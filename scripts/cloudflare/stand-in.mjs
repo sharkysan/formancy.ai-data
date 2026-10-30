@@ -13,7 +13,10 @@ import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 
 /** The key of one command line, as the script computes it: its arguments, a newline after each, hashed. */
-const keyOf = (args) => createHash('sha256').update(args.map((arg) => `${arg}\n`).join('')).digest('hex')
+const keyOf = (args) =>
+  createHash('sha256')
+    .update(args.map((arg) => `${arg}\n`).join(''))
+    .digest('hex')
 
 const SCRIPT = (answers, log) => `#!/bin/sh
 for arg in "$@"; do printf '%s\\t' "$arg"; done >> '${log}'

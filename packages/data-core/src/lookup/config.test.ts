@@ -8,10 +8,27 @@ import type { LookupConfig } from './types.js'
 import { validateLookupQuery } from './query.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
-const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
+const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({
+  kind: 'text',
+  maxLength,
+  lengthUnit,
+  fixedLength,
+})
 
 function col(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
+  return {
+    name,
+    ordinal,
+    databaseType: type.kind,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+    ...extra,
+  }
 }
 
 function fk(name: string, columns: string[], target: string, targetColumns: string[]): ForeignKeyMeta {
@@ -27,7 +44,18 @@ function fk(name: string, columns: string[], target: string, targetColumns: stri
 }
 
 function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta>): ObjectMeta {
-  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
+  return {
+    ref: { schema: 'sales', name },
+    kind: 'table',
+    comment: null,
+    columns,
+    primaryKey: null,
+    uniqueKeys: [],
+    foreignKeys: [],
+    checks: [],
+    rowSecurity: 'none',
+    ...extra,
+  }
 }
 
 /** A customer with a composite key and columns of every kind a lookup treats differently; a rate keyed by a float. */
@@ -51,15 +79,30 @@ function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSna
     }),
     table(
       'order',
-      [col('id', 1, INT32, { generated: 'identity-always' }), col('tenant_id', 2, INT32), col('customer_no', 3, INT32), col('rate_factor', 4, { kind: 'float', bits: 64 }, { nullable: true })],
+      [
+        col('id', 1, INT32, { generated: 'identity-always' }),
+        col('tenant_id', 2, INT32),
+        col('customer_no', 3, INT32),
+        col('rate_factor', 4, { kind: 'float', bits: 64 }, { nullable: true }),
+      ],
       {
         primaryKey: { name: 'pk_order', columns: ['id'] },
-        foreignKeys: [fk('fk_order_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no']), fk('fk_order_rate', ['rate_factor'], 'rate', ['factor'])],
+        foreignKeys: [
+          fk('fk_order_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no']),
+          fk('fk_order_rate', ['rate_factor'], 'rate', ['factor']),
+        ],
       },
     ),
   ]
   edit(objects)
-  return createSnapshot({ kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps: [] })
+  return createSnapshot({
+    kind: 'postgres',
+    serverVersion: '17.6',
+    account: { user: 'owner', login: 'owner' },
+    scope: { schemas: ['sales'] },
+    objects,
+    gaps: [],
+  })
 }
 
 /** Bindings exactly as the generator makes them, for a customer lookup showing `display`. */
@@ -128,7 +171,7 @@ describe('buildLookupConfig', () => {
   // formancy's select asks for fifty rows unless the host says otherwise
   // (MAX_ROWS in @formancy/react and @formancy/angular). A default page size
   // below that would refuse every search the default control makes.
-  test('by default, accepts the page formancy\'s control asks for', () => {
+  test("by default, accepts the page formancy's control asks for", () => {
     const source = snapshot()
     const config = buildLookupConfig(bindingsFor(source, ['name']), 'customer', { snapshot: source })
     expect(validateLookupQuery(config, { search: 'Acme', offset: 0, limit: 50 })).toMatchObject({ ok: true })
@@ -169,9 +212,9 @@ describe('buildLookupConfig', () => {
       direction: 'asc',
       nulls: 'first',
     })
-    expect(() => buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'city', direction: 'asc', nulls: 'middle' as 'first' }] })).toThrow(
-      /city puts NULLs first or last/,
-    )
+    expect(() =>
+      buildLookupConfig(bindings, 'customer', { snapshot: source, sort: [{ column: 'city', direction: 'asc', nulls: 'middle' as 'first' }] }),
+    ).toThrow(/city puts NULLs first or last/)
   })
 
   // An adapter reads each display column with its record reader and searches
@@ -216,7 +259,9 @@ describe('buildLookupConfig', () => {
   test('refuses a key no token can hold exactly, and a display or sort column with no text form', () => {
     const source = snapshot()
     const rate = bindingsFor(source, ['name'], [{ foreignKey: 'fk_order_rate', display: ['label'] }])
-    expect(() => buildLookupConfig(rate, 'rate', { snapshot: source })).toThrow(/key column factor is double precision; a floating-point value cannot be referenced exactly/)
+    expect(() => buildLookupConfig(rate, 'rate', { snapshot: source })).toThrow(
+      /key column factor is double precision; a floating-point value cannot be referenced exactly/,
+    )
     const binaryKeyed = snapshot((objects) => {
       const factor = objects.find((object) => object.ref.name === 'rate')?.columns[0]
       if (factor !== undefined) Object.assign(factor, { type: { kind: 'binary', maxLength: 16, fixedLength: false }, databaseType: 'bytea' })
@@ -277,10 +322,18 @@ describe('buildLookupConfig', () => {
     elsewhere.snapshotFingerprint = outside.fingerprint
     expect(() => buildLookupConfig(elsewhere, 'customer', { snapshot: outside })).toThrow(/sales\.elsewhere is outside the snapshot/)
 
-    expect(() => buildLookupConfig(editedLookup(bindings, (lookup) => (lookup.display = ['nope'])), 'customer', { snapshot: source })).toThrow(/has no column nope/)
+    expect(() =>
+      buildLookupConfig(
+        editedLookup(bindings, (lookup) => (lookup.display = ['nope'])),
+        'customer',
+        { snapshot: source },
+      ),
+    ).toThrow(/has no column nope/)
     expect(() => buildLookupConfig({ ...bindings, version: 3 as 2 }, 'customer', { snapshot: source })).toThrow(/version 3/)
     // A version-1 file says one write flag for both operations (0027): republished, not guessed at.
-    expect(() => buildLookupConfig({ ...bindings, version: 1 as 2 }, 'customer', { snapshot: source })).toThrow(/version 1 were published before 0027.*republish the form/)
+    expect(() => buildLookupConfig({ ...bindings, version: 1 as 2 }, 'customer', { snapshot: source })).toThrow(
+      /version 1 were published before 0027.*republish the form/,
+    )
   })
 
   // Every column the config names is read on every search: the key to make a
@@ -289,18 +342,25 @@ describe('buildLookupConfig', () => {
   // with permission-denied (0027), after the form was published. A bindings
   // file is edited by hand, so the generator having refused it proves nothing.
   test('refuses a key, display, search or sort column the account may not read', () => {
-    const narrowed = (column: string) => snapshot((objects) => {
-      const found = objects.find((object) => object.ref.name === 'customer')?.columns.find((candidate) => candidate.name === column)
-      if (found !== undefined) found.access = { ...found.access, select: false }
-    })
+    const narrowed = (column: string) =>
+      snapshot((objects) => {
+        const found = objects.find((object) => object.ref.name === 'customer')?.columns.find((candidate) => candidate.name === column)
+        if (found !== undefined) found.access = { ...found.access, select: false }
+      })
     const bindings = bindingsFor(snapshot(), ['name', 'city'])
-    const against = (source: MetadataSnapshot, options: Partial<Parameters<typeof buildLookupConfig>[2]> = {}) => () =>
-      buildLookupConfig({ ...copyOf(bindings), snapshotFingerprint: source.fingerprint }, 'customer', { snapshot: source, ...options })
+    const against =
+      (source: MetadataSnapshot, options: Partial<Parameters<typeof buildLookupConfig>[2]> = {}) =>
+      () =>
+        buildLookupConfig({ ...copyOf(bindings), snapshotFingerprint: source.fingerprint }, 'customer', { snapshot: source, ...options })
 
-    expect(against(narrowed('tenant_id'))).toThrow(/fk_order_customer \(sales\.customer\): key column tenant_id is a column this connection's account may not read/)
+    expect(against(narrowed('tenant_id'))).toThrow(
+      /fk_order_customer \(sales\.customer\): key column tenant_id is a column this connection's account may not read/,
+    )
     expect(against(narrowed('city'))).toThrow(/display column city is a column this connection's account may not read/)
     const hiddenSince = narrowed('since')
-    expect(against(hiddenSince, { sort: [{ column: 'since', direction: 'desc' }] })).toThrow(/since is a column this connection's account may not read, so a lookup cannot sort by it/)
+    expect(against(hiddenSince, { sort: [{ column: 'since', direction: 'desc' }] })).toThrow(
+      /since is a column this connection's account may not read, so a lookup cannot sort by it/,
+    )
     // Search is over displayed columns only, so an unreadable one is refused as a display column first; the search check guards the same rule for a file that slipped one past.
     expect(against(narrowed('city'), { search: ['city'] })).toThrow(/city is a column this connection's account may not read/)
     expect(against(hiddenSince)).not.toThrow()
@@ -317,7 +377,8 @@ describe('buildLookupConfig', () => {
     const source = snapshot()
     const bindings = bindingsFor(source, ['name'])
     const build = (edited: FormBindings) => () => buildLookupConfig(edited, 'customer', { snapshot: source })
-    const mismatch = /the bindings do not say what fk_order_customer does: it goes from \(tenant_id, customer_no\) to sales\.customer \(tenant_id, customer_no\)/
+    const mismatch =
+      /the bindings do not say what fk_order_customer does: it goes from \(tenant_id, customer_no\) to sales\.customer \(tenant_id, customer_no\)/
 
     const anotherTable = editedLookup(bindings, (lookup) => {
       lookup.target = { table: { schema: 'sales', name: 'rate' }, columns: ['label'] }

@@ -32,7 +32,12 @@ export const EMPTY_VIEW: ViewDraft = { name: '', filter: [], sort: [], opens: fa
 
 /** A saved view back in the form, to be edited: each condition in the boxes `conditionOf` reads. */
 export function draftOfView(view: ListView): ViewDraft {
-  return { name: view.name, filter: view.filter.map((term) => ({ ...draftOf(term), field: term.field })), sort: view.sort.map((term) => ({ ...term })), opens: view.default === true }
+  return {
+    name: view.name,
+    filter: view.filter.map((term) => ({ ...draftOf(term), field: term.field })),
+    sort: view.sort.map((term) => ({ ...term })),
+    opens: view.default === true,
+  }
 }
 
 /**
@@ -103,7 +108,7 @@ function ConditionRow({ index, row, offers, label, onRow, onRemove }: ConditionR
       />
       <p className="actions">
         <button type="button" id={`${id}-remove`} className="button" onClick={onRemove}>
-          Remove{' '}<span className="visually-hidden">condition {index + 1}</span>
+          Remove <span className="visually-hidden">condition {index + 1}</span>
         </button>
       </p>
     </fieldset>
@@ -139,7 +144,11 @@ function SortRow({ index, term, sortable, label, onTerm, onRemove }: SortRowProp
         </div>
         <div className="field">
           <label htmlFor={`${id}-direction`}>Direction</label>
-          <select id={`${id}-direction`} value={term.direction} onChange={(event) => onTerm({ ...term, direction: event.target.value === 'desc' ? 'desc' : 'asc' })}>
+          <select
+            id={`${id}-direction`}
+            value={term.direction}
+            onChange={(event) => onTerm({ ...term, direction: event.target.value === 'desc' ? 'desc' : 'asc' })}
+          >
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
           </select>
@@ -147,7 +156,7 @@ function SortRow({ index, term, sortable, label, onTerm, onRemove }: SortRowProp
       </div>
       <p className="actions">
         <button type="button" id={`${id}-remove`} className="button" onClick={onRemove}>
-          Remove{' '}<span className="visually-hidden">sort {index + 1}</span>
+          Remove <span className="visually-hidden">sort {index + 1}</span>
         </button>
       </p>
     </fieldset>
@@ -228,7 +237,9 @@ export function ViewForm({ heading, draft, offers, sortable, label, refused, foc
       )}
       <p className="actions">
         {freeOffer === undefined ? (
-          <span className="none">{offers.length === 0 ? 'No field of this form’s list can be filtered.' : 'Every field this list can be filtered by has a condition.'}</span>
+          <span className="none">
+            {offers.length === 0 ? 'No field of this form’s list can be filtered.' : 'Every field this list can be filtered by has a condition.'}
+          </span>
         ) : (
           <button type="button" id={ADD_CONDITION} className="button" onClick={() => addTerm(freeOffer)}>
             Add condition
@@ -253,7 +264,9 @@ export function ViewForm({ heading, draft, offers, sortable, label, refused, foc
       )}
       <p className="actions">
         {freeSort === undefined ? (
-          <span className="none">{sortable.length === 0 ? 'No field of this form’s list can be sorted by.' : 'Every field this list can be sorted by is in the order.'}</span>
+          <span className="none">
+            {sortable.length === 0 ? 'No field of this form’s list can be sorted by.' : 'Every field this list can be sorted by is in the order.'}
+          </span>
         ) : (
           <button type="button" id={ADD_SORT} className="button" onClick={() => addSort(freeSort)}>
             Add sort

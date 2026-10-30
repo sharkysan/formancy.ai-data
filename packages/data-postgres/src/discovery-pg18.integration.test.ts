@@ -108,7 +108,10 @@ const eighteen = (name: string): ObjectRef => ({ schema: 'eighteen', name })
 // from attnotnull, and with only the description reading it so).
 test('a NOT NULL added NOT VALID on PostgreSQL 18 reads as CHECK (… IS NOT NULL) NOT VALID does: a nullable column and an enforced, unvalidated check', async () => {
   // The server, first: a new NULL is refused, and the old one is still there.
-  await expect(sql`insert into eighteen.loose (id, amount, "Paid On") values (2, null, current_date)`).rejects.toMatchObject({ code: '23502', column_name: 'amount' })
+  await expect(sql`insert into eighteen.loose (id, amount, "Paid On") values (2, null, current_date)`).rejects.toMatchObject({
+    code: '23502',
+    column_name: 'amount',
+  })
   await expect(sql`insert into eighteen.loose (id, amount, "Paid On") values (2, 1, null)`).rejects.toMatchObject({ code: '23502', column_name: 'Paid On' })
   expect([...(await sql`select count(*)::int as n from eighteen.loose where amount is null and "Paid On" is null`)]).toEqual([{ n: 1 }])
   const snapshot = await discoverPostgres(sql, { schemas: ['eighteen'] })
@@ -163,8 +166,13 @@ test('a NOT NULL added NOT VALID over a row type on PostgreSQL 18 reads as CHECK
   for (const table of ['ranged', 'ranged_check']) {
     await sql`insert into eighteen.${sql(table)} (id, pair, span, bounded, pairs) values (2, row(null, null), row(null, null), row(null, null), array[row(null, null)]::eighteen.pair[])`
   }
-  expect([...(await sql`select (row(null, null)::eighteen.bounded_span) is not null as "notNull", (row(null, null)::eighteen.bounded_span) is distinct from null as "distinct"`)]).toEqual([{ notNull: false, distinct: true }])
-  await expect(sql`insert into eighteen.ranged (id, pair, span, bounded, pairs) values (3, null, row(1, 1), row(1, 1), '{}')`).rejects.toMatchObject({ code: '23502', column_name: 'pair' })
+  expect([
+    ...(await sql`select (row(null, null)::eighteen.bounded_span) is not null as "notNull", (row(null, null)::eighteen.bounded_span) is distinct from null as "distinct"`),
+  ]).toEqual([{ notNull: false, distinct: true }])
+  await expect(sql`insert into eighteen.ranged (id, pair, span, bounded, pairs) values (3, null, row(1, 1), row(1, 1), '{}')`).rejects.toMatchObject({
+    code: '23502',
+    column_name: 'pair',
+  })
   const snapshot = await discoverPostgres(sql, { schemas: ['eighteen'] })
   const ranged = findObject(snapshot, eighteen('ranged'))
   const checked = findObject(snapshot, eighteen('ranged_check'))

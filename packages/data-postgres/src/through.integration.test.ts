@@ -1,5 +1,15 @@
 import { generateForm, planRead, planUpdate } from '@formancy/data-core'
-import type { DescribedRead, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, ReadRequest, RecordAdapter, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import type {
+  DescribedRead,
+  FormBindings,
+  FormPolicy,
+  MetadataSnapshot,
+  PolicyContext,
+  ReadRequest,
+  RecordAdapter,
+  RecordOutcome,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { covers, EDGE_VALUES, FIXTURE_SCOPE, startPostgresFixture, throughCase } from '@formancy/data-fixtures'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
@@ -142,13 +152,23 @@ function found(read: DescribedRead): Record<string, unknown> | null {
 
 /** The line as the owner reads it: what no request of anybody's changed. */
 async function stored(order: string): Promise<{ quantity: number; row_version: string }> {
-  const [row] = await owner<{ quantity: number; row_version: string }[]>`select quantity, row_version::text as row_version from sales.order_line where order_id = ${order} and line_no = 1`
+  const [row] = await owner<
+    { quantity: number; row_version: string }[]
+  >`select quantity, row_version::text as row_version from sales.order_line where order_id = ${order} and line_no = 1`
   if (row === undefined) throw new Error(`no line of ${order}`)
   return row
 }
 
 /** An update planned for `actor` as the server plans one: over the table as `describe` reads it now, through `via`. */
-async function plannedUpdate(via: RecordAdapter, bindings: FormBindings, policy: FormPolicy, actor: PolicyContext, token: string, version: string, answers: Record<string, unknown>): Promise<UpdateRequest> {
+async function plannedUpdate(
+  via: RecordAdapter,
+  bindings: FormBindings,
+  policy: FormPolicy,
+  actor: PolicyContext,
+  token: string,
+  version: string,
+  answers: Record<string, unknown>,
+): Promise<UpdateRequest> {
   const described = await via.describe(bindings.root)
   if (!described.ok) throw new Error(`expected a description, got ${described.code}`)
   const plan = planUpdate(snapshot, bindings, policy, actor, token, version, answers, undefined, described.described)
@@ -163,7 +183,9 @@ async function update(actor: PolicyContext, order: string, version: string, quan
 
 /** The order's tenant and version as the owner reads them. */
 async function orderOf(id: string): Promise<{ tenant_id: number; notes: string | null; row_version: string }> {
-  const [row] = await owner<{ tenant_id: number; notes: string | null; row_version: string }[]>`select tenant_id, notes, row_version::text as row_version from sales."order" where id = ${id}`
+  const [row] = await owner<
+    { tenant_id: number; notes: string | null; row_version: string }[]
+  >`select tenant_id, notes, row_version::text as row_version from sales."order" where id = ${id}`
   if (row === undefined) throw new Error(`no order ${id}`)
   return row
 }
@@ -242,7 +264,8 @@ describe('a table scoped through a key onto itself', covers('postgres', throughC
   // employee's own, and the scope would ask whether the manager manages
   // itself.
   test('finds only the employees whose manager the filter admits', async () => {
-    const read = async (attributes: Record<string, string>, id: string) => found(await records.read(planned(staff, STAFF_POLICY, clerk(attributes), `k1:${id}`)))
+    const read = async (attributes: Record<string, string>, id: string) =>
+      found(await records.read(planned(staff, STAFF_POLICY, clerk(attributes), `k1:${id}`)))
     expect(await read({ manager: 'Ada' }, '2')).toMatchObject({ id: '2', name: 'Grace' })
     expect(await read({ manager: 'Ada' }, '1')).toBeNull()
     expect(await read({ manager: 'Ada' }, '3')).toBeNull()

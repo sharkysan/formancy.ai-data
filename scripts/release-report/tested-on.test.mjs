@@ -111,7 +111,10 @@ describe('the README blocks', () => {
     expect(table[0]).toBe('| | Tested with | Declared as |')
     const row = table.find((line) => line.startsWith('| **Recognised, not tested** |'))
     expect(row, 'the README table has no "Recognised, not tested" row').toBeDefined()
-    const [, testedWith, declaredAs] = row.slice(1, -1).split('|').map((text) => text.trim())
+    const [, testedWith, declaredAs] = row
+      .slice(1, -1)
+      .split('|')
+      .map((text) => text.trim())
     expect(testedWith).toMatch(/^None: /)
     expect(declaredAs).toBe('')
     expect(testedWith).toContain('Azure SQL Database')
@@ -140,7 +143,10 @@ describe('the README blocks', () => {
       .split('\n')
       .find((line) => line.startsWith('| **SQL Server logins** |'))
     expect(row, 'the README table has no "SQL Server logins" row').toBeDefined()
-    const [, testedWith, declaredAs] = row.slice(1, -1).split('|').map((text) => text.trim())
+    const [, testedWith, declaredAs] = row
+      .slice(1, -1)
+      .split('|')
+      .map((text) => text.trim())
     expect(testedWith).toBe('SQL login; Entra managed identity and Entra service principal are accepted and not tested')
     expect(declaredAs).toBe('')
     const [tested, untested = ''] = testedWith.split('; ')
@@ -236,7 +242,10 @@ describe('testedOn()', () => {
     const stages = text.split('\n').filter((line) => /^FROM\s/i.test(line)).length
     expect(stages).toBeGreaterThanOrEqual(2)
     expect(facts.node.dockerfile).toHaveLength(stages)
-    expect(dockerfileImages('FROM --platform=$BUILDPLATFORM node:22-alpine AS build\nRUN true\nFROM node:22-slim AS runtime\n')).toEqual(['node:22-alpine', 'node:22-slim'])
+    expect(dockerfileImages('FROM --platform=$BUILDPLATFORM node:22-alpine AS build\nRUN true\nFROM node:22-slim AS runtime\n')).toEqual([
+      'node:22-alpine',
+      'node:22-slim',
+    ])
   })
 
   // An upstream package is shipped when a consumer's install of the
@@ -259,7 +268,8 @@ describe('testedOn()', () => {
     const version = /^\d+\.\d+/
     expect(facts.browser.playwright).toMatch(version)
     expect(facts.browser.pins.map((pin) => pin.browser)).toEqual([...BROWSERS])
-    for (const pin of facts.browser.pins) expect(pin, pin.browser).toMatchObject({ browserVersion: expect.stringMatching(version), revision: expect.stringMatching(/^\d+$/) })
+    for (const pin of facts.browser.pins)
+      expect(pin, pin.browser).toMatchObject({ browserVersion: expect.stringMatching(version), revision: expect.stringMatching(/^\d+$/) })
     for (const tool of facts.tooling) {
       expect(tool.versions.length, tool.name).toBeGreaterThan(0)
       for (const entry of tool.versions) expect(entry.version, tool.name).toMatch(version)

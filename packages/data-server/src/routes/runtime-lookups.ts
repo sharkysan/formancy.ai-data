@@ -58,7 +58,12 @@ export function lookupScope(bundle: PublishedBundle, context: PolicyContext, ope
 }
 
 /** The lookup field a source name stands for, its config and the actor's filter for it — or a reply already sent. */
-async function lookupFor(steps: LookupRouteSteps, request: LookupRequest, reply: FastifyReply, operation: unknown): Promise<{ open: OpenConnection; config: LookupConfig; filters: RowFilters } | undefined> {
+async function lookupFor(
+  steps: LookupRouteSteps,
+  request: LookupRequest,
+  reply: FastifyReply,
+  operation: unknown,
+): Promise<{ open: OpenConnection; config: LookupConfig; filters: RowFilters } | undefined> {
   if (typeof operation !== 'string' || !OPERATIONS.has(operation as PolicyOperation)) {
     await reply.code(400).send({ code: 'invalid-request', message: 'Say which operation the form is open for: read, create or update.' })
     return undefined
@@ -110,7 +115,14 @@ const UNAVAILABLE: Record<'search' | 'resolve', string> = {
  * source's message has nowhere else to go: the renderers drop a rejection's
  * reason, and a page that carried one would be refused whole.
  */
-async function answer<T>(steps: LookupRouteSteps, request: LookupRequest, reply: FastifyReply, kind: 'search' | 'resolve', run: (open: OpenConnection, config: LookupConfig, filters: RowFilters, signal: AbortSignal) => Promise<T>, operation: unknown): Promise<T | FastifyReply> {
+async function answer<T>(
+  steps: LookupRouteSteps,
+  request: LookupRequest,
+  reply: FastifyReply,
+  kind: 'search' | 'resolve',
+  run: (open: OpenConnection, config: LookupConfig, filters: RowFilters, signal: AbortSignal) => Promise<T>,
+  operation: unknown,
+): Promise<T | FastifyReply> {
   const abandoned = abandonment(request, reply)
   try {
     const found = await lookupFor(steps, request, reply, operation)
@@ -135,12 +147,18 @@ async function answer<T>(steps: LookupRouteSteps, request: LookupRequest, reply:
 function stopped(steps: LookupRouteSteps, request: LookupRequest, reply: FastifyReply, kind: 'search' | 'resolve', left: boolean): FastifyReply {
   if (left) {
     request.log.info({ lookup: kind }, 'a lookup was abandoned by its client; the database was told to stop it')
-    return reply.code(499).send({ code: 'abandoned', message: 'The client closed the connection before the answer; the database was told to stop the statement.' } satisfies RuntimeRefusal)
+    return reply.code(499).send({
+      code: 'abandoned',
+      message: 'The client closed the connection before the answer; the database was told to stop the statement.',
+    } satisfies RuntimeRefusal)
   }
   const ms = steps.lookupDeadlineMs
   request.log.warn({ lookup: kind, deadlineMs: ms }, 'a lookup passed its deadline; the database was told to stop it')
   if (kind === 'resolve') return reply.code(503).send({ code: 'unavailable', message: UNAVAILABLE.resolve } satisfies RuntimeRefusal)
-  return reply.code(503).send({ code: 'lookup-timeout', message: `The search took longer than this server allows (${String(ms)} ms), and the database was told to stop it. The same search will take as long again.` } satisfies RuntimeRefusal)
+  return reply.code(503).send({
+    code: 'lookup-timeout',
+    message: `The search took longer than this server allows (${String(ms)} ms), and the database was told to stop it. The same search will take as long again.`,
+  } satisfies RuntimeRefusal)
 }
 
 /**
@@ -173,6 +191,13 @@ export function registerLookupRoutes(app: FastifyInstance, steps: LookupRouteSte
     if (!Array.isArray(tokens) || tokens.length > MAX_RESOLVE || !tokens.every((token) => typeof token === 'string')) {
       return reply.code(400).send({ code: 'invalid-request', message: `Expected { operation, tokens } with at most ${String(MAX_RESOLVE)} tokens.` })
     }
-    return answer(steps, request, reply, 'resolve', async (open, config, filters, signal) => ({ rows: await open.lookups.resolve(config, tokens as string[], filters, signal) }) satisfies ResolvedLookup, body['operation'])
+    return answer(
+      steps,
+      request,
+      reply,
+      'resolve',
+      async (open, config, filters, signal) => ({ rows: await open.lookups.resolve(config, tokens, filters, signal) }) satisfies ResolvedLookup,
+      body['operation'],
+    )
   })
 }

@@ -69,8 +69,15 @@ function meaning(comparison: Comparison, key: InboundKey, role: Role, what: stri
   const { after, policy } = comparison
   const root = describe(after.ref)
   if (role.removes) {
-    if (unaccepted(policy, key)) return { acts: true, message: `${what}. ${deleteEffect(after.ref, key).replace(/^d/, 'D')}, which this form does not offer, so delete is blocked until the form is reviewed.` }
-    return { acts: false, message: `${what}. On delete it ${key.onDelete === 'restrict' ? 'restricts' : 'takes no action'}: the database refuses to delete a record of ${root} while rows of ${describe(key.table)} refer to it.` }
+    if (unaccepted(policy, key))
+      return {
+        acts: true,
+        message: `${what}. ${deleteEffect(after.ref, key).replace(/^d/, 'D')}, which this form does not offer, so delete is blocked until the form is reviewed.`,
+      }
+    return {
+      acts: false,
+      message: `${what}. On delete it ${key.onDelete === 'restrict' ? 'restricts' : 'takes no action'}: the database refuses to delete a record of ${root} while rows of ${describe(key.table)} refer to it.`,
+    }
   }
   const followed = list(key.referencedColumns.filter((column) => role.cleared.includes(column)))
   if (actsOnDelete(key.onUpdate)) {
@@ -79,7 +86,10 @@ function meaning(comparison: Comparison, key: InboundKey, role: Role, what: stri
       message: `${what}. It follows ${followed} ON UPDATE ${key.onUpdate.replace('-', ' ').toUpperCase()}: a delete of a record of ${root} clears them, and the change would be carried on into ${describe(key.table)}, which this form does not offer, so delete is blocked until the form is reviewed.`,
     }
   }
-  return { acts: false, message: `${what}. On update it ${key.onUpdate === 'restrict' ? 'restricts' : 'takes no action'}: the database refuses to clear ${followed} while rows of ${describe(key.table)} refer to them.` }
+  return {
+    acts: false,
+    message: `${what}. On update it ${key.onUpdate === 'restrict' ? 'restricts' : 'takes no action'}: the database refuses to clear ${followed} while rows of ${describe(key.table)} refer to them.`,
+  }
 }
 
 function drafts(comparison: Comparison, table: ObjectRef, role: Role): Draft[] {
@@ -90,9 +100,15 @@ function drafts(comparison: Comparison, table: ObjectRef, role: Role): Draft[] {
   const found: Draft[] = []
   for (const key of now) {
     const earlier = was.find((candidate) => sameKey(candidate, key))
-    const changed = earlier === undefined ? [] : PROPERTIES.filter(([, , same]) => !same(earlier, key)).map(([label, show]) => `${label} from ${show(earlier)} to ${show(key)}`)
+    const changed =
+      earlier === undefined
+        ? []
+        : PROPERTIES.filter(([, , same]) => !same(earlier, key)).map(([label, show]) => `${label} from ${show(earlier)} to ${show(key)}`)
     if (earlier !== undefined && changed.length === 0) continue
-    const what = earlier === undefined ? `${key.name} of ${describe(key.table)} is a new foreign key that refers to ${onto}` : `${key.name} of ${describe(key.table)}, which refers to ${onto}, changed: ${changed.join('; ')}`
+    const what =
+      earlier === undefined
+        ? `${key.name} of ${describe(key.table)} is a new foreign key that refers to ${onto}`
+        : `${key.name} of ${describe(key.table)}, which refers to ${onto}, changed: ${changed.join('; ')}`
     const { acts, message } = meaning(comparison, key, role, what)
     found.push({
       kind: earlier === undefined ? 'referrer-added' : 'referrer-changed',

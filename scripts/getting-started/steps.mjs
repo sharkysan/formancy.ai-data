@@ -176,7 +176,10 @@ const deletesVolumes = (command) => /\s-v(\s|$)/.test(command)
  */
 export function plan(steps) {
   const starts = steps.filter((step) => isStart(step.command))
-  if (starts.length !== 1) throw new Error(`the guide has ${String(starts.length)} steps that start the stack (\`docker compose ... up\`); the gate runs exactly one, again after each stop`)
+  if (starts.length !== 1)
+    throw new Error(
+      `the guide has ${String(starts.length)} steps that start the stack (\`docker compose ... up\`); the gate runs exactly one, again after each stop`,
+    )
   const firstDown = steps.findIndex((step) => isDown(step.command))
   if (firstDown === -1) throw new Error('the guide never stops the stack')
   if (steps.indexOf(starts[0]) > firstDown) throw new Error('the guide stops the stack before it starts it')
@@ -185,7 +188,9 @@ export function plan(steps) {
   if (!deletesVolumes(last.command)) throw new Error("the guide's last step does not delete the stack's volumes with `down -v`")
   const keep = steps.slice(firstDown, -1)
   if (keep.length === 0 || keep.some((step) => deletesVolumes(step.command))) {
-    throw new Error('the guide never stops the stack keeping its volumes before it deletes them, so the gate cannot show that a start after a stop finds everything as it was')
+    throw new Error(
+      'the guide never stops the stack keeping its volumes before it deletes them, so the gate cannot show that a start after a stop finds everything as it was',
+    )
   }
   return { start: starts[0], before: steps.slice(0, firstDown), keep, last }
 }
@@ -247,7 +252,9 @@ function studioTable(journey) {
   const shape = (walk) => JSON.stringify(walk.map((entry) => [entry.step, entry.control]))
   for (const [index, walk] of walks.entries()) {
     if (shape(walk) !== shape(walks[0])) {
-      throw new Error(`journey.json: ${forms[index].connection} walks through other controls than ${forms[0].connection}, and the guide's table names each control once`)
+      throw new Error(
+        `journey.json: ${forms[index].connection} walks through other controls than ${forms[0].connection}, and the guide's table names each control once`,
+      )
     }
   }
   const lines = [
@@ -301,7 +308,7 @@ export function generatedRegions(markdown) {
     try {
       found[name] = readBlock(markdown, GENERATOR, { name })
     } catch (error) {
-      throw new Error(`docs/getting-started.md ${error.message}`)
+      throw new Error(`docs/getting-started.md ${error.message}`, { cause: error })
     }
   }
   return found

@@ -82,8 +82,8 @@ function TokenSignIn({ fetch, onSignedIn, focus, base }: Required<Omit<SignInPro
         Sign in
       </h2>
       <p className="lede">
-        In a real host the application&rsquo;s own session supplies the token, and the person never sees it. This page has
-        no session, so paste a token your host issued.
+        In a real host the application&rsquo;s own session supplies the token, and the person never sees it. This page has no session, so paste a token your
+        host issued.
       </p>
       <form onSubmit={(event) => void submit(event)}>
         <div className="field">

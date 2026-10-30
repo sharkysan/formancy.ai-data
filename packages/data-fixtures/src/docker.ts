@@ -51,6 +51,9 @@ export interface DockerReader {
   usage(id: string): Promise<{ cpuNs: number; memoryBytes: number }>
 }
 
+/** What the daemon says as text, or nothing: a field it does not word as text is not worded here. */
+const text = (value: unknown): string => (typeof value === 'string' ? value : '')
+
 export async function connectDocker(): Promise<DockerReader> {
   const dockerode: Dockerode = (await getContainerRuntimeClient()).container.dockerode
   return {
@@ -58,9 +61,9 @@ export async function connectDocker(): Promise<DockerReader> {
       const [info, version] = await Promise.all([dockerode.info() as Promise<Record<string, unknown>>, dockerode.version()])
       return {
         version: version.Version,
-        os: String(info['OperatingSystem'] ?? ''),
-        storageDriver: String(info['Driver'] ?? ''),
-        cgroupDriver: String(info['CgroupDriver'] ?? ''),
+        os: text(info['OperatingSystem']),
+        storageDriver: text(info['Driver']),
+        cgroupDriver: text(info['CgroupDriver']),
         ncpu: Number(info['NCPU'] ?? 0),
         memTotalBytes: Number(info['MemTotal'] ?? 0),
       }

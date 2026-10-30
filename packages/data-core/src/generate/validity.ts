@@ -51,11 +51,14 @@ export function validityFor(
   if (from.type.kind !== to.type.kind) throw new Error(`${from.name} and ${to.name} are not both dates or both instants`)
   if (from.nullable) throw new Error(`${from.name} may be NULL, and every version starts somewhere`)
   if (!to.nullable) throw new Error(`${to.name} may not be NULL, and the open version holds NULL there`)
-  if (concurrency === null) throw new Error(`a version is changed by naming the one its person read, and ${root.ref.name} has no rowversion and no version column: confirm one`)
+  if (concurrency === null)
+    throw new Error(`a version is changed by naming the one its person read, and ${root.ref.name} has no rowversion and no version column: confirm one`)
   const keys = [...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys]
   const key = keys.find((entry) => entry.columns.includes(from.name) && !entry.columns.includes(to.name) && entry.columns.length > 1)
   if (key === undefined) {
-    throw new Error(`no primary or unique key of ${root.ref.name} holds ${from.name} with another column and not ${to.name}, so nothing says which versions are one thing's`)
+    throw new Error(
+      `no primary or unique key of ${root.ref.name} holds ${from.name} with another column and not ${to.name}, so nothing says which versions are one thing's`,
+    )
   }
   const chain = key.columns.filter((name) => name !== from.name)
   for (const name of chain) {
@@ -82,7 +85,11 @@ export function narrowForValidity(validity: ValidityBinding, planned: ReadonlyAr
     const columns = columnsOf(binding)
     if (columns.includes(validity.to)) {
       if (binding.writes.create || binding.writes.update) {
-        notes.push({ subject: binding.field, kind: 'read-only', message: 'Shown, never written: a version ends when it is changed from a date, and the server writes its end (0113).' })
+        notes.push({
+          subject: binding.field,
+          kind: 'read-only',
+          message: 'Shown, never written: a version ends when it is changed from a date, and the server writes its end (0113).',
+        })
       }
       binding.writes = { create: false, update: false }
     } else if (binding.writes.update && columns.some((name) => name === validity.from || validity.key.includes(name))) {

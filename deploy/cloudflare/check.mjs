@@ -131,18 +131,27 @@ export function verdict(expectation, response, inputs) {
     }
     case 'https': {
       if ((status === 301 || status === 308) && location === `https://${expectation.host}${expectation.path}`) return { pass: true }
-      return { pass: false, saw: `answered ${String(status)}${location === '' ? '' : ` to ${location}`}, not a redirect to https://${expectation.host}${expectation.path}` }
+      return {
+        pass: false,
+        saw: `answered ${String(status)}${location === '' ? '' : ` to ${location}`}, not a redirect to https://${expectation.host}${expectation.path}`,
+      }
     }
     case 'server': {
       const body = json(response)
       if (status === 401 && fromServer(response) && body?.code === 'unauthenticated' && header(response, 'www-authenticate') === 'Bearer') return { pass: true }
-      return { pass: false, saw: `answered ${String(status)}${fromServer(response) ? ` ${String(body?.code)}` : ', not as the data server through the web front'}` }
+      return {
+        pass: false,
+        saw: `answered ${String(status)}${fromServer(response) ? ` ${String(body?.code)}` : ', not as the data server through the web front'}`,
+      }
     }
     case 'outside': {
       if (!throughWebFront(response)) return { pass: true }
       if (status === 400 && fromServer(response) && json(response)?.code === 'path-not-plain') return { pass: true }
       if (status === 404 && json(response) === undefined) return { pass: true }
-      return { pass: false, saw: `reached the web front and answered ${String(status)}${fromServer(response) ? ` ${String(json(response)?.code ?? json(response)?.status)}` : ''}` }
+      return {
+        pass: false,
+        saw: `reached the web front and answered ${String(status)}${fromServer(response) ? ` ${String(json(response)?.code ?? json(response)?.status)}` : ''}`,
+      }
     }
   }
   throw new Error(`no verdict for ${String(expectation.kind)}`)
@@ -154,7 +163,10 @@ export function render(results, inputs) {
   const failed = results.filter((result) => !result.pass).length
   return [
     `doors-check: ${doors.join(', ')}, team ${inputs.team}`,
-    ...results.map(({ expectation: entry, pass, saw }) => `${pass ? 'pass' : 'FAIL'}  ${entry.method} ${entry.scheme}://${entry.host}${entry.path}  ${pass ? MEANS[entry.kind] : saw}`),
+    ...results.map(
+      ({ expectation: entry, pass, saw }) =>
+        `${pass ? 'pass' : 'FAIL'}  ${entry.method} ${entry.scheme}://${entry.host}${entry.path}  ${pass ? MEANS[entry.kind] : saw}`,
+    ),
     `${String(results.length)} requests, ${String(results.length - failed)} as expected, ${String(failed)} not.`,
   ].join('\n')
 }

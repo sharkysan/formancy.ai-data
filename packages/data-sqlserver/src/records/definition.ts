@@ -59,7 +59,8 @@ const DEFINITION = /^[0-9a-f]{64}$/
 
 /** The definition's bytes, to bind as varbinary(32); a definition this adapter did not make is a programming error. */
 export function definitionBytes(token: string): Buffer {
-  if (typeof token !== 'string' || !DEFINITION.test(token)) throw new Error('A write carries the definition this adapter described the table with: a SHA-256 in hex.')
+  if (typeof token !== 'string' || !DEFINITION.test(token))
+    throw new Error('A write carries the definition this adapter described the table with: a SHA-256 in hex.')
   return Buffer.from(token, 'hex')
 }
 

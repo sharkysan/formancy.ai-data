@@ -162,7 +162,17 @@ describe('when the data server is not what answers', () => {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
     }
-    for (const list of [null, { ...columns, filterable: [] }, offer(['equals', 'range'], 'integer'), offer(['null', 'not-null'], null), offer(['equals', 'contains', 'null', 'not-null'], 'text'), offer(['range'], 'date', 'utc'), offer(['range', 'null', 'not-null'], 'date', 'wall'), viewed({}), viewed({ default: true })]) {
+    for (const list of [
+      null,
+      { ...columns, filterable: [] },
+      offer(['equals', 'range'], 'integer'),
+      offer(['null', 'not-null'], null),
+      offer(['equals', 'contains', 'null', 'not-null'], 'text'),
+      offer(['range'], 'date', 'utc'),
+      offer(['range', 'null', 'not-null'], 'date', 'wall'),
+      viewed({}),
+      viewed({ default: true }),
+    ]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toEqual({ ok: true, value: body })
     }
@@ -209,7 +219,15 @@ describe('when the data server is not what answers', () => {
       { ...child, one: true, when: { field: 'kind', equals: null } },
       { ...child, one: true, when: { equals: 'company' } },
     ]
-    for (const forms of [undefined, {}, [childless], [{ ...ENTRY, id: 7 }], [{ ...ENTRY, title: null }], [{ ...ENTRY, operations: 'read' }], ...unread.map((entry) => [{ ...ENTRY, children: [entry] }])]) {
+    for (const forms of [
+      undefined,
+      {},
+      [childless],
+      [{ ...ENTRY, id: 7 }],
+      [{ ...ENTRY, title: null }],
+      [{ ...ENTRY, operations: 'read' }],
+      ...unread.map((entry) => [{ ...ENTRY, children: [entry] }]),
+    ]) {
       body = { forms }
       expect(await client.forms(), JSON.stringify(forms)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
     }
@@ -223,7 +241,12 @@ describe('when the data server is not what answers', () => {
     const { base } = await serve((_request, response) => {
       response.writeHead(429, { 'content-type': 'application/json' }).end(JSON.stringify({ message: 'Rate limit exceeded, retry in 1 minute' }))
     })
-    expect(await createDataClient({ token: () => 't', base }).form('pg-order')).toEqual({ ok: false, status: 429, code: 'http-429', message: 'Rate limit exceeded, retry in 1 minute' })
+    expect(await createDataClient({ token: () => 't', base }).form('pg-order')).toEqual({
+      ok: false,
+      status: 429,
+      code: 'http-429',
+      message: 'Rate limit exceeded, retry in 1 minute',
+    })
   })
 
   // A connection that drops after the status and before the body ends is not
@@ -300,7 +323,7 @@ describe('when the data server is not what answers', () => {
     const seen: string[] = []
     const original = globalThis.fetch
     globalThis.fetch = async (input) => {
-      seen.push(String(input))
+      seen.push(input instanceof Request ? input.url : String(input))
       return new Response(JSON.stringify({ rows: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
     }
     try {
@@ -321,7 +344,10 @@ describe('when the data server is not what answers', () => {
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({ rows: [] }))
     })
-    const outcome = await createDataClient({ token: () => 't', base: `${base}///` }).resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] })
+    const outcome = await createDataClient({ token: () => 't', base: `${base}///` }).resolve('pg-order', 'order.customer', {
+      operation: 'read',
+      tokens: ['k1:1'],
+    })
     expect(outcome).toEqual({ ok: true, value: [] })
     expect(asked).toEqual(['POST /v1/forms/pg-order/lookups/order.customer/resolve Bearer t'])
   })
@@ -360,7 +386,16 @@ describe('across origins (0060)', () => {
       return new Response(JSON.stringify({}), { status: 200, headers: { 'content-type': 'application/json' } })
     }
     const client = createDataClient({ token: () => 't', base: 'https://data.example', fetch })
-    const lost: UnknownWrite = { ok: false, status: 0, code: 'unknown-outcome', message: TRANSPORT, operation: 'update', record: 'k1:7', version: '00000000000007d1', origin: 'transport' }
+    const lost: UnknownWrite = {
+      ok: false,
+      status: 0,
+      code: 'unknown-outcome',
+      message: TRANSPORT,
+      operation: 'update',
+      record: 'k1:7',
+      version: '00000000000007d1',
+      origin: 'transport',
+    }
     const calls: Record<keyof typeof client, () => Promise<unknown>> = {
       forms: () => client.forms(),
       form: () => client.form('pg-order'),
@@ -389,9 +424,7 @@ describe('across origins (0060)', () => {
     expect(sentHeaders.filter(({ headers }) => !headers.some(([header]) => header === 'authorization')).map(({ name }) => name)).toEqual([])
     const granted = new Set<string>(CROSS_ORIGIN_REQUEST_HEADERS)
     const ungranted = sentHeaders.flatMap(({ name, headers }) =>
-      headers
-        .filter(([header, value]) => !safelisted(header, value) && !granted.has(header))
-        .map(([header, value]) => `${name} sends ${header}: ${value}`),
+      headers.filter(([header, value]) => !safelisted(header, value) && !granted.has(header)).map(([header, value]) => `${name} sends ${header}: ${value}`),
     )
     expect(ungranted).toEqual([])
     expect(sent.filter(({ init }) => 'credentials' in init).map(({ call: name }) => name)).toEqual([])
@@ -433,7 +466,16 @@ describe('a write whose answer is not known (0031)', () => {
     const message = 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.'
     const { base, asked } = await serve(json(502, { code: 'unknown-outcome', message, operation: 'create', record: 'k1:1,8', version: null }))
     const outcome = await createDataClient({ token: () => 't', base }).create('pg-customer', { customer_no: 8 })
-    expect(outcome).toEqual({ ok: false, status: 502, code: 'unknown-outcome', message, operation: 'create', record: 'k1:1,8', version: null, origin: 'database' })
+    expect(outcome).toEqual({
+      ok: false,
+      status: 502,
+      code: 'unknown-outcome',
+      message,
+      operation: 'create',
+      record: 'k1:1,8',
+      version: null,
+      origin: 'database',
+    })
     expect(asked).toEqual(['POST /v1/forms/pg-customer/records/create Bearer t'])
   })
 
@@ -556,7 +598,9 @@ describe('a write id on every write (0031)', () => {
     const { base } = await serve((request, response) => {
       const id = request.headers[WRITE_ID_HEADER]
       ids.push(typeof id === 'string' ? id : undefined)
-      void drained(request).then(() => response.writeHead(404, { 'content-type': 'application/json' }).end(JSON.stringify({ code: 'not-found', message: 'No such record.' })))
+      void drained(request).then(() =>
+        response.writeHead(404, { 'content-type': 'application/json' }).end(JSON.stringify({ code: 'not-found', message: 'No such record.' })),
+      )
     })
     const client = createDataClient({ token: () => 't', base })
     await client.create('pg-order', { notes: 'a' })
@@ -586,7 +630,10 @@ describe('a delete (0050)', () => {
       })
     })
     const client = createDataClient({ token: () => 't', base })
-    expect(await client.delete('pg-ticket', { ...GONE, answers: { notes: 'never sent' } } as typeof GONE)).toEqual({ ok: true, value: { record: 'k1:07', deleted: true } })
+    expect(await client.delete('pg-ticket', { ...GONE, answers: { notes: 'never sent' } } as typeof GONE)).toEqual({
+      ok: true,
+      value: { record: 'k1:07', deleted: true },
+    })
     expect(seen).toEqual([{ url: '/v1/forms/pg-ticket/records/delete', id: expect.stringMatching(/^[0-9a-f]{32}$/), body: JSON.stringify(GONE) }])
   })
 
@@ -596,7 +643,12 @@ describe('a delete (0050)', () => {
   // a deletion's words (watched failing with writeOutcome requiring a
   // FormRecord: the deletion answer itself was unknown).
   test('any other 2xx is an unknown deletion from the transport', async () => {
-    for (const body of [{ record: 'k1:7', version: 'v', answers: {} }, { deleted: true }, { record: 'k1:7', deleted: 'yes' }, { record: null, deleted: true }]) {
+    for (const body of [
+      { record: 'k1:7', version: 'v', answers: {} },
+      { deleted: true },
+      { record: 'k1:7', deleted: 'yes' },
+      { record: null, deleted: true },
+    ]) {
       const { base } = await serve(json(200, body))
       expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE), JSON.stringify(body)).toEqual({
         ok: false,
@@ -615,7 +667,15 @@ describe('a delete (0050)', () => {
   test("the server's 502 is an unknown deletion from the database, sent once", async () => {
     const message = 'The connection to the database failed after the deletion was sent. It may have been deleted.'
     const { base, asked } = await serve(json(502, { code: 'unknown-outcome', message, operation: 'delete', ...GONE }))
-    expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE)).toEqual({ ok: false, status: 502, code: 'unknown-outcome', message, operation: 'delete', ...GONE, origin: 'database' })
+    expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE)).toEqual({
+      ok: false,
+      status: 502,
+      code: 'unknown-outcome',
+      message,
+      operation: 'delete',
+      ...GONE,
+      origin: 'database',
+    })
     expect(asked).toHaveLength(1)
   })
 
@@ -623,7 +683,11 @@ describe('a delete (0050)', () => {
   // it: each is the server saying nothing was deleted -- a refusal, never
   // unknown.
   test('a 404, a 409 and a 422 are refusals', async () => {
-    for (const [status, code] of [[404, 'not-found'], [409, 'stale'], [422, 'referenced']] as const) {
+    for (const [status, code] of [
+      [404, 'not-found'],
+      [409, 'stale'],
+      [422, 'referenced'],
+    ] as const) {
       const { base } = await serve(json(status, { code, message: 'Nothing was deleted.' }))
       expect(await createDataClient({ token: () => 't', base }).delete('pg-ticket', GONE)).toEqual({ ok: false, status, code, message: 'Nothing was deleted.' })
     }
@@ -680,7 +744,10 @@ describe('a delete (0050)', () => {
       [['read'], ['note']],
       [['read'], []],
       [['read', 'create'], 'note'],
-      [['read', 'create'], ['note', 7]],
+      [
+        ['read', 'create'],
+        ['note', 7],
+      ],
     ] as const) {
       body = { ...FORM, operations, copied }
       expect(await client.form('pg-ticket'), JSON.stringify(body)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
@@ -734,7 +801,9 @@ describe('a delete (0050)', () => {
   // the CHANGELOG and the limitations say.
   test('a form reply from a server older than 0050, which has no deleting, is unexpected', async () => {
     const { base } = await serve((_request, response) => {
-      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ form: { model: {} }, operations: ['read', 'update'], readable: ['id'], list: null }))
+      response
+        .writeHead(200, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ form: { model: {} }, operations: ['read', 'update'], readable: ['id'], list: null }))
     })
     expect(await createDataClient({ token: () => 't', base }).form('pg-ticket')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
   })
@@ -753,7 +822,9 @@ describe('a file of records (0079)', () => {
     const { base, asked } = await serve((request, response) => {
       void drained(request).then((body) => {
         seen.push({ accept: request.headers.accept, body })
-        response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="other.csv"' }).end(Buffer.from(FILE, 'utf8'))
+        response
+          .writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="other.csv"' })
+          .end(Buffer.from(FILE, 'utf8'))
       })
     })
     const query = { search: 'Muster', sort: [{ field: 'name', direction: 'asc' as const }], parent: null, offset: 50, limit: 10 }
@@ -762,7 +833,9 @@ describe('a file of records (0079)', () => {
     expect(outcome.value.name).toBe('pg-order.csv')
     expect(Buffer.from(await outcome.value.file.arrayBuffer())).toEqual(Buffer.from(FILE, 'utf8'))
     expect(asked).toEqual(['POST /v1/forms/pg-order/records/export Bearer t'])
-    expect(seen).toEqual([{ accept: 'text/csv, application/json', body: JSON.stringify({ search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: null }) }])
+    expect(seen).toEqual([
+      { accept: 'text/csv, application/json', body: JSON.stringify({ search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: null }) },
+    ])
   })
 
   // A 200 that is not a CSV file -- a captive portal's page, a proxy's
@@ -770,7 +843,11 @@ describe('a file of records (0079)', () => {
   // not the file. Saved, it would be a page of markup under a .csv name.
   // Watched failing with the content type unchecked: a file of `{}`.
   test('a 200 that is not text/csv is unexpected', async () => {
-    for (const [type, body] of [['application/json', '{}'], ['text/html', '<html></html>'], ['text/csvx', 'a,b\r\n']]) {
+    for (const [type, body] of [
+      ['application/json', '{}'],
+      ['text/html', '<html></html>'],
+      ['text/csvx', 'a,b\r\n'],
+    ]) {
       const { base } = await serve((_request, response) => {
         response.writeHead(200, { 'content-type': type as string }).end(body)
       })
@@ -803,15 +880,24 @@ describe('a file of records (0079)', () => {
   // page would show.
   test('a refusal is the server’s, and an abort while the file arrives rejects with the AbortError', async () => {
     const { base } = await serve((_request, response) => {
-      response.writeHead(422, { 'content-type': 'application/json' }).end(JSON.stringify({ code: 'export-too-large', message: 'The file would be larger than 16 MB.' }))
+      response
+        .writeHead(422, { 'content-type': 'application/json' })
+        .end(JSON.stringify({ code: 'export-too-large', message: 'The file would be larger than 16 MB.' }))
     })
-    expect(await createDataClient({ token: () => 't', base }).exportRecords('pg-order')).toEqual({ ok: false, status: 422, code: 'export-too-large', message: 'The file would be larger than 16 MB.' })
+    expect(await createDataClient({ token: () => 't', base }).exportRecords('pg-order')).toEqual({
+      ok: false,
+      status: 422,
+      code: 'export-too-large',
+      message: 'The file would be larger than 16 MB.',
+    })
     const controller = new AbortController()
     const { base: slow } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'text/csv; charset=utf-8' })
       response.write(FILE)
       setTimeout(() => controller.abort(), 20)
     })
-    await expect(createDataClient({ token: () => 't', base: slow }).exportRecords('pg-order', {}, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+    await expect(createDataClient({ token: () => 't', base: slow }).exportRecords('pg-order', {}, controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
   })
 })

@@ -105,10 +105,15 @@ export function createWriteOnce(now: () => number = Date.now) {
      * check and the claim are one synchronous step, so two sendings that
      * arrive together cannot both perform.
      */
-    async once(scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede'; id: string; body: unknown }, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated: boolean }> {
+    async once(
+      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede'; id: string; body: unknown },
+      perform: () => Promise<WriteAnswer>,
+    ): Promise<WriteAnswer & { repeated: boolean }> {
       prune()
       const key = JSON.stringify([scope.actor, scope.form, scope.operation, scope.id])
-      const digest = createHash('sha256').update(JSON.stringify(scope.body) ?? '').digest('hex')
+      const digest = createHash('sha256')
+        .update(JSON.stringify(scope.body) ?? '')
+        .digest('hex')
       const earlier = kept.get(key)
       if (earlier !== undefined) {
         if (earlier.digest !== digest) return { ...REUSED_WRITE_ID, repeated: false }

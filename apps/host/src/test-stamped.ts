@@ -49,8 +49,23 @@ export interface Held {
 export async function connectOwners(): Promise<Owners> {
   const { pg, ms } = inject('databases')
   return {
-    pg: postgres({ host: pg.host, port: pg.port, database: pg.database, username: pg.user, password: pg.password, onnotice: () => {}, connection: { TimeZone: 'UTC' } }),
-    ms: await new mssql.ConnectionPool({ server: ms.host, port: ms.port, database: ms.database, user: ms.user, password: ms.password, options: { encrypt: false, trustServerCertificate: true } }).connect(),
+    pg: postgres({
+      host: pg.host,
+      port: pg.port,
+      database: pg.database,
+      username: pg.user,
+      password: pg.password,
+      onnotice: () => {},
+      connection: { TimeZone: 'UTC' },
+    }),
+    ms: await new mssql.ConnectionPool({
+      server: ms.host,
+      port: ms.port,
+      database: ms.database,
+      user: ms.user,
+      password: ms.password,
+      options: { encrypt: false, trustServerCertificate: true },
+    }).connect(),
   }
 }
 
@@ -94,21 +109,36 @@ export async function dropStamped(owners: Owners, schema: string, others: readon
  * `sysdatetimeoffset()`, as it would for a row another application
  * inserted. Returns the record token the runtime plane names it by.
  */
-export async function insertStamped(owners: Owners, schema: string, engine: Engine, row: { note: string; atTime: string; createdAt?: string }): Promise<string> {
+export async function insertStamped(
+  owners: Owners,
+  schema: string,
+  engine: Engine,
+  row: { note: string; atTime: string; createdAt?: string },
+): Promise<string> {
   if (engine === 'pg') {
     const [inserted] =
       row.createdAt === undefined
-        ? await owners.pg.unsafe<Array<{ id: number }>>(`insert into ${schema}.stamped (tenant_id, note, at_time) values (1, $1::text, $2::text::time) returning id`, [row.note, row.atTime])
-        : await owners.pg.unsafe<Array<{ id: number }>>(`insert into ${schema}.stamped (tenant_id, note, at_time, created_at) values (1, $1::text, $2::text::time, $3::text::timestamptz) returning id`, [row.note, row.atTime, row.createdAt])
+        ? await owners.pg.unsafe<Array<{ id: number }>>(
+            `insert into ${schema}.stamped (tenant_id, note, at_time) values (1, $1::text, $2::text::time) returning id`,
+            [row.note, row.atTime],
+          )
+        : await owners.pg.unsafe<Array<{ id: number }>>(
+            `insert into ${schema}.stamped (tenant_id, note, at_time, created_at) values (1, $1::text, $2::text::time, $3::text::timestamptz) returning id`,
+            [row.note, row.atTime, row.createdAt],
+          )
     return `k1:${String(inserted?.id)}`
   }
   const request = owners.ms.request().input('note', mssql.NVarChar(50), row.note).input('at', mssql.NVarChar(30), row.atTime)
   const result =
     row.createdAt === undefined
-      ? await request.query<{ id: number }>(`insert into ${schema}.stamped (tenant_id, note, at_time) output inserted.id values (1, @note, convert(time(7), @at))`)
+      ? await request.query<{ id: number }>(
+          `insert into ${schema}.stamped (tenant_id, note, at_time) output inserted.id values (1, @note, convert(time(7), @at))`,
+        )
       : await request
           .input('created', mssql.NVarChar(40), row.createdAt)
-          .query<{ id: number }>(`insert into ${schema}.stamped (tenant_id, note, at_time, created_at) output inserted.id values (1, @note, convert(time(7), @at), convert(datetimeoffset(7), @created))`)
+          .query<{ id: number }>(
+            `insert into ${schema}.stamped (tenant_id, note, at_time, created_at) output inserted.id values (1, @note, convert(time(7), @at), convert(datetimeoffset(7), @created))`,
+          )
   return `k1:${String(result.recordset[0]?.id)}`
 }
 
@@ -171,7 +201,12 @@ export function fetchThrough(app: Awaited<ReturnType<typeof createDataServer>>, 
     const body = typeof init?.body === 'string' ? init.body : undefined
     sent.push({ path: url.pathname, body })
     init?.signal?.throwIfAborted()
-    const reply = await app.inject({ method: method as 'GET' | 'POST', url: `${url.pathname}${url.search}`, headers, ...(body === undefined ? {} : { payload: body }) })
+    const reply = await app.inject({
+      method: method as 'GET' | 'POST',
+      url: `${url.pathname}${url.search}`,
+      headers,
+      ...(body === undefined ? {} : { payload: body }),
+    })
     const answered = new Headers()
     for (const [name, value] of Object.entries(reply.headers)) {
       if (value !== undefined) answered.set(name, Array.isArray(value) ? value.join(', ') : String(value))
@@ -182,5 +217,8 @@ export function fetchThrough(app: Awaited<ReturnType<typeof createDataServer>>, 
 
 /** The update bodies `sent` holds from `from` on: what the server was asked to write. */
 export function updatesIn(sent: readonly Sent[], from: number): unknown[] {
-  return sent.slice(from).filter((entry) => entry.path.endsWith('/records/update')).map((entry) => JSON.parse(entry.body ?? 'null') as unknown)
+  return sent
+    .slice(from)
+    .filter((entry) => entry.path.endsWith('/records/update'))
+    .map((entry) => JSON.parse(entry.body ?? 'null') as unknown)
 }

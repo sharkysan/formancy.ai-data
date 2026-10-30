@@ -112,6 +112,10 @@ describe.each(ENGINES)('a tree of records on $engine', (engine) => {
     item(tree, lone).focus()
     await user.keyboard('{ArrowRight}')
     await waitFor(() => expect(item(tree, lone).hasAttribute('aria-expanded')).toBe(false), ARRIVES_WITHIN)
-    expect(within(screen.getByRole('region', { name: 'Records' })).getAllByRole('status').map((line) => line.textContent)).toContain(`No records name ${lone} as their Employee.`)
+    expect(
+      within(screen.getByRole('region', { name: 'Records' }))
+        .getAllByRole('status')
+        .map((line) => line.textContent),
+    ).toContain(`No records name ${lone} as their Employee.`)
   })
 })

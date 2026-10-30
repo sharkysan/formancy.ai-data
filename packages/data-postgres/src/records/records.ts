@@ -16,7 +16,6 @@ import type {
   RecordRead,
   RecordTarget,
   RowFilterTerm,
-  SupersedeRequest,
   ThroughTerms,
   UpdateRequest,
 } from '@formancy/data-core'
@@ -47,8 +46,16 @@ import { freshStatement, supersedeStatement } from './versions.js'
 
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
 const STALE: RecordFailure = { ok: false, code: 'stale', message: 'The record changed after it was read; its version is no longer the one sent.' }
-const VERSION_ENDED: RecordFailure = { ok: false, code: 'version-ended', message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).' }
-const CHAIN_EXISTS: RecordFailure = { ok: false, code: 'chain-exists', message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).' }
+const VERSION_ENDED: RecordFailure = {
+  ok: false,
+  code: 'version-ended',
+  message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).',
+}
+const CHAIN_EXISTS: RecordFailure = {
+  ok: false,
+  code: 'chain-exists',
+  message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).',
+}
 /**
  * A change from a date whose own check undid it (0113): it ended a version
  * and inserted none -- a trigger or a rule declined the next one -- or the
@@ -57,7 +64,8 @@ const CHAIN_EXISTS: RecordFailure = { ok: false, code: 'chain-exists', message: 
 const DECLINED_CHANGE: RecordFailure = {
   ok: false,
   code: 'refused',
-  message: 'PostgreSQL undid the change from a date: the next version was declined by a trigger or a rule, or the key matched more than one row. Nothing was written.',
+  message:
+    'PostgreSQL undid the change from a date: the next version was declined by a trigger or a rule, or the key matched more than one row. Nothing was written.',
 }
 
 /**
@@ -77,7 +85,8 @@ const DECLINED_INSERT: RecordFailure = {
 const DECLINED_UPDATE: RecordFailure = {
   ok: false,
   code: 'refused',
-  message: 'PostgreSQL completed the update without writing the row, though it exists at the version sent: a trigger, a rule or a row security policy declined it.',
+  message:
+    'PostgreSQL completed the update without writing the row, though it exists at the version sent: a trigger, a rule or a row security policy declined it.',
 }
 
 /**
@@ -206,7 +215,10 @@ function describedBy(row: TextRow): { described: ReturnType<typeof describedFrom
  * same suite: 64 MB after four lost writes of 16 MB each).
  */
 function untilLost<T>(statement: Promise<T>): Promise<T> {
-  return statement.catch((error: unknown) => (connectionLost(error) ? new Promise<never>(() => {}) : Promise.reject(error)))
+  return statement.catch((error: unknown) => {
+    if (connectionLost(error)) return new Promise<never>(() => {})
+    throw error
+  })
 }
 
 /**
@@ -220,7 +232,11 @@ function untilLost<T>(statement: Promise<T>): Promise<T> {
  * statement had been sent when it failed, which decides between
  * `unavailable` and `unknown-outcome`.
  */
-async function lockedTransaction(sql: Sql, lock: RecordStatement, statement: RecordStatement): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
+async function lockedTransaction(
+  sql: Sql,
+  lock: RecordStatement,
+  statement: RecordStatement,
+): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
   let sent = false
   try {
     const result = await sql.begin(async (tx) => {
@@ -228,7 +244,7 @@ async function lockedTransaction(sql: Sql, lock: RecordStatement, statement: Rec
       sent = true
       return untilLost(run(tx, statement.text, statement.params))
     })
-    return { ok: true, result: result as TextResult }
+    return { ok: true, result }
   } catch (error) {
     return { ok: false, error, sent }
   }
@@ -259,7 +275,9 @@ function listAnswer(request: ListRequest, ran: Ran): { answer: ListOutcome; isol
   const { described, isolation } = describedBy(first)
   if (described === undefined) return { answer: NOT_DESCRIBED, isolation }
   const after = request.after === null ? null : first[DESCRIBED_COLUMNS] === 'true' ? 'found' : 'gone'
-  const rows = ran.result.rows.filter((row) => row[DESCRIBED_COLUMNS + 1] !== null).map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 2)))
+  const rows = ran.result.rows
+    .filter((row) => row[DESCRIBED_COLUMNS + 1] !== null)
+    .map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 2)))
   return { answer: { ok: true, described, rows, after }, isolation }
 }
 
@@ -329,7 +347,14 @@ async function whyNothingChanged(
  * state of one record for good (0050) -- so the database declined the
  * delete itself.
  */
-async function whyNotDeleted(sql: Sql, request: DeleteRequest, terms: DeleteTerms, withVersion: boolean, definition: Definition, path: WritePath): Promise<RecordFailure> {
+async function whyNotDeleted(
+  sql: Sql,
+  request: DeleteRequest,
+  terms: DeleteTerms,
+  withVersion: boolean,
+  definition: Definition,
+  path: WritePath,
+): Promise<RecordFailure> {
   const asked = await attempt(sql, whyNotDeletedStatement(request, terms, withVersion, definition), 'read')
   if (!asked.ok) return asked.failure
   const [same, reach, deletable, rules, isolation, unchanged] = asked.result.rows[0] as TextRow
@@ -461,7 +486,9 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       }
       // Always one row: `one` NULL where nothing was ended, the next version beside it otherwise.
       const row = onlyRow(ran.result) as TextRow
-      return row[0] === null ? whyNothingChanged(sql, located, scope, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row.slice(1)) }
+      return row[0] === null
+        ? whyNothingChanged(sql, located, scope, true, definition, path)
+        : { ok: true, ...recordOf(request.target, request.returning, row.slice(1)) }
     },
 
     async update(request): Promise<RecordOutcome> {
@@ -482,9 +509,12 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // (0006). Nothing was written either way, so it is answered the same
       // way — as a race, whatever the version reads now: under SERIALIZABLE
       // a conflict over other rows is 40001 too, with this one unchanged.
-      if (!ran.ok) return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
+      if (!ran.ok)
+        return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
       const row = onlyRow(ran.result)
-      return row === undefined ? whyNothingChanged(sql, request, scope, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row) }
+      return row === undefined
+        ? whyNothingChanged(sql, request, scope, true, definition, path)
+        : { ok: true, ...recordOf(request.target, request.returning, row) }
     },
 
     async delete(request): Promise<DeleteOutcome> {
@@ -513,7 +543,10 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
         // with nothing deleted -- an identity that is not a key, a
         // programming error (delete.ts). A trigger's own 21000 is reported
         // as the same, and nothing was deleted either.
-        if (ran.state === CARDINALITY) throw new Error('The identity matched more than one row, so the delete was refused inside its statement and nothing was deleted: the bindings do not name a key.')
+        if (ran.state === CARDINALITY)
+          throw new Error(
+            'The identity matched more than one row, so the delete was refused inside its statement and nothing was deleted: the bindings do not name a key.',
+          )
         return ran.state === '40001' ? whyNotDeleted(sql, request, terms, false, definition, path) : failedWrite(sql, terms.root, definition, path, ran.failure)
       }
       const row = ran.result.rows[0]

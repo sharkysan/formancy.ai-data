@@ -20,7 +20,13 @@ const ORDER: GenerationRequest = {
   title: 'Order',
   lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
 }
-const on = (name: string, extra: Partial<GenerationRequest> = {}): GenerationRequest => ({ ...ORDER, root: sales(name), formId: `sales-${name}`, lookups: [], ...extra })
+const on = (name: string, extra: Partial<GenerationRequest> = {}): GenerationRequest => ({
+  ...ORDER,
+  root: sales(name),
+  formId: `sales-${name}`,
+  lookups: [],
+  ...extra,
+})
 
 function fieldOf(form: GeneratedForm, key: string): FieldBinding | undefined {
   return form.bindings.fields.find((binding) => binding.field === key)
@@ -46,7 +52,10 @@ describe('columns the account may not read or write', () => {
   // A field over a column the account may not SELECT fails at its first read,
   // 42501 on PostgreSQL and 230 on SQL Server, and takes the whole form with it.
   test('an unreadable column gets no field and an excluded note', () => {
-    const form = generateForm(snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { select: false })), ORDER)
+    const form = generateForm(
+      snapshot('postgres', (objects) => restrict(objects, 'order', 'notes', { select: false })),
+      ORDER,
+    )
     expect(fieldOf(form, 'notes')).toBeUndefined()
     expect(form.form.model.fields.map((field) => field.key)).not.toContain('notes')
     expect(form.notes).toContainEqual({ subject: 'notes', kind: 'excluded', message: "This connection's account may not read it." })
@@ -67,14 +76,22 @@ describe('columns the account may not read or write', () => {
     )
     expect(fieldOf(form, 'amount')?.writes).toEqual({ create: true, update: false })
     expect(form.form.model.fields.find((field) => field.key === 'amount')).toMatchObject({ required: true })
-    expect(form.notes).toContainEqual({ subject: 'amount', kind: 'read-only', message: "Read-only on update: this connection's account may not UPDATE amount." })
+    expect(form.notes).toContainEqual({
+      subject: 'amount',
+      kind: 'read-only',
+      message: "Read-only on update: this connection's account may not UPDATE amount.",
+    })
 
     expect(fieldOf(form, 'notes')?.writes).toEqual({ create: false, update: true })
     expect(form.notes).toContainEqual({ subject: 'notes', kind: 'read-only', message: "Not written on create: this connection's account may not INSERT it." })
 
     // A lookup is written per operation by the same rule, over its columns.
     expect(fieldOf(form, 'customer')?.writes).toEqual({ create: true, update: false })
-    expect(form.notes).toContainEqual({ subject: 'customer', kind: 'read-only', message: "Read-only on update: this connection's account may not UPDATE tenant_id." })
+    expect(form.notes).toContainEqual({
+      subject: 'customer',
+      kind: 'read-only',
+      message: "Read-only on update: this connection's account may not UPDATE tenant_id.",
+    })
 
     expect(disabled(form)).not.toContain('amount')
     expect(disabled(form)).not.toContain('notes')
@@ -86,17 +103,27 @@ describe('columns the account may not read or write', () => {
   // a generated one; a note that said only "read-only" would leave a reviewer
   // looking for a generator that is not there.
   test('a column that may be neither inserted nor updated is a disabled field, and says why', () => {
-    const form = generateForm(snapshot('sqlserver', (objects) => restrict(objects, 'order', 'group', { insert: false, update: false })), ORDER)
+    const form = generateForm(
+      snapshot('sqlserver', (objects) => restrict(objects, 'order', 'group', { insert: false, update: false })),
+      ORDER,
+    )
     expect(fieldOf(form, 'group')?.writes).toEqual({ create: false, update: false })
     expect(disabled(form)).toContain('group')
-    expect(form.notes).toContainEqual({ subject: 'group', kind: 'read-only', message: "Read-only: this connection's account may neither INSERT nor UPDATE it." })
+    expect(form.notes).toContainEqual({
+      subject: 'group',
+      kind: 'read-only',
+      message: "Read-only: this connection's account may neither INSERT nor UPDATE it.",
+    })
   })
 
   // A read-only reason that is not privilege — a generated column — says so
   // and nothing about privileges, which would mislead the reviewer into a grant
   // that changes nothing.
   test('privilege is noted only when it alone stops a write', () => {
-    const form = generateForm(snapshot('sqlserver', (objects) => restrict(objects, 'order', 'id', { insert: false, update: false })), ORDER)
+    const form = generateForm(
+      snapshot('sqlserver', (objects) => restrict(objects, 'order', 'id', { insert: false, update: false })),
+      ORDER,
+    )
     expect(form.notes.filter((note) => note.subject === 'id' && note.kind === 'read-only').map((note) => note.message)).toEqual([
       'The database numbers this value (identity-always) and refuses one given to it.',
     ])
@@ -108,24 +135,38 @@ describe('operations the account may not perform', () => {
   // the whole form. Offered only when the account may INSERT, and the note
   // names the privilege so the remedy is a grant.
   test('no INSERT on the root blocks create, and the note names INSERT', () => {
-    const form = generateForm(snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { insert: false })), ORDER)
+    const form = generateForm(
+      snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { insert: false })),
+      ORDER,
+    )
     expect(form.bindings.operations).toEqual({ create: false, update: true, delete: false })
-    expect(form.notes).toContainEqual({ subject: 'order', kind: 'blocked', message: "Create is not offered: this connection's account may INSERT none of the columns of sales.order." })
+    expect(form.notes).toContainEqual({
+      subject: 'order',
+      kind: 'blocked',
+      message: "Create is not offered: this connection's account may INSERT none of the columns of sales.order.",
+    })
   })
 
   // An update that writes nothing the account may UPDATE is refused by the
   // database on every save.
   test('no UPDATE on any column the form would write blocks update, and the note names UPDATE', () => {
-    const form = generateForm(snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { update: false })), ORDER)
+    const form = generateForm(
+      snapshot('sqlserver', (objects) => restrictAll(objects, 'order', { update: false })),
+      ORDER,
+    )
     expect(form.bindings.operations).toEqual({ create: true, update: false, delete: false })
-    expect(form.notes).toContainEqual({ subject: 'order', kind: 'blocked', message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes." })
+    expect(form.notes).toContainEqual({
+      subject: 'order',
+      kind: 'blocked',
+      message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes.",
+    })
   })
 
   // A form that cannot read its root cannot show a record, so there is no
   // form to generate; saying which table and which privilege is the remedy.
   test('an unreadable root throws, naming it', () => {
     const blind = snapshot('postgres', (objects) => restrictAll(objects, 'customer', { select: false }))
-    expect(() => generateForm(blind, on('customer'))).toThrow("sales.customer cannot be read by this connection: its account may SELECT none of its columns.")
+    expect(() => generateForm(blind, on('customer'))).toThrow('sales.customer cannot be read by this connection: its account may SELECT none of its columns.')
   })
 
   // The tenant column is in the WHERE of every read and update; unreadable,
@@ -133,14 +174,20 @@ describe('operations the account may not perform', () => {
   // the policy writes it on is refused.
   test('an unreadable pinned column throws; a pinned column the account may not insert blocks create', () => {
     const blind = snapshot('postgres', (objects) => restrict(objects, 'employee', 'tenant_id', { select: false }))
-    expect(() => generateForm(blind, on('employee', { pinned: ['tenant_id'] }))).toThrow(/tenant_id is pinned by the policy, and this connection's account may not read it/)
+    expect(() => generateForm(blind, on('employee', { pinned: ['tenant_id'] }))).toThrow(
+      /tenant_id is pinned by the policy, and this connection's account may not read it/,
+    )
 
-    const fixed = generateForm(snapshot('postgres', (objects) => restrict(objects, 'employee', 'tenant_id', { insert: false })), on('employee', { pinned: ['tenant_id'] }))
+    const fixed = generateForm(
+      snapshot('postgres', (objects) => restrict(objects, 'employee', 'tenant_id', { insert: false })),
+      on('employee', { pinned: ['tenant_id'] }),
+    )
     expect(fixed.bindings.operations.create).toBe(false)
     expect(fixed.notes).toContainEqual({
       subject: 'employee',
       kind: 'blocked',
-      message: "Create is not offered: tenant_id is pinned by the policy and written from the trusted context, and this connection's account may not INSERT it.",
+      message:
+        "Create is not offered: tenant_id is pinned by the policy and written from the trusted context, and this connection's account may not INSERT it.",
     })
   })
 })
@@ -164,7 +211,11 @@ describe('identity and concurrency', () => {
     const form = generateForm(keyless, on('country'))
     expect(form.bindings.identity).toBeNull()
     expect(form.bindings.operations).toEqual({ create: true, update: false, delete: false })
-    expect(form.notes).toContainEqual({ subject: 'country', kind: 'blocked', message: "Records cannot be read back or updated: this connection's account may not read key column id." })
+    expect(form.notes).toContainEqual({
+      subject: 'country',
+      kind: 'blocked',
+      message: "Records cannot be read back or updated: this connection's account may not read key column id.",
+    })
   })
 
   // Every update writes a version column (0015) and reads it back; a
@@ -173,12 +224,19 @@ describe('identity and concurrency', () => {
   // account cannot read cannot be compared, so update is not offered.
   test('a confirmed version column that is not updatable throws; an unreadable rowversion leaves update blocked with a note', () => {
     const noUpdate = snapshot('postgres', (objects) => restrict(objects, 'order', 'row_version', { update: false }))
-    expect(() => generateForm(noUpdate, { ...ORDER, versionColumn: 'row_version' })).toThrow("row_version cannot be a version column: this connection's account may not UPDATE it")
+    expect(() => generateForm(noUpdate, { ...ORDER, versionColumn: 'row_version' })).toThrow(
+      "row_version cannot be a version column: this connection's account may not UPDATE it",
+    )
     const noRead = snapshot('postgres', (objects) => restrict(objects, 'order', 'row_version', { select: false }))
-    expect(() => generateForm(noRead, { ...ORDER, versionColumn: 'row_version' })).toThrow("row_version cannot be a version column: this connection's account may not read it")
+    expect(() => generateForm(noRead, { ...ORDER, versionColumn: 'row_version' })).toThrow(
+      "row_version cannot be a version column: this connection's account may not read it",
+    )
     expect(generateForm(noUpdate, ORDER).bindings.concurrency).toBeNull()
 
-    const hidden = generateForm(snapshot('sqlserver', (objects) => restrict(objects, 'order', 'row_version', { select: false })), ORDER)
+    const hidden = generateForm(
+      snapshot('sqlserver', (objects) => restrict(objects, 'order', 'row_version', { select: false })),
+      ORDER,
+    )
     expect(hidden.bindings.concurrency).toBeNull()
     expect(hidden.bindings.operations.update).toBe(false)
     expect(hidden.notes).toContainEqual({
@@ -194,7 +252,11 @@ describe('lookups', () => {
   // and display columns on every search; one the account cannot read throws
   // on every search, after the form was published.
   test('a lookup over an unreadable foreign-key, target-key or display column throws, naming it', () => {
-    const over = (table: string, column: string) => () => generateForm(snapshot('postgres', (objects) => restrict(objects, table, column, { select: false })), ORDER)
+    const over = (table: string, column: string) => () =>
+      generateForm(
+        snapshot('postgres', (objects) => restrict(objects, table, column, { select: false })),
+        ORDER,
+      )
     expect(over('order', 'customer_no')).toThrow("fk_order_customer: this connection's account may not read sales.order.customer_no")
     expect(over('customer', 'tenant_id')).toThrow("fk_order_customer: this connection's account may not read sales.customer.tenant_id")
     expect(over('customer', 'name')).toThrow("fk_order_customer: this connection's account may not read sales.customer.name")
@@ -230,11 +292,19 @@ describe('row security', () => {
 
   // "Cannot tell" is not "none": the reviewer is told which, and why.
   test('row security that cannot be established gives an access note with the gap that says why', () => {
-    const unknown = withGaps(MS, [{ subject: { kind: 'scope' }, aspect: 'row-security', detail: 'This account has no VIEW DEFINITION on the database.' }], (objects) => {
-      for (const object of objects) if (object.ref.name === 'order') object.rowSecurity = 'unknown'
-    })
+    const unknown = withGaps(
+      MS,
+      [{ subject: { kind: 'scope' }, aspect: 'row-security', detail: 'This account has no VIEW DEFINITION on the database.' }],
+      (objects) => {
+        for (const object of objects) if (object.ref.name === 'order') object.rowSecurity = 'unknown'
+      },
+    )
     expect(generateForm(unknown, ORDER).notes.filter((note) => note.kind === 'access')).toEqual([
-      { subject: 'order', kind: 'access', message: 'This connection cannot tell whether row-level security applies to sales.order: This account has no VIEW DEFINITION on the database.' },
+      {
+        subject: 'order',
+        kind: 'access',
+        message: 'This connection cannot tell whether row-level security applies to sales.order: This account has no VIEW DEFINITION on the database.',
+      },
     ])
   })
 

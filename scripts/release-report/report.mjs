@@ -117,7 +117,11 @@ export function buildReport(inputs) {
     browserGates: report.results.browserGates,
     browsers: facts.browser.pins.map((pin) => pin.browser),
     needs: ci ? inputs.needs : null,
-    sharedCasesPassed: unknown.length === 0 && withoutEngine.length === 0 && withoutImage.length === 0 && rows.every((row) => heldCells(row, columns, allowMissing).every(([, entry]) => entry.state === 'passed')),
+    sharedCasesPassed:
+      unknown.length === 0 &&
+      withoutEngine.length === 0 &&
+      withoutImage.length === 0 &&
+      rows.every((row) => heldCells(row, columns, allowMissing).every(([, entry]) => entry.state === 'passed')),
     documents: inputs.documents ?? {},
   })
   const { problems: releaseProblems, ...release } = releaseOf(report, inputs)
@@ -126,7 +130,9 @@ export function buildReport(inputs) {
     ...(ci ? needsProblems(inputs.needs, inputs.jobs) : []),
     ...(ci ? artefactProblems(inputs.artefacts, { expected: inputs.expected, commit, runId: inputs.run.id }) : []),
     ...contentProblems(report, { published: inputs.published, browserApps: inputs.browserApps, allowMissing }),
-    ...gatesProblems(inputs.gatesRegister, { covered: covered.map((entry) => entry.path), browserApps: inputs.browserApps, jobs: inputs.jobs, exists }).map((problem) => `docs/release/gates.json: ${problem}`),
+    ...gatesProblems(inputs.gatesRegister, { covered: covered.map((entry) => entry.path), browserApps: inputs.browserApps, jobs: inputs.jobs, exists }).map(
+      (problem) => `docs/release/gates.json: ${problem}`,
+    ),
     ...releaseGateProblems(report.gates, allowMissing),
     ...releaseProblems,
   ]
@@ -155,7 +161,10 @@ export function readResults(dir) {
 }
 
 /** `git+https://github.com/x/y.git` as the URL a link opens. */
-const browsable = (url) => String(url).replace(/^git\+/, '').replace(/\.git$/, '')
+const browsable = (url) =>
+  String(url)
+    .replace(/^git\+/, '')
+    .replace(/\.git$/, '')
 
 /** Each app: the renderers it draws, by the versions its directory loads, and its jsdom. */
 function appsOf(root) {
@@ -218,7 +227,10 @@ export async function loadInputs(root, resultsDir, { ci = false, allowMissing = 
     return { ...common, mode: 'local', results, commit, release: '', allowMissing }
   }
   for (const name of ['NEEDS', 'GITHUB_SHA', 'GITHUB_RUN_ID']) {
-    if (env[name] === undefined || env[name] === '') throw new Error(`report.mjs reads a gates run, and ${name} is not set: in the report job NEEDS is toJSON(needs); on a machine, run collect.mjs --local and report.mjs --local`)
+    if (env[name] === undefined || env[name] === '')
+      throw new Error(
+        `report.mjs reads a gates run, and ${name} is not set: in the report job NEEDS is toJSON(needs); on a machine, run collect.mjs --local and report.mjs --local`,
+      )
   }
   return {
     ...common,
@@ -242,7 +254,11 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/repo
   const argv = process.argv.slice(2)
   const option = (name, fallback) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : fallback)
   const local = argv.includes('--local')
-  const allowMissing = local ? option('--allow-missing', '').split(',').filter((entry) => entry !== '') : []
+  const allowMissing = local
+    ? option('--allow-missing', '')
+        .split(',')
+        .filter((entry) => entry !== '')
+    : []
   const report = buildReport(await loadInputs(repo, resolve(repo, option('--results', 'release-results')), { ci: !local, allowMissing }))
   const out = resolve(repo, option('--out', 'release-report'))
   mkdirSync(out, { recursive: true })

@@ -62,26 +62,38 @@ export function trustProblems(config) {
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
   const front = fixedAddresses(web, Object.keys(joined(server)))
-  if (front.length === 0) problems.push("the web front holds no fixed address on a network it shares with the server, so the server cannot name it and every client shares nginx's one bucket")
-  else if (!front.some((address) => trusted.includes(address))) problems.push("the server's FORMANCY_DATA_TRUSTED_PROXIES does not name the web front's address, so every client shares nginx's one bucket")
+  if (front.length === 0)
+    problems.push(
+      "the web front holds no fixed address on a network it shares with the server, so the server cannot name it and every client shares nginx's one bucket",
+    )
+  else if (!front.some((address) => trusted.includes(address)))
+    problems.push("the server's FORMANCY_DATA_TRUSTED_PROXIES does not name the web front's address, so every client shares nginx's one bucket")
   if (cloudflared !== undefined) {
     const tunnel = fixedAddresses(cloudflared, Object.keys(joined(web)))
-    if (!tunnel.some((address) => trusted.includes(address))) problems.push("cloudflared holds no fixed address the server trusts on the network it shares with the web front, so behind the tunnel every visitor shares cloudflared's one bucket")
+    if (!tunnel.some((address) => trusted.includes(address)))
+      problems.push(
+        "cloudflared holds no fixed address the server trusts on the network it shares with the web front, so behind the tunnel every visitor shares cloudflared's one bucket",
+      )
   }
   const networks = config.networks ?? {}
   for (const [place, entry] of trusted.entries()) {
     const where = `the server's FORMANCY_DATA_TRUSTED_PROXIES entry ${String(place + 1)}`
     const address = ipv4(entry)
     if (address === undefined) {
-      problems.push(`${where} is not one IPv4 address: a range takes in its network's gateway, from where any local process reaches a container and could choose its own address`)
+      problems.push(
+        `${where} is not one IPv4 address: a range takes in its network's gateway, from where any local process reaches a container and could choose its own address`,
+      )
       continue
     }
-    const homes = Object.entries(networks).flatMap(([name, network]) => (network?.ipam?.config ?? []).filter((range) => range?.subnet !== undefined && within(address, range.subnet)).map((range) => ({ name, range })))
+    const homes = Object.entries(networks).flatMap(([name, network]) =>
+      (network?.ipam?.config ?? []).filter((range) => range?.subnet !== undefined && within(address, range.subnet)).map((range) => ({ name, range })),
+    )
     if (homes.length === 0) problems.push(`${where} is in no network of the file with a fixed range, so nothing says who holds it`)
     for (const { name, range } of homes) {
       const gateway = range.gateway === undefined ? (ipv4(String(range.subnet).split('/')[0]) ?? 0) + 1 : ipv4(range.gateway)
       if (address === gateway) problems.push(`${where} is the gateway of ${name}, from where any local process reaches its containers`)
-      if (range.ip_range === undefined || within(address, range.ip_range)) problems.push(`${where} is in the part of ${name} Docker hands out, so another container could be given it`)
+      if (range.ip_range === undefined || within(address, range.ip_range))
+        problems.push(`${where} is in the part of ${name} Docker hands out, so another container could be given it`)
     }
     for (const [name, service] of Object.entries(services)) {
       if (!PROXIES.has(name) && fixedAddresses(service).includes(entry)) problems.push(`${name} holds the address of ${where}, and is no proxy`)
@@ -107,7 +119,8 @@ export function believedProblems(logText, config) {
     } catch {
       continue
     }
-    if (parsed !== null && typeof parsed === 'object' && parsed.msg === 'incoming request' && typeof parsed.req?.remoteAddress === 'string') addresses.push(parsed.req.remoteAddress)
+    if (parsed !== null && typeof parsed === 'object' && parsed.msg === 'incoming request' && typeof parsed.req?.remoteAddress === 'string')
+      addresses.push(parsed.req.remoteAddress)
   }
   if (addresses.length === 0) return ["the server's log names no request, so whom it believed cannot be read"]
   const own = addresses.filter((address) => front.includes(address)).length

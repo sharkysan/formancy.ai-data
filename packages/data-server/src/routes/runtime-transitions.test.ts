@@ -2,7 +2,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, DescribedRoot, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, UpdateRequest } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  DescribedRoot,
+  FormPolicy,
+  InsertRequest,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+  UpdateRequest,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -25,14 +35,30 @@ import type { ConnectionRegistry } from '../connections.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: { schema: 'sales', name: 'ticket' }, kind: 'table', comment: null,
+      ref: { schema: 'sales', name: 'ticket' },
+      kind: 'table',
+      comment: null,
       columns: [
         col('id', 1, INT32, { generated: 'identity-always' }),
         col('tenant_id', 2, INT32),
@@ -40,7 +66,11 @@ const SNAPSHOT = createSnapshot({
         col('status', 4, TEXT, { hasDefault: true }),
         col('rv', 5, { kind: 'rowversion' }, { generated: 'rowversion' }),
       ],
-      primaryKey: { name: 'pk_ticket', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_ticket', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -63,7 +93,9 @@ const POLICY: FormPolicy = {
 }
 
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'clerk' || token === 'manager' ? { ok: true, identity: { actor: { id: token[0] ?? '', roles: [token] }, attributes: { tenant: '1' } } } : { ok: false, reason: 'bad' }
+  token === 'clerk' || token === 'manager'
+    ? { ok: true, identity: { actor: { id: token[0] ?? '', roles: [token] }, attributes: { tenant: '1' } } }
+    : { ok: false, reason: 'bad' }
 
 const RECORD = 'k1:5'
 const VERSION = '00000000000007d1'
@@ -103,8 +135,18 @@ function registry(): ConnectionRegistry {
     },
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
-  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined), close: async () => {} }
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
+  return {
+    ids: () => ['erp'],
+    scope: () => ({ schemas: ['sales'] }),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    close: async () => {},
+  }
 }
 
 beforeEach(async () => {
@@ -114,7 +156,14 @@ beforeEach(async () => {
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-transitions-'))
   const store = createFileConfigurationStore(root)
-  const { form, bindings } = generateForm(SNAPSHOT, { connection: 'erp', root: { schema: 'sales', name: 'ticket' }, formId: 'ticket', title: 'Ticket', lookups: [], pinned: ['tenant_id'] })
+  const { form, bindings } = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: { schema: 'sales', name: 'ticket' },
+    formId: 'ticket',
+    title: 'Ticket',
+    lookups: [],
+    pinned: ['tenant_id'],
+  })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('ticket', null, bundle)
   const sink: AuditSink = (event) => {
@@ -127,7 +176,8 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const post = (who: string, url: string, payload: unknown) => app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${who}` }, payload: payload as Record<string, unknown> })
+const post = (who: string, url: string, payload: unknown) =>
+  app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${who}` }, payload: payload as Record<string, unknown> })
 const update = (who: string, answers: Record<string, unknown>) => post(who, '/v1/forms/ticket/records/update', { record: RECORD, version: VERSION, answers })
 const create = (answers: Record<string, unknown>) => post('clerk', '/v1/forms/ticket/records/create', { answers })
 /** What the trail said of each request: its operation, how it ended, and whether it moved. */
@@ -151,11 +201,18 @@ describe('a state field’s moves on the runtime plane (0112)', () => {
   // sentence that names the field and no state. Watched failing with the
   // code left out of the 403s: the route answered 500.
   test('a move not listed for the actor’s roles is 403, names no state, and sends nothing', async () => {
-    for (const [who, from, to] of [['clerk', 'open', 'archived'], ['manager', 'open', 'archived'], ['clerk', 'closed', 'open']]) {
+    for (const [who, from, to] of [
+      ['clerk', 'open', 'archived'],
+      ['manager', 'open', 'archived'],
+      ['clerk', 'closed', 'open'],
+    ]) {
       status = from ?? ''
       const refused = await update(who ?? '', { status: to })
       expect(refused.statusCode, `${String(who)}: ${String(from)} to ${String(to)}`).toBe(403)
-      expect(refused.json()).toEqual({ code: 'transition-denied', message: 'status may not move from where it is to where this update puts it, for your roles.' })
+      expect(refused.json()).toEqual({
+        code: 'transition-denied',
+        message: 'status may not move from where it is to where this update puts it, for your roles.',
+      })
     }
     expect(calls.updates).toEqual([])
     expect(trail().map(({ outcome, moved }) => ({ outcome, moved }))).toEqual(Array.from({ length: 3 }, () => ({ outcome: 'transition-denied', moved: null })))

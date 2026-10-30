@@ -81,7 +81,7 @@ export interface SectionDrill {
   /** The row the level below holds when it was opened from this section: the grid marks it open. */
   held: string | null
   /** Go down into `want`; `toRow` gives the keyboard back on Keep editing, `refused` says a read the server refused. */
-  descend(want: DrillWant, toRow: () => void, refused: (message: string) => void): void
+  descend: (want: DrillWant, toRow: () => void, refused: (message: string) => void) => void
 }
 
 /** What every grid of the open form tells the levels held, in every layout: a record's rows can be deleted wherever they are listed. */
@@ -91,7 +91,7 @@ export interface HeldLevels {
   /** A record gone from a grid: the level that holds it, and every level below, go too. */
   recordGone(formId: string, token: string): void
   /** A section's handle, by its owner, while it is mounted. */
-  register(owner: string, handle: SectionHandle | null): void
+  register: (owner: string, handle: SectionHandle | null) => void
 }
 
 export interface Drill {
@@ -101,7 +101,7 @@ export interface Drill {
   /** Where entering Drill down goes: the level last shown there while it is held, else the record when one is open, else the records. */
   enter(open: boolean): { view: View; level?: number }
   /** A section of `from.level` goes down. */
-  descend(from: SectionAt, want: DrillWant, back: { toRow(): void; refused(message: string): void }): void
+  descend: (from: SectionAt, want: DrillWant, back: { toRow: () => void; refused: (message: string) => void }) => void
   /** A crumb: the level shown is `level`, an entry pushed; `back` on Keep editing. */
   up(level: number, back: () => void): void
   /** What a section at `level` is given in Drill down. */
@@ -234,7 +234,7 @@ export function useDrill({
     setPath([...pathRef.current.slice(0, from.level - 1), step])
   }
 
-  function descend(from: SectionAt, wanted: DrillWant, back: { toRow(): void; refused(message: string): void }): void {
+  function descend(from: SectionAt, wanted: DrillWant, back: { toRow: () => void; refused: (message: string) => void }): void {
     const below = pathRef.current[from.level - 1]
     if (wanted.kind === 'record' && below !== undefined && below.from === from.owner && below.token === wanted.token) {
       show(from.level + 1, false)
@@ -378,6 +378,7 @@ export function useDrill({
     if (shown !== asking) show(shown, true, false)
     if (shown >= 2) focusLevel(shown)
     // On each change made by history, and only then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs on each change made by history, from the render that saw it, so what it reads is current
   }, [historyView])
 
   return {

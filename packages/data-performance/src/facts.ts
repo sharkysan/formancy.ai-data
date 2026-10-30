@@ -84,12 +84,20 @@ export async function networkFacts(writers: Record<EngineKey, WriterEndpoint>, d
     const { host, port } = writers[engine]
     engines[engine] = { host, lookup: await lookupOrder(host), port, dockerProxy: await dockerProxyFor(port), tls: false }
   }
-  return { client: { transport: 'HTTP/1.1, keep-alive, Node fetch', address: '127.0.0.1', tls: false, proxy: proxySettings(process.env) }, engines, hopDelayMs: delayMs }
+  return {
+    client: { transport: 'HTTP/1.1, keep-alive, Node fetch', address: '127.0.0.1', tls: false, proxy: proxySettings(process.env) },
+    engines,
+    hopDelayMs: delayMs,
+  }
 }
 
 /** A published version's file size, and its snapshot's size as compact JSON and object count. */
 export async function bundleFacts(storeDir: string, formId: string): Promise<BundleFacts> {
   const file = join(storeDir, formId, '1.json')
   const document = JSON.parse(await readFile(file, 'utf8')) as { snapshot: { objects: unknown[] } }
-  return { versionBytes: (await stat(file)).size, snapshotBytes: Buffer.byteLength(JSON.stringify(document.snapshot)), snapshotObjects: document.snapshot.objects.length }
+  return {
+    versionBytes: (await stat(file)).size,
+    snapshotBytes: Buffer.byteLength(JSON.stringify(document.snapshot)),
+    snapshotObjects: document.snapshot.objects.length,
+  }
 }

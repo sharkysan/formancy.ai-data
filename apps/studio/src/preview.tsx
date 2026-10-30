@@ -25,7 +25,17 @@ import { lookupBindings } from './policy-model.js'
  * `revision` keys the provider: a new document is a new engine, and a new
  * provider over it.
  */
-export function FormPaper({ document, bindings, label, revision }: { document: FormSchema; bindings: FormBindings; label: string; revision: number | string }): ReactElement {
+export function FormPaper({
+  document,
+  bindings,
+  label,
+  revision,
+}: {
+  document: FormSchema
+  bindings: FormBindings
+  label: string
+  revision: number | string
+}): ReactElement {
   const engine = useMemo(
     () =>
       createFormEngine({
@@ -42,9 +52,9 @@ export function FormPaper({ document, bindings, label, revision }: { document: F
     <>
       {lookupBindings(bindings).map((binding) => (
         <p role="note" className="lookup-note" key={binding.field}>
-          The <strong>{labelOf(document, binding.field)}</strong> list is filled by the runtime plane once the form is
-          published, from {binding.target.table.schema}.{binding.target.table.name} under its lookup filters. The studio
-          speaks only the administrator plane, so here the renderer says where the list would be.
+          The <strong>{labelOf(document, binding.field)}</strong> list is filled by the runtime plane once the form is published, from{' '}
+          {binding.target.table.schema}.{binding.target.table.name} under its lookup filters. The studio speaks only the administrator plane, so here the
+          renderer says where the list would be.
         </p>
       ))}
       <form className="sheet" aria-label={label} data-formancy-theme="blueprint" noValidate onSubmit={(event) => event.preventDefault()}>
@@ -67,8 +77,8 @@ export function PreviewStep({ session, bindings }: { session: BuilderSession; bi
   return (
     <>
       <p className="lede">
-        <strong>Validate</strong> runs the formancy engine in this browser against the document you are about to publish.
-        Nothing is saved: the studio writes forms, never records.
+        <strong>Validate</strong> runs the formancy engine in this browser against the document you are about to publish. Nothing is saved: the studio writes
+        forms, never records.
       </p>
       <FormPaper document={document} bindings={bindings} label={`${title} preview`} revision={session.revision()} />
     </>

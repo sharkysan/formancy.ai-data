@@ -30,25 +30,51 @@ const DEFAULT_ATTRIBUTE = 'tenant'
  * (0109), offered only where its foreign key is the root's key: shown under
  * each one as one form, while a column of it holds a value, or always.
  */
-function SectionChoice({ id, root, target, lookup, onLookup }: { id: string; root: ObjectMeta; target: ObjectMeta; lookup: LookupChoice; onLookup: (next: LookupChoice) => void }): ReactElement {
+function SectionChoice({
+  id,
+  root,
+  target,
+  lookup,
+  onLookup,
+}: {
+  id: string
+  root: ObjectMeta
+  target: ObjectMeta
+  lookup: LookupChoice
+  onLookup: (next: LookupChoice) => void
+}): ReactElement {
   const columns = conditionColumns(target)
   const when = lookup.section?.when ?? null
   const { section: _section, ...plain } = lookup
   return (
     <fieldset className="nested">
-      <legend>{root.ref.name} as a section of {target.ref.name}</legend>
+      <legend>
+        {root.ref.name} as a section of {target.ref.name}
+      </legend>
       <div className="check">
-        <input type="checkbox" id={`${id}-section`} checked={lookup.section !== undefined} aria-describedby={`${id}-section-about`} onChange={(event) => onLookup(event.target.checked ? { ...plain, section: { when: null } } : plain)} />
+        <input
+          type="checkbox"
+          id={`${id}-section`}
+          checked={lookup.section !== undefined}
+          aria-describedby={`${id}-section-about`}
+          onChange={(event) => onLookup(event.target.checked ? { ...plain, section: { when: null } } : plain)}
+        />
         <label htmlFor={`${id}-section`}>Show it under each {target.ref.name} as one form</label>
       </div>
       <p id={`${id}-section-about`} className="hint">
-        Its key is its foreign key onto {target.ref.name}, so a {target.ref.name} has at most one of its rows. A page shows that row under the{' '}
-        {target.ref.name} as a form of its own, not a grid.
+        Its key is its foreign key onto {target.ref.name}, so a {target.ref.name} has at most one of its rows. A page shows that row under the {target.ref.name}{' '}
+        as a form of its own, not a grid.
       </p>
       {lookup.section === undefined ? null : (
         <div className="condition">
           <label htmlFor={`${id}-when`}>Shown while</label>
-          <select id={`${id}-when`} value={when?.column ?? ''} onChange={(event) => onLookup({ ...plain, section: { when: event.target.value === '' ? null : { column: event.target.value, value: when?.value ?? '' } } })}>
+          <select
+            id={`${id}-when`}
+            value={when?.column ?? ''}
+            onChange={(event) =>
+              onLookup({ ...plain, section: { when: event.target.value === '' ? null : { column: event.target.value, value: when?.value ?? '' } } })
+            }
+          >
             <option value="">always</option>
             {columns.map((column) => (
               <option key={column.name} value={column.name}>
@@ -59,7 +85,12 @@ function SectionChoice({ id, root, target, lookup, onLookup }: { id: string; roo
           {when === null ? null : (
             <>
               <label htmlFor={`${id}-value`}>holds</label>
-              <input type="text" id={`${id}-value`} value={when.value} onChange={(event) => onLookup({ ...plain, section: { when: { column: when.column, value: event.target.value } } })} />
+              <input
+                type="text"
+                id={`${id}-value`}
+                value={when.value}
+                onChange={(event) => onLookup({ ...plain, section: { when: { column: when.column, value: event.target.value } } })}
+              />
             </>
           )}
         </div>
@@ -68,7 +99,17 @@ function SectionChoice({ id, root, target, lookup, onLookup }: { id: string; roo
   )
 }
 
-function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: MetadataSnapshot; root: ObjectMeta; choice: Choice; onChoice: (next: Choice) => void }): ReactElement {
+function LookupChoices({
+  snapshot,
+  root,
+  choice,
+  onChoice,
+}: {
+  snapshot: MetadataSnapshot
+  root: ObjectMeta
+  choice: Choice
+  onChoice: (next: Choice) => void
+}): ReactElement {
   const hidden = gapsAbout(snapshot, root.ref).filter((gap) => gap.aspect === 'foreign-keys')
   const toggle = (foreignKey: ForeignKeyMeta, target: ObjectMeta | undefined, on: boolean) => {
     const others = choice.lookups.filter((lookup) => lookup.foreignKey !== foreignKey.name)
@@ -165,15 +206,23 @@ function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: Metadat
   )
 }
 
-function Pins({ root, rowFilters, onRowFilters }: { root: ObjectMeta; rowFilters: readonly RowFilterRule[]; onRowFilters: (next: RowFilterRule[]) => void }): ReactElement {
+function Pins({
+  root,
+  rowFilters,
+  onRowFilters,
+}: {
+  root: ObjectMeta
+  rowFilters: readonly RowFilterRule[]
+  onRowFilters: (next: RowFilterRule[]) => void
+}): ReactElement {
   const hint = useId()
   return (
     <fieldset aria-describedby={hint}>
       <legend>Columns the policy pins to trusted context</legend>
       <p id={hint} className="hint">
-        A pinned column is never written from the form. A create takes its value from the signed-in person&rsquo;s attribute,
-        and every read, update and lookup is filtered by it: this is how a form is kept to one tenant. The generator shows
-        a pinned column read-only, and the policy&rsquo;s row filters are this list.
+        A pinned column is never written from the form. A create takes its value from the signed-in person&rsquo;s attribute, and every read, update and lookup
+        is filtered by it: this is how a form is kept to one tenant. The generator shows a pinned column read-only, and the policy&rsquo;s row filters are this
+        list.
       </p>
       {pinCandidates(root).map((column) => {
         const rule = rowFilters.find((entry) => entry.column === column.name)
@@ -202,7 +251,9 @@ function Pins({ root, rowFilters, onRowFilters }: { root: ObjectMeta; rowFilters
                   id={`${id}-attribute`}
                   value={rule.attribute}
                   spellCheck={false}
-                  onChange={(event) => onRowFilters(rowFilters.map((entry) => (entry.column === column.name ? { ...entry, attribute: event.target.value } : entry)))}
+                  onChange={(event) =>
+                    onRowFilters(rowFilters.map((entry) => (entry.column === column.name ? { ...entry, attribute: event.target.value } : entry)))
+                  }
                 />
               </div>
             )}
@@ -218,8 +269,8 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
   if (rowversion !== undefined) {
     return (
       <p className="hint">
-        {describeRef(root.ref)} has a rowversion column, <code>{rowversion.name}</code>: the database changes it on every
-        update, so a stale save is detected with nothing to confirm.
+        {describeRef(root.ref)} has a rowversion column, <code>{rowversion.name}</code>: the database changes it on every update, so a stale save is detected
+        with nothing to confirm.
       </p>
     )
   }
@@ -240,8 +291,8 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
         ))}
       </select>
       <p id="version-column-hint" className="hint">
-        {describeRef(root.ref)} has no rowversion. Confirm a column only if every writer of the table increments it on each
-        update; without one the form offers no update and no delete, because a stale save or delete could not be detected.
+        {describeRef(root.ref)} has no rowversion. Confirm a column only if every writer of the table increments it on each update; without one the form offers
+        no update and no delete, because a stale save or delete could not be detected.
       </p>
     </div>
   )
@@ -318,8 +369,8 @@ export function ChooseStep({
   return (
     <form className="choose" onSubmit={(event) => void submit(event)} noValidate>
       <p className="lede">
-        One table or view of <code>{connection}</code> becomes the form. Everything here goes to the generator as asked;
-        it decides the fields and says what it chose.
+        One table or view of <code>{connection}</code> becomes the form. Everything here goes to the generator as asked; it decides the fields and says what it
+        chose.
       </p>
       <div className="field">
         {/* Not `root`: index.html mounts the studio in #root, and a label points at the first element with its id. */}
@@ -373,8 +424,8 @@ export function ChooseStep({
           )}
           {generated !== null ? (
             <p className="hint">
-              A form is already generated. Generating again replaces it and starts its presentation afresh; the policy is
-              kept, and checked against the new form.
+              A form is already generated. Generating again replaces it and starts its presentation afresh; the policy is kept, and checked against the new
+              form.
             </p>
           ) : null}
           <p className="next">

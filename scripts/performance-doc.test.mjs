@@ -21,7 +21,10 @@ const RESULTS = join(root, 'docs', 'performance', 'results.json')
 const PAGE = join(root, 'docs', 'performance.md')
 
 function results() {
-  if (!existsSync(RESULTS)) throw new Error('docs/performance/results.json does not exist: no figures have been measured. Run "pnpm performance" on a quiet Linux machine (RELEASING.md).')
+  if (!existsSync(RESULTS))
+    throw new Error(
+      'docs/performance/results.json does not exist: no figures have been measured. Run "pnpm performance" on a quiet Linux machine (RELEASING.md).',
+    )
   return JSON.parse(readFileSync(RESULTS, 'utf8'))
 }
 

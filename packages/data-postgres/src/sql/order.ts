@@ -85,7 +85,8 @@ export function after(row: string, anchor: (index: number) => string, terms: rea
     if (past === undefined || (term.nulls !== null && term.nulls !== 'last')) throw new Error(`${term.column} has no place after a row this adapter can spell.`)
     const column = `${row}.${quoteIdentifier(term.column)}`
     const value = anchor(index)
-    const beyond = term.nulls === null ? `(${column} ${op(past)} ${value})` : `((${column} ${op(past)} ${value}) or (${column} is null and ${value} is not null))`
+    const beyond =
+      term.nulls === null ? `(${column} ${op(past)} ${value})` : `((${column} ${op(past)} ${value}) or (${column} is null and ${value} is not null))`
     const tied = term.nulls === null ? `(${column} ${op('=')} ${value})` : `((${column} ${op('=')} ${value}) or (${column} is null and ${value} is null))`
     rest = index === terms.length - 1 ? beyond : `(${beyond} or (${tied} and ${rest}))`
   }

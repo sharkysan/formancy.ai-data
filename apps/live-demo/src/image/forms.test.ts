@@ -31,7 +31,10 @@ const lookupBinding = (field: string, foreignKey: string, columns: string[], tab
   field,
   foreignKey,
   columns,
-  target: { table: { schema: 'sales', name: table }, columns: columns.map((column) => (column === 'tenant_id' ? 'tenant_id' : column === 'customer_no' ? 'customer_no' : 'id')) },
+  target: {
+    table: { schema: 'sales', name: table },
+    columns: columns.map((column) => (column === 'tenant_id' ? 'tenant_id' : column === 'customer_no' ? 'customer_no' : 'id')),
+  },
   display: ['name'],
   source: `demo.sales.${table}.${field}`,
   nullable: true,
@@ -91,7 +94,7 @@ describe('the demo forms', () => {
 
   // A role granted an operation the table does not give it -- or a role
   // the table names left out -- is a persona whose sentence lies.
-  test("grant each operation to exactly the roles ROLE_GRANTS gives it on that form", () => {
+  test('grant each operation to exactly the roles ROLE_GRANTS gives it on that form', () => {
     for (const spec of DEMO_FORM_SPECS) {
       const policy = demoPolicy({ ...spec, lookups: [] }, { ...orderBindings(), fields: [] })
       for (const operation of ['read', 'create', 'update', 'delete'] as const) {
@@ -109,10 +112,22 @@ describe('the demo forms', () => {
   // employee lookup and the customer offer every tenant's rows.
   test('filter each lookup by its foreign key, under whatever key the generator gave it', () => {
     expect(demoPolicy(order, orderBindings()).lookups).toEqual({ customer: [{ column: 'tenant_id', attribute: 'tenant' }], employee: [], employee_2: [] })
-    expect(demoPolicy(order, orderBindings('employee_2', 'employee', 'buyer')).lookups).toEqual({ buyer: [{ column: 'tenant_id', attribute: 'tenant' }], employee_2: [], employee: [] })
+    expect(demoPolicy(order, orderBindings('employee_2', 'employee', 'buyer')).lookups).toEqual({
+      buyer: [{ column: 'tenant_id', attribute: 'tenant' }],
+      employee_2: [],
+      employee: [],
+    })
     const lines = DEMO_FORM_SPECS.find((spec) => spec.id === 'order-line') as DemoFormSpec
-    const bindings: FormBindings = { ...orderBindings(), root: { schema: 'sales', name: 'order_line' }, fields: [lookupBinding('parent_order', 'fk_order_line_order', ['order_id'], 'order')] }
-    expect(demoPolicy(lines, bindings)).toMatchObject({ rowFilters: [], lookups: { parent_order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['parent_order'] })
+    const bindings: FormBindings = {
+      ...orderBindings(),
+      root: { schema: 'sales', name: 'order_line' },
+      fields: [lookupBinding('parent_order', 'fk_order_line_order', ['order_id'], 'order')],
+    }
+    expect(demoPolicy(lines, bindings)).toMatchObject({
+      rowFilters: [],
+      lookups: { parent_order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['parent_order'],
+    })
   })
 
   // Fail closed: a lookup nobody chose a filter for would otherwise offer
@@ -121,7 +136,9 @@ describe('the demo forms', () => {
   test('refuse a lookup the demo does not name, and a named one the generator did not make', () => {
     const extra = orderBindings()
     extra.fields.push(lookupBinding('shipment', 'fk_order_shipment', ['shipment_id'], 'shipment'))
-    expect(() => demoPolicy(order, extra)).toThrow('order: the generated form has a lookup over fk_order_shipment, and the demo says nothing of which of its rows it may offer')
+    expect(() => demoPolicy(order, extra)).toThrow(
+      'order: the generated form has a lookup over fk_order_shipment, and the demo says nothing of which of its rows it may offer',
+    )
     const missing = orderBindings()
     missing.fields = missing.fields.filter((binding) => binding.kind !== 'lookup' || binding.foreignKey !== 'fk_order_approved_by')
     expect(() => demoPolicy(order, missing)).toThrow('order: the demo names a lookup over fk_order_approved_by, and the generated form has none')

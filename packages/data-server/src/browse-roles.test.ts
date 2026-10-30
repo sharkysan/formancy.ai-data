@@ -24,25 +24,40 @@ describe('browseRolesSetting', () => {
 
   // Set and empty would read as "browsing is on" to whoever set it, and let nobody browse.
   test.each(['', ' ', ','])('stops on %j, which names no role', (text) => {
-    expect(browseRolesSetting(text, ON)).toEqual({ ok: false, problem: 'FORMANCY_DATA_BROWSE_ROLES is set and names no role. Name the roles that may browse, or leave it unset so that nobody does.' })
+    expect(browseRolesSetting(text, ON)).toEqual({
+      ok: false,
+      problem: 'FORMANCY_DATA_BROWSE_ROLES is set and names no role. Name the roles that may browse, or leave it unset so that nobody does.',
+    })
   })
 
   // The browse route is on the administrator's plane: a role the plane refuses at its door could browse nothing, and the deployment would have no browser it can reach.
   test('stops on a role that is not an administrator role, naming it', () => {
-    expect(browseRolesSetting('data-browser,data-reader', ON)).toEqual({ ok: false, problem: 'FORMANCY_DATA_BROWSE_ROLES names "data-reader", which is not in FORMANCY_DATA_ADMIN_ROLES: a browser is an administrator who may also read rows.' })
+    expect(browseRolesSetting('data-browser,data-reader', ON)).toEqual({
+      ok: false,
+      problem:
+        'FORMANCY_DATA_BROWSE_ROLES names "data-reader", which is not in FORMANCY_DATA_ADMIN_ROLES: a browser is an administrator who may also read rows.',
+    })
   })
 
   // Without the administrator's plane the setting would be read and nothing it says would happen.
   test('stops when the administrator plane is off', () => {
-    expect(browseRolesSetting('data-browser', { adminRoles: ['data-browser'], admin: false })).toEqual({ ok: false, problem: "FORMANCY_DATA_BROWSE_ROLES names browsers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and FORMANCY_DATA_ADMIN_ROLES, or leave it unset." })
+    expect(browseRolesSetting('data-browser', { adminRoles: ['data-browser'], admin: false })).toEqual({
+      ok: false,
+      problem:
+        "FORMANCY_DATA_BROWSE_ROLES names browsers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and FORMANCY_DATA_ADMIN_ROLES, or leave it unset.",
+    })
   })
 })
 
 describe('browseRolesProblem', () => {
   // An embedder passes the list itself, and adminRoutes holds it to the same rule under the option's own name.
   test('names the embedded options', () => {
-    expect(browseRolesProblem([], ['a'])).toBe('admin.browseRoles is set and names no role. Name the roles that may browse, or leave it unset so that nobody does.')
-    expect(browseRolesProblem(['b'], ['a'])).toBe('admin.browseRoles names "b", which is not in admin.adminRoles: a browser is an administrator who may also read rows.')
+    expect(browseRolesProblem([], ['a'])).toBe(
+      'admin.browseRoles is set and names no role. Name the roles that may browse, or leave it unset so that nobody does.',
+    )
+    expect(browseRolesProblem(['b'], ['a'])).toBe(
+      'admin.browseRoles names "b", which is not in admin.adminRoles: a browser is an administrator who may also read rows.',
+    )
     expect(browseRolesProblem(['a'], ['a'])).toBeUndefined()
   })
 })

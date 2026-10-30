@@ -10,31 +10,84 @@ const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '21474
 const NAME: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const BYTES: NormalizedType = { kind: 'binary', maxLength: null, fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 const ref = (name: string): ObjectRef => ({ schema: 'sales', name })
-const object = (name: string, kind: ObjectMeta['kind'], columns: ColumnMeta[], keys: Partial<Pick<ObjectMeta, 'primaryKey' | 'uniqueKeys'>> = {}): ObjectMeta => ({
-  ref: ref(name), kind, comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...keys,
+const object = (
+  name: string,
+  kind: ObjectMeta['kind'],
+  columns: ColumnMeta[],
+  keys: Partial<Pick<ObjectMeta, 'primaryKey' | 'uniqueKeys'>> = {},
+): ObjectMeta => ({
+  ref: ref(name),
+  kind,
+  comment: null,
+  columns,
+  primaryKey: null,
+  uniqueKeys: [],
+  foreignKeys: [],
+  checks: [],
+  rowSecurity: 'none',
+  ...keys,
 })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'postgres',
+  serverVersion: '17.6',
+  account: { user: 'owner', login: 'owner' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
-    object('country', 'table', [col('id', 1, INT32), col('iso_code', 2, NAME), col('name', 3, NAME), col('flag', 4, BYTES, { nullable: true }), col('shape', 5, { kind: 'unsupported' }, { nullable: true })], {
-      primaryKey: { name: 'pk_country', columns: ['id'] },
-      uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
-    }),
-    object('customer', 'table', [col('id', 1, INT32, { access: { select: false, insert: false, update: false } }), col('code', 2, NAME), col('note', 3, NAME, { nullable: true })], {
-      primaryKey: { name: 'pk_customer', columns: ['id'] },
-      uniqueKeys: [{ name: 'uq_customer_code', columns: ['code'] }],
-    }),
+    object(
+      'country',
+      'table',
+      [
+        col('id', 1, INT32),
+        col('iso_code', 2, NAME),
+        col('name', 3, NAME),
+        col('flag', 4, BYTES, { nullable: true }),
+        col('shape', 5, { kind: 'unsupported' }, { nullable: true }),
+      ],
+      {
+        primaryKey: { name: 'pk_country', columns: ['id'] },
+        uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
+      },
+    ),
+    object(
+      'customer',
+      'table',
+      [col('id', 1, INT32, { access: { select: false, insert: false, update: false } }), col('code', 2, NAME), col('note', 3, NAME, { nullable: true })],
+      {
+        primaryKey: { name: 'pk_customer', columns: ['id'] },
+        uniqueKeys: [{ name: 'uq_customer_code', columns: ['code'] }],
+      },
+    ),
     object('summary', 'view', [col('customer_no', 1, INT32, { nullable: true }), col('name', 2, NAME, { nullable: true }), col('order_count', 3, INT32)]),
     object('blobs', 'table', [col('data', 1, BYTES)]),
     object('secret', 'table', [col('id', 1, INT32, { access: { select: false, insert: true, update: true } })]),
   ],
 })
 
-const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({ object: ref(name), equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE, ...extra })
+const query = (name: string, extra: Partial<BrowseQuery> = {}): BrowseQuery => ({
+  object: ref(name),
+  equal: [],
+  filter: [],
+  search: '',
+  sort: [],
+  offset: 0,
+  limit: LIST_PAGE_SIZE,
+  ...extra,
+})
 
 function planned(name: string, extra: Partial<BrowseQuery> = {}) {
   const plan = planBrowse(SNAPSHOT, query(name, extra))
@@ -92,7 +145,14 @@ describe('planBrowse', () => {
     expect(plan.request.filters).toEqual({ kind: 'unrestricted' })
     expect(plan.request.through).toEqual([])
     expect(plan.request.equal).toEqual([])
-    expect(plan.request.search).toEqual({ text: 'Swi', columns: [{ name: 'id', type: INT32 }, { name: 'iso_code', type: NAME }, { name: 'name', type: NAME }] })
+    expect(plan.request.search).toEqual({
+      text: 'Swi',
+      columns: [
+        { name: 'id', type: INT32 },
+        { name: 'iso_code', type: NAME },
+        { name: 'name', type: NAME },
+      ],
+    })
     expect(plan.request.offset).toBe(50)
     expect(() => listTerms(plan.request)).not.toThrow()
   })
@@ -117,7 +177,11 @@ describe('planBrowse', () => {
   // A search over an object with no text or integer column would match nothing and look like an empty table.
   test('refuses a search where no shown column can be searched', () => {
     const dates = createSnapshot({
-      kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
+      kind: 'postgres',
+      serverVersion: '17.6',
+      account: { user: 'owner', login: 'owner' },
+      scope: { schemas: ['sales'] },
+      gaps: [],
       objects: [object('days', 'table', [col('day', 1, { kind: 'date' })])],
     })
     expect(planBrowse(dates, { ...query('days'), search: '2026' })).toMatchObject({ ok: false, code: 'not-searchable' })
@@ -127,7 +191,12 @@ describe('planBrowse', () => {
 describe('planBrowse, narrowed to equal values (0103)', () => {
   // A row followed through a foreign key is found by the values of its key's columns: each bound as a list binds a parent's, through the same listTerms check.
   test('narrows to the rows whose columns equal the values given', () => {
-    const plan = planned('country', { equal: [{ column: 'iso_code', value: 'CH' }, { column: 'id', value: '1' }] })
+    const plan = planned('country', {
+      equal: [
+        { column: 'iso_code', value: 'CH' },
+        { column: 'id', value: '1' },
+      ],
+    })
     expect(plan.request.equal).toEqual([
       { name: 'iso_code', type: NAME, value: 'CH' },
       { name: 'id', type: INT32, value: '1' },
@@ -145,10 +214,17 @@ describe('planBrowse, narrowed to equal values (0103)', () => {
   // Equality is a key's: a timestamp's instant has more than one spelling, and the engines compare it in different precisions, so a value equal on one could find nothing on the other.
   test('refuses to narrow by a kind no key has', () => {
     const stamps = createSnapshot({
-      kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
+      kind: 'postgres',
+      serverVersion: '17.6',
+      account: { user: 'owner', login: 'owner' },
+      scope: { schemas: ['sales'] },
+      gaps: [],
       objects: [object('events', 'table', [col('at', 1, { kind: 'timestamp', withTimeZone: true, precision: 6 })])],
     })
-    expect(planBrowse(stamps, { ...query('events'), equal: [{ column: 'at', value: '2026-10-26T12:00:00Z' }] })).toMatchObject({ ok: false, code: 'not-comparable' })
+    expect(planBrowse(stamps, { ...query('events'), equal: [{ column: 'at', value: '2026-10-26T12:00:00Z' }] })).toMatchObject({
+      ok: false,
+      code: 'not-comparable',
+    })
   })
 
   // A value its column cannot hold would make listTerms throw: a 500 for the page, where a refusal that says which column belongs.
@@ -161,7 +237,10 @@ describe('planBrowse, narrowed to equal values (0103)', () => {
 
   // listTerms throws on a column named twice; the planner is public, so it refuses before anything is built.
   test('refuses a column named twice', () => {
-    const twice = [{ column: 'id', value: '1' }, { column: 'id', value: '2' }]
+    const twice = [
+      { column: 'id', value: '1' },
+      { column: 'id', value: '2' },
+    ]
     expect(planBrowse(SNAPSHOT, query('country', { equal: twice }))).toMatchObject({ ok: false, code: 'not-comparable' })
   })
 })
@@ -169,7 +248,13 @@ describe('planBrowse, narrowed to equal values (0103)', () => {
 describe('planBrowse, filtered by a person (0104)', () => {
   // A condition is planned by columnFilter, the form list's own, and reaches the adapter through listTerms beside a follow's equal: both narrow, together.
   test('narrows by each condition on a shown column, beside a follow', () => {
-    const plan = planned('summary', { equal: [{ column: 'order_count', value: '2' }], filter: [{ column: 'customer_no', op: 'range', from: '1000', to: '1999' }, { column: 'name', op: 'null' }] })
+    const plan = planned('summary', {
+      equal: [{ column: 'order_count', value: '2' }],
+      filter: [
+        { column: 'customer_no', op: 'range', from: '1000', to: '1999' },
+        { column: 'name', op: 'null' },
+      ],
+    })
     expect(plan.request.filter).toEqual([
       { op: 'range', column: 'customer_no', type: INT32, from: '1000', to: '1999', before: null },
       { op: 'null', column: 'name' },
@@ -190,8 +275,16 @@ describe('planBrowse, filtered by a person (0104)', () => {
 
   // An operator the column does not offer, or a value it cannot hold, is refused as a form's list refuses it, naming the column and never the value.
   test('refuses what the column does not offer, or cannot hold', () => {
-    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'contains', text: '1' }] }))).toEqual({ ok: false, code: 'not-filterable', message: 'id offers no contains condition.' })
-    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'null' }] }))).toEqual({ ok: false, code: 'not-filterable', message: 'id offers no null condition.' })
+    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'contains', text: '1' }] }))).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'id offers no contains condition.',
+    })
+    expect(planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'null' }] }))).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'id offers no null condition.',
+    })
     const refused = planBrowse(SNAPSHOT, query('country', { filter: [{ column: 'id', op: 'equals', value: '1e3' }] }))
     expect(refused).toEqual({ ok: false, code: 'not-filterable', message: 'A value given for id is not one it can hold.' })
   })
@@ -205,7 +298,10 @@ describe('validateBrowseQuery', () => {
 
   // A follow is a browse narrowed by column and value, read as given: which columns may narrow it is the planner's question, asked over the server's own snapshot.
   test('reads an equal as columns and values', () => {
-    const equal = [{ column: 'tenant_id', value: '1' }, { column: 'customer_no', value: '1001' }]
+    const equal = [
+      { column: 'tenant_id', value: '1' },
+      { column: 'customer_no', value: '1001' },
+    ]
     expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, equal })).toEqual({ ok: true, query: query('country', { equal }) })
   })
 
@@ -218,12 +314,30 @@ describe('validateBrowseQuery', () => {
     ['an object with a third part', { object: { schema: 'sales', name: 'country', database: 'other' } }],
     ['an empty name', { object: { schema: 'sales', name: '' } }],
     ['a sort term with no direction', { object: ref('country'), sort: [{ column: 'name' }] }],
-    ['a column sorted twice', { object: ref('country'), sort: [{ column: 'name', direction: 'asc' }, { column: 'name', direction: 'desc' }] }],
+    [
+      'a column sorted twice',
+      {
+        object: ref('country'),
+        sort: [
+          { column: 'name', direction: 'asc' },
+          { column: 'name', direction: 'desc' },
+        ],
+      },
+    ],
     ['an equal that is not a list', { object: ref('country'), equal: { iso_code: 'CH' } }],
     ['an equal term with more than a column and a value', { object: ref('country'), equal: [{ column: 'iso_code', value: 'CH', op: 'like' }] }],
     ['an equal value that is not text', { object: ref('country'), equal: [{ column: 'id', value: 1 }] }],
     ['an equal value of NULL, which equals nothing', { object: ref('country'), equal: [{ column: 'id', value: null }] }],
-    ['a column narrowed twice', { object: ref('country'), equal: [{ column: 'id', value: '1' }, { column: 'id', value: '2' }] }],
+    [
+      'a column narrowed twice',
+      {
+        object: ref('country'),
+        equal: [
+          { column: 'id', value: '1' },
+          { column: 'id', value: '2' },
+        ],
+      },
+    ],
   ])('refuses %s as malformed', (_, body) => {
     expect(validateBrowseQuery(body)).toMatchObject({ ok: false, code: 'malformed' })
   })
@@ -231,8 +345,14 @@ describe('validateBrowseQuery', () => {
   // A filter is read by column, by the same reader a form's list reads by field (0104), so the two take the same conditions.
   test('reads a filter as conditions by column', () => {
     const filter = [{ column: 'name', op: 'contains', text: ' land ' }]
-    expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, filter })).toEqual({ ok: true, query: query('country', { filter: [{ column: 'name', op: 'contains', text: 'land' }] }) })
-    expect(validateBrowseQuery({ object: ref('country'), filter: [{ column: 'name', op: 'contains', text: 'x'.repeat(201) }] })).toMatchObject({ ok: false, code: 'not-filterable' })
+    expect(validateBrowseQuery({ object: { schema: 'sales', name: 'country' }, filter })).toEqual({
+      ok: true,
+      query: query('country', { filter: [{ column: 'name', op: 'contains', text: 'land' }] }),
+    })
+    expect(validateBrowseQuery({ object: ref('country'), filter: [{ column: 'name', op: 'contains', text: 'x'.repeat(201) }] })).toMatchObject({
+      ok: false,
+      code: 'not-filterable',
+    })
   })
 
   // The page and the search are a list's own checks, so a browse can never ask for more rows at once than a list.

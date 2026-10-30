@@ -34,7 +34,7 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
     if (!Array.isArray(display) || !display.every((column) => typeof column === 'string')) return undefined
     const read = sectionOf(entry['section'])
     if (read === null) return undefined
-    choices.push({ foreignKey: entry['foreignKey'], display: [...(display as string[])], ...(read.section === undefined ? {} : { section: read.section }) })
+    choices.push({ foreignKey: entry['foreignKey'], display: [...display], ...(read.section === undefined ? {} : { section: read.section }) })
   }
   return choices
 }
@@ -60,7 +60,7 @@ export function readGeneration(value: unknown): GenerationReading {
   if (typeof title !== 'string') problems.push('title must be text')
   const lookups = lookupChoices(value['lookups'])
   if (lookups === undefined) problems.push('lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null } }')
-  const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...(pinned as string[])] : undefined
+  const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...pinned] : undefined
   if (pinnedColumns === undefined) problems.push('pinned must be a list of columns')
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')
   const chain = validityOf(validity)

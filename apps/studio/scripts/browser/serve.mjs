@@ -19,7 +19,14 @@ export const DIST = join(APP, 'dist')
 /** The policy nginx.conf sends with the page and every file under it. */
 export const POLICY = pagePolicy('/studio/')
 
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.woff': 'font/woff' }
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+}
 
 export function serve(plane) {
   const http = createServer((request, response) => {

@@ -67,7 +67,11 @@ const customer = (renderer: RendererName): HTMLElement => within(paper(renderer)
 /** What the open list offers, by name; empty when it is closed, since a closed listbox is hidden. */
 function offered(renderer: RendererName): string[] {
   const list = within(paper(renderer)).queryByRole('listbox', { name: 'Customer suggestions' })
-  return list === null ? [] : within(list).getAllByRole('option').map((option) => computeAccessibleName(option))
+  return list === null
+    ? []
+    : within(list)
+        .getAllByRole('option')
+        .map((option) => computeAccessibleName(option))
 }
 
 /** The option the combobox names active, by name. A DOM read: `aria-activedescendant` is an id. */
@@ -96,7 +100,17 @@ function searchesOf(formId: string, from = 0): unknown[] {
  * the wrong thing fails here, naming what the list said instead.
  */
 async function listing(renderer: RendererName, formId: string, query: string, from: number, names: readonly string[], more: boolean): Promise<void> {
-  await waitFor(() => expect({ renderer, query, sent: searchesOf(formId, from).includes(query), offered: offered(renderer), more: saysMore(renderer) }).toEqual({ renderer, query, sent: true, offered: names, more }), ARRIVES)
+  await waitFor(
+    () =>
+      expect({ renderer, query, sent: searchesOf(formId, from).includes(query), offered: offered(renderer), more: saysMore(renderer) }).toEqual({
+        renderer,
+        query,
+        sent: true,
+        offered: names,
+        more,
+      }),
+    ARRIVES,
+  )
 }
 
 /** Press Tab until `target` has the keyboard, as a person reaches a field; fails when it never does. */
@@ -152,7 +166,11 @@ describe.each(ENGINES)('a lookup whose list goes on, on $engine', (engine) => {
     await user.keyboard('{ArrowDown}')
     await waitFor(() => expect({ renderer, offered: offered(renderer), more: saysMore(renderer) }).toEqual({ renderer, offered: FIRST, more: true }), ARRIVES)
     await user.keyboard('{End}')
-    expect({ renderer, active: active(renderer), later: offered(renderer).filter((name) => name.startsWith('Later')) }).toEqual({ renderer, active: FIRST.at(-1), later: [] })
+    expect({ renderer, active: active(renderer), later: offered(renderer).filter((name) => name.startsWith('Later')) }).toEqual({
+      renderer,
+      active: FIRST.at(-1),
+      later: [],
+    })
 
     let from = plane.sent.length
     await user.keyboard('First')
@@ -163,7 +181,12 @@ describe.each(ENGINES)('a lookup whose list goes on, on $engine', (engine) => {
     await listing(renderer, engine.formId, 'Later 07', from, ['Later 07'], false)
     await user.keyboard('{ArrowDown}{Enter}')
     await shows(renderer, 'Customer', 'Later 07')
-    expect({ renderer, focused: focusedName(), offered: offered(renderer), more: saysMore(renderer) }).toEqual({ renderer, focused: 'Customer', offered: [], more: false })
+    expect({ renderer, focused: focusedName(), offered: offered(renderer), more: saysMore(renderer) }).toEqual({
+      renderer,
+      focused: 'Customer',
+      offered: [],
+      more: false,
+    })
 
     await user.keyboard('{ArrowDown}')
     await waitFor(() => expect({ renderer, more: saysMore(renderer) }).toEqual({ renderer, more: true }), ARRIVES)
@@ -188,9 +211,17 @@ describe.each(ENGINES)('a lookup whose list goes on, on $engine', (engine) => {
     await newRecord(user)
     for (const renderer of RENDERERS) {
       // Its label carries the required mark in one renderer.
-      const order = (): HTMLElement => within(within(pane(renderer)).getByRole('form', { name: `Order line, ${renderer}` })).getByRole('combobox', { name: /^Order\*?$/ })
+      const order = (): HTMLElement =>
+        within(within(pane(renderer)).getByRole('form', { name: `Order line, ${renderer}` })).getByRole('combobox', { name: /^Order\*?$/ })
       await waitFor(() => expect({ renderer, more: statuses(renderer).includes(MORE_LISTED) }).toEqual({ renderer, more: true }), ARRIVES)
-      expect({ renderer, tag: order().tagName, options: within(order()).getAllByRole('option').filter((option) => computeAccessibleName(option) !== '').length, typeahead: statuses(renderer).includes(MORE) }).toEqual({ renderer, tag: 'SELECT', options: DEFAULT_MAX_PAGE_SIZE, typeahead: false })
+      expect({
+        renderer,
+        tag: order().tagName,
+        options: within(order())
+          .getAllByRole('option')
+          .filter((option) => computeAccessibleName(option) !== '').length,
+        typeahead: statuses(renderer).includes(MORE),
+      }).toEqual({ renderer, tag: 'SELECT', options: DEFAULT_MAX_PAGE_SIZE, typeahead: false })
     }
   })
 

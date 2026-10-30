@@ -53,8 +53,10 @@ const OPTIONS = { setup: ['--admin', '--team', '--aud', '--app', '--app-service'
 function hostProblem(flag, value) {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return `${flag} ${value} is a URL; give the hostname alone, such as formancy.example.com.`
   if (/[/?#]/.test(value)) return `${flag} ${value} holds a path; a door is a whole hostname, so give the hostname alone.`
-  if (/[A-Z]/.test(value)) return `${flag} ${value} has upper-case letters; cloudflared matches a rule's hostname as written, and a browser sends it in lower case, so write it in lower case.`
-  if (!HOST.test(value)) return `${flag} ${value} is not a DNS name: lower-case letters, digits and hyphens, in labels separated by dots, such as formancy.example.com.`
+  if (/[A-Z]/.test(value))
+    return `${flag} ${value} has upper-case letters; cloudflared matches a rule's hostname as written, and a browser sends it in lower case, so write it in lower case.`
+  if (!HOST.test(value))
+    return `${flag} ${value} is not a DNS name: lower-case letters, digits and hyphens, in labels separated by dots, such as formancy.example.com.`
   return undefined
 }
 
@@ -85,7 +87,8 @@ export function parseInputs(argv, tool = 'setup') {
   }
   if (given['--admin'] === undefined) problems.push('--admin is required: the administrator’s hostname, such as formancy.example.com.')
   if (given['--team'] === undefined) problems.push('--team is required: your Zero Trust team name, as in <team>.cloudflareaccess.com.')
-  if (tool === 'setup' && given['--aud'] === undefined) problems.push('--aud is required: the AUD tag of the Access application on the administrator’s hostname.')
+  if (tool === 'setup' && given['--aud'] === undefined)
+    problems.push('--aud is required: the AUD tag of the Access application on the administrator’s hostname.')
   for (const flag of ['--admin', '--app', '--drop']) {
     if (given[flag] === undefined) continue
     const problem = hostProblem(flag, given[flag])
@@ -103,7 +106,9 @@ export function parseInputs(argv, tool = 'setup') {
   if (given['--app-service'] !== undefined) {
     if (given['--app'] === undefined) problems.push('--app-service needs --app: it names the service that answers the rest of that hostname.')
     if (!SERVICE.test(given['--app-service'])) {
-      problems.push('--app-service must be http://host:port or https://host:port, the host application’s own service on compose’s network, with no path, query or credentials.')
+      problems.push(
+        '--app-service must be http://host:port or https://host:port, the host application’s own service on compose’s network, with no path, query or credentials.',
+      )
     }
   }
   if (problems.length > 0) return { ok: false, problems }
@@ -161,7 +166,10 @@ export function droppedDoors(configText, doors, inputs) {
   const removed = before.filter((entry) => !after.includes(`${entry.hostname} ${entry.door}`))
   const problems = removed
     .filter((entry) => entry.hostname !== inputs.drop)
-    .map((entry) => `The configuration in use ${DOOR_SAYS[entry.door](entry.hostname)}, and these arguments would not: give the arguments setup was given, or add --drop ${entry.hostname} to remove it.`)
+    .map(
+      (entry) =>
+        `The configuration in use ${DOOR_SAYS[entry.door](entry.hostname)}, and these arguments would not: give the arguments setup was given, or add --drop ${entry.hostname} to remove it.`,
+    )
   if (inputs.drop !== undefined && !removed.some((entry) => entry.hostname === inputs.drop)) {
     problems.push(`--drop ${inputs.drop} removes no door: the configuration in use opens none on it that these arguments leave out.`)
   }
@@ -308,7 +316,8 @@ export const MEASURED = [
 const segmentsOf = (path) => path.split('/').slice(1)
 
 /** Whether a route's tail `template` (its segments, `:name` for a parameter) matches the path segments `values`. */
-const tailMatches = (template, values) => template.length === values.length && template.every((segment, index) => segment.startsWith(':') || segment === values[index])
+const tailMatches = (template, values) =>
+  template.length === values.length && template.every((segment, index) => segment.startsWith(':') || segment === values[index])
 
 /**
  * Paths a proxy that decodes and resolves before it matches could send to
@@ -326,7 +335,9 @@ const tailMatches = (template, values) => template.length === values.length && t
  * removes a segment after the parameter.
  */
 export function hostilePaths(doors, { statics = [] } = {}) {
-  const runtime = doors.routes.filter((route) => route.plane === 'runtime').map((route) => ({ template: segmentsOf(route.path), sample: segmentsOf(route.sample) }))
+  const runtime = doors.routes
+    .filter((route) => route.plane === 'runtime')
+    .map((route) => ({ template: segmentsOf(route.path), sample: segmentsOf(route.sample) }))
   const found = new Map()
   for (const route of doors.routes.filter((entry) => entry.plane !== 'runtime')) {
     const template = segmentsOf(route.path)
@@ -348,7 +359,8 @@ export function hostilePaths(doors, { statics = [] } = {}) {
       }
     })
   }
-  for (const entry of [...staticClimbs(doors, statics), ...MEASURED]) if (!found.has(`${entry.method} ${entry.path}`)) found.set(`${entry.method} ${entry.path}`, entry)
+  for (const entry of [...staticClimbs(doors, statics), ...MEASURED])
+    if (!found.has(`${entry.method} ${entry.path}`)) found.set(`${entry.method} ${entry.path}`, entry)
   return [...found.values()]
 }
 
@@ -381,7 +393,12 @@ export function staticClimbs(doors, statics) {
         for (const slash of ['%5C', '\\', '%2F']) {
           for (const up of ['%2E%2E', '..']) {
             const climb = [...Array.from({ length: depth }, () => '..'), ...head, 'Z'].join(slash)
-            found.push({ method: 'GET', path: `${base}${climb}/${up}/${file.split('/').at(-1)}`, route: `the web front's ${location}`, climb: `${slash} out of ${base}` })
+            found.push({
+              method: 'GET',
+              path: `${base}${climb}/${up}/${file.split('/').at(-1)}`,
+              route: `the web front's ${location}`,
+              climb: `${slash} out of ${base}`,
+            })
           }
         }
       }

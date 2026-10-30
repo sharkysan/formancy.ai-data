@@ -40,7 +40,11 @@ export type SearchCheck = { ok: true; search: string } | { ok: false; code: Sear
 export function checkSearch(search: unknown): SearchCheck {
   if (typeof search !== 'string') return { ok: false, code: 'malformed', message: 'The search is text, and may be empty.' }
   if (search.length > MAX_SEARCH_LENGTH) {
-    return { ok: false, code: 'search-too-long', message: `A search is at most ${String(MAX_SEARCH_LENGTH)} characters, and this one has ${String(search.length)}.` }
+    return {
+      ok: false,
+      code: 'search-too-long',
+      message: `A search is at most ${String(MAX_SEARCH_LENGTH)} characters, and this one has ${String(search.length)}.`,
+    }
   }
   const trimmed = search.trim()
   if (CONTROL.test(trimmed)) return { ok: false, code: 'search-control-character', message: 'A search cannot contain a control character.' }

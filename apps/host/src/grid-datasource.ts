@@ -1,6 +1,7 @@
 import type { IDatasource, IGetRowsParams, SortModelItem } from 'ag-grid-community'
 import type { DataClient, FormRecord, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { sameSort } from './views.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What a record grid asks the runtime plane for, and what it says about the
@@ -52,7 +53,7 @@ export function columnsOf(definition: PublishedForm, parentField: string | null)
     .filter((field) => readable.has(field.key) && field.key !== parentField)
     .map((field) => {
       const source = (field as { optionsSource?: unknown }).optionsSource
-      return { key: field.key, label: String(field.label ?? field.key), sortable: sortable.has(field.key), source: typeof source === 'string' ? source : null }
+      return { key: field.key, label: fieldHeading(field), sortable: sortable.has(field.key), source: typeof source === 'string' ? source : null }
     })
 }
 
@@ -89,7 +90,13 @@ export function listQuery({
 
 /** A page's records as grid rows, each with an id; labels are filled in afterwards. */
 export function rowsOf(records: readonly FormRecord[], start: number): GridRow[] {
-  return records.map((row, index) => ({ id: row.record ?? `row-${String(start + index)}`, record: row.record, version: row.version, answers: row.answers, labels: {} }))
+  return records.map((row, index) => ({
+    id: row.record ?? `row-${String(start + index)}`,
+    record: row.record,
+    version: row.version,
+    answers: row.answers,
+    labels: {},
+  }))
 }
 
 /** What a cell shows: a lookup's label where the server gave one, otherwise the answer as the form holds it. */
@@ -98,7 +105,11 @@ export function cellText(row: GridRow | undefined, column: GridColumn): string {
   const label = row.labels[column.key]
   if (label !== undefined) return label
   const value = row.answers[column.key]
-  return value === null || value === undefined ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return value === null || value === undefined
+    ? ''
+    : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint'
+      ? String(value)
+      : JSON.stringify(value)
 }
 
 const range = (from: number, to: number): string => `${String(from)}–${String(to)}`
@@ -220,7 +231,11 @@ export function createDatasource({
   /** The cursor each block is asked for after, by the row it starts at. */
   const cursors = new Map<number, string | null>([[0, null]])
 
-  async function rowsFor(params: IGetRowsParams, query: RecordListQuery, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean; next: string | null } | { refused: string; code: string }> {
+  async function rowsFor(
+    params: IGetRowsParams,
+    query: RecordListQuery,
+    signal: AbortSignal,
+  ): Promise<{ rows: GridRow[]; hasMore: boolean; next: string | null } | { refused: string; code: string }> {
     const page = await client.list(formId, query, signal)
     if (!page.ok) return { refused: page.message, code: page.code }
     const rows = rowsOf(page.value.rows, params.startRow)

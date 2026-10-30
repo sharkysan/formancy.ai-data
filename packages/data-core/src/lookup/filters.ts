@@ -15,9 +15,7 @@ import { isKeyValue, isLookupKeyType } from './values.js'
  */
 
 /** A scoping, or why the policy or the context cannot be applied. */
-export type FilterScoping =
-  | { ok: true; filters: RowFilters }
-  | { ok: false; code: 'invalid-policy' | 'invalid-context'; message: string }
+export type FilterScoping = { ok: true; filters: RowFilters } | { ok: false; code: 'invalid-policy' | 'invalid-context'; message: string }
 
 /**
  * Why a row filter cannot compare this column of `object`, or null: absent,
@@ -129,7 +127,8 @@ function term(entry: unknown): RowFilterTerm {
   if (typeof column !== 'string' || column === '' || typeof value !== 'string') throw new Error('A row filter is a column name and a text value.')
   const typed = rowFilterType(type)
   if (typed === undefined) throw new Error(UNTYPED)
-  if (!isKeyValue(typed, value)) throw new Error(`The row filter value for ${column} is not spelled as its column holds it, so it could match nothing the column reads back.`)
+  if (!isKeyValue(typed, value))
+    throw new Error(`The row filter value for ${column} is not spelled as its column holds it, so it could match nothing the column reads back.`)
   return { column, type: typed, value }
 }
 

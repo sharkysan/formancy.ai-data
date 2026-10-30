@@ -49,8 +49,8 @@ describe('the Versions of a root', () => {
     const choose = await choosePrice(user)
     expect(within(choose).queryByLabelText('Valid from')).toBeNull()
     await user.click(within(choose).getByRole('checkbox', { name: 'Each row of sales.price is a version, valid from a date until the next one starts' }))
-    expect((within(choose).getByLabelText('Valid from') as HTMLSelectElement).value).toBe('valid_from')
-    expect((within(choose).getByLabelText('Valid until, empty while open') as HTMLSelectElement).value).toBe('valid_to')
+    expect(within(choose).getByLabelText<HTMLSelectElement>('Valid from').value).toBe('valid_from')
+    expect(within(choose).getByLabelText<HTMLSelectElement>('Valid until, empty while open').value).toBe('valid_to')
     expect(unnamed()).toEqual([])
     expect(await audit()).toEqual([])
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
@@ -84,8 +84,11 @@ describe('the Versions of a root', () => {
     const regenerated = await within(drift).findByRole('region', { name: 'Regenerated from version 1' })
     await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
     const again = await goTo(user, 'Choose')
-    expect(within(again).getByRole('checkbox', { name: 'Each row of sales.price is a version, valid from a date until the next one starts' })).toHaveProperty('checked', true)
-    expect((within(again).getByLabelText('Valid from') as HTMLSelectElement).value).toBe('valid_from')
+    expect(within(again).getByRole('checkbox', { name: 'Each row of sales.price is a version, valid from a date until the next one starts' })).toHaveProperty(
+      'checked',
+      true,
+    )
+    expect(within(again).getByLabelText<HTMLSelectElement>('Valid from').value).toBe('valid_from')
     await user.click(within(again).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     expect(lastProposal().validity).toEqual({ from: 'valid_from', to: 'valid_to' })

@@ -48,7 +48,10 @@ const acts = {
   // §3, scene 2: both sales.order previews after Validate, with a status
   // given and an amount one decimal past the column's scale.
   'examples-order': async (page) => {
-    const parts = { React: page.getByRole('region', { name: 'sales.order React', exact: true }), Angular: page.getByRole('region', { name: 'sales.order Angular', exact: true }) }
+    const parts = {
+      React: page.getByRole('region', { name: 'sales.order React', exact: true }),
+      Angular: page.getByRole('region', { name: 'sales.order Angular', exact: true }),
+    }
     for (const part of Object.values(parts)) {
       await fillField(part, part.getByRole('textbox', { name: 'Status', exact: true }), 'placed', { within: WITHIN })
       await fillField(part, part.getByRole('textbox', { name: field('Amount') }), AMOUNT, { within: WITHIN })

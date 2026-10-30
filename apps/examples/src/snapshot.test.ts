@@ -20,7 +20,7 @@ describe('the committed fixture snapshot', () => {
   // render a form for a database that does not exist, on a page that says it
   // was captured from PostgreSQL. The fingerprint is recomputed over the
   // contents, so every edit that is not a re-capture fails here.
-  test("its fingerprint is what createSnapshot computes over its contents", () => {
+  test('its fingerprint is what createSnapshot computes over its contents', () => {
     const { fingerprint, ...contents } = committed()
     expect(createSnapshot(contents).fingerprint).toBe(fingerprint)
   })

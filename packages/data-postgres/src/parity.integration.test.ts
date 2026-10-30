@@ -16,7 +16,21 @@ import type {
   UpdateRequest,
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { covers, defined, DISPLAY_PARITY, displayCase, FILTER_PARITY, filterCase, PARITY_SCOPE, REFUSAL_PARITY, refusalCase, startPostgresFixture, TEMPORAL_PARITY, temporalCase, versionFact } from '@formancy/data-fixtures'
+import {
+  covers,
+  defined,
+  DISPLAY_PARITY,
+  displayCase,
+  FILTER_PARITY,
+  filterCase,
+  PARITY_SCOPE,
+  REFUSAL_PARITY,
+  refusalCase,
+  startPostgresFixture,
+  TEMPORAL_PARITY,
+  temporalCase,
+  versionFact,
+} from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -72,7 +86,11 @@ function val(table: string, name: string, value: ApiValue): RecordValue {
 }
 
 function versioned(table: string, identity: readonly string[]): RecordTarget & UpdateRequest['target'] {
-  return { table: { schema: 'parity', name: table }, identity: identity.map((name) => col(table, name)), concurrency: { kind: 'version-column', column: 'version' } }
+  return {
+    table: { schema: 'parity', name: table },
+    identity: identity.map((name) => col(table, name)),
+    concurrency: { kind: 'version-column', column: 'version' },
+  }
 }
 
 /** The filters a policy's rule on tenant_item becomes, scoped as the planner and the server scope them. */
@@ -133,9 +151,18 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
       test(`${entry.column} = '${entry.value}' is refused before any SQL is built`, covers('postgres', filterCase(entry)), async () => {
         const scoping = scopeRowFilters(objectOf('tenant_item'), [{ column: entry.column, value: entry.value }], 'parity')
         expect(scoping).toMatchObject({ ok: false, code: entry.refused })
-        const forged = { kind: 'restricted', equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }] } as unknown as RowFilters
+        const forged = {
+          kind: 'restricted',
+          equal: [{ column: entry.column, type: col('tenant_item', entry.column).type, value: entry.value }],
+        } as unknown as RowFilters
         await expect(createPostgresLookups(owner).search(items(), FIRST_PAGE, forged, NEVER)).rejects.toThrow(/not spelled as its column holds it/)
-        const read = defined(createPostgresRecords(owner)).read({ target: tenantItem(), key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')], columns: [], filters: forged, through: [] })
+        const read = defined(createPostgresRecords(owner)).read({
+          target: tenantItem(),
+          key: [val('tenant_item', 'tenant_code', 'acme'), val('tenant_item', 'item_no', '1')],
+          columns: [],
+          filters: forged,
+          through: [],
+        })
         await expect(read).rejects.toThrow(/not spelled as its column holds it/)
       })
       continue
@@ -147,60 +174,69 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
     // Server, comparing differently, disagreed. Every path a filter scopes is
     // run: the lookup's page, its resolve and its membership, a list of the
     // table's records (0044), a read and an update.
-    test(`${entry.column} = '${entry.value}' selects exactly ${String(entry.keys.length)} named row(s), in every operation`, covers('postgres', filterCase(entry)), async () => {
-      const filters = scoped(entry.column, entry.value)
-      const expected = new Set(entry.keys.map((key) => tokenOf(...key)))
-      const named = NAMED.map((key) => tokenOf(...key))
-      const lookups = createPostgresLookups(owner)
+    test(
+      `${entry.column} = '${entry.value}' selects exactly ${String(entry.keys.length)} named row(s), in every operation`,
+      covers('postgres', filterCase(entry)),
+      async () => {
+        const filters = scoped(entry.column, entry.value)
+        const expected = new Set(entry.keys.map((key) => tokenOf(...key)))
+        const named = NAMED.map((key) => tokenOf(...key))
+        const lookups = createPostgresLookups(owner)
 
-      const page = await lookups.search(items(), FIRST_PAGE, filters, NEVER)
-      expect(new Set(page.rows.map((row) => row.token))).toEqual(expected)
-      expect(page.hasMore).toBe(false)
-      expect(new Set((await lookups.resolve(items(), named, filters, NEVER)).map((row) => row.token))).toEqual(expected)
-      expect(new Set(await lookups.rejects(items(), named, filters, NEVER))).toEqual(new Set(named.filter((token) => !expected.has(token))))
+        const page = await lookups.search(items(), FIRST_PAGE, filters, NEVER)
+        expect(new Set(page.rows.map((row) => row.token))).toEqual(expected)
+        expect(page.hasMore).toBe(false)
+        expect(new Set((await lookups.resolve(items(), named, filters, NEVER)).map((row) => row.token))).toEqual(expected)
+        expect(new Set(await lookups.rejects(items(), named, filters, NEVER))).toEqual(new Set(named.filter((token) => !expected.has(token))))
 
-      // A list of the table under the same filter lists exactly those rows (0044).
-      const listed = await createPostgresRecords(owner).list({
-        target: tenantItem(),
-        columns: [col('tenant_item', 'tenant_code'), col('tenant_item', 'item_no')],
-        filters, through: [],
-        equal: [],
-        filter: [],
-        search: null,
-        sort: [{ column: 'tenant_code', direction: 'asc', nulls: null }, { column: 'item_no', direction: 'asc', nulls: null }],
-        after: null,
-        offset: 0,
-        limit: 50,
-      })
-      if (!listed.ok) throw new Error(`expected a page, got ${listed.code}`)
-      expect(new Set(listed.rows.map((row) => tokenOf(String(row.values['tenant_code']), String(row.values['item_no']))))).toEqual(expected)
-
-      const records = defined(createPostgresRecords(owner))
-      const before = await namedRows()
-      for (const [tenant, item] of NAMED) {
-        const key = [val('tenant_item', 'tenant_code', tenant), val('tenant_item', 'item_no', item)]
-        const token = tokenOf(tenant, item)
-        const read = await records.read({ target: tenantItem(), key, columns: [col('tenant_item', 'label')], filters, through: [] })
-        expect(read.ok ? 'found' : read.code, token).toBe(expected.has(token) ? 'found' : 'not-found')
-        const row = before.get(token)
-        if (row === undefined) throw new Error(`${token} is not a named row`)
-        const update = await records.update({
+        // A list of the table under the same filter lists exactly those rows (0044).
+        const listed = await createPostgresRecords(owner).list({
           target: tenantItem(),
-          key,
-          set: [val('tenant_item', 'label', row.label)],
-          expectedVersion: row.version,
-          filters, through: [],
-          returning: [],
+          columns: [col('tenant_item', 'tenant_code'), col('tenant_item', 'item_no')],
+          filters,
+          through: [],
+          equal: [],
+          filter: [],
+          search: null,
+          sort: [
+            { column: 'tenant_code', direction: 'asc', nulls: null },
+            { column: 'item_no', direction: 'asc', nulls: null },
+          ],
+          after: null,
+          offset: 0,
+          limit: 50,
         })
-        expect(update.ok ? 'written' : update.code, token).toBe(expected.has(token) ? 'written' : 'not-found')
-      }
-      // The update moved the version of the rows inside the filter, and of no other.
-      const after = await namedRows()
-      for (const token of named) {
-        const moved = BigInt(after.get(token)?.version ?? '0') - BigInt(before.get(token)?.version ?? '0')
-        expect(moved, token).toBe(expected.has(token) ? 1n : 0n)
-      }
-    })
+        if (!listed.ok) throw new Error(`expected a page, got ${listed.code}`)
+        expect(new Set(listed.rows.map((row) => tokenOf(String(row.values['tenant_code']), String(row.values['item_no']))))).toEqual(expected)
+
+        const records = defined(createPostgresRecords(owner))
+        const before = await namedRows()
+        for (const [tenant, item] of NAMED) {
+          const key = [val('tenant_item', 'tenant_code', tenant), val('tenant_item', 'item_no', item)]
+          const token = tokenOf(tenant, item)
+          const read = await records.read({ target: tenantItem(), key, columns: [col('tenant_item', 'label')], filters, through: [] })
+          expect(read.ok ? 'found' : read.code, token).toBe(expected.has(token) ? 'found' : 'not-found')
+          const row = before.get(token)
+          if (row === undefined) throw new Error(`${token} is not a named row`)
+          const update = await records.update({
+            target: tenantItem(),
+            key,
+            set: [val('tenant_item', 'label', row.label)],
+            expectedVersion: row.version,
+            filters,
+            through: [],
+            returning: [],
+          })
+          expect(update.ok ? 'written' : update.code, token).toBe(expected.has(token) ? 'written' : 'not-found')
+        }
+        // The update moved the version of the rows inside the filter, and of no other.
+        const after = await namedRows()
+        for (const token of named) {
+          const moved = BigInt(after.get(token)?.version ?? '0') - BigInt(before.get(token)?.version ?? '0')
+          expect(moved, token).toBe(expected.has(token) ? 1n : 0n)
+        }
+      },
+    )
   }
 
   // The first conjunct compares in the column's own type and collation, so
@@ -216,7 +252,10 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
     const nodes = flatten(plan[0].Plan)
     const index = nodes.find((node) => node['Index Name'] === 'pk_tenant_item')
     expect(index?.['Index Cond'], JSON.stringify(plan)).toMatch(/tenant_code/)
-    expect(nodes.some((node) => /COLLATE "C"/.test(node.Filter ?? '')), JSON.stringify(plan)).toBe(true)
+    expect(
+      nodes.some((node) => /COLLATE "C"/.test(node.Filter ?? '')),
+      JSON.stringify(plan),
+    ).toBe(true)
   })
 })
 
@@ -240,7 +279,8 @@ describe('an exact filter with objects planted on the search path', () => {
     const ask = async (driver: Sql) => {
       const lookups = createPostgresLookups(driver)
       const answers: string[][] = []
-      for (const entry of cases) answers.push((await lookups.search(items(), FIRST_PAGE, scoped(entry.column, entry.value), NEVER)).rows.map((row) => row.token).sort())
+      for (const entry of cases)
+        answers.push((await lookups.search(items(), FIRST_PAGE, scoped(entry.column, entry.value), NEVER)).rows.map((row) => row.token).sort())
       return answers
     }
     const expected = cases.map((entry) => ('keys' in entry ? entry.keys.map((key) => tokenOf(...key)).sort() : []))
@@ -287,7 +327,13 @@ describe('an unconstrained numeric, which only PostgreSQL has', () => {
     const scoping = scopeRowFilters(amount, [{ column: 'amount', value: '12.5' }], 'measured')
     if (!scoping.ok) throw new Error(scoping.message)
 
-    const { bindings } = generateForm(measured, { connection: 'test', root: { schema: 'measured', name: 'amount_use' }, formId: 'measured', title: 'Measured', lookups: [{ foreignKey: 'fk_amount_use_amount', display: ['amount'] }] })
+    const { bindings } = generateForm(measured, {
+      connection: 'test',
+      root: { schema: 'measured', name: 'amount_use' },
+      formId: 'measured',
+      title: 'Measured',
+      lookups: [{ foreignKey: 'fk_amount_use_amount', display: ['amount'] }],
+    })
     const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
     if (field === undefined) throw new Error('the generator made no lookup for fk_amount_use_amount')
     const config = buildLookupConfig(bindings, field.field, { snapshot: measured })
@@ -299,7 +345,13 @@ describe('an unconstrained numeric, which only PostgreSQL has', () => {
     const target: RecordTarget = { table: amount.ref, identity: [{ name: 'id', type: idType }], concurrency: null }
     const found: string[] = []
     for (const id of ['1', '2', '3']) {
-      const read = await defined(createPostgresRecords(owner)).read({ target, key: [{ name: 'id', type: idType, value: id }], columns: [], filters: scoping.filters, through: [] })
+      const read = await defined(createPostgresRecords(owner)).read({
+        target,
+        key: [{ name: 'id', type: idType, value: id }],
+        columns: [],
+        filters: scoping.filters,
+        through: [],
+      })
       if (read.ok) found.push(id)
     }
     expect(found).toEqual(['1'])
@@ -343,21 +395,25 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
   // the real 1234567.875 reads 1.23457e+06 at 0. The setting is a string:
   // postgres.js drops a startup parameter whose value is falsy, so `0` as a
   // number never reached the server, and the session is asked what it has.
-  test('every kind reads as the shared label, whatever TimeZone, DateStyle and float digits the session has', covers('postgres', ...Object.keys(DISPLAY_PARITY).map(displayCase)), async () => {
-    const configured = postgres(fixture.admin, {
-      onnotice: () => {},
-      connection: { TimeZone: 'America/New_York', extra_float_digits: '0', DateStyle: 'SQL, DMY' },
-    })
-    try {
-      const [settings] = await configured<{ digits: string; zone: string; style: string }[]>`
+  test(
+    'every kind reads as the shared label, whatever TimeZone, DateStyle and float digits the session has',
+    covers('postgres', ...Object.keys(DISPLAY_PARITY).map(displayCase)),
+    async () => {
+      const configured = postgres(fixture.admin, {
+        onnotice: () => {},
+        connection: { TimeZone: 'America/New_York', extra_float_digits: '0', DateStyle: 'SQL, DMY' },
+      })
+      try {
+        const [settings] = await configured<{ digits: string; zone: string; style: string }[]>`
         select current_setting('extra_float_digits') as digits, current_setting('TimeZone') as zone, current_setting('DateStyle') as style`
-      expect(settings).toEqual({ digits: '0', zone: 'America/New_York', style: 'SQL, DMY' })
-      expect(await labels(configured)).toEqual(DISPLAY_PARITY)
-      expect(await labels(owner)).toEqual(DISPLAY_PARITY)
-    } finally {
-      await configured.end()
-    }
-  })
+        expect(settings).toEqual({ digits: '0', zone: 'America/New_York', style: 'SQL, DMY' })
+        expect(await labels(configured)).toEqual(DISPLAY_PARITY)
+        expect(await labels(owner)).toEqual(DISPLAY_PARITY)
+      } finally {
+        await configured.end()
+      }
+    },
+  )
 
   // An integer is searched as its canonical text, the digits a label shows.
   // Compared through any other conversion — a float, a locale's grouping — a
@@ -366,7 +422,9 @@ describe('a label is spelled once, from the canonical value (DISPLAY_PARITY)', (
     const lookups = createPostgresLookups(owner)
     const config = kinds('i')
     expect(config.search.map((column) => column.name)).toEqual(['i'])
-    expect((await lookups.search(config, { search: '9007199254740993', offset: 0, limit: 50 }, EVERY_ROW, NEVER)).rows).toEqual([{ token: tokenOf('1'), label: '9007199254740993' }])
+    expect((await lookups.search(config, { search: '9007199254740993', offset: 0, limit: 50 }, EVERY_ROW, NEVER)).rows).toEqual([
+      { token: tokenOf('1'), label: '9007199254740993' },
+    ])
     expect((await lookups.search(config, { search: '9007199254740992', offset: 0, limit: 50 }, EVERY_ROW, NEVER)).rows).toEqual([])
   })
 })
@@ -380,48 +438,65 @@ describe('an instant and a time are read cut to the shape (TEMPORAL_PARITY)', ()
   // TimeZone, another DateStyle -- the answer is the same. The session is
   // asked what it has first, as the label case above does: a setting the
   // driver dropped on the way would leave that half proving nothing.
-  test('to the second in UTC and to the minute, cut and never rounded, whatever the session', covers('postgres', ...(Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase)), async () => {
-    const configured = postgres(fixture.admin, { onnotice: () => {}, connection: { TimeZone: 'Pacific/Chatham', DateStyle: 'SQL, DMY' } })
-    try {
-      const [settings] = await configured<{ zone: string; style: string }[]>`select current_setting('TimeZone') as zone, current_setting('DateStyle') as style`
-      expect(settings).toEqual({ zone: 'Pacific/Chatham', style: 'SQL, DMY' })
-      const request = {
-        target: { table: { schema: 'parity', name: 'display_kinds' }, identity: [col('display_kinds', 'id')], concurrency: null },
-        key: [val('display_kinds', 'id', '1')],
-        columns: [col('display_kinds', 'tm'), col('display_kinds', 'ts')],
-        filters: EVERY_ROW, through: [],
+  test(
+    'to the second in UTC and to the minute, cut and never rounded, whatever the session',
+    covers('postgres', ...(Object.keys(TEMPORAL_PARITY) as (keyof typeof TEMPORAL_PARITY)[]).map(temporalCase)),
+    async () => {
+      const configured = postgres(fixture.admin, { onnotice: () => {}, connection: { TimeZone: 'Pacific/Chatham', DateStyle: 'SQL, DMY' } })
+      try {
+        const [settings] = await configured<
+          { zone: string; style: string }[]
+        >`select current_setting('TimeZone') as zone, current_setting('DateStyle') as style`
+        expect(settings).toEqual({ zone: 'Pacific/Chatham', style: 'SQL, DMY' })
+        const request = {
+          target: { table: { schema: 'parity', name: 'display_kinds' }, identity: [col('display_kinds', 'id')], concurrency: null },
+          key: [val('display_kinds', 'id', '1')],
+          columns: [col('display_kinds', 'tm'), col('display_kinds', 'ts')],
+          filters: EVERY_ROW,
+          through: [],
+        }
+        for (const sql of [owner, configured])
+          expect(await defined(createPostgresRecords(sql)).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
+      } finally {
+        await configured.end()
       }
-      for (const sql of [owner, configured]) expect(await defined(createPostgresRecords(sql)).read(request)).toEqual({ ok: true, values: TEMPORAL_PARITY, version: null })
-    } finally {
-      await configured.end()
-    }
-  })
+    },
+  )
 })
 
 describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
   const guarded = () => versioned('guarded', ['id'])
   const insertGuarded = (sql: Sql, id: string, note: string) =>
-    defined(createPostgresRecords(sql)).insert({ target: guarded(), values: [val('guarded', 'id', id), val('guarded', 'note', note)], returning: [col('guarded', 'id')] })
+    defined(createPostgresRecords(sql)).insert({
+      target: guarded(),
+      values: [val('guarded', 'id', id), val('guarded', 'note', note)],
+      returning: [col('guarded', 'id')],
+    })
   const guardedRows = async (id: number) => [...(await owner`select note, version from parity.guarded where id = ${id}`)]
 
   // A trigger's RAISE was `check-violation`, which claims a constraint the
   // form could have checked and names none. It is the database refusing by a
   // rule of its own, and the same request will be refused again.
-  test("a trigger's own error is refused, on insert and on update, and nothing is written", covers('postgres', refusalCase('guardedInsert'), refusalCase('guardedUpdate')), async () => {
-    expect(failed(await insertGuarded(owner, '1', 'refuse')).code).toBe(REFUSAL_PARITY.guardedInsert)
-    expect(await guardedRows(1)).toEqual([])
-    await owner`insert into parity.guarded (id, note) values (2, 'fine')`
-    const update = await defined(createPostgresRecords(owner)).update({
-      target: guarded(),
-      key: [val('guarded', 'id', '2')],
-      set: [val('guarded', 'note', 'refuse')],
-      expectedVersion: '0',
-      filters: EVERY_ROW, through: [],
-      returning: [],
-    })
-    expect(failed(update).code).toBe(REFUSAL_PARITY.guardedUpdate)
-    expect(await guardedRows(2)).toEqual([{ note: 'fine', version: 0 }])
-  })
+  test(
+    "a trigger's own error is refused, on insert and on update, and nothing is written",
+    covers('postgres', refusalCase('guardedInsert'), refusalCase('guardedUpdate')),
+    async () => {
+      expect(failed(await insertGuarded(owner, '1', 'refuse')).code).toBe(REFUSAL_PARITY.guardedInsert)
+      expect(await guardedRows(1)).toEqual([])
+      await owner`insert into parity.guarded (id, note) values (2, 'fine')`
+      const update = await defined(createPostgresRecords(owner)).update({
+        target: guarded(),
+        key: [val('guarded', 'id', '2')],
+        set: [val('guarded', 'note', 'refuse')],
+        expectedVersion: '0',
+        filters: EVERY_ROW,
+        through: [],
+        returning: [],
+      })
+      expect(failed(update).code).toBe(REFUSAL_PARITY.guardedUpdate)
+      expect(await guardedRows(2)).toEqual([{ note: 'fine', version: 0 }])
+    },
+  )
 
   // SQLSTATE 38000 has no meaning this adapter knows (C11). It was
   // `unavailable`, which invites the person to try again; it will be
@@ -476,7 +551,8 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
           key: [val('contended', 'id', '1')],
           set: [val('contended', 'note', 'the victim')],
           expectedVersion: '0',
-          filters: EVERY_ROW, through: [],
+          filters: EVERY_ROW,
+          through: [],
           returning: [],
         })
         await waitUntilBlocked(1)
@@ -514,7 +590,8 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
           key: [val('guarded', 'id', '5')],
           set: [val('guarded', 'note', 'waited')],
           expectedVersion: '0',
-          filters: EVERY_ROW, through: [],
+          filters: EVERY_ROW,
+          through: [],
           returning: [],
         })
         return { outcome }
@@ -559,7 +636,10 @@ describe('a refusal is named alike on both engines (REFUSAL_PARITY)', () => {
         const timedOut = failed(await insertGuarded(bounded, '8', 'slow'))
         expect([timedOut.code, timedOut.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
       } else {
-        await expect(insertGuarded(bounded, '8', 'slow')).rejects.toMatchObject({ code: '42704', message: 'unrecognized configuration parameter "transaction_timeout"' })
+        await expect(insertGuarded(bounded, '8', 'slow')).rejects.toMatchObject({
+          code: '42704',
+          message: 'unrecognized configuration parameter "transaction_timeout"',
+        })
       }
       expect(await guardedRows(7)).toEqual([])
       expect(await guardedRows(8)).toEqual([])

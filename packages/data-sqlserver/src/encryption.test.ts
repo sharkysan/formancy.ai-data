@@ -128,10 +128,18 @@ describe('what mssql is given', () => {
   // connector left out of the SQL login's options.
   test('a SQL login with encrypt: true is given the guarded connector, and no other pool is', () => {
     const address = { host: 'erp.example', port: 1433, database: 'erp' }
-    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: true, trustServerCertificate: false }).options?.connector).toBe(encryptedConnector)
-    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: true, trustServerCertificate: true }).options?.connector).toBe(encryptedConnector)
-    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: false, trustServerCertificate: true }).options).not.toHaveProperty('connector')
-    expect(sqlServerConfig({ ...address, encrypt: true, trustServerCertificate: false, entra: { type: 'managed-identity' } }).options).not.toHaveProperty('connector')
+    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: true, trustServerCertificate: false }).options?.connector).toBe(
+      encryptedConnector,
+    )
+    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: true, trustServerCertificate: true }).options?.connector).toBe(
+      encryptedConnector,
+    )
+    expect(sqlServerConfig({ ...address, user: USER, password: PASSWORD, encrypt: false, trustServerCertificate: true }).options).not.toHaveProperty(
+      'connector',
+    )
+    expect(sqlServerConfig({ ...address, encrypt: true, trustServerCertificate: false, entra: { type: 'managed-identity' } }).options).not.toHaveProperty(
+      'connector',
+    )
   })
 })
 
@@ -152,7 +160,9 @@ function options(entries: ReadonlyArray<readonly [number, Buffer]>, terminated =
 const VERSION = Buffer.from([16, 0, 0x10, 0, 0, 0])
 
 /** tedious's own PRELOGIN parser, from the copy mssql loads, to hold the guard's reading to the one tedious acts on. */
-const PreloginPayload = createRequire(createRequire(import.meta.url).resolve('mssql'))('tedious/lib/prelogin-payload') as new (data: Buffer) => { encryptionString?: string }
+const PreloginPayload = createRequire(createRequire(import.meta.url).resolve('mssql'))('tedious/lib/prelogin-payload') as new (data: Buffer) => {
+  encryptionString?: string
+}
 
 describe('readPreloginAnswer', () => {
   // A real server's answer, ON or REQ, passes, and the guard says where it
@@ -181,7 +191,8 @@ describe('readPreloginAnswer', () => {
     const payload = preloginPayload(PRELOGIN_ENCRYPTION.ON)
     const split = Buffer.concat([tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(0, 7), false), tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(7))])
     for (const answer of [preloginAnswer(PRELOGIN_ENCRYPTION.ON), split]) {
-      for (let length = 0; length < answer.length; length++) expect(readPreloginAnswer(answer.subarray(0, length)), `${String(length)} bytes`).toEqual({ kind: 'incomplete' })
+      for (let length = 0; length < answer.length; length++)
+        expect(readPreloginAnswer(answer.subarray(0, length)), `${String(length)} bytes`).toEqual({ kind: 'incomplete' })
       expect(readPreloginAnswer(answer)).toEqual({ kind: 'encrypts', length: answer.length })
     }
   })
@@ -193,7 +204,11 @@ describe('readPreloginAnswer', () => {
   // table and the data, NOT_SUP is still refused.
   test('reads an answer split across packets as one message', () => {
     const payload = preloginPayload(PRELOGIN_ENCRYPTION.NOT_SUP)
-    const split = Buffer.concat([tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(0, 11), false), tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(11, 15), false), tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(15))])
+    const split = Buffer.concat([
+      tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(0, 11), false),
+      tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(11, 15), false),
+      tdsPacket(TDS_PACKET.RESPONSE, payload.subarray(15)),
+    ])
     expect(readPreloginAnswer(split)).toEqual({ kind: 'refused', reason: UNENCRYPTED_ANSWER })
   })
 
@@ -211,7 +226,16 @@ describe('readPreloginAnswer', () => {
     ['a first message that is not a response', tdsPacket(TDS_PACKET.PRELOGIN, preloginPayload(PRELOGIN_ENCRYPTION.ON))],
     ['a packet shorter than its header', Buffer.from([TDS_PACKET.RESPONSE, 0x01, 0x00, 0x04, 0, 0, 1, 0])],
     ['no ENCRYPTION option', tdsPacket(TDS_PACKET.RESPONSE, options([[0x00, VERSION]]))],
-    ['two ENCRYPTION options', tdsPacket(TDS_PACKET.RESPONSE, options([[0x01, Buffer.from([PRELOGIN_ENCRYPTION.ON])], [0x01, Buffer.from([PRELOGIN_ENCRYPTION.NOT_SUP])]]))],
+    [
+      'two ENCRYPTION options',
+      tdsPacket(
+        TDS_PACKET.RESPONSE,
+        options([
+          [0x01, Buffer.from([PRELOGIN_ENCRYPTION.ON])],
+          [0x01, Buffer.from([PRELOGIN_ENCRYPTION.NOT_SUP])],
+        ]),
+      ),
+    ],
     ['an ENCRYPTION option of two bytes', tdsPacket(TDS_PACKET.RESPONSE, options([[0x01, Buffer.from([PRELOGIN_ENCRYPTION.ON, 0])]]))],
     ['an option whose data lies past the payload', tdsPacket(TDS_PACKET.RESPONSE, Buffer.from([0x01, 0x00, 0xc8, 0x00, 0x01, 0xff, PRELOGIN_ENCRYPTION.ON]))],
     ['an option table with no terminator', tdsPacket(TDS_PACKET.RESPONSE, options([[0x01, Buffer.from([PRELOGIN_ENCRYPTION.ON])]], false))],
@@ -237,8 +261,20 @@ describe('readPreloginAnswer', () => {
   // answer above that the guard passes, tedious's own parser reads ON or
   // REQ, and for every one it refuses as unencrypted, OFF or NOT_SUP.
   test('passes only what tedious reads as ON or REQ', () => {
-    const answers = [PRELOGIN_ENCRYPTION.ON, PRELOGIN_ENCRYPTION.REQ, PRELOGIN_ENCRYPTION.OFF, PRELOGIN_ENCRYPTION.NOT_SUP].map((encryption) => preloginAnswer(encryption))
-    answers.push(tdsPacket(TDS_PACKET.RESPONSE, options([[0x01, Buffer.from([PRELOGIN_ENCRYPTION.REQ])], [0x00, VERSION], [0x02, Buffer.from([0])], [0x04, Buffer.from([0])]])))
+    const answers = [PRELOGIN_ENCRYPTION.ON, PRELOGIN_ENCRYPTION.REQ, PRELOGIN_ENCRYPTION.OFF, PRELOGIN_ENCRYPTION.NOT_SUP].map((encryption) =>
+      preloginAnswer(encryption),
+    )
+    answers.push(
+      tdsPacket(
+        TDS_PACKET.RESPONSE,
+        options([
+          [0x01, Buffer.from([PRELOGIN_ENCRYPTION.REQ])],
+          [0x00, VERSION],
+          [0x02, Buffer.from([0])],
+          [0x04, Buffer.from([0])],
+        ]),
+      ),
+    )
     for (const answer of answers) {
       const read = readPreloginAnswer(answer)
       const tedious = new PreloginPayload(answer.subarray(8)).encryptionString
@@ -379,7 +415,8 @@ describe('the guard', () => {
     }
     const after = passed.slice(1)
     expect(Buffer.concat(after)).toEqual(Buffer.concat([1, 2, 3, 4, 5].map((fill) => Buffer.alloc(30_000, fill))))
-    const own = (chunk: Buffer): boolean => fromSocket.some((read) => read.buffer === chunk.buffer && read.byteOffset === chunk.byteOffset && read.length === chunk.length)
+    const own = (chunk: Buffer): boolean =>
+      fromSocket.some((read) => read.buffer === chunk.buffer && read.byteOffset === chunk.byteOffset && read.length === chunk.length)
     expect(after.filter((chunk) => !own(chunk))).toEqual([])
   })
 

@@ -2,7 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm, recordToken } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, DescribedRoot, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, RecordOutcome, SupersedeRequest, UpdateRequest } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  DescribedRoot,
+  FormPolicy,
+  InsertRequest,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+  RecordOutcome,
+  SupersedeRequest,
+  UpdateRequest,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -25,14 +37,30 @@ const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '21474
 const DATE: NormalizedType = { kind: 'date' }
 const AMOUNT: NormalizedType = { kind: 'decimal', precision: 18, scale: 4 }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: { schema: 'sales', name: 'price' }, kind: 'table', comment: null,
+      ref: { schema: 'sales', name: 'price' },
+      kind: 'table',
+      comment: null,
       columns: [
         col('tenant_id', 1, INT32),
         col('product_no', 2, INT32),
@@ -41,7 +69,11 @@ const SNAPSHOT = createSnapshot({
         col('amount', 5, AMOUNT),
         col('rv', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
       ],
-      primaryKey: { name: 'pk_price', columns: ['tenant_id', 'product_no', 'valid_from'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_price', columns: ['tenant_id', 'product_no', 'valid_from'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
       access: { delete: true },
       referencedBy: [],
     },
@@ -52,13 +84,21 @@ const BOTH = ['clerk', 'auditor']
 const POLICY: FormPolicy = {
   version: 1,
   operations: { read: BOTH, create: ['clerk'], update: ['clerk'] },
-  fields: { tenant_id: { read: BOTH, write: [] }, product_no: { read: BOTH, write: ['clerk'] }, valid_from: { read: BOTH, write: ['clerk'] }, valid_to: { read: BOTH, write: [] }, amount: { read: BOTH, write: ['clerk'] } },
+  fields: {
+    tenant_id: { read: BOTH, write: [] },
+    product_no: { read: BOTH, write: ['clerk'] },
+    valid_from: { read: BOTH, write: ['clerk'] },
+    valid_to: { read: BOTH, write: [] },
+    amount: { read: BOTH, write: ['clerk'] },
+  },
   rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
   lookups: {},
 }
 
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'clerk' || token === 'auditor' ? { ok: true, identity: { actor: { id: token[0] ?? '', roles: [token] }, attributes: { tenant: '1' } } } : { ok: false, reason: 'bad' }
+  token === 'clerk' || token === 'auditor'
+    ? { ok: true, identity: { actor: { id: token[0] ?? '', roles: [token] }, attributes: { tenant: '1' } } }
+    : { ok: false, reason: 'bad' }
 
 const encoded = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: '1', product_no: '7', valid_from: '2026-01-01' })
 if (!encoded.ok) throw new Error(encoded.message)
@@ -92,15 +132,27 @@ function registry(): ConnectionRegistry {
     },
     supersede: async (request) => {
       calls.changes.push(request)
-      return answer ?? { ok: true, values: { tenant_id: '1', product_no: '7', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }, version: NEXT_VERSION }
+      return (
+        answer ?? { ok: true, values: { tenant_id: '1', product_no: '7', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }, version: NEXT_VERSION }
+      )
     },
     delete: async () => {
       throw new Error('a form over versions offers no delete')
     },
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
-  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined), close: async () => {} }
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
+  return {
+    ids: () => ['erp'],
+    scope: () => ({ schemas: ['sales'] }),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    close: async () => {},
+  }
 }
 
 beforeEach(async () => {
@@ -110,7 +162,15 @@ beforeEach(async () => {
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-supersede-'))
   const store = createFileConfigurationStore(root)
-  const { form, bindings } = generateForm(SNAPSHOT, { connection: 'erp', root: { schema: 'sales', name: 'price' }, formId: 'price', title: 'Price', lookups: [], pinned: ['tenant_id'], validity: { from: 'valid_from', to: 'valid_to' } })
+  const { form, bindings } = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: { schema: 'sales', name: 'price' },
+    formId: 'price',
+    title: 'Price',
+    lookups: [],
+    pinned: ['tenant_id'],
+    validity: { from: 'valid_from', to: 'valid_to' },
+  })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('price', null, bundle)
   const sink: AuditSink = (event) => {
@@ -123,8 +183,10 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const post = (who: string, url: string, payload: unknown) => app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${who}` }, payload: payload as Record<string, unknown> })
-const change = (answers: Record<string, unknown>, who = 'clerk') => post(who, '/v1/forms/price/records/supersede', { record: RECORD, version: VERSION, answers })
+const post = (who: string, url: string, payload: unknown) =>
+  app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${who}` }, payload: payload as Record<string, unknown> })
+const change = (answers: Record<string, unknown>, who = 'clerk') =>
+  post(who, '/v1/forms/price/records/supersede', { record: RECORD, version: VERSION, answers })
 /** What a renderer submits for the open version's copy: every field, the start moved and the price changed. */
 const COPY = { tenant_id: 1, product_no: 7, valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }
 
@@ -137,9 +199,14 @@ describe('a change from a date (0113)', () => {
     const changed = await change(COPY)
     expect(changed.statusCode, changed.body).toBe(201)
     expect(changed.json()).toMatchObject({ answers: { valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }, version: NEXT_VERSION })
-    expect(calls.changes.map((request) => ({ ends: request.ends, start: request.start.value, chain: request.chain.map((entry) => entry.name), values: request.values.map((value) => [value.name, value.value]) }))).toEqual([
-      { ends: 'valid_to', start: '2026-07-01', chain: ['tenant_id', 'product_no'], values: [['amount', '10.0000']] },
-    ])
+    expect(
+      calls.changes.map((request) => ({
+        ends: request.ends,
+        start: request.start.value,
+        chain: request.chain.map((entry) => entry.name),
+        values: request.values.map((value) => [value.name, value.value]),
+      })),
+    ).toEqual([{ ends: 'valid_to', start: '2026-07-01', chain: ['tenant_id', 'product_no'], values: [['amount', '10.0000']] }])
     expect(events.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([{ operation: 'supersede', status: 201, outcome: 'ok' }])
   })
 
@@ -189,7 +256,10 @@ describe('a form over versions (0113)', () => {
   // statement's to enforce, and each refusal answered for the person.
   test('names its versions’ fields, and guards its create and its update', async () => {
     const opened = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer clerk' } })
-    expect(opened.json()).toMatchObject({ versions: { from: 'valid_from', to: 'valid_to', key: ['tenant_id', 'product_no'] }, operations: ['read', 'create', 'update'] })
+    expect(opened.json()).toMatchObject({
+      versions: { from: 'valid_from', to: 'valid_to', key: ['tenant_id', 'product_no'] },
+      operations: ['read', 'create', 'update'],
+    })
     const read = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer auditor' } })
     expect(read.json()).toMatchObject({ versions: null })
 

@@ -58,8 +58,14 @@ const sameAnchor = (left: FieldAnchor, right: FieldAnchor): boolean =>
  * publish that moves the form to another root or connection is compared by
  * name, and its grants follow their keys unasked (0039's costs).
  */
-export function unconfirmedKeys(replaced: FormBindings, published: { bindings: FormBindings; policy: FormPolicy }, confirmed: readonly ReassignedKey[]): ReassignedKey[] {
+export function unconfirmedKeys(
+  replaced: FormBindings,
+  published: { bindings: FormBindings; policy: FormPolicy },
+  confirmed: readonly ReassignedKey[],
+): ReassignedKey[] {
   return reassignedKeys(replaced, published.bindings).filter(
-    (key) => grantsOnKey(published.policy, key.field) && !confirmed.some((entry) => entry.field === key.field && sameAnchor(entry.was, key.was) && sameAnchor(entry.now, key.now)),
+    (key) =>
+      grantsOnKey(published.policy, key.field) &&
+      !confirmed.some((entry) => entry.field === key.field && sameAnchor(entry.was, key.was) && sameAnchor(entry.now, key.now)),
   )
 }

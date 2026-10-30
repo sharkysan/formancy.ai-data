@@ -34,7 +34,17 @@ const KIND = { idle: 'answer', making: 'loading', made: 'answer', refused: 'refu
  * -- another form, signing out, a child section's other parent -- aborts a
  * file in the making and says nothing: there is nobody left to tell.
  */
-export function DownloadCsv({ client, formId, idBase, query }: { client: DataClient; formId: string; idBase: string; query: () => RecordExportQuery }): ReactElement {
+export function DownloadCsv({
+  client,
+  formId,
+  idBase,
+  query,
+}: {
+  client: DataClient
+  formId: string
+  idBase: string
+  query: () => RecordExportQuery
+}): ReactElement {
   const save = useContext(SaveContext)
   const [state, setState] = useState<FileState>({ kind: 'idle' })
   const running = useRef<AbortController | null>(null)
@@ -62,10 +72,18 @@ export function DownloadCsv({ client, formId, idBase, query }: { client: DataCli
     )
   }
 
-  const said = state.kind === 'making' ? `Making ${name}.` : state.kind === 'made' ? `Made ${name}; your browser saves it.` : state.kind === 'refused' ? state.message : ''
+  const said =
+    state.kind === 'making' ? `Making ${name}.` : state.kind === 'made' ? `Made ${name}; your browser saves it.` : state.kind === 'refused' ? state.message : ''
   return (
     <>
-      <button type="button" className="button" id={`${idBase}-button`} aria-disabled={state.kind === 'making' ? 'true' : undefined} aria-describedby={`${idBase}-line`} onClick={press}>
+      <button
+        type="button"
+        className="button"
+        id={`${idBase}-button`}
+        aria-disabled={state.kind === 'making' ? 'true' : undefined}
+        aria-describedby={`${idBase}-line`}
+        onClick={press}
+      >
         Download CSV
       </button>
       <p role="status" id={`${idBase}-line`} className="status export-line" data-kind={KIND[state.kind]} aria-labelledby={`${idBase}-button`}>

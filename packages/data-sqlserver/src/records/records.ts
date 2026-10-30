@@ -18,14 +18,30 @@ type Row = Record<string, unknown>
 
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record is visible to this request.' }
 const STALE: RecordFailure = { ok: false, code: 'stale', message: 'The record has changed since it was read.' }
-const VERSION_ENDED: RecordFailure = { ok: false, code: 'version-ended', message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).' }
-const CHAIN_EXISTS: RecordFailure = { ok: false, code: 'chain-exists', message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).' }
+const VERSION_ENDED: RecordFailure = {
+  ok: false,
+  code: 'version-ended',
+  message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).',
+}
+const CHAIN_EXISTS: RecordFailure = {
+  ok: false,
+  code: 'chain-exists',
+  message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).',
+}
 /** The table moved under an update that matched nothing, or that was never sent (0041). */
-const DEFINITION_MOVED: RecordFailure = { ok: false, code: 'schema-changed', message: "The table's definition is not the one this write was decided over; nothing was written." }
+const DEFINITION_MOVED: RecordFailure = {
+  ok: false,
+  code: 'schema-changed',
+  message: "The table's definition is not the one this write was decided over; nothing was written.",
+}
 /** An object the catalog does not show this account as discovery describes one: gone, out of sight, or not a table or a view. Which, drift review says (0010). */
 const NOT_DESCRIBED: RecordFailure = { ok: false, code: 'schema-changed', message: 'The catalog does not show this table as discovery describes one.' }
 /** The facts arrived shorter than they were hashed: a TEXTSIZE the connection set. Nothing can be decided over them. */
-const CUT: RecordFailure = { ok: false, code: 'unavailable', message: "The table's description arrived cut short, so nothing can be decided over it: the connection's TEXTSIZE is smaller than the description." }
+const CUT: RecordFailure = {
+  ok: false,
+  code: 'unavailable',
+  message: "The table's description arrived cut short, so nothing can be decided over it: the connection's TEXTSIZE is smaller than the description.",
+}
 
 /** The largest bigint: a version column's token is compared as one. */
 const BIGINT_MAX = 9223372036854775807n
@@ -188,7 +204,12 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       if (described === undefined) return NOT_DESCRIBED
       // Whether the row the page continues after was found (0108), on every row.
       const after = request.after === null ? null : (rows[0] as Row).anchored === 1 ? 'found' : 'gone'
-      return { ok: true, described, rows: rows.filter((row) => row.found !== null).map((row) => recordFrom(row, request.columns, request.target.concurrency)), after }
+      return {
+        ok: true,
+        described,
+        rows: rows.filter((row) => row.found !== null).map((row) => recordFrom(row, request.columns, request.target.concurrency)),
+        after,
+      }
     },
 
     async insert(request) {
@@ -235,7 +256,8 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const through = throughTerms(request.through)
       checkKey(target, request.key)
       const written = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
-      if (new Set(written).size !== written.length || written.includes(request.ends)) throw new Error('A change from a date writes each column of the next version once, and never its end')
+      if (new Set(written).size !== written.length || written.includes(request.ends))
+        throw new Error('A change from a date writes each column of the next version once, and never its end')
       checkAssigned([request.start, ...request.values], target.concurrency.column)
       const definition = definitionBytes(request.definition)
       const expected = expectedVersion(target.concurrency, request.expectedVersion)

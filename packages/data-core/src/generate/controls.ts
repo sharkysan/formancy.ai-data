@@ -13,9 +13,7 @@ import type { NormalizedType, TextLengthUnit } from '../metadata.js'
  * text's `maxLength` relates to the unit the column counts, what a real keeps
  * — and becomes an inferred note on the field.
  */
-export type ControlPlan =
-  | { field: Omit<FieldDef, 'key' | 'label' | 'required'>; describe: string; readOnly?: string; caveat?: string }
-  | { exclude: string }
+export type ControlPlan = { field: Omit<FieldDef, 'key' | 'label' | 'required'>; describe: string; readOnly?: string; caveat?: string } | { exclude: string }
 
 /** Above this, a text column gets a multi-line control. */
 const SINGLE_LINE_LIMIT = 255

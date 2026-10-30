@@ -47,13 +47,19 @@ describe('the proxies the server trusts, in the configuration', () => {
   // the overlay, cloudflared with none or one the server does not name.
   // Watched failing with each of the three checks removed in turn.
   test('refuses a stack in which a proxy cannot be named, or is not', () => {
-    expect(trustProblems(trusting('172.16.239.250'))).toEqual(["the server's FORMANCY_DATA_TRUSTED_PROXIES does not name the web front's address, so every client shares nginx's one bucket"])
+    expect(trustProblems(trusting('172.16.239.250'))).toEqual([
+      "the server's FORMANCY_DATA_TRUSTED_PROXIES does not name the web front's address, so every client shares nginx's one bucket",
+    ])
     const unpinned = committed()
     unpinned.services.web.networks = ['proxy', 'edge']
-    expect(trustProblems(unpinned)).toEqual(["the web front holds no fixed address on a network it shares with the server, so the server cannot name it and every client shares nginx's one bucket"])
+    expect(trustProblems(unpinned)).toEqual([
+      "the web front holds no fixed address on a network it shares with the server, so the server cannot name it and every client shares nginx's one bucket",
+    ])
     const loose = committed({ overlay: true })
     loose.services.cloudflared.networks = ['edge']
-    expect(trustProblems(loose)).toEqual(["cloudflared holds no fixed address the server trusts on the network it shares with the web front, so behind the tunnel every visitor shares cloudflared's one bucket"])
+    expect(trustProblems(loose)).toEqual([
+      "cloudflared holds no fixed address the server trusts on the network it shares with the web front, so behind the tunnel every visitor shares cloudflared's one bucket",
+    ])
     expect(trustProblems(trusting('172.16.238.250', committed({ overlay: true })))).toEqual([
       "cloudflared holds no fixed address the server trusts on the network it shares with the web front, so behind the tunnel every visitor shares cloudflared's one bucket",
     ])
@@ -67,10 +73,31 @@ describe('the proxies the server trusts, in the configuration', () => {
   // takes it; and a service that is no proxy holding the address speaks for
   // whoever reaches it. Watched failing with each rule removed in turn.
   test.each([
-    ['a range', '172.16.238.250,172.16.238.0/24', ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is not one IPv4 address: a range takes in its network's gateway, from where any local process reaches a container and could choose its own address"]],
-    ['the gateway', '172.16.238.250,172.16.238.1', ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is the gateway of proxy, from where any local process reaches its containers", "the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in the part of proxy Docker hands out, so another container could be given it"]],
-    ['an address Docker hands out', '172.16.238.250,172.16.239.7', ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in the part of edge Docker hands out, so another container could be given it"]],
-    ['an address in no network of the file', '172.16.238.250,10.9.9.9', ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in no network of the file with a fixed range, so nothing says who holds it"]],
+    [
+      'a range',
+      '172.16.238.250,172.16.238.0/24',
+      [
+        "the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is not one IPv4 address: a range takes in its network's gateway, from where any local process reaches a container and could choose its own address",
+      ],
+    ],
+    [
+      'the gateway',
+      '172.16.238.250,172.16.238.1',
+      [
+        "the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is the gateway of proxy, from where any local process reaches its containers",
+        "the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in the part of proxy Docker hands out, so another container could be given it",
+      ],
+    ],
+    [
+      'an address Docker hands out',
+      '172.16.238.250,172.16.239.7',
+      ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in the part of edge Docker hands out, so another container could be given it"],
+    ],
+    [
+      'an address in no network of the file',
+      '172.16.238.250,10.9.9.9',
+      ["the server's FORMANCY_DATA_TRUSTED_PROXIES entry 2 is in no network of the file with a fixed range, so nothing says who holds it"],
+    ],
   ])('refuses %s', (_, list, problems) => {
     expect(trustProblems(trusting(list))).toEqual(problems)
   })
@@ -103,7 +130,9 @@ describe("what the server's log says it believed", () => {
   // taken as passing.
   test("passes addresses nginx saw, and refuses the web front's own or none at all", () => {
     expect(believedProblems([line('172.16.238.1'), line('127.0.0.1'), '{"level":30,"msg":"planes"}', 'not json'].join('\n'), config)).toEqual([])
-    expect(believedProblems([line('172.16.238.1'), line('172.16.238.250'), line('172.16.238.250')].join('\n'), config)).toEqual(["2 of the 3 requests in the server's log name the web front's own address"])
+    expect(believedProblems([line('172.16.238.1'), line('172.16.238.250'), line('172.16.238.250')].join('\n'), config)).toEqual([
+      "2 of the 3 requests in the server's log name the web front's own address",
+    ])
     expect(believedProblems('{"level":30,"msg":"planes"}\n', config)).toEqual(["the server's log names no request, so whom it believed cannot be read"])
   })
 })

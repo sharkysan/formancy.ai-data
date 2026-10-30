@@ -26,7 +26,12 @@ import {
  */
 
 /** Publish from a base made by `before`, review against a snapshot made by `after`. */
-function between(before: (objects: ObjectMeta[]) => void, after: (objects: ObjectMeta[]) => void, request = ORDER, kind: 'sqlserver' | 'postgres' = 'sqlserver') {
+function between(
+  before: (objects: ObjectMeta[]) => void,
+  after: (objects: ObjectMeta[]) => void,
+  request = ORDER,
+  kind: 'sqlserver' | 'postgres' = 'sqlserver',
+) {
   return drift(after, { kind }, request, snapshot(before, { kind }))
 }
 
@@ -53,7 +58,12 @@ describe('diffSnapshots: privileges of the root', () => {
   // can be addressed, and every read and update fails.
   test('an identity column that lost SELECT breaks reads', () => {
     const report = drift((objects) => restrict(objects, 'order', 'id', { select: false }))
-    expect(only(report)).toMatchObject({ kind: 'privilege-narrowed', severity: 'blocking', affects: ['id'], message: expect.stringMatching(/identifies a record/) })
+    expect(only(report)).toMatchObject({
+      kind: 'privilege-narrowed',
+      severity: 'blocking',
+      affects: ['id'],
+      message: expect.stringMatching(/identifies a record/),
+    })
     expect(report.writable).toEqual({ create: false, update: false, delete: false })
   })
 
@@ -142,7 +152,11 @@ describe('diffSnapshots: privileges of the root', () => {
   // What the form does not rest on is recorded and decides nothing: a
   // column no field binds, and every privilege gained.
   test('any other capability change on the root is information, narrowed or widened', () => {
-    expect(only(drift((objects) => restrict(objects, 'order', 'attachment', { select: false })))).toMatchObject({ kind: 'privilege-narrowed', severity: 'info', affects: [] })
+    expect(only(drift((objects) => restrict(objects, 'order', 'attachment', { select: false })))).toMatchObject({
+      kind: 'privilege-narrowed',
+      severity: 'info',
+      affects: [],
+    })
     const widened = between((objects) => restrict(objects, 'order', 'amount', { update: false }), nothing)
     expect(only(widened)).toMatchObject({
       kind: 'privilege-widened',
@@ -161,11 +175,20 @@ describe('diffSnapshots: privileges of a lookup target', () => {
   test("a lookup target's key or display column that lost SELECT stops both writes and affects the lookup", () => {
     for (const lost of ['tenant_id', 'name']) {
       const report = drift((objects) => restrict(objects, 'customer', lost, { select: false }))
-      expect(only(report), lost).toMatchObject({ kind: 'privilege-narrowed', severity: 'blocking', subject: { kind: 'column', object: CUSTOMER_REF, name: lost }, affects: ['customer'] })
+      expect(only(report), lost).toMatchObject({
+        kind: 'privilege-narrowed',
+        severity: 'blocking',
+        subject: { kind: 'column', object: CUSTOMER_REF, name: lost },
+        affects: ['customer'],
+      })
       expect(report.writable, lost).toEqual({ create: false, update: false, delete: false })
     }
     // A target column the lookup neither keys on nor shows is not its business.
-    expect(only(drift((objects) => restrict(objects, 'customer', 'active', { select: false })))).toMatchObject({ kind: 'privilege-narrowed', severity: 'info', affects: [] })
+    expect(only(drift((objects) => restrict(objects, 'customer', 'active', { select: false })))).toMatchObject({
+      kind: 'privilege-narrowed',
+      severity: 'info',
+      affects: [],
+    })
     expect(only(drift((objects) => restrict(objects, 'customer', 'name', { update: false })))).toMatchObject({ severity: 'info' })
   })
 })
@@ -176,10 +199,20 @@ describe('diffSnapshots: row security and the account', () => {
   // nothing is stopped (B17).
   test('row security that changed on the root or a lookup target is for review, and stops nothing', () => {
     const root = drift((objects) => (object(objects, 'order').rowSecurity = 'applies'))
-    expect(only(root)).toMatchObject({ kind: 'row-security-changed', severity: 'review', subject: { kind: 'object', object: ORDER_REF }, message: expect.stringMatching(/now applies/) })
+    expect(only(root)).toMatchObject({
+      kind: 'row-security-changed',
+      severity: 'review',
+      subject: { kind: 'object', object: ORDER_REF },
+      message: expect.stringMatching(/now applies/),
+    })
     expect(root.writable).toEqual({ create: true, update: true, delete: false })
     const target = drift((objects) => (object(objects, 'customer').rowSecurity = 'applies'))
-    expect(only(target)).toMatchObject({ kind: 'row-security-changed', severity: 'review', subject: { kind: 'object', object: CUSTOMER_REF }, affects: ['customer'] })
+    expect(only(target)).toMatchObject({
+      kind: 'row-security-changed',
+      severity: 'review',
+      subject: { kind: 'object', object: CUSTOMER_REF },
+      affects: ['customer'],
+    })
     // A table the form does not touch is not its business.
     expect(drift((objects) => (object(objects, 'employee').rowSecurity = 'applies')).changes).toEqual([])
   })
@@ -190,7 +223,12 @@ describe('diffSnapshots: row security and the account', () => {
   // know whose form it now is.
   test('another account with identical grants and no row security is for review, never an empty report', () => {
     const report = drift(undefined, { account: { user: 'clerk', login: 'clerk' } })
-    expect(only(report)).toMatchObject({ kind: 'account-changed', severity: 'review', subject: { kind: 'scope' }, message: expect.stringMatching(/owner.*clerk/) })
+    expect(only(report)).toMatchObject({
+      kind: 'account-changed',
+      severity: 'review',
+      subject: { kind: 'scope' },
+      message: expect.stringMatching(/owner.*clerk/),
+    })
     expect(report.writable).toEqual({ create: true, update: true, delete: false })
     // A login is not the principal: a renamed login mapped to the same user changes nothing.
     expect(drift(undefined, { account: { user: 'owner', login: 'app_login_2026' } }).changes).toEqual([])

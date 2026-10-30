@@ -19,9 +19,23 @@ describe('FORMANCY_DATA_CORS_ORIGINS', () => {
   // same as unset: nothing is listed. Watched failing with "" taken as an
   // entry.
   test('accepts origins as a browser sends them, and empty is the same as unset', () => {
-    expect(corsOriginsSetting('https://app.example, https://app.example:8443,http://localhost:3000,http://127.0.0.1,http://[::1]:3000,https://xn--bcher-kva.example,https://[2001:db8::1],https://10.0.0.5', RUNTIME)).toEqual({
+    expect(
+      corsOriginsSetting(
+        'https://app.example, https://app.example:8443,http://localhost:3000,http://127.0.0.1,http://[::1]:3000,https://xn--bcher-kva.example,https://[2001:db8::1],https://10.0.0.5',
+        RUNTIME,
+      ),
+    ).toEqual({
       ok: true,
-      origins: ['https://app.example', 'https://app.example:8443', 'http://localhost:3000', 'http://127.0.0.1', 'http://[::1]:3000', 'https://xn--bcher-kva.example', 'https://[2001:db8::1]', 'https://10.0.0.5'],
+      origins: [
+        'https://app.example',
+        'https://app.example:8443',
+        'http://localhost:3000',
+        'http://127.0.0.1',
+        'http://[::1]:3000',
+        'https://xn--bcher-kva.example',
+        'https://[2001:db8::1]',
+        'https://10.0.0.5',
+      ],
     })
     for (const empty of [undefined, '', ' , ', ',,']) expect(corsOriginsSetting(empty, RUNTIME)).toEqual({ ok: true, origins: [] })
     expect(corsOriginsSetting('', { runtime: false })).toEqual({ ok: true, origins: [] })
@@ -80,7 +94,10 @@ describe('FORMANCY_DATA_CORS_ORIGINS', () => {
   // plane would start with a setting that does nothing: it stops instead,
   // with a sentence that says what is missing. An empty list needs nothing.
   test('a list needs the runtime plane', () => {
-    expect(corsOriginsSetting('https://app.example', { runtime: false })).toEqual({ ok: false, problem: expect.stringMatching(/^FORMANCY_DATA_CORS_ORIGINS lists origins, and the runtime plane is off/) })
+    expect(corsOriginsSetting('https://app.example', { runtime: false })).toEqual({
+      ok: false,
+      problem: expect.stringMatching(/^FORMANCY_DATA_CORS_ORIGINS lists origins, and the runtime plane is off/),
+    })
   })
 })
 
@@ -93,7 +110,7 @@ describe('runtime.origins', () => {
     expect(originsProblem(['https://app.example', 'http://localhost:5173'])).toBeUndefined()
     expect(originsProblem(['https://app.example', '*'])).toMatch(/^runtime\.origins\[1\] /)
     expect(originsProblem([7])).toMatch(/^runtime\.origins\[0\] /)
-    expect(originsProblem(' https://app.example' as unknown as string[])).toMatch(/^runtime\.origins is not a list/)
+    expect(originsProblem(' https://app.example')).toMatch(/^runtime\.origins is not a list/)
     expect(originsProblem([' https://app.example'])).toMatch(/^runtime\.origins\[0\] /)
   })
 })

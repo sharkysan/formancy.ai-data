@@ -50,7 +50,8 @@ export function checkUpdate(request: UpdateRequest, terms: readonly RowFilterTer
   once(request.set, 'the values to set')
   for (const value of request.set) {
     if (value.name === concurrency.column) throw new Error(`${value.name} is the version column; an update moves it, and never sets it.`)
-    if (terms.some((term) => term.column === value.name)) throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
+    if (terms.some((term) => term.column === value.name))
+      throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
     if (value.name === request.open) throw new Error(`${value.name} is where a version ends; an update of a version never sets it (0113).`)
   }
 }
@@ -71,7 +72,8 @@ export function checkSupersede(request: SupersedeRequest): void {
   const seen = new Set<string>()
   for (const name of written) {
     if (seen.has(name)) throw new Error(`${name} is written twice in the next version.`)
-    if (name === request.ends || name === concurrency.column) throw new Error(`${name} is not the next version's to be given: the change ends one version and the insert leaves its version to the default.`)
+    if (name === request.ends || name === concurrency.column)
+      throw new Error(`${name} is not the next version's to be given: the change ends one version and the insert leaves its version to the default.`)
     seen.add(name)
   }
 }

@@ -59,7 +59,11 @@ const attribute = (text) => text.replaceAll('&', '&amp;').replaceAll('"', '&quot
 function picture(scene, record) {
   const entry = record[scene.id]
   if (entry === undefined) throw new Error(`${scene.id} has no record in docs/images/readme/captured.json: \`pnpm pictures --scene ${scene.id}\` takes it`)
-  return [`<img src="./${pictureOf(scene.id)}" width="${String(entry.css.width)}" alt="${attribute(scene.alt)}">`, '', `${scene.step === undefined ? '' : lead(scene.step)}*${scene.caption}*`].join('\n')
+  return [
+    `<img src="./${pictureOf(scene.id)}" width="${String(entry.css.width)}" alt="${attribute(scene.alt)}">`,
+    '',
+    `${scene.step === undefined ? '' : lead(scene.step)}*${scene.caption}*`,
+  ].join('\n')
 }
 
 /** Every generated region's text, by name, from scenes.json and the record. */
@@ -70,7 +74,19 @@ export function render(scenes, record) {
     let more = []
     const close = () => {
       if (more.length === 0) return
-      blocks.push(['<details>', `<summary>More: ${more.map((scene) => scene.title).join(', ')}</summary>`, '', ...more.map((scene) => picture(scene, record)).join('\n\n').split('\n'), '', '</details>'].join('\n'))
+      blocks.push(
+        [
+          '<details>',
+          `<summary>More: ${more.map((scene) => scene.title).join(', ')}</summary>`,
+          '',
+          ...more
+            .map((scene) => picture(scene, record))
+            .join('\n\n')
+            .split('\n'),
+          '',
+          '</details>',
+        ].join('\n'),
+      )
       more = []
     }
     for (const scene of scenes.filter((candidate) => regionOf(candidate) === name)) {
@@ -112,7 +128,9 @@ export function rewrite(markdown, scenes, record) {
   const missing = names.filter((name) => !present.includes(name))
   const stray = present.filter((name) => !names.includes(name))
   if (missing.length > 0 || stray.length > 0) {
-    throw new Error(`README.md must hold the pictures regions ${names.join(', ')}, each opened by ${START('<name>')}${missing.length > 0 ? `; ${missing.join(', ')} missing` : ''}${stray.length > 0 ? `; ${stray.join(', ')} no scene's` : ''}`)
+    throw new Error(
+      `README.md must hold the pictures regions ${names.join(', ')}, each opened by ${START('<name>')}${missing.length > 0 ? `; ${missing.join(', ')} missing` : ''}${stray.length > 0 ? `; ${stray.join(', ')} no scene's` : ''}`,
+    )
   }
   const rendered = render(scenes, record)
   for (const name of names) {
@@ -159,7 +177,8 @@ export function regionProblems({ scenes, record, readme }) {
     return [...problems, error.message]
   }
   for (const name of names) {
-    if (Object.hasOwn(present, name) && present[name] !== rendered[name]) problems.push(`README.md's pictures region "${name}" is not what scenes.json and captured.json render: run \`node scripts/pictures/readme.mjs --write\``)
+    if (Object.hasOwn(present, name) && present[name] !== rendered[name])
+      problems.push(`README.md's pictures region "${name}" is not what scenes.json and captured.json render: run \`node scripts/pictures/readme.mjs --write\``)
   }
   return problems
 }
@@ -168,7 +187,8 @@ export function regionProblems({ scenes, record, readme }) {
 export function integrityProblems({ scenes, record, recordText, file }) {
   if (recordText === undefined) return ['docs/images/readme/captured.json does not exist: `pnpm pictures --all` takes the pictures and writes it']
   const problems = []
-  if (recordText !== serialize(record, scenes)) problems.push('docs/images/readme/captured.json is not as the camera writes it: pretty-printed, keyed in scenes.json order, LF only')
+  if (recordText !== serialize(record, scenes))
+    problems.push('docs/images/readme/captured.json is not as the camera writes it: pretty-printed, keyed in scenes.json order, LF only')
   for (const scene of scenes) {
     const entry = record[scene.id]
     if (entry === undefined) {
@@ -182,7 +202,9 @@ export function integrityProblems({ scenes, record, recordText, file }) {
       continue
     }
     if (bytes.length !== entry.bytes || createHash('sha256').update(bytes).digest('hex') !== entry.sha256) {
-      problems.push(`${pictureOf(scene.id)} is not the picture its record describes (${String(bytes.length)} bytes, recorded ${String(entry.bytes)}): it was changed by hand, or the record was`)
+      problems.push(
+        `${pictureOf(scene.id)} is not the picture its record describes (${String(bytes.length)} bytes, recorded ${String(entry.bytes)}): it was changed by hand, or the record was`,
+      )
     }
   }
   return problems
@@ -193,7 +215,9 @@ export function orphanProblems({ scenes, record, listing }) {
   const wanted = new Set(['captured.json', ...scenes.map((scene) => `${scene.id}.webp`)])
   return [
     ...listing.filter((name) => !wanted.has(name)).map((name) => `docs/images/readme/${name} is no scene's picture`),
-    ...Object.keys(record).filter((id) => !scenes.some((scene) => scene.id === id)).map((id) => `captured.json records ${id}, which is no scene of scenes.json`),
+    ...Object.keys(record)
+      .filter((id) => !scenes.some((scene) => scene.id === id))
+      .map((id) => `captured.json records ${id}, which is no scene of scenes.json`),
   ]
 }
 
@@ -212,12 +236,18 @@ export function quoteProblems({ scenes, record }) {
 /** Every record was taken on the same look. */
 export function lookProblems({ record }) {
   const looks = [...new Set(Object.values(record).map((entry) => describeLook(entry.look)))]
-  return looks.length <= 1 ? [] : [`the pictures were taken on ${String(looks.length)} looks, and every one must be taken on one: ${looks.join('; ')}; \`pnpm pictures --all\` retakes every picture`]
+  return looks.length <= 1
+    ? []
+    : [
+        `the pictures were taken on ${String(looks.length)} looks, and every one must be taken on one: ${looks.join('; ')}; \`pnpm pictures --all\` retakes every picture`,
+      ]
 }
 
 /** Every relative link and picture source in `markdown`: a Markdown link's target, and an `src="…"`. */
 function relativeTargets(markdown) {
-  return [...markdown.matchAll(/\]\(([^)\s]+)\)|\bsrc="([^"]+)"/g)].map((match) => match[1] ?? match[2]).filter((target) => !/^[a-z]+:/i.test(target) && !target.startsWith('#'))
+  return [...markdown.matchAll(/\]\(([^)\s]+)\)|\bsrc="([^"]+)"/g)]
+    .map((match) => match[1] ?? match[2])
+    .filter((target) => !/^[a-z]+:/i.test(target) && !target.startsWith('#'))
 }
 
 /**
@@ -261,10 +291,13 @@ export function shapeProblems({ scenes, appScripts }) {
     seen.add(id)
     if (!PLACEMENTS.includes(scene.placement)) problems.push(`${id}: placement ${JSON.stringify(scene.placement)} is none of ${PLACEMENTS.join(', ')}`)
     for (const key of ['title', 'caption', 'alt']) if (typeof scene[key] !== 'string' || scene[key].trim() === '') problems.push(`${id} has no ${key}`)
-    if (scene.placement === 'more' && typeof scene.title === 'string' && scene.title.includes(',')) problems.push(`${id}'s title has a comma in it, and a <details> summary joins titles with commas, so it would read as two scenes`)
-    if (typeof scene.alt === 'string' && /`|\*|\]\(|<|>|(^|\s)_|_(\s|$)/.test(scene.alt)) problems.push(`${id}'s alt has Markdown in it, which an alt shows as written`)
+    if (scene.placement === 'more' && typeof scene.title === 'string' && scene.title.includes(','))
+      problems.push(`${id}'s title has a comma in it, and a <details> summary joins titles with commas, so it would read as two scenes`)
+    if (typeof scene.alt === 'string' && /`|\*|\]\(|<|>|(^|\s)_|_(\s|$)/.test(scene.alt))
+      problems.push(`${id}'s alt has Markdown in it, which an alt shows as written`)
     if (scene.step !== undefined && !/^\d+\. \S/.test(String(scene.step))) problems.push(`${id}: step ${JSON.stringify(scene.step)} is not "<number>. <name>"`)
-    if (!appScripts.includes(scene.app)) problems.push(`${id}: apps/${String(scene.app)}/scripts/pictures.mjs does not exist, so nothing takes or checks this picture`)
+    if (!appScripts.includes(scene.app))
+      problems.push(`${id}: apps/${String(scene.app)}/scripts/pictures.mjs does not exist, so nothing takes or checks this picture`)
   }
   if (scenes.filter((scene) => scene.placement === 'hero').length !== 1) problems.push('scenes.json must have exactly one hero scene')
   return problems
@@ -276,7 +309,9 @@ export function shapeProblems({ scenes, appScripts }) {
  * that shows a region without one refused.
  */
 export function guardProblems({ scenes, record, appScripts }, drawn) {
-  const problems = appScripts.filter((app) => !scenes.some((scene) => scene.app === app)).map((app) => `apps/${app}/scripts/pictures.mjs takes no scene of scenes.json, so its check would compare nothing`)
+  const problems = appScripts
+    .filter((app) => !scenes.some((scene) => scene.app === app))
+    .map((app) => `apps/${app}/scripts/pictures.mjs takes no scene of scenes.json, so its check would compare nothing`)
   let rendered = drawn
   try {
     rendered ??= render(scenes, record)

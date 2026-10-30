@@ -99,9 +99,8 @@ export function PersonaSignIn({
       {index === null ? null : (
         <>
           <p className="lede">
-            Choose who to be. A data server and a PostgreSQL database of your own start on Cloudflare, with sample sales
-            data of the tenants these people work in. They stop {index.idleMinutes} minutes after your last request, and
-            everything you changed goes with them.
+            Choose who to be. A data server and a PostgreSQL database of your own start on Cloudflare, with sample sales data of the tenants these people work
+            in. They stop {index.idleMinutes} minutes after your last request, and everything you changed goes with them.
           </p>
           <ul className="personas" aria-label="People">
             {index.personas.map((persona, at) => (
@@ -122,11 +121,9 @@ export function PersonaSignIn({
             ))}
           </ul>
           <p className="hint">
-            One cookie holds a random name for your server and nothing else. Whoever holds it can sign in to your server,
-            so it goes only to this demo&rsquo;s own addresses, no script can read it, and your browser keeps it no
-            longer than its session. The token for the person you choose is held in this tab&rsquo;s memory and sent only
-            in the Authorization header; reloading the page signs you out, and your server keeps your changes until it
-            stops.
+            One cookie holds a random name for your server and nothing else. Whoever holds it can sign in to your server, so it goes only to this demo&rsquo;s
+            own addresses, no script can read it, and your browser keeps it no longer than its session. The token for the person you choose is held in this
+            tab&rsquo;s memory and sent only in the Authorization header; reloading the page signs you out, and your server keeps your changes until it stops.
           </p>
           <p className="standing">
             Formancy Data is source-available: <a href={REPOSITORY}>sharkysan/formancy.ai-data</a> on GitHub.

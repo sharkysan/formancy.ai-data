@@ -57,7 +57,9 @@ function clerkPolicy(bindings, extra = {}) {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
     ...extra,
@@ -69,7 +71,19 @@ export async function startPlane() {
   await insertPaged({ kind: 'postgres', admin: fixture.admin })
   const url = new URL(fixture.admin)
   const real = createConnectionRegistry(
-    [{ id: 'pg', kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } }],
+    [
+      {
+        id: 'pg',
+        kind: 'postgres',
+        host: url.hostname,
+        port: Number(url.port),
+        database: url.pathname.slice(1),
+        user: decodeURIComponent(url.username),
+        password: 'env:PG_PASSWORD',
+        schemas: ['sales'],
+        tls: { enabled: false },
+      },
+    ],
     DRIVER_FACTORIES,
     { env: { PG_PASSWORD: decodeURIComponent(url.password) }, readFile: async () => '' },
   )
@@ -95,21 +109,45 @@ export async function startPlane() {
     return { ok: false, reason: 'ERR_JWS_INVALID' }
   }
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const server = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const server = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   const call = async (token, path, payload) => {
     const reply = await server.inject({ method: 'POST', url: path, headers: { authorization: `Bearer ${token}` }, payload })
     if (reply.statusCode >= 300) throw new Error(`${path} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json()
   }
   const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version', views }) => {
-    const proposal = await call(TOKENS.admin, '/v1/form-proposals', { connection: 'pg', root: { schema: 'sales', name: table }, formId, title, lookups, ...(versionColumn === null ? {} : { versionColumn }) })
+    const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
+      connection: 'pg',
+      root: { schema: 'sales', name: table },
+      formId,
+      title,
+      lookups,
+      ...(versionColumn === null ? {} : { versionColumn }),
+    })
     // Published as the generator made it (0030 refuses anything but
     // presentation over the generated base), which draws a lookup as a
     // typeahead where it can be searched (0066); views alone leave the form
     // its base.
     const form = proposal.form
     const presentation = views === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views }
-    await call(TOKENS.admin, `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection: 'pg', generation: proposal.generation, base: form, presentation, form, bindings: proposal.bindings, policy: policy(proposal.bindings), snapshot: proposal.snapshot } })
+    await call(TOKENS.admin, `/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: {
+        format: 2,
+        connection: 'pg',
+        generation: proposal.generation,
+        base: form,
+        presentation,
+        form,
+        bindings: proposal.bindings,
+        policy: policy(proposal.bindings),
+        snapshot: proposal.snapshot,
+      },
+    })
     return form
   }
   const form = await publish({
@@ -117,7 +155,8 @@ export async function startPlane() {
     title: 'Order',
     table: 'order',
     lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
-    policy: (bindings) => clerkPolicy(bindings, { operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] }, cascades: ORDER_CASCADES }),
+    policy: (bindings) =>
+      clerkPolicy(bindings, { operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] }, cascades: ORDER_CASCADES }),
     views: ORDER_VIEWS,
   })
   // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
@@ -149,8 +188,15 @@ export async function startPlane() {
     /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it; `notes` finds it, and `customer` is searched for its customer. */
     order: async (lines = 0, notes = null, customer = 'Muster') => {
       const buyer = (await call(TOKENS.clerk, `/v1/forms/${FORM}/lookups/${source}/query`, { operation: 'create', search: customer })).rows[0].token
-      const record = (await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, { answers: { customer: buyer, order_date: '2026-10-08', status: 'placed', amount: '1', notes } })).record
-      for (let no = 1; no <= lines; no += 1) await call(TOKENS.clerk, `/v1/forms/${LINES}/records/create`, { answers: { order: record, line_no: String(no), quantity: String(no), unit_price: '2.50' } })
+      const record = (
+        await call(TOKENS.clerk, `/v1/forms/${FORM}/records/create`, {
+          answers: { customer: buyer, order_date: '2026-10-08', status: 'placed', amount: '1', notes },
+        })
+      ).record
+      for (let no = 1; no <= lines; no += 1)
+        await call(TOKENS.clerk, `/v1/forms/${LINES}/records/create`, {
+          answers: { order: record, line_no: String(no), quantity: String(no), unit_price: '2.50' },
+        })
       return record
     },
     insertCustomer: (no, name) => sql`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`,

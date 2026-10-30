@@ -6,10 +6,7 @@ describe('splitBatches', () => {
   // A driver sends GO as text and SQL Server answers with a syntax error. It
   // has to be split out, on its own line only.
   test('splits at GO alone on a line, in any case, and drops empty batches', () => {
-    expect(splitBatches('create schema a;\nGO\ncreate view v as select 1;\r\n  go  \n\nGO\n')).toEqual([
-      'create schema a;',
-      'create view v as select 1;',
-    ])
+    expect(splitBatches('create schema a;\nGO\ncreate view v as select 1;\r\n  go  \n\nGO\n')).toEqual(['create schema a;', 'create view v as select 1;'])
   })
 
   // A column called go_live, or a comment saying "go", is not a separator.
@@ -38,7 +35,9 @@ describe('the fixture files', () => {
       const body = batch.replaceAll(/--.*$/gm, '').trim().toLowerCase()
       const opensWith = /^create (schema|view|function|trigger)\b/.test(body)
       const contains = /\bcreate (schema|view|function|trigger)\b/.test(body)
-      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW, FUNCTION or TRIGGER after its first statement:\n${batch.slice(0, 120)}`).toBe(true)
+      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW, FUNCTION or TRIGGER after its first statement:\n${batch.slice(0, 120)}`).toBe(
+        true,
+      )
     }
   })
 
@@ -65,8 +64,7 @@ describe('the fixture files', () => {
     // A set, because SQL Server's file names ck_shipment_reference twice — once
     // to add it and once to disable it (NOCHECK CONSTRAINT), which PostgreSQL 17
     // cannot do — and a constraint named twice is still one constraint.
-    const names = (text: string) =>
-      [...new Set([...text.replaceAll(/--.*$/gm, '').matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].sort()
+    const names = (text: string) => [...new Set([...text.replaceAll(/--.*$/gm, '').matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].sort()
     expect(names(readFixture('sqlserver.sql')).filter((name) => !name?.startsWith('df_'))).toEqual(names(readFixture('postgres.sql')))
   })
 
@@ -88,7 +86,8 @@ describe('the fixture files', () => {
   test('both parity editions create the same tables and name the same constraints', () => {
     const strip = (text: string) => text.replaceAll(/--.*$/gm, '')
     const tables = (text: string) => [...strip(text).matchAll(/create\s+table\s+parity\.(\w+)/gi)].map((match) => match[1]).sort()
-    const names = (text: string) => [...new Set([...strip(text).matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].filter((name) => !name?.startsWith('df_')).sort()
+    const names = (text: string) =>
+      [...new Set([...strip(text).matchAll(/constraint\s+(\w+)/gi)].map((match) => match[1]))].filter((name) => !name?.startsWith('df_')).sort()
     const postgres = readFixture('postgres.parity.sql')
     const sqlServer = readFixture('sqlserver.parity.sql')
     expect(tables(postgres)).toEqual([

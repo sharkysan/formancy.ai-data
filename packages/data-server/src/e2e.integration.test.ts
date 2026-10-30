@@ -120,11 +120,20 @@ beforeAll(async () => {
   })
   root = await mkdtemp(join(tmpdir(), 'formancy-data-e2e-'))
   const store = createFileConfigurationStore(root)
-  const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
+  const verifyIdentity = await createIdentityVerifier({
+    key: { kind: 'secret', secret: SECRET },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: 'tid' },
+  })
   // The administrator's trail is admin-audit.test.ts's subject; here it is
   // required and discarded. Administrators browse too, for a filtered
   // browse to be read from the databases (0099, 0104).
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], browseRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], browseRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   admin = await token('admin-1', { roles: ['data-admin'] })
   clerk = await token('clerk-1', { roles: ['clerk'], tid: 1 })
   otherClerk = await token('clerk-2', { roles: ['clerk'], tid: 2 })
@@ -160,7 +169,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     // The customer lookup carries the tenant in its key, so its target is
     // pinned to the same tenant: a clerk can only pick their own customers.
@@ -169,7 +180,7 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg', versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg', versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms', versionColumn: undefined },
 ])('the journey on $engine', ({ connection, versionColumn }) => {
   const formId = `${connection}-order`
@@ -188,7 +199,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     // Delete too (0050): the database numbers an order's key. Nothing grants it: its lines cascade from it.
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const bundle = asProposed(connection, proposed, clerkPolicy(proposed.bindings.fields))
@@ -214,7 +225,13 @@ describe.each([
     const { record, version } = created.json()
 
     const read = (await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record })).json()
-    expect(read.answers).toMatchObject({ customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: EDGE_VALUES.largestAmount, notes: 'from the end-to-end test' })
+    expect(read.answers).toMatchObject({
+      customer,
+      order_date: EDGE_VALUES.orderDate,
+      status: 'placed',
+      amount: EDGE_VALUES.largestAmount,
+      notes: 'from the end-to-end test',
+    })
     expect(read.version).toBe(version)
 
     const saved = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record, version, answers: { ...read.answers, amount: '12.5' } })
@@ -234,11 +251,14 @@ describe.each([
   // out -- the key and the create check, either of which keeps an identity
   // out -- on both engines: the key copied, the create is refused 403
   // over-posting.
-  test("a copy of an order is a create the server accepts, of every field it names and not the key", async () => {
+  test('a copy of an order is a create the server accepts, of every field it names and not the key', async () => {
     const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
     const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
-    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
-    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: { customer, order_date: '2026-10-29', status: 'placed', amount: '7.25', notes: 'copied from' } })
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0]
+      .token as string
+    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, {
+      answers: { customer, order_date: '2026-10-29', status: 'placed', amount: '7.25', notes: 'copied from' },
+    })
     const read = (await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: created.json().record })).json()
     const copy = Object.fromEntries((definition.copied as string[]).map((field) => [field, read.answers[field]]))
     const second = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: copy })
@@ -280,7 +300,7 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     // A line's key is typed: SQL Server's rowversion proves a line, a PostgreSQL version column does not (0050).
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: versionColumn === undefined })
     const policy: FormPolicy = {
@@ -332,11 +352,16 @@ describe.each([
     const theirsDefinition = (await call('GET', `/v1/forms/${formId}`, otherClerk)).json()
     expect(theirsDefinition.list).toMatchObject({ sortable: expect.arrayContaining(['id', 'order_date']) })
     const source = theirsDefinition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
-    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0].token as string
-    const order = await call('POST', `/v1/forms/${formId}/records/create`, otherClerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' } })
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0]
+      .token as string
+    const order = await call('POST', `/v1/forms/${formId}/records/create`, otherClerk, {
+      answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' },
+    })
     expect(order.statusCode, order.body).toBe(201)
     const theirOrder = order.json().record as string
-    const line = await call('POST', `/v1/forms/${lineForm}/records/create`, otherClerk, { answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' } })
+    const line = await call('POST', `/v1/forms/${lineForm}/records/create`, otherClerk, {
+      answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' },
+    })
     expect(line.statusCode, line.body).toBe(201)
     const theirLine = line.json().record as string
 
@@ -412,12 +437,26 @@ function cellsUnder(records: string[][], header: string): Array<string | undefin
 
 /** A file of `form`'s records as `bearer`, asked for as a browser does: answered whole, or the refusal. */
 async function exported(form: string, bearer: string, payload: Record<string, unknown> = {}) {
-  const response = await app.inject({ method: 'POST', url: `/v1/forms/${form}/records/export`, headers: { authorization: `Bearer ${bearer}`, accept: 'text/csv, application/json' }, payload })
-  return { status: response.statusCode, type: response.headers['content-type'], text: response.body, json: () => response.json() as { code: string; message: string } }
+  const response = await app.inject({
+    method: 'POST',
+    url: `/v1/forms/${form}/records/export`,
+    headers: { authorization: `Bearer ${bearer}`, accept: 'text/csv, application/json' },
+    payload,
+  })
+  return {
+    status: response.statusCode,
+    type: response.headers['content-type'],
+    text: response.body,
+    json: () => response.json<{ code: string; message: string }>(),
+  }
 }
 
 /** Every record token `bearer`'s list of `form` pages through, from the first page to the last, in the list's order. */
-async function everyListed(form: string, bearer: string, body: Record<string, unknown> = {}): Promise<Array<{ record: string; answers: Record<string, unknown> }>> {
+async function everyListed(
+  form: string,
+  bearer: string,
+  body: Record<string, unknown> = {},
+): Promise<Array<{ record: string; answers: Record<string, unknown> }>> {
   const rows: Array<{ record: string; answers: Record<string, unknown> }> = []
   let after: string | null = null
   for (;;) {
@@ -430,11 +469,19 @@ async function everyListed(form: string, bearer: string, body: Record<string, un
 }
 
 /** Proposes `root` on `connection` as `formId` and publishes it with the policy `policyOf` gives, as proposed. */
-async function published(connection: string, formId: string, request: Record<string, unknown>, policyOf: (fields: readonly FieldBinding[]) => FormPolicy): Promise<void> {
+async function published(
+  connection: string,
+  formId: string,
+  request: Record<string, unknown>,
+  policyOf: (fields: readonly FieldBinding[]) => FormPolicy,
+): Promise<void> {
   const proposal = await call('POST', '/v1/form-proposals', admin, { connection, formId, title: formId, ...request })
   expect(proposal.statusCode, proposal.body).toBe(200)
-  const proposed = proposal.json() as Proposal
-  const answer = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policyOf(proposed.bindings.fields)) })
+  const proposed = proposal.json<Proposal>()
+  const answer = await call('POST', `/v1/forms/${formId}/versions`, admin, {
+    expectedBase: null,
+    bundle: asProposed(connection, proposed, policyOf(proposed.bindings.fields)),
+  })
   expect(answer.statusCode, answer.body).toBe(201)
 }
 
@@ -448,7 +495,7 @@ const customerPolicy = (fields: readonly FieldBinding[]): FormPolicy => ({
 const CUSTOMERS = { root: { schema: 'sales', name: 'customer' }, lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
 ])("a file of a form's records on $engine (0079)", ({ connection, versionColumn }) => {
   const orders = `${connection}-export-order`
@@ -463,23 +510,43 @@ describe.each([
   beforeAll(async () => {
     ddl = await owner(connection)
     const versioned = versionColumn === undefined ? {} : { versionColumn }
-    await published(connection, orders, { root: { schema: 'sales', name: 'order' }, lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...versioned }, clerkPolicy)
-    await published(connection, lines, { root: { schema: 'sales', name: 'order_line' }, lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }], ...versioned }, (fields) => ({
-      ...clerkPolicy(fields),
-      rowFilters: [],
-      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
-      through: ['order'],
-    }))
+    await published(
+      connection,
+      orders,
+      { root: { schema: 'sales', name: 'order' }, lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...versioned },
+      clerkPolicy,
+    )
+    await published(
+      connection,
+      lines,
+      { root: { schema: 'sales', name: 'order_line' }, lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }], ...versioned },
+      (fields) => ({
+        ...clerkPolicy(fields),
+        rowFilters: [],
+        lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+        through: ['order'],
+      }),
+    )
     await published(connection, customers, CUSTOMERS, customerPolicy)
-    const source = ((await call('GET', `/v1/forms/${orders}`, otherClerk)).json().form.model.fields as Array<{ key: string; optionsSource?: string }>).find((field) => field.key === 'customer')?.optionsSource as string
-    const customer = (await call('POST', `/v1/forms/${orders}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0].token as string
-    const created = await call('POST', `/v1/forms/${orders}/records/create`, otherClerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' } })
+    const source = ((await call('GET', `/v1/forms/${orders}`, otherClerk)).json().form.model.fields as Array<{ key: string; optionsSource?: string }>).find(
+      (field) => field.key === 'customer',
+    )?.optionsSource as string
+    const customer = (await call('POST', `/v1/forms/${orders}/lookups/${source}/query`, otherClerk, { operation: 'create', search: '' })).json().rows[0]
+      .token as string
+    const created = await call('POST', `/v1/forms/${orders}/records/create`, otherClerk, {
+      answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1' },
+    })
     expect(created.statusCode, created.body).toBe(201)
     theirOrder = created.json().record as string
-    const line = await call('POST', `/v1/forms/${lines}/records/create`, otherClerk, { answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' } })
+    const line = await call('POST', `/v1/forms/${lines}/records/create`, otherClerk, {
+      answers: { order: theirOrder, line_no: 1, quantity: 1, unit_price: '1.00' },
+    })
     expect(line.statusCode, line.body).toBe(201)
     await ddl.run(
-      EXPORT_ROWS.customers.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`),
+      EXPORT_ROWS.customers.map(
+        (row) =>
+          `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`,
+      ),
     )
   })
 
@@ -544,10 +611,21 @@ describe.each([
     }
     for (const row of EXPORT_ROWS.customers) {
       const cell = of(row.number)
-      expect([row.number, cell('Name'), cell('Credit limit'), cell('Country'), cell('Country (key)')]).toEqual([row.number, row.cell, row.creditLimit ?? '', '', ''])
+      expect([row.number, cell('Name'), cell('Credit limit'), cell('Country'), cell('Country (key)')]).toEqual([
+        row.number,
+        row.cell,
+        row.creditLimit ?? '',
+        '',
+        '',
+      ])
     }
     const muster = of('1001')
-    expect([muster('Name'), muster('Credit limit'), muster('Country'), muster('Country (key)')]).toEqual(['Muster AG', EDGE_VALUES.largestCreditLimit, 'Switzerland', 'k1:CH'])
+    expect([muster('Name'), muster('Credit limit'), muster('Country'), muster('Country (key)')]).toEqual([
+      'Muster AG',
+      EDGE_VALUES.largestCreditLimit,
+      'Switzerland',
+      'k1:CH',
+    ])
   })
 })
 
@@ -613,13 +691,18 @@ describe.each([
     ddl = await owner(connection)
     await published(connection, customers, CUSTOMERS, customerPolicy)
     await ddl.run([
-      ...FILTER_CUSTOMERS.map((row) => `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`),
+      ...FILTER_CUSTOMERS.map(
+        (row) =>
+          `insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, ${row.number}, ${literal(row.name)}, ${row.creditLimit ?? 'null'})`,
+      ),
       `insert into sales.customer (tenant_id, customer_no, name) values ${FILTER_PAGED.map((row) => `(1, ${row.number}, ${literal(row.name)})`).join(', ')}`,
     ])
   })
 
   afterAll(async () => {
-    await ddl?.run([`delete from sales.customer where tenant_id = 1 and (customer_no in (${FILTER_CUSTOMERS.map((row) => row.number).join(', ')}) or customer_no between 4101 and 4160)`])
+    await ddl?.run([
+      `delete from sales.customer where tenant_id = 1 and (customer_no in (${FILTER_CUSTOMERS.map((row) => row.number).join(', ')}) or customer_no between 4101 and 4160)`,
+    ])
     await ddl?.close()
   })
 
@@ -653,7 +736,9 @@ describe.each([
 
     expect(numbers(await everyListed(customers, clerk, { filter: [{ field: 'customer_no', op: 'equals', value: ' +04002 ' }] }))).toEqual(['4002'])
     const ranged = await everyListed(customers, clerk, { filter: [{ field: 'credit_limit', op: 'range', from: '-2.5', to: '5' }] })
-    expect(numbers(ranged)).toEqual(numbers(every.filter((row) => limited(row) && Number(row.answers['credit_limit']) >= -2.5 && Number(row.answers['credit_limit']) <= 5)))
+    expect(numbers(ranged)).toEqual(
+      numbers(every.filter((row) => limited(row) && Number(row.answers['credit_limit']) >= -2.5 && Number(row.answers['credit_limit']) <= 5)),
+    )
     expect(numbers(ranged)).toEqual(['4002', '4003'])
 
     const theirs = await everyListed(customers, otherClerk, { filter: [NAMED] })
@@ -670,7 +755,10 @@ describe.each([
   // after the first: the file was refused 409, its second page repeating
   // records of the first.
   test("the same filter's file is every page of that list, exactly", async () => {
-    const filter = [{ field: 'name', op: 'contains', text: 'filter page' }, { field: 'customer_no', op: 'range', from: null, to: '4155' }]
+    const filter = [
+      { field: 'name', op: 'contains', text: 'filter page' },
+      { field: 'customer_no', op: 'range', from: null, to: '4155' },
+    ]
     const file = await exported(customers, clerk, { filter })
     expect([file.status, file.type]).toEqual([200, 'text/csv; charset=utf-8'])
     const listed = numbers(await everyListed(customers, clerk, { filter }))
@@ -733,7 +821,7 @@ describe.each([
       pinned: ['tenant_id'],
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const policy: FormPolicy = {
       version: 1,
@@ -767,7 +855,10 @@ describe.each([
     const saved = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record, version, answers: { note: 'clara, changed' } })
     expect(saved.statusCode, saved.body).toBe(200)
     const stale = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version })
-    expect([stale.statusCode, stale.json()]).toEqual([409, { code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' }])
+    expect([stale.statusCode, stale.json()]).toEqual([
+      409,
+      { code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' },
+    ])
 
     const current = saved.json().version as string
     const deleted = await call('POST', `/v1/forms/${formId}/records/delete`, clerk, { record, version: current })
@@ -791,9 +882,15 @@ describe('deleting an order line through its order on SQL Server', () => {
       lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     const base = clerkPolicy(proposed.bindings.fields)
-    const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
+    const policy: FormPolicy = {
+      ...base,
+      operations: { ...base.operations, delete: ['clerk'] },
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }
     expect((await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed('ms', proposed, policy) })).statusCode).toBe(201)
 
     const order = `k1:${EDGE_VALUES.beyondSafeInteger}`
@@ -811,7 +908,7 @@ describe('deleting an order line through its order on SQL Server', () => {
 const writerWrites = new Map<string, Array<[string, FieldWrites]>>()
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg-writer', versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg-writer', versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms-writer', versionColumn: undefined },
 ])("a form proposed through the order form's own account on $engine", ({ connection, versionColumn }) => {
   const formId = `${connection}-order`
@@ -838,8 +935,17 @@ describe.each([
     const fields = bindings.fields as FieldBinding[]
     expect(fields.find((binding) => binding.field === 'amount')?.writes).toEqual({ create: true, update: false })
     expect(fields.find((binding) => binding.field === 'status')?.writes).toEqual({ create: true, update: true })
-    expect(notes).toContainEqual(expect.objectContaining({ subject: 'customer', kind: 'access', message: expect.stringMatching(/^Row-level security applies to this connection on sales\.customer/) }))
-    writerWrites.set(connection.slice(0, 2), fields.map((binding): [string, FieldWrites] => [binding.field, binding.writes]))
+    expect(notes).toContainEqual(
+      expect.objectContaining({
+        subject: 'customer',
+        kind: 'access',
+        message: expect.stringMatching(/^Row-level security applies to this connection on sales\.customer/),
+      }),
+    )
+    writerWrites.set(
+      connection.slice(0, 2),
+      fields.map((binding): [string, FieldWrites] => [binding.field, binding.writes]),
+    )
 
     const bundle = asProposed(connection, proposed, clerkPolicy(fields))
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
@@ -865,7 +971,8 @@ describe.each([
   test('creates, is refused a changed amount on update, and saves status', async () => {
     const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
     const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
-    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0]
+      .token as string
     const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, {
       answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '5', notes: 'through the writer' },
     })
@@ -901,7 +1008,7 @@ const ORDER_CASCADES: NonNullable<FormPolicy['cascades']> = [
 ]
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg-writer', db: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg-writer', db: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms-writer', db: 'ms' as const, versionColumn: undefined },
 ])("deleting an order with what it reaches, through the order form's own account on $engine", ({ connection, db, versionColumn }) => {
   const formId = `${connection}-order-delete`
@@ -913,7 +1020,14 @@ describe.each([
     count = async (order) => {
       if (db === 'pg') {
         const url = new URL(pg.admin)
-        const sql = connectPostgres({ host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false } })
+        const sql = connectPostgres({
+          host: url.hostname,
+          port: Number(url.port),
+          database: url.pathname.slice(1),
+          user: decodeURIComponent(url.username),
+          password: decodeURIComponent(url.password),
+          tls: { enabled: false, rejectUnauthorized: false },
+        })
         try {
           const [row] = await sql.unsafe<Array<{ lines: number; deliveries: number; parcels: number }>>(
             `select (select count(*)::int from sales.order_line where order_id = $1::text::bigint) as lines,
@@ -926,13 +1040,24 @@ describe.each([
           await sql.end({ timeout: 5 })
         }
       }
-      const pool = await connectSqlServer({ host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true })
+      const pool = await connectSqlServer({
+        host: String(ms.admin.server),
+        port: Number(ms.admin.port),
+        database: String(ms.admin.database),
+        user: String(ms.admin.user),
+        password: String(ms.admin.password),
+        encrypt: false,
+        trustServerCertificate: true,
+      })
       try {
-        const result = await pool.request().input('id', order).query<{ lines: number; deliveries: number; parcels: number }>(
-          `select (select count(*) from sales.order_line where order_id = convert(bigint, @id)) as lines,
+        const result = await pool
+          .request()
+          .input('id', order)
+          .query<{ lines: number; deliveries: number; parcels: number }>(
+            `select (select count(*) from sales.order_line where order_id = convert(bigint, @id)) as lines,
                   (select count(*) from sales.delivery where order_id = convert(bigint, @id)) as deliveries,
                   (select count(*) from sales.parcel p join sales.delivery d on d.id = p.delivery_id where d.order_id = convert(bigint, @id)) as parcels`,
-        )
+          )
         return result.recordset[0] as { lines: number; deliveries: number; parcels: number }
       } finally {
         await pool.close()
@@ -957,14 +1082,19 @@ describe.each([
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const proposed = proposal.json() as Proposal
+    const proposed = proposal.json<Proposal>()
     expect(proposed.bindings.operations).toEqual({ create: true, update: true, delete: true })
     const base = clerkPolicy(proposed.bindings.fields)
     const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
-    const partial = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, { ...policy, cascades: ORDER_CASCADES.slice(0, 2) }) })
+    const partial = await call('POST', `/v1/forms/${formId}/versions`, admin, {
+      expectedBase: null,
+      bundle: asProposed(connection, proposed, { ...policy, cascades: ORDER_CASCADES.slice(0, 2) }),
+    })
     expect([partial.statusCode, partial.json().problems]).toEqual([
       422,
-      ['policy: operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which cascades does not accept'],
+      [
+        'policy: operations.delete grants roles, and deleting a record of sales.order also deletes rows of sales.parcel (fk_parcel_delivery, ON DELETE CASCADE), which cascades does not accept',
+      ],
     ])
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, policy) })
     expect(published.statusCode, published.body).toBe(201)
@@ -978,10 +1108,13 @@ describe.each([
     const definition = (await call('GET', `/v1/forms/${formId}`, clerk)).json()
     expect(definition).toMatchObject({ operations: ['read', 'create', 'update', 'delete'], deleting: { cascades: true, clears: false, restricted: false } })
     const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
-    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
-    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, { answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '5', notes: 'deleted with its lines' } })
+    const customer = (await call('POST', `/v1/forms/${formId}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0]
+      .token as string
+    const created = await call('POST', `/v1/forms/${formId}/records/create`, clerk, {
+      answers: { customer, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '5', notes: 'deleted with its lines' },
+    })
     expect(created.statusCode, created.body).toBe(201)
-    const { record, version } = created.json() as { record: string; version: string }
+    const { record, version } = created.json<{ record: string; version: string }>()
     const id = record.slice('k1:'.length)
     await rows.run(
       db === 'pg'
@@ -1040,25 +1173,55 @@ const STEP_8 = {
  * row as JSON text, so a write the runtime refused can be shown to have left
  * it as it was.
  */
-async function owner(connection: 'pg' | 'ms'): Promise<{ run(statements: readonly string[]): Promise<void>; order(id: string): Promise<string | null>; close(): Promise<void> }> {
+async function owner(
+  connection: 'pg' | 'ms',
+): Promise<{ run(statements: readonly string[]): Promise<void>; order(id: string): Promise<string | null>; close(): Promise<void> }> {
   if (connection === 'pg') {
     const url = new URL(pg.admin)
     const sql = connectPostgres({
-      host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      tls: { enabled: false, rejectUnauthorized: false },
     })
     return {
-      run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) },
-      order: async (id) => (await sql.unsafe<Array<{ row: string | null }>>('select (select pg_catalog.row_to_json(o)::text from sales."order" o where o.id = $1::text::bigint) as row', [id]))[0]?.row ?? null,
+      run: async (statements) => {
+        for (const statement of statements) await sql.unsafe(statement)
+      },
+      order: async (id) =>
+        (
+          await sql.unsafe<Array<{ row: string | null }>>(
+            'select (select pg_catalog.row_to_json(o)::text from sales."order" o where o.id = $1::text::bigint) as row',
+            [id],
+          )
+        )[0]?.row ?? null,
       close: () => sql.end({ timeout: 5 }),
     }
   }
   const pool = await connectSqlServer({
-    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
   })
   return {
-    run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) },
+    run: async (statements) => {
+      for (const statement of statements) await pool.request().batch(statement)
+    },
     order: async (id) =>
-      (await pool.request().input('id', id).query<{ row: string | null }>('select (select * from sales.[order] where id = convert(bigint, @id) for json path, without_array_wrapper, include_null_values) as row')).recordset[0]?.row ?? null,
+      (
+        await pool
+          .request()
+          .input('id', id)
+          .query<{ row: string | null }>(
+            'select (select * from sales.[order] where id = convert(bigint, @id) for json path, without_array_wrapper, include_null_values) as row',
+          )
+      ).recordset[0]?.row ?? null,
     close: () => pool.close(),
   }
 }
@@ -1068,7 +1231,7 @@ const sectionsOf = (form: FormSchema) => (form.layouts?.[0]?.nodes ?? []) as Arr
 const orderOf = (form: FormSchema) => (sectionsOf(form)[0]?.children[0] as Grid).children.map((node) => node.path)
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
 ])('a published form through a change to its table on $engine (plan section 14, step 8)', ({ connection, versionColumn }) => {
   const formId = `${connection}-evolve`
@@ -1091,14 +1254,22 @@ describe.each([
   // derived holds exactly those edits.
   test('an administrator proposes the order form and edits its presentation', async () => {
     const response = await call('POST', '/v1/form-proposals', admin, {
-      connection, root: { schema: 'sales', name: 'order' }, formId, title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...(versionColumn === undefined ? {} : { versionColumn }),
+      connection,
+      root: { schema: 'sales', name: 'order' },
+      formId,
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(response.statusCode, response.body).toBe(200)
-    proposal = response.json() as Proposal
+    proposal = response.json<Proposal>()
     expect(orderOf(proposal.form)).toEqual(['customer', 'order_date', 'status', 'amount', 'notes', 'group', 'created_by', 'approved_by'])
 
     edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
-    for (const [key, label] of [['notes', 'Delivery notes'], ['approved_by', 'Approver']] as const) {
+    for (const [key, label] of [
+      ['notes', 'Delivery notes'],
+      ['approved_by', 'Approver'],
+    ] as const) {
       const field = edited.model.fields.find((entry) => entry.key === key)
       if (field !== undefined) field.label = label
     }
@@ -1119,7 +1290,13 @@ describe.each([
         { field: 'group', anchor: { kind: 'column', column: 'group' }, span: 'all' },
         { field: 'approved_by', anchor: { kind: 'column', column: 'approved_by' }, label: 'Approver' },
       ],
-      sections: [{ anchor: { label: 'Order', occurrence: 0 }, label: 'Order details', order: ['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'approved_by'] }],
+      sections: [
+        {
+          anchor: { label: 'Order', occurrence: 0 },
+          label: 'Order details',
+          order: ['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'approved_by'],
+        },
+      ],
     })
   })
 
@@ -1170,7 +1347,16 @@ describe.each([
     expect(orderOf(regeneration.form)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'approved_by', 'reference'])
     expect(regeneration.form.model.fields.find((field: { key: string }) => field.key === 'group')).toMatchObject({ maxLength: 60, label: 'Group' })
 
-    const { version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+    const {
+      version,
+      drift: _drift,
+      policyProblems: _problems,
+      conflicts: _conflicts,
+      lookupsDropped: _dropped,
+      keysReassigned: _keys,
+      notes: _notes,
+      ...parts
+    } = regeneration
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: version, bundle: { format: 2, connection, ...parts } })
     expect(published.statusCode, published.body).toBe(201)
     expect((await call('POST', `/v1/forms/${formId}/drift`, admin)).json()).toMatchObject({ version: 2, changes: [], blocking: false })
@@ -1201,7 +1387,10 @@ describe.each([
     await ddl.run(STEP_8[connection].incompatible)
     const refused = await call('POST', `/v1/forms/${formId}/restorations`, admin, { version: 2, expectedBase: 3 })
     expect(refused.statusCode).toBe(409)
-    expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
+    expect(refused.json()).toMatchObject({
+      code: 'incompatible',
+      changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }],
+    })
     expect(refused.json().changes).toHaveLength(1)
     expect(await versions()).toEqual([1, 2, 3])
 
@@ -1223,12 +1412,29 @@ describe.each([
     const regeneration = (await call('POST', `/v1/forms/${formId}/regenerations`, admin)).json()
     expect(regeneration.version).toBe(3)
     expect(regeneration.conflicts).toEqual([
-      { kind: 'field-gone', field: 'approved_by', anchor: { kind: 'column', column: 'approved_by' }, property: 'label', yours: 'Approver', resolution: 'dropped', message: expect.any(String) },
+      {
+        kind: 'field-gone',
+        field: 'approved_by',
+        anchor: { kind: 'column', column: 'approved_by' },
+        property: 'label',
+        yours: 'Approver',
+        resolution: 'dropped',
+        message: expect.any(String),
+      },
     ])
     expect(orderOf(regeneration.form)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'group', 'created_by', 'reference'])
     expect(regeneration.policyProblems).toContain('policy: fields.approved_by: the form has no field approved_by')
 
-    const { version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+    const {
+      version,
+      drift: _drift,
+      policyProblems: _problems,
+      conflicts: _conflicts,
+      lookupsDropped: _dropped,
+      keysReassigned: _keys,
+      notes: _notes,
+      ...parts
+    } = regeneration
     const bundle = { format: 2, connection, ...parts, policy: clerkPolicy(regeneration.bindings.fields) }
     const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: version, bundle })
     expect(published.statusCode, published.body).toBe(201)

@@ -13,7 +13,8 @@ type Restored =
   | { kind: 'conflict'; current: number | null }
   | { kind: 'failed'; message: string }
 
-type Downloadable = { state: 'reading'; version: number } | { state: 'read'; version: number; href: string } | { state: 'refused'; version: number; message: string }
+type Downloadable =
+  { state: 'reading'; version: number } | { state: 'read'; version: number; href: string } | { state: 'refused'; version: number; message: string }
 
 /**
  * A published version as the store spelled its file (0062):
@@ -209,8 +210,8 @@ export function VersionsPanel({
           ) : (
             <>
               <p className="hint">
-                Restoring publishes an older version again as version {newest + 1}, with the policy it had, when the database can
-                still serve it. It changes no table.
+                Restoring publishes an older version again as version {newest + 1}, with the policy it had, when the database can still serve it. It changes no
+                table.
               </p>
               <div className="inline-form">
                 <div className="field">
@@ -234,8 +235,8 @@ export function VersionsPanel({
       )}
       {restored === null ? null : restored.kind === 'restored' ? (
         <p role="status" className="done">
-          Restored version {restored.restoredFrom} as version {restored.version}: the runtime serves it from now on, with the
-          policy it had. The database was not changed.
+          Restored version {restored.restoredFrom} as version {restored.version}: the runtime serves it from now on, with the policy it had. The database was
+          not changed.
         </p>
       ) : restored.kind === 'incompatible' ? (
         <div role="alert" className="problem-box">
@@ -249,8 +250,8 @@ export function VersionsPanel({
         </div>
       ) : restored.kind === 'conflict' ? (
         <p role="alert" className="problem-box">
-          Somebody published {restored.current === null ? 'a version' : `version ${String(restored.current)}`} since the list was
-          read. Nothing was restored; the list now shows it.
+          Somebody published {restored.current === null ? 'a version' : `version ${String(restored.current)}`} since the list was read. Nothing was restored;
+          the list now shows it.
         </p>
       ) : (
         <p role="alert" className="problem-box">

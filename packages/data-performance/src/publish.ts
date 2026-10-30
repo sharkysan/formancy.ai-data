@@ -41,7 +41,9 @@ export function policyFor(fields: readonly FieldBinding[], policy: Policy): Form
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: policy === 'order' ? tenant : [],
     lookups: { customer: policy === 'order' ? tenant : [] },
   }
@@ -81,7 +83,17 @@ export async function publishForms(admin: (path: string, body: unknown) => Promi
         if (customer?.kind !== 'lookup') throw new Error(`${formId}'s proposal has no customer lookup`)
         await admin(`/v1/forms/${formId}/versions`, {
           expectedBase: null,
-          bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: policyFor(fields, policy), snapshot },
+          bundle: {
+            format: 2,
+            connection,
+            generation,
+            base: form,
+            presentation: EMPTY_PRESENTATION,
+            form,
+            bindings,
+            policy: policyFor(fields, policy),
+            snapshot,
+          },
         })
         published.push({ formId, engine, policy, hop, source: customer.source })
       }

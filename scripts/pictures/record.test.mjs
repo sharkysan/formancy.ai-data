@@ -1,7 +1,22 @@
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
-import { announce, checkProblems, dated, entry, lineDiff, misquotes, outsideRepository, pairingProblems, quotations, readScenes, REPO, serialize, stylesheetNotices, withEntry } from './record.mjs'
+import {
+  announce,
+  checkProblems,
+  dated,
+  entry,
+  lineDiff,
+  misquotes,
+  outsideRepository,
+  pairingProblems,
+  quotations,
+  readScenes,
+  REPO,
+  serialize,
+  stylesheetNotices,
+  withEntry,
+} from './record.mjs'
 
 /**
  * What a capture may write into docs/images/readme/captured.json and what
@@ -9,15 +24,47 @@ import { announce, checkProblems, dated, entry, lineDiff, misquotes, outsideRepo
  * Pure, so held here without a browser; the browser half is the camera's.
  */
 
-const LOOK = { platform: 'linux-x64', playwright: '1.63.0', chromium: '153.0.8010.12', fonts: { Archivo: 'v25', 'IBM Plex Mono': 'v20', 'IBM Plex Sans': 'v23' } }
+const LOOK = {
+  platform: 'linux-x64',
+  playwright: '1.63.0',
+  chromium: '153.0.8010.12',
+  fonts: { Archivo: 'v25', 'IBM Plex Mono': 'v20', 'IBM Plex Sans': 'v23' },
+}
 const SETTINGS = { width: 1200, height: 900, deviceScaleFactor: 2, locale: 'en-US', timezoneId: 'UTC' }
 const SCENES = [
-  { id: 'studio-drift', app: 'studio', placement: 'inline', title: 'Drift', step: '8. Drift', caption: 'A “possible-rename”.', alt: 'The Drift step.', quotes: { 'possible-rename': ['Drift'] } },
-  { id: 'studio-restored', app: 'studio', placement: 'more', title: 'Restored', caption: '“The database was not changed.”', alt: 'The versions panel.', quotes: { 'The database was not changed.': ['Versions'] } },
+  {
+    id: 'studio-drift',
+    app: 'studio',
+    placement: 'inline',
+    title: 'Drift',
+    step: '8. Drift',
+    caption: 'A “possible-rename”.',
+    alt: 'The Drift step.',
+    quotes: { 'possible-rename': ['Drift'] },
+  },
+  {
+    id: 'studio-restored',
+    app: 'studio',
+    placement: 'more',
+    title: 'Restored',
+    caption: '“The database was not changed.”',
+    alt: 'The versions panel.',
+    quotes: { 'The database was not changed.': ['Versions'] },
+  },
 ]
 const DRIFT = { Drift: '- main "Drift":\n  - code: possible-rename' }
 const RESTORED = { Versions: '- region "Versions of pg-order":\n  - status: Restored version 1 as version 4. The database was not changed.' }
-const taken = (id, text, look = LOOK) => entry(id, { captured: '2026-10-09', settings: SETTINGS, clip: { x: 296, y: 12, width: 892, height: 1357 }, picture: Buffer.from(id), look, database: 'captured snapshots', stylesheet: 'sha256 0', text })
+const taken = (id, text, look = LOOK) =>
+  entry(id, {
+    captured: '2026-10-09',
+    settings: SETTINGS,
+    clip: { x: 296, y: 12, width: 892, height: 1357 },
+    picture: Buffer.from(id),
+    look,
+    database: 'captured snapshots',
+    stylesheet: 'sha256 0',
+    text,
+  })
 
 describe('quotations', () => {
   // A mark opened and never closed, or closed twice, would quote a run nobody
@@ -34,10 +81,30 @@ describe('the record an app script writes', () => {
   // The shape captured.json keeps every entry in: a key out of place, or a
   // size taken from the viewport instead of the clip, would be a record
   // the README renders at the wrong width.
-  test('is one entry per scene, with the clip as its CSS size and the picture\'s own bytes and digest', () => {
+  test("is one entry per scene, with the clip as its CSS size and the picture's own bytes and digest", () => {
     const written = taken('studio-drift', DRIFT)
-    expect(Object.keys(written)).toEqual(['file', 'captured', 'viewport', 'deviceScaleFactor', 'locale', 'timezone', 'css', 'bytes', 'sha256', 'look', 'database', 'stylesheet', 'text'])
-    expect(written).toMatchObject({ file: 'docs/images/readme/studio-drift.webp', viewport: { width: 1200, height: 900 }, css: { width: 892, height: 1357 }, bytes: 12, timezone: 'UTC' })
+    expect(Object.keys(written)).toEqual([
+      'file',
+      'captured',
+      'viewport',
+      'deviceScaleFactor',
+      'locale',
+      'timezone',
+      'css',
+      'bytes',
+      'sha256',
+      'look',
+      'database',
+      'stylesheet',
+      'text',
+    ])
+    expect(written).toMatchObject({
+      file: 'docs/images/readme/studio-drift.webp',
+      viewport: { width: 1200, height: 900 },
+      css: { width: 892, height: 1357 },
+      bytes: 12,
+      timezone: 'UTC',
+    })
     expect(written.sha256).toBe(createHash('sha256').update('studio-drift').digest('hex'))
   })
 
@@ -47,7 +114,9 @@ describe('the record an app script writes', () => {
     expect(() => withEntry({}, SCENES, 'studio-drift', taken('studio-drift', { Drift: '- main "Drift":\n  - code: column-dropped' }))).toThrow(
       /studio-drift was not written, because its caption or alt would not be true of it:\n {2}studio-drift: “possible-rename” is not inside one name or value of what the part Drift says/,
     )
-    expect(() => withEntry({}, SCENES, 'studio-drift', taken('studio-drift', { Drift: 'main "Drift"' }))).toThrow(/line 1 is not an accessibility snapshot line/)
+    expect(() => withEntry({}, SCENES, 'studio-drift', taken('studio-drift', { Drift: 'main "Drift"' }))).toThrow(
+      /line 1 is not an accessibility snapshot line/,
+    )
     expect(() => withEntry({}, SCENES, 'studio-gone', taken('studio-gone', DRIFT))).toThrow(/studio-gone is not a scene of scripts\/pictures\/scenes\.json/)
   })
 
@@ -108,7 +177,9 @@ describe('what --check fails with', () => {
   // check that walked nothing would pass, so "compared no scene" comes
   // first and alone.
   test('is "compared no scene" first, before anything else is looked at', () => {
-    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: [], running: {}, playwright: '1.63.0' })).toEqual(['studio: compared no scene, so nothing held its pictures'])
+    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: [], running: {}, playwright: '1.63.0' })).toEqual([
+      'studio: compared no scene, so nothing held its pictures',
+    ])
   })
 
   // The same sentence from the walk's side: with every scene paired with its
@@ -116,14 +187,25 @@ describe('what --check fails with', () => {
   // say -- would otherwise find nothing to differ and pass, since the test
   // above reaches the sentence through the pairing alone.
   test('is "compared no scene" when the walk read nothing, though every scene has its act', () => {
-    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: Object.keys(all), running: {}, playwright: '1.63.0' })).toEqual(['studio: compared no scene, so nothing held its pictures'])
+    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: Object.keys(all), running: {}, playwright: '1.63.0' })).toEqual([
+      'studio: compared no scene, so nothing held its pictures',
+    ])
   })
 
   // The BRIEF's "a scene with no act; separately, an act's key renamed": a
   // picture nothing walks is held by nothing, and an act nothing records
   // compares nothing.
   test('is a scene with no act, and an act with no scene', () => {
-    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: ['studio-drift', 'studio-restord'], running: { 'studio-drift': DRIFT }, playwright: '1.63.0' })).toEqual([
+    expect(
+      checkProblems({
+        app: 'studio',
+        scenes: SCENES,
+        record,
+        actIds: ['studio-drift', 'studio-restord'],
+        running: { 'studio-drift': DRIFT },
+        playwright: '1.63.0',
+      }),
+    ).toEqual([
       'studio: the scene studio-restored has no act, so its picture is held by nothing',
       'studio: the act studio-restord is no scene of scripts/pictures/scenes.json',
     ])
@@ -155,7 +237,9 @@ describe('what --check fails with', () => {
   // A part added to or dropped from an act changes what the picture is of.
   test('is a part the record or the walk does not have', () => {
     const running = { ...all, 'studio-restored': { ...RESTORED, Extra: '- button "Restore version 1"' } }
-    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: Object.keys(all), running, playwright: '1.63.0' })).toEqual(['studio-restored: the part Extra is not in the record'])
+    expect(checkProblems({ app: 'studio', scenes: SCENES, record, actIds: Object.keys(all), running, playwright: '1.63.0' })).toEqual([
+      'studio-restored: the part Extra is not in the record',
+    ])
   })
 })
 
@@ -187,7 +271,11 @@ describe('the stylesheet notice', () => {
     expect(printed).toEqual(['notice: a notice, 100% true'])
     expect(appended).toEqual([])
     printed.length = 0
-    announce(['a notice, 100% true'], { env: { GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: '/summary' }, print: (line) => printed.push(line), append: (...args) => appended.push(args) })
+    announce(['a notice, 100% true'], {
+      env: { GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: '/summary' },
+      print: (line) => printed.push(line),
+      append: (...args) => appended.push(args),
+    })
     expect(printed).toEqual(['notice: a notice, 100% true', '::warning title=README pictures::a notice, 100%25 true'])
     expect(appended).toEqual([['/summary', '> **README pictures:** a notice, 100% true\n\n']])
   })

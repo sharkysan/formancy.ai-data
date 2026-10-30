@@ -21,7 +21,9 @@ const byJson = (values) => [...new Map(values.map((value) => [JSON.stringify(val
  * and, for a leg of the test-images job, the image that leg ran on.
  */
 export function serversOf(results) {
-  return results.flatMap((result) => (result.servers ?? []).map((server) => ({ ...server, job: result.key, leg: result.job === 'test-images' ? (result.variant ?? null) : null })))
+  return results.flatMap((result) =>
+    (result.servers ?? []).map((server) => ({ ...server, job: result.key, leg: result.job === 'test-images' ? (result.variant ?? null) : null })),
+  )
 }
 
 /** Whether a record is the getting-started journey's composed database rather than a container a test or a gate started. */
@@ -92,13 +94,21 @@ export function testedOnInRun({ results, facts }) {
       ran: distinct(results.map((result) => result.runner?.node).filter((node) => node != null)).sort(),
       image: container?.node ?? null,
     },
-    runners: byJson(results.map((result) => ({ image: result.runner?.image ?? null, imageVersion: result.runner?.imageVersion ?? null, docker: result.runner?.docker ?? null }))),
-    browsers: byJson(gates.filter((gate) => gate.browser != null).map((gate) => ({ name: gate.browser.name, version: gate.browser.version }))).map((browser) => ({
-      ...browser,
-      // Null for a browser no gate here runs, which problems.mjs fails.
-      pin: facts.browser.pins.find((pin) => pin.browser === browser.name)?.browserVersion ?? null,
-      gates: gates.filter((gate) => gate.browser?.name === browser.name && gate.browser?.version === browser.version).map((gate) => gate.gate),
-    })),
+    runners: byJson(
+      results.map((result) => ({
+        image: result.runner?.image ?? null,
+        imageVersion: result.runner?.imageVersion ?? null,
+        docker: result.runner?.docker ?? null,
+      })),
+    ),
+    browsers: byJson(gates.filter((gate) => gate.browser != null).map((gate) => ({ name: gate.browser.name, version: gate.browser.version }))).map(
+      (browser) => ({
+        ...browser,
+        // Null for a browser no gate here runs, which problems.mjs fails.
+        pin: facts.browser.pins.find((pin) => pin.browser === browser.name)?.browserVersion ?? null,
+        gates: gates.filter((gate) => gate.browser?.name === browser.name && gate.browser?.version === browser.version).map((gate) => gate.gate),
+      }),
+    ),
     playwright: facts.browser,
     axe: distinct(gates.map((gate) => gate.axe).filter((version) => version != null)),
     tooling: facts.tooling,

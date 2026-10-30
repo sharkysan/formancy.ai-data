@@ -1,4 +1,18 @@
-import type { FieldError, FilterableField, FilterDays, FilterInput, FilterOp, FormMenu, FormRecord, ListView, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordList } from '@formancy/data-core'
+import type {
+  FieldError,
+  FilterableField,
+  FilterDays,
+  FilterInput,
+  FilterOp,
+  FormMenu,
+  FormRecord,
+  ListView,
+  LookupResult,
+  LookupRow,
+  PublishedForm,
+  RecordDeleted,
+  RecordList,
+} from '@formancy/data-core'
 import type { Refusal } from './client.js'
 
 /*
@@ -68,7 +82,8 @@ function isFilterableField(value: unknown): value is FilterableField {
 function isListView(value: unknown): value is ListView {
   if (!isRecord(value) || typeof value['name'] !== 'string') return false
   const { filter, sort } = value
-  const isCondition = (term: unknown) => isRecord(term) && typeof term['field'] === 'string' && typeof term['op'] === 'string' && Object.hasOwn(FILTER_OPERATORS, term['op'])
+  const isCondition = (term: unknown) =>
+    isRecord(term) && typeof term['field'] === 'string' && typeof term['op'] === 'string' && Object.hasOwn(FILTER_OPERATORS, term['op'])
   const isOrder = (term: unknown) => isRecord(term) && typeof term['field'] === 'string' && (term['direction'] === 'asc' || term['direction'] === 'desc')
   if (!Array.isArray(filter) || !filter.every(isCondition) || !Array.isArray(sort) || !sort.every(isOrder)) return false
   return !Object.hasOwn(value, 'default') || value['default'] === true
@@ -126,7 +141,14 @@ function isCopied(value: unknown, operations: readonly unknown[]): value is Publ
  */
 function isVersions(value: unknown, operations: readonly unknown[]): value is PublishedForm['versions'] {
   if (value === null) return true
-  return operations.includes('create') && operations.includes('update') && isRecord(value) && typeof value['from'] === 'string' && typeof value['to'] === 'string' && isStrings(value['key'])
+  return (
+    operations.includes('create') &&
+    operations.includes('update') &&
+    isRecord(value) &&
+    typeof value['from'] === 'string' &&
+    typeof value['to'] === 'string' &&
+    isStrings(value['key'])
+  )
 }
 
 export function isPublishedForm(body: unknown): body is PublishedForm {

@@ -13,7 +13,14 @@ import { validatePolicy } from './validate.js'
 /** `true` writes on both operations, `false` on neither, and an object says which (0027). */
 function column(field: string, writes: boolean | FieldWrites = true): FieldBinding {
   const both = typeof writes === 'boolean' ? { create: writes, update: writes } : writes
-  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writes: both }
+  return {
+    kind: 'column',
+    field,
+    column: field,
+    type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false },
+    nullable: true,
+    writes: both,
+  }
 }
 
 function lookup(field: string, columns: string[], table: string, targetColumns: string[]): FieldBinding {
@@ -186,7 +193,11 @@ describe('delete', () => {
   // anything delete (watched failing that way).
   test('refuses delete to everybody when the policy says nothing of it, and grants it to the roles it lists', () => {
     for (const actor of [CLERK, MANAGER]) {
-      expect(authorizeOperation(ORDER_POLICY, actor, 'delete')).toEqual({ ok: false, code: 'operation-denied', message: 'no role of this actor may delete with this form' })
+      expect(authorizeOperation(ORDER_POLICY, actor, 'delete')).toEqual({
+        ok: false,
+        code: 'operation-denied',
+        message: 'no role of this actor may delete with this form',
+      })
     }
     const deleting = edited(ORDER_POLICY, (draft) => {
       draft.operations.delete = ['manager']
@@ -202,7 +213,10 @@ describe('delete', () => {
   // without the through's attribute is refused rather than scoped by less.
   test('scopes a delete through a parent as it scopes an update', () => {
     const deleting = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, delete: BOTH } }
-    expect(throughFilters(deleting, MANAGER, DELETABLE_LINE, 'delete')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    expect(throughFilters(deleting, MANAGER, DELETABLE_LINE, 'delete')).toEqual({
+      ok: true,
+      through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }],
+    })
     expect(throughFilters(deleting, { ...MANAGER, attributes: {} }, DELETABLE_LINE, 'delete')).toMatchObject({ ok: false, code: 'missing-attribute' })
     expect(throughFilters(LINE_POLICY, MANAGER, DELETABLE_LINE, 'delete')).toMatchObject({ ok: false, code: 'operation-denied' })
   })
@@ -212,7 +226,7 @@ describe('delete', () => {
   // lookup no delete request carries.
   test('offers no lookup to search for a delete', () => {
     const deleting = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, delete: BOTH } }
-    expect(lookupRowFilter(deleting, MANAGER, DELETABLE_LINE, 'delete' as 'read', 'order')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(lookupRowFilter(deleting, MANAGER, DELETABLE_LINE, 'delete', 'order')).toMatchObject({ ok: false, code: 'operation-denied' })
   })
 })
 
@@ -345,7 +359,10 @@ describe('checkSubmittedFields', () => {
   // decide which echoes it may drop — so the create-only field answers no on
   // update and yes on create, and an unchanged echo of it is removed, not refused.
   test('a field written on create only is over-posting on update, and is not on create', () => {
-    const createOnly = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)) }
+    const createOnly = {
+      ...ORDER,
+      fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)),
+    }
     expect(checkSubmittedFields(ORDER_POLICY, MANAGER, createOnly, 'update', ['amount', 'order_date'])).toEqual({
       ok: false,
       code: 'over-posting',
@@ -554,8 +571,14 @@ describe('throughFilters', () => {
   // reference: that filter, resolved from the context, is what scopes the
   // lines (0043). A policy that names no through scopes nothing more.
   test("resolves each through lookup's filter from the context, and is empty for a policy that names none", () => {
-    expect(throughFilters(LINE_POLICY, CLERK, LINE, 'read')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
-    expect(throughFilters(LINE_POLICY, MANAGER, LINE, 'update')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    expect(throughFilters(LINE_POLICY, CLERK, LINE, 'read')).toEqual({
+      ok: true,
+      through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }],
+    })
+    expect(throughFilters(LINE_POLICY, MANAGER, LINE, 'update')).toEqual({
+      ok: true,
+      through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }],
+    })
     const { through: _, ...unscoped } = LINE_POLICY
     expect(throughFilters(unscoped, CLERK, LINE, 'read')).toEqual({ ok: true, through: [] })
   })
@@ -565,7 +588,11 @@ describe('throughFilters', () => {
   // a missing tenant is a refusal, never a shorter scope -- dropped, it would
   // be every tenant's lines.
   test('authorises the operation first, and refuses a missing attribute rather than scoping nothing', () => {
-    expect(throughFilters(LINE_POLICY, NOBODY, LINE, 'read')).toEqual({ ok: false, code: 'operation-denied', message: 'no role of this actor may read with this form' })
+    expect(throughFilters(LINE_POLICY, NOBODY, LINE, 'read')).toEqual({
+      ok: false,
+      code: 'operation-denied',
+      message: 'no role of this actor may read with this form',
+    })
     for (const attributes of [{}, { tenant: '' }]) {
       expect(throughFilters(LINE_POLICY, { ...CLERK, attributes }, LINE, 'read')).toMatchObject({
         ok: false,
@@ -573,7 +600,16 @@ describe('throughFilters', () => {
         message: expect.stringMatching(/^lookups\.order: tenant_id must equal the context's tenant/),
       })
     }
-    expect(throughFilters(edited(LINE_POLICY, (draft) => { draft.lookups['order'] = [] }), CLERK, LINE, 'read')).toMatchObject({ ok: false, code: 'invalid-policy' })
+    expect(
+      throughFilters(
+        edited(LINE_POLICY, (draft) => {
+          draft.lookups['order'] = []
+        }),
+        CLERK,
+        LINE,
+        'read',
+      ),
+    ).toMatchObject({ ok: false, code: 'invalid-policy' })
   })
 
   // A through is a row filter: it scopes rows, and offers the actor no
@@ -584,7 +620,10 @@ describe('throughFilters', () => {
   test('scopes an actor granted nothing on the field, where a lookup search refuses them', () => {
     const auditor: PolicyContext = { actor: { id: 'u-5', roles: ['auditor'] }, attributes: { tenant: '42' } }
     expect(lookupRowFilter(LINE_POLICY, auditor, LINE, 'read', 'order')).toMatchObject({ ok: false, code: 'field-denied' })
-    expect(throughFilters(LINE_POLICY, auditor, LINE, 'read')).toEqual({ ok: true, through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }] })
+    expect(throughFilters(LINE_POLICY, auditor, LINE, 'read')).toEqual({
+      ok: true,
+      through: [{ field: 'order', filter: [{ column: 'tenant_id', value: '42' }] }],
+    })
   })
 })
 

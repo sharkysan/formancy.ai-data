@@ -38,7 +38,15 @@ const sayColumns = (columns: readonly string[]): string => `${columns.join(' and
  * SIMPLE), since a browse narrowed by its other columns alone would find
  * rows that merely share them.
  */
-function Way({ relation, row, onFollow }: { relation: BrowseRelation; row: Row; onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void }): ReactElement {
+function Way({
+  relation,
+  row,
+  onFollow,
+}: {
+  relation: BrowseRelation
+  row: Row
+  onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
+}): ReactElement {
   const terms = followTerms(relation, row)
   if (terms === null) {
     const missing = relation.from.filter((column) => row[column] === undefined)
@@ -60,7 +68,19 @@ function Way({ relation, row, onFollow }: { relation: BrowseRelation; row: Row; 
 }
 
 /** A list of ways out, headed by which way they go, or nothing when there is none. */
-function Ways({ id, title, relations, row, onFollow }: { id: string; title: string; relations: BrowseRelation[]; row: Row; onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void }): ReactElement | null {
+function Ways({
+  id,
+  title,
+  relations,
+  row,
+  onFollow,
+}: {
+  id: string
+  title: string
+  relations: BrowseRelation[]
+  row: Row
+  onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
+}): ReactElement | null {
   if (relations.length === 0) return null
   return (
     <>
@@ -98,7 +118,21 @@ export function KeyHints({ name, kind, relations }: { name: string; kind: 'table
  * The heading takes the keyboard when the section opens, and again when
  * another row's button moves it, which remounts it by its row.
  */
-export function Related({ id, name, number, row, relations, onFollow }: { id: string; name: string; number: number; row: Row; relations: BrowseRelations; onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void }): ReactElement {
+export function Related({
+  id,
+  name,
+  number,
+  row,
+  relations,
+  onFollow,
+}: {
+  id: string
+  name: string
+  number: number
+  row: Row
+  relations: BrowseRelations
+  onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
+}): ReactElement {
   const heading = useRef<HTMLHeadingElement>(null)
   useEffect(() => heading.current?.focus(), [])
   return (
@@ -106,8 +140,20 @@ export function Related({ id, name, number, row, relations, onFollow }: { id: st
       <h4 id={`${id}-heading`} ref={heading} tabIndex={-1}>
         Related to row {number} of <code>{name}</code>
       </h4>
-      <Ways id={`${id}-out`} title="It refers to" relations={relations.relations.filter((relation) => relation.direction === 'refers-to')} row={row} onFollow={onFollow} />
-      <Ways id={`${id}-in`} title="Rows that refer to it" relations={relations.relations.filter((relation) => relation.direction === 'referred-by')} row={row} onFollow={onFollow} />
+      <Ways
+        id={`${id}-out`}
+        title="It refers to"
+        relations={relations.relations.filter((relation) => relation.direction === 'refers-to')}
+        row={row}
+        onFollow={onFollow}
+      />
+      <Ways
+        id={`${id}-in`}
+        title="Rows that refer to it"
+        relations={relations.relations.filter((relation) => relation.direction === 'referred-by')}
+        row={row}
+        onFollow={onFollow}
+      />
     </section>
   )
 }

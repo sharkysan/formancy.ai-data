@@ -36,7 +36,15 @@ const POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], create: 
 
 /** The order, published by another administrator as `formId`: `notes` relabelled `label`, or as generated. */
 async function publishOrder(expectedBase: number | null, label?: string, formId = 'sales-order'): Promise<void> {
-  const proposal = await admin.propose({ connection: 'fixture', root: { schema: 'sales', name: 'order' }, formId, title: 'Order', lookups: [], pinned: [], versionColumn: 'row_version' })
+  const proposal = await admin.propose({
+    connection: 'fixture',
+    root: { schema: 'sales', name: 'order' },
+    formId,
+    title: 'Order',
+    lookups: [],
+    pinned: [],
+    versionColumn: 'row_version',
+  })
   if (!proposal.ok) throw new Error(proposal.message)
   const { form: base, bindings, snapshot, generation } = proposal.value
   const presentation: PresentationOverrides =
@@ -98,7 +106,11 @@ describe('downloading a version', () => {
     const user = await signIn(plane)
     const versions = await versionsOf(user)
     const select = within(versions).getByRole('combobox', { name: 'Version to download' })
-    expect(within(select).getAllByRole('option').map((option) => [option.textContent, (option as HTMLOptionElement).selected])).toEqual([
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => [option.textContent, (option as HTMLOptionElement).selected]),
+    ).toEqual([
       ['Version 1', false],
       ['Version 2', true],
     ])
@@ -204,7 +216,9 @@ describe('restoring a version', () => {
     const alert = await within(versions).findByRole('alert')
     expect(paragraphs(alert)[0]).toBe('Version 1 cannot be restored: the database has changed in a way it cannot serve.')
     const blocking = within(within(alert).getByRole('list', { name: 'What blocks it' })).getAllByRole('listitem')
-    expect(blocking.map((item) => item.textContent)).toEqual([expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/)])
+    expect(blocking.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/),
+    ])
     expect(await plane.store.versions('sales-order')).toEqual([1, 2])
     expect(await audit()).toEqual([])
   })
@@ -219,7 +233,9 @@ describe('restoring a version', () => {
     const versions = await versionsOf(user)
     await publishOrder(2, 'Newer notes')
     await user.click(within(versions).getByRole('button', { name: 'Restore version 1' }))
-    expect((await within(versions).findByRole('alert')).textContent).toBe('Somebody published version 3 since the list was read. Nothing was restored; the list now shows it.')
+    expect((await within(versions).findByRole('alert')).textContent).toBe(
+      'Somebody published version 3 since the list was read. Nothing was restored; the list now shows it.',
+    )
     // In the restore's list: the download's offers every version, and had version 2 already.
     await waitFor(() => expect(offered(versions)).toEqual(['Version 1', 'Version 2']))
     expect(await plane.store.versions('sales-order')).toEqual([1, 2, 3])

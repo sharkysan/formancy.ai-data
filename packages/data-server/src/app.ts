@@ -67,7 +67,14 @@ export interface DataServerOptions {
    * Absent, nobody browses; the runnable server reads
    * `FORMANCY_DATA_BROWSE_ROLES` for it.
    */
-  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; publisherRoles?: readonly string[]; browseRoles?: readonly string[]; audit: AdminOptions['audit'] }
+  admin?: {
+    registry: ConnectionRegistry
+    store: ConfigurationStore
+    adminRoles: readonly string[]
+    publisherRoles?: readonly string[]
+    browseRoles?: readonly string[]
+    audit: AdminOptions['audit']
+  }
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.
@@ -89,7 +96,13 @@ export interface DataServerOptions {
    * performance figures; the runnable server reads
    * `FORMANCY_DATA_LOOKUP_DEADLINE_MS` for it (main.ts).
    */
-  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']>; origins?: readonly string[]; lookupDeadlineMs?: number }
+  runtime?: {
+    registry: ConnectionRegistry
+    store: ConfigurationStore
+    audit?: NonNullable<RuntimeOptions['audit']>
+    origins?: readonly string[]
+    lookupDeadlineMs?: number
+  }
 }
 
 /**
@@ -156,7 +169,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // made, and an embedder's array changed meanwhile would be granted
   // unchecked.
   const given = options.runtime?.origins ?? []
-  const origins = Array.isArray(given) ? Object.freeze([...given]) : given
+  const listed: unknown = given
+  const origins = Array.isArray(listed) ? Object.freeze([...given]) : given
   const refused = originsProblem(origins)
   if (refused !== undefined) throw new Error(refused)
   // The deadline by the variable's rule (lookup-deadline.ts): 0 or a value
@@ -170,7 +184,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // that would believe every client about itself stops the server here. A
   // copy is checked and handed to Fastify, as the origins are.
   const offered = options.trustedProxies ?? []
-  const trustedProxies = Array.isArray(offered) ? Object.freeze([...offered]) : offered
+  const proxyList: unknown = offered
+  const trustedProxies = Array.isArray(proxyList) ? Object.freeze([...offered]) : offered
   const proxiesRefused = trustedProxiesProblem(trustedProxies)
   if (proxiesRefused !== undefined) throw new Error(proxiesRefused)
 
@@ -209,7 +224,12 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // Counted by the address the log names (trusted-proxies.ts), masked as the
   // limiter's own default key is: an IPv6 client by its /64.
   const limit = options.rateLimit ?? DEFAULT_RATE_LIMIT
-  await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs, keyGenerator: (request) => normalizeIP(clientAddress(request)) })
+  await app.register(rateLimit, {
+    global: true,
+    max: limit.max,
+    timeWindow: limit.timeWindowMs,
+    keyGenerator: (request) => normalizeIP(clientAddress(request)),
+  })
 
   // A path a proxy could read differently from the router is answered here,
   // before any route's work (paths.ts, 0037): before a plane's hooks, before

@@ -40,10 +40,11 @@ function equalOf(given: unknown): RecordValue[] {
   if (!Array.isArray(given)) throw refuse('narrows by a list of columns and values, [] for none')
   const seen = new Set<string>()
   return (given as unknown[]).map((entry) => {
-    if (!isRecord(entry) || !isName(entry['name']) || !isRecord(entry['type'])) throw refuse("names each parent column and its type")
+    if (!isRecord(entry) || !isName(entry['name']) || !isRecord(entry['type'])) throw refuse('names each parent column and its type')
     const type = entry['type'] as NormalizedType
     const value = entry['value']
-    if (!isLookupKeyType(type) || typeof value !== 'string' || !isKeyValue(type, value)) throw refuse('narrows by key values spelled as their columns hold them')
+    if (!isLookupKeyType(type) || typeof value !== 'string' || !isKeyValue(type, value))
+      throw refuse('narrows by key values spelled as their columns hold them')
     if (seen.has(entry['name'])) throw refuse(`names ${entry['name']} twice in its parent`)
     seen.add(entry['name'])
     return { name: entry['name'], type, value }
@@ -104,14 +105,16 @@ function filterTerm(entry: unknown): RecordFilter {
       const type = equalsType(entry['type'])
       const value = entry['value']
       if (type === undefined || typeof value !== 'string') throw refuse(`compares ${column} as text, an integer, a decimal, a uuid, a date or a boolean`)
-      if (type.kind === 'boolean' ? value !== 'true' && value !== 'false' : !isKeyValue(type, value)) throw refuse(`compares ${column} with a value spelled as it holds them`)
+      if (type.kind === 'boolean' ? value !== 'true' && value !== 'false' : !isKeyValue(type, value))
+        throw refuse(`compares ${column} with a value spelled as it holds them`)
       return { op: 'equals', column, type, value }
     }
     case 'contains': {
       const type = rowFilterType(entry['type'])
       const text = checkSearch(entry['text'])
       if (type?.kind !== 'text') throw refuse(`finds text only in a text column, and ${column} is not one`)
-      if (!text.ok || text.search === '' || text.search !== entry['text']) throw refuse(`finds text in ${column} a person may search for, trimmed and not empty`)
+      if (!text.ok || text.search === '' || text.search !== entry['text'])
+        throw refuse(`finds text in ${column} a person may search for, trimmed and not empty`)
       return { op: 'contains', column, type, text: text.search }
     }
     case 'range': {
@@ -120,7 +123,8 @@ function filterTerm(entry: unknown): RecordFilter {
       const from = boundOf(type, entry['from'], column)
       const to = boundOf(type, entry['to'], column)
       const before = boundOf(type, entry['before'], column)
-      if (type.kind === 'timestamp' ? to !== null : before !== null) throw refuse(`bounds ${column} at most a value when it is a number or a date, and below a midnight when it is a timestamp`)
+      if (type.kind === 'timestamp' ? to !== null : before !== null)
+        throw refuse(`bounds ${column} at most a value when it is a number or a date, and below a midnight when it is a timestamp`)
       if (from === null && to === null && before === null) throw refuse(`ranges over ${column} with at least one bound`)
       return { op: 'range', column, type, from, to, before }
     }
@@ -162,7 +166,8 @@ function sortOf(given: unknown, identity: readonly string[]): RecordSort[] {
   const sort = (given as unknown[]).map((entry): RecordSort => {
     if (!isRecord(entry) || !isName(entry['column'])) throw refuse('orders by named columns')
     const { column, direction, nulls } = entry
-    if ((direction !== 'asc' && direction !== 'desc') || (nulls !== 'last' && nulls !== null)) throw refuse(`orders ${column} asc or desc, its NULLs last or unspelled`)
+    if ((direction !== 'asc' && direction !== 'desc') || (nulls !== 'last' && nulls !== null))
+      throw refuse(`orders ${column} asc or desc, its NULLs last or unspelled`)
     if (seen.has(column)) throw refuse(`orders by ${column} twice`)
     seen.add(column)
     return { column, direction, nulls }
@@ -181,7 +186,8 @@ function afterKey(given: unknown, identity: readonly RecordColumn[]): RecordValu
     const column = identity[index] as RecordColumn
     if (!isRecord(entry) || entry['name'] !== column.name) throw refuse("continues after a key in the identity's order")
     const value = entry['value']
-    if (!isLookupKeyType(column.type) || typeof value !== 'string' || !isKeyValue(column.type, value)) throw refuse(`continues after a ${column.name} spelled as it holds it`)
+    if (!isLookupKeyType(column.type) || typeof value !== 'string' || !isKeyValue(column.type, value))
+      throw refuse(`continues after a ${column.name} spelled as it holds it`)
     return { name: column.name, type: column.type, value }
   })
 }
@@ -197,7 +203,11 @@ function afterKey(given: unknown, identity: readonly RecordColumn[]): RecordValu
  * index.
  */
 function seekOf(sort: readonly RecordSort[], terms: readonly RowFilterTerm[], equal: readonly RecordValue[], filter: readonly RecordFilter[]): RecordSort[] {
-  const held = new Set([...terms.map((term) => term.column), ...equal.map((value) => value.name), ...filter.filter((term) => term.op === 'equals').map((term) => term.column)])
+  const held = new Set([
+    ...terms.map((term) => term.column),
+    ...equal.map((value) => value.name),
+    ...filter.filter((term) => term.op === 'equals').map((term) => term.column),
+  ])
   return sort.filter((term) => !held.has(term.column))
 }
 

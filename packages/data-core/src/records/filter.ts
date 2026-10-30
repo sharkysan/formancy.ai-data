@@ -248,7 +248,11 @@ function hasExactly(record: Record<string, unknown>, keys: readonly string[]): b
  * sentence of the condition's own: the rules are `checkSearch`'s, and the
  * person typed a condition, not a search.
  */
-function unfindable(name: string, code: 'search-too-long' | 'search-control-character' | 'ill-formed-text', length: number): { ok: false; code: 'not-filterable'; message: string } {
+function unfindable(
+  name: string,
+  code: 'search-too-long' | 'search-control-character' | 'ill-formed-text',
+  length: number,
+): { ok: false; code: 'not-filterable'; message: string } {
   const finds = `What a contains condition on ${name} finds`
   switch (code) {
     case 'search-too-long':
@@ -261,7 +265,11 @@ function unfindable(name: string, code: 'search-too-long' | 'search-control-char
 }
 
 /** One condition's own properties, checked: text where text is asked for, a bound or `null`, and a search's own check on what `contains` finds. */
-function conditionOf(op: FilterOp, entry: Record<string, unknown>, name: string): { ok: true; condition: FilterCondition } | { ok: false; code: 'malformed' | 'not-filterable'; message: string } {
+function conditionOf(
+  op: FilterOp,
+  entry: Record<string, unknown>,
+  name: string,
+): { ok: true; condition: FilterCondition } | { ok: false; code: 'malformed' | 'not-filterable'; message: string } {
   switch (op) {
     case 'null':
     case 'not-null':
@@ -273,14 +281,18 @@ function conditionOf(op: FilterOp, entry: Record<string, unknown>, name: string)
     }
     case 'range': {
       const { from, to } = entry
-      if ((typeof from !== 'string' && from !== null) || (typeof to !== 'string' && to !== null)) return malformed(`A range on ${name} has bounds of text, or null.`)
+      if ((typeof from !== 'string' && from !== null) || (typeof to !== 'string' && to !== null))
+        return malformed(`A range on ${name} has bounds of text, or null.`)
       if (from === null && to === null) return malformed(`A range on ${name} has a from, a to or both.`)
       return { ok: true, condition: { op, from, to } }
     }
     case 'contains': {
       const given = entry['text']
       const text = checkSearch(given)
-      if (!text.ok) return text.code === 'malformed' ? malformed(`The text a contains condition on ${name} finds is text.`) : unfindable(name, text.code, (given as string).length)
+      if (!text.ok)
+        return text.code === 'malformed'
+          ? malformed(`The text a contains condition on ${name} finds is text.`)
+          : unfindable(name, text.code, (given as string).length)
       if (text.search === '') return malformed(`A contains condition on ${name} has text to find.`)
       return { ok: true, condition: { op, text: text.search } }
     }

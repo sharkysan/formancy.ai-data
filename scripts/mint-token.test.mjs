@@ -138,7 +138,9 @@ describe('a minted token', () => {
     expect(shown, 'a ```text block in the guide showing the sentence').toBeDefined()
     const subject = /^A token for (\S+) /.exec(shown ?? '')?.[1]
     const subjectOf = (words) => words[words.indexOf('--subject') + 1]
-    const command = extractSteps(guide).run.map((step) => step.command.split(' ')).find((words) => words.includes('token') && subjectOf(words) === subject)
+    const command = extractSteps(guide)
+      .run.map((step) => step.command.split(' '))
+      .find((words) => words.includes('token') && subjectOf(words) === subject)
     expect(command, `the guide's command minting for ${String(subject)}`).toBeDefined()
     const run = mint(command.slice(command.indexOf('token') + 1))
     expect(run.status).toBe(0)
@@ -155,26 +157,52 @@ describe('the minter refuses', () => {
   const refusals = [
     // The server will not start with a key under 32 bytes; a minter that
     // signed with one would print tokens for a server that cannot exist.
-    { why: 'a secret shorter than the server accepts', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: `file:${SHORT_SECRET_FILE}` }, says: /32 bytes/, secret: SHORT_SECRET },
+    {
+      why: 'a secret shorter than the server accepts',
+      args: ['--subject', 'ada'],
+      settings: { FORMANCY_DATA_IDENTITY_SECRET: `file:${SHORT_SECRET_FILE}` },
+      says: /32 bytes/,
+      secret: SHORT_SECRET,
+    },
     // A deployment that verifies with a public key mints with its identity
     // provider's private key, which this minter does not have and must not
     // pretend to: HS256 only, said.
-    { why: 'a public-key identity', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: undefined, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' }, says: /HS256/ },
+    {
+      why: 'a public-key identity',
+      args: ['--subject', 'ada'],
+      settings: { FORMANCY_DATA_IDENTITY_SECRET: undefined, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' },
+      says: /HS256/,
+    },
     // A server that reads a key set (0059) verifies whatever keys its file
     // holds. A minter that signed with FORMANCY_DATA_IDENTITY_SECRET beside
     // it -- a setting the server would refuse to start with -- would print
     // tokens for a key the server may not hold, with nothing but a 401 to
     // say so.
-    { why: 'a key set identity, even beside a secret', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' }, says: /FORMANCY_DATA_IDENTITY_KEYS_FILE/ },
+    {
+      why: 'a key set identity, even beside a secret',
+      args: ['--subject', 'ada'],
+      settings: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' },
+      says: /FORMANCY_DATA_IDENTITY_KEYS_FILE/,
+    },
     { why: 'no identity at all', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: undefined }, says: /FORMANCY_DATA_IDENTITY_SECRET/ },
     // The mistake resolveSecret's own wording is for: the secret pasted where
     // its reference belongs.
-    { why: 'the secret itself where its reference belongs', args: ['--subject', 'ada'], settings: { FORMANCY_DATA_IDENTITY_SECRET: SECRET }, says: /secret reference/ },
+    {
+      why: 'the secret itself where its reference belongs',
+      args: ['--subject', 'ada'],
+      settings: { FORMANCY_DATA_IDENTITY_SECRET: SECRET },
+      says: /secret reference/,
+    },
     // A misspelt --tenant that was ignored would mint a token with no tenant,
     // and the clerk would see every tenant's rows the policy does not filter.
     { why: 'an unknown flag', args: ['--subject', 'clara', '--tennant', '1'], says: /--tennant/ },
     { why: 'no subject', args: ['--role', 'clerk'], says: /--subject/ },
-    { why: 'a tenant the deployment has no claim for', args: ['--subject', 'clara', '--tenant', '1'], settings: { FORMANCY_DATA_ATTRIBUTES: undefined }, says: /FORMANCY_DATA_ATTRIBUTES/ },
+    {
+      why: 'a tenant the deployment has no claim for',
+      args: ['--subject', 'clara', '--tenant', '1'],
+      settings: { FORMANCY_DATA_ATTRIBUTES: undefined },
+      says: /FORMANCY_DATA_ATTRIBUTES/,
+    },
     // Twelve hours is the ceiling: a demo token that outlived a working day
     // would be a credential nobody remembers minting.
     { why: 'minutes past the ceiling', args: ['--subject', 'ada', '--minutes', '721'], says: /--minutes/ },
@@ -182,12 +210,16 @@ describe('the minter refuses', () => {
     { why: 'minutes that are not a whole number', args: ['--subject', 'ada', '--minutes', '1.5'], says: /--minutes/ },
   ]
 
-  test.each(refusals)('$why', ({ args, settings, says, secret = SECRET }) => {
-    const run = mint(args, settings)
-    expect(run.status).toBe(1)
-    expect(run.stdout).toBe('')
-    expect(run.stderr).toMatch(says)
-    expect(run.stderr).not.toContain(secret)
-    expect(run.stderr).not.toContain(SECRET)
-  }, 15_000)
+  test.each(refusals)(
+    '$why',
+    ({ args, settings, says, secret = SECRET }) => {
+      const run = mint(args, settings)
+      expect(run.status).toBe(1)
+      expect(run.stdout).toBe('')
+      expect(run.stderr).toMatch(says)
+      expect(run.stderr).not.toContain(secret)
+      expect(run.stderr).not.toContain(SECRET)
+    },
+    15_000,
+  )
 })

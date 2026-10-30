@@ -4,7 +4,21 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, EXPORT_MAX_BYTES, generateForm, LIST_PAGE_SIZE } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FieldBinding, DescribedTable, FormPolicy, ListOutcome, ListRequest, LookupAdapter, LookupConfig, NormalizedType, ObjectRef, RecordAdapter, RowFilters } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  FieldBinding,
+  DescribedTable,
+  FormPolicy,
+  ListOutcome,
+  ListRequest,
+  LookupAdapter,
+  LookupConfig,
+  NormalizedType,
+  ObjectRef,
+  RecordAdapter,
+  RowFilters,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
@@ -32,21 +46,52 @@ const PHOTO: NormalizedType = { kind: 'binary', maxLength: null, fixedLength: fa
 /** Text long enough that a key of it needs more than `KEY_TOKEN_MAX_LENGTH` characters as a token: such a record is listed with no token. */
 const LONG: NormalizedType = { kind: 'text', maxLength: 400, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 const ref = (name: string): ObjectRef => ({ schema: 'sales', name })
-const fk = (name: string, columns: string[], target: string, targetColumns: string[]) => ({ name, columns, references: { table: ref(target), columns: targetColumns }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }) as const
+const fk = (name: string, columns: string[], target: string, targetColumns: string[]) =>
+  ({
+    name,
+    columns,
+    references: { table: ref(target), columns: targetColumns },
+    onUpdate: 'no-action',
+    onDelete: 'no-action',
+    enforced: true,
+    validated: true,
+  }) as const
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: ref('country'), kind: 'table', comment: null,
+      ref: ref('country'),
+      kind: 'table',
+      comment: null,
       columns: [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, CODE), col('name', 3, NAME), col('region', 4, CODE)],
-      primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_country', columns: ['id'] },
+      uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('customer'), kind: 'table', comment: null,
+      ref: ref('customer'),
+      kind: 'table',
+      comment: null,
       columns: [
         col('tenant_id', 1, INT32),
         col('customer_no', 2, INT32),
@@ -56,22 +101,49 @@ const SNAPSHOT = createSnapshot({
         col('row_version', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
         col('photo', 7, PHOTO, { nullable: true }),
       ],
-      primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, uniqueKeys: [], foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] },
+      uniqueKeys: [],
+      foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('order'), kind: 'table', comment: null,
+      ref: ref('order'),
+      kind: 'table',
+      comment: null,
       columns: [col('id', 1, INT32), col('tenant_id', 2, INT32), col('placed', 3, { kind: 'date' })],
-      primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_order', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('line'), kind: 'table', comment: null,
-      columns: [col('order_id', 1, INT32), col('line_no', 2, INT32), col('quantity', 3, INT32), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
-      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [], foreignKeys: [fk('fk_line_order', ['order_id'], 'order', ['id'])], checks: [], rowSecurity: 'none',
+      ref: ref('line'),
+      kind: 'table',
+      comment: null,
+      columns: [
+        col('order_id', 1, INT32),
+        col('line_no', 2, INT32),
+        col('quantity', 3, INT32),
+        col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+      ],
+      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] },
+      uniqueKeys: [],
+      foreignKeys: [fk('fk_line_order', ['order_id'], 'order', ['id'])],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('tag'), kind: 'table', comment: null,
+      ref: ref('tag'),
+      kind: 'table',
+      comment: null,
       columns: [col('code', 1, LONG), col('name', 2, NAME)],
-      primaryKey: { name: 'pk_tag', columns: ['code'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_tag', columns: ['code'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -90,7 +162,13 @@ const POLICY: FormPolicy = {
 /** customer_no, half the key, kept from the clerk: a list, and so a file, would hand out every customer number. */
 const HIDDEN_KEY: FormPolicy = { ...POLICY, fields: { ...POLICY.fields, customer_no: { read: [], write: ['clerk'] } } }
 /** Tags, which every clerk may read: nothing in them is a tenant's. */
-const TAG_POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { code: RW, name: RW }, rowFilters: [], lookups: {} }
+const TAG_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: { code: RW, name: RW },
+  rowFilters: [],
+  lookups: {},
+}
 /** An order's lines with nothing scoping them while the order's options are filtered: a read reaches a line by a guessed token, and a list would hand out all of them. */
 const UNSCOPED_LINE: FormPolicy = {
   version: 1,
@@ -117,7 +195,8 @@ const customer = (number: number, name: string, country: string | null = null, n
   version: VERSION,
 })
 /** `count` customers numbered from 1, every third in Switzerland. */
-const many = (count: number, notes: string | null = null): Stored[] => Array.from({ length: count }, (_, index) => customer(index + 1, `Customer ${String(index + 1)}`, index % 3 === 0 ? 'CH' : null, notes))
+const many = (count: number, notes: string | null = null): Stored[] =>
+  Array.from({ length: count }, (_, index) => customer(index + 1, `Customer ${String(index + 1)}`, index % 3 === 0 ? 'CH' : null, notes))
 
 const describedAs = (table: ObjectRef): DescribedTable => {
   const found = describedOf(SNAPSHOT, table)
@@ -196,10 +275,15 @@ function registry(): ConnectionRegistry {
       if (resolving === 'wait') {
         const started = performance.now()
         return new Promise((_resolve, reject) =>
-          signal.addEventListener('abort', () => {
-            stopping(signal.reason, performance.now() - started)
-            reject(signal.reason)
-          }, { once: true }))
+          signal.addEventListener(
+            'abort',
+            () => {
+              stopping(signal.reason, performance.now() - started)
+              reject(signal.reason)
+            },
+            { once: true },
+          ),
+        )
       }
       return tokens.flatMap((token) => (LABELS.has(token) ? [{ token, label: LABELS.get(token) as string }] : []))
     },
@@ -207,8 +291,18 @@ function registry(): ConnectionRegistry {
       throw new Error('an export never checks a selection')
     },
   }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
-  return { ids: () => ['erp', 'crm'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records } : undefined), close: async () => {} }
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
+  return {
+    ids: () => ['erp', 'crm'],
+    scope: () => ({ schemas: ['sales'] }),
+    open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records } : undefined),
+    close: async () => {},
+  }
 }
 
 async function server(options: { lookupDeadlineMs?: number } = {}): Promise<FastifyInstance> {
@@ -216,7 +310,10 @@ async function server(options: { lookupDeadlineMs?: number } = {}): Promise<Fast
   const sink: AuditSink = (event) => {
     if (event.plane === 'runtime') events.push(event)
   }
-  const app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store, audit: { sink, now: () => '2026-10-17T12:00:00.000Z' }, ...options } })
+  const app = await createDataServer({
+    verifyIdentity,
+    runtime: { registry: registry(), store, audit: { sink, now: () => '2026-10-17T12:00:00.000Z' }, ...options },
+  })
   apps.push(app)
   return app
 }
@@ -233,13 +330,26 @@ beforeEach(async () => {
   events = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-exports-'))
   const store = createFileConfigurationStore(root)
-  const generated = generateForm(SNAPSHOT, { connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] })
+  const generated = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('customer'),
+    formId: 'customer',
+    title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+    pinned: ['tenant_id'],
+  })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form: generated.form, bindings: generated.bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
   await store.publish('customer-crm', null, { ...bundle, connection: 'crm' })
   await store.publish('customer-2', null, bundle)
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
-  const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
+  const line = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('line'),
+    formId: 'line',
+    title: 'Line',
+    lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }],
+  })
   await store.publish('unscoped-line', null, { ...bundle, form: line.form, bindings: line.bindings, policy: UNSCOPED_LINE })
   const tag = generateForm(SNAPSHOT, { connection: 'erp', root: ref('tag'), formId: 'tag', title: 'Tag', lookups: [] })
   await store.publish('tag', null, { ...bundle, form: tag.form, bindings: tag.bindings, policy: TAG_POLICY })
@@ -254,11 +364,16 @@ afterEach(async () => {
 
 const as = (token: string) => ({ authorization: `Bearer ${token}` })
 const exported = (form: string, payload: unknown = {}, token = 'clerk', on = app) =>
-  on.inject({ method: 'POST', url: `/v1/forms/${form}/records/export`, headers: { ...as(token), accept: 'text/csv, application/json' }, payload: payload as Record<string, unknown> })
+  on.inject({
+    method: 'POST',
+    url: `/v1/forms/${form}/records/export`,
+    headers: { ...as(token), accept: 'text/csv, application/json' },
+    payload: payload as Record<string, unknown>,
+  })
 /** An answer's status and body, a refusal's read as JSON and a file's left as text: a file where a refusal was expected then fails as a file, not as JSON that does not parse. */
 const answerOf = (response: Awaited<ReturnType<typeof exported>>) => ({
   status: response.statusCode,
-  body: String(response.headers['content-type']).startsWith('application/json') ? (response.json() as unknown) : response.body,
+  body: String(response.headers['content-type']).startsWith('application/json') ? response.json<unknown>() : response.body,
 })
 
 /** The header row the clerk's file of customers starts with, after the byte-order mark. */
@@ -298,7 +413,10 @@ describe('the export route', () => {
       search: ' Customer ',
       sort: [{ field: 'name', direction: 'desc' }],
       parent: { field: 'country', record: 'k1:CH' },
-      filter: [{ field: 'notes', op: 'null' }, { field: 'customer_no', op: 'range', from: '+01', to: '0200' }],
+      filter: [
+        { field: 'notes', op: 'null' },
+        { field: 'customer_no', op: 'range', from: '+01', to: '0200' },
+      ],
     }
     const response = await exported('customer', body)
     expect(response.statusCode, response.body).toBe(200)
@@ -374,7 +492,14 @@ describe('the export route', () => {
   // filter a grid would have been refused. Watched failing with
   // `not-filterable` left out of `planRefusal`: each was a 500.
   test('refuses a cursor, an offset, a limit, a filter not offered or anything else in the body 400, asking nothing', async () => {
-    for (const body of [{ after: 'c1:1,50' }, { offset: 0 }, { limit: 10 }, { columns: ['name'] }, { sort: [{ field: 'notes', direction: 'sideways' }] }, { filter: [{ field: 'name', op: 'like', value: 'M%' }] }]) {
+    for (const body of [
+      { after: 'c1:1,50' },
+      { offset: 0 },
+      { limit: 10 },
+      { columns: ['name'] },
+      { sort: [{ field: 'notes', direction: 'sideways' }] },
+      { filter: [{ field: 'name', op: 'like', value: 'M%' }] },
+    ]) {
       const response = await exported('customer', body)
       expect({ body, status: response.statusCode, code: response.json().code }).toEqual({ body, status: 400, code: 'malformed' })
     }
@@ -400,7 +525,10 @@ describe('the export route', () => {
     table = many(60, 'x'.repeat(1_000_000))
     expect(16 * 1_000_000 < EXPORT_MAX_BYTES && 17 * 1_000_000 > EXPORT_MAX_BYTES).toBe(true)
     const response = await exported('customer')
-    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 422, body: { code: 'export-too-large', message: 'The file would be larger than 16 MB. Search for fewer records and try again.' } })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 422,
+      body: { code: 'export-too-large', message: 'The file would be larger than 16 MB. Search for fewer records and try again.' },
+    })
     expect(response.body).not.toContain('xxxx')
     expect(events.map(({ outcome, rows }) => ({ outcome, rows }))).toEqual([{ outcome: 'export-too-large', rows: 16 }])
   })
@@ -418,7 +546,10 @@ describe('the export route', () => {
       vi.setSystemTime(Date.now() + EXPORT_DEADLINE_MS)
       return undefined
     }
-    const timedOut = { status: 503, body: { code: 'export-timeout', message: 'The file could not be made within 30 seconds. Search for fewer records and try again.' } }
+    const timedOut = {
+      status: 503,
+      body: { code: 'export-timeout', message: 'The file could not be made within 30 seconds. Search for fewer records and try again.' },
+    }
     table = Array.from({ length: 60 }, (_, index) => customer(index + 1, 'Unlabelled'))
     const unlabelled = await exported('customer')
     expect({ status: unlabelled.statusCode, body: unlabelled.json() }).toEqual(timedOut)
@@ -460,7 +591,10 @@ describe('the export route', () => {
     }
     const response = await exported('customer')
     expect(response.statusCode, response.body).toBe(200)
-    const numbers = response.body.split('\r\n').slice(1, -1).map((line) => line.split(',')[1])
+    const numbers = response.body
+      .split('\r\n')
+      .slice(1, -1)
+      .map((line) => line.split(',')[1])
     expect(numbers).toEqual(many(120).map((row) => row.values['customer_no']))
   })
 
@@ -476,7 +610,10 @@ describe('the export route', () => {
       return undefined
     }
     const response = await exported('customer')
-    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 409, body: { code: 'moved', message: 'The records changed while the file was made. Try again.' } })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 409,
+      body: { code: 'moved', message: 'The records changed while the file was made. Try again.' },
+    })
     expect(response.body).not.toContain('Customer 1')
   })
 
@@ -488,7 +625,10 @@ describe('the export route', () => {
     table = many(60)
     table[50] = table[0] as Stored
     const response = await exported('customer')
-    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 409, body: { code: 'moved', message: 'The records changed while the file was made. Try again.' } })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 409,
+      body: { code: 'moved', message: 'The records changed while the file was made. Try again.' },
+    })
   })
 
   // A record whose key needs more characters as a token than a token holds
@@ -497,10 +637,15 @@ describe('the export route', () => {
   // repeated by the second would be in a file sent 200 twice. The check is
   // on the key itself. Watched failing with the check kept on tokens: 200.
   test('refuses a file in which a record whose key fits no token would appear twice 409 moved', async () => {
-    table = Array.from({ length: 60 }, (_, index) => ({ values: { code: `${'k'.repeat(250)}${String(index + 1).padStart(2, '0')}`, name: `Tag ${String(index + 1)}` }, version: VERSION }))
+    table = Array.from({ length: 60 }, (_, index) => ({
+      values: { code: `${'k'.repeat(250)}${String(index + 1).padStart(2, '0')}`, name: `Tag ${String(index + 1)}` },
+      version: VERSION,
+    }))
     // A guard on the guard: these records have no token, and a file of them, moved by nothing, is whole.
     const listed = await app.inject({ method: 'POST', url: '/v1/forms/tag/records/list', headers: as('clerk'), payload: {} })
-    expect((listed.json() as { rows: Array<{ record: string | null }> }).rows.map(({ record }) => record)).toEqual(Array.from({ length: LIST_PAGE_SIZE }, () => null))
+    expect(listed.json<{ rows: Array<{ record: string | null }> }>().rows.map(({ record }) => record)).toEqual(
+      Array.from({ length: LIST_PAGE_SIZE }, () => null),
+    )
     const whole = await exported('tag')
     expect({ status: whole.statusCode, lines: whole.body.split('\r\n').length }).toEqual({ status: 200, lines: 1 + 60 + 1 })
     table[50] = table[0] as Stored
@@ -519,9 +664,23 @@ describe('the export route', () => {
     expect(response.statusCode).toBe(409)
     expect(response.json()).toEqual({ code: 'unencodable', message: 'Name holds text a CSV file cannot carry: an unpaired surrogate or a NUL character.' })
 
-    const generated = generateForm(SNAPSHOT, { connection: 'erp', root: ref('customer'), formId: 'odd', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] })
+    const generated = generateForm(SNAPSHOT, {
+      connection: 'erp',
+      root: ref('customer'),
+      formId: 'odd',
+      title: 'Customer',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      pinned: ['tenant_id'],
+    })
     const fields = generated.form.model.fields.map((field) => (field.key === 'name' ? { ...field, label: 'Na\uD800me' } : field))
-    await createFileConfigurationStore(root).publish('odd', null, { format: 1, connection: 'erp', form: { ...generated.form, model: { ...generated.form.model, fields } }, bindings: generated.bindings, policy: POLICY, snapshot: SNAPSHOT })
+    await createFileConfigurationStore(root).publish('odd', null, {
+      format: 1,
+      connection: 'erp',
+      form: { ...generated.form, model: { ...generated.form.model, fields } },
+      bindings: generated.bindings,
+      policy: POLICY,
+      snapshot: SNAPSHOT,
+    })
     lists = []
     const header = await exported('odd')
     expect({ status: header.statusCode, body: header.json(), lists }).toEqual({
@@ -539,14 +698,27 @@ describe('the export route', () => {
   // open. Its list is answered; its file is a 500 with nothing of it,
   // never a cell that is not the value.
   test('answers a form that binds a column with no text 500, with nothing of the file', async () => {
-    const generated = generateForm(SNAPSHOT, { connection: 'erp', root: ref('customer'), formId: 'photo', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] })
+    const generated = generateForm(SNAPSHOT, {
+      connection: 'erp',
+      root: ref('customer'),
+      formId: 'photo',
+      title: 'Customer',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      pinned: ['tenant_id'],
+    })
     expect(generated.bindings.fields.map((binding) => binding.field)).not.toContain('photo')
     const notes = generated.form.model.fields.find((field) => field.key === 'notes')
     const photo: FieldBinding = { kind: 'column', field: 'photo', column: 'photo', type: PHOTO, nullable: true, writes: { create: false, update: false } }
     await createFileConfigurationStore(root).publish('photo', null, {
       format: 1,
       connection: 'erp',
-      form: { ...generated.form, model: { ...generated.form.model, fields: [...generated.form.model.fields, { ...notes, key: 'photo', label: 'Photo' } as typeof generated.form.model.fields[number]] } },
+      form: {
+        ...generated.form,
+        model: {
+          ...generated.form.model,
+          fields: [...generated.form.model.fields, { ...notes, key: 'photo', label: 'Photo' } as (typeof generated.form.model.fields)[number]],
+        },
+      },
       bindings: { ...generated.bindings, fields: [...generated.bindings.fields, photo] },
       policy: { ...POLICY, fields: { ...POLICY.fields, photo: { read: ['clerk'], write: [] } } },
       snapshot: SNAPSHOT,
@@ -591,7 +763,10 @@ describe('the export route', () => {
     expect((await exported('customer-crm')).statusCode).toBe(200)
     release()
     const answered = await first
-    expect({ status: answered.statusCode, body: answered.body }).toEqual({ status: 200, body: `${HEADER}1,7,Muster AG,Switzerland,k1:CH,\r\n1,8,'=1+1,,k1:DE,"a, b"\r\n` })
+    expect({ status: answered.statusCode, body: answered.body }).toEqual({
+      status: 200,
+      body: `${HEADER}1,7,Muster AG,Switzerland,k1:CH,\r\n1,8,'=1+1,,k1:DE,"a, b"\r\n`,
+    })
     expect((await exported('customer')).statusCode).toBe(200)
   })
 
@@ -602,7 +777,10 @@ describe('the export route', () => {
     resolving = 'wait'
     const short = await server({ lookupDeadlineMs: 50 })
     const response = await exported('customer', {}, 'clerk', short)
-    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 503, body: { code: 'unavailable', message: 'The labels of the records could not be loaded, so no file was made.' } })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 503,
+      body: { code: 'unavailable', message: 'The labels of the records could not be loaded, so no file was made.' },
+    })
   })
 
   // A resolve gets the lookup's deadline cut to what is left of the
@@ -629,7 +807,10 @@ describe('the export route', () => {
     const long = await server({ lookupDeadlineMs: 60_000 })
     table = many(10)
     const response = await exported('customer', {}, 'clerk', long)
-    expect({ status: response.statusCode, body: response.json() }).toEqual({ status: 503, body: { code: 'export-timeout', message: 'The file could not be made within 30 seconds. Search for fewer records and try again.' } })
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 503,
+      body: { code: 'export-timeout', message: 'The file could not be made within 30 seconds. Search for fewer records and try again.' },
+    })
     expect(stoppedWith).toMatchObject({ name: 'TimeoutError', message: `The lookup passed its deadline of ${String(LEFT_MS)} ms.` })
     expect(events.map(({ status, outcome, rows }) => ({ status, outcome, rows }))).toEqual([{ status: 503, outcome: 'export-timeout', rows: 0 }])
   })
@@ -647,7 +828,12 @@ describe('the export route', () => {
     const closed = new Promise<void>((resolve) => listening.server.on('connection', (socket: Socket) => socket.once('close', () => resolve())))
     const controller = new AbortController()
     const base = `http://127.0.0.1:${String((listening.server.address() as AddressInfo).port)}`
-    const sent = fetch(`${base}/v1/forms/customer/records/export`, { method: 'POST', headers: { ...as('clerk'), 'content-type': 'application/json' }, body: '{}', signal: controller.signal })
+    const sent = fetch(`${base}/v1/forms/customer/records/export`, {
+      method: 'POST',
+      headers: { ...as('clerk'), 'content-type': 'application/json' },
+      body: '{}',
+      signal: controller.signal,
+    })
     while (resolves.length === 0) await new Promise((resolve) => setTimeout(resolve, 5))
     controller.abort()
     await expect(sent).rejects.toThrow()
@@ -683,7 +869,12 @@ describe('the export route', () => {
     }
     const controller = new AbortController()
     const base = `http://127.0.0.1:${String((listening.server.address() as AddressInfo).port)}`
-    const sent = fetch(`${base}/v1/forms/customer/records/export`, { method: 'POST', headers: { ...as('clerk'), 'content-type': 'application/json' }, body: '{}', signal: controller.signal })
+    const sent = fetch(`${base}/v1/forms/customer/records/export`, {
+      method: 'POST',
+      headers: { ...as('clerk'), 'content-type': 'application/json' },
+      body: '{}',
+      signal: controller.signal,
+    })
     while (lists.length === 0) await new Promise((resolve) => setTimeout(resolve, 5))
     controller.abort()
     await expect(sent).rejects.toThrow()
@@ -704,13 +895,54 @@ describe('the export route', () => {
   // filter or a value (0023): a filter's value is a person's data, as a
   // search is. Watched failing with `rows` left null for an export.
   test('is audited as export, with the rows and nothing the person sent', async () => {
-    await exported('customer', { search: 'Muster', sort: [{ field: 'name', direction: 'asc' }], parent: { field: 'country', record: 'k1:CH' }, filter: [{ field: 'notes', op: 'contains', text: 'filter-marker-0c7a' }] })
+    await exported('customer', {
+      search: 'Muster',
+      sort: [{ field: 'name', direction: 'asc' }],
+      parent: { field: 'country', record: 'k1:CH' },
+      filter: [{ field: 'notes', op: 'contains', text: 'filter-marker-0c7a' }],
+    })
     await exported('customer', {}, 'stranger')
     await exported('customer', { filter: [{ field: 'customer_no', op: 'equals', value: '98765x' }] })
     expect(events).toEqual([
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: 2, moved: null },
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'export', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: 0, moved: null },
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: 0, moved: null },
+      {
+        at: '2026-10-17T12:00:00.000Z',
+        plane: 'runtime',
+        actor: 'c',
+        operation: 'export',
+        form: 'customer',
+        formVersion: 1,
+        status: 200,
+        outcome: 'ok',
+        record: null,
+        rows: 2,
+        moved: null,
+      },
+      {
+        at: '2026-10-17T12:00:00.000Z',
+        plane: 'runtime',
+        actor: 's',
+        operation: 'export',
+        form: 'customer',
+        formVersion: 1,
+        status: 403,
+        outcome: 'operation-denied',
+        record: null,
+        rows: 0,
+        moved: null,
+      },
+      {
+        at: '2026-10-17T12:00:00.000Z',
+        plane: 'runtime',
+        actor: 'c',
+        operation: 'export',
+        form: 'customer',
+        formVersion: 1,
+        status: 400,
+        outcome: 'not-filterable',
+        record: null,
+        rows: 0,
+        moved: null,
+      },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|k1:|"name"|filter-marker|98765|notes/)
   })

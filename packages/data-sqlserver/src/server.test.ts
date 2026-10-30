@@ -23,7 +23,10 @@ const answer = (overrides: Partial<SqlServerAnswer> = {}): SqlServerAnswer => ({
 describe('sqlServerRead', () => {
   // The Developer edition every container runs, as every leg answers it.
   test('translates a boxed SQL Server: product, major and the connected database’s compatibility level', () => {
-    expect(sqlServerRead(answer())).toEqual({ identity: { kind: 'sqlserver', version: '16.0.4295.3', product: 'sqlserver', major: 16, compatibility: 160 }, edgeConstraints: true })
+    expect(sqlServerRead(answer())).toEqual({
+      identity: { kind: 'sqlserver', version: '16.0.4295.3', product: 'sqlserver', major: 16, compatibility: 160 },
+      edgeConstraints: true,
+    })
     // Standard, Enterprise or Developer, and Express.
     for (const engineEdition of [2, 3, 4]) expect(sqlServerRead(answer({ engineEdition })).identity.product, String(engineEdition)).toBe('sqlserver')
   })
@@ -36,8 +39,14 @@ describe('sqlServerRead', () => {
   // answering 16 a tested 2022, and no container can answer either edition
   // to catch it.
   test('reads Azure SQL Database and Managed Instance by EngineEdition, whatever major they answer', () => {
-    expect(sqlServerRead(answer({ engineEdition: 5, version: '12.0.2000.8', majorVersion: '12' })).identity).toMatchObject({ product: 'azure-sql-database', major: 12 })
-    expect(sqlServerRead(answer({ engineEdition: 8, version: '16.0.1135.2', majorVersion: '16' })).identity).toMatchObject({ product: 'azure-sql-managed-instance', major: 16 })
+    expect(sqlServerRead(answer({ engineEdition: 5, version: '12.0.2000.8', majorVersion: '12' })).identity).toMatchObject({
+      product: 'azure-sql-database',
+      major: 12,
+    })
+    expect(sqlServerRead(answer({ engineEdition: 8, version: '16.0.1135.2', majorVersion: '16' })).identity).toMatchObject({
+      product: 'azure-sql-managed-instance',
+      major: 16,
+    })
   })
 
   // Synapse (6, 11), SQL Edge (9) and an edition no release has named yet

@@ -28,12 +28,15 @@ const SETTING: Names = { publisher: 'FORMANCY_DATA_PUBLISHER_ROLES', admin: 'FOR
  * claim, never a secret.
  */
 export function publisherRolesProblem(roles: readonly string[], adminRoles: readonly string[], names: Names = EMBEDDED): string | undefined {
-  if (!Array.isArray(roles)) return `${names.publisher} is not a list of roles.`
+  // `Array.isArray` narrows a readonly array to `any[]`, so it is asked of an `unknown` copy.
+  const listed: unknown = roles
+  if (!Array.isArray(listed)) return `${names.publisher} is not a list of roles.`
   if (roles.length === 0) {
     return `${names.publisher} is set and names no role: a deployment under review that nobody can publish to is not one anybody meant. Name the roles that approve, or leave it unset for no review.`
   }
   const outside = roles.find((role) => !adminRoles.includes(role))
-  if (outside !== undefined) return `${names.publisher} names ${JSON.stringify(outside)}, which is not in ${names.admin}: a publisher is an administrator who may also approve.`
+  if (outside !== undefined)
+    return `${names.publisher} names ${JSON.stringify(outside)}, which is not in ${names.admin}: a publisher is an administrator who may also approve.`
   return undefined
 }
 
@@ -46,9 +49,19 @@ export function publisherRolesProblem(roles: readonly string[], adminRoles: read
  */
 export function publisherRolesSetting(text: string | undefined, plane: { adminRoles: readonly string[]; admin: boolean }): PublisherRolesSetting {
   if (text === undefined) return { ok: true, publisherRoles: undefined }
-  const roles = [...new Set(text.split(',').map((role) => role.trim()).filter((role) => role !== ''))]
+  const roles = [
+    ...new Set(
+      text
+        .split(',')
+        .map((role) => role.trim())
+        .filter((role) => role !== ''),
+    ),
+  ]
   if (roles.length > 0 && !plane.admin) {
-    return { ok: false, problem: `${SETTING.publisher} names publishers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and ${SETTING.admin}, or leave it unset.` }
+    return {
+      ok: false,
+      problem: `${SETTING.publisher} names publishers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and ${SETTING.admin}, or leave it unset.`,
+    }
   }
   const problem = publisherRolesProblem(roles, plane.adminRoles, SETTING)
   return problem === undefined ? { ok: true, publisherRoles: roles } : { ok: false, problem }

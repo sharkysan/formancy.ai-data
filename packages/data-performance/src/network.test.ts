@@ -24,7 +24,9 @@ describe('the proxy settings the page records', () => {
   // Upper case wins over lower, as Node's fetch reads them; unset is null,
   // never an empty string that reads as "set to nothing".
   test('read each variable once, upper case first, credentials removed', () => {
-    expect(proxySettings({ https_proxy: 'http://bob:pw@lower:1', HTTPS_PROXY: 'http://carol:pw@upper:2', no_proxy: 'localhost', NODE_USE_ENV_PROXY: '' })).toEqual({
+    expect(
+      proxySettings({ https_proxy: 'http://bob:pw@lower:1', HTTPS_PROXY: 'http://carol:pw@upper:2', no_proxy: 'localhost', NODE_USE_ENV_PROXY: '' }),
+    ).toEqual({
       HTTP_PROXY: null,
       HTTPS_PROXY: 'http://upper:2',
       NO_PROXY: 'localhost',

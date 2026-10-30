@@ -389,15 +389,41 @@ describe('the discovery scope', () => {
   // An adapter that read only the keys of tables in scope would say a delete
   // of an order reaches its deliveries and lines and nothing else.
   test('a key from a schema outside the scope that refers to a table in it is named there, and its table is not described', async () => {
-    await owner.unsafe('create schema elsewhere; create table elsewhere.order_copy (id integer primary key, order_id bigint constraint fk_copy_order references sales."order" (id) on delete set null)')
+    await owner.unsafe(
+      'create schema elsewhere; create table elsewhere.order_copy (id integer primary key, order_id bigint constraint fk_copy_order references sales."order" (id) on delete set null)',
+    )
     try {
       for (const sql of [owner, reader]) {
         const snapshot = await discoverPostgres(sql, FIXTURE_SCOPE)
         expect(names(snapshot).every((name) => name.startsWith('sales.'))).toBe(true)
         expect(described(snapshot, 'sales', 'order').referencedBy).toEqual([
-          { table: { schema: 'elsewhere', name: 'order_copy' }, name: 'fk_copy_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'set-null', onUpdate: 'no-action', enforced: true },
-          { table: { schema: 'sales', name: 'delivery' }, name: 'fk_delivery_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'cascade', onUpdate: 'no-action', enforced: true },
-          { table: { schema: 'sales', name: 'order_line' }, name: 'fk_order_line_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'cascade', onUpdate: 'no-action', enforced: true },
+          {
+            table: { schema: 'elsewhere', name: 'order_copy' },
+            name: 'fk_copy_order',
+            columns: ['order_id'],
+            referencedColumns: ['id'],
+            onDelete: 'set-null',
+            onUpdate: 'no-action',
+            enforced: true,
+          },
+          {
+            table: { schema: 'sales', name: 'delivery' },
+            name: 'fk_delivery_order',
+            columns: ['order_id'],
+            referencedColumns: ['id'],
+            onDelete: 'cascade',
+            onUpdate: 'no-action',
+            enforced: true,
+          },
+          {
+            table: { schema: 'sales', name: 'order_line' },
+            name: 'fk_order_line_order',
+            columns: ['order_id'],
+            referencedColumns: ['id'],
+            onDelete: 'cascade',
+            onUpdate: 'no-action',
+            enforced: true,
+          },
         ])
         expect(snapshot.gaps).toEqual([])
       }
@@ -427,9 +453,16 @@ describe('the discovery scope', () => {
       create table parted.leaf (id integer, root_id integer constraint fk_leaf_root references parted.root (id) on delete cascade, primary key (id)) partition by range (id);
       create table parted.leaf_low partition of parted.leaf for values from (0) to (100);
       create table parted.leaf_high partition of parted.leaf for values from (100) to (200);`)
-    const keysOnto = async () => (described(await discoverPostgres(owner, { schemas: ['parted'] }), 'parted', 'root').referencedBy ?? []).map((key) => [key.table.name, key.name, key.enforced])
+    const keysOnto = async () =>
+      (described(await discoverPostgres(owner, { schemas: ['parted'] }), 'parted', 'root').referencedBy ?? []).map((key) => [
+        key.table.name,
+        key.name,
+        key.enforced,
+      ])
     expect(await keysOnto()).toEqual([['leaf', 'fk_leaf_root', true]])
-    const [clones] = await owner<{ count: number }[]>`select count(*)::int as count from pg_catalog.pg_constraint where conparentid <> 0 and confrelid = 'parted.root'::regclass`
+    const [clones] = await owner<
+      { count: number }[]
+    >`select count(*)::int as count from pg_catalog.pg_constraint where conparentid <> 0 and confrelid = 'parted.root'::regclass`
     expect(clones?.count).toBe(2)
     await owner.unsafe('alter table parted.leaf_low disable trigger all')
     expect(await keysOnto()).toEqual([['leaf', 'fk_leaf_root', false]])
@@ -478,9 +511,21 @@ describe('the discovery scope', () => {
         const snapshot = await discoverPostgres(sql, { schemas: ['heir'] })
         expect(names(snapshot)).toEqual(['heir.doc', 'heir.doc_archive', 'heir.ord'])
         expect(snapshot.gaps.map((gap) => [`${gap.subject.kind === 'object' ? gap.subject.object.name : gap.subject.kind}`, gap.aspect, gap.detail])).toEqual([
-          ['doc', 'referenced-by', 'foreign key fk_mention_archive of heir_refs.mention refers to heir.doc_archive, a table that inherits from this one, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
-          ['ord', 'referenced-by', 'foreign key fk_memo_ord_2a of heir_refs.memo refers to heir_far.ord_2a, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
-          ['ord', 'referenced-by', 'foreign key fk_note_ord_1 of heir_refs.note refers to heir.ord_1, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names'],
+          [
+            'doc',
+            'referenced-by',
+            'foreign key fk_mention_archive of heir_refs.mention refers to heir.doc_archive, a table that inherits from this one, and a delete from this table reaches its rows; this release lists a key only on the table it names',
+          ],
+          [
+            'ord',
+            'referenced-by',
+            'foreign key fk_memo_ord_2a of heir_refs.memo refers to heir_far.ord_2a, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names',
+          ],
+          [
+            'ord',
+            'referenced-by',
+            'foreign key fk_note_ord_1 of heir_refs.note refers to heir.ord_1, a partition of this table, and a delete from this table reaches its rows; this release lists a key only on the table it names',
+          ],
         ])
         expect(described(snapshot, 'heir', 'ord').referencedBy?.map((key) => key.name)).toEqual(['fk_line_ord'])
         expect(described(snapshot, 'heir', 'doc').referencedBy).toEqual([])

@@ -5,6 +5,7 @@ import { displayText, isDisplayType } from '../lookup/display.js'
 import type { NormalizedType } from '../metadata.js'
 import { canonicalValue } from './answers.js'
 import { csvHeader, csvRecord } from './csv.js'
+import { fieldHeading } from './heading.js'
 import type { CsvCell, CsvText } from './csv.js'
 import type { FormRecord } from './plan-types.js'
 
@@ -58,7 +59,7 @@ export function exportColumns(form: FormSchema, bindings: FormBindings, readable
   for (const field of form.model.fields) {
     const binding = bound.get(field.key)
     if (binding === undefined || !wanted.has(field.key)) continue
-    fields.push({ header: typeof field.label === 'string' ? field.label : field.key, binding })
+    fields.push({ header: fieldHeading(field), binding })
   }
   if (fields.length !== wanted.size) throw new Error('A readable field is not a bound field of the form, so the file cannot place it.')
   const headers = fields.flatMap(({ header, binding }) => (binding.kind === 'lookup' ? [header, `${header} (key)`] : [header]))
@@ -90,7 +91,7 @@ export function exportText(type: NormalizedType, value: ApiValue): string | null
 }
 
 /** The cells of one field: its value, or a lookup's label and token. */
-function cellsOf({ header, binding }: ExportField, answers: FormRecord['answers'], labels: ExportLabels): CsvCell[] | null {
+function cellsOf({ binding }: ExportField, answers: FormRecord['answers'], labels: ExportLabels): CsvCell[] | null {
   const answered = Object.hasOwn(answers, binding.field)
   if (binding.kind === 'column') {
     if (!answered) throw new Error(`The record has no answer for ${binding.field}, a field the person may read.`)
@@ -119,7 +120,8 @@ export function exportRecord(columns: ExportColumns, record: FormRecord, labels:
   const cells: CsvCell[] = []
   for (const field of columns.fields) {
     const written = cellsOf(field, record.answers, labels)
-    if (written === null) return { ok: false, code: 'unencodable', message: `${field.header} names a row whose key is too long for a token, so a file cannot say which.` }
+    if (written === null)
+      return { ok: false, code: 'unencodable', message: `${field.header} names a row whose key is too long for a token, so a file cannot say which.` }
     cells.push(...written)
   }
   return csvRecord(columns.headers, cells)

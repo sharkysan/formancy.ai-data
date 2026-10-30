@@ -10,7 +10,8 @@ import type { FieldBinding } from './types.js'
  * refuses rather than publish a section of something it cannot be one of.
  */
 
-const lookupOf = (bindings: { fields: FieldBinding[] }) => bindings.fields.find((binding) => binding.kind === 'lookup') as Extract<FieldBinding, { kind: 'lookup' }>
+const lookupOf = (bindings: { fields: FieldBinding[] }) =>
+  bindings.fields.find((binding) => binding.kind === 'lookup') as Extract<FieldBinding, { kind: 'lookup' }>
 
 describe('a section', () => {
   // The condition travels typed as the referenced table holds the column, so
@@ -31,7 +32,9 @@ describe('a section', () => {
     const source = sectioned('postgres', (objects) => {
       ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).columns.push(col('is_company', 9, BOOLEAN))
     })
-    expect(lookupOf(companyForm(source, { when: { column: 'is_company', value: 'true' } }).bindings).section).toEqual({ when: { column: 'is_company', type: BOOLEAN, value: 'true' } })
+    expect(lookupOf(companyForm(source, { when: { column: 'is_company', value: 'true' } }).bindings).section).toEqual({
+      when: { column: 'is_company', type: BOOLEAN, value: 'true' },
+    })
     expect(() => companyForm(source, { when: { column: 'is_company', value: 'TRUE' } })).toThrow('not spelled as')
   })
 
@@ -47,7 +50,13 @@ describe('a section', () => {
       ;(customer.columns.find((column) => column.name === 'country_code') as ColumnMeta).access = { select: false, insert: true, update: true }
     })
     expect(() =>
-      generateForm(source, { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['customer_no'], section: { when: null } }] }),
+      generateForm(source, {
+        connection: 'erp',
+        root: { schema: 'sales', name: 'order' },
+        formId: 'sales-order',
+        title: 'Order',
+        lookups: [{ foreignKey: 'fk_order_customer', display: ['customer_no'], section: { when: null } }],
+      }),
     ).toThrow('not the whole key of order')
     expect(() => companyForm(source, { when: { column: 'kinds', value: 'company' } })).toThrow('customer has no column kinds')
     expect(() => companyForm(source, { when: { column: 'country_code', value: 'CH' } })).toThrow('may not read customer.country_code')

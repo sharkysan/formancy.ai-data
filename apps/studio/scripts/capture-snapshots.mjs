@@ -108,7 +108,10 @@ if (problems.length > 0) throw new Error(`the discovered snapshots disagree with
 // The SQL Server reader is the capture that shows "cannot tell"; PostgreSQL's
 // catalog answers every role, so its reader and writer have nothing to hide.
 if (ms.restricted.gaps.length === 0) throw new Error('the SQL Server reader saw no gap, so no snapshot can show what a restricted account misses')
-for (const [who, snapshot] of [['reader', pg.restricted], ['writer', pg.writing]]) {
+for (const [who, snapshot] of [
+  ['reader', pg.restricted],
+  ['writer', pg.writing],
+]) {
   if (snapshot.gaps.length > 0) throw new Error(`the PostgreSQL ${who} reported gaps, which 0027 says it cannot have: ${JSON.stringify(snapshot.gaps)}`)
 }
 

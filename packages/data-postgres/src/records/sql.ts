@@ -1,4 +1,15 @@
-import type { InsertRequest, ObjectRef, ReachTerms, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import type {
+  InsertRequest,
+  ObjectRef,
+  ReachTerms,
+  ReadRequest,
+  RecordColumn,
+  RecordTarget,
+  RecordValue,
+  RowFilterTerm,
+  ThroughTerms,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
@@ -188,7 +199,10 @@ export function nothingChangedStatement(
   // A version that has ended (0113): `'false'` where it has, `'true'` for a version still open or a form without versions.
   const open = request.open === undefined ? `'true'` : `(${column(request.open)} is null)::pg_catalog.text`
   const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`, `${open} as "open"`], where)}\nlimit 1`
-  return { text: `select ${same}, ${ISOLATION}, "found"."unchanged", "found"."open"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+  return {
+    text: `select ${same}, ${ISOLATION}, "found"."unchanged", "found"."open"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`,
+    params: statement.params,
+  }
 }
 
 /** Whether the table's definition is still `definition`, and this connection's isolation: after a write that wrote nothing or failed. */
@@ -246,12 +260,23 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
  * The same WHERE holds the table to the definition the update was decided
  * over (0041).
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Definition, path: WritePath): RecordStatement {
+export function updateStatement(
+  request: UpdateRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  definition: Definition,
+  path: WritePath,
+): RecordStatement {
   const statement = new Statement()
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
-  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), ...openSql(request), ...guard(statement, request.target.table, definition, path)]
+  const where = [
+    ...located(statement, request.key, terms, through),
+    versionIs(statement, request),
+    ...openSql(request),
+    ...guard(statement, request.target.table, definition, path),
+  ]
   const text = [
     `update ${quoteTable(request.target.table)} as ${ROW}`,
     `set ${set.join(', ')}`,

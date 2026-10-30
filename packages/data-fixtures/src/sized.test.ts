@@ -175,7 +175,11 @@ describe('sizedLookupPage', () => {
   // engine that answered correctly.
   test('a page exactly full has no more', () => {
     expect(sizedLookupPage(1, 'Muster AG', 1)).toEqual({ rows: [FIXTURE_CUSTOMERS[0]], hasMore: false, matched: 1 })
-    expect(sizedLookupPage(1, 'bau', 50).rows.map((row) => row.customerNo)).toEqual(sizedLookupPage(1, 'bau', 51).rows.slice(0, 50).map((row) => row.customerNo))
+    expect(sizedLookupPage(1, 'bau', 50).rows.map((row) => row.customerNo)).toEqual(
+      sizedLookupPage(1, 'bau', 51)
+        .rows.slice(0, 50)
+        .map((row) => row.customerNo),
+    )
   })
 })
 
@@ -245,10 +249,14 @@ describe('sizedReadBack', () => {
   test('refuses the first row that differs, naming its key', () => {
     const misplaced = sizedReadBack()
     misplaced.take({ tenantId: 1, customerNo: 1001, name: 'Muster AG' })
-    expect(() => misplaced.take({ tenantId: 1, customerNo: 1_000_002, name: sizedCustomer(1).name })).toThrow('sales.customer holds (1, 1000002) where the generator expects (1, 1000001)')
+    expect(() => misplaced.take({ tenantId: 1, customerNo: 1_000_002, name: sizedCustomer(1).name })).toThrow(
+      'sales.customer holds (1, 1000002) where the generator expects (1, 1000001)',
+    )
 
     const renamed = sizedReadBack()
-    expect(() => renamed.take({ tenantId: 1, customerNo: 1001, name: 'Muster GmbH' })).toThrow('sales.customer (1, 1001) is named "Muster GmbH", the generator expects "Muster AG"')
+    expect(() => renamed.take({ tenantId: 1, customerNo: 1001, name: 'Muster GmbH' })).toThrow(
+      'sales.customer (1, 1001) is named "Muster GmbH", the generator expects "Muster AG"',
+    )
 
     const short = sizedReadBack()
     short.take({ tenantId: 1, customerNo: 1001, name: 'Muster AG' })

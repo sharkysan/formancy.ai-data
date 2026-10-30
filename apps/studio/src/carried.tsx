@@ -96,9 +96,7 @@ export function CarriedPanel({
         <p className="none">Everything you chose was carried.</p>
       ) : (
         <>
-          <p className="hint">
-            What could not be carried as it was, and what was done instead. A choice here is one edit, which Undo takes back.
-          </p>
+          <p className="hint">What could not be carried as it was, and what was done instead. A choice here is one edit, which Undo takes back.</p>
           <ul aria-labelledby="carried-heading">
             {carried.conflicts.map((conflict, index) => (
               // The rebase's order is the order to read them in, and two can concern one field.

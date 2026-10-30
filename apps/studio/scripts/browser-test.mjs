@@ -73,7 +73,20 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEveryPass, canary, canaryProblem, declaredFamilies, fontProblem, foreignProblem, fromTheTop, guardRequests, hearPolicy, policyRefused, unlikeTheTable, webFonts } from '../../../scripts/browser-gate.mjs'
+import {
+  afterEveryPass,
+  canary,
+  canaryProblem,
+  declaredFamilies,
+  fontProblem,
+  foreignProblem,
+  fromTheTop,
+  guardRequests,
+  hearPolicy,
+  policyRefused,
+  unlikeTheTable,
+  webFonts,
+} from '../../../scripts/browser-gate.mjs'
 import { FACTS } from '../../../scripts/browsers.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { browse } from './browser/browse.mjs'
@@ -134,7 +147,12 @@ async function wayIn(gate, page) {
   const table = FACTS.clickThenTab.values[gate.asked]
   check(
     'a click on the workbench’s corner, then Tab: as 0058’s table says of this browser',
-    reached === table ? null : unlikeTheTable(gate.asked, { did: reached ? 'reached the skip link' : `went to ${await describeFocus(page)}, not the skip link`, says: table ? 'it reaches it' : 'it does not' }),
+    reached === table
+      ? null
+      : unlikeTheTable(gate.asked, {
+          did: reached ? 'reached the skip link' : `went to ${await describeFocus(page)}, not the skip link`,
+          says: table ? 'it reaches it' : 'it does not',
+        }),
   )
 
   // From the top of the workbench, as the harness puts it there: the skip link, on screen, into the step.

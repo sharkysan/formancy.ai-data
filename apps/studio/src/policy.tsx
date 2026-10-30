@@ -88,9 +88,8 @@ function UnscopedNote({ root, filtered }: { root: string; filtered: readonly str
         <strong>Nothing scopes these rows</strong>
       </p>
       <p>
-        {root} has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation
-        names, though the {lists} filtered, and the server offers no list of them. Where a row belongs to the tenant of the row it
-        names, tick the box under its list.
+        {root} has no row filter and is reached through no lookup, so every one of its rows is in reach of anybody an operation names, though the {lists}{' '}
+        filtered, and the server offers no list of them. Where a row belongs to the tenant of the row it names, tick the box under its list.
       </p>
     </div>
   )
@@ -161,8 +160,8 @@ export function PolicyStep({
   return (
     <>
       <p className="lede">
-        Who may read, create, update and delete with this form, field by field, and which rows of {describeRef(bindings.root)}{' '}
-        and of each lookup it reaches. Roles are the names your host puts in its tokens, separated by commas.
+        Who may read, create, update and delete with this form, field by field, and which rows of {describeRef(bindings.root)} and of each lookup it reaches.
+        Roles are the names your host puts in its tokens, separated by commas.
       </p>
       <PolicyCheck problems={problems} />
       <ReassignedKeys keys={reassigned} after={CHECK} onDecide={decide} />
@@ -180,8 +179,8 @@ export function PolicyStep({
         ))}
         <p className="hint">
           This form offers create: {bindings.operations.create ? 'yes' : 'no'}; update: {bindings.operations.update ? 'yes' : 'no'}; delete:{' '}
-          {offers(bindings, 'delete') ? 'yes' : 'no'}. A role granted an operation the form does not offer is refused. A role that may
-          delete must also be able to read, so its delete names the version it read.
+          {offers(bindings, 'delete') ? 'yes' : 'no'}. A role granted an operation the form does not offer is refused. A role that may delete must also be able
+          to read, so its delete names the version it read.
         </p>
       </fieldset>
       <DeleteReach bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
@@ -218,7 +217,7 @@ export function PolicyStep({
                   id={`read-${binding.field}`}
                   label={
                     <>
-                      Read roles{' '}<span className="visually-hidden">for {label}</span>
+                      Read roles <span className="visually-hidden">for {label}</span>
                     </>
                   }
                   roles={entry?.read ?? []}
@@ -229,7 +228,7 @@ export function PolicyStep({
                     id={`write-${binding.field}`}
                     label={
                       <>
-                        Write roles{' '}<span className="visually-hidden">for {label}</span>
+                        Write roles <span className="visually-hidden">for {label}</span>
                       </>
                     }
                     roles={entry?.write ?? []}
@@ -249,7 +248,7 @@ export function PolicyStep({
                 <li key={key}>
                   <code>{key}</code>{' '}
                   <button type="button" id={orphanRemove(key)} className="button" onClick={() => removeOrphan(key)}>
-                    Remove{' '}<span className="visually-hidden">{key}</span>
+                    Remove <span className="visually-hidden">{key}</span>
                   </button>
                 </li>
               ))}
@@ -287,7 +286,7 @@ export function PolicyStep({
               <li key={key}>
                 <code>{key}</code>{' '}
                 <button type="button" id={strayRemove(key)} className="button" onClick={() => removeStrayLookup(key)}>
-                  Remove{' '}<span className="visually-hidden">{Object.hasOwn(policy.lookups, key) ? `the ${key} lookup filter` : `${key} from through`}</span>
+                  Remove <span className="visually-hidden">{Object.hasOwn(policy.lookups, key) ? `the ${key} lookup filter` : `${key} from through`}</span>
                 </button>
               </li>
             ))}

@@ -52,21 +52,21 @@ export interface DeleteFlow {
   /** The newest version of `record` the detail heard, if it holds it. */
   heard(record: string): string | null
   /** Ask whether to delete `target`. */
-  ask(target: DeleteTarget): void
+  ask: (target: DeleteTarget) => void
   /** Keep it, or Escape: nothing deleted, the keyboard back on what asked. */
-  keep(): void
+  keep: () => void
   /** Delete it. */
   confirm(): void
   /** Check whether it was deleted. */
-  check(): void
+  check: () => void
   /** Delete it again: the confirmation again. */
-  again(): void
+  again: () => void
   /** Close a refusal's notice: the keyboard back on what asked. */
-  close(): void
+  close: () => void
   /** Close the record a delete could not find: gone from the page, said as closed. */
-  closeRecord(): void
+  closeRecord: () => void
   /** Load the saved record: read again into the detail. */
-  load(): void
+  load: () => void
 }
 
 export interface DeleteFlowOptions {
@@ -248,6 +248,7 @@ function useRegionFocus(deletion: Deletion, regionRef: RefObject<HTMLDivElement 
     if (show(deletion.target)) after(focus)
     else focus()
     // Only on a new state: the deletion out keeps the confirmation's number, and the keyboard where it is.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs once for each new state, from the render that made it, so what it reads is that render's and nothing stale
   }, [n])
 }
 
@@ -325,7 +326,8 @@ export function useHeard(sessions: readonly Session[]): (record: string) => stri
     }
   }, [sessions])
   return useCallback(
-    (record: string) => (last.current?.record === record ? last.current.version : (sessions.find((session) => session.state().record === record)?.state().version ?? null)),
+    (record: string) =>
+      last.current?.record === record ? last.current.version : (sessions.find((session) => session.state().record === record)?.state().version ?? null),
     [sessions],
   )
 }

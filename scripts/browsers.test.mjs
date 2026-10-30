@@ -44,19 +44,27 @@ describe('gateBrowsers', () => {
   // went missing, which must not quietly run the default; a repeat runs one
   // browser twice and overwrites its own results.
   test('refuses an unknown browser, an empty list, a repeat and `all` among names', () => {
-    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'opera' } })).toThrow('FORMANCY_BROWSERS names opera, which is no browser the gates run in: chromium, firefox, webkit')
+    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'opera' } })).toThrow(
+      'FORMANCY_BROWSERS names opera, which is no browser the gates run in: chromium, firefox, webkit',
+    )
     expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'firefox' }, browsers: ['chromium'] })).toThrow(/names firefox, which is no browser the gates run in/)
-    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: '' } })).toThrow('FORMANCY_BROWSERS is set and names no browser: unset it for Chromium alone, or name the browsers (chromium, firefox, webkit), or all')
+    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: '' } })).toThrow(
+      'FORMANCY_BROWSERS is set and names no browser: unset it for Chromium alone, or name the browsers (chromium, firefox, webkit), or all',
+    )
     expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: ' , ' } })).toThrow(/names no browser/)
     expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'chromium,chromium' } })).toThrow('FORMANCY_BROWSERS names chromium twice')
-    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'all,chromium' }, browsers: two })).toThrow('FORMANCY_BROWSERS names all beside a browser: all stands alone')
+    expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'all,chromium' }, browsers: two })).toThrow(
+      'FORMANCY_BROWSERS names all beside a browser: all stands alone',
+    )
   })
 
   // A gate handed no browser loops over nothing and exits green, having
   // measured nothing: a list of browsers without Chromium, with the
   // variable unset, would turn every local `pnpm test:browser` into that.
   test('refuses to leave a gate no browser to run in', () => {
-    expect(() => gateBrowsers({ env: {}, browsers: ['firefox', 'webkit'] })).toThrow('FORMANCY_BROWSERS is unset, which runs Chromium alone, and Chromium is no browser the gates run in: name one of firefox, webkit')
+    expect(() => gateBrowsers({ env: {}, browsers: ['firefox', 'webkit'] })).toThrow(
+      'FORMANCY_BROWSERS is unset, which runs Chromium alone, and Chromium is no browser the gates run in: name one of firefox, webkit',
+    )
     expect(() => gateBrowsers({ env: { FORMANCY_BROWSERS: 'all' }, browsers: [] })).toThrow('FORMANCY_BROWSERS=all names no browser: the gates run in none')
   })
 
@@ -197,7 +205,9 @@ describe('ranIn', () => {
     expect(ranIn(['chromium'], { env: {}, browsers: ['chromium', 'firefox'] })).toBe(
       'In Chromium: FORMANCY_BROWSERS is unset, which on a machine runs Chromium alone; FORMANCY_BROWSERS=all runs Chromium and Firefox, as CI does.',
     )
-    expect(ranIn(['firefox'], { env: { FORMANCY_BROWSERS: 'firefox' }, browsers: ['chromium', 'firefox'] })).toBe('In Firefox, as FORMANCY_BROWSERS=firefox asks.')
+    expect(ranIn(['firefox'], { env: { FORMANCY_BROWSERS: 'firefox' }, browsers: ['chromium', 'firefox'] })).toBe(
+      'In Firefox, as FORMANCY_BROWSERS=firefox asks.',
+    )
     // Off Linux, `all` is refused for WebKit: the line names what runs there.
     expect(ranIn(['chromium'], { env: {}, platform: 'darwin' })).toBe(
       'In Chromium: FORMANCY_BROWSERS is unset, which on a machine runs Chromium alone; FORMANCY_BROWSERS=chromium,firefox runs Chromium and Firefox, and WebKit runs on Linux only.',

@@ -15,7 +15,12 @@ export interface DeleteRouteSteps {
   connection(bundle: PublishedBundle, reply: FastifyReply): Promise<OpenConnection | undefined>
   context(request: FastifyRequest): PolicyContext
   /** Runs `perform` once per sending of a write id, and answers a later sending with its answer (0031). */
-  sendOnce(request: FastifyRequest<{ Params: { id: string } }>, operation: 'delete', id: string | undefined, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated?: boolean }>
+  sendOnce(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: 'delete',
+    id: string | undefined,
+    perform: () => Promise<WriteAnswer>,
+  ): Promise<WriteAnswer & { repeated?: boolean }>
   /** A write sent whose answer was lost: said in the log, answered 502 with what was addressed, never sent again. */
   lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'delete', record: string, version: string, failure: string): WriteAnswer
   /** A planner's refusal as the answer, its drift said in the log first. */
@@ -41,7 +46,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * case-insensitive key may be spelled otherwise than the token sent (0028)
  * -- and holds no value of it, so a resend's kept answer holds none either.
  */
-async function deleted(steps: DeleteRouteSteps, request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, record: string, version: string): Promise<WriteAnswer> {
+async function deleted(
+  steps: DeleteRouteSteps,
+  request: FastifyRequest<{ Params: { id: string } }>,
+  bundle: PublishedBundle,
+  open: OpenConnection,
+  record: string,
+  version: string,
+): Promise<WriteAnswer> {
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'delete')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
@@ -58,7 +70,10 @@ async function deleted(steps: DeleteRouteSteps, request: FastifyRequest<{ Params
     request.log.info({ form: request.params.id, constraint: outcome.constraint ?? null }, 'a delete was refused: other records still refer to this one')
   }
   if (!outcome.ok) return deleteFailure(outcome)
-  const token = recordToken(plan.request.target.identity.map((column) => column.name), outcome.deleted.values)
+  const token = recordToken(
+    plan.request.target.identity.map((column) => column.name),
+    outcome.deleted.values,
+  )
   // A key the planner decoded from a token makes one again; the token sent is the fallback, never a guess.
   const removed = token.ok ? token.token : record
   return { status: 200, body: { record: removed, deleted: true } satisfies RecordDeleted, record: removed }

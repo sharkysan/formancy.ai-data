@@ -1,10 +1,26 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription as computeDescription } from 'dom-accessibility-api'
-import { createDataClient } from '@formancy/data-client'
+import { createDataClient, fieldHeading } from '@formancy/data-client'
 import { STARTED_AGAIN } from './grid-datasource.js'
 import { focusedName } from './test-accessible.js'
-import { answer, answeredOnce, chooseForm, chooseRenderer, formLink, gridSection, gridStatus, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  formLink,
+  gridSection,
+  gridStatus,
+  mount,
+  newRecord,
+  rendered,
+  searchRecords,
+  shows,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -42,14 +58,21 @@ afterEach(() => {
 const records = (): HTMLElement => within(gridSection('Records')).getByRole('grid', { name: 'Records' })
 
 /** The Records grid's headers, as their text. */
-const headersOf = (): string[] => within(records()).getAllByRole('columnheader').map((header) => header.textContent?.trim() ?? '')
+const headersOf = (): string[] =>
+  within(records())
+    .getAllByRole('columnheader')
+    .map((header) => header.textContent?.trim() ?? '')
 
 /** The data rows of a grid, each as the text of its cells. */
 function rowsOf(grid: HTMLElement): string[][] {
   return within(grid)
     .getAllByRole('row')
     .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) => within(row).getAllByRole('gridcell').map((cell) => cell.textContent ?? ''))
+    .map((row) =>
+      within(row)
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent ?? ''),
+    )
 }
 
 /** The row of a grid whose first cell says `first`. */
@@ -94,12 +117,22 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const links = within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent)
-    expect(links).toEqual(expect.arrayContaining([`Order ${engine.formId}`, `Order line ${engine.lines}`, `Employee ${engine.employees}`, `Order ${engine.staff}`]))
+    expect(links).toEqual(
+      expect.arrayContaining([`Order ${engine.formId}`, `Order line ${engine.lines}`, `Employee ${engine.employees}`, `Order ${engine.staff}`]),
+    )
     await user.click(await formLink(engine.formId))
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: `Order ${engine.formId}` })), { timeout: 15_000 })
     expect(screen.getByRole('main', { name: `Order ${engine.formId}` })).toBeTruthy()
-    expect(within(nav).getByRole('link', { name: `Order ${engine.formId}` }).getAttribute('aria-current')).toBe('page')
-    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update'])
+    expect(
+      within(nav)
+        .getByRole('link', { name: `Order ${engine.formId}` })
+        .getAttribute('aria-current'),
+    ).toBe('page')
+    expect(
+      within(screen.getByRole('list', { name: 'Operations' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Read', 'Create', 'Update'])
   })
 
   // Tenant 1's orders, and never tenant 2's: the grid is `records/list`
@@ -178,7 +211,9 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
     await screen.findByRole('heading', { level: 3, name: `Order ${record}` }, { timeout: 15_000 })
     await shows('Angular', 'Amount', '1.0000')
-    expect(within(screen.getByRole('region', { name: `Order ${record}` })).getAllByRole('status')[0]?.textContent).toBe(`Discarded the unsaved changes. Opened ${record}.`)
+    expect(within(screen.getByRole('region', { name: `Order ${record}` })).getAllByRole('status')[0]?.textContent).toBe(
+      `Discarded the unsaved changes. Opened ${record}.`,
+    )
   })
 
   // A search is the person's words, submitted: the hint names the fields it
@@ -191,10 +226,12 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const user = await workspace(engine.formId)
     const definition = await plane.clerk.form(engine.formId)
     if (!definition.ok) throw new Error(definition.message)
-    const labels = new Map(definition.value.form.model.fields.map((field) => [field.key, String(field.label)]))
+    const labels = new Map(definition.value.form.model.fields.map((field) => [field.key, fieldHeading(field)]))
     const names = (definition.value.list?.searchable ?? []).map((key) => labels.get(key))
     const search = screen.getByRole('search', { name: 'Search records' })
-    expect(computeDescription(within(search).getByRole('textbox', { name: 'Search' }))).toBe(`Looks in ${names.slice(0, -1).join(', ')} and ${String(names.at(-1))} when you press Search.`)
+    expect(computeDescription(within(search).getByRole('textbox', { name: 'Search' }))).toBe(
+      `Looks in ${names.slice(0, -1).join(', ')} and ${String(names.at(-1))} when you press Search.`,
+    )
 
     await user.type(within(search).getByRole('textbox', { name: 'Search' }), stamp)
     await user.click(within(search).getByRole('button', { name: 'Search' }))
@@ -209,7 +246,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`No records match “${stamp}nothing”.`), { timeout: 15_000 })
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Clear search' }))
     expect(focusedName()).toBe('Search')
-    expect((within(search).getByRole('textbox', { name: 'Search' }) as HTMLInputElement).value).toBe('')
+    expect(within(search).getByRole<HTMLInputElement>('textbox', { name: 'Search' }).value).toBe('')
     await waitFor(() => expect(rowsOf(records()).length).toBeGreaterThan(1), { timeout: 15_000 })
   })
 
@@ -251,14 +288,24 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
     const previous = within(gridSection('Records')).getByRole('button', { name: 'Previous rows' })
     expect(previous.getAttribute('aria-disabled')).toBe('true')
-    const lists = (): Array<Record<string, unknown>> => plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).map((request) => JSON.parse(request.body ?? '{}') as Record<string, unknown>)
+    const lists = (): Array<Record<string, unknown>> =>
+      plane.sent
+        .filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`)
+        .map((request) => JSON.parse(request.body ?? '{}') as Record<string, unknown>)
     const before = lists().length
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 51–53.'), { timeout: 15_000 })
     expect(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }).getAttribute('aria-disabled')).toBe('true')
     await user.click(previous)
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
-    expect(lists().slice(before).map((body) => [body['after'], body['offset']])).toEqual([[expect.stringMatching(/^c1:/), undefined], [null, undefined]])
+    expect(
+      lists()
+        .slice(before)
+        .map((body) => [body['after'], body['offset']]),
+    ).toEqual([
+      [expect.stringMatching(/^c1:/), undefined],
+      [null, undefined],
+    ])
   })
 
   // The row the next page comes after, deleted by another application
@@ -287,7 +334,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
 
   // A list the server refuses is said in its words, never AG Grid's, and
   // Ask again asks for the same page once the database answers.
-  test('says a refused list in the server\'s words, and asks again', async () => {
+  test("says a refused list in the server's words, and asks again", async () => {
     // The first list request finds its database unreachable, as the real
     // server answers it: the form itself opened, its records did not.
     let refused = false
@@ -324,7 +371,9 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await user.type(within(search).getByRole('textbox', { name: 'Search' }), stamp)
     await user.click(within(search).getByRole('button', { name: 'Search' }))
     await waitFor(() => expect(rowsOf(records()).map((cells) => cells[0])).toEqual([record.slice(3)]), { timeout: 15_000 })
-    within(row(records(), record.slice(3))).getAllByRole('gridcell')[0]?.focus()
+    within(row(records(), record.slice(3)))
+      .getAllByRole('gridcell')[0]
+      ?.focus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${record}`), { timeout: 15_000 })
     // The address names the view, not the record (read from the browser's location).

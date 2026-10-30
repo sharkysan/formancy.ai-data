@@ -118,19 +118,39 @@ async function startPlane() {
     // FORMANCY_IMAGES left set in a shell must not move them to another.
     fixture = await startPostgresFixture(POSTGRES_IMAGE)
   } catch (error) {
-    throw new Error(`the host pictures need Docker, for their PostgreSQL, and testcontainers could not start one: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`)
+    throw new Error(
+      `the host pictures need Docker, for their PostgreSQL, and testcontainers could not start one: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`,
+      { cause: error },
+    )
   }
   const url = new URL(fixture.writer)
   const registry = createConnectionRegistry(
-    [{ id: FORM.connection, kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: WRITER.user, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } }],
+    [
+      {
+        id: FORM.connection,
+        kind: 'postgres',
+        host: url.hostname,
+        port: Number(url.port),
+        database: url.pathname.slice(1),
+        user: WRITER.user,
+        password: 'env:PG_PASSWORD',
+        schemas: ['sales'],
+        tls: { enabled: false },
+      },
+    ],
     DRIVER_FACTORIES,
     { env: { PG_PASSWORD: WRITER.postgresPassword }, readFile: async () => '' },
   )
   const root = mkdtempSync(join(tmpdir(), 'formancy-data-host-pictures-'))
   const store = createFileConfigurationStore(root)
-  const verifyIdentity = async (token) => (IDENTITIES[token] === undefined ? { ok: false, reason: 'ERR_JWS_INVALID' } : { ok: true, identity: IDENTITIES[token] })
+  const verifyIdentity = async (token) =>
+    IDENTITIES[token] === undefined ? { ok: false, reason: 'ERR_JWS_INVALID' } : { ok: true, identity: IDENTITIES[token] }
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const server = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const server = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   const owner = postgres(fixture.admin, { onnotice: () => {} })
   const close = async () => {
     await server.close()
@@ -142,7 +162,12 @@ async function startPlane() {
   try {
     const ada = { authorization: `Bearer ${TOKENS.ada}` }
     const { connection, root: table, formId, title, lookups, pinned, versionColumn } = FORM
-    const proposal = await server.inject({ method: 'POST', url: '/v1/form-proposals', headers: ada, payload: { connection, root: table, formId, title, lookups, pinned, versionColumn } })
+    const proposal = await server.inject({
+      method: 'POST',
+      url: '/v1/form-proposals',
+      headers: ada,
+      payload: { connection, root: table, formId, title, lookups, pinned, versionColumn },
+    })
     if (proposal.statusCode !== 200) throw new Error(`the proposal for ${formId} answered ${String(proposal.statusCode)}`)
     const { form, bindings, snapshot, generation } = proposal.json()
     const policy = { version: 1, ...journey.policy, fields: fieldsFromOperations(journey.policy, bindings) }
@@ -179,7 +204,10 @@ function actsOver(plane) {
     if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
     await page.getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
     await carryOn(page, page.getByRole('button', { name: HOST.load, exact: true }))
-    await detail(page, `Order ${RECORD}`).getByRole('status').filter({ hasText: `Loaded record ${RECORD} into both forms.` }).waitFor()
+    await detail(page, `Order ${RECORD}`)
+      .getByRole('status')
+      .filter({ hasText: `Loaded record ${RECORD} into both forms.` })
+      .waitFor()
     // Each pane names the loaded customer after asking the runtime plane, so after the detail's status.
     const named = new RegExp(`combobox "${journey.order.customer.label}\\*?": ${journey.order.customer.choose}`)
     for (const name of ['React', 'Angular']) await untilSnapshot(pane(page, name), named, { within: WITHIN, what: `the ${name} pane's customer` })
@@ -216,7 +244,9 @@ function actsOver(plane) {
       const number = (tenant, name) => matching.find((row) => row.tenant_id === tenant && row.name === name)?.customer_no
       const hers = number(1, journey.order.customer.choose)
       if (hers === undefined || number(OTHER_TENANT.tenant, OTHER_TENANT.name) !== hers) {
-        throw new Error(`"${SEARCH}" matches ${JSON.stringify(matching)}, not tenant 1's ${journey.order.customer.choose} and tenant 2's ${OTHER_TENANT.name} under one customer number`)
+        throw new Error(
+          `"${SEARCH}" matches ${JSON.stringify(matching)}, not tenant 1's ${journey.order.customer.choose} and tenant 2's ${OTHER_TENANT.name} under one customer number`,
+        )
       }
       await customer(page, 'React').pressSequentially(SEARCH)
       if (!(await answered)) throw new Error(`no lookup query for "${SEARCH}" was answered by the runtime plane within ${String(WITHIN)} ms`)
@@ -239,7 +269,11 @@ function actsOver(plane) {
       const wanted = { Id: ID, Amount: '99999999999999.9999', Customer: journey.order.customer.choose }
       const wrong = []
       for (const name of ['React', 'Angular']) {
-        const held = { Id: await box(page, name, 'Id').inputValue(), Amount: await box(page, name, 'Amount').inputValue(), Customer: await customer(page, name).inputValue() }
+        const held = {
+          Id: await box(page, name, 'Id').inputValue(),
+          Amount: await box(page, name, 'Amount').inputValue(),
+          Customer: await customer(page, name).inputValue(),
+        }
         if (JSON.stringify(held) !== JSON.stringify(wanted)) wrong.push(`the ${name} pane holds ${JSON.stringify(held)}`)
       }
       if (wrong.length > 0) throw new Error(`${wrong.join('; ')}, not ${JSON.stringify(wanted)}`)
@@ -259,7 +293,8 @@ function actsOver(plane) {
       await save(page, 'Angular')
       await pane(page, 'Angular').getByRole('region', { name: 'Angular Not saved', exact: true }).waitFor()
       const stored = await row()
-      if (stored.status !== journey.order.update.value || stored.notes !== null) throw new Error(`the order is ${JSON.stringify(stored)}: the stale save overwrote the saved one`)
+      if (stored.status !== journey.order.update.value || stored.notes !== null)
+        throw new Error(`the order is ${JSON.stringify(stored)}: the stale save overwrote the saved one`)
       return { parts: both(page) }
     },
 
@@ -273,7 +308,9 @@ function actsOver(plane) {
       // bare token instead of the name (measured: with every lookup answer a
       // second late, 2026-10-10), so the customer is deleted only once the
       // page has heard its name, as it would be by somebody else a moment later.
-      const named = page.waitForResponse((response) => response.request().method() === 'POST' && /\/lookups\/[^/]+\/resolve$/.test(new URL(response.url()).pathname))
+      const named = page.waitForResponse(
+        (response) => response.request().method() === 'POST' && /\/lookups\/[^/]+\/resolve$/.test(new URL(response.url()).pathname),
+      )
       await paper(page, 'React').getByRole('option', { name: DELETED.name, exact: true }).click()
       if ((await named).status() !== 200) throw new Error('the page could not have the chosen customer named')
       for (const entry of journey.order.create) await fillField(paper(page, 'React'), box(page, 'React', entry.label), entry.value, { within: WITHIN })
@@ -285,7 +322,10 @@ function actsOver(plane) {
       // the camera refused the picture because the pane shrank by 24px while
       // it was taken -- about one status line; the search wait in session.mjs
       // is the likelier fix, and the cause was not established.)
-      await untilSnapshot(pane(page, 'React'), /status: Not saved\.[\s\S]*paragraph: This is not one of the options this form offers\./, { within: WITHIN, what: 'the refusal on the Customer field' })
+      await untilSnapshot(pane(page, 'React'), /status: Not saved\.[\s\S]*paragraph: This is not one of the options this form offers\./, {
+        within: WITHIN,
+        what: 'the refusal on the Customer field',
+      })
       const [{ n }] = await owner`select count(*)::int as n from sales."order" where customer_no = ${DELETED.no}`
       if (n !== 0) throw new Error(`${String(n)} orders were stored for the deleted customer`)
       return { parts: { React: pane(page, 'React') } }
@@ -302,7 +342,12 @@ function actsOver(plane) {
         sent += 1
         const request = route.request()
         const path = new URL(request.url())
-        const reply = await plane.server.inject({ method: request.method(), url: `${path.pathname}${path.search}`, headers: await request.allHeaders(), payload: request.postDataBuffer() })
+        const reply = await plane.server.inject({
+          method: request.method(),
+          url: `${path.pathname}${path.search}`,
+          headers: await request.allHeaders(),
+          payload: request.postDataBuffer(),
+        })
         answers.push(reply.statusCode)
         await route.abort('connectionreset')
       })
@@ -312,7 +357,8 @@ function actsOver(plane) {
       // Counted when the page says so: a resend by the browser would come before the page heard of the reset.
       if (sent !== 1 || answers[0] !== 200) throw new Error(`the update was sent ${String(sent)} times and answered ${answers.join(', ')}, not once with 200`)
       const stored = await row()
-      if (stored.notes !== NOTES) throw new Error(`the order's notes are ${JSON.stringify(stored.notes)}: the server did not store the save whose answer was lost`)
+      if (stored.notes !== NOTES)
+        throw new Error(`the order's notes are ${JSON.stringify(stored.notes)}: the server did not store the save whose answer was lost`)
       // React alone: Angular's pane, which saved nothing, is host-stale's picture again.
       return { parts: { React: pane(page, 'React') } }
     },
@@ -346,24 +392,40 @@ function actsOver(plane) {
       const formId = `${FORM.formId}${journey.deleting.formSuffix}`
       const ada = { authorization: `Bearer ${TOKENS.ada}` }
       const { connection, root: table, title, lookups, pinned, versionColumn } = FORM
-      const proposal = await plane.server.inject({ method: 'POST', url: '/v1/form-proposals', headers: ada, payload: { connection, root: table, formId, title, lookups, pinned, versionColumn } })
+      const proposal = await plane.server.inject({
+        method: 'POST',
+        url: '/v1/form-proposals',
+        headers: ada,
+        payload: { connection, root: table, formId, title, lookups, pinned, versionColumn },
+      })
       if (proposal.statusCode !== 200) throw new Error(`the proposal for ${formId} answered ${String(proposal.statusCode)}`)
       const { form, bindings, snapshot, generation } = proposal.json()
       const operations = { ...journey.policy.operations, delete: [...journey.policy.operations.read] }
       const policy = { version: 1, ...journey.policy, operations, fields: fieldsFromOperations(journey.policy, bindings), cascades: journey.deleting.cascades }
-      const published = await plane.server.inject({ method: 'POST', url: `/v1/forms/${formId}/versions`, headers: ada, payload: { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } } })
+      const published = await plane.server.inject({
+        method: 'POST',
+        url: `/v1/forms/${formId}/versions`,
+        headers: ada,
+        payload: {
+          expectedBase: null,
+          bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+        },
+      })
       if (published.statusCode !== 201) throw new Error(`publishing ${formId} answered ${String(published.statusCode)}: ${published.body}`)
       await carryOn(page, page.getByRole('button', { name: HOST.signOut, exact: true }))
       await signIn(page, TOKENS.clara, formId)
       // The order's own row: its Delete is a button named for it, which asks under the grid.
       const question = `Delete Order ${RECORD}?`
-      await records(page).getByRole('button', { name: `Delete Order ${RECORD}`, exact: true }).click()
+      await records(page)
+        .getByRole('button', { name: `Delete Order ${RECORD}`, exact: true })
+        .click()
       const confirmation = records(page).getByRole('region', { name: question, exact: true })
       await confirmation.waitFor()
       if (!(await confirmation.evaluate((element) => element === document.activeElement))) throw new Error('the confirmation did not take the keyboard')
       // "Keep it" first, so the keyboard is never put on the button that deletes: the next Tab is on it.
       const answers = await confirmation.getByRole('button').allTextContents()
-      if (JSON.stringify(answers.map((text) => text.trim())) !== JSON.stringify(['Keep it', 'Delete it'])) throw new Error(`the confirmation's answers are ${JSON.stringify(answers)}, not Keep it then Delete it`)
+      if (JSON.stringify(answers.map((text) => text.trim())) !== JSON.stringify(['Keep it', 'Delete it']))
+        throw new Error(`the confirmation's answers are ${JSON.stringify(answers)}, not Keep it then Delete it`)
       return { parts: { Records: records(page) }, keepFocus: true }
     },
 
@@ -375,18 +437,28 @@ function actsOver(plane) {
       // Stacked, as clara arrived, whatever layout the address kept through Sign out.
       await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
       await load(page)
-      const width = async () => Number((await owner`select character_maximum_length as width from information_schema.columns where table_schema = 'sales' and table_name = 'order' and column_name = 'status'`)[0]?.width)
+      const width = async () =>
+        Number(
+          (
+            await owner`select character_maximum_length as width from information_schema.columns where table_schema = 'sales' and table_name = 'order' and column_name = 'status'`
+          )[0]?.width,
+        )
       const wide = await width()
       // After the form was opened and the record read: what somebody changing the table would do.
       await owner.unsafe(NARROWED)
       const narrow = await width()
-      if (wide !== WIDTHS.before || narrow !== WIDTHS.after) throw new Error(`status was varchar(${String(wide)}) and is varchar(${String(narrow)}), not varchar(${String(WIDTHS.before)}) and varchar(${String(WIDTHS.after)}) as the caption says`)
+      if (wide !== WIDTHS.before || narrow !== WIDTHS.after)
+        throw new Error(
+          `status was varchar(${String(wide)}) and is varchar(${String(narrow)}), not varchar(${String(WIDTHS.before)}) and varchar(${String(WIDTHS.after)}) as the caption says`,
+        )
       // The caption's premise, asked of drift review as ada: reads go on, create and update stop, and the runtime refuses the same.
       const review = await plane.server.inject({ method: 'POST', url: `/v1/forms/${FORM.formId}/drift`, headers: { authorization: `Bearer ${TOKENS.ada}` } })
       const report = review.json()
       const writesStop = (verdict) => verdict?.readable === true && verdict.writable?.create === false && verdict.writable?.update === false
       if (review.statusCode !== 200 || !writesStop(report) || !writesStop(report.runtime)) {
-        throw new Error(`drift review answered ${String(review.statusCode)} with ${JSON.stringify({ readable: report.readable, writable: report.writable, runtime: report.runtime })}, not reads allowed and writes stopped`)
+        throw new Error(
+          `drift review answered ${String(review.statusCode)} with ${JSON.stringify({ readable: report.readable, writable: report.writable, runtime: report.runtime })}, not reads allowed and writes stopped`,
+        )
       }
       const before = await row()
       let sent = 0
@@ -403,9 +475,11 @@ function actsOver(plane) {
       await pane(page, 'React').getByRole('region', { name: 'React Not saved', exact: true }).waitFor()
       await page.unroute(update)
       // Counted when the page says so; refused by the server, not by the page.
-      if (sent !== 1 || answer.status() !== 409 || code !== 'drift') throw new Error(`the update was sent ${String(sent)} times and answered ${String(answer.status())} ${String(code)}, not once with 409 drift`)
+      if (sent !== 1 || answer.status() !== 409 || code !== 'drift')
+        throw new Error(`the update was sent ${String(sent)} times and answered ${String(answer.status())} ${String(code)}, not once with 409 drift`)
       const after = await row()
-      if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`the order was ${JSON.stringify(before)} and is ${JSON.stringify(after)}: the refused save wrote it`)
+      if (JSON.stringify(after) !== JSON.stringify(before))
+        throw new Error(`the order was ${JSON.stringify(before)} and is ${JSON.stringify(after)}: the refused save wrote it`)
       return { parts: { React: pane(page, 'React') } }
     },
   }
@@ -415,8 +489,15 @@ function actsOver(plane) {
 async function signIn(page, token, formId = FORM.formId) {
   await page.getByLabel(HOST.token, { exact: true }).fill(token)
   await page.getByRole('button', { name: HOST.signIn, exact: true }).click()
-  await page.getByRole('navigation', { name: HOST.forms, exact: true }).getByRole('link', { name: `${FORM.title} ${formId}`, exact: true }).click()
-  await page.getByRole('region', { name: 'Records', exact: true }).getByRole('status').filter({ hasText: /^(Rows|No records)/ }).waitFor()
+  await page
+    .getByRole('navigation', { name: HOST.forms, exact: true })
+    .getByRole('link', { name: `${FORM.title} ${formId}`, exact: true })
+    .click()
+  await page
+    .getByRole('region', { name: 'Records', exact: true })
+    .getByRole('status')
+    .filter({ hasText: /^(Rows|No records)/ })
+    .waitFor()
 }
 
 /**
@@ -430,7 +511,10 @@ async function arrive(page) {
   await page.getByRole('region', { name: 'Records', exact: true }).getByRole('button', { name: HOST.newRecord, exact: true }).click()
   await page.getByRole('radio', { name: 'Both', exact: true }).check()
   for (const name of ['React', 'Angular']) {
-    await page.getByRole('region', { name, exact: true }).getByRole('combobox', { name: field(journey.order.customer.label) }).waitFor()
+    await page
+      .getByRole('region', { name, exact: true })
+      .getByRole('combobox', { name: field(journey.order.customer.label) })
+      .waitFor()
   }
 }
 

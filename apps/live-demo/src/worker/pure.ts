@@ -9,7 +9,22 @@
  * it, and the image's gate how much data each tenant has. A barrel: it
  * re-exports and does nothing.
  */
-export { FORWARDED_HEADERS, forwardedRequest, forwardFailed, jsonAnswer, methodNotAllowed, NOT_RUNNING, notFound, notRunning, PAGE_SAFE_HEADERS, pageSafe, START_FAILED, startFailed, streamingOption, WORKER_HEADERS } from './answers.js'
+export {
+  FORWARDED_HEADERS,
+  forwardedRequest,
+  forwardFailed,
+  jsonAnswer,
+  methodNotAllowed,
+  NOT_RUNNING,
+  notFound,
+  notRunning,
+  PAGE_SAFE_HEADERS,
+  pageSafe,
+  START_FAILED,
+  startFailed,
+  streamingOption,
+  WORKER_HEADERS,
+} from './answers.js'
 export { COOKIE_NAME, instanceCookie, instanceNameOf, newInstanceName } from './cookie.js'
 export { handle } from './handle.js'
 export type { DemoInstance, InstanceNamed } from './handle.js'

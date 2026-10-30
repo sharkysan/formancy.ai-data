@@ -130,7 +130,10 @@ export function fontPackages(app) {
     for (const face of fontFaces(readFileSync(resolve(`${name}/${stylesheet}`), 'utf8'))) entry.families.add(face.family)
   }
   return [...found.values()].map(({ families, ...entry }) => {
-    if (families.size !== 1) throw new Error(`${entry.stylesheets.join(', ')} declare ${families.size === 0 ? 'no family' : `${String(families.size)} families, ${[...families].join(', ')}`}, where one package is one face`)
+    if (families.size !== 1)
+      throw new Error(
+        `${entry.stylesheets.join(', ')} declare ${families.size === 0 ? 'no family' : `${String(families.size)} families, ${[...families].join(', ')}`}, where one package is one face`,
+      )
     return { ...entry, family: [...families][0] }
   })
 }

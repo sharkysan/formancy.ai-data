@@ -60,7 +60,9 @@ describe('the session', () => {
     // Sign out shows the people again; they are not asked for again, since
     // the Worker answers constants.
     expect(await session.personas()).toEqual({ ok: true, value: sessionIndex() })
-    expect(worker.sent.map((sent) => [sent.method, sent.path, sent.headers['authorization'], sent.body])).toEqual([['GET', `${PREFIX}/session`, undefined, undefined]])
+    expect(worker.sent.map((sent) => [sent.method, sent.path, sent.headers['authorization'], sent.body])).toEqual([
+      ['GET', `${PREFIX}/session`, undefined, undefined],
+    ])
   })
 
   // A sign-in is the one request that starts a visitor's server, so the
@@ -77,9 +79,15 @@ describe('the session', () => {
     const spied = recording(worker.fetch)
     const signedIn = await demoSession(spied.fetch, PREFIX).signIn('clara')
     expect(signedIn).toEqual({ ok: true, value: { token: worker.tokens[0], expiresAt: expect.any(Number) as number } })
-    expect(worker.sent.map((sent) => ({ method: sent.method, path: sent.path, type: sent.headers['content-type'], authorization: sent.headers['authorization'], body: sent.body }))).toEqual([
-      { method: 'POST', path: `${PREFIX}/session`, type: 'application/json', authorization: undefined, body: JSON.stringify({ persona: 'clara' }) },
-    ])
+    expect(
+      worker.sent.map((sent) => ({
+        method: sent.method,
+        path: sent.path,
+        type: sent.headers['content-type'],
+        authorization: sent.headers['authorization'],
+        body: sent.body,
+      })),
+    ).toEqual([{ method: 'POST', path: `${PREFIX}/session`, type: 'application/json', authorization: undefined, body: JSON.stringify({ persona: 'clara' }) }])
     expect(spied.inits.map((init) => [init?.mode, init?.credentials])).toEqual([[undefined, undefined]])
   })
 
@@ -89,7 +97,13 @@ describe('the session', () => {
   test("a refusal is the Worker's code and sentence, verbatim", async () => {
     const worker = door()
     const session = demoSession(worker.fetch, PREFIX)
-    const unknown = await readSignIn(new Request(`${DEMO_ORIGIN}${PREFIX}/session`, { method: 'POST', headers: { origin: DEMO_ORIGIN, 'content-type': 'application/json' }, body: JSON.stringify({ persona: 'nobody' }) }))
+    const unknown = await readSignIn(
+      new Request(`${DEMO_ORIGIN}${PREFIX}/session`, {
+        method: 'POST',
+        headers: { origin: DEMO_ORIGIN, 'content-type': 'application/json' },
+        body: JSON.stringify({ persona: 'nobody' }),
+      }),
+    )
     if (unknown.ok) throw new Error('the Worker took a persona it does not have')
     expect(await session.signIn('nobody')).toEqual({ ok: false, status: 400, ...((await unknown.answer.json()) as object) })
     worker.failNextStart()
@@ -105,7 +119,10 @@ describe('the session', () => {
     }, PREFIX)
     expect(await thrown.personas()).toEqual({ ok: false, status: 0, code: 'unreachable', message: 'The demo could not be reached.' })
     expect(await thrown.signIn('clara')).toEqual({ ok: false, status: 0, code: 'unreachable', message: 'The demo could not be reached.' })
-    const answering = (status: number, body: string): typeof fetch => async () => new Response(body, { status, headers: { 'content-type': 'text/html' } })
+    const answering =
+      (status: number, body: string): typeof fetch =>
+      async () =>
+        new Response(body, { status, headers: { 'content-type': 'text/html' } })
     const unexpected = { ok: false, code: 'unexpected', message: 'The demo did not answer in a way this page understands.' }
     expect(await demoSession(answering(404, '<!doctype html><p>Not found'), PREFIX).personas()).toEqual({ ...unexpected, status: 404 })
     expect(await demoSession(answering(200, '{"personas":[{"id":"clara"}],"idleMinutes":10}'), PREFIX).personas()).toEqual({ ...unexpected, status: 200 })

@@ -13,7 +13,17 @@ import type { RegionLevel } from './words.js'
  * confirmation, then what the server answered (delete-outcome.tsx). Nothing
  * when there is no deletion.
  */
-export function DeleteRegion({ flow, deleting, level, idBase }: { flow: DeleteFlow; deleting: Deleting; level: RegionLevel; idBase: string }): ReactElement | null {
+export function DeleteRegion({
+  flow,
+  deleting,
+  level,
+  idBase,
+}: {
+  flow: DeleteFlow
+  deleting: Deleting
+  level: RegionLevel
+  idBase: string
+}): ReactElement | null {
   const now = flow.deletion
   if (now.state === 'idle') return null
   if (now.state !== 'confirming' && now.state !== 'sending') return <DeleteOutcome flow={flow} level={level} idBase={idBase} />

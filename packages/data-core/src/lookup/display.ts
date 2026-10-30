@@ -20,7 +20,11 @@ import type { LookupDisplayType } from './types.js'
  */
 
 /** No canonical text: nothing a token, a label or a portable order can rely on. */
-export const NO_TEXT_KINDS: ReadonlySet<NormalizedTypeKind> = new Set<Exclude<NormalizedTypeKind, LookupDisplayType['kind']>>(['binary', 'rowversion', 'unsupported'])
+export const NO_TEXT_KINDS: ReadonlySet<NormalizedTypeKind> = new Set<Exclude<NormalizedTypeKind, LookupDisplayType['kind']>>([
+  'binary',
+  'rowversion',
+  'unsupported',
+])
 
 /**
  * Whether a label can show a column of `type`: every kind with a canonical

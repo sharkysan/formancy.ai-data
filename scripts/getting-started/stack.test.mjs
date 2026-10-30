@@ -6,7 +6,19 @@ import { afterAll, describe, expect, test } from 'vitest'
 import { styleReferences } from '../addresses.mjs'
 import { pagePolicy } from '../web-policies.mjs'
 import { classify, MISSING } from './journey.mjs'
-import { anonymousMountProblems, auditEvents, bindMountProblems, configProblems, exposureProblems, leaks, namedSecretFiles, noticesProblem, pageProblems, pageReferences, redact } from './stack.mjs'
+import {
+  anonymousMountProblems,
+  auditEvents,
+  bindMountProblems,
+  configProblems,
+  exposureProblems,
+  leaks,
+  namedSecretFiles,
+  noticesProblem,
+  pageProblems,
+  pageReferences,
+  redact,
+} from './stack.mjs'
 
 /**
  * The gate's checks that need no Docker, held to cases (0032). Each is also
@@ -26,8 +38,16 @@ describe('the compose configuration check', () => {
       configProblems(
         config({
           web: { ports: [loopback(8080, 4394)] },
-          postgres: { ports: [loopback(5432, 5440)], environment: { POSTGRES_USER: 'formancy', POSTGRES_PASSWORD_FILE: '/run/formancy-secrets/postgres-owner-password' } },
-          server: { environment: { FORMANCY_DATA_IDENTITY_SECRET: 'file:/run/formancy-secrets/host-token-secret', FORMANCY_DATA_AUDIT_KEY: 'file:/run/formancy-secrets/audit-key' } },
+          postgres: {
+            ports: [loopback(5432, 5440)],
+            environment: { POSTGRES_USER: 'formancy', POSTGRES_PASSWORD_FILE: '/run/formancy-secrets/postgres-owner-password' },
+          },
+          server: {
+            environment: {
+              FORMANCY_DATA_IDENTITY_SECRET: 'file:/run/formancy-secrets/host-token-secret',
+              FORMANCY_DATA_AUDIT_KEY: 'file:/run/formancy-secrets/audit-key',
+            },
+          },
           secrets: { restart: 'no' },
         }),
       ),
@@ -45,7 +65,9 @@ describe('the compose configuration check', () => {
     ['a relative file: reference', { FORMANCY_DATA_IDENTITY_SECRET: 'file:secrets/host-token-secret' }],
   ])('refuses %s', (_, environment) => {
     const problems = configProblems(config({ server: { environment } }))
-    expect(problems).toEqual([`server's ${Object.keys(environment)[0]} holds a value of its own; a secret here is a file: reference or a _FILE setting, naming an absolute path`])
+    expect(problems).toEqual([
+      `server's ${Object.keys(environment)[0]} holds a value of its own; a secret here is a file: reference or a _FILE setting, naming an absolute path`,
+    ])
     expect(problems.join('')).not.toContain('Fd1-literal')
   })
 
@@ -62,8 +84,13 @@ describe('the compose configuration check', () => {
   // A port on every interface puts an unauthenticated database login on the
   // machine's network; a published server is a second origin beside nginx.
   test('refuses a port off loopback, and any port on the server', () => {
-    const problems = configProblems(config({ sqlserver: { ports: [{ ...loopback(1433, 1434), host_ip: '0.0.0.0' }] }, server: { ports: [loopback(4390, 4390)] } }))
-    expect(problems).toEqual(['sqlserver publishes port 1433 on 0.0.0.0, not on 127.0.0.1', "server publishes port 4390; the browser's way in is web, on one origin"])
+    const problems = configProblems(
+      config({ sqlserver: { ports: [{ ...loopback(1433, 1434), host_ip: '0.0.0.0' }] }, server: { ports: [loopback(4390, 4390)] } }),
+    )
+    expect(problems).toEqual([
+      'sqlserver publishes port 1433 on 0.0.0.0, not on 127.0.0.1',
+      "server publishes port 4390; the browser's way in is web, on one origin",
+    ])
   })
 
   // An interpolated secret is printed by `docker compose config` and `docker
@@ -136,8 +163,16 @@ describe.skipIf(process.platform === 'win32')('the bind mounts', () => {
   writeFileSync(join(checkout, 'seed', 'sqlserver.sh'), 'echo\n', { mode: 0o644 })
   writeFileSync(join(checkout, 'connections.json'), '[]\n', { mode: 0o644 })
   const services = (user) => ({
-    'seed-sqlserver': { ...(user === undefined ? {} : { user }), volumes: [{ type: 'bind', source: join(checkout, 'seed'), target: '/seed', read_only: true }] },
-    server: { volumes: [{ type: 'bind', source: join(checkout, 'connections.json'), target: '/etc/formancy-data/connections.json' }, { type: 'volume', source: 'store', target: '/var/lib/formancy-data' }] },
+    'seed-sqlserver': {
+      ...(user === undefined ? {} : { user }),
+      volumes: [{ type: 'bind', source: join(checkout, 'seed'), target: '/seed', read_only: true }],
+    },
+    server: {
+      volumes: [
+        { type: 'bind', source: join(checkout, 'connections.json'), target: '/etc/formancy-data/connections.json' },
+        { type: 'volume', source: 'store', target: '/var/lib/formancy-data' },
+      ],
+    },
   })
 
   // A checkout made under umask 027 or 077 gives files other users cannot
@@ -145,7 +180,7 @@ describe.skipIf(process.platform === 'win32')('the bind mounts', () => {
   // -- is such another user. The stack then fails in a seed or at the
   // server's start, with "Permission denied" in a log; this says which file,
   // which service, and what the guide asks for, before anything starts.
-  test("refuse a file a service that is not root reads, and other users cannot", () => {
+  test('refuse a file a service that is not root reads, and other users cannot', () => {
     chmodSync(join(checkout, 'seed', 'sqlserver.sh'), 0o640)
     chmodSync(join(checkout, 'connections.json'), 0o600)
     try {
@@ -168,8 +203,16 @@ describe('the volumes a container mounts', () => {
   const container = (service, mounts) => ({ Config: { Labels: { 'com.docker.compose.service': service } }, Mounts: mounts })
   const volume = (Destination) => ({ Type: 'volume', Name: `named-or-not-${Destination}`, Destination })
   const services = {
-    secrets: { volumes: [{ type: 'bind', source: '/checkout/deploy/secrets.sh', target: '/deploy/secrets.sh' }, { type: 'volume', source: 'formancy-data-secrets', target: '/secrets' }] },
-    'seed-postgres': { volumes: [{ type: 'volume', source: 'formancy-data-secrets-postgres', target: '/run/formancy-secrets' }], tmpfs: ['/var/lib/postgresql/data'] },
+    secrets: {
+      volumes: [
+        { type: 'bind', source: '/checkout/deploy/secrets.sh', target: '/deploy/secrets.sh' },
+        { type: 'volume', source: 'formancy-data-secrets', target: '/secrets' },
+      ],
+    },
+    'seed-postgres': {
+      volumes: [{ type: 'volume', source: 'formancy-data-secrets-postgres', target: '/run/formancy-secrets' }],
+      tmpfs: ['/var/lib/postgresql/data'],
+    },
   }
 
   // The postgres image declares its data directory a VOLUME, and `secrets`
@@ -194,7 +237,9 @@ describe('the volumes a container mounts', () => {
   // tmpfs over the image's VOLUME, which is how compose.yaml keeps Docker from
   // making one, is no volume in `docker inspect` at all.
   test('passes every one the service names', () => {
-    expect(anonymousMountProblems([container('secrets', [volume('/secrets')]), container('seed-postgres', [volume('/run/formancy-secrets')])], { services })).toEqual([])
+    expect(
+      anonymousMountProblems([container('secrets', [volume('/secrets')]), container('seed-postgres', [volume('/run/formancy-secrets')])], { services }),
+    ).toEqual([])
   })
 })
 
@@ -230,7 +275,7 @@ describe('the leak check', () => {
   // other place, the access log above all, is a leak.
   test('allows a token only in the output of the command that minted it', () => {
     const haystacks = [
-      { where: 'the output of the guide\'s step on line 82', text: 'eyJx.eyJy.sig\n', mints: 'clerk1' },
+      { where: "the output of the guide's step on line 82", text: 'eyJx.eyJy.sig\n', mints: 'clerk1' },
       { where: 'the logs of web', text: 'GET /v1/whoami?t=eyJx.eyJy.sig 200' },
     ]
     expect(leaks({ secrets, tokens, haystacks })).toEqual(['the clerk1 token is in the logs of web'])
@@ -246,7 +291,8 @@ describe('the page check', () => {
   // Vite writes the stylesheet's link over several lines and with its
   // attributes in any order; a reader that missed it would check no asset.
   test('reads every script src and link href, across lines', () => {
-    const html = '<script type="module" crossorigin src="/studio/assets/index-B7.js"></script>\n<link\n  href="https://cdn.example/x.css"\n  rel="stylesheet"\n/>\n<link rel=stylesheet href=/studio/assets/index-D.css>'
+    const html =
+      '<script type="module" crossorigin src="/studio/assets/index-B7.js"></script>\n<link\n  href="https://cdn.example/x.css"\n  rel="stylesheet"\n/>\n<link rel=stylesheet href=/studio/assets/index-D.css>'
     expect(pageReferences(html)).toEqual([
       { tag: 'script', url: '/studio/assets/index-B7.js' },
       { tag: 'link', url: 'https://cdn.example/x.css' },
@@ -273,8 +319,14 @@ describe('the page check', () => {
   test('fails a page or a stylesheet that names another host, Google’s fonts included, and passes its own files', async () => {
     const answers = {
       '/studio/': ['text/html', '<link rel="stylesheet" href="/studio/assets/index-D.css"><script type="module" src="/studio/assets/index-B7.js"></script>'],
-      '/host/': ['text/html', '<link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet"><script type="module" src="/host/assets/index-B7.js"></script>'],
-      '/studio/assets/index-D.css': ['text/css', '@font-face{font-family:A;src:url(./a-latin-400-normal-CcBhy9p4.woff2) format("woff2"),url(https://fonts.gstatic.com/s/a/v1/x.woff2) format("woff2")}'],
+      '/host/': [
+        'text/html',
+        '<link href="https://fonts.googleapis.com/css2?family=Archivo" rel="stylesheet"><script type="module" src="/host/assets/index-B7.js"></script>',
+      ],
+      '/studio/assets/index-D.css': [
+        'text/css',
+        '@font-face{font-family:A;src:url(./a-latin-400-normal-CcBhy9p4.woff2) format("woff2"),url(https://fonts.gstatic.com/s/a/v1/x.woff2) format("woff2")}',
+      ],
       '/studio/assets/a-latin-400-normal-CcBhy9p4.woff2': ['font/woff2', 'wOF2'],
       '/studio/assets/index-B7.js': ['text/javascript', 'export {}'],
       '/host/assets/index-B7.js': ['text/javascript', 'export {}'],
@@ -344,10 +396,16 @@ describe('the page check', () => {
   test('wants each page’s notices as UTF-8 text', () => {
     expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=utf-8')).toBeUndefined()
     expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=UTF-8')).toBeUndefined()
-    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 200, 'text/plain')).toBe('/host/THIRD-PARTY-NOTICES.txt answered 200 text/plain, not 200 text/plain; charset=utf-8')
-    expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 404, 'text/html')).toBe('/studio/THIRD-PARTY-NOTICES.txt answered 404 text/html, not 200 text/plain; charset=utf-8')
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 200, 'text/plain')).toBe(
+      '/host/THIRD-PARTY-NOTICES.txt answered 200 text/plain, not 200 text/plain; charset=utf-8',
+    )
+    expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 404, 'text/html')).toBe(
+      '/studio/THIRD-PARTY-NOTICES.txt answered 404 text/html, not 200 text/plain; charset=utf-8',
+    )
     expect(noticesProblem('/studio/THIRD-PARTY-NOTICES.txt', 200, 'text/plain; charset=iso-8859-1')).toBeDefined()
-    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 404, 'text/plain; charset=utf-8')).toBe('/host/THIRD-PARTY-NOTICES.txt answered 404 text/plain; charset=utf-8, not 200 text/plain; charset=utf-8')
+    expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 404, 'text/plain; charset=utf-8')).toBe(
+      '/host/THIRD-PARTY-NOTICES.txt answered 404 text/plain; charset=utf-8, not 200 text/plain; charset=utf-8',
+    )
     expect(noticesProblem('/host/THIRD-PARTY-NOTICES.txt', 301, 'text/plain; charset=utf-8')).toBeDefined()
   })
 })

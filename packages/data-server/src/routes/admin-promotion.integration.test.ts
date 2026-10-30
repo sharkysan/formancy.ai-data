@@ -66,11 +66,16 @@ type Account = 'owner' | 'writer'
 const DDL: Record<Engine, { drop: string[]; restore: string[] }> = {
   pg: {
     drop: ['alter table sales."order" drop column approved_by'],
-    restore: ['alter table sales."order" add column approved_by integer, add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)'],
+    restore: [
+      'alter table sales."order" add column approved_by integer, add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)',
+    ],
   },
   ms: {
     drop: ['alter table sales.[order] drop constraint fk_order_approved_by', 'alter table sales.[order] drop column approved_by'],
-    restore: ['alter table sales.[order] add approved_by int null', 'alter table sales.[order] add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)'],
+    restore: [
+      'alter table sales.[order] add approved_by int null',
+      'alter table sales.[order] add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)',
+    ],
   },
 }
 
@@ -100,14 +105,28 @@ function erp(engine: Engine, account: Account): { config: ConnectionConfig; pass
   if (engine === 'pg') {
     const url = new URL(pg.admin)
     const config: ConnectionConfig = {
-      id: 'erp', kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: account === 'owner' ? decodeURIComponent(url.username) : WRITER.user, password: 'env:ERP_PASSWORD', schemas: ['sales'],
+      id: 'erp',
+      kind: 'postgres',
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: account === 'owner' ? decodeURIComponent(url.username) : WRITER.user,
+      password: 'env:ERP_PASSWORD',
+      schemas: ['sales'],
       // The fixture's containers speak no TLS. A real allowlist leaves it on.
       tls: { enabled: false },
     }
     return { config, password: account === 'owner' ? decodeURIComponent(url.password) : WRITER.postgresPassword }
   }
   const config: ConnectionConfig = {
-    id: 'erp', kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: account === 'owner' ? String(ms.admin.user) : WRITER.user, password: 'env:ERP_PASSWORD', schemas: ['sales'],
+    id: 'erp',
+    kind: 'sqlserver',
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: account === 'owner' ? String(ms.admin.user) : WRITER.user,
+    password: 'env:ERP_PASSWORD',
+    schemas: ['sales'],
     tls: { enabled: false, trustServerCertificate: true },
   }
   return { config, password: account === 'owner' ? String(ms.admin.password) : WRITER.sqlServerPassword }
@@ -127,10 +146,20 @@ async function deployment(engine: Engine, account: Account = 'owner'): Promise<D
   roots.push(root)
   const store = createFileConfigurationStore(root)
   // The administrator's trail is admin-audit.test.ts's subject; here it is required and discarded.
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   return {
     root,
-    call: (method, url, bearer, payload) => app.inject({ method, url, headers: { authorization: `Bearer ${bearer}` }, ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }) }),
+    call: (method, url, bearer, payload) =>
+      app.inject({
+        method,
+        url,
+        headers: { authorization: `Bearer ${bearer}` },
+        ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }),
+      }),
   }
 }
 
@@ -139,14 +168,35 @@ async function owner(engine: Engine): Promise<{ run(statements: readonly string[
   if (engine === 'pg') {
     const url = new URL(pg.admin)
     const sql = connectPostgres({
-      host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      tls: { enabled: false, rejectUnauthorized: false },
     })
-    return { run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) }, close: () => sql.end({ timeout: 5 }) }
+    return {
+      run: async (statements) => {
+        for (const statement of statements) await sql.unsafe(statement)
+      },
+      close: () => sql.end({ timeout: 5 }),
+    }
   }
   const pool = await connectSqlServer({
-    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
   })
-  return { run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) }, close: () => pool.close() }
+  return {
+    run: async (statements) => {
+      for (const statement of statements) await pool.request().batch(statement)
+    },
+    close: () => pool.close(),
+  }
 }
 
 /** A clerk does everything the form offers, on their own tenant's orders and customers, as the end-to-end journey's policy says. */
@@ -154,14 +204,16 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
 }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, other: 'ms' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, other: 'ms' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, other: 'pg' as const, versionColumn: undefined },
 ])('a version of the order form moved between deployments on $engine', ({ connection, other, versionColumn }) => {
   let development: Deployment
@@ -182,13 +234,33 @@ describe.each([
   // store wrote, which is what the studio downloads.
   test('development publishes the order form, and its version is read as the export', async () => {
     const proposal = await development.call('POST', '/v1/form-proposals', admin, {
-      connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...(versionColumn === undefined ? {} : { versionColumn }),
+      connection: 'erp',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'order',
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const { form, bindings, snapshot, generation } = proposal.json() as { form: unknown; bindings: FormBindings; snapshot: MetadataSnapshot; generation: unknown }
+    const { form, bindings, snapshot, generation } = proposal.json<{
+      form: unknown
+      bindings: FormBindings
+      snapshot: MetadataSnapshot
+      generation: unknown
+    }>()
     const published = await development.call('POST', '/v1/forms/order/versions', admin, {
       expectedBase: null,
-      bundle: { format: 2, connection: 'erp', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: clerkPolicy(bindings.fields), snapshot },
+      bundle: {
+        format: 2,
+        connection: 'erp',
+        generation,
+        base: form,
+        presentation: EMPTY_PRESENTATION,
+        form,
+        bindings,
+        policy: clerkPolicy(bindings.fields),
+        snapshot,
+      },
     })
     expect(published.statusCode, published.body).toBe(201)
     const read = await development.call('GET', '/v1/forms/order/versions/1', admin)
@@ -212,7 +284,11 @@ describe.each([
     const target = await deployment(connection)
     const refused = await target.call('POST', '/v1/forms/order/imports', admin, { expectedBase: null, bundle: older })
     expect(refused.statusCode, refused.body).toBe(422)
-    expect(refused.json()).toEqual({ code: 'invalid-bundle', message: expect.any(String), problems: ['base: is not what this server generates from the stored snapshot and generation request'] })
+    expect(refused.json()).toEqual({
+      code: 'invalid-bundle',
+      message: expect.any(String),
+      problems: ['base: is not what this server generates from the stored snapshot and generation request'],
+    })
     expect((await target.call('GET', '/v1/forms/order/versions', admin)).statusCode).toBe(404)
   })
 
@@ -223,7 +299,10 @@ describe.each([
     await ddl.run(DDL[connection].drop)
     const refused = await production.call('POST', '/v1/forms/order/imports', admin, { expectedBase: null, bundle })
     expect(refused.statusCode, refused.body).toBe(409)
-    expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
+    expect(refused.json()).toMatchObject({
+      code: 'incompatible',
+      changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }],
+    })
     expect(refused.json().changes).toHaveLength(1)
     expect((await production.call('GET', '/v1/forms/order/versions', admin)).statusCode).toBe(404)
   })
@@ -244,7 +323,13 @@ describe.each([
     const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
     const options = (await production.call('POST', `/v1/forms/order/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json()
     expect(options.rows.map((row: { label: string }) => row.label)).toEqual(['Muster AG'])
-    const answers = { customer: options.rows[0].token as string, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: EDGE_VALUES.largestAmount, notes: 'imported from development' }
+    const answers = {
+      customer: options.rows[0].token as string,
+      order_date: EDGE_VALUES.orderDate,
+      status: 'placed',
+      amount: EDGE_VALUES.largestAmount,
+      notes: 'imported from development',
+    }
     const created = await production.call('POST', '/v1/forms/order/records/create', clerk, { answers })
     expect(created.statusCode, created.body).toBe(201)
     const read = await production.call('POST', '/v1/forms/order/records/read', clerk, { record: created.json().record })
@@ -277,11 +362,15 @@ describe.each([
     const writer = await deployment(connection, 'writer')
     const discovered = await writer.call('GET', '/v1/connections/erp/metadata', admin)
     expect(discovered.statusCode, discovered.body).toBe(200)
-    const drift = diffSnapshots(bundle.snapshot, discovered.json() as MetadataSnapshot, bundle.bindings, bundle.policy)
+    const drift = diffSnapshots(bundle.snapshot, discovered.json<MetadataSnapshot>(), bundle.bindings, bundle.policy)
     expect(drift.blocking).toBe(true)
     const imported = await writer.call('POST', '/v1/forms/order/imports', admin, { expectedBase: null, bundle })
     expect(imported.statusCode, imported.body).toBe(409)
-    expect(imported.json()).toEqual({ code: 'incompatible', message: expect.any(String), changes: drift.changes.filter((change) => change.severity === 'blocking') })
+    expect(imported.json()).toEqual({
+      code: 'incompatible',
+      message: expect.any(String),
+      changes: drift.changes.filter((change) => change.severity === 'blocking'),
+    })
     expect((await writer.call('GET', '/v1/forms/order/versions', admin)).statusCode).toBe(404)
   })
 })

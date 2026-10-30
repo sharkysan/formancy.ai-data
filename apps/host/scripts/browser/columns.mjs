@@ -33,19 +33,27 @@ const move = (page, label, way) => list(page).getByRole('button', { name: `Move 
 const lineOf = async (page) => (await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? ''
 
 /** The grid's headers, in the order drawn: a hidden column draws none. */
-const headers = async (page) => (await page.getByRole('grid', { name: 'Records', exact: true }).getByRole('columnheader').allTextContents()).map((text) => text.trim())
+const headers = async (page) =>
+  (await page.getByRole('grid', { name: 'Records', exact: true }).getByRole('columnheader').allTextContents()).map((text) => text.trim())
 
 /** What the panel lists, in order: each column's label, from its Show's name. */
-const listed = async (page) => Promise.all((await list(page).getByRole('checkbox').all()).map(async (box) => (await box.getAttribute('aria-label')).replace(/^Show /, '')))
+const listed = async (page) =>
+  Promise.all((await list(page).getByRole('checkbox').all()).map(async (box) => (await box.getAttribute('aria-label')).replace(/^Show /, '')))
 
 /** The name of what has the keyboard, as its aria-label or its text says; the page itself when nothing does. */
-const focused = (page) => page.evaluate(() => (document.activeElement === null || document.activeElement === document.body ? 'the page itself' : (document.activeElement.getAttribute('aria-label') ?? document.activeElement.textContent?.trim() ?? '')))
+const focused = (page) =>
+  page.evaluate(() =>
+    document.activeElement === null || document.activeElement === document.body
+      ? 'the page itself'
+      : (document.activeElement.getAttribute('aria-label') ?? document.activeElement.textContent?.trim() ?? ''),
+  )
 
 /** Null when `got` is `want`, otherwise both. */
 const same = (got, want) => (JSON.stringify(got) === JSON.stringify(want) ? null : `it is ${JSON.stringify(got)}, not ${JSON.stringify(want)}`)
 
 /** Wait until the grid's headers are `want`. */
-const headed = (page, want) => until(async () => JSON.stringify(await headers(page)) === JSON.stringify(want), `the grid's headers never became ${JSON.stringify(want)}`)
+const headed = (page, want) =>
+  until(async () => JSON.stringify(await headers(page)) === JSON.stringify(want), `the grid's headers never became ${JSON.stringify(want)}`)
 
 /** `labels` with `label` moved to `at`. */
 const placed = (labels, label, at) => {
@@ -86,94 +94,121 @@ export function columnsJourney(plane, { check }, run) {
   /** The form's columns as the grid first drew them: read in the first state. */
   let generated = []
   return [
-    ['Columns open (Records)', async (page) => {
-      generated = await headers(page)
-      check('the row’s Delete is the grid’s last header', same(generated.at(-1), 'Delete'))
-      await toggle(page).focus()
-      await page.keyboard.press('Enter')
-      check('Enter on Columns opens the panel', same(await toggle(page).getAttribute('aria-expanded'), 'true'))
-      check('and leaves the keyboard on Columns', await focusedOn(page, toggle(page)))
-      check('the panel lists the grid’s columns in its order, and no Delete', same(await listed(page), generated.slice(0, -1)))
-      await page.keyboard.press('Tab')
-      check('the next Tab reaches the first column’s Show', await focusedOn(page, show(page, generated[0])))
-    }],
-    ['A column hidden (Records)', async (page) => {
-      const sent = await listsSentWhile(page, async () => {
+    [
+      'Columns open (Records)',
+      async (page) => {
+        generated = await headers(page)
+        check('the row’s Delete is the grid’s last header', same(generated.at(-1), 'Delete'))
+        await toggle(page).focus()
+        await page.keyboard.press('Enter')
+        check('Enter on Columns opens the panel', same(await toggle(page).getAttribute('aria-expanded'), 'true'))
+        check('and leaves the keyboard on Columns', await focusedOn(page, toggle(page)))
+        check('the panel lists the grid’s columns in its order, and no Delete', same(await listed(page), generated.slice(0, -1)))
+        await page.keyboard.press('Tab')
+        check('the next Tab reaches the first column’s Show', await focusedOn(page, show(page, generated[0])))
+      },
+    ],
+    [
+      'A column hidden (Records)',
+      async (page) => {
+        const sent = await listsSentWhile(page, async () => {
+          await show(page, 'Group').focus()
+          await page.keyboard.press('Space')
+          await headed(
+            page,
+            generated.filter((label) => label !== 'Group'),
+          )
+        })
+        check('a column hidden: its Show is unchecked', (await show(page, 'Group').isChecked()) ? 'it is still checked' : null)
+        check('a column hidden: the keyboard stays on its Show', await focusedOn(page, show(page, 'Group')))
+        check('a column hidden: nothing is asked of the server', sent === 0 ? null : `${String(sent)} list requests were sent`)
+      },
+    ],
+    [
+      'A column shown again (Records)',
+      async (page) => {
+        // Longer than any group the column held when the page was sized: shown again, it is sized to it.
+        const wide = `shown ${String(run.customer)} southern loading bay`
+        await plane.setGroup(run.record, wide)
+        await search(page, wide, /^Rows 1–1\.$/)
         await show(page, 'Group').focus()
         await page.keyboard.press('Space')
-        await headed(page, generated.filter((label) => label !== 'Group'))
-      })
-      check('a column hidden: its Show is unchecked', (await show(page, 'Group').isChecked()) ? 'it is still checked' : null)
-      check('a column hidden: the keyboard stays on its Show', await focusedOn(page, show(page, 'Group')))
-      check('a column hidden: nothing is asked of the server', sent === 0 ? null : `${String(sent)} list requests were sent`)
-    }],
-    ['A column shown again (Records)', async (page) => {
-      // Longer than any group the column held when the page was sized: shown again, it is sized to it.
-      const wide = `shown ${String(run.customer)} southern loading bay`
-      await plane.setGroup(run.record, wide)
-      await search(page, wide, /^Rows 1–1\.$/)
-      await show(page, 'Group').focus()
-      await page.keyboard.press('Space')
-      await headed(page, generated)
-      const cell = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('gridcell', { name: wide, exact: true })
-      const cut = await until(async () => !(await cell.evaluate((element) => element.scrollWidth > element.clientWidth)), 'the cell stayed cut').then(
-        () => false,
-        () => true,
-      )
-      check('a column shown again: sized to the rows shown, its value whole', cut ? 'its value is cut' : null)
-      await plane.setGroup(run.record, null)
-      await search(page, '', /^Rows 1–(?!1\.)/)
-    }],
-    ['A column shown while nothing is listed (Records)', async (page) => {
-      // Shown over a page with no rows, a column has nothing to be sized to:
-      // it waits for the next page that has some, and is sized to it --
-      // here to a group longer than the one the state before sized it to.
-      // Longer than the state before's, so the column must grow to show it,
-      // and short enough to fit the 320 pixels a column may have in the
-      // fallback font a refused web font leaves (44 characters did not).
-      const wide = `waited ${String(run.customer)} far southern loading bay`
-      await show(page, 'Group').focus()
-      await page.keyboard.press('Space')
-      await headed(page, generated.filter((label) => label !== 'Group'))
-      await search(page, `nothing at all ${String(run.customer)}`, /^No .* match /)
-      await show(page, 'Group').focus()
-      await page.keyboard.press('Space')
-      await headed(page, generated)
-      await plane.setGroup(run.record, wide)
-      await search(page, wide, /^Rows 1–1\.$/)
-      const cell = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('gridcell', { name: wide, exact: true })
-      const cut = await until(async () => !(await cell.evaluate((element) => element.scrollWidth > element.clientWidth)), 'the cell stayed cut').then(
-        () => false,
-        () => true,
-      )
-      check('a column shown while nothing is listed: sized to the next rows, its value whole', cut ? 'its value is cut' : null)
-      await plane.setGroup(run.record, null)
-      await search(page, '', /^Rows 1–(?!1\.)/)
-    }],
-    ['A column moved (Records)', async (page) => {
-      const from = generated.indexOf('Amount')
-      await move(page, 'Amount', 'up').focus()
-      await page.keyboard.press('Enter')
-      await headed(page, placed(generated, 'Amount', from - 1))
-      check('a column moved: the keyboard stays on the button pressed', same(await focused(page), 'Move Amount up'))
-      for (let step = 1; step < from; step += 1) await page.keyboard.press('Enter')
-      await headed(page, placed(generated, 'Amount', 0))
-      check('a column moved to the top: the keyboard is still on its move up', same(await focused(page), 'Move Amount up'))
-      check('a column moved to the top: its move up says it does nothing', same(await page.evaluate(() => document.activeElement?.getAttribute('aria-disabled') ?? null), 'true'))
-      await page.keyboard.press('Enter')
-      check('a column moved to the top: Enter there keeps the keyboard on it', same(await focused(page), 'Move Amount up'))
-      check('a column moved to the top: and the row’s Delete is still last', same((await headers(page)).at(-1), 'Delete'))
-    }],
-    ['Columns reset (Records)', async (page) => {
-      const reset = records(page).getByRole('button', { name: 'Reset columns', exact: true })
-      await reset.focus()
-      await page.keyboard.press('Enter')
-      await headed(page, generated)
-      check('columns reset: the keyboard stays on Reset columns', await focusedOn(page, reset))
-      // Closed again, as the journeys after this one found the panel.
-      await toggle(page).focus()
-      await page.keyboard.press('Enter')
-      check('columns reset: Enter on Columns closes the panel', same(await toggle(page).getAttribute('aria-expanded'), 'false'))
-    }],
+        await headed(page, generated)
+        const cell = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('gridcell', { name: wide, exact: true })
+        const cut = await until(async () => !(await cell.evaluate((element) => element.scrollWidth > element.clientWidth)), 'the cell stayed cut').then(
+          () => false,
+          () => true,
+        )
+        check('a column shown again: sized to the rows shown, its value whole', cut ? 'its value is cut' : null)
+        await plane.setGroup(run.record, null)
+        await search(page, '', /^Rows 1–(?!1\.)/)
+      },
+    ],
+    [
+      'A column shown while nothing is listed (Records)',
+      async (page) => {
+        // Shown over a page with no rows, a column has nothing to be sized to:
+        // it waits for the next page that has some, and is sized to it --
+        // here to a group longer than the one the state before sized it to.
+        // Longer than the state before's, so the column must grow to show it,
+        // and short enough to fit the 320 pixels a column may have in the
+        // fallback font a refused web font leaves (44 characters did not).
+        const wide = `waited ${String(run.customer)} far southern loading bay`
+        await show(page, 'Group').focus()
+        await page.keyboard.press('Space')
+        await headed(
+          page,
+          generated.filter((label) => label !== 'Group'),
+        )
+        await search(page, `nothing at all ${String(run.customer)}`, /^No .* match /)
+        await show(page, 'Group').focus()
+        await page.keyboard.press('Space')
+        await headed(page, generated)
+        await plane.setGroup(run.record, wide)
+        await search(page, wide, /^Rows 1–1\.$/)
+        const cell = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('gridcell', { name: wide, exact: true })
+        const cut = await until(async () => !(await cell.evaluate((element) => element.scrollWidth > element.clientWidth)), 'the cell stayed cut').then(
+          () => false,
+          () => true,
+        )
+        check('a column shown while nothing is listed: sized to the next rows, its value whole', cut ? 'its value is cut' : null)
+        await plane.setGroup(run.record, null)
+        await search(page, '', /^Rows 1–(?!1\.)/)
+      },
+    ],
+    [
+      'A column moved (Records)',
+      async (page) => {
+        const from = generated.indexOf('Amount')
+        await move(page, 'Amount', 'up').focus()
+        await page.keyboard.press('Enter')
+        await headed(page, placed(generated, 'Amount', from - 1))
+        check('a column moved: the keyboard stays on the button pressed', same(await focused(page), 'Move Amount up'))
+        for (let step = 1; step < from; step += 1) await page.keyboard.press('Enter')
+        await headed(page, placed(generated, 'Amount', 0))
+        check('a column moved to the top: the keyboard is still on its move up', same(await focused(page), 'Move Amount up'))
+        check(
+          'a column moved to the top: its move up says it does nothing',
+          same(await page.evaluate(() => document.activeElement?.getAttribute('aria-disabled') ?? null), 'true'),
+        )
+        await page.keyboard.press('Enter')
+        check('a column moved to the top: Enter there keeps the keyboard on it', same(await focused(page), 'Move Amount up'))
+        check('a column moved to the top: and the row’s Delete is still last', same((await headers(page)).at(-1), 'Delete'))
+      },
+    ],
+    [
+      'Columns reset (Records)',
+      async (page) => {
+        const reset = records(page).getByRole('button', { name: 'Reset columns', exact: true })
+        await reset.focus()
+        await page.keyboard.press('Enter')
+        await headed(page, generated)
+        check('columns reset: the keyboard stays on Reset columns', await focusedOn(page, reset))
+        // Closed again, as the journeys after this one found the panel.
+        await toggle(page).focus()
+        await page.keyboard.press('Enter')
+        check('columns reset: Enter on Columns closes the panel', same(await toggle(page).getAttribute('aria-expanded'), 'false'))
+      },
+    ],
   ]
 }

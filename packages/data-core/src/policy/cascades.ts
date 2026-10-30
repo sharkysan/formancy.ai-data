@@ -85,7 +85,8 @@ export function unaccepted(policy: Pick<FormPolicy, 'cascades'>, key: Pick<Inbou
 /** The roles a stored policy grants delete, whatever shape a hand edit left it in; `validatePolicy` reports a bad shape. */
 function deleteRoles(policy: Pick<FormPolicy, 'operations'>): string[] {
   const operations: unknown = (policy as { operations?: unknown }).operations
-  const roles: unknown = typeof operations === 'object' && operations !== null && Object.hasOwn(operations, 'delete') ? (operations as Record<string, unknown>)['delete'] : undefined
+  const roles: unknown =
+    typeof operations === 'object' && operations !== null && Object.hasOwn(operations, 'delete') ? (operations as Record<string, unknown>)['delete'] : undefined
   return Array.isArray(roles) ? roles.filter((role): role is string => typeof role === 'string' && role !== '') : []
 }
 
@@ -137,13 +138,23 @@ interface Walk {
 }
 
 function walk(snapshot: MetadataSnapshot, root: ObjectRef): Walk {
-  const found: Walk = { removed: [{ schema: root.schema, name: root.name }], cleared: [], acting: [], restricting: [], following: [], unseen: [], hidden: [], undeletable: [] }
+  const found: Walk = {
+    removed: [{ schema: root.schema, name: root.name }],
+    cleared: [],
+    acting: [],
+    restricting: [],
+    following: [],
+    unseen: [],
+    hidden: [],
+    undeletable: [],
+  }
   const reported = new Set<CoverageGap>()
   /** The table's keys, or nothing when the snapshot cannot say them; records why, and any gap over them. */
   const keysOf = (table: ObjectRef, via: InboundKey | null, how: Unseen['how']): readonly InboundKey[] => {
     const object = findObject(snapshot, table)
     if (object === undefined || object.referencedBy === undefined) {
-      if (via !== null && !found.unseen.some((known) => sameRef(known.table, table))) found.unseen.push({ table, via, how, why: object === undefined ? 'outside' : 'unrecorded' })
+      if (via !== null && !found.unseen.some((known) => sameRef(known.table, table)))
+        found.unseen.push({ table, via, how, why: object === undefined ? 'outside' : 'unrecorded' })
       return []
     }
     for (const gap of snapshot.gaps) {

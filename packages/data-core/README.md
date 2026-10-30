@@ -499,7 +499,9 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   puts one apostrophe before a cell that starts as a formula, or with an
   apostrophe, unless it is a number. `EXPORT_MAX_BYTES`, 16 MiB, is the
   budget server and client share, and `exportFileName(formId)` the name a
-  file is saved under, `<form id>.csv`.
+  file is saved under, `<form id>.csv`. `fieldHeading(field)` is what a
+  page or a file calls a field: its label where that is a string, otherwise
+  its key, so a `{ $t }` reference is never "[object Object]".
 - **A copy of a record** (0107). `copiedFields(snapshot, bindings, policy,
   context)` is the fields a copy of one of the form's records carries into
   a new one, which `GET /v1/forms/:id` sends as `copied` where it offers

@@ -74,7 +74,8 @@ export function browseRelations(snapshot: MetadataSnapshot, ref: ObjectRef): Bro
   const consider = (relation: BrowseRelation): void => {
     const other = findObject(snapshot, relation.to.object)
     if (other === undefined) unfollowed.push({ direction: relation.direction, key: relation.key, object: relation.to.object, reason: 'not-browsed' })
-    else if (!comparable(object, relation.from) || !comparable(other, relation.to.columns)) unfollowed.push({ direction: relation.direction, key: relation.key, object: relation.to.object, reason: 'not-comparable' })
+    else if (!comparable(object, relation.from) || !comparable(other, relation.to.columns))
+      unfollowed.push({ direction: relation.direction, key: relation.key, object: relation.to.object, reason: 'not-comparable' })
     else relations.push(relation)
   }
   for (const key of object.foreignKeys) {

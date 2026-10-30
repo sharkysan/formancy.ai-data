@@ -96,7 +96,14 @@ describe('a proxy the operator names', () => {
   // before 0071, which ignored the option: Bob's request was 429.
   test('splits the limit by the address it forwards, and the log names each client', async () => {
     const app = await server({ trustedProxies: [PROXY] })
-    expect(await statuses(app, [{ peer: PROXY, forwardedFor: ALICE }, { peer: PROXY, forwardedFor: ALICE }, { peer: PROXY, forwardedFor: ALICE }, { peer: PROXY, forwardedFor: BOB }])).toEqual([401, 401, 429, 401])
+    expect(
+      await statuses(app, [
+        { peer: PROXY, forwardedFor: ALICE },
+        { peer: PROXY, forwardedFor: ALICE },
+        { peer: PROXY, forwardedFor: ALICE },
+        { peer: PROXY, forwardedFor: BOB },
+      ]),
+    ).toEqual([401, 401, 429, 401])
     expect(logged()).toEqual([ALICE, ALICE, ALICE, BOB])
   })
 
@@ -107,9 +114,15 @@ describe('a proxy the operator names', () => {
   // tunnel -- reach one further, and no further. Watched failing with
   // Fastify given `true`, which believed the leftmost address: each forged
   // one was a bucket of its own.
-  test("believes only the address a trusted hop wrote, not what the client wrote to the left of it", async () => {
+  test('believes only the address a trusted hop wrote, not what the client wrote to the left of it', async () => {
     const app = await server({ trustedProxies: [PROXY, '10.0.1.0/24'] })
-    expect(await statuses(app, [{ peer: PROXY, forwardedFor: `203.0.113.1, ${ALICE}` }, { peer: PROXY, forwardedFor: `203.0.113.2, ${ALICE}` }, { peer: PROXY, forwardedFor: `203.0.113.3, ${ALICE}, 10.0.1.5` }])).toEqual([401, 401, 429])
+    expect(
+      await statuses(app, [
+        { peer: PROXY, forwardedFor: `203.0.113.1, ${ALICE}` },
+        { peer: PROXY, forwardedFor: `203.0.113.2, ${ALICE}` },
+        { peer: PROXY, forwardedFor: `203.0.113.3, ${ALICE}, 10.0.1.5` },
+      ]),
+    ).toEqual([401, 401, 429])
     expect(logged()).toEqual([ALICE, ALICE, ALICE])
   })
 
@@ -127,7 +140,12 @@ describe('a proxy the operator names', () => {
   test('counts a forwarded value that is no address as the peer, and logs none of it', async () => {
     const app = await server({ trustedProxies: [PROXY] })
     const typed = ['S3cret-pw-e81', `${ALICE}:4711`, 'unknown']
-    expect(await statuses(app, typed.map((forwardedFor) => ({ peer: PROXY, forwardedFor })))).toEqual([401, 401, 429])
+    expect(
+      await statuses(
+        app,
+        typed.map((forwardedFor) => ({ peer: PROXY, forwardedFor })),
+      ),
+    ).toEqual([401, 401, 429])
     expect(logged()).toEqual([PROXY, PROXY, PROXY])
     expect(written.filter((line) => typed.some((value) => line.includes(value)))).toEqual([])
   })
@@ -160,7 +178,13 @@ describe('a proxy the operator names', () => {
     await expect(createDataServer({ verifyIdentity, trustedProxies: [PROXY, '*'] })).rejects.toThrow(/^trustedProxies\[1\] trusts every peer/)
     await expect(createDataServer({ verifyIdentity, trustedProxies: ['10.0.0.5/24'] })).rejects.toThrow(/^trustedProxies\[0\] has bits set past its prefix/)
     const app = await server({ trustedProxies: [] })
-    expect(await statuses(app, [{ peer: PROXY, forwardedFor: ALICE }, { peer: PROXY, forwardedFor: BOB }, { peer: PROXY, forwardedFor: '203.0.113.1' }])).toEqual([401, 401, 429])
+    expect(
+      await statuses(app, [
+        { peer: PROXY, forwardedFor: ALICE },
+        { peer: PROXY, forwardedFor: BOB },
+        { peer: PROXY, forwardedFor: '203.0.113.1' },
+      ]),
+    ).toEqual([401, 401, 429])
   })
 })
 
@@ -171,7 +195,13 @@ describe('a peer the operator does not name', () => {
   // Fastify given `true` whatever the list.
   test('with no list, a forged X-Forwarded-For changes neither the bucket nor the log', async () => {
     const app = await server()
-    expect(await statuses(app, [{ peer: PROXY, forwardedFor: ALICE }, { peer: PROXY, forwardedFor: BOB }, { peer: PROXY, forwardedFor: '203.0.113.1' }])).toEqual([401, 401, 429])
+    expect(
+      await statuses(app, [
+        { peer: PROXY, forwardedFor: ALICE },
+        { peer: PROXY, forwardedFor: BOB },
+        { peer: PROXY, forwardedFor: '203.0.113.1' },
+      ]),
+    ).toEqual([401, 401, 429])
     expect(logged()).toEqual([PROXY, PROXY, PROXY])
   })
 
@@ -184,7 +214,13 @@ describe('a peer the operator does not name', () => {
   test('a peer not in the list is not believed, whatever its header names', async () => {
     const app = await server({ trustedProxies: [PROXY] })
     const direct = '10.0.0.9'
-    expect(await statuses(app, [{ peer: direct, forwardedFor: `${ALICE}, ${PROXY}` }, { peer: direct, forwardedFor: `${BOB}, ${PROXY}` }, { peer: direct, forwardedFor: ALICE }])).toEqual([401, 401, 429])
+    expect(
+      await statuses(app, [
+        { peer: direct, forwardedFor: `${ALICE}, ${PROXY}` },
+        { peer: direct, forwardedFor: `${BOB}, ${PROXY}` },
+        { peer: direct, forwardedFor: ALICE },
+      ]),
+    ).toEqual([401, 401, 429])
     expect(logged()).toEqual([direct, direct, direct])
   })
 })
@@ -216,12 +252,20 @@ describe("the log's address and port", () => {
     await plain.listen({ port: 0, host: '127.0.0.1' })
     expect(await send((plain.server.address() as AddressInfo).port, { 'x-forwarded-for': ALICE })).toBe(401)
     const requests = lines.filter((line) => line.msg === 'incoming request').map((line) => line.req)
-    expect(requests).toEqual([{ method: 'GET', route: '/v1/whoami', remoteAddress: ALICE }, { method: 'GET', route: '/v1/whoami', remoteAddress: '127.0.0.1', remotePort: expect.any(Number) as unknown }])
+    expect(requests).toEqual([
+      { method: 'GET', route: '/v1/whoami', remoteAddress: ALICE },
+      { method: 'GET', route: '/v1/whoami', remoteAddress: '127.0.0.1', remotePort: expect.any(Number) as unknown },
+    ])
   })
 })
 
 /** The allowlist knows `erp` and opens nothing. */
-const registry = (): ConnectionRegistry => ({ ids: () => ['erp'], scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined), open: async () => undefined, close: async () => {} })
+const registry = (): ConnectionRegistry => ({
+  ids: () => ['erp'],
+  scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
+  open: async () => undefined,
+  close: async () => {},
+})
 
 describe('X-Forwarded-Host and X-Forwarded-Proto', () => {
   // Trusting a proxy also makes Fastify's request.host and request.protocol

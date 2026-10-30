@@ -5,7 +5,19 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
-import { configProblems, demoBase, demoUrl, indexProblems, namingProblems, readDemoConfig, unhashedAssets, unloadedAssets, viteBuild, WORKER, WRANGLER } from './demo.mjs'
+import {
+  configProblems,
+  demoBase,
+  demoUrl,
+  indexProblems,
+  namingProblems,
+  readDemoConfig,
+  unhashedAssets,
+  unloadedAssets,
+  viteBuild,
+  WORKER,
+  WRANGLER,
+} from './demo.mjs'
 import { contentSecurityPolicy, headerRules, headersFile, headersFor, parseHeadersFile, policyProblems, POLICY } from './demo-headers.mjs'
 import { serveDemo } from './demo-serve.mjs'
 import { fontPackages } from './fonts.mjs'
@@ -39,7 +51,13 @@ const address = 'https://formancy.ai/data/examples/'
  * the same policy.
  */
 const installed = (specifier) => readFileSync(createRequire(join(app, 'package.json')).resolve(specifier), 'utf8')
-const stylesheets = [...fontPackages(app).flatMap((entry) => entry.stylesheets).map(installed), installed('@formancy/themes/blueprint.css'), read('apps', 'examples', 'src', 'app.css')]
+const stylesheets = [
+  ...fontPackages(app)
+    .flatMap((entry) => entry.stylesheets)
+    .map(installed),
+  installed('@formancy/themes/blueprint.css'),
+  read('apps', 'examples', 'src', 'app.css'),
+]
 
 /** The text under `## <title>`, up to the next heading of that level. */
 function section(title) {
@@ -113,14 +131,21 @@ describe('the demo on formancy.ai (0069)', () => {
   // path, the host or the whole of formancy.ai, or climbs out of the
   // page's directory.
   test('refuses a built page that asks formancy.ai for a file other than by a path relative to the page, and only that', () => {
-    expect(indexProblems('<script type="module" crossorigin src="./assets/index-a.js"></script><link rel="stylesheet" crossorigin href="./assets/index-b.css">', address)).toEqual([])
+    expect(
+      indexProblems(
+        '<script type="module" crossorigin src="./assets/index-a.js"></script><link rel="stylesheet" crossorigin href="./assets/index-b.css">',
+        address,
+      ),
+    ).toEqual([])
     expect(indexProblems('<link rel="icon" href="data:," /><link href="https://cdn.example/x.css" rel="stylesheet" />', address)).toEqual([])
     expect(indexProblems('<script type="module" crossorigin src="/assets/index-a.js"></script>', address)).toEqual(['src="/assets/index-a.js"'])
     expect(indexProblems('<link rel="modulepreload" crossorigin href="/data/examples/assets/c.js">', address)).toEqual(['href="/data/examples/assets/c.js"'])
     expect(indexProblems("<script src='/assets/x.js'></script>", address)).toEqual(['src="/assets/x.js"'])
     expect(indexProblems('<script src=/assets/x.js></script>', address)).toEqual(['src="/assets/x.js"'])
     expect(indexProblems('<script src="//formancy.ai/assets/x.js"></script>', address)).toEqual(['src="//formancy.ai/assets/x.js"'])
-    expect(indexProblems('<link rel="stylesheet" href="https://formancy.ai/data/examples/assets/b.css">', address)).toEqual(['href="https://formancy.ai/data/examples/assets/b.css"'])
+    expect(indexProblems('<link rel="stylesheet" href="https://formancy.ai/data/examples/assets/b.css">', address)).toEqual([
+      'href="https://formancy.ai/data/examples/assets/b.css"',
+    ])
     expect(indexProblems('<script src="../assets/x.js"></script>', address)).toEqual(['src="../assets/x.js"'])
   })
 
@@ -143,7 +168,10 @@ describe('the demo on formancy.ai (0069)', () => {
   test('refuses a file in assets/ that the public directory put there, or whose name has not the shape of a hashed one', () => {
     expect(unhashedAssets(['index-BxKwE78K.js', 'angular-bootstrap-b1VPoZ-e.js', 'index-BgSCHOjx.css'], [])).toEqual([])
     expect(unhashedAssets(['index-BxKwE78K.js', 'index.js', 'logo.svg'], [])).toEqual(['index.js', 'logo.svg'])
-    expect(unhashedAssets(['index-BxKwE78K.js', 'fixture-snapshot.json', 'brand-template.svg'], ['fixture-snapshot.json', 'brand-template.svg'])).toEqual(['fixture-snapshot.json', 'brand-template.svg'])
+    expect(unhashedAssets(['index-BxKwE78K.js', 'fixture-snapshot.json', 'brand-template.svg'], ['fixture-snapshot.json', 'brand-template.svg'])).toEqual([
+      'fixture-snapshot.json',
+      'brand-template.svg',
+    ])
   })
 
   // turbo replays a cached build over the dist/ that is there and removes
@@ -164,7 +192,12 @@ describe('the demo on formancy.ai (0069)', () => {
     }
     expect(unloadedAssets(files, html)).toEqual(['index-DzQepO-y.js', 'angular-bootstrap-CLnQwhwK.js', 'index-jUG2n6pz.css'])
     // A chunk only another chunk loads is loaded, however deep.
-    expect(unloadedAssets({ 'a-11111111.js': 'import("./b-22222222.js")', 'b-22222222.js': 'import("./c-33333333.js")', 'c-33333333.js': '' }, '<script src="./assets/a-11111111.js"></script>')).toEqual([])
+    expect(
+      unloadedAssets(
+        { 'a-11111111.js': 'import("./b-22222222.js")', 'b-22222222.js': 'import("./c-33333333.js")', 'c-33333333.js': '' },
+        '<script src="./assets/a-11111111.js"></script>',
+      ),
+    ).toEqual([])
   })
 
   test.each([
@@ -208,27 +241,31 @@ describe('the demo on formancy.ai (0069)', () => {
   test.each([
     ['scripts/demo.mjs', 'usage: node scripts/demo.mjs [--dry-run]'],
     ['scripts/live-demo.mjs', 'usage: node scripts/live-demo.mjs [--dry-run]'],
-  ])('%s runs as the program it is, however its path reaches it', (script, usage) => {
-    const place = mkdtempSync(join(tmpdir(), 'formancy-deploy-link-'))
-    const linked = join(place, 'checkout')
-    symlinkSync(repo, linked, 'junction')
-    try {
-      for (const [path, cwd] of [
-        [join(repo, script), repo],
-        [join(linked, script), repo],
-        [script, linked],
-      ]) {
-        const result = spawnSync(process.execPath, [path, '--not-an-option'], { cwd, encoding: 'utf8' })
-        expect(result.status, `${path} from ${cwd}`).toBe(1)
-        expect(result.stderr, `${path} from ${cwd}`).toContain(usage)
+  ])(
+    '%s runs as the program it is, however its path reaches it',
+    (script, usage) => {
+      const place = mkdtempSync(join(tmpdir(), 'formancy-deploy-link-'))
+      const linked = join(place, 'checkout')
+      symlinkSync(repo, linked, 'junction')
+      try {
+        for (const [path, cwd] of [
+          [join(repo, script), repo],
+          [join(linked, script), repo],
+          [script, linked],
+        ]) {
+          const result = spawnSync(process.execPath, [path, '--not-an-option'], { cwd, encoding: 'utf8' })
+          expect(result.status, `${path} from ${cwd}`).toBe(1)
+          expect(result.stderr, `${path} from ${cwd}`).toContain(usage)
+        }
+      } finally {
+        // The link alone, then the empty directory: nothing that could reach
+        // through the link into the checkout.
+        unlinkSync(linked)
+        rmdirSync(place)
       }
-    } finally {
-      // The link alone, then the empty directory: nothing that could reach
-      // through the link into the checkout.
-      unlinkSync(linked)
-      rmdirSync(place)
-    }
-  }, 30_000)
+    },
+    30_000,
+  )
 
   // Cloudflare's Workers Builds runs the commands its dashboard holds, which
   // nothing here can read; REPO-METADATA.md records them. Recorded apart
@@ -241,7 +278,9 @@ describe('the demo on formancy.ai (0069)', () => {
   // would connect formancy.ai-report, or create its Worker a second time.
   test("REPO-METADATA.md's Workers Builds settings are pnpm demo:deploy's halves, for the demo's Worker and this repository", () => {
     const metadata = read('.github', 'REPO-METADATA.md')
-    const repository = JSON.parse(read('packages', 'data-core', 'package.json')).repository.url.replace(/^git\+https:\/\/github\.com\//, '').replace(/\.git$/, '')
+    const repository = JSON.parse(read('packages', 'data-core', 'package.json'))
+      .repository.url.replace(/^git\+https:\/\/github\.com\//, '')
+      .replace(/\.git$/, '')
     const start = metadata.indexOf("\n## The demo's Worker on Cloudflare\n")
     const worker = metadata.slice(start, metadata.indexOf('\n## ', start + 1))
     // Read from this section alone: the live demo's has a table of the same
@@ -265,7 +304,9 @@ describe('the demo on formancy.ai (0069)', () => {
   // major; without it the demo would be built on a Node no gate builds on.
   test('Cloudflare builds the demo on the Node every gate and the release run on', () => {
     const pinned = read('.node-version').trim()
-    const versions = ['gates.yml', 'release.yml'].flatMap((file) => [...read('.github', 'workflows', file).matchAll(/node-version: (\S+)/g)].map((match) => match[1]))
+    const versions = ['gates.yml', 'release.yml'].flatMap((file) =>
+      [...read('.github', 'workflows', file).matchAll(/node-version: (\S+)/g)].map((match) => match[1]),
+    )
     expect(versions.length).toBeGreaterThan(0)
     for (const each of versions) expect(each).toBe(pinned)
   })
@@ -327,7 +368,8 @@ describe('the demo on formancy.ai (0069)', () => {
       }
       const missing = await get('/data/examples/nope.js')
       expect(missing.status).toBe(404)
-      for (const [name, value] of Object.entries(headersFor(rules, '/data/examples/nope.js'))) expect(missing.headers.get(name), `the 404 under the path: ${name}`).toBe(value)
+      for (const [name, value] of Object.entries(headersFor(rules, '/data/examples/nope.js')))
+        expect(missing.headers.get(name), `the 404 under the path: ${name}`).toBe(value)
       for (const path of ['/data/examples/', '/data/examples/assets/index-BxKwE78K.js', `/data/examples/${NOTICES_FILE}`]) {
         const answer = await get(path)
         expect(answer.status, path).toBe(200)
@@ -380,23 +422,63 @@ describe("the demo's headers (0069)", () => {
     ['an inline script in the page', { html: index.replace('</body>', '<script>window.x = 1</script></body>') }, 'inline'],
     ['a style attribute in the page', { html: index.replace('<div id="root">', '<div id="root" style="color: red">') }, 'style'],
     ['a script from another host', { html: index.replace('</head>', '<script src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
-    ['a script from another host, by a protocol-relative address', { html: index.replace('</head>', '<script src="//cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
-    ['a script from another host, single-quoted', { html: index.replace('</head>', "<script src='https://cdn.example/x.js'></script></head>") }, 'https://cdn.example'],
-    ['a stylesheet from another host, unquoted', { html: index.replace('</head>', '<link rel=stylesheet href=https://cdn.example/x.css></head>') }, 'https://cdn.example'],
-    ['a script from another host, after a > in a quoted attribute', { html: index.replace('</head>', '<script data-x="a>b" src="https://cdn.example/x.js"></script></head>') }, 'https://cdn.example'],
+    [
+      'a script from another host, by a protocol-relative address',
+      { html: index.replace('</head>', '<script src="//cdn.example/x.js"></script></head>') },
+      'https://cdn.example',
+    ],
+    [
+      'a script from another host, single-quoted',
+      { html: index.replace('</head>', "<script src='https://cdn.example/x.js'></script></head>") },
+      'https://cdn.example',
+    ],
+    [
+      'a stylesheet from another host, unquoted',
+      { html: index.replace('</head>', '<link rel=stylesheet href=https://cdn.example/x.css></head>') },
+      'https://cdn.example',
+    ],
+    [
+      'a script from another host, after a > in a quoted attribute',
+      { html: index.replace('</head>', '<script data-x="a>b" src="https://cdn.example/x.js"></script></head>') },
+      'https://cdn.example',
+    ],
     // A face is fetched under font-src, from wherever its stylesheet's
     // url() says, which index.html never shows (0072).
-    ['a face on another host in a stylesheet', { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(https://cdn.example/f.woff2) format('woff2')}"] }, 'https://cdn.example'],
-    ['a face on another host, by a protocol-relative address', { stylesheets: [...stylesheets, '@font-face{font-family:X;src:url("//cdn.example/f.woff2")}'] }, 'https://cdn.example'],
-    ['a stylesheet another host serves, imported by one of the page', { stylesheets: [...stylesheets, "@import url('https://cdn.example/x.css');"] }, 'https://cdn.example'],
+    [
+      'a face on another host in a stylesheet',
+      { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(https://cdn.example/f.woff2) format('woff2')}"] },
+      'https://cdn.example',
+    ],
+    [
+      'a face on another host, by a protocol-relative address',
+      { stylesheets: [...stylesheets, '@font-face{font-family:X;src:url("//cdn.example/f.woff2")}'] },
+      'https://cdn.example',
+    ],
+    [
+      'a stylesheet another host serves, imported by one of the page',
+      { stylesheets: [...stylesheets, "@import url('https://cdn.example/x.css');"] },
+      'https://cdn.example',
+    ],
     ["the page's own faces with font-src not allowing 'self'", { policy: { ...POLICY, 'font-src': ["'none'"] } }, "font-src does not allow 'self'"],
-    ['a face inlined as a data: URL, which font-src refuses', { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(data:font/woff2;base64,d09GMgAB) format('woff2')}"] }, 'inlines a face as a data: URL'],
+    [
+      'a face inlined as a data: URL, which font-src refuses',
+      { stylesheets: [...stylesheets, "@font-face{font-family:X;src:url(data:font/woff2;base64,d09GMgAB) format('woff2')}"] },
+      'inlines a face as a data: URL',
+    ],
     ['a host the page never loads', { policy: { ...POLICY, 'connect-src': ["'self'", 'https://api.example'] } }, 'https://api.example'],
     ['inline scripts allowed', { policy: { ...POLICY, 'script-src': ["'self'", "'unsafe-inline'"] } }, 'unsafe-inline'],
     ['eval allowed', { policy: { ...POLICY, 'script-src': ["'self'", "'unsafe-eval'"] } }, 'unsafe-eval'],
-    ['data: images neither the page nor its stylesheets use', { html: index.replace('href="data:,"', 'href="./icon.svg"'), stylesheets: ['a { color: red }'] }, 'data:'],
+    [
+      'data: images neither the page nor its stylesheets use',
+      { html: index.replace('href="data:,"', 'href="./icon.svg"'), stylesheets: ['a { color: red }'] },
+      'data:',
+    ],
     ['data: images refused while the theme draws them', { policy: { ...POLICY, 'img-src': ["'self'"] } }, 'data:'],
-    ['a directive the record names missing', { policy: Object.fromEntries(Object.entries(POLICY).filter(([name]) => name !== 'frame-ancestors')) }, 'frame-ancestors'],
+    [
+      'a directive the record names missing',
+      { policy: Object.fromEntries(Object.entries(POLICY).filter(([name]) => name !== 'frame-ancestors')) },
+      'frame-ancestors',
+    ],
   ])('refuses %s', (_name, change, says) => {
     const problems = policyProblems(change.policy ?? POLICY, { html: change.html ?? index, stylesheets: change.stylesheets ?? stylesheets, address })
     expect(problems.length).toBeGreaterThan(0)

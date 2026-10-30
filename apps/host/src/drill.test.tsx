@@ -5,7 +5,8 @@ import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
@@ -75,7 +76,11 @@ function rows(heading: string): string[][] {
   return within(grid)
     .getAllByRole('row')
     .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) => within(row).getAllByRole('gridcell').map((cell) => cell.textContent ?? ''))
+    .map((row) =>
+      within(row)
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent ?? ''),
+    )
 }
 
 /** The row of the grid `heading` names whose first cell says `first`, once it is listed. */
@@ -93,7 +98,11 @@ async function enterRowWith(user: User, heading: string, text: string): Promise<
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
   const row = within(grid)
     .getAllByRole('row')
-    .find((candidate) => within(candidate).queryAllByRole('gridcell').some((cell) => cell.textContent === text)) as HTMLElement
+    .find((candidate) =>
+      within(candidate)
+        .queryAllByRole('gridcell')
+        .some((cell) => cell.textContent === text),
+    ) as HTMLElement
   ;(within(row).getAllByRole('gridcell')[0] as HTMLElement).focus()
   await user.keyboard('{Enter}')
 }
@@ -163,9 +172,9 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     expect(trail()).toEqual(['Records', `Order ${order}`, `Order line ${lines[0] ?? ''}`])
     expect(screen.queryByRole('heading', { level: 3, name: `Order ${order}` })).toBeNull()
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=2`)
-    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
-    const parent = within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByRole('combobox', { name: /^Order\*?$/ }) as HTMLSelectElement
+    const parent = within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ })
     expect({ disabled: parent.disabled, value: parent.value }).toEqual({ disabled: true, value: order })
 
     const nav = screen.getByRole('navigation', { name: 'Breadcrumb' })
@@ -266,7 +275,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
     await held.pass()
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
-    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(pane(`Order line ${lines[0] ?? ''}`, 'React')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.type(quantity, '5')
     await user.click(within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('button', { name: `Order ${order}` }))
@@ -294,7 +303,9 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
-    await user.click(within(await waitFor(() => screen.getByRole('region', { name: `Delete Order ${order}?` }), ARRIVES)).getByRole('button', { name: 'Delete it' }))
+    await user.click(
+      within(await waitFor(() => screen.getByRole('region', { name: `Delete Order ${order}?` }), ARRIVES)).getByRole('button', { name: 'Delete it' }),
+    )
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
@@ -303,7 +314,9 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const clerk = client(TOKENS.clerk)
     const read = await clerk.read(engine.formId, order)
     if (!read.ok || read.value.version === null) throw new Error('the order was not read')
-    expect(await clerk.update(engine.formId, { record: order, version: read.value.version, answers: { notes: `${words} moved on` } })).toMatchObject({ ok: true })
+    expect(await clerk.update(engine.formId, { record: order, version: read.value.version, answers: { notes: `${words} moved on` } })).toMatchObject({
+      ok: true,
+    })
     await held.pass()
     const detail = await waitFor(() => screen.getByRole('region', { name: `Order ${order}` }), ARRIVES)
     await waitFor(() => expect(detail.contains(document.activeElement)).toBe(true), ARRIVES)
@@ -322,7 +335,8 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     // AG Grid speaks of a row when it moves the keyboard itself -- an arrow
     // key, a click -- and not when a cell is focused from outside it: so a
     // row's first cell is focused, and the keyboard moves one column.
-    const firstCell = (): HTMLElement => within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
+    const firstCell = (): HTMLElement =>
+      within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
     firstCell().focus()
     await user.keyboard('{ArrowRight}')
     await waitFor(() => expect(rowSays('Records')).toBe('Space or Enter opens this record and moves to it.'), ARRIVES)
@@ -363,7 +377,9 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     // Moved on elsewhere, so the next save here is stale.
     const read = await clerk.read(engine.deliveries, delivery)
     if (!read.ok || read.value.version === null) throw new Error('the delivery was not read')
-    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({ ok: true })
+    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({
+      ok: true,
+    })
     await user.clear(await carrier())
     await user.type(await carrier(), `${words} Ship`)
     await user.click(within(sheet).getByRole('button', { name: 'Save' }))
@@ -392,9 +408,11 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
 
     const read = await clerk.read(engine.deliveries, delivery)
     if (!read.ok || read.value.version === null) throw new Error('the delivery was not read')
-    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({ ok: true })
+    expect(await clerk.update(engine.deliveries, { record: delivery, version: read.value.version, answers: { carrier: `${words} Rail` } })).toMatchObject({
+      ok: true,
+    })
     const sheet = screen.getByRole('region', { name: 'React' })
-    const carrier = (await waitFor(() => within(sheet).getByLabelText(/^Carrier\b/), ARRIVES)) as HTMLInputElement
+    const carrier = await waitFor(() => within(sheet).getByLabelText<HTMLInputElement>(/^Carrier\b/), ARRIVES)
     await user.clear(carrier)
     await user.type(carrier, `${words} Ship`)
     await user.click(within(sheet).getByRole('button', { name: 'Save' }))
@@ -444,7 +462,15 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const refused = await clerk.read(engine.lines, lines[0] ?? '')
     if (refused.ok) throw new Error('the line is still there')
     await pressOn(user, 'Order line', '1', '{Enter}')
-    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status').map((status) => status.textContent)).toContain(refused.message), ARRIVES)
+    await waitFor(
+      () =>
+        expect(
+          within(gridSection('Order line'))
+            .getAllByRole('status')
+            .map((status) => status.textContent),
+        ).toContain(refused.message),
+      ARRIVES,
+    )
     expect(trail()).toEqual(['Records', `Order ${order}`])
     expect(screen.getByRole('heading', { level: 3, name: `Order ${order}` })).toBeTruthy()
   })
@@ -511,7 +537,7 @@ async function crumb(user: User, name: string): Promise<void> {
 
 /** A field of a level's React pane, by its label, once drawn. */
 async function field(heading: string, label: RegExp): Promise<HTMLInputElement> {
-  return waitFor(() => within(pane(heading, 'React')).getByLabelText(label) as HTMLInputElement, ARRIVES)
+  return waitFor(() => within(pane(heading, 'React')).getByLabelText<HTMLInputElement>(label), ARRIVES)
 }
 
 /** Down from employee 1 to the approved order's line: level 3, with the keyboard on its heading. */
@@ -634,7 +660,11 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
 
     await pressOn(user, 'Order, Approved by', second.order.slice(3), '{Enter}')
     const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
-    expect(within(notice).getAllByRole('paragraph').map((text) => text.textContent)).toContain(`Opening ${second.order} closes these forms:`)
+    expect(
+      within(notice)
+        .getAllByRole('paragraph')
+        .map((text) => text.textContent),
+    ).toContain(`Opening ${second.order} closes these forms:`)
     expect(listed(notice)).toEqual([`Order line ${first.line}, React: changes that are not saved.`])
     await user.click(within(notice).getByRole('button', { name: 'Keep editing' }))
     expect(unsavedNotice()).toBeNull()
@@ -681,14 +711,14 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
     expect(current()).toBe('New Order line')
     const sheet = pane('New Order line', 'React')
-    const parent = (await waitFor(() => within(sheet).getByRole('combobox', { name: /^Order\*?$/ }), ARRIVES)) as HTMLSelectElement
+    const parent = await waitFor(() => within(sheet).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ }), ARRIVES)
     expect({ disabled: parent.disabled, value: parent.value }).toEqual({ disabled: true, value: order })
     for (const [label, value] of [
       [/^Line no\b/, '5'],
       [/^Quantity\b/, '3'],
       [/^Unit price\b/, '1.25'],
     ] as const) {
-      const input = within(sheet).getByLabelText(label) as HTMLInputElement
+      const input = within(sheet).getByLabelText<HTMLInputElement>(label)
       await user.clear(input)
       await user.type(input, value)
     }
@@ -811,7 +841,15 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
     await waitFor(() => expect(focusedName()).toBe('Order line'), ARRIVES)
     expect(trail()).toEqual(['Records', `Order ${order}`])
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
-    await waitFor(() => expect(within(gridSection('Order line')).getAllByRole('status').some((status) => status.textContent?.startsWith(`Deleted Order line ${lines[0] ?? ''}. `))).toBe(true), ARRIVES)
+    await waitFor(
+      () =>
+        expect(
+          within(gridSection('Order line'))
+            .getAllByRole('status')
+            .some((status) => status.textContent?.startsWith(`Deleted Order line ${lines[0] ?? ''}. `)),
+        ).toBe(true),
+      ARRIVES,
+    )
     await waitFor(() => expect(rows('Order line').map((cells) => cells[0])).toEqual(['2']), ARRIVES)
   })
 

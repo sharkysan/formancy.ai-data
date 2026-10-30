@@ -17,7 +17,8 @@ interface AuditEventBase {
   outcome: string
 }
 
-export type RuntimeOperation = 'form-list' | 'form' | 'read' | 'list' | 'export' | 'create' | 'update' | 'delete' | 'supersede' | 'lookup-query' | 'lookup-resolve'
+export type RuntimeOperation =
+  'form-list' | 'form' | 'read' | 'list' | 'export' | 'create' | 'update' | 'delete' | 'supersede' | 'lookup-query' | 'lookup-resolve'
 
 export type AdminOperation =
   | 'connection-list'
@@ -272,7 +273,13 @@ export function auditRequests<Operation extends string>(app: FastifyInstance, op
     if (operation === undefined) return
     const status = reply.statusCode
     try {
-      const base = { at: now(), actor: request.identity?.actor.id ?? null, operation, status, outcome: status < 400 ? 'ok' : (codes.get(request) ?? `http-${String(status)}`) }
+      const base = {
+        at: now(),
+        actor: request.identity?.actor.id ?? null,
+        operation,
+        status,
+        outcome: status < 400 ? 'ok' : (codes.get(request) ?? `http-${String(status)}`),
+      }
       await sink(describe(request, base))
     } catch (error) {
       request.log.error({ error: (error as Error).message }, 'an audit event could not be written')

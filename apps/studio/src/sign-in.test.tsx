@@ -32,8 +32,12 @@ async function tryToken(token: string) {
 
 /** The definition list of who a token names, as term and description pairs. */
 function identity(region: HTMLElement): Record<string, string> {
-  const terms = within(region).getAllByRole('term').map((term) => term.textContent ?? '')
-  const details = within(region).getAllByRole('definition').map((detail) => detail.textContent ?? '')
+  const terms = within(region)
+    .getAllByRole('term')
+    .map((term) => term.textContent ?? '')
+  const details = within(region)
+    .getAllByRole('definition')
+    .map((detail) => detail.textContent ?? '')
   return Object.fromEntries(terms.map((term, index) => [term, details[index] ?? '']))
 }
 
@@ -78,7 +82,9 @@ describe('signing in', () => {
   // claim is made where the decision to paste is.
   test('says where the token goes before it is pasted', () => {
     mount(plane.fetch)
-    expect(paragraphs(screen.getByRole('main', { name: 'Sign in to the studio' })).join(' ')).toMatch(/held in this tab.s memory.*not written to storage, a cookie or the address/i)
+    expect(paragraphs(screen.getByRole('main', { name: 'Sign in to the studio' })).join(' ')).toMatch(
+      /held in this tab.s memory.*not written to storage, a cookie or the address/i,
+    )
   })
 
   // Signing out forgets the client and the token with it: the next screen is
@@ -86,7 +92,7 @@ describe('signing in', () => {
   test('signing out forgets the token', async () => {
     const user = await signIn(plane)
     await user.click(screen.getByRole('button', { name: 'Sign out' }))
-    expect((screen.getByLabelText('Host token') as HTMLInputElement).value).toBe('')
+    expect(screen.getByLabelText<HTMLInputElement>('Host token').value).toBe('')
     expect(screen.queryByRole('navigation', { name: 'Steps' })).toBeNull()
   })
 
@@ -99,8 +105,14 @@ describe('signing in', () => {
     const reviewed = await startPlane({ review: true })
     try {
       await signIn(reviewed)
-      expect(reviewed.requests.map((request) => `${request.method} ${request.path}`)).toEqual(['GET /v1/whoami', 'GET /v1/connections', 'GET /v1/administration'])
-      const steps = within(screen.getByRole('navigation', { name: 'Steps' })).getAllByRole('button').map((button) => button.textContent)
+      expect(reviewed.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+        'GET /v1/whoami',
+        'GET /v1/connections',
+        'GET /v1/administration',
+      ])
+      const steps = within(screen.getByRole('navigation', { name: 'Steps' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent)
       expect(steps.slice(6)).toEqual(['7. Submit', '8. Drift', '9. Review', '10. Browse'])
       expect(await audit()).toEqual([])
     } finally {
@@ -117,7 +129,11 @@ describe('signing in', () => {
     const reviewed = await startPlane({ review: true })
     try {
       const user = userEvent.setup()
-      mount(async (input, init) => (String(input).endsWith('/v1/administration') ? Promise.reject(new TypeError('Failed to fetch')) : reviewed.fetch(input, init)))
+      mount(async (input, init) =>
+        (input instanceof Request ? input.url : String(input)).endsWith('/v1/administration')
+          ? Promise.reject(new TypeError('Failed to fetch'))
+          : reviewed.fetch(input, init),
+      )
       await user.type(screen.getByLabelText('Host token'), TOKENS.publisher)
       await user.click(screen.getByRole('button', { name: 'Sign in' }))
       expect((await screen.findByRole('alert')).textContent).toBe(

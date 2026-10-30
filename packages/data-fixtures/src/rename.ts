@@ -15,13 +15,15 @@ function namers(objects: readonly ObjectMeta[], object: ObjectMeta, column: stri
   for (const other of objects) {
     for (const foreignKey of other.foreignKeys) {
       const target = foreignKey.references
-      if (target !== null && same(target.table, object.ref) && target.columns.includes(column)) out.push(`foreign key ${foreignKey.name} of ${other.ref.schema}.${other.ref.name}`)
+      if (target !== null && same(target.table, object.ref) && target.columns.includes(column))
+        out.push(`foreign key ${foreignKey.name} of ${other.ref.schema}.${other.ref.name}`)
     }
   }
   // A key from a table outside the snapshot is said only here (0049); one from inside was said above.
   for (const inbound of object.referencedBy ?? []) {
     const inside = objects.some((other) => same(other.ref, inbound.table))
-    if (!inside && inbound.referencedColumns.includes(column)) out.push(`foreign key ${inbound.name} of ${inbound.table.schema}.${inbound.table.name}, which refers to it`)
+    if (!inside && inbound.referencedColumns.includes(column))
+      out.push(`foreign key ${inbound.name} of ${inbound.table.schema}.${inbound.table.name}, which refers to it`)
   }
   for (const check of object.checks) {
     if (check.expression === null) out.push(`check ${check.name}, whose text this account could not read`)

@@ -66,6 +66,11 @@ describe('the paged customers', () => {
     expect(pagedCustomers().find((customer) => customer.customerNo === PAGED_ORDERS.customerNo)?.name).toBe('First 01')
     expect(PAGED_ORDERS.count).toBe(DEFAULT_MAX_PAGE_SIZE + 1)
     const notes = pagedOrderNotes()
-    expect({ count: notes.length, unique: new Set(notes).size, first: notes[0], sorted: [...notes].sort() }).toEqual({ count: PAGED_ORDERS.count, unique: PAGED_ORDERS.count, first: 'paged 01', sorted: notes })
+    expect({ count: notes.length, unique: new Set(notes).size, first: notes[0], sorted: [...notes].sort() }).toEqual({
+      count: PAGED_ORDERS.count,
+      unique: PAGED_ORDERS.count,
+      first: 'paged 01',
+      sorted: notes,
+    })
   })
 })

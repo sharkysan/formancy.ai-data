@@ -196,9 +196,7 @@ describe('foreign keys', () => {
   // read from the wrong column -- on update for on delete -- turns RESTRICT
   // into CASCADE in the report.
   test('reads every referential action, on update and on delete separately', () => {
-    const actions = Object.fromEntries(
-      described('actions').foreignKeys.map((entry) => [entry.name, [entry.onUpdate, entry.onDelete]]),
-    )
+    const actions = Object.fromEntries(described('actions').foreignKeys.map((entry) => [entry.name, [entry.onUpdate, entry.onDelete]]))
     expect(actions).toEqual({
       fk_actions_a: ['cascade', 'restrict'],
       fk_actions_b: ['set-null', 'set-null'],

@@ -77,6 +77,7 @@ export function DrillLevel({
         return session
       }),
     // A level is mounted again for another step: these never change under it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a level's sessions are made once as it is placed, and a level is mounted again for another step, so none of these changes under it
     [],
   )
   const entries = useMemo<PaneEntry[]>(
@@ -160,7 +161,14 @@ export function DrillLevel({
             <Words said={heading} />
           </h3>
           {canDelete && open.kind === 'record' ? (
-            <button type="button" className="button danger" ref={deleteButton} aria-disabled={saving ? 'true' : undefined} aria-describedby={saving ? `${idBase}-delete-waits` : undefined} onClick={deleteOpen}>
+            <button
+              type="button"
+              className="button danger"
+              ref={deleteButton}
+              aria-disabled={saving ? 'true' : undefined}
+              aria-describedby={saving ? `${idBase}-delete-waits` : undefined}
+              onClick={deleteOpen}
+            >
               Delete {title}
             </button>
           ) : null}
@@ -170,7 +178,9 @@ export function DrillLevel({
             </span>
           ) : null}
         </div>
-        {removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase={`${idBase}-delete`} /> : null}
+        {removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? (
+          <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase={`${idBase}-delete`} />
+        ) : null}
         <p role="status" className="status quiet-line">
           <Words said={line} />
         </p>
@@ -180,7 +190,15 @@ export function DrillLevel({
           .filter((session) => renderersOf(renderer).includes(session.renderer))
           .map((session) => (
             // The paper is named for the row, so it differs from a level above of the same form.
-            <Pane key={session.renderer} session={session} title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`} idBase={owner} namedBy={headingId} onAnswer={(result) => answered(result, session)} onLoaded={() => loaded(session)} />
+            <Pane
+              key={session.renderer}
+              session={session}
+              title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
+              idBase={owner}
+              namedBy={headingId}
+              onAnswer={(result) => answered(result, session)}
+              onLoaded={() => loaded(session)}
+            />
           ))}
       </div>
       {(childForms ?? []).map((each, index) => {
@@ -188,7 +206,17 @@ export function DrillLevel({
         // A section is this level's own form under its record, never a level below (0109).
         if (each.child.one) {
           return sectionShown(each.child, stored) ? (
-            <OneChild key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`} client={client} form={each} index={index} parentNoun={title} parent={parentNow} renderer={renderer} ownerBase={drillBase(level)} idBase={`${idBase}-child`} />
+            <OneChild
+              key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`}
+              client={client}
+              form={each}
+              index={index}
+              parentNoun={title}
+              parent={parentNow}
+              renderer={renderer}
+              ownerBase={drillBase(level)}
+              idBase={`${idBase}-child`}
+            />
           ) : null
         }
         return (
@@ -206,7 +234,9 @@ export function DrillLevel({
             idBase={`${idBase}-child`}
             onShow={() => drill.reveal(level)}
             levels={drill.levels}
-            drill={parentNow.kind === 'record' ? drill.section({ level, owner: sectionOwner, form: each, parentNoun: title, parent: parentNow.token }) : undefined}
+            drill={
+              parentNow.kind === 'record' ? drill.section({ level, owner: sectionOwner, form: each, parentNoun: title, parent: parentNow.token }) : undefined
+            }
           />
         )
       })}

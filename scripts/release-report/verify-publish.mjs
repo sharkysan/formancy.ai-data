@@ -104,7 +104,8 @@ function tarballProblems(report, tarballs, version) {
     }
     const gate = installed.get(tarball.name)
     if (gate === undefined) problems.push(`${tarball.file}: the install gate recorded no tarball of ${tarball.name}`)
-    else if (gate.sha256 !== tarball.sha256 || gate.file !== tarball.file) problems.push(`${tarball.file} has sha256 ${tarball.sha256}, not that of the ${gate.file} the install gate installed and ran, ${gate.sha256}`)
+    else if (gate.sha256 !== tarball.sha256 || gate.file !== tarball.file)
+      problems.push(`${tarball.file} has sha256 ${tarball.sha256}, not that of the ${gate.file} the install gate installed and ran, ${gate.sha256}`)
     // One number for every package (bump.mjs): the tag job reads data-core's
     // manifest only, so a package at another version is found here or on npm.
     if (tarball.version !== version) problems.push(`${tarball.file} is ${tarball.name} ${String(tarball.version)}, where this release is ${version}`)
@@ -123,7 +124,11 @@ function dependencyGraph(sbom) {
   const graph = new Map()
   for (const { ref, dependsOn } of sbom?.dependencies ?? []) {
     const from = npmPurl(ref)
-    if (from !== undefined) graph.set(`${from.name}@${from.version}`, (dependsOn ?? []).map(npmPurl).filter((to) => to !== undefined))
+    if (from !== undefined)
+      graph.set(
+        `${from.name}@${from.version}`,
+        (dependsOn ?? []).map(npmPurl).filter((to) => to !== undefined),
+      )
   }
   return graph
 }
@@ -167,15 +172,23 @@ export function sbomProblems(report, sbom) {
     // The version the suites ran, or the one the install gate's clean install resolved in this run, which the release body names as run by no suite.
     const fresh = entry.fresh === null || entry.fresh === undefined ? null : entry.fresh
     for (const to of given) {
-      if (to.version !== entry.loaded && to.version !== fresh) problems.push(`the SBOM gives ${declarer.name} ${entry.name} ${to.version}, where its suites loaded ${entry.loaded}${fresh === null ? '' : ` and a clean install resolved ${fresh}`}`)
+      if (to.version !== entry.loaded && to.version !== fresh)
+        problems.push(
+          `the SBOM gives ${declarer.name} ${entry.name} ${to.version}, where its suites loaded ${entry.loaded}${fresh === null ? '' : ` and a clean install resolved ${fresh}`}`,
+        )
       else if (!names(to.name, to.version)) problems.push(`the SBOM names no ${to.name} ${to.version}, which ${declarer.name} depends on`)
     }
   }
   const loaded = new Map()
-  for (const entry of upstream) loaded.set(entry.name, new Set([...(loaded.get(entry.name) ?? []), entry.version, ...(entry.fresh === null || entry.fresh === undefined ? [] : [entry.fresh])]))
+  for (const entry of upstream)
+    loaded.set(
+      entry.name,
+      new Set([...(loaded.get(entry.name) ?? []), entry.version, ...(entry.fresh === null || entry.fresh === undefined ? [] : [entry.fresh])]),
+    )
   for (const component of components) {
     const versions = loaded.get(component.name)
-    if (versions !== undefined && !versions.has(component.version)) problems.push(`the SBOM names ${component.name} ${component.version}, where the suites loaded ${[...versions].join(', ')}`)
+    if (versions !== undefined && !versions.has(component.version))
+      problems.push(`the SBOM names ${component.name} ${component.version}, where the suites loaded ${[...versions].join(', ')}`)
   }
   return [...new Set(problems)]
 }
@@ -211,7 +224,9 @@ export function sbomInstallProblems(sbom, lockfile) {
   for (const component of sbom?.components ?? []) {
     const npm = npmPurl(component.purl)
     if (npm === undefined) {
-      problems.push(`the SBOM names ${String(component.name ?? component['bom-ref'] ?? 'a component')}, a component with no npm package URL, in an inventory of an npm install`)
+      problems.push(
+        `the SBOM names ${String(component.name ?? component['bom-ref'] ?? 'a component')}, a component with no npm package URL, in an inventory of an npm install`,
+      )
       continue
     }
     named.add(key(npm))
@@ -233,7 +248,8 @@ export function pinned(files) {
  */
 function pinProblems(checked, files) {
   const pins = typeof checked === 'string' ? readPins(checked) : checked
-  if (pins === null || pins === undefined || typeof pins !== 'object' || Object.keys(pins).length === 0) return ['the check job pinned no file, so nothing downloaded here can be shown to be what it checked']
+  if (pins === null || pins === undefined || typeof pins !== 'object' || Object.keys(pins).length === 0)
+    return ['the check job pinned no file, so nothing downloaded here can be shown to be what it checked']
   const problems = []
   const here = pinned(files)
   for (const [path, hash] of Object.entries(here)) {
@@ -263,7 +279,11 @@ export function contentProblems({ report, tarballs, notes, release, version, com
   return [
     ...reportProblems(report, { release, version, commit, runId }),
     ...tarballProblems(report, tarballs, version),
-    ...(notes === null ? ['the report job wrote no release body'] : notes.length > BODY_LIMIT ? [`the release body is ${String(notes.length)} characters, over the ${String(BODY_LIMIT)} GitHub accepts`] : []),
+    ...(notes === null
+      ? ['the report job wrote no release body']
+      : notes.length > BODY_LIMIT
+        ? [`the release body is ${String(notes.length)} characters, over the ${String(BODY_LIMIT)} GitHub accepts`]
+        : []),
   ]
 }
 
@@ -314,7 +334,8 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/veri
   }
   const stage = option('--stage')
   const run = () => {
-    for (const name of ['GITHUB_SHA', 'GITHUB_RUN_ID']) if (!process.env[name]) throw new Error(`verify-publish.mjs checks the report against this run, and ${name} is not set`)
+    for (const name of ['GITHUB_SHA', 'GITHUB_RUN_ID'])
+      if (!process.env[name]) throw new Error(`verify-publish.mjs checks the report against this run, and ${name} is not set`)
     return { release: option('--release'), version: option('--version'), commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID }
   }
   const reportFile = resolve(option('--report'))
@@ -329,15 +350,24 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/veri
     const file = resolve(option('--sbom'))
     const sbom = JSON.parse(readFileSync(file, 'utf8'))
     problems = [...sbomProblems(report, sbom), ...sbomInstallProblems(sbom, JSON.parse(readFileSync(resolve(option('--installed')), 'utf8')))]
-    if (problems.length === 0) output('checked', JSON.stringify(pinned([{ path: relative(process.cwd(), file).replaceAll('\\', '/'), bytes: readFileSync(file) }])))
+    if (problems.length === 0)
+      output('checked', JSON.stringify(pinned([{ path: relative(process.cwd(), file).replaceAll('\\', '/'), bytes: readFileSync(file) }])))
   } else if (stage === 'downloads') {
     const sbom = resolve(option('--sbom'))
     // Both of check's pins, or none: a stage whose output is missing pinned nothing.
     const [content, bom] = [process.env.CHECKED, process.env.CHECKED_SBOM].map(readPins)
-    const files = [...filesIn(dirname(reportFile)), ...filesIn(resolve(option('--tarballs'))), { path: relative(process.cwd(), sbom).replaceAll('\\', '/'), bytes: readFileSync(sbom) }]
+    const files = [
+      ...filesIn(dirname(reportFile)),
+      ...filesIn(resolve(option('--tarballs'))),
+      { path: relative(process.cwd(), sbom).replaceAll('\\', '/'), bytes: readFileSync(sbom) },
+    ]
     problems = downloadedProblems({ ...run(), checked: content === null || bom === null ? null : { ...content, ...bom }, files, report })
   } else throw new Error(`verify-publish.mjs --stage is content, sbom or downloads, not ${stage}`)
   for (const problem of problems) console.error(`::error::${problem}`)
   if (problems.length > 0) process.exit(1)
-  console.log(stage === 'downloads' ? 'verify-publish.mjs --stage downloads: every file is what check pinned, and the report is this run’s' : `verify-publish.mjs --stage ${stage}: what this run gated, checked and pinned`)
+  console.log(
+    stage === 'downloads'
+      ? 'verify-publish.mjs --stage downloads: every file is what check pinned, and the report is this run’s'
+      : `verify-publish.mjs --stage ${stage}: what this run gated, checked and pinned`,
+  )
 }

@@ -46,7 +46,9 @@ async function goToChoose(user: User): Promise<HTMLElement> {
 }
 
 function list(container: HTMLElement, name: string): string[] {
-  return within(within(container).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return within(within(container).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 describe('choosing', () => {
@@ -82,7 +84,9 @@ describe('choosing', () => {
     await user.selectOptions(root, 'sales.order')
     const lookup = within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' })
     expect(lookup).toHaveProperty('disabled', true)
-    expect(paragraphs(choose)).toContain('tenant_id, customer_no → sales.customer. tenant_id of sales.customer cannot be read by this connection, so its rows cannot be offered.')
+    expect(paragraphs(choose)).toContain(
+      'tenant_id, customer_no → sales.customer. tenant_id of sales.customer cannot be read by this connection, so its rows cannot be offered.',
+    )
     expect(await audit()).toEqual([])
   })
 
@@ -113,7 +117,10 @@ describe('choosing', () => {
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
     const shown = within(within(choose).getByRole('group', { name: 'Columns to show for fk_order_customer' })).getAllByRole('checkbox')
-    const state = shown.map((box) => `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`)
+    const state = shown.map(
+      (box) =>
+        `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`,
+    )
     expect(state).toEqual([
       'tenant_id:enabled',
       'customer_no:enabled',
@@ -143,13 +150,22 @@ describe('choosing', () => {
     const group = within(choose).getByRole('group', { name: 'Columns to show for fk_customer_country' })
     const state = within(group)
       .getAllByRole('checkbox')
-      .map((box) => `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`)
+      .map(
+        (box) =>
+          `${computeAccessibleName(box)}:${(box as HTMLInputElement).disabled ? 'disabled' : 'enabled'}${(box as HTMLInputElement).checked ? ',checked' : ''}`,
+      )
     expect(state).toEqual(['id:enabled', 'iso_code:enabled', 'name:enabled,checked', 'flag:disabled', 'shape:disabled'])
-    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'flag' }))).toBe('It is bytea, which has no text form for a label, so it cannot be shown.')
-    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'shape' }))).toBe('It is point, which has no text form for a label, so it cannot be shown.')
+    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'flag' }))).toBe(
+      'It is bytea, which has no text form for a label, so it cannot be shown.',
+    )
+    expect(computeAccessibleDescription(within(group).getByRole('checkbox', { name: 'shape' }))).toBe(
+      'It is point, which has no text form for a label, so it cannot be shown.',
+    )
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Inferred')).toContain('country A lookup over fk_customer_country (country_code), showing name of country, drawn as a typeahead searching name; label from the table name.')
+    expect(list(generated, 'Inferred')).toContain(
+      'country A lookup over fk_customer_country (country_code), showing name of country, drawn as a typeahead searching name; label from the table name.',
+    )
     expect(await audit()).toEqual([])
   })
 
@@ -163,13 +179,15 @@ describe('choosing', () => {
   test('suggests a display column, and sends the one confirmed', async () => {
     const user = await signIn(plane)
     const choose = await chooseOrder(user)
-    expect((within(choose).getByLabelText('Form id') as HTMLInputElement).value).toBe('sales-order')
+    expect(within(choose).getByLabelText<HTMLInputElement>('Form id').value).toBe('sales-order')
     const shown = within(choose).getByRole('group', { name: 'Columns to show for fk_order_customer' })
     expect(within(shown).getByRole('checkbox', { name: 'name' })).toHaveProperty('checked', true)
     await user.click(within(shown).getByRole('checkbox', { name: 'customer_no' }))
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Inferred')).toContain('customer A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.')
+    expect(list(generated, 'Inferred')).toContain(
+      'customer A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.',
+    )
     expect(await audit()).toEqual([])
   })
 
@@ -181,10 +199,12 @@ describe('choosing', () => {
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
-    expect((within(choose).getByLabelText('Attribute tenant_id is pinned to') as HTMLInputElement).value).toBe('tenant')
+    expect(within(choose).getByLabelText<HTMLInputElement>('Attribute tenant_id is pinned to').value).toBe('tenant')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
-    expect(list(generated, 'Read-only')).toContain('tenant_id Pinned by the policy: its value comes from the trusted context, never from the person filling the form.')
+    expect(list(generated, 'Read-only')).toContain(
+      'tenant_id Pinned by the policy: its value comes from the trusted context, never from the person filling the form.',
+    )
     expect(plane.requests.filter((request) => request.path === '/v1/form-proposals')).toHaveLength(1)
   })
 
@@ -196,7 +216,9 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
-    expect(within(within(choose).getByLabelText('Version column')).getByRole('option', { selected: true }).textContent).toBe('None: update and delete are not offered')
+    expect(within(within(choose).getByLabelText('Version column')).getByRole('option', { selected: true }).textContent).toBe(
+      'None: update and delete are not offered',
+    )
     expect(within(choose).getByText(/has no rowversion/).textContent).toBe(
       'sales.order has no rowversion. Confirm a column only if every writer of the table increments it on each update; without one the form offers no update and no delete, because a stale save or delete could not be detected.',
     )
@@ -244,11 +266,23 @@ describe('choosing', () => {
     await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     let generated = await screen.findByRole('main', { name: 'Generate' })
-    const lines = await proposalFromServer({ connection: 'fixture', root: { schema: 'sales', name: 'order_line' }, formId: 'sales-order_line', title: 'Order line', lookups: [], pinned: [], versionColumn: 'row_version' })
+    const lines = await proposalFromServer({
+      connection: 'fixture',
+      root: { schema: 'sales', name: 'order_line' },
+      formId: 'sales-order_line',
+      title: 'Order line',
+      lookups: [],
+      pinned: [],
+      versionColumn: 'row_version',
+    })
     expect(lines.bindings.operations).toEqual({ create: true, update: true, delete: false })
     expect(list(generated, 'Operations')).toEqual(['Create: offered', 'Update: offered', 'Delete: not offered'])
     expect(list(generated, 'Blocked')).toEqual(lines.notes.filter((note) => note.kind === 'blocked').map((note) => `${note.subject} ${note.message}`))
-    expect(list(generated, 'Blocked')).toEqual([expect.stringMatching(/^order_line Delete is not offered: a record of sales\.order_line created again with a deleted record's key starts its row_version where the deleted one did/)])
+    expect(list(generated, 'Blocked')).toEqual([
+      expect.stringMatching(
+        /^order_line Delete is not offered: a record of sales\.order_line created again with a deleted record's key starts its row_version where the deleted one did/,
+      ),
+    ])
 
     await user.click(within(screen.getByRole('navigation', { name: 'Steps' })).getByRole('button', { name: '1. Connect' }))
     // SQL Server's reader: a rowversion it may read, and no DELETE.
@@ -272,11 +306,11 @@ describe('choosing', () => {
     await user.clear(within(choose).getByLabelText('Title'))
     await user.clear(within(choose).getByLabelText('Attribute tenant_id is pinned to'))
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
-    expect(within(within(choose).getByRole('alert')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'The form needs a title.',
-      'fk_order_customer needs at least one column to show.',
-      'Name the trusted attribute tenant_id is pinned to.',
-    ])
+    expect(
+      within(within(choose).getByRole('alert'))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['The form needs a title.', 'fk_order_customer needs at least one column to show.', 'Name the trusted attribute tenant_id is pinned to.'])
     expect(plane.requests.length).toBe(sent)
   })
 
@@ -360,7 +394,9 @@ describe('choosing', () => {
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     const sent = plane.requests.filter((request) => request.method === 'POST' && request.path === '/v1/form-proposals').at(-1)?.body as ProposalRequest
-    expect(sent.lookups).toEqual([{ foreignKey: 'fk_customer_company_customer', display: expect.any(Array) as unknown, section: { when: { column: 'kind', value: 'company' } } }])
+    expect(sent.lookups).toEqual([
+      { foreignKey: 'fk_customer_company_customer', display: expect.any(Array) as unknown, section: { when: { column: 'kind', value: 'company' } } },
+    ])
     const generated = await proposalFromServer(sent)
     expect(generated.bindings.fields.find((binding) => binding.kind === 'lookup')).toMatchObject({ section: { when: { column: 'kind', value: 'company' } } })
 

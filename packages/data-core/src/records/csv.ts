@@ -51,6 +51,7 @@ const FORMULA_START = /^[=+\-@\t\r]/
 /** A number a spreadsheet reads as one: every canonical integer and decimal, and every `String(n)` of a finite float. */
 const NUMBER = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$/
 /** In `u` mode a surrogate pair is one code point and only an unpaired surrogate is `Cs`. */
+// eslint-disable-next-line no-control-regex -- NUL is a character a file cannot hold, which the pattern exists to find
 const UNENCODABLE = /[\p{Cs}\u0000]/u
 const NEEDS_QUOTES = /[",\r\n]/
 

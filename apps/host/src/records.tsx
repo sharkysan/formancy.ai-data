@@ -110,7 +110,17 @@ export function Records({
           }}
         >
           <label htmlFor="search">Search</label>
-          <input id="search" type="text" autoComplete="off" spellCheck={false} enterKeyHint="search" aria-describedby="search-hint" ref={searchRef} value={typed} onChange={(event) => setTyped(event.target.value)} />
+          <input
+            id="search"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            aria-describedby="search-hint"
+            ref={searchRef}
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+          />
           <button type="submit" className="button">
             Search
           </button>
@@ -132,7 +142,9 @@ export function Records({
             New record
           </button>
         ) : null}
-        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />}
+        {definition.list === null ? null : (
+          <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />
+        )}
       </div>
       {tree === null ? null : (
         <Segmented
@@ -148,43 +160,51 @@ export function Records({
         />
       )}
       {tree !== null && shape === 'tree' ? (
-        <RecordTree client={client} formId={formId} definition={definition} field={tree} labelledBy="records-heading" openToken={openToken} onOpen={onTreeOpen} />
+        <RecordTree
+          client={client}
+          formId={formId}
+          definition={definition}
+          field={tree}
+          labelledBy="records-heading"
+          openToken={openToken}
+          onOpen={onTreeOpen}
+        />
       ) : (
-      <RecordGrid
-        ref={grid}
-        client={client}
-        formId={formId}
-        definition={definition}
-        columns={columns}
-        choices={state.choices}
-        labelledBy="records-heading"
-        parent={null}
-        search={search}
-        filter={filter}
-        sort={sort}
-        openToken={openToken}
-        canCreate={canCreate}
-        toolbarStart={
-          <>
-            {searchBlock}
-            <ViewPicker idBase="records" views={views} filter={filter} sort={sort} onPick={state.pick} />
-            <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
-            {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
-          </>
-        }
-        refit={refit}
-        bench="master-bench"
-        {...(remove === undefined ? {} : { remove })}
-        after={after}
-        drilling={drilling}
-        onOpen={onOpen}
-        onSort={state.setSort}
-        onClearSearch={() => {
-          setTyped('')
-          onSearch('')
-          searchRef.current?.focus()
-        }}
-      />
+        <RecordGrid
+          ref={grid}
+          client={client}
+          formId={formId}
+          definition={definition}
+          columns={columns}
+          choices={state.choices}
+          labelledBy="records-heading"
+          parent={null}
+          search={search}
+          filter={filter}
+          sort={sort}
+          openToken={openToken}
+          canCreate={canCreate}
+          toolbarStart={
+            <>
+              {searchBlock}
+              <ViewPicker idBase="records" views={views} filter={filter} sort={sort} onPick={state.pick} />
+              <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+              {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
+            </>
+          }
+          refit={refit}
+          bench="master-bench"
+          {...(remove === undefined ? {} : { remove })}
+          after={after}
+          drilling={drilling}
+          onOpen={onOpen}
+          onSort={state.setSort}
+          onClearSearch={() => {
+            setTyped('')
+            onSearch('')
+            searchRef.current?.focus()
+          }}
+        />
       )}
     </section>
   )

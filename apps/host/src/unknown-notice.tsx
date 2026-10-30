@@ -19,7 +19,10 @@ export function verdict(found: Reconciliation, origin: 'database' | 'transport' 
     case 'changed':
       return { text: 'The record has changed since it was read, by this save or by someone else.', current: found.current }
     case 'present':
-      return { text: `A record with this key is stored, record ${String(found.current.record)}. Load it to see whether it holds what was entered here.`, current: found.current }
+      return {
+        text: `A record with this key is stored, record ${String(found.current.record)}. Load it to see whether it holds what was entered here.`,
+        current: found.current,
+      }
     case 'absent':
       return { text: 'This form cannot find a record with its key. Saving it again is safe: the key stops a second copy.' }
     case 'unverifiable':

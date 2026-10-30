@@ -12,6 +12,15 @@ describe('the package entry', () => {
   // the server's settings and its key set file tool make the same decisions
   // with them (0091).
   test('exports exactly the verifier, the key set, the file, the secret reference and the two helpers the server shares', () => {
-    expect(Object.keys(identity).sort()).toEqual(['KeySet', 'KeySetRefusal', 'createIdentityVerifier', 'isKeySetAlgorithm', 'oneKeySet', 'openKeySetFile', 'readKeySet', 'resolveSecret'])
+    expect(Object.keys(identity).sort()).toEqual([
+      'KeySet',
+      'KeySetRefusal',
+      'createIdentityVerifier',
+      'isKeySetAlgorithm',
+      'oneKeySet',
+      'openKeySetFile',
+      'readKeySet',
+      'resolveSecret',
+    ])
   })
 })

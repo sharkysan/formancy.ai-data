@@ -90,21 +90,32 @@ describe('a page', () => {
   test('shows the rows the server read, says NULL, and names the columns it left out', async () => {
     const user = await browsing()
     await show(user, 'sales.country')
-    expect(browses()).toEqual([{ method: 'POST', path: '/v1/connections/fixture/browse', body: { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE } }])
+    expect(browses()).toEqual([
+      {
+        method: 'POST',
+        path: '/v1/connections/fixture/browse',
+        body: { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
+      },
+    ])
     expect(grid()).toEqual([
       ['Related', 'id', 'iso_code', 'name'],
       ['Related', '1', 'CH', 'Switzerland'],
       ['Related', '2', 'DE', 'NULL'],
     ])
     expect(status()).toBe('Showing rows 1 to 2.')
-    expect(within(browseStep()).getByText(/^Not shown:/).textContent).toBe('Not shown: flag, because it has no text form to show; shape, because it has no text form to show.')
+    expect(within(browseStep()).getByText(/^Not shown:/).textContent).toBe(
+      'Not shown: flag, because it has no text form to show; shape, because it has no text form to show.',
+    )
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])
   })
 
   // Fifty rows at a time, the next page asked for by its offset; a press on a button with nothing to do sends nothing, and keeps the keyboard where it was.
   test('pages forward and back, and the last page asks for nothing more', async () => {
-    plane.rows.set('sales.employee', Array.from({ length: LIST_PAGE_SIZE + 1 }, (_, index) => ({ id: String(index + 1), name: `E${String(index + 1)}`, manager_id: null })))
+    plane.rows.set(
+      'sales.employee',
+      Array.from({ length: LIST_PAGE_SIZE + 1 }, (_, index) => ({ id: String(index + 1), name: `E${String(index + 1)}`, manager_id: null })),
+    )
     const user = await browsing()
     await show(user, 'sales.employee')
     const browse = browseStep()
@@ -137,8 +148,24 @@ describe('a page', () => {
     await screen.findByRole('button', { name: 'name, sort ascending' })
     expect(browses().map((request) => request.body)).toEqual([
       { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: 'Swi', sort: [{ column: 'name', direction: 'desc' }], offset: 0, limit: LIST_PAGE_SIZE },
+      {
+        object: { schema: 'sales', name: 'country' },
+        equal: [],
+        filter: [],
+        search: 'Swi',
+        sort: [{ column: 'name', direction: 'asc' }],
+        offset: 0,
+        limit: LIST_PAGE_SIZE,
+      },
+      {
+        object: { schema: 'sales', name: 'country' },
+        equal: [],
+        filter: [],
+        search: 'Swi',
+        sort: [{ column: 'name', direction: 'desc' }],
+        offset: 0,
+        limit: LIST_PAGE_SIZE,
+      },
     ])
     // The plane's port does not search; the status says what was asked for and what came back.
     expect(status()).toBe('Matching “Swi”, showing rows 1 to 2.')
@@ -148,7 +175,9 @@ describe('a page', () => {
   test('a view says what ordering it by every column costs', async () => {
     const user = await browsing()
     await show(user, 'sales.customer_summary')
-    expect(screen.getByText(/has no key this connection may read/).textContent).toMatch(/^sales\.customer_summary has no key this connection may read, so its rows are ordered by every column shown/)
+    expect(screen.getByText(/has no key this connection may read/).textContent).toMatch(
+      /^sales\.customer_summary has no key this connection may read, so its rows are ordered by every column shown/,
+    )
   })
 
   // The server discovers again for every page: a table dropped since the studio's discovery is refused in the server's words, not read.
@@ -179,11 +208,27 @@ function withUnfollowedKeys(): MetadataSnapshot {
   order.columns = order.columns.map((column) => (column.name === 'created_by' ? { ...column, access: { ...column.access, select: false } } : column))
   order.foreignKeys = [
     ...order.foreignKeys.map((key) => (key.name === 'fk_order_approved_by' ? { ...key, references: null } : key)),
-    { name: 'fk_order_group', columns: ['group'], references: { table: { schema: 'geo', name: 'region' }, columns: ['code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true },
+    {
+      name: 'fk_order_group',
+      columns: ['group'],
+      references: { table: { schema: 'geo', name: 'region' }, columns: ['code'] },
+      onUpdate: 'no-action',
+      onDelete: 'no-action',
+      enforced: true,
+      validated: true,
+    },
   ]
   order.referencedBy = [
     ...(order.referencedBy ?? []),
-    { table: { schema: 'audit', name: 'trail' }, name: 'fk_trail_order', columns: ['order_id'], referencedColumns: ['id'], onDelete: 'no-action', onUpdate: 'no-action', enforced: true },
+    {
+      table: { schema: 'audit', name: 'trail' },
+      name: 'fk_trail_order',
+      columns: ['order_id'],
+      referencedColumns: ['id'],
+      onDelete: 'no-action',
+      onUpdate: 'no-action',
+      enforced: true,
+    },
   ]
   // What the approver's key refers to is hidden, so nothing on the other side says the key refers to it.
   for (const object of contents.objects) {
@@ -258,8 +303,16 @@ describe("a row's related rows", () => {
     const user = await browsing()
     await show(user, 'sales.order')
     await openRelated(user, 1)
-    expect(entries('It refers to')).toEqual(['fk_order_approved_by: approved_by is NULL, so it follows to no row.', 'sales.employee where id = 1', 'sales.customer where tenant_id = 1 and customer_no = 1001'])
-    expect(within(screen.getByRole('list', { name: 'It refers to' })).getAllByRole('button').map((button) => button.textContent)).toEqual(['sales.employee where id = 1', 'sales.customer where tenant_id = 1 and customer_no = 1001'])
+    expect(entries('It refers to')).toEqual([
+      'fk_order_approved_by: approved_by is NULL, so it follows to no row.',
+      'sales.employee where id = 1',
+      'sales.customer where tenant_id = 1 and customer_no = 1001',
+    ])
+    expect(
+      within(screen.getByRole('list', { name: 'It refers to' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(['sales.employee where id = 1', 'sales.customer where tenant_id = 1 and customer_no = 1001'])
     expect(await audit()).toEqual([])
     // Every column of a composite key NULL is named.
     await openRelated(user, 2)
@@ -272,7 +325,8 @@ describe("a row's related rows", () => {
     plane.databases.set('fixture', withUnfollowedKeys())
     const user = await browsing()
     await show(user, 'sales.order')
-    const notFollowed = 'Not followed: fk_order_approved_by, which refers to a table this connection cannot see; fk_order_created_by, whose columns this connection may not read or a browse cannot narrow by; fk_order_group to geo.region, which is outside the approved schemas; fk_trail_order from audit.trail, which is outside the approved schemas.'
+    const notFollowed =
+      'Not followed: fk_order_approved_by, which refers to a table this connection cannot see; fk_order_created_by, whose columns this connection may not read or a browse cannot narrow by; fk_order_group to geo.region, which is outside the approved schemas; fk_trail_order from audit.trail, which is outside the approved schemas.'
     expect(within(browseStep()).getByText(/^Not followed:/).textContent).toBe(notFollowed)
     expect(within(browseStep()).getByText(/may not see every table/).textContent).toBe('This connection may not see every table that refers to sales.order.')
     const related = await openRelated(user, 1)
@@ -288,13 +342,39 @@ describe("a row's related rows", () => {
     const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
     const shipment = contents.objects.find((object) => object.ref.name === 'shipment')
     if (shipment === undefined) throw new Error('the snapshot has no shipment')
-    shipment.foreignKeys = [...shipment.foreignKeys, { name: 'fk_shipment_region', columns: ['reference'], references: { table: { schema: 'geo', name: 'region' }, columns: ['code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }]
-    plane.databases.set('fixture', createSnapshot({ ...contents, gaps: [...contents.gaps, { subject: { kind: 'object', object: shipment.ref }, aspect: 'referenced-by', detail: 'a key on a table this account cannot see may refer to sales.shipment' }] }))
+    shipment.foreignKeys = [
+      ...shipment.foreignKeys,
+      {
+        name: 'fk_shipment_region',
+        columns: ['reference'],
+        references: { table: { schema: 'geo', name: 'region' }, columns: ['code'] },
+        onUpdate: 'no-action',
+        onDelete: 'no-action',
+        enforced: true,
+        validated: true,
+      },
+    ]
+    plane.databases.set(
+      'fixture',
+      createSnapshot({
+        ...contents,
+        gaps: [
+          ...contents.gaps,
+          {
+            subject: { kind: 'object', object: shipment.ref },
+            aspect: 'referenced-by',
+            detail: 'a key on a table this account cannot see may refer to sales.shipment',
+          },
+        ],
+      }),
+    )
     plane.rows.set('sales.shipment', [{ id: '1', tenant_id: '1', reference: 'S-1' }])
     const user = await browsing()
     await show(user, 'sales.shipment')
     expect(screen.queryByRole('columnheader', { name: 'Related' })).toBeNull()
-    expect(within(browseStep()).getByText(/^Not followed:/).textContent).toBe('Not followed: fk_shipment_region to geo.region, which is outside the approved schemas.')
+    expect(within(browseStep()).getByText(/^Not followed:/).textContent).toBe(
+      'Not followed: fk_shipment_region to geo.region, which is outside the approved schemas.',
+    )
     expect(within(browseStep()).getByText(/may not see every table/).textContent).toBe('This connection may not see every table that refers to sales.shipment.')
   })
 
@@ -332,7 +412,15 @@ describe('following a foreign key', () => {
     await openRelated(user, 1)
     await user.click(screen.getByRole('button', { name: 'sales.country where iso_code = CH' }))
     await screen.findByRole('region', { name: /^sales\.country, / })
-    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [{ column: 'iso_code', value: 'CH' }], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
+    expect(browses().at(-1)?.body).toEqual({
+      object: { schema: 'sales', name: 'country' },
+      equal: [{ column: 'iso_code', value: 'CH' }],
+      filter: [],
+      search: '',
+      sort: [],
+      offset: 0,
+      limit: LIST_PAGE_SIZE,
+    })
     expect(grid()).toEqual([
       ['Related', 'id', 'iso_code', 'name'],
       ['Related', '1', 'CH', 'Switzerland'],
@@ -353,7 +441,9 @@ describe('following a foreign key', () => {
     const user = await browsing()
     await show(user, 'sales.country')
     await openRelated(user, 1)
-    await user.click(within(screen.getByRole('list', { name: 'Rows that refer to it' })).getByRole('button', { name: 'sales.customer where country_code = CH' }))
+    await user.click(
+      within(screen.getByRole('list', { name: 'Rows that refer to it' })).getByRole('button', { name: 'sales.customer where country_code = CH' }),
+    )
     await statusSays('Where country_code = CH, showing rows 1 to 2.')
     expect(grid().map((row) => row[3])).toEqual(['name', 'Muster AG', 'Other Tenant GmbH'])
     await openRelated(user, 1)
@@ -390,7 +480,17 @@ describe('following a foreign key', () => {
   // Back returns to the page left, not to its first page: the offset, the sort and the search it was asked with, and the search box says the search again.
   test('back returns to the exact page it left', async () => {
     relatedRows()
-    plane.rows.set('sales.order', Array.from({ length: LIST_PAGE_SIZE + 1 }, (_, index) => ({ id: String(index + 1), tenant_id: '1', customer_no: '1001', status: 'placed', created_by: '1', approved_by: null })))
+    plane.rows.set(
+      'sales.order',
+      Array.from({ length: LIST_PAGE_SIZE + 1 }, (_, index) => ({
+        id: String(index + 1),
+        tenant_id: '1',
+        customer_no: '1001',
+        status: 'placed',
+        created_by: '1',
+        approved_by: null,
+      })),
+    )
     const user = await browsing()
     await show(user, 'sales.order', 'placed')
     await user.click(screen.getByRole('button', { name: 'status, sort ascending' }))
@@ -406,7 +506,15 @@ describe('following a foreign key', () => {
 
     await user.click(screen.getByRole('button', { name: 'Back to sales.order' }))
     await statusSays('Matching “placed”, showing rows 51 to 51.')
-    expect(left).toEqual({ object: { schema: 'sales', name: 'order' }, equal: [], filter: [], search: 'placed', sort: [{ column: 'status', direction: 'asc' }], offset: 50, limit: LIST_PAGE_SIZE })
+    expect(left).toEqual({
+      object: { schema: 'sales', name: 'order' },
+      equal: [],
+      filter: [],
+      search: 'placed',
+      sort: [{ column: 'status', direction: 'asc' }],
+      offset: 50,
+      limit: LIST_PAGE_SIZE,
+    })
     expect(browses().at(-1)?.body).toEqual(left)
     expect(screen.getByRole('columnheader', { name: 'status' }).getAttribute('aria-sort')).toBe('ascending')
     expect(within(browseStep()).getByLabelText('Search')).toHaveProperty('value', 'placed')
@@ -431,10 +539,22 @@ describe('following a foreign key', () => {
     await user.click(screen.getByRole('button', { name: 'name, sort ascending' }))
     await screen.findByRole('button', { name: 'name, sort descending' })
     const equal = [{ column: 'manager_id', value: '1' }]
-    expect(browses().slice(1).map((request) => request.body)).toEqual([
+    expect(
+      browses()
+        .slice(1)
+        .map((request) => request.body),
+    ).toEqual([
       { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE },
       { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [], offset: 50, limit: LIST_PAGE_SIZE },
-      { object: { schema: 'sales', name: 'employee' }, equal, filter: [], search: '', sort: [{ column: 'name', direction: 'asc' }], offset: 0, limit: LIST_PAGE_SIZE },
+      {
+        object: { schema: 'sales', name: 'employee' },
+        equal,
+        filter: [],
+        search: '',
+        sort: [{ column: 'name', direction: 'asc' }],
+        offset: 0,
+        limit: LIST_PAGE_SIZE,
+      },
     ])
     expect(status()).toBe('Where manager_id = 1, showing rows 1 to 50, and more follow.')
     // Paging is not leaving: the way back still names the page the follow left.
@@ -451,12 +571,20 @@ describe('following a foreign key', () => {
     await statusSays('Where iso_code = CH, showing rows 1 to 1.')
     await user.click(within(browseStep()).getByRole('button', { name: 'Show rows' }))
     await statusSays('Showing rows 1 to 2.')
-    expect(browses().at(-1)?.body).toEqual({ object: { schema: 'sales', name: 'country' }, equal: [], filter: [], search: '', sort: [], offset: 0, limit: LIST_PAGE_SIZE })
+    expect(browses().at(-1)?.body).toEqual({
+      object: { schema: 'sales', name: 'country' },
+      equal: [],
+      filter: [],
+      search: '',
+      sort: [],
+      offset: 0,
+      limit: LIST_PAGE_SIZE,
+    })
     expect(screen.queryByRole('button', { name: /^Back to / })).toBeNull()
   })
 
   // The server plans every follow again over its own discovery: one the catalog no longer allows is refused in its words, and the page the person was on stays, with no way back to a page never reached.
-  test("a follow the server refuses is said, and the page stays", async () => {
+  test('a follow the server refuses is said, and the page stays', async () => {
     relatedRows()
     const user = await browsing()
     await show(user, 'sales.customer')

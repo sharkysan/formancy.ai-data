@@ -61,7 +61,6 @@ declare module 'vitest' {
   }
 }
 
-
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const [pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)

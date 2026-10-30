@@ -1,6 +1,15 @@
 import { findObject, generateForm, planDelete, planUpdate } from '@formancy/data-core'
 import type { DeleteOutcome, DeleteRequest, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, RecordAdapter, RecordColumn } from '@formancy/data-core'
-import { covers, deleteAnswer, deleteCase, PARITY_SCOPE, startPostgresFixture, UPDATE_RECREATED, UPDATE_RECREATED_CASE, versionFact } from '@formancy/data-fixtures'
+import {
+  covers,
+  deleteAnswer,
+  deleteCase,
+  PARITY_SCOPE,
+  startPostgresFixture,
+  UPDATE_RECREATED,
+  UPDATE_RECREATED_CASE,
+  versionFact,
+} from '@formancy/data-fixtures'
 import type { DeleteAnswer, DeleteCase, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
@@ -32,7 +41,14 @@ const CLARA = clerk({ tenant: '1' })
 
 /** Clerks read and delete, within their tenant where the table has one. */
 function deleting(fields: readonly string[], extra: Partial<FormPolicy> = {}): FormPolicy {
-  return { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: Object.fromEntries(fields.map((field) => [field, READS])), rowFilters: [], lookups: {}, ...extra }
+  return {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: Object.fromEntries(fields.map((field) => [field, READS])),
+    rowFilters: [],
+    lookups: {},
+    ...extra,
+  }
 }
 
 const POLICIES = {
@@ -59,7 +75,17 @@ beforeAll(async () => {
   parity = await discoverPostgres(owner, PARITY_SCOPE)
   for (const table of Object.keys(POLICIES) as Table[]) {
     const lookups = table === 'removable_child' ? [{ foreignKey: 'fk_removable_child_removable', display: ['note'] }] : []
-    forms.set(table, generateForm(parity, { connection: 'test', root: { schema: 'parity', name: table }, formId: table.replaceAll('_', '-'), title: table, lookups, versionColumn: 'version' }).bindings)
+    forms.set(
+      table,
+      generateForm(parity, {
+        connection: 'test',
+        root: { schema: 'parity', name: table },
+        formId: table.replaceAll('_', '-'),
+        title: table,
+        lookups,
+        versionColumn: 'version',
+      }).bindings,
+    )
   }
   records = createPostgresRecords(owner)
 })
@@ -211,7 +237,10 @@ describe('a delete of one record', () => {
       const via = createPostgresRecords(sql)
       const id = await inserted('removable', { tenant_id: 1, note: 'raced' })
       const request = await planned('removable', CLARA, `k1:${id}`, '1', via)
-      const outcome = await racedWith((tx) => tx.unsafe('update parity.removable set version = version + 1 where id = $1', [id]), () => via.delete(request))
+      const outcome = await racedWith(
+        (tx) => tx.unsafe('update parity.removable set version = version + 1 where id = $1', [id]),
+        () => via.delete(request),
+      )
       expect(outcome).toMatchObject({ ok: false, code: 'stale' })
       expect(await via.delete({ ...request, expectedVersion: 'not a number' })).toMatchObject({ ok: false, code: 'stale' })
       expect(await versionOf('removable', id)).toBe('2')
@@ -259,7 +288,10 @@ describe('what the database keeps', () => {
     const outcome = await records.delete(await planned('removable', CLARA, `k1:${parent}`, '1'))
     expect(answer(outcome)).toBe(expected('restrict'))
     const state = versionFact('restrictViolation', fixture.server) ? '23001' : '23503'
-    expect(outcome).toMatchObject({ constraint: 'fk_removable_restrict_removable', message: `PostgreSQL refused the statement with SQLSTATE ${state} on constraint fk_removable_restrict_removable.` })
+    expect(outcome).toMatchObject({
+      constraint: 'fk_removable_restrict_removable',
+      message: `PostgreSQL refused the statement with SQLSTATE ${state} on constraint fk_removable_restrict_removable.`,
+    })
     expect(await versionOf('removable', parent)).toBe('1')
   })
 
@@ -303,12 +335,16 @@ describe('what the database runs on a delete', () => {
   // A trigger that writes another table runs with the delete, and the
   // delete is answered done: a guard that refused every table with a DELETE
   // trigger would refuse the audit triggers a deployment keeps (0050).
-  test('after-trigger-elsewhere: a row an AFTER DELETE trigger writes elsewhere is there', covers('postgres', deleteCase('after-trigger-elsewhere')), async () => {
-    const id = await inserted('removable_triggered', { note: 'log' })
-    expect(answer(await records.delete(await planned('removable_triggered', CLARA, `k1:${id}`, '1')))).toBe(expected('after-trigger-elsewhere'))
-    expect(await versionOf('removable_triggered', id)).toBeNull()
-    expect([...(await owner.unsafe('select note from parity.removable_log where id = $1', [id]))]).toEqual([{ note: 'log' }])
-  })
+  test(
+    'after-trigger-elsewhere: a row an AFTER DELETE trigger writes elsewhere is there',
+    covers('postgres', deleteCase('after-trigger-elsewhere')),
+    async () => {
+      const id = await inserted('removable_triggered', { note: 'log' })
+      expect(answer(await records.delete(await planned('removable_triggered', CLARA, `k1:${id}`, '1')))).toBe(expected('after-trigger-elsewhere'))
+      expect(await versionOf('removable_triggered', id)).toBeNull()
+      expect([...(await owner.unsafe('select note from parity.removable_log where id = $1', [id]))]).toEqual([{ note: 'log' }])
+    },
+  )
 
   // PostgreSQL only: SQL Server has no rules. A data-modifying statement in
   // WITH is refused on a table a DO ALSO rule acts on (0A000, measured,
@@ -335,7 +371,14 @@ describe('what the database runs on a delete', () => {
         returning removable_soft.id, removable_soft.note, removable_soft.version, removable_soft.gone`)
     try {
       const snapshot = await discoverPostgres(owner, PARITY_SCOPE)
-      const bindings = generateForm(snapshot, { connection: 'test', root: { schema: 'parity', name: 'removable_soft' }, formId: 'removable-soft', title: 'Soft', lookups: [], versionColumn: 'version' }).bindings
+      const bindings = generateForm(snapshot, {
+        connection: 'test',
+        root: { schema: 'parity', name: 'removable_soft' },
+        formId: 'removable-soft',
+        title: 'Soft',
+        lookups: [],
+        versionColumn: 'version',
+      }).bindings
       expect(bindings.operations.delete).toBe(true)
       const id = await inserted('removable_soft', { note: 'soft' })
       const described = await records.describe({ schema: 'parity', name: 'removable_soft' })
@@ -343,7 +386,9 @@ describe('what the database runs on a delete', () => {
       const plan = planDelete(snapshot, bindings, deleting(['id', 'note', 'gone']), CLARA, `k1:${id}`, '1', described.described)
       if (!plan.ok) throw new Error(plan.message)
       expect(await records.delete(plan.request)).toMatchObject({ ok: false, code: 'refused', message: expect.stringMatching(/rule/) })
-      expect([...(await owner.unsafe('select gone, version::text as version from parity.removable_soft where id = $1', [id]))]).toEqual([{ gone: false, version: '1' }])
+      expect([...(await owner.unsafe('select gone, version::text as version from parity.removable_soft where id = $1', [id]))]).toEqual([
+        { gone: false, version: '1' },
+      ])
     } finally {
       await owner.unsafe('drop table parity.removable_soft')
     }
@@ -412,7 +457,9 @@ describe('what moved since the delete was decided', () => {
       const before = await inserted('removable', { tenant_id: 1, note: 'reached' })
       const request = await planned('removable', CLARA, `k1:${before}`, '1')
       await owner.unsafe('insert into parity.removable_copy values ($1)', [before])
-      await owner.unsafe('alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade')
+      await owner.unsafe(
+        'alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade',
+      )
       expect(answer(await records.delete(request))).toBe(expected('reach-moved'))
       expect(await versionOf('removable', before)).toBe('1')
       await owner.unsafe('alter table parity.removable_copy drop constraint fk_removable_copy')
@@ -421,7 +468,10 @@ describe('what moved since the delete was decided', () => {
       await owner.unsafe('insert into parity.removable_copy values ($1)', [waiting])
       const late = await planned('removable', CLARA, `k1:${waiting}`, '1')
       const outcome = await racedWith(
-        (tx) => tx.unsafe('alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade'),
+        (tx) =>
+          tx.unsafe(
+            'alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade',
+          ),
         () => records.delete(late),
       )
       expect(answer(outcome)).toBe(expected('reach-moved'))
@@ -448,11 +498,21 @@ describe('what moved since the delete was decided', () => {
     await owner.unsafe(`create table parity.parted (id int generated always as identity, tenant_id int not null, note varchar(50), version int not null default 1, constraint pk_parted primary key (id, tenant_id)) partition by list (tenant_id);
       create table parity.parted_one partition of parity.parted for values in (1);
       create table parity.parted_copy (id int not null, tenant_id int not null)`)
-    const counts = async () => [...(await owner.unsafe('select (select count(*)::int from parity.parted) as rows, (select count(*)::int from parity.parted_copy) as copies'))]
-    const addKey = 'alter table parity.parted_copy add constraint fk_parted_copy foreign key (id, tenant_id) references parity.parted_one (id, tenant_id) on delete cascade'
+    const counts = async () => [
+      ...(await owner.unsafe('select (select count(*)::int from parity.parted) as rows, (select count(*)::int from parity.parted_copy) as copies')),
+    ]
+    const addKey =
+      'alter table parity.parted_copy add constraint fk_parted_copy foreign key (id, tenant_id) references parity.parted_one (id, tenant_id) on delete cascade'
     try {
       const snapshot = await discoverPostgres(owner, PARITY_SCOPE)
-      const bindings = generateForm(snapshot, { connection: 'test', root: { schema: 'parity', name: 'parted' }, formId: 'parted', title: 'Parted', lookups: [], versionColumn: 'version' }).bindings
+      const bindings = generateForm(snapshot, {
+        connection: 'test',
+        root: { schema: 'parity', name: 'parted' },
+        formId: 'parted',
+        title: 'Parted',
+        lookups: [],
+        versionColumn: 'version',
+      }).bindings
       expect(bindings.operations.delete).toBe(true)
       /** A row and the copy that refers to it, and a delete of the row planned through `via`. */
       const staged = async (via: RecordAdapter): Promise<DeleteRequest> => {
@@ -461,7 +521,15 @@ describe('what moved since the delete was decided', () => {
         await owner.unsafe('insert into parity.parted_copy values ($1, 1)', [id])
         const described = await via.describe({ schema: 'parity', name: 'parted' })
         if (!described.ok) throw new Error(described.message)
-        const plan = planDelete(snapshot, bindings, deleting(['id', 'tenant_id', 'note'], { rowFilters: TENANT }), CLARA, `k1:${id},1`, '1', described.described)
+        const plan = planDelete(
+          snapshot,
+          bindings,
+          deleting(['id', 'tenant_id', 'note'], { rowFilters: TENANT }),
+          CLARA,
+          `k1:${id},1`,
+          '1',
+          described.described,
+        )
         if (!plan.ok) throw new Error(plan.message)
         return plan.request
       }
@@ -477,7 +545,10 @@ describe('what moved since the delete was decided', () => {
           const via = createPostgresRecords(sql)
           const late = await staged(via)
           const staging = await counts()
-          const outcome = await racedWith((tx) => tx.unsafe(addKey), () => via.delete(late))
+          const outcome = await racedWith(
+            (tx) => tx.unsafe(addKey),
+            () => via.delete(late),
+          )
           expect(outcome, isolation).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringMatching(/foreign key now acts/) })
           expect(await counts(), isolation).toEqual(staging)
         } finally {
@@ -494,22 +565,26 @@ describe('what moved since the delete was decided', () => {
   // with no USAGE on the schema a cascading key is declared in still sees
   // it, and the guard refuses the delete. SQL Server's account that lost
   // VIEW DEFINITION is refused for that alone; either way nothing is deleted.
-  test('visibility-narrowed: a cascading key from a schema the account cannot use is seen, and deletes nothing', covers('postgres', deleteCase('visibility-narrowed')), async () => {
-    const sql = await asRole('narrowed_deleter', ['grant select, delete on parity.removable to narrowed_deleter'])
-    await owner.unsafe('create schema hidden')
-    try {
-      const id = await inserted('removable', { tenant_id: 1, note: 'out of sight' })
-      const via = createPostgresRecords(sql)
-      const request = await planned('removable', CLARA, `k1:${id}`, '1', via)
-      await owner.unsafe('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
-      await owner.unsafe('insert into hidden.copy values ($1)', [id])
-      expect(answer(await via.delete(request))).toBe(expected('visibility-narrowed'))
-      expect(await versionOf('removable', id)).toBe('1')
-    } finally {
-      await sql.end()
-      await owner.unsafe('drop schema hidden cascade')
-    }
-  })
+  test(
+    'visibility-narrowed: a cascading key from a schema the account cannot use is seen, and deletes nothing',
+    covers('postgres', deleteCase('visibility-narrowed')),
+    async () => {
+      const sql = await asRole('narrowed_deleter', ['grant select, delete on parity.removable to narrowed_deleter'])
+      await owner.unsafe('create schema hidden')
+      try {
+        const id = await inserted('removable', { tenant_id: 1, note: 'out of sight' })
+        const via = createPostgresRecords(sql)
+        const request = await planned('removable', CLARA, `k1:${id}`, '1', via)
+        await owner.unsafe('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
+        await owner.unsafe('insert into hidden.copy values ($1)', [id])
+        expect(answer(await via.delete(request))).toBe(expected('visibility-narrowed'))
+        expect(await versionOf('removable', id)).toBe('1')
+      } finally {
+        await sql.end()
+        await owner.unsafe('drop schema hidden cascade')
+      }
+    },
+  )
 
   // Only a hand-made request names an identity two rows share: the
   // statement refuses its second row, and both are still there (watched
@@ -521,7 +596,11 @@ describe('what moved since the delete was decided', () => {
     if (!described.ok) throw new Error(described.message)
     const tenant = findObject(parity, { schema: 'parity', name: 'removable' })?.columns.find((candidate) => candidate.name === 'tenant_id') as RecordColumn
     const request: DeleteRequest = {
-      target: { table: { schema: 'parity', name: 'removable' }, identity: [{ name: 'tenant_id', type: tenant.type }], concurrency: { kind: 'version-column', column: 'version' } },
+      target: {
+        table: { schema: 'parity', name: 'removable' },
+        identity: [{ name: 'tenant_id', type: tenant.type }],
+        concurrency: { kind: 'version-column', column: 'version' },
+      },
       key: [{ name: 'tenant_id', type: tenant.type, value: '9' }],
       expectedVersion: '1',
       filters: { kind: 'unrestricted' },
@@ -541,19 +620,36 @@ describe('a version that cannot tell two records apart', () => {
   // starts at its default -- the version the deleted row had. An update
   // sent with that version lands on the new record. Characterised, not
   // refused: it is the limitation a delete would make this module's own.
-  test('update: recreated: an update with the old version lands on a record created again under the key', covers('postgres', UPDATE_RECREATED_CASE), async () => {
-    const keyed = generateForm(parity, { connection: 'test', root: { schema: 'parity', name: 'keyed' }, formId: 'keyed', title: 'Keyed', lookups: [], versionColumn: 'version' }).bindings
-    expect(keyed.operations).toMatchObject({ update: true, delete: false })
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: ['clerk'] }, fields: { code: READS, note: { read: ['clerk'], write: ['clerk'] } }, rowFilters: [], lookups: {} }
-    await owner.unsafe("insert into parity.keyed (code, note) values ('k', 'first')")
-    const described = await records.describe({ schema: 'parity', name: 'keyed' })
-    if (!described.ok) throw new Error(described.message)
-    const plan = planUpdate(parity, keyed, policy, CLARA, 'k1:k', '1', { note: 'changed' }, undefined, described.described)
-    if (!plan.ok) throw new Error(plan.message)
-    await owner.unsafe("delete from parity.keyed where code = 'k'")
-    await owner.unsafe("insert into parity.keyed (code, note) values ('k', 'second')")
-    const outcome = await records.update(plan.request)
-    expect(outcome.ok ? 'updated' : outcome.code).toBe(UPDATE_RECREATED)
-    expect([...(await owner.unsafe("select note, version::text as version from parity.keyed where code = 'k'"))]).toEqual([{ note: 'changed', version: '2' }])
-  })
+  test(
+    'update: recreated: an update with the old version lands on a record created again under the key',
+    covers('postgres', UPDATE_RECREATED_CASE),
+    async () => {
+      const keyed = generateForm(parity, {
+        connection: 'test',
+        root: { schema: 'parity', name: 'keyed' },
+        formId: 'keyed',
+        title: 'Keyed',
+        lookups: [],
+        versionColumn: 'version',
+      }).bindings
+      expect(keyed.operations).toMatchObject({ update: true, delete: false })
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: ['clerk'] },
+        fields: { code: READS, note: { read: ['clerk'], write: ['clerk'] } },
+        rowFilters: [],
+        lookups: {},
+      }
+      await owner.unsafe("insert into parity.keyed (code, note) values ('k', 'first')")
+      const described = await records.describe({ schema: 'parity', name: 'keyed' })
+      if (!described.ok) throw new Error(described.message)
+      const plan = planUpdate(parity, keyed, policy, CLARA, 'k1:k', '1', { note: 'changed' }, undefined, described.described)
+      if (!plan.ok) throw new Error(plan.message)
+      await owner.unsafe("delete from parity.keyed where code = 'k'")
+      await owner.unsafe("insert into parity.keyed (code, note) values ('k', 'second')")
+      const outcome = await records.update(plan.request)
+      expect(outcome.ok ? 'updated' : outcome.code).toBe(UPDATE_RECREATED)
+      expect([...(await owner.unsafe("select note, version::text as version from parity.keyed where code = 'k'"))]).toEqual([{ note: 'changed', version: '2' }])
+    },
+  )
 })

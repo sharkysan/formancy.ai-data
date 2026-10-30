@@ -69,7 +69,9 @@ export async function runMeasurement(protocol: Protocol, options: RunOptions): P
     dirtyFiles: await dirtyFiles(options.root, measuredPaths(product)),
     env: process.env,
     // The images the stack's fixtures will start: the defaults, unless FORMANCY_IMAGES names others (0067).
-    missingImages: (await Promise.all(Object.values(selectedImages()).map(async (image) => ((await docker.hasImage(image)) ? undefined : image)))).filter((image) => image !== undefined),
+    missingImages: (await Promise.all(Object.values(selectedImages()).map(async (image) => ((await docker.hasImage(image)) ? undefined : image)))).filter(
+      (image) => image !== undefined,
+    ),
     tolerance: protocol.calibration.tolerance,
   })
   if (protocol.quiet.enforced && problems.length > 0) throw new Refusal(`The measurement did not start:\n  ${problems.join('\n  ')}`)
@@ -84,7 +86,18 @@ export async function runMeasurement(protocol: Protocol, options: RunOptions): P
     stack = await startStack({ runDir: options.runDir, rateLimit: RATE_LIMIT })
     observers.pg = observePostgres(stack.pg.admin)
     observers.ms = await observeSqlServer(stack.ms.admin)
-    return await measureOn(protocol, options, { docker, stack, calibration, observers: observers as Record<EngineKey, Observer>, expected, product, measuredAt, started, containersBefore, say })
+    return await measureOn(protocol, options, {
+      docker,
+      stack,
+      calibration,
+      observers: observers as Record<EngineKey, Observer>,
+      expected,
+      product,
+      measuredAt,
+      started,
+      containersBefore,
+      say,
+    })
   } finally {
     await Promise.all(Object.values(observers).map((observer) => observer.close().catch(() => {})))
     await stack?.stop()
@@ -143,7 +156,11 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
   const base = stack.server.base
   const adminToken = await mintToken(stack.secret, 'admin-1', { roles: ['data-admin'] }, 600)
   const admin = async (path: string, body: unknown): Promise<Record<string, unknown>> => {
-    const response = await spied(`${base}${path}`, { method: 'POST', headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    const response = await spied(`${base}${path}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${adminToken}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
     const parsed = (await response.json()) as Record<string, unknown>
     if (!response.ok) throw new Error(`${path} answered ${String(response.status)}: ${JSON.stringify(parsed)}`)
     return parsed
@@ -165,7 +182,13 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
     const formId = `${engine}-order`
     const created: FormRecord[] = []
     for (let i = 0; i <= lanes; i += 1) {
-      const outcome = await client.create(formId, { customer: setup.expected.rotation[50 + i] as string, order_date: '2026-10-09', status: 'placed', amount: '5', notes: 'performance setup' })
+      const outcome = await client.create(formId, {
+        customer: setup.expected.rotation[50 + i],
+        order_date: '2026-10-09',
+        status: 'placed',
+        amount: '5',
+        notes: 'performance setup',
+      })
       if (!outcome.ok) throw new Error(`setup could not create an order on ${formId}: ${outcome.message}`)
       created.push(outcome.value)
     }
@@ -178,7 +201,10 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
 
   // After setup and before anything is counted or timed.
   say('quiet check')
-  const quiet = { ...(await quietCheck(protocol, calibration)), containersBefore: setup.containersBefore.map((container) => `${container.name} (${container.image})`) }
+  const quiet = {
+    ...(await quietCheck(protocol, calibration)),
+    containersBefore: setup.containersBefore.map((container) => `${container.name} (${container.image})`),
+  }
 
   say('counting round trips through the hop')
   const counted = await countingPass(
@@ -215,7 +241,8 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
   })
   const calibrated = (name: string, block: () => Promise<BlockResult>): Promise<Measured> => judged(name, block, baseline, protocol.calibration.tolerance)
   const raw = `${options.runDir}/samples.ndjson`
-  const keep = (record: Record<string, unknown>, measured: Measured): void => appendFileSync(raw, `${JSON.stringify({ ...record, repeated: measured.repeated === true, samples: measured.block.samples })}\n`)
+  const keep = (record: Record<string, unknown>, measured: Measured): void =>
+    appendFileSync(raw, `${JSON.stringify({ ...record, repeated: measured.repeated === true, samples: measured.block.samples })}\n`)
 
   const blocks = new Map<string, Measured[]>()
   const passes = new Map<string, Array<{ undelayed: Measured; delayed: Measured }>>()
@@ -278,16 +305,36 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
   const latency: LatencyResult[] = ENGINE_KEYS.flatMap((engine) =>
     CATALOGUE.scenarios
       .filter((entry) => entry.latency)
-      .map((entry) => latencyResult(engine, entry.name, counted[engine].scenarios[entry.name] as number, protocol.latency.delayMs, passes.get(`${engine}\t${entry.name}`) ?? [], baseline)),
+      .map((entry) =>
+        latencyResult(
+          engine,
+          entry.name,
+          counted[engine].scenarios[entry.name] as number,
+          protocol.latency.delayMs,
+          passes.get(`${engine}\t${entry.name}`) ?? [],
+          baseline,
+        ),
+      ),
   )
   const refusals: RefusalResult[] = ENGINE_KEYS.flatMap((engine) =>
-    CATALOGUE.refusals.map((entry) => ({ engine, scenario: entry.name, ...(counted[engine].refusals[entry.name] as { roundTrips: number; status: number; code: string }) })),
+    CATALOGUE.refusals.map((entry) => ({
+      engine,
+      scenario: entry.name,
+      ...(counted[engine].refusals[entry.name] as { roundTrips: number; status: number; code: string }),
+    })),
   )
   const imageOf = (engine: EngineKey): ContainerFacts => containers.find((container) => container.role === engine) as ContainerFacts
   const engines = {} as Record<EngineKey, EngineFacts>
   for (const engine of ENGINE_KEYS) {
     const image = imageOf(engine)
-    engines[engine] = { image: image.image, imageId: image.imageId, repoDigests: image.repoDigests, ...facts[engine], sizes: { before: sizesBefore[engine], after: sizesAfter[engine] }, memoryBytes: memory[engine] }
+    engines[engine] = {
+      image: image.image,
+      imageId: image.imageId,
+      repoDigests: image.repoDigests,
+      ...facts[engine],
+      sizes: { before: sizesBefore[engine], after: sizesAfter[engine] },
+      memoryBytes: memory[engine],
+    }
   }
   if (stack.loads.pg.digest !== stack.loads.ms.digest) throw new Error('the two engines were loaded with different customers')
   const machine = await describeMachine()

@@ -48,7 +48,19 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { hostilePaths, ingressYaml, probes, rules, SERVICES } from '../deploy/cloudflare/ingress.mjs'
 import { DOORS, EXAMPLE, GUIDE } from './cloudflare/doors.mjs'
-import { cloudflareProblems, DOCKERFILE, FILES, guideCommandProblems, imageVolumeProblems, NGINX_CONF, staticLocations, TUNNEL_VOLUME, WEB_DOCKERFILE, webFrontImage, webPort } from './cloudflare/gate.mjs'
+import {
+  cloudflareProblems,
+  DOCKERFILE,
+  FILES,
+  guideCommandProblems,
+  imageVolumeProblems,
+  NGINX_CONF,
+  staticLocations,
+  TUNNEL_VOLUME,
+  WEB_DOCKERFILE,
+  webFrontImage,
+  webPort,
+} from './cloudflare/gate.mjs'
 import { STAND_IN, startWebFront } from './cloudflare/web-front.mjs'
 import { bindMountProblems, configProblems } from './getting-started/stack.mjs'
 import { trustProblems } from './getting-started/trust.mjs'
@@ -62,9 +74,18 @@ const NOT_PLAIN = 'path-not-plain'
 /** `docker compose` with both files, or compose.yaml alone (`base`), for the gate's project. */
 function compose(env, args, { input, allowFailure = false, timeout = 120_000, base = false } = {}) {
   const files = base ? ['-f', 'compose.yaml'] : FILES
-  const result = spawnSync('docker', ['compose', ...files, ...PROFILES, ...args], { cwd: repo, env, input, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 })
+  const result = spawnSync('docker', ['compose', ...files, ...PROFILES, ...args], {
+    cwd: repo,
+    env,
+    input,
+    encoding: 'utf8',
+    timeout,
+    maxBuffer: 64 * 1024 * 1024,
+  })
   if (!allowFailure && (result.error !== undefined || result.status !== 0)) {
-    throw new Error(`docker compose ${args.slice(0, 4).join(' ')} failed${result.error === undefined ? '' : ` (${result.error.message})`}: ${(result.stderr ?? '').trim()}`)
+    throw new Error(
+      `docker compose ${args.slice(0, 4).join(' ')} failed${result.error === undefined ? '' : ` (${result.error.message})`}: ${(result.stderr ?? '').trim()}`,
+    )
   }
   return result
 }
@@ -176,7 +197,17 @@ async function main() {
     outputs.push({ where: `run ${args.filter((arg) => !arg.includes('\n')).join(' ')}`, text: `${result.stdout ?? ''}${result.stderr ?? ''}` })
     return result
   }
-  const configureArgs = (given) => ['--admin', given.admin, '--team', given.team, '--aud', given.aud, ...(given.app === undefined ? [] : ['--app', given.app]), ...(given.appService === undefined ? [] : ['--app-service', given.appService]), ...(given.drop === undefined ? [] : ['--drop', given.drop])]
+  const configureArgs = (given) => [
+    '--admin',
+    given.admin,
+    '--team',
+    given.team,
+    '--aud',
+    given.aud,
+    ...(given.app === undefined ? [] : ['--app', given.app]),
+    ...(given.appService === undefined ? [] : ['--app-service', given.appService]),
+    ...(given.drop === undefined ? [] : ['--drop', given.drop]),
+  ]
   const inVolume = (script) => tool(['--entrypoint', 'sh', 'tunnel-config', '-c', script])
   const ask = (urls) => {
     const result = tool(['--entrypoint', 'node', 'tunnel-config', '--input-type=module', '-e', MATCHER], JSON.stringify(urls))
@@ -189,7 +220,12 @@ async function main() {
     const config = JSON.parse(compose(env, ['config', '--format', 'json']).stdout)
     const base = JSON.parse(compose(env, ['config', '--format', 'json'], { base: true }).stdout)
     await timed('1. Resolved configuration', async () => {
-      fail('the overlay is not what 0037 and 0071 say', [...configProblems(config), ...bindMountProblems(config), ...cloudflareProblems(config, base, read(DOCKERFILE)), ...trustProblems(config)])
+      fail('the overlay is not what 0037 and 0071 say', [
+        ...configProblems(config),
+        ...bindMountProblems(config),
+        ...cloudflareProblems(config, base, read(DOCKERFILE)),
+        ...trustProblems(config),
+      ])
     })
     await timed("2. The guide's commands", async () => fail(`${GUIDE}'s commands do not fit the overlay`, guideCommandProblems(read(GUIDE), config, GUIDE)))
 
@@ -199,11 +235,15 @@ async function main() {
     })
     const images = [config.services.cloudflared.image, config.services['tunnel-config'].image]
     for (const image of images) facts[image] = JSON.parse(docker(['image', 'inspect', image]).stdout)[0]
-    fail('an image declares a volume its service mounts nothing over', imageVolumeProblems(config, base, Object.fromEntries(images.map((image) => [image, facts[image].Config?.Volumes ?? null]))))
+    fail(
+      'an image declares a volume its service mounts nothing over',
+      imageVolumeProblems(config, base, Object.fromEntries(images.map((image) => [image, facts[image].Config?.Volumes ?? null]))),
+    )
 
     await timed('3. The configure step, offline', async () => {
       const credentials = JSON.stringify({ AccountTag: randomBytes(16).toString('hex'), TunnelSecret: secret, TunnelID: id })
-      if (tool(['--entrypoint', 'sh', 'tunnel-config', '-c', 'umask 077 && cat > /etc/formancy-cloudflare/credentials.json'], credentials).status !== 0) throw new Error('the credentials could not be put in the volume')
+      if (tool(['--entrypoint', 'sh', 'tunnel-config', '-c', 'umask 077 && cat > /etc/formancy-cloudflare/credentials.json'], credentials).status !== 0)
+        throw new Error('the credentials could not be put in the volume')
       const configured = (given, expected) => {
         const result = tool(['tunnel-config', ...configureArgs(given)])
         if (result.status !== 0) throw new Error(`tunnel-config exited ${String(result.status)}: ${(result.stderr ?? '').trim()}`)
@@ -216,16 +256,21 @@ async function main() {
       // Without the host application's own service again: refused unless
       // --drop names its hostname, so a door is never closed unasked.
       const refused = tool(['tunnel-config', ...configureArgs(inputs)])
-      if (refused.status !== 1 || !(refused.stderr ?? '').includes(`--drop ${inputs.app}`)) throw new Error(`tunnel-config without --app-service exited ${String(refused.status)} without naming --drop ${inputs.app}`)
+      if (refused.status !== 1 || !(refused.stderr ?? '').includes(`--drop ${inputs.app}`))
+        throw new Error(`tunnel-config without --app-service exited ${String(refused.status)} without naming --drop ${inputs.app}`)
       configured({ ...inputs, drop: inputs.app }, kept)
       const owners = inVolume("stat -c '%u:%g %a %n' /etc/formancy-cloudflare/config.yml /etc/formancy-cloudflare/credentials.json").stdout.trim().split('\n')
-      fail('the tunnel’s files are not cloudflared’s alone', owners.filter((line) => !line.startsWith('65532:65532 400 ')))
+      fail(
+        'the tunnel’s files are not cloudflared’s alone',
+        owners.filter((line) => !line.startsWith('65532:65532 400 ')),
+      )
       for (const [why, given, sentence] of [
         ['an upper-case hostname', { ...inputs, admin: 'Formancy.example.com' }, 'has upper-case letters'],
         ['a 63-character AUD tag', { ...inputs, aud: inputs.aud.slice(1) }, '64 lower-case hexadecimal characters'],
       ]) {
         const result = tool(['tunnel-config', ...configureArgs(given)])
-        if (result.status !== 1 || !(result.stderr ?? '').includes(sentence)) throw new Error(`tunnel-config with ${why} exited ${String(result.status)} without saying "${sentence}"`)
+        if (result.status !== 1 || !(result.stderr ?? '').includes(sentence))
+          throw new Error(`tunnel-config with ${why} exited ${String(result.status)} without saying "${sentence}"`)
         if (inVolume(`cat ${CONFIG}`).stdout !== kept) throw new Error(`tunnel-config with ${why} changed the configuration in use`)
       }
     })
@@ -261,8 +306,16 @@ async function main() {
       const answer = ask(expected.map((probe) => probe.url))
       facts.version = answer.version
       facts.probes = expected.length
-      if (answer.validate.status !== 0 || !/^OK$/m.test(answer.validate.said)) throw new Error(`cloudflared refused the generated configuration: ${answer.validate.said.trim()}`)
-      fail('cloudflared matches the generated configuration differently from doors.json', expected.flatMap((probe, index) => (answer.answers[index].rule === probe.rule ? [] : [`${probe.url} matched ${String(answer.answers[index].rule ?? answer.answers[index].said)}, not rule #${String(probe.rule)}: ${probe.why}`])))
+      if (answer.validate.status !== 0 || !/^OK$/m.test(answer.validate.said))
+        throw new Error(`cloudflared refused the generated configuration: ${answer.validate.said.trim()}`)
+      fail(
+        'cloudflared matches the generated configuration differently from doors.json',
+        expected.flatMap((probe, index) =>
+          answer.answers[index].rule === probe.rule
+            ? []
+            : [`${probe.url} matched ${String(answer.answers[index].rule ?? answer.answers[index].said)}, not rule #${String(probe.rule)}: ${probe.why}`],
+        ),
+      )
     })
 
     let forwarded = []
@@ -285,16 +338,27 @@ async function main() {
           } catch {
             code = undefined
           }
-          if (reply.status !== 400 || code !== NOT_PLAIN) problems.push(`${entry.method} ${entry.path}, which cloudflared sends to the runtime door, was answered ${String(reply.status)} ${String(code)} by the server`)
+          if (reply.status !== 400 || code !== NOT_PLAIN)
+            problems.push(
+              `${entry.method} ${entry.path}, which cloudflared sends to the runtime door, was answered ${String(reply.status)} ${String(code)} by the server`,
+            )
         }
         await new Promise((resolve) => setTimeout(resolve, 200))
         const ran = server.events.filter((event) => event.outcome !== NOT_PLAIN)
-        problems.push(...[...new Set(ran.map((event) => `${String(event.plane)} ${String(event.operation)}`))].map((operation) => `the ${operation} route ran for a path cloudflared sends to the runtime door`))
+        problems.push(
+          ...[...new Set(ran.map((event) => `${String(event.plane)} ${String(event.operation)}`))].map(
+            (operation) => `the ${operation} route ran for a path cloudflared sends to the runtime door`,
+          ),
+        )
         if (server.asked.length > 0) problems.push(`the server read the token for ${String(server.asked.length)} of them, so a route's work began`)
       } finally {
         await server.close()
       }
-      problems.push(...[...climbed].filter((route) => !reached.has(route)).map((route) => `no climb from ${route} reached the runtime door under cloudflared, so this step shows nothing of the refusal for it`))
+      problems.push(
+        ...[...climbed]
+          .filter((route) => !reached.has(route))
+          .map((route) => `no climb from ${route} reached the runtime door under cloudflared, so this step shows nothing of the refusal for it`),
+      )
       fail('a path the runtime door forwards reached a route of the server', problems)
     })
 
@@ -307,7 +371,14 @@ async function main() {
       // runtime route's sample, sent there without a token, must reach the
       // server, which asks for one: the door forwards what it is for.
       const port = webPort(SERVICES.runtime)
-      const front = await startWebFront({ name: `${env.COMPOSE_PROJECT_NAME}-front`, toolsImage: config.services['tunnel-config'].image, nginxImage: webFrontImage(read(WEB_DOCKERFILE)), repo, conf: join(repo, NGINX_CONF), statics })
+      const front = await startWebFront({
+        name: `${env.COMPOSE_PROJECT_NAME}-front`,
+        toolsImage: config.services['tunnel-config'].image,
+        nginxImage: webFrontImage(read(WEB_DOCKERFILE)),
+        repo,
+        conf: join(repo, NGINX_CONF),
+        statics,
+      })
       const problems = []
       try {
         const published = front.port(port)
@@ -316,17 +387,27 @@ async function main() {
           const code = codeOf(reply.body)
           const refused = reply.status === 400 && code === NOT_PLAIN
           const nginx404 = reply.status === 404 && code === undefined && !reply.body.includes(STAND_IN)
-          if (!refused && !nginx404) problems.push(`${entry.method} ${entry.path}, which cloudflared sends to the runtime door, was answered ${String(reply.status)}${code === undefined ? '' : ` ${code}`} through the web front${reply.body.includes(STAND_IN) ? `, with the file ${reply.body.trim().split(': ').at(-1)}` : ''}`)
+          if (!refused && !nginx404)
+            problems.push(
+              `${entry.method} ${entry.path}, which cloudflared sends to the runtime door, was answered ${String(reply.status)}${code === undefined ? '' : ` ${code}`} through the web front${reply.body.includes(STAND_IN) ? `, with the file ${reply.body.trim().split(': ').at(-1)}` : ''}`,
+            )
         }
         await new Promise((resolve) => setTimeout(resolve, 200))
         const lines = front.lines()
         const ran = lines.filter((line) => line.event !== undefined && line.event.outcome !== NOT_PLAIN)
-        problems.push(...[...new Set(ran.map((line) => `${String(line.event.plane)} ${String(line.event.operation)}`))].map((operation) => `the ${operation} route ran for a path cloudflared sends to the runtime door, through the web front`))
+        problems.push(
+          ...[...new Set(ran.map((line) => `${String(line.event.plane)} ${String(line.event.operation)}`))].map(
+            (operation) => `the ${operation} route ran for a path cloudflared sends to the runtime door, through the web front`,
+          ),
+        )
         const asked = lines.filter((line) => line.asked === true).length
         if (asked > 0) problems.push(`the server read a token for ${String(asked)} of them through the web front, so a route's work began`)
         for (const route of doors.routes.filter((entry) => entry.plane === 'runtime')) {
           const reply = await send(published, route.method, route.sample, {})
-          if (reply.status !== 401 || codeOf(reply.body) !== 'unauthenticated') problems.push(`${route.method} ${route.sample}, a runtime route, was answered ${String(reply.status)} ${String(codeOf(reply.body))} through the runtime door's web front, not the server's 401`)
+          if (reply.status !== 401 || codeOf(reply.body) !== 'unauthenticated')
+            problems.push(
+              `${route.method} ${route.sample}, a runtime route, was answered ${String(reply.status)} ${String(codeOf(reply.body))} through the runtime door's web front, not the server's 401`,
+            )
         }
         facts.webFront = `${String(forwarded.length)} forwarded paths and ${String(doors.routes.filter((entry) => entry.plane === 'runtime').length)} runtime samples through nginx.conf's port ${String(port)}`
       } finally {
@@ -336,7 +417,10 @@ async function main() {
     })
 
     await timed('6. The tunnel’s secret in no output', async () => {
-      fail('the tunnel’s secret was printed', outputs.filter((output) => output.text.includes(secret)).map((output) => output.where))
+      fail(
+        'the tunnel’s secret was printed',
+        outputs.filter((output) => output.text.includes(secret)).map((output) => output.where),
+      )
     })
   } catch (error) {
     failure = error
@@ -355,8 +439,12 @@ async function main() {
     ...Object.entries(facts)
       .filter(([, value]) => typeof value === 'object')
       .map(([image, value]) => `- \`${image}\`: ${(value.RepoDigests ?? []).join(', ') || value.Id}`),
-    ...(facts.version === undefined ? [] : [`- ${facts.version}; ${String(facts.probes)} probes; ${String(facts.forwarded)} of ${String(facts.hostile)} hostile paths sent to the runtime door${failure === undefined ? ', each refused by the server' : ''}`]),
-    ...(facts.webFront === undefined ? [] : [`- ${facts.webFront}${failure === undefined ? ', each refused, 404 or the server\'s 401' : ''}`]),
+    ...(facts.version === undefined
+      ? []
+      : [
+          `- ${facts.version}; ${String(facts.probes)} probes; ${String(facts.forwarded)} of ${String(facts.hostile)} hostile paths sent to the runtime door${failure === undefined ? ', each refused by the server' : ''}`,
+        ]),
+    ...(facts.webFront === undefined ? [] : [`- ${facts.webFront}${failure === undefined ? ", each refused, 404 or the server's 401" : ''}`]),
     ...(facts.settings === undefined ? [] : [`- cloudflared's settings as it started: \`${facts.settings}\``]),
     '',
     '| Step | Seconds |',

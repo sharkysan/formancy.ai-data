@@ -175,10 +175,13 @@ function importKey(entry: Entry, algorithm: KeySetAlgorithm, kid: string): KeyOb
   }
   if (algorithm === 'RS256') {
     const details = key.asymmetricKeyDetails
-    if ((details?.modulusLength ?? 0) < MIN_RSA_BITS) throw new KeySetRefusal(`key ${name} is an RSA key of fewer than ${String(MIN_RSA_BITS)} bits, which RS256 refuses`)
+    if ((details?.modulusLength ?? 0) < MIN_RSA_BITS)
+      throw new KeySetRefusal(`key ${name} is an RSA key of fewer than ${String(MIN_RSA_BITS)} bits, which RS256 refuses`)
     const exponent = details?.publicExponent ?? 0n
     if (exponent < MIN_RSA_EXPONENT || exponent % 2n === 0n) {
-      throw new KeySetRefusal(`key ${name}'s RSA public exponent is not an odd number of at least ${String(MIN_RSA_EXPONENT)}: under an exponent of 1 anyone signs any token`)
+      throw new KeySetRefusal(
+        `key ${name}'s RSA public exponent is not an odd number of at least ${String(MIN_RSA_EXPONENT)}: under an exponent of 1 anyone signs any token`,
+      )
     }
   }
   if (algorithm === 'EdDSA') {
@@ -210,7 +213,13 @@ export class KeySet {
   /** A one-key setting's key, which ignores a token's kid as it always has. */
   readonly #single: KeyObject | CryptoKey | undefined
 
-  private constructor(build: symbol, algorithm: KeySetAlgorithm, keys: readonly InForce[], leftOut: readonly LeftOutKey[], single: KeyObject | CryptoKey | undefined) {
+  private constructor(
+    build: symbol,
+    algorithm: KeySetAlgorithm,
+    keys: readonly InForce[],
+    leftOut: readonly LeftOutKey[],
+    single: KeyObject | CryptoKey | undefined,
+  ) {
     if (build !== BUILD) throw new TypeError('a KeySet is made by readKeySet, KeySet.fromSecret or KeySet.fromPem')
     this.#algorithm = algorithm
     this.#keys = keys
@@ -252,7 +261,8 @@ export class KeySet {
     const checked: Entry[] = entries.map((entry: unknown, index) => {
       if (!isEntry(entry)) throw new KeySetRefusal(`key #${String(index + 1)} of the identity key set is not an object`)
       const member = PRIVATE_MEMBERS.find((candidate) => entry[candidate] !== undefined)
-      if (member !== undefined) throw new KeySetRefusal(`key ${quoted(nameOf(entry, index))} holds the private member "${member}": a verifier's file holds public keys only`)
+      if (member !== undefined)
+        throw new KeySetRefusal(`key ${quoted(nameOf(entry, index))} holds the private member "${member}": a verifier's file holds public keys only`)
       return entry
     })
 
@@ -266,9 +276,12 @@ export class KeySet {
       }
       const kid = entry['kid']
       if (kid === undefined) throw new KeySetRefusal(`key #${String(index + 1)} has no "kid": a key in force is selected by it`)
-      if (typeof kid !== 'string' || !KID.test(kid)) throw new KeySetRefusal(`key #${String(index + 1)}'s "kid" is not a non-empty string of A-Z, a-z, 0-9 and . _ ~ + / = -`)
+      if (typeof kid !== 'string' || !KID.test(kid))
+        throw new KeySetRefusal(`key #${String(index + 1)}'s "kid" is not a non-empty string of A-Z, a-z, 0-9 and . _ ~ + / = -`)
       if (kidCouldBeSecret(entry)) {
-        throw new KeySetRefusal(`key #${String(index + 1)}'s "kid" could be a secret -- it is its "k", or ${String(SECRET_CHARACTERS)} base64 characters or more -- and a kid is logged, so it is a name, never key material`)
+        throw new KeySetRefusal(
+          `key #${String(index + 1)}'s "kid" could be a secret -- it is its "k", or ${String(SECRET_CHARACTERS)} base64 characters or more -- and a kid is logged, so it is a name, never key material`,
+        )
       }
       if (inForce.some((other) => other.kid === kid)) throw new KeySetRefusal(`two keys in force are both "${kid}": a kid selects one key`)
       inForce.push({ kid, key: importKey(entry, algorithm, kid) })
@@ -346,7 +359,8 @@ export class KeySet {
     const single = this.#single
     if (single === undefined) throw new KeySetRefusal('a set read from a file is a key set file already')
     if (!KID.test(kid)) throw new KeySetRefusal('a kid is a non-empty string of A-Z, a-z, 0-9 and . _ ~ + / = -')
-    const { kty, ...material } = single instanceof KeyObject && single.type === 'secret' ? { kty: 'oct', k: single.export().toString('base64url') } : await exportJWK(single)
+    const { kty, ...material } =
+      single instanceof KeyObject && single.type === 'secret' ? { kty: 'oct', k: single.export().toString('base64url') } : await exportJWK(single)
     const text = `${JSON.stringify({ keys: [{ kty, kid, alg: this.#algorithm, ...material }] }, null, 2)}\n`
     KeySet.read(text, this.#algorithm)
     return text

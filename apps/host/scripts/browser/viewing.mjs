@@ -32,7 +32,10 @@ const picker = (page) => records(page).getByRole('combobox', { name: 'View', exa
 const showView = (page) => records(page).getByRole('button', { name: 'Show view', exact: true })
 /** A header's sort, as its aria-sort says it; null for a column that is not sorted. A sorted header's name holds its sort's number too, so it is found by how it starts. */
 const sortOf = async (page, label) => {
-  const sort = await page.getByRole('grid', { name: 'Records', exact: true }).getByRole('columnheader', { name: new RegExp(`^${label}`) }).getAttribute('aria-sort')
+  const sort = await page
+    .getByRole('grid', { name: 'Records', exact: true })
+    .getByRole('columnheader', { name: new RegExp(`^${label}`) })
+    .getAttribute('aria-sort')
   return sort === 'none' ? null : sort
 }
 
@@ -103,71 +106,95 @@ async function pressShowView(page) {
 }
 
 /** The states, in order. */
-export function viewJourney(plane, { check }) {
+export function viewJourney(_plane, { check }) {
   return [
-    ['Views offered (Records)', async (page) => {
-      // From Search, as the filter's states left it: the next Tab is View, then Show view, then Columns, then Filter.
-      await records(page).getByRole('button', { name: 'Search', exact: true }).focus()
-      await page.keyboard.press('Tab')
-      check('Tab from Search reaches View', await focusedOn(page, picker(page)))
-      await page.keyboard.press('Tab')
-      check('the next Tab Show view', await focusedOn(page, showView(page)))
-      await page.keyboard.press('Tab')
-      check('the next Tab Columns', await focusedOn(page, records(page).getByRole('button', { name: 'Columns', exact: true })))
-      await page.keyboard.press('Tab')
-      check('and the next Tab Filter', await focusedOn(page, records(page).getByRole('button', { name: 'Filter', exact: true })))
-      check('views offered: every view, and the grid on every record', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }))
-    }],
-    ['A view chosen, not shown yet (Records)', async (page) => {
-      const before = await lineOf(page)
-      const sent = await listsSentWhile(page, async () => {
-        await picker(page).focus()
-        await picker(page).selectOption({ label: PLACED.name })
-        await picker(page).selectOption({ label: NOTED.name })
-      })
-      check('a view chosen: nothing is sent until Show view', sent === 0 ? null : `${String(sent)} list requests were sent`)
-      check('a view chosen: the grid lists what it listed', same(await lineOf(page), before))
-      check('a view chosen: no header sorted', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], [null, null]))
-      check('a view chosen: the select holds it', same((await choices(page)).shown, NOTED.name))
-    }],
-    ['A view shown (Records)', async (page) => {
-      const before = page.url()
-      const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/)
-      check('a view shown: one first page, with its filter and its sort', same(sent, [{ filter: NOTED.filter, sort: NOTED.sort, after: null }]))
-      check('a view shown: the headers show its two columns', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], ['descending', 'ascending']))
-      check('a view shown: the picker names it', same((await choices(page)).shown, NOTED.name))
-      check('a view shown: the keyboard stays on Show view', await focusedOn(page, showView(page)))
-      check('a view shown: nothing of it is in the address', page.url() === before ? null : `the address became ${page.url()}`)
-    }],
-    ['A sort of your own (Records)', async (page) => {
-      const header = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('columnheader', { name: /^Order date/ })
-      const sent = await listsWhile(
-        page,
-        async () => {
-          await header.focus()
-          await page.keyboard.press('Enter')
-        },
-        /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/,
-      )
-      check('a sort of your own: one first page, in the view’s filter and the header’s sort', same(sent, [{ filter: NOTED.filter, sort: [{ field: 'order_date', direction: 'asc' }], after: null }]))
-      check('a sort of your own: the Order date header says it sorts ascending', same(await sortOf(page, 'Order date'), 'ascending'))
-      check('a sort of your own: the picker says so', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name, OWN], shown: OWN }))
-      check('a sort of your own: the view’s columns no longer sorted', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], [null, null]))
-      // Off it in the select and back, as arrows step a closed select, then Show view on it: nothing sent, the sort kept.
-      const stepped = await listsSentWhile(page, async () => {
-        await picker(page).selectOption({ label: PLACED.name })
-        await picker(page).selectOption({ label: OWN })
-        await pressShowView(page)
-      })
-      check('a sort of your own: a step off it and back sends nothing', stepped === 0 ? null : `${String(stepped)} list requests were sent`)
-      check('a sort of your own: and keeps it', same([await sortOf(page, 'Order date'), (await choices(page)).shown], ['ascending', OWN]))
-    }],
-    ['All records again (Records)', async (page) => {
-      await picker(page).selectOption({ label: 'All records' })
-      const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\.$/)
-      check('all records: one first page, with neither a filter nor a sort', same(sent, [{ filter: [], sort: [], after: null }]))
-      check('all records: no header sorted', same(await sortOf(page, 'Order date'), null))
-      check('all records: the picker says so, and offers no filter of your own', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }))
-    }],
+    [
+      'Views offered (Records)',
+      async (page) => {
+        // From Search, as the filter's states left it: the next Tab is View, then Show view, then Columns, then Filter.
+        await records(page).getByRole('button', { name: 'Search', exact: true }).focus()
+        await page.keyboard.press('Tab')
+        check('Tab from Search reaches View', await focusedOn(page, picker(page)))
+        await page.keyboard.press('Tab')
+        check('the next Tab Show view', await focusedOn(page, showView(page)))
+        await page.keyboard.press('Tab')
+        check('the next Tab Columns', await focusedOn(page, records(page).getByRole('button', { name: 'Columns', exact: true })))
+        await page.keyboard.press('Tab')
+        check('and the next Tab Filter', await focusedOn(page, records(page).getByRole('button', { name: 'Filter', exact: true })))
+        check(
+          'views offered: every view, and the grid on every record',
+          same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }),
+        )
+      },
+    ],
+    [
+      'A view chosen, not shown yet (Records)',
+      async (page) => {
+        const before = await lineOf(page)
+        const sent = await listsSentWhile(page, async () => {
+          await picker(page).focus()
+          await picker(page).selectOption({ label: PLACED.name })
+          await picker(page).selectOption({ label: NOTED.name })
+        })
+        check('a view chosen: nothing is sent until Show view', sent === 0 ? null : `${String(sent)} list requests were sent`)
+        check('a view chosen: the grid lists what it listed', same(await lineOf(page), before))
+        check('a view chosen: no header sorted', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], [null, null]))
+        check('a view chosen: the select holds it', same((await choices(page)).shown, NOTED.name))
+      },
+    ],
+    [
+      'A view shown (Records)',
+      async (page) => {
+        const before = page.url()
+        const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/)
+        check('a view shown: one first page, with its filter and its sort', same(sent, [{ filter: NOTED.filter, sort: NOTED.sort, after: null }]))
+        check('a view shown: the headers show its two columns', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], ['descending', 'ascending']))
+        check('a view shown: the picker names it', same((await choices(page)).shown, NOTED.name))
+        check('a view shown: the keyboard stays on Show view', await focusedOn(page, showView(page)))
+        check('a view shown: nothing of it is in the address', page.url() === before ? null : `the address became ${page.url()}`)
+      },
+    ],
+    [
+      'A sort of your own (Records)',
+      async (page) => {
+        const header = page.getByRole('grid', { name: 'Records', exact: true }).getByRole('columnheader', { name: /^Order date/ })
+        const sent = await listsWhile(
+          page,
+          async () => {
+            await header.focus()
+            await page.keyboard.press('Enter')
+          },
+          /^Rows 1–\d+(; more follow)?\. Filtered by Notes\.$/,
+        )
+        check(
+          'a sort of your own: one first page, in the view’s filter and the header’s sort',
+          same(sent, [{ filter: NOTED.filter, sort: [{ field: 'order_date', direction: 'asc' }], after: null }]),
+        )
+        check('a sort of your own: the Order date header says it sorts ascending', same(await sortOf(page, 'Order date'), 'ascending'))
+        check('a sort of your own: the picker says so', same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name, OWN], shown: OWN }))
+        check('a sort of your own: the view’s columns no longer sorted', same([await sortOf(page, 'Amount'), await sortOf(page, 'Id')], [null, null]))
+        // Off it in the select and back, as arrows step a closed select, then Show view on it: nothing sent, the sort kept.
+        const stepped = await listsSentWhile(page, async () => {
+          await picker(page).selectOption({ label: PLACED.name })
+          await picker(page).selectOption({ label: OWN })
+          await pressShowView(page)
+        })
+        check('a sort of your own: a step off it and back sends nothing', stepped === 0 ? null : `${String(stepped)} list requests were sent`)
+        check('a sort of your own: and keeps it', same([await sortOf(page, 'Order date'), (await choices(page)).shown], ['ascending', OWN]))
+      },
+    ],
+    [
+      'All records again (Records)',
+      async (page) => {
+        await picker(page).selectOption({ label: 'All records' })
+        const sent = await listsWhile(page, () => pressShowView(page), /^Rows 1–\d+(; more follow)?\.$/)
+        check('all records: one first page, with neither a filter nor a sort', same(sent, [{ filter: [], sort: [], after: null }]))
+        check('all records: no header sorted', same(await sortOf(page, 'Order date'), null))
+        check(
+          'all records: the picker says so, and offers no filter of your own',
+          same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }),
+        )
+      },
+    ],
   ]
 }

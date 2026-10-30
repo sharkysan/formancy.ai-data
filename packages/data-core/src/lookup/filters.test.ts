@@ -14,7 +14,19 @@ const UUID: RowFilterType = { kind: 'uuid' }
 const restricted = (...equal: unknown[]): RowFilters => untyped({ kind: 'restricted', equal })
 
 function col(name: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal: 1, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
+  return {
+    name,
+    ordinal: 1,
+    databaseType: type.kind,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+    ...extra,
+  }
 }
 
 /** A tenant's items: a key kind of every sort a filter can compare, and three it cannot. */
@@ -76,7 +88,13 @@ describe('rowFilterTerms', () => {
     expect(terms[0]).not.toBe(filters.equal[0])
     expect(terms[0]?.type).not.toBe(filters.equal[0].type)
 
-    for (const entry of [{ column: '', type: INT32, value: '7' }, { column: 'tenant_id', type: INT32, value: 7 }, { column: 'tenant_id', type: INT32 }, null, 'tenant_id=7']) {
+    for (const entry of [
+      { column: '', type: INT32, value: '7' },
+      { column: 'tenant_id', type: INT32, value: 7 },
+      { column: 'tenant_id', type: INT32 },
+      null,
+      'tenant_id=7',
+    ]) {
       expect(() => rowFilterTerms(restricted(entry)), JSON.stringify(entry)).toThrow(/a column name and a text value/)
     }
   })
@@ -109,7 +127,15 @@ describe('rowFilterTerms', () => {
       expect(() => rowFilterTerms(restricted({ column: 'c', type, value: '1' })), JSON.stringify(type) ?? 'undefined').toThrow(/its column's type/)
     }
     // Every shape the contract does name passes, and comes back without anything it did not.
-    for (const type of [INT32, CODE, FIXED, UUID, { kind: 'date' }, { kind: 'decimal', precision: null, scale: null }, { kind: 'text', maxLength: null, lengthUnit: 'code-page-bytes', fixedLength: false }]) {
+    for (const type of [
+      INT32,
+      CODE,
+      FIXED,
+      UUID,
+      { kind: 'date' },
+      { kind: 'decimal', precision: null, scale: null },
+      { kind: 'text', maxLength: null, lengthUnit: 'code-page-bytes', fixedLength: false },
+    ]) {
       const value = type.kind === 'uuid' ? '0f8fad5b-d9cb-469f-a165-70867728950e' : type.kind === 'date' ? '2026-10-09' : '1'
       expect(rowFilterTerms(restricted({ column: 'c', type: { ...type, extra: true }, value }))[0]?.type, type.kind).toEqual(type)
     }
@@ -120,7 +146,14 @@ describe('rowFilterTerms', () => {
   // as exact text, an upper-case uuid is a spelling no row reads back as, and
   // an unpaired surrogate reaches PostgreSQL as U+FFFD and SQL Server as itself.
   test("refuses a value its column's type does not hold in that spelling", () => {
-    for (const [type, value] of [[INT32, '042'], [INT32, 'acme'], [FIXED, 'AB '], [UUID, '0F8FAD5B-D9CB-469F-A165-70867728950E'], [CODE, 'x'.repeat(11)], [CODE, 'x\uD800']] as const) {
+    for (const [type, value] of [
+      [INT32, '042'],
+      [INT32, 'acme'],
+      [FIXED, 'AB '],
+      [UUID, '0F8FAD5B-D9CB-469F-A165-70867728950E'],
+      [CODE, 'x'.repeat(11)],
+      [CODE, 'x\uD800'],
+    ] as const) {
       expect(() => rowFilterTerms(restricted({ column: 'c', type, value })), value).toThrow(/not spelled as its column holds it/)
     }
   })
@@ -145,7 +178,16 @@ describe('scopeRowFilters', () => {
   // function, so a lookup can no longer list rows a record request refuses:
   // the lookup route used to pass the policy's text through untyped.
   test("types each term from the object's column, and keeps [] the only spelling of unrestricted", () => {
-    expect(scopeRowFilters(ITEM, [{ column: 'tenant_code', value: 'acme' }, { column: 'tenant_id', value: '7' }], 'lookups.item')).toEqual({
+    expect(
+      scopeRowFilters(
+        ITEM,
+        [
+          { column: 'tenant_code', value: 'acme' },
+          { column: 'tenant_id', value: '7' },
+        ],
+        'lookups.item',
+      ),
+    ).toEqual({
       ok: true,
       filters: {
         kind: 'restricted',
@@ -162,7 +204,11 @@ describe('scopeRowFilters', () => {
   // at all by this connection: refused as the policy's fault, naming where.
   test('refuses an absent, unreadable or uncomparable column as invalid-policy', () => {
     for (const column of ['nope', 'secret', 'active', 'changed_at', 'weight']) {
-      expect(scopeRowFilters(ITEM, [{ column, value: '1' }], 'rowFilters'), column).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringMatching(/^rowFilters: /) as unknown as string })
+      expect(scopeRowFilters(ITEM, [{ column, value: '1' }], 'rowFilters'), column).toMatchObject({
+        ok: false,
+        code: 'invalid-policy',
+        message: expect.stringMatching(/^rowFilters: /),
+      })
     }
   })
 
@@ -170,7 +216,12 @@ describe('scopeRowFilters', () => {
   // is a deployment problem, and never something an engine converts — nor
   // text the two drivers would send as two different strings.
   test('refuses a misspelled trusted value as invalid-context', () => {
-    for (const [column, value] of [['tenant_id', '042'], ['fixed_code', 'AB '], ['owner', '0F8FAD5B-D9CB-469F-A165-70867728950E'], ['tenant_code', 'x\uD800']] as const) {
+    for (const [column, value] of [
+      ['tenant_id', '042'],
+      ['fixed_code', 'AB '],
+      ['owner', '0F8FAD5B-D9CB-469F-A165-70867728950E'],
+      ['tenant_code', 'x\uD800'],
+    ] as const) {
       expect(scopeRowFilters(ITEM, [{ column, value }], 'lookups.item'), value).toMatchObject({ ok: false, code: 'invalid-context' })
     }
   })

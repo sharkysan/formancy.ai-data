@@ -18,7 +18,11 @@ const PAGE = 'https://formancy.ai'
 const SESSION = `${PAGE}/data/demo/session`
 
 function signIn(body: string | Uint8Array<ArrayBuffer>, headers: Record<string, string> = {}): Request {
-  return new Request(SESSION, { method: 'POST', body, headers: { origin: PAGE, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...headers } })
+  return new Request(SESSION, {
+    method: 'POST',
+    body,
+    headers: { origin: PAGE, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...headers },
+  })
 }
 
 async function refusal(request: Request): Promise<{ status: number; body: unknown }> {
@@ -47,7 +51,9 @@ describe('the session', () => {
     }
     // Sec-Fetch-Site is a browser's to send: a browser that sends none is
     // judged by its Origin and type alone, and a charset is still JSON.
-    const read = await readSignIn(new Request(SESSION, { method: 'POST', body: '{"persona":"otto"}', headers: { origin: PAGE, 'content-type': 'application/json; charset=utf-8' } }))
+    const read = await readSignIn(
+      new Request(SESSION, { method: 'POST', body: '{"persona":"otto"}', headers: { origin: PAGE, 'content-type': 'application/json; charset=utf-8' } }),
+    )
     expect(read.ok).toBe(true)
   })
 
@@ -72,7 +78,10 @@ describe('the session', () => {
     for (const [name, value] of Object.entries(headers)) if (value === '') request.headers.delete(name)
     expect(await refusal(request)).toEqual({
       status: 403,
-      body: { code: 'cross-origin-refused', message: "A demo server is started only from the demo's own page, and this request did not come from it, so nothing was started." },
+      body: {
+        code: 'cross-origin-refused',
+        message: "A demo server is started only from the demo's own page, and this request did not come from it, so nothing was started.",
+      },
     })
   })
 
@@ -97,7 +106,10 @@ describe('the session', () => {
   // A POST with no body at all names nobody either.
   test('refuses a sign-in with no body', async () => {
     const request = new Request(SESSION, { method: 'POST', headers: { origin: PAGE, 'content-type': 'application/json' } })
-    expect((await refusal(request)).body).toEqual({ code: 'malformed', message: `A sign-in is a JSON object naming one persona, {"persona": "<id>"}, in at most ${String(SIGN_IN_BYTES)} bytes.` })
+    expect((await refusal(request)).body).toEqual({
+      code: 'malformed',
+      message: `A sign-in is a JSON object naming one persona, {"persona": "<id>"}, in at most ${String(SIGN_IN_BYTES)} bytes.`,
+    })
   })
 
   // A persona is chosen from the list, never made up: a role or a tenant
@@ -122,7 +134,12 @@ describe('the session', () => {
         controller.enqueue(new Uint8Array(256).fill(0x20))
       },
     })
-    const request = new Request(SESSION, { method: 'POST', body: endless, headers: { origin: PAGE, 'content-type': 'application/json' }, duplex: 'half' } as RequestInit)
+    const request = new Request(SESSION, {
+      method: 'POST',
+      body: endless,
+      headers: { origin: PAGE, 'content-type': 'application/json' },
+      duplex: 'half',
+    })
     expect((await refusal(request)).status).toBe(400)
     expect(pulled).toBeLessThan(SIGN_IN_BYTES / 256 + 4)
   })
@@ -134,10 +151,18 @@ describe('a sign-in answer', () => {
   // What the Durable Object signs for a persona is what the server reads
   // as that persona: their id, their roles, their tenant.
   test("signs each persona's token as the server reads that persona", async () => {
-    const verify = await createIdentityVerifier({ key: { kind: 'secret', secret: KEY }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } })
+    const verify = await createIdentityVerifier({
+      key: { kind: 'secret', secret: KEY },
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      attributes: { tenant: TENANT_CLAIM },
+    })
     for (const persona of PERSONAS) {
       const { token } = await mintToken(KEY, claimsFor(persona))
-      expect(await verify(token)).toEqual({ ok: true, identity: { actor: { id: persona.id, roles: [...persona.roles] }, attributes: { tenant: String(persona.tenant) } } })
+      expect(await verify(token)).toEqual({
+        ok: true,
+        identity: { actor: { id: persona.id, roles: [...persona.roles] }, attributes: { tenant: String(persona.tenant) } },
+      })
     }
   })
 

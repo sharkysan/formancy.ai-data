@@ -1,6 +1,18 @@
 import { WRITE_ID_HEADER } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
-import { FORWARDED_HEADERS, forwardedRequest, forwardFailed, jsonAnswer, methodNotAllowed, notFound, notRunning, pageSafe, startFailed, streamingOption, WORKER_HEADERS } from './answers.js'
+import {
+  FORWARDED_HEADERS,
+  forwardedRequest,
+  forwardFailed,
+  jsonAnswer,
+  methodNotAllowed,
+  notFound,
+  notRunning,
+  pageSafe,
+  startFailed,
+  streamingOption,
+  WORKER_HEADERS,
+} from './answers.js'
 import { IDLE_MINUTES, MAX_INSTANCES } from './limits.js'
 
 /**
@@ -68,7 +80,8 @@ describe("the Worker's own answers", () => {
 })
 
 describe('what the Worker forwards', () => {
-  const browser = (init: RequestInit & { headers: Record<string, string> }): Request => new Request('https://formancy.ai/data/demo/v1/forms/order/records/create', init)
+  const browser = (init: RequestInit & { headers: Record<string, string> }): Request =>
+    new Request('https://formancy.ai/data/demo/v1/forms/order/records/create', init)
 
   // An allowlist, so nothing of the visitor's reaches their server but what
   // the runtime plane reads: the token, the body's type, the write id that
@@ -110,14 +123,26 @@ describe('what the Worker forwards', () => {
       'sec-fetch-mode': 'cors',
       'sec-fetch-dest': 'empty',
     })
-    expect([...FORWARDED_HEADERS]).toEqual(['authorization', 'content-type', 'accept', WRITE_ID_HEADER, 'origin', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'])
+    expect([...FORWARDED_HEADERS]).toEqual([
+      'authorization',
+      'content-type',
+      'accept',
+      WRITE_ID_HEADER,
+      'origin',
+      'sec-fetch-site',
+      'sec-fetch-mode',
+      'sec-fetch-dest',
+    ])
   })
 
   // The path routeOf made, on the container's own address; the method and
   // the body as sent; a redirect never followed, as data-client never
   // follows one.
   test('sends the method, the body and the path as given, to the container, following no redirect', async () => {
-    const sent = forwardedRequest(browser({ method: 'POST', body: '{"values":{"notes":"Call first"}}', headers: { 'content-type': 'application/json' } }), '/v1/forms/order/records/create?x=1')
+    const sent = forwardedRequest(
+      browser({ method: 'POST', body: '{"values":{"notes":"Call first"}}', headers: { 'content-type': 'application/json' } }),
+      '/v1/forms/order/records/create?x=1',
+    )
     expect([sent.method, sent.url, sent.redirect]).toEqual(['POST', 'http://container/v1/forms/order/records/create?x=1', 'manual'])
     expect(await sent.text()).toBe('{"values":{"notes":"Call first"}}')
     const read = forwardedRequest(new Request('https://formancy.ai/data/demo/v1/forms'), '/v1/forms')
@@ -138,7 +163,12 @@ describe('what the Worker sends back', () => {
   // never sends a referrer, and is framed by nobody. The server's status,
   // body and headers -- its no-store among them -- are kept.
   test("keeps the server's answer and adds what the composed stack's proxy adds", async () => {
-    const answer = pageSafe(new Response('{"code":"forbidden","message":"No."}', { status: 403, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } }))
+    const answer = pageSafe(
+      new Response('{"code":"forbidden","message":"No."}', {
+        status: 403,
+        headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+      }),
+    )
     expect(answer.status).toBe(403)
     expect(await answer.json()).toEqual({ code: 'forbidden', message: 'No.' })
     expect(Object.fromEntries(answer.headers)).toEqual({

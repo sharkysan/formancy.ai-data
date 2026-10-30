@@ -53,7 +53,7 @@ export function readTarball(source) {
   const archive = gunzipSync(typeof source === 'string' ? readFileSync(source) : source)
   const files = new Map()
   let longName
-  for (let at = 0; at + BLOCK <= archive.length; ) {
+  for (let at = 0; at + BLOCK <= archive.length;) {
     const header = archive.subarray(at, at + BLOCK)
     if (header.every((byte) => byte === 0)) break
     if (!checksumHolds(header)) throw new Error(`the tar header at byte ${String(at)} does not hold its own checksum`)

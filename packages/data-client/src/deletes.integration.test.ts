@@ -32,7 +32,10 @@ describe.each(ENGINES)('a deletion through the client on $engine', ({ connection
   // The form says delete and what it also does: nothing cascades or clears,
   // and the database may keep a record other rows refer to.
   test('the form offers delete, with what a delete also does', async () => {
-    expect(expectOk(await plane.client().form(formId))).toMatchObject({ operations: ['read', 'create', 'update', 'delete'], deleting: { cascades: false, clears: false, restricted: true } })
+    expect(expectOk(await plane.client().form(formId))).toMatchObject({
+      operations: ['read', 'create', 'update', 'delete'],
+      deleting: { cascades: false, clears: false, restricted: true },
+    })
   })
 
   // A clerk deletes her record at the version she read: the answer is its
@@ -45,7 +48,12 @@ describe.each(ENGINES)('a deletion through the client on $engine', ({ connection
     const created = expectOk(await clerk.create(formId, { note: `delete through the client ${connection}` }))
     const record = created.record ?? ''
     const version = created.version ?? ''
-    expect(await plane.client(plane.tokens.otherClerk).delete(formId, { record, version })).toEqual({ ok: false, status: 404, code: 'not-found', message: 'No such record.' })
+    expect(await plane.client(plane.tokens.otherClerk).delete(formId, { record, version })).toEqual({
+      ok: false,
+      status: 404,
+      code: 'not-found',
+      message: 'No such record.',
+    })
 
     const saved = expectOk(await clerk.update(formId, { record, version, answers: { note: 'changed' } }))
     expect(await clerk.delete(formId, { record, version })).toMatchObject({ ok: false, status: 409, code: 'stale' })

@@ -35,12 +35,10 @@ describe('a chain of versions', () => {
       })
       expect(bindings.operations, kind).toEqual({ create: true, update: true, delete: false, supersede: true })
       expect(form.logic?.rules, kind).toContainEqual({ target: 'valid_to', kind: 'disabled', cel: 'true' })
-      expect(notes.filter((note) => note.message.includes('(0113)')).map((note) => `${note.subject}: ${note.kind}`), kind).toEqual([
-        'product_no: read-only',
-        'valid_from: read-only',
-        'valid_to: read-only',
-        ...(kind === 'sqlserver' ? ['price: blocked'] : []),
-      ])
+      expect(
+        notes.filter((note) => note.message.includes('(0113)')).map((note) => `${note.subject}: ${note.kind}`),
+        kind,
+      ).toEqual(['product_no: read-only', 'valid_from: read-only', 'valid_to: read-only', ...(kind === 'sqlserver' ? ['price: blocked'] : [])])
     }
   })
 
@@ -60,7 +58,10 @@ describe('a chain of versions', () => {
   test('offers no change from a date where it could not end one version or start the next', () => {
     const blocked = (edit: (objects: ObjectMeta[]) => void) => {
       const { bindings, notes } = priceForm(priced('sqlserver', edit))
-      return { supersede: bindings.operations.supersede, said: notes.filter((note) => note.kind === 'blocked' && note.message.startsWith('Change from a date')).map((note) => note.message) }
+      return {
+        supersede: bindings.operations.supersede,
+        said: notes.filter((note) => note.kind === 'blocked' && note.message.startsWith('Change from a date')).map((note) => note.message),
+      }
     }
     expect(blocked((objects) => restrict(objects, 'price', 'valid_to', { update: false }))).toEqual({
       supersede: false,
@@ -76,23 +77,38 @@ describe('a chain of versions', () => {
   // key of the start alone let through: it bound a chain whose key was
   // empty, every row one thing's version.
   test('is refused where no chain could be held to it', () => {
-    const refused = (edit: (objects: ObjectMeta[]) => void, validity = { from: 'valid_from', to: 'valid_to' }) => () => priceForm(priced('sqlserver', edit), validity)
+    const refused =
+      (edit: (objects: ObjectMeta[]) => void, validity = { from: 'valid_from', to: 'valid_to' }) =>
+      () =>
+        priceForm(priced('sqlserver', edit), validity)
     const none = () => {}
     expect(refused(none, { from: 'starts', to: 'valid_to' })).toThrow('price has no column starts for a version to start at')
-    expect(refused((objects) => restrict(objects, 'price', 'valid_to', { select: false }))).toThrow("valid_to cannot say where a version ends: this connection's account may not read it")
-    expect(refused((objects) => (column(objects, 'valid_to').generated = 'computed'))).toThrow('valid_to cannot say where a version ends: the database computes it')
+    expect(refused((objects) => restrict(objects, 'price', 'valid_to', { select: false }))).toThrow(
+      "valid_to cannot say where a version ends: this connection's account may not read it",
+    )
+    expect(refused((objects) => (column(objects, 'valid_to').generated = 'computed'))).toThrow(
+      'valid_to cannot say where a version ends: the database computes it',
+    )
     expect(refused(none, { from: 'tenant_id', to: 'valid_to' })).toThrow('tenant_id cannot say where a version starts: the policy pins it')
     expect(refused(none, { from: 'amount', to: 'valid_to' })).toThrow('amount is decimal: a version starts at a date or at an instant')
     expect(refused(none, { from: 'valid_from', to: 'valid_from' })).toThrow('a version cannot start and end at one column, valid_from')
-    expect(refused((objects) => (column(objects, 'valid_to').type = { kind: 'timestamp', withTimeZone: true, precision: 6 }))).toThrow('valid_from and valid_to are not both dates or both instants')
-    expect(refused((objects) => (column(objects, 'valid_to').type = { kind: 'timestamp', withTimeZone: false, precision: 6 }))).toThrow('a version ends at a date or at an instant')
+    expect(refused((objects) => (column(objects, 'valid_to').type = { kind: 'timestamp', withTimeZone: true, precision: 6 }))).toThrow(
+      'valid_from and valid_to are not both dates or both instants',
+    )
+    expect(refused((objects) => (column(objects, 'valid_to').type = { kind: 'timestamp', withTimeZone: false, precision: 6 }))).toThrow(
+      'a version ends at a date or at an instant',
+    )
     expect(refused((objects) => (column(objects, 'valid_from').nullable = true))).toThrow('valid_from may be NULL, and every version starts somewhere')
     expect(refused((objects) => (column(objects, 'valid_to').nullable = false))).toThrow('valid_to may not be NULL, and the open version holds NULL there')
     expect(refused((objects) => (price(objects).primaryKey = { name: 'pk_price', columns: ['tenant_id', 'product_no', 'valid_from', 'valid_to'] }))).toThrow(
       'no primary or unique key of price holds valid_from with another column and not valid_to',
     )
-    expect(refused((objects) => (price(objects).primaryKey = { name: 'pk_price', columns: ['valid_from'] }))).toThrow('no primary or unique key of price holds valid_from with another column')
-    expect(refused((objects) => restrict(objects, 'price', 'product_no', { select: false }))).toThrow("product_no says which thing a version belongs to, and this connection's account may not read it")
+    expect(refused((objects) => (price(objects).primaryKey = { name: 'pk_price', columns: ['valid_from'] }))).toThrow(
+      'no primary or unique key of price holds valid_from with another column',
+    )
+    expect(refused((objects) => restrict(objects, 'price', 'product_no', { select: false }))).toThrow(
+      "product_no says which thing a version belongs to, and this connection's account may not read it",
+    )
     expect(refused((objects) => price(objects).columns.splice(6, 1))).toThrow('has no rowversion and no version column: confirm one')
   })
 

@@ -4,7 +4,16 @@ import { searchableDisplay } from '../lookup/searchable.js'
 import type { LookupSearchColumn } from '../lookup/types.js'
 import type { ColumnMeta, ForeignKeyMeta, Generation, MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { findObject } from '../snapshot.js'
-import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes, UNREADABLE, uninsertablePins, versionAccessProblem, writesFor } from './access.js'
+import {
+  assertReadableLookup,
+  assertReadableRoot,
+  identityFor,
+  rowSecurityNotes,
+  UNREADABLE,
+  uninsertablePins,
+  versionAccessProblem,
+  writesFor,
+} from './access.js'
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
@@ -124,7 +133,8 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
 function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: readonly LookupChoice[]): ResolvedLookup[] {
   const sections = choices.filter((choice) => choice.section !== undefined)
   // A record is a section of one record: two would put one row under two parents' pages.
-  if (sections.length > 1) throw new Error(`${sections.map((choice) => choice.foreignKey).join(' and ')} are both marked as sections; a form is a section of one table's records`)
+  if (sections.length > 1)
+    throw new Error(`${sections.map((choice) => choice.foreignKey).join(' and ')} are both marked as sections; a form is a section of one table's records`)
   const seen = new Map<string, string>()
   return choices.map((choice) => {
     const foreignKey = root.foreignKeys.find((candidate) => candidate.name === choice.foreignKey)
@@ -134,7 +144,9 @@ function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: r
     }
     const target = findObject(snapshot, foreignKey.references.table)
     if (target === undefined) {
-      throw new Error(`${choice.foreignKey} points at ${foreignKey.references.table.schema}.${foreignKey.references.table.name}, which is outside the discovered scope`)
+      throw new Error(
+        `${choice.foreignKey} points at ${foreignKey.references.table.schema}.${foreignKey.references.table.name}, which is outside the discovered scope`,
+      )
     }
     if (choice.display.length === 0) throw new Error(`${choice.foreignKey} needs at least one display column`)
     for (const name of choice.display) {
@@ -142,7 +154,8 @@ function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: r
       if (column === undefined) throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${name} to display`)
       // `buildLookupConfig` refuses it in these words, so a form published
       // with it would list nothing, under a control its note named (0066).
-      if (!isDisplayType(column.type)) throw new Error(`${choice.foreignKey}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
+      if (!isDisplayType(column.type))
+        throw new Error(`${choice.foreignKey}: display column ${name} is ${column.databaseType}, which has no text form for a label`)
     }
     assertReadableLookup(root, foreignKey, target, choice.display)
     // One column bound through two lookups would take two values from two
@@ -263,7 +276,8 @@ function filledKey(identity: readonly string[] | null, pinned: ReadonlySet<strin
 }
 
 /** Why a key the database fills by default is shown and never written (0056). */
-const FILLED_KEY = "The database fills this key by its default when a create leaves it out, and the form never gives it: a record's address is the database's to choose, as an identity's is."
+const FILLED_KEY =
+  "The database fills this key by its default when a create leaves it out, and the form never gives it: a record's address is the database's to choose, as an identity's is."
 
 /**
  * The generator's own wording, opening a sentence: its first letter raised and
@@ -303,7 +317,12 @@ function planColumn(
   if (filled) notes.push({ subject: key, kind: 'read-only', message: FILLED_KEY })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
   if (isView) notes.push({ subject: key, kind: 'read-only', message: `${root.ref.name} is a view.` })
-  if (pinned) notes.push({ subject: key, kind: 'read-only', message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.' })
+  if (pinned)
+    notes.push({
+      subject: key,
+      kind: 'read-only',
+      message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.',
+    })
   const writes = writesFor([column], possible, key, notes)
   const required = writes.create && !column.nullable && !column.hasDefault
 
@@ -390,7 +409,9 @@ function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixe
     return false
   }
   for (const column of fixedOut) {
-    blocked(`Create is not offered: ${column.name} is pinned by the policy and written from the trusted context, and this connection's account may not INSERT it.`)
+    blocked(
+      `Create is not offered: ${column.name} is pinned by the policy and written from the trusted context, and this connection's account may not INSERT it.`,
+    )
   }
 
   // A create needs a value for every column that has neither a default nor a
@@ -403,7 +424,8 @@ function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixe
     ...planned.flatMap((entry) => (entry.binding.writes.create ? (entry.binding.kind === 'lookup' ? entry.binding.columns : [entry.binding.column]) : [])),
   ])
   const unreachable = root.columns.filter((column) => !column.nullable && !column.hasDefault && column.generated === 'none' && !bound.has(column.name))
-  if (unreachable.length > 0) blocked(`Create is not offered: ${unreachable.map((column) => column.name).join(', ')} must be given a value and no field can give one.`)
+  if (unreachable.length > 0)
+    blocked(`Create is not offered: ${unreachable.map((column) => column.name).join(', ')} must be given a value and no field can give one.`)
   return unreachable.length === 0 && fixedOut.length === 0
 }
 
@@ -453,7 +475,11 @@ function operationsFor(
     // the database would refuse every save. A form that writes nothing for
     // other reasons keeps the behaviour it had before 0027.
     update = false
-    notes.push({ subject: root.ref.name, kind: 'blocked', message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes." })
+    notes.push({
+      subject: root.ref.name,
+      kind: 'blocked',
+      message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes.",
+    })
   }
 
   // What the delete also does to other tables is never read here: that is
@@ -469,9 +495,7 @@ function layoutFor(root: ObjectMeta, planned: readonly Planned[]): LayoutNode[] 
   const grid = (entries: readonly Planned[]): LayoutNode => ({
     kind: 'table',
     columns: 2,
-    children: entries.map((entry) =>
-      entry.multiline ? { kind: 'field', path: entry.field.key, span: 'all' } : { kind: 'field', path: entry.field.key },
-    ),
+    children: entries.map((entry) => (entry.multiline ? { kind: 'field', path: entry.field.key, span: 'all' } : { kind: 'field', path: entry.field.key })),
   })
 
   const main = ordered.filter((entry) => !entry.system)

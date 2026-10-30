@@ -143,7 +143,11 @@ describe('the review queue', () => {
     await user.click(within(region).getByRole('button', { name: 'Approve and publish' }))
     expect((await findStatus(region)).textContent).toBe('Published as version 1.')
     const differs = within(region).getByRole('list', { name: 'What differs from the database now, and blocks nothing' })
-    expect(within(differs).getAllByRole('listitem').map((item) => item.textContent)).toEqual([expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/)])
+    expect(
+      within(differs)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/)])
     expect(await audit()).toEqual([])
   })
 
@@ -220,14 +224,21 @@ describe('what a draft offers whom', () => {
     expect(await queued(review)).toEqual(['sales-order, draft 2: “Order”, submitted by ada over version 1.'])
     const region = await open(user, review, 2)
     const confirmed = within(region).getByRole('list', { name: 'Keys its author confirmed' })
-    expect(within(confirmed).getAllByRole('listitem').map((item) => item.textContent)).toEqual(keys.map(describeReassigned))
+    expect(
+      within(confirmed)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(keys.map(describeReassigned))
     expect(await audit()).toEqual([])
   })
 })
 
 describe('what a draft shows its reviewer', () => {
   /** A list's items under a name, as a person reads them. */
-  const items = (region: HTMLElement, name: string) => within(within(region).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent)
+  const items = (region: HTMLElement, name: string) =>
+    within(within(region).getByRole('list', { name }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent)
 
   // A publisher approves the policy as much as the form: who reads and
   // writes which column, which rows a list offers and a person reaches,
@@ -251,17 +262,38 @@ describe('what a draft shows its reviewer', () => {
       ],
     }
     await submit(plane, TOKENS.admin, null, await orderBundle(plane, granting, order))
-    const lines = { ...ORDER, root: { schema: 'sales', name: 'order_line' }, formId: 'sales-order_line', title: 'Order line', lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }] }
-    const through: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
+    const lines = {
+      ...ORDER,
+      root: { schema: 'sales', name: 'order_line' },
+      formId: 'sales-order_line',
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+    }
+    const through: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: {},
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }
     await submit(plane, TOKENS.admin, null, await orderBundle(plane, through, lines))
     const { user, review } = await reviewAs(TOKENS.publisher)
 
     const region = await open(user, review, 1)
-    expect(items(region, 'Who may do what')).toEqual(['Roles that may read: clerk, auditor.', 'Roles that may create: clerk.', 'Roles that may update: clerk.', 'Roles that may delete: clerk.'])
+    expect(items(region, 'Who may do what')).toEqual([
+      'Roles that may read: clerk, auditor.',
+      'Roles that may create: clerk.',
+      'Roles that may update: clerk.',
+      'Roles that may delete: clerk.',
+    ])
     const fields = items(region, 'Fields')
     expect(fields).toContain('Notes (notes): read roles clerk, auditor; write roles clerk.')
     expect(fields).toContain('Order date (order_date): read roles nobody; write roles nobody.')
-    expect(items(region, 'Rows')).toEqual(['Row filters on sales.order: tenant_id = trusted attribute tenant.', 'Rows the Customer list may offer: tenant_id = trusted attribute tenant.'])
+    expect(items(region, 'Rows')).toEqual([
+      'Row filters on sales.order: tenant_id = trusted attribute tenant.',
+      'Rows the Customer list may offer: tenant_id = trusted attribute tenant.',
+    ])
     expect(items(region, 'What a delete also does')).toEqual([
       'fk_delivery_order of sales.delivery, as ON DELETE CASCADE.',
       'fk_order_line_order of sales.order_line, as ON DELETE CASCADE.',
@@ -270,7 +302,12 @@ describe('what a draft shows its reviewer', () => {
     expect(await audit()).toEqual([])
 
     const reached = await open(user, review, 1, 'sales-order_line')
-    expect(items(reached, 'Who may do what')).toEqual(['Roles that may read: clerk.', 'Roles that may create: nobody.', 'Roles that may update: nobody.', 'Roles that may delete: nobody.'])
+    expect(items(reached, 'Who may do what')).toEqual([
+      'Roles that may read: clerk.',
+      'Roles that may create: nobody.',
+      'Roles that may update: nobody.',
+      'Roles that may delete: nobody.',
+    ])
     expect(items(reached, 'Rows')).toEqual([
       'No row filter on sales.order_line: its rows are reached through Order alone.',
       'Rows the Order list may offer: tenant_id = trusted attribute tenant. Only rows of sales.order_line whose Order is one of these.',
@@ -297,7 +334,10 @@ describe('what a draft shows its reviewer', () => {
     const { user, review } = await reviewAs(TOKENS.publisher)
 
     const region = await open(user, review, 1)
-    expect(items(region, 'List views')).toEqual(['Placed: where Status = placed; sorted by Order date descending; opens the grid.', 'Large: where Amount from 1000.'])
+    expect(items(region, 'List views')).toEqual([
+      'Placed: where Status = placed; sorted by Order date descending; opens the grid.',
+      'Large: where Amount from 1000.',
+    ])
     expect(await audit()).toEqual([])
     const without = await open(user, review, 2)
     expect(within(without).queryByRole('list', { name: 'List views' })).toBeNull()
@@ -319,7 +359,9 @@ describe('a decision the server refuses', () => {
     const alert = await within(region).findByRole('alert')
     expect(paragraphs(alert)[0]).toBe('Draft 1 cannot be approved: the database differs from the one this version was generated from in a way it cannot serve.')
     const blocking = within(within(alert).getByRole('list', { name: 'What blocks it' })).getAllByRole('listitem')
-    expect(blocking.map((item) => item.textContent)).toEqual([expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/)])
+    expect(blocking.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/),
+    ])
     expect(await plane.store.latest('sales-order')).toBeNull()
     expect(decisions(region)).toEqual(['Approve and publish', 'Reject'])
     expect(focusedName()).toBe('Approve and publish')
@@ -393,7 +435,9 @@ describe('a decision the server refuses', () => {
     await writeFile(join(plane.root, '.drafts', 'other-order', '1.json'), '{ "entry": "draft" }\n')
     const { review } = await reviewAs(TOKENS.publisher)
     expect(await queued(review)).toEqual(['sales-order, draft 1: “Order”, submitted by ada as the first version.'])
-    expect(within(review).getByText(/^The drafts of other-order/).textContent).toBe('The drafts of other-order could not be read, and are not listed: the operator’s log says why.')
+    expect(within(review).getByText(/^The drafts of other-order/).textContent).toBe(
+      'The drafts of other-order could not be read, and are not listed: the operator’s log says why.',
+    )
     expect(await audit()).toEqual([])
   })
 
@@ -420,7 +464,7 @@ describe('a decision the server refuses', () => {
     await submit(plane, TOKENS.admin, null, await orderBundle(plane))
     let approved = false
     const fetch: typeof globalThis.fetch = async (input, init) => {
-      const url = String(input)
+      const url = input instanceof Request ? input.url : String(input)
       if (approved && (init?.method ?? 'GET') === 'GET' && url.endsWith('/v1/forms/sales-order/drafts/1')) throw new TypeError('Failed to fetch')
       const response = await plane.fetch(input, init)
       if (url.endsWith('/approval')) approved = true

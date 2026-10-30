@@ -21,7 +21,17 @@ import { DRIFT_CHECK_USAGE, runDriftCheck } from './drift-check.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** The database as the server's connection finds it "now", and who it is: a test changes either, as a migration or a rotated login would. */
@@ -32,16 +42,38 @@ let app: FastifyInstance
 
 function snapshot(): MetadataSnapshot {
   return createSnapshot({
-    kind: 'sqlserver', serverVersion: '16.0', account, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{ ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns, primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none' }],
+    kind: 'sqlserver',
+    serverVersion: '16.0',
+    account,
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns,
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys: [],
+        checks: [],
+        rowSecurity: 'none',
+      },
+    ],
   })
 }
 
 const TOKEN = 'drift-check-administrator'
-const verifyIdentity: IdentityVerifier = async (token) => (token === TOKEN ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } } : { ok: false, reason: 'bad' })
+const verifyIdentity: IdentityVerifier = async (token) =>
+  token === TOKEN ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } } : { ok: false, reason: 'bad' }
 
 function registry(): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => snapshot(),
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
@@ -70,12 +102,38 @@ beforeEach(async () => {
   columns = [col('id', 1, INT32), col('name', 2, TEXT), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
   account = { user: 'dbo', login: 'sa' }
   root = await mkdtemp(join(tmpdir(), 'formancy-data-drift-check-'))
-  app = await createDataServer({ verifyIdentity, admin: { registry: registry(), store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry: registry(), store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } },
+  })
   // The employee form, proposed and published as an administrator would.
   const as = { authorization: `Bearer ${TOKEN}` }
-  const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as, payload: { connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' } })).json()
-  const policy = { version: 1, operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] }, fields: { id: { read: ['clerk'], write: ['clerk'] }, name: { read: ['clerk'], write: ['clerk'] } }, rowFilters: [], lookups: {} }
-  const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+  const proposal = (
+    await app.inject({
+      method: 'POST',
+      url: '/v1/form-proposals',
+      headers: as,
+      payload: { connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' },
+    })
+  ).json()
+  const policy = {
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: { id: { read: ['clerk'], write: ['clerk'] }, name: { read: ['clerk'], write: ['clerk'] } },
+    rowFilters: [],
+    lookups: {},
+  }
+  const bundle = {
+    format: 2,
+    connection: 'erp',
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation: EMPTY_PRESENTATION,
+    form: proposal.form,
+    bindings: proposal.bindings,
+    policy,
+    snapshot: proposal.snapshot,
+  }
   const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as, payload: { expectedBase: null, bundle } })
   if (published.statusCode !== 201) throw new Error(published.body)
 })
@@ -88,7 +146,11 @@ describe('the drift check', () => {
   // Nothing changed since publication: the form is reported clean and the
   // pipeline goes on.
   test('passes a form the database still matches, 0', async () => {
-    expect(await check([SERVER, 'employee'])).toEqual({ status: 0, stdout: 'employee (version 1): no changes\n1 of 1 form checked; 0 with a change failing on blocking.\n', stderr: '' })
+    expect(await check([SERVER, 'employee'])).toEqual({
+      status: 0,
+      stdout: 'employee (version 1): no changes\n1 of 1 form checked; 0 with a change failing on blocking.\n',
+      stderr: '',
+    })
   })
 
   // A migration dropped a column the form is bound to: a blocking change,
@@ -131,7 +193,11 @@ describe('the drift check', () => {
       throw new TypeError('fetch failed')
     })
     expect(away).toMatchObject({ status: 2, stderr: 'employee: https://staging.example could not be reached: fetch failed\n' })
-    const portal = await check([SERVER, 'employee'], undefined, async () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } }))
+    const portal = await check(
+      [SERVER, 'employee'],
+      undefined,
+      async () => new Response('<html></html>', { status: 200, headers: { 'content-type': 'text/html' } }),
+    )
     expect(portal).toMatchObject({ status: 2, stderr: 'employee: the server answered 200, which is not a drift report\n' })
   })
 

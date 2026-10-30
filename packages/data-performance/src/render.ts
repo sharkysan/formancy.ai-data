@@ -43,7 +43,12 @@ export function productDigest(product: Results['product']): string {
 const NAMED_LIBRARIES = new Set(['@fastify/rate-limit', '@formancy/spec', 'fastify', 'jose', 'mssql', 'pino', 'postgres', 'tedious'])
 
 /** What a disturbance counter is called on the page. */
-const DISTURBANCES: Readonly<Record<string, string>> = { autovacuum: 'autovacuum', autoanalyze: 'autoanalyze', recompiles: 'recompiles', statisticsUpdated: 'statistics updated' }
+const DISTURBANCES: Readonly<Record<string, string>> = {
+  autovacuum: 'autovacuum',
+  autoanalyze: 'autoanalyze',
+  recompiles: 'recompiles',
+  statisticsUpdated: 'statistics updated',
+}
 
 function labelOf(scenario: CatalogueScenario): string {
   return scenario.form === 'order-unfiltered' ? `${scenario.label} (no tenant row filter)` : scenario.label
@@ -63,7 +68,9 @@ function byRound(rounds: ReadonlyArray<number | null>): string {
 function scenarioRows(results: Results, engine: EngineKey, concurrency: number): Array<{ scenario: CatalogueScenario; entry: ScenarioResult }> {
   const found: Array<{ scenario: CatalogueScenario; entry: ScenarioResult }> = []
   for (const scenario of results.catalogue.scenarios) {
-    const entry = results.scenarios.find((candidate) => candidate.engine === engine && candidate.scenario === scenario.name && candidate.concurrency === concurrency)
+    const entry = results.scenarios.find(
+      (candidate) => candidate.engine === engine && candidate.scenario === scenario.name && candidate.concurrency === concurrency,
+    )
     if (entry !== undefined) found.push({ scenario, entry })
   }
   return found
@@ -79,7 +86,11 @@ function whenAndOnWhat(results: Results): string {
       : `${grouped(cpu.vcpus)} vCPUs presented by the ${cpu.hypervisor} hypervisor as ${topology}; the host's topology is not visible`
   const limits = (engine: EngineKey): string => {
     const limit = machine.databaseLimits[engine]
-    const parts = [limit.nanoCpus > 0 ? `${figure(limit.nanoCpus / 1e9)} CPUs` : '', limit.cpuQuota > 0 ? `CPU quota ${grouped(limit.cpuQuota)}/${grouped(limit.cpuPeriod)} µs` : '', limit.memoryBytes > 0 ? `memory ${bytes(limit.memoryBytes)}` : '']
+    const parts = [
+      limit.nanoCpus > 0 ? `${figure(limit.nanoCpus / 1e9)} CPUs` : '',
+      limit.cpuQuota > 0 ? `CPU quota ${grouped(limit.cpuQuota)}/${grouped(limit.cpuPeriod)} µs` : '',
+      limit.memoryBytes > 0 ? `memory ${bytes(limit.memoryBytes)}` : '',
+    ]
     const set = parts.filter((part) => part !== '')
     return `${ENGINE_NAMES[engine]} ${set.length === 0 ? 'none' : set.join(', ')}`
   }
@@ -103,18 +114,39 @@ function whenAndOnWhat(results: Results): string {
     ['Engine', 'Image', 'Image id', 'Digests', 'Version', 'Text order', 'Settings'],
     ENGINE_KEYS.map((engine) => {
       const facts = engines[engine]
-      const text = facts.text === null ? 'the collation in Settings' : facts.text.codePointOrder ? `code-point order${facts.version.includes('musl') ? ' (musl)' : ''}` : 'locale order'
+      const text =
+        facts.text === null
+          ? 'the collation in Settings'
+          : facts.text.codePointOrder
+            ? `code-point order${facts.version.includes('musl') ? ' (musl)' : ''}`
+            : 'locale order'
       const settings = Object.entries(facts.settings)
         .map(([name, value]) => `${name} ${value}`)
         .join(', ')
-      return [ENGINE_NAMES[engine], `\`${facts.image}\``, `\`${facts.imageId}\``, facts.repoDigests.map((digest) => `\`${digest}\``).join(' '), facts.version, text, settings]
+      return [
+        ENGINE_NAMES[engine],
+        `\`${facts.image}\``,
+        `\`${facts.imageId}\``,
+        facts.repoDigests.map((digest) => `\`${digest}\``).join(' '),
+        facts.version,
+        text,
+        settings,
+      ]
     }),
   )
   const packages = Object.entries(results.product.packages).sort(([a], [b]) => (a < b ? -1 : 1))
   const named = packages.filter(([name]) => NAMED_LIBRARIES.has(name)).map(([name, version]) => `\`${name}@${version}\``)
   const others = packages.length - named.length
   const libraries = `${named.join(', ')}${others === 0 ? '' : `, and ${grouped(others)} other packages`}`
-  return [`### When and on what`, '', ...lines, '', images, '', `Drivers and server libraries as installed: ${libraries} in the server's and the client's runtime closure, each version in \`results.json\`.`].join('\n')
+  return [
+    `### When and on what`,
+    '',
+    ...lines,
+    '',
+    images,
+    '',
+    `Drivers and server libraries as installed: ${libraries} in the server's and the client's runtime closure, each version in \`results.json\`.`,
+  ].join('\n')
 }
 
 function sizes(results: Results): string {
@@ -124,7 +156,8 @@ function sizes(results: Results): string {
       .sort(([a], [b]) => Number(a) - Number(b))
       .map(([tenant, rows]) => `${grouped(rows)} in tenant ${tenant}`)
       .join(', ')
-    const span = (from: SizeFacts, to: SizeFacts, pick: (facts: SizeFacts) => number, show: (value: number) => string): string => `${show(pick(from))} → ${show(pick(to))}`
+    const span = (from: SizeFacts, to: SizeFacts, pick: (facts: SizeFacts) => number, show: (value: number) => string): string =>
+      `${show(pick(from))} → ${show(pick(to))}`
     return [
       ENGINE_NAMES[engine],
       `${grouped(after.customerRows.total)} (${tenants})`,
@@ -146,7 +179,10 @@ function sizes(results: Results): string {
     '',
     `\`sales.customer\` holds the generator's \`${sized.generator}\` (digest \`${sized.digest.slice(0, 12)}\`), loaded in ${ENGINE_KEYS.map((engine) => `${figure(sized.loadSeconds[engine])} s on ${ENGINE_NAMES[engine]}`).join(' and ')}. The measured clerk is tenant 1.`,
     '',
-    table(['Engine', '`sales.customer` rows', 'Customer data', 'Customer indexes', '`sales.order` rows, start → end', 'Database, start → end'], ENGINE_KEYS.map(size)),
+    table(
+      ['Engine', '`sales.customer` rows', 'Customer data', 'Customer indexes', '`sales.order` rows, start → end', 'Database, start → end'],
+      ENGINE_KEYS.map(size),
+    ),
     '',
     bundle,
   ].join('\n')
@@ -154,7 +190,8 @@ function sizes(results: Results): string {
 
 function method(results: Results): string {
   const p = results.protocol
-  const budget = (b: { requests: number; seconds: number; atLeast: number }): string => `up to ${setting(b.requests)} requests or ${setting(b.seconds)} s, whichever ends first, and at least ${setting(b.atLeast)}`
+  const budget = (b: { requests: number; seconds: number; atLeast: number }): string =>
+    `up to ${setting(b.requests)} requests or ${setting(b.seconds)} s, whichever ends first, and at least ${setting(b.atLeast)}`
   const tolerance = p.calibration.tolerance === null ? 'none set' : p.calibration.tolerance === 'unbounded' ? 'unbounded' : setting(p.calibration.tolerance)
   return [
     '### How it was measured',
@@ -180,7 +217,9 @@ function deadline(results: Results): string[] {
   if (!results.catalogue.scenarios.every((entry) => entry.operation !== undefined)) return []
   const derived = lookupDeadlineFrom(results.scenarios, results.catalogue)
   const scenario = results.catalogue.scenarios.find((entry) => entry.name === derived.scenario) as CatalogueScenario
-  return [`- The default lookup deadline, ${grouped(derived.ms)} ms, is the slowest lookup or resolve answer in these figures: ${ENGINE_NAMES[derived.engine]}, ${labelOf(scenario)}, ${grouped(derived.concurrency)} in flight.`]
+  return [
+    `- The default lookup deadline, ${grouped(derived.ms)} ms, is the slowest lookup or resolve answer in these figures: ${ENGINE_NAMES[derived.engine]}, ${labelOf(scenario)}, ${grouped(derived.concurrency)} in flight.`,
+  ]
 }
 
 /**
@@ -215,7 +254,23 @@ function oneAtATime(results: Results, engine: EngineKey): string {
   return [
     `### One request at a time: ${ENGINE_NAMES[engine]}`,
     '',
-    table(['Operation', 'Rows the database reads', 'Rows answered', 'Database round trips', 'n', 'p50 (ms)', 'p90 (ms)', 'p99 (ms)', 'max (ms)', 'p50 by round (ms)', 'Server CPU per request (ms)', ...DATABASE_CPU], rows),
+    table(
+      [
+        'Operation',
+        'Rows the database reads',
+        'Rows answered',
+        'Database round trips',
+        'n',
+        'p50 (ms)',
+        'p90 (ms)',
+        'p99 (ms)',
+        'max (ms)',
+        'p50 by round (ms)',
+        'Server CPU per request (ms)',
+        ...DATABASE_CPU,
+      ],
+      rows,
+    ),
   ].join('\n')
 }
 
@@ -245,12 +300,35 @@ function addedLatency(results: Results, engine: EngineKey): string {
     if (entry === undefined) return []
     // The same request sent directly, one at a time: the hop undelayed beside it shows what the hop costs by itself.
     const direct = results.scenarios.find((candidate) => candidate.engine === engine && candidate.scenario === scenario.name && candidate.concurrency === 1)
-    return [[labelOf(scenario), grouped(entry.roundTrips), direct === undefined ? '—' : cell(direct.p50), cell(entry.undelayedMs), cell(entry.delayedMs), cell(entry.differenceMs), figure(entry.expectedMs), entry.ratio === null ? '—' : figure(entry.ratio)]]
+    return [
+      [
+        labelOf(scenario),
+        grouped(entry.roundTrips),
+        direct === undefined ? '—' : cell(direct.p50),
+        cell(entry.undelayedMs),
+        cell(entry.delayedMs),
+        cell(entry.differenceMs),
+        figure(entry.expectedMs),
+        entry.ratio === null ? '—' : figure(entry.ratio),
+      ],
+    ]
   })
   return [
     `### Added database latency: ${ENGINE_NAMES[engine]}`,
     '',
-    table(['Operation', 'Database round trips', 'p50 direct (ms)', 'p50 through the hop, undelayed (ms)', `p50 with ${delay} ms per answer (ms)`, 'Difference (ms)', `${delay} ms × round trips`, 'Ratio'], rows),
+    table(
+      [
+        'Operation',
+        'Database round trips',
+        'p50 direct (ms)',
+        'p50 through the hop, undelayed (ms)',
+        `p50 with ${delay} ms per answer (ms)`,
+        'Difference (ms)',
+        `${delay} ms × round trips`,
+        'Ratio',
+      ],
+      rows,
+    ),
   ].join('\n')
 }
 
@@ -275,12 +353,24 @@ function refused(results: Results): string {
 
 function fixedCosts(results: Results): string {
   const { components } = results
-  const summary = (s: { n: number; p50: number | null; p90: number | null; p99: number | null; max: number }): string[] => [grouped(s.n), cell(s.p50), cell(s.p90), cell(s.p99), figure(s.max)]
+  const summary = (s: { n: number; p50: number | null; p90: number | null; p99: number | null; max: number }): string[] => [
+    grouped(s.n),
+    cell(s.p50),
+    cell(s.p90),
+    cell(s.p99),
+    figure(s.max),
+  ]
   const rows: string[][] = [[components.verifyToken.label, ...summary(components.verifyToken), '']]
   for (const engine of ENGINE_KEYS) {
     const read = components.readBundle[engine]
     const facts = results.bundle[read.form]
-    rows.push([`${read.label}, \`${read.form}\``, ...summary(read), facts === undefined ? '' : `a ${bytes(facts.versionBytes)} version, its snapshot ${bytes(facts.snapshotBytes)} in ${grouped(facts.snapshotObjects)} objects`])
+    rows.push([
+      `${read.label}, \`${read.form}\``,
+      ...summary(read),
+      facts === undefined
+        ? ''
+        : `a ${bytes(facts.versionBytes)} version, its snapshot ${bytes(facts.snapshotBytes)} in ${grouped(facts.snapshotObjects)} objects`,
+    ])
   }
   for (const engine of ENGINE_KEYS) {
     const health = results.scenarios.find((entry) => entry.engine === engine && entry.scenario === 'health' && entry.concurrency === 1)
@@ -288,7 +378,11 @@ function fixedCosts(results: Results): string {
   }
   for (const engine of ENGINE_KEYS) {
     const floor = components.floor[engine]
-    rows.push([`${results.catalogue.floor.label}, ${ENGINE_NAMES[engine]}`, ...summary(floor), `${grouped(floor.roundTrips)} round trips: ${floor.perRoundTripMs === null ? 'n too small' : `${figure(floor.perRoundTripMs)} ms each at p50`}`])
+    rows.push([
+      `${results.catalogue.floor.label}, ${ENGINE_NAMES[engine]}`,
+      ...summary(floor),
+      `${grouped(floor.roundTrips)} round trips: ${floor.perRoundTripMs === null ? 'n too small' : `${figure(floor.perRoundTripMs)} ms each at p50`}`,
+    ])
   }
   return ['### Fixed costs', '', table(['Component', 'n', 'p50 (ms)', 'p90 (ms)', 'p99 (ms)', 'max (ms)', 'Beside it'], rows)].join('\n')
 }
@@ -296,7 +390,9 @@ function fixedCosts(results: Results): string {
 function runFacts(entries: readonly RunFacts[]): string[] {
   const mean = entries.reduce((sum, entry) => sum + entry.machineBusyPct, 0) / entries.length
   const steals = entries.map((entry) => entry.steal)
-  const steal = steals.every((value) => value === 'not reported') ? 'not reported' : figure(Math.max(...steals.map((value) => (value === 'not reported' ? 0 : value))))
+  const steal = steals.every((value) => value === 'not reported')
+    ? 'not reported'
+    : figure(Math.max(...steals.map((value) => (value === 'not reported' ? 0 : value))))
   const disturbances: Record<string, number> = {}
   for (const entry of entries) for (const [name, count] of Object.entries(entry.disturbances)) disturbances[name] = (disturbances[name] ?? 0) + count
   return [
@@ -327,7 +423,20 @@ function theRun(results: Results): string {
   return [
     '### The run',
     '',
-    table(['Engine', 'Block', 'Machine busy, mean (%)', 'Steal, most (%)', 'Generator lag p99, worst (ms)', 'Calibration, worst idle gap against the baseline', 'Repeated', 'Disturbances', 'Reconnects'], rows),
+    table(
+      [
+        'Engine',
+        'Block',
+        'Machine busy, mean (%)',
+        'Steal, most (%)',
+        'Generator lag p99, worst (ms)',
+        'Calibration, worst idle gap against the baseline',
+        'Repeated',
+        'Disturbances',
+        'Reconnects',
+      ],
+      rows,
+    ),
     '',
     `The server wrote ${figure(results.server.logLinesPerRequest)} log lines per runtime request. Its log holds ${grouped(events)} runtime audit events for the ${grouped(sent)} runtime requests the harness sent, equal by operation, form and status, and ${grouped(results.checks.adminEvents)} administrator events for ${grouped(results.checks.adminRequests)} requests. ${grouped(results.checks.writes)} creates and updates were sent, all through one server's write-id cache (0031); that is a count, not a claim about the cache's bound. The run's orders reference ${ENGINE_KEYS.map((engine) => `${grouped(results.checks.createdCustomers[engine])} customers on ${ENGINE_NAMES[engine]}`).join(' and ')}: creates rotate through them, so no one customer's row is locked by every create.`,
   ].join('\n')
@@ -337,7 +446,8 @@ function theRun(results: Results): string {
 export function renderPerformance(results: Results): string {
   const parts = [whenAndOnWhat(results), sizes(results), method(results)]
   for (const engine of ENGINE_KEYS) parts.push(oneAtATime(results, engine))
-  for (const concurrency of results.protocol.concurrency.filter((c) => c !== 1)) for (const engine of ENGINE_KEYS) parts.push(inFlight(results, engine, concurrency))
+  for (const concurrency of results.protocol.concurrency.filter((c) => c !== 1))
+    for (const engine of ENGINE_KEYS) parts.push(inFlight(results, engine, concurrency))
   for (const engine of ENGINE_KEYS) parts.push(addedLatency(results, engine))
   parts.push(refused(results), fixedCosts(results), theRun(results))
   return `${parts.join('\n\n')}\n`

@@ -15,7 +15,23 @@ export const heldChecks = (app) => Object.values(FACTS).flatMap((fact) => (fact.
 export const DIST = 'sha256:aaaa111122223333444455556666777788889999aaaabbbbccccddddeeeeffff'
 
 const runner = { node: 'v22.20.0', platform: 'linux', arch: 'x64', image: 'ubuntu24', imageVersion: '20261005.1', docker: '29.8.1' }
-const base = (key, job) => ({ schema: 1, job, key, runner, commit: 'c0ffee', run: { id: '42', attempt: '1' }, collectedAt: new Date(T0 + 3_600_000).toISOString(), suites: [], servers: [], browserGates: [], install: null, container: null, dist: [], tarballs: [], missing: [] })
+const base = (key, job) => ({
+  schema: 1,
+  job,
+  key,
+  runner,
+  commit: 'c0ffee',
+  run: { id: '42', attempt: '1' },
+  collectedAt: new Date(T0 + 3_600_000).toISOString(),
+  suites: [],
+  servers: [],
+  browserGates: [],
+  install: null,
+  container: null,
+  dist: [],
+  tarballs: [],
+  missing: [],
+})
 
 const test = (name, meta = {}) => ({ name, status: 'passed', durationMs: 5, meta })
 const file = (path, tests) => ({ file: path, status: 'passed', startTime: T0 + 1000, endTime: T0 + 2000, tests })
@@ -45,7 +61,14 @@ export const server = (overrides) => ({
   imageId: 'sha256:b0f9',
   ...overrides,
 })
-const SQLSERVER = { engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3', updateLevel: 'CU20', edition: 'Developer Edition (64-bit)', digest: 'mcr.microsoft.com/mssql/server@sha256:4402' }
+const SQLSERVER = {
+  engine: 'sqlserver',
+  image: 'mcr.microsoft.com/mssql/server:2022-latest',
+  version: '16.0.4295.3',
+  updateLevel: 'CU20',
+  edition: 'Developer Edition (64-bit)',
+  digest: 'mcr.microsoft.com/mssql/server@sha256:4402',
+}
 
 export const CASES = ['edge: orderDate', 'filter: tenant_code = "acme"']
 const PUBLISHED = ['@formancy/data-core', '@formancy/data-postgres', '@formancy/data-sqlserver']
@@ -55,7 +78,16 @@ const dist = (names = PUBLISHED) => names.map((name) => ({ package: name, distHa
 /** The inputs of a run in which everything passed. */
 export function greenRun() {
   const verify = { ...base('verify', 'verify'), suites: [suite(null, '.', [file('scripts/check-cla.test.mjs', [test('records a signature')])])], dist: dist() }
-  const core = { ...base('test-data-core', 'test'), package: '@formancy/data-core', suites: [suite('@formancy/data-core', 'packages/data-core', [file('packages/data-core/src/a.test.ts', [test('parses an amount')]), file('packages/data-core/src/labels.test.ts', [test('labels two customers alike')])])] }
+  const core = {
+    ...base('test-data-core', 'test'),
+    package: '@formancy/data-core',
+    suites: [
+      suite('@formancy/data-core', 'packages/data-core', [
+        file('packages/data-core/src/a.test.ts', [test('parses an amount')]),
+        file('packages/data-core/src/labels.test.ts', [test('labels two customers alike')]),
+      ]),
+    ],
+  }
   const pg = {
     ...base('test-data-postgres', 'test'),
     package: '@formancy/data-postgres',
@@ -89,7 +121,10 @@ export function greenRun() {
     ...base('test-app-host', 'test'),
     package: '@formancy/data-host',
     suites: [suite('@formancy/data-host', 'apps/host', [file('apps/host/src/page.test.tsx', [test('loads a record')])])],
-    servers: [server({ caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' }), server({ ...SQLSERVER, caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' })],
+    servers: [
+      server({ caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' }),
+      server({ ...SQLSERVER, caller: 'apps/host/src/test-databases.ts', package: '@formancy/data-host' }),
+    ],
   }
   const browser = {
     ...base('browser-chromium', 'browser'),
@@ -137,7 +172,14 @@ export function greenRun() {
         { name: 'postgres', version: '3.4.9' },
         { name: 'fastify', version: '5.12.5' },
       ],
-      tarballs: PUBLISHED.map((name) => ({ name, version: '0.1.0', file: `${name.slice(1).replace('/', '-')}-0.1.0.tgz`, sha256: 'ab'.repeat(32), integrity: 'sha512-x', distHash: DIST })),
+      tarballs: PUBLISHED.map((name) => ({
+        name,
+        version: '0.1.0',
+        file: `${name.slice(1).replace('/', '-')}-0.1.0.tgz`,
+        sha256: 'ab'.repeat(32),
+        integrity: 'sha512-x',
+        distHash: DIST,
+      })),
     },
     dist: dist(),
   }
@@ -155,7 +197,12 @@ export function greenRun() {
         { package: '@formancy/data-server', name: 'fastify', range: '^5.12.5', loaded: '5.12.5' },
       ],
       upstream: [{ name: '@formancy/spec', version: '0.3.0', declared: '0.3.0', direct: true }],
-      node: { engines: '>=22.12.0', dockerfile: ['node:22.12-alpine', 'node:22.12-alpine'], ci: [{ workflow: 'gates.yml', job: 'verify', version: '22' }], declared: [] },
+      node: {
+        engines: '>=22.12.0',
+        dockerfile: ['node:22.12-alpine', 'node:22.12-alpine'],
+        ci: [{ workflow: 'gates.yml', job: 'verify', version: '22' }],
+        declared: [],
+      },
       browser: { playwright: '1.63.0', pins: [{ browser: 'chromium', name: 'chromium-headless-shell', revision: '1243', browserVersion: '153.0.8010.12' }] },
       tooling: [{ name: 'jsdom', versions: [{ version: '30.1.2', from: ['apps/host'] }] }],
       snapshots: [{ file: 'apps/studio/src/fixtures/postgres-owner.json', kind: 'postgres', serverVersion: '17.11' }],
@@ -169,7 +216,17 @@ export function greenRun() {
     ],
     published: [...PUBLISHED],
     browserApps: ['apps/host'],
-    apps: [{ path: 'apps/host', name: '@formancy/data-host', renderers: [{ name: 'React', version: '19.3.0' }, { name: 'Angular', version: '22.2.1' }], jsdom: '30.1.2' }],
+    apps: [
+      {
+        path: 'apps/host',
+        name: '@formancy/data-host',
+        renderers: [
+          { name: 'React', version: '19.3.0' },
+          { name: 'Angular', version: '22.2.1' },
+        ],
+        jsdom: '30.1.2',
+      },
+    ],
     register: {
       records: {
         '0012': {
@@ -183,7 +240,9 @@ export function greenRun() {
     // Evidence no other test's defect touches, so each defect still gives
     // exactly its own sentence; gates.test.mjs and the gate tests here change it.
     gatesRegister: {
-      gates: Array.from({ length: 12 }, (_, index) => ({ gate: index + 1, open: 'Nothing to test yet.' })).map((entry) => (EVIDENCE[entry.gate] === undefined ? entry : { gate: entry.gate, evidence: EVIDENCE[entry.gate] })),
+      gates: Array.from({ length: 12 }, (_, index) => ({ gate: index + 1, open: 'Nothing to test yet.' })).map((entry) =>
+        EVIDENCE[entry.gate] === undefined ? entry : { gate: entry.gate, evidence: EVIDENCE[entry.gate] },
+      ),
     },
     documents: { [FIGURES]: { sha: '1234567890abcdef1234567890abcdef12345678', date: '2026-10-01T12:00:00+02:00', behind: 3 } },
     exists: () => true,
@@ -191,7 +250,22 @@ export function greenRun() {
     commit: 'c0ffee',
     version: '0.1.0',
     release: '',
-    changelog: ['# Changelog', '', '## Unreleased', '', 'Something changed.', '', '## 0.2.0', '', 'Ahead of the manifests.', '', '## 0.1.0', '', 'The first.', ''].join('\n'),
+    changelog: [
+      '# Changelog',
+      '',
+      '## Unreleased',
+      '',
+      'Something changed.',
+      '',
+      '## 0.2.0',
+      '',
+      'Ahead of the manifests.',
+      '',
+      '## 0.1.0',
+      '',
+      'The first.',
+      '',
+    ].join('\n'),
     generatedAt: new Date(T0 + 3_700_000).toISOString(),
   }
 }
@@ -252,7 +326,9 @@ export function withBrowser(inputs, { browser, revision, version, image, offset,
     key: `browser-${browser}`,
     variant: browser,
     runner: { ...runner, image },
-    servers: [server({ caller: 'apps/host/scripts/browser-test.mjs', script: 'test-browser', package: 'apps/host', at: new Date(T0 + offset + 500).toISOString() })],
+    servers: [
+      server({ caller: 'apps/host/scripts/browser-test.mjs', script: 'test-browser', package: 'apps/host', at: new Date(T0 + offset + 500).toISOString() }),
+    ],
     browserGates: [
       {
         ...structuredClone(gate),
@@ -289,7 +365,15 @@ export function withImageLeg(inputs, { image = 'postgres:16-alpine', version = '
 
 /** `inputs` as a run in which the gates run in Chromium and Firefox. */
 export const withFirefox = (inputs) =>
-  withBrowser(inputs, { browser: 'firefox', revision: '1543', version: '155.0', image: 'ubuntu24-firefox', offset: 60_000, value: 30.2, environment: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0' } })
+  withBrowser(inputs, {
+    browser: 'firefox',
+    revision: '1543',
+    version: '155.0',
+    image: 'ubuntu24-firefox',
+    offset: 60_000,
+    value: 30.2,
+    environment: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0' },
+  })
 
 /** `inputs` as a run in which the gates run in Chromium and WebKit. */
 export const withWebKit = (inputs) =>

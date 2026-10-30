@@ -82,5 +82,7 @@ test("a container Docker no longer knows is reported in Docker's words, after th
       (error: unknown) => error,
     )
   expect(error).toBeInstanceOf(Error)
-  expect((error as Error).message).toMatch(/^Log stream ended and message "\/never\/" was not received; Docker could not say how container formancy-dat ended: \(HTTP code 404\) no such container/)
+  expect((error as Error).message).toMatch(
+    /^Log stream ended and message "\/never\/" was not received; Docker could not say how container formancy-dat ended: \(HTTP code 404\) no such container/,
+  )
 })

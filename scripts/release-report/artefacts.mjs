@@ -76,12 +76,16 @@ export function artefactProblems(artefacts, { expected, commit, runId }) {
       continue
     }
     if (file !== `${key}.json` || result?.key !== key || result?.job !== wanted.get(key)) {
-      problems.push(`${artefact.name} holds ${file}, the results of key ${String(result?.key)} from job ${String(result?.job)}, where it holds ${key}.json from job ${wanted.get(key)}`)
+      problems.push(
+        `${artefact.name} holds ${file}, the results of key ${String(result?.key)} from job ${String(result?.job)}, where it holds ${key}.json from job ${wanted.get(key)}`,
+      )
     }
     keys.set(result?.key, (keys.get(result?.key) ?? 0) + 1)
     if (result?.commit !== commit) problems.push(`${artefact.name} is from commit ${String(result?.commit)}, not this run's ${commit}`)
     if (String(result?.run?.id) !== String(runId)) problems.push(`${artefact.name} is from run ${String(result?.run?.id)}, not this run's ${String(runId)}`)
   }
-  for (const [key, count] of keys) if (count > 1 && names.filter((name) => name === `${ARTEFACT_PREFIX}${key}`).length < 2) problems.push(`the results of ${String(key)} appear in ${String(count)} artefacts`)
+  for (const [key, count] of keys)
+    if (count > 1 && names.filter((name) => name === `${ARTEFACT_PREFIX}${key}`).length < 2)
+      problems.push(`the results of ${String(key)} appear in ${String(count)} artefacts`)
   return problems
 }

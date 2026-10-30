@@ -51,10 +51,19 @@ describe('the administrator plane, through the studio client', () => {
   // failure that names the route.
   test('reads every route the studio uses in the shape the server sends', async () => {
     expect(await admin.whoami()).toEqual({ ok: true, value: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } })
-    expect(await admin.connections()).toEqual({ ok: true, value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] })
+    expect(await admin.connections()).toEqual({
+      ok: true,
+      value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'],
+    })
     expect(await admin.test('fixture')).toEqual({
       ok: true,
-      value: { kind: 'postgres', version: '17.11', product: 'postgresql', major: 17, standing: { tested: true, says: 'This release of Formancy Data was tested on PostgreSQL 17.' } },
+      value: {
+        kind: 'postgres',
+        version: '17.11',
+        product: 'postgresql',
+        major: 17,
+        standing: { tested: true, says: 'This release of Formancy Data was tested on PostgreSQL 17.' },
+      },
     })
     // The connection whose catalog hides what it may not use, and says so as gaps (0027).
     const metadata = await admin.metadata('fixture-sqlserver-reader')
@@ -132,7 +141,17 @@ describe('the administrator plane, through the studio client', () => {
     expect(await admin.restore('sales-order', 1, 1)).toMatchObject({ ok: false, status: 409, code: 'conflict', current: 2 })
     expect(await admin.restore('sales-order', 1, 2)).toEqual({
       ok: true,
-      value: { version: 3, restoredFrom: 1, drift: { changes: [], blocking: false, readable: true, writable: { create: true, update: true, delete: true }, runtime: { readable: true, writable: { create: true, update: true, delete: true } } } },
+      value: {
+        version: 3,
+        restoredFrom: 1,
+        drift: {
+          changes: [],
+          blocking: false,
+          readable: true,
+          writable: { create: true, update: true, delete: true },
+          runtime: { readable: true, writable: { create: true, update: true, delete: true } },
+        },
+      },
     })
     expect(await admin.version('sales-order', 9)).toMatchObject({ ok: false, status: 404, code: 'unknown-version' })
     expect(await admin.versions('nothing-here')).toMatchObject({ ok: false, status: 404, code: 'unknown-form' })
@@ -176,7 +195,19 @@ describe('the administrator plane, through the studio client', () => {
       const proposal = await there.propose(ORDER)
       if (!proposal.ok) throw new Error(proposal.message)
       const { form, bindings, snapshot, generation } = proposal.value
-      expect(await there.publish('sales-order', null, { format: 2, connection: 'fixture', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: granting, snapshot })).toMatchObject({ ok: true })
+      expect(
+        await there.publish('sales-order', null, {
+          format: 2,
+          connection: 'fixture',
+          generation,
+          base: form,
+          presentation: EMPTY_PRESENTATION,
+          form,
+          bindings,
+          policy: granting,
+          snapshot,
+        }),
+      ).toMatchObject({ ok: true })
       const file = JSON.parse(await readFile(join(source.root, 'sales-order', '1.json'), 'utf8')) as unknown
 
       const refused = await admin.importVersion('sales-order', 1, file)
@@ -184,8 +215,15 @@ describe('the administrator plane, through the studio client', () => {
       const keys = refused.ok ? undefined : refused.keys
       expect(keys).toEqual([{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }])
       const nothing = { readable: true, writable: { create: true, update: true, delete: true } }
-      expect(await admin.importVersion('sales-order', 1, file, keys)).toEqual({ ok: true, value: { version: 2, drift: { changes: [], blocking: false, ...nothing, runtime: nothing } } })
-      expect(plane.requests.at(-1)).toEqual({ method: 'POST', path: '/v1/forms/sales-order/imports', body: { expectedBase: 1, bundle: file, keysConfirmed: keys } })
+      expect(await admin.importVersion('sales-order', 1, file, keys)).toEqual({
+        ok: true,
+        value: { version: 2, drift: { changes: [], blocking: false, ...nothing, runtime: nothing } },
+      })
+      expect(plane.requests.at(-1)).toEqual({
+        method: 'POST',
+        path: '/v1/forms/sales-order/imports',
+        body: { expectedBase: 1, bundle: file, keysConfirmed: keys },
+      })
     } finally {
       await source.close()
     }
@@ -201,11 +239,26 @@ describe('the administrator plane, through the studio client', () => {
 })
 
 /** The server's governance sentences (0065), as the client carries them. */
-const REVIEW_REQUIRED = { code: 'review-required', message: 'This deployment reviews publication: submit this version as a draft, and a publisher other than you approves it.' }
-const PUBLISHER_REQUIRED = { code: 'publisher-required', message: "This needs a publisher role: restoring a version, and approving or rejecting someone else's draft, are a publisher's." }
-const BROWSE_ROLE_REQUIRED = { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." }
+const REVIEW_REQUIRED = {
+  code: 'review-required',
+  message: 'This deployment reviews publication: submit this version as a draft, and a publisher other than you approves it.',
+}
+const PUBLISHER_REQUIRED = {
+  code: 'publisher-required',
+  message: "This needs a publisher role: restoring a version, and approving or rejecting someone else's draft, are a publisher's.",
+}
+const BROWSE_ROLE_REQUIRED = {
+  code: 'browse-role-required',
+  message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you.",
+}
 const OWN_DRAFT = { code: 'own-draft', message: 'You submitted this draft: a publisher other than you approves it.' }
-const NOTHING_DRIFTED = { changes: [], blocking: false, readable: true, writable: { create: true, update: true, delete: true }, runtime: { readable: true, writable: { create: true, update: true, delete: true } } }
+const NOTHING_DRIFTED = {
+  changes: [],
+  blocking: false,
+  readable: true,
+  writable: { create: true, update: true, delete: true },
+  runtime: { readable: true, writable: { create: true, update: true, delete: true } },
+}
 
 describe('publication under review, through the studio client', () => {
   let reviewed: TestPlane
@@ -231,9 +284,23 @@ describe('publication under review, through the studio client', () => {
     expect(await admin.administration()).toEqual({ ok: true, value: { review: false, publisher: true, refuses: { browse: BROWSE_ROLE_REQUIRED } } })
     expect(await author.administration()).toEqual({
       ok: true,
-      value: { review: true, publisher: false, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, restore: PUBLISHER_REQUIRED, 'draft-approve': PUBLISHER_REQUIRED, 'draft-reject': PUBLISHER_REQUIRED, browse: BROWSE_ROLE_REQUIRED } },
+      value: {
+        review: true,
+        publisher: false,
+        refuses: {
+          publish: REVIEW_REQUIRED,
+          import: REVIEW_REQUIRED,
+          restore: PUBLISHER_REQUIRED,
+          'draft-approve': PUBLISHER_REQUIRED,
+          'draft-reject': PUBLISHER_REQUIRED,
+          browse: BROWSE_ROLE_REQUIRED,
+        },
+      },
     })
-    expect(await publisher.administration()).toEqual({ ok: true, value: { review: true, publisher: true, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, browse: BROWSE_ROLE_REQUIRED } } })
+    expect(await publisher.administration()).toEqual({
+      ok: true,
+      value: { review: true, publisher: true, refuses: { publish: REVIEW_REQUIRED, import: REVIEW_REQUIRED, browse: BROWSE_ROLE_REQUIRED } },
+    })
   })
 
   // A draft submitted, queued, read, approved, rejected and withdrawn, each
@@ -250,7 +317,16 @@ describe('publication under review, through the studio client', () => {
     const read = await publisher.draft('sales-order', 1)
     if (!read.ok) throw new Error(read.message)
     const { bundle: drafted, ...rest } = read.value
-    expect(rest).toEqual({ form: 'sales-order', draft: 1, state: 'pending', expectedBase: null, submittedBy: 'ada', keysConfirmed: [], current: null, refuses: {} })
+    expect(rest).toEqual({
+      form: 'sales-order',
+      draft: 1,
+      state: 'pending',
+      expectedBase: null,
+      submittedBy: 'ada',
+      keysConfirmed: [],
+      current: null,
+      refuses: {},
+    })
     expect(drafted).toEqual(sent)
 
     expect(await publisher.approveDraft('sales-order', 1)).toEqual({ ok: true, value: { version: 1, drift: NOTHING_DRIFTED } })
@@ -312,7 +388,7 @@ describe('when the server is not the one answering', () => {
     const spy = createAdminClient({
       token: TOKENS.admin,
       fetch: async (input, init) => {
-        seen.push({ url: String(input), authorization: new Headers(init?.headers).get('authorization') })
+        seen.push({ url: input instanceof Request ? input.url : String(input), authorization: new Headers(init?.headers).get('authorization') })
         return plane.fetch(input, init)
       },
     })
@@ -336,7 +412,19 @@ describe("the studio's form id rule", () => {
   // to refuse any path parameter past 100 before a handler ran — a limit no
   // regular expression shows. Found here, and fixed in the server.
   test('agrees with the server on every candidate', async () => {
-    const candidates = ['sales-order', 'order.v2', 'a', '9lives', 'Order', 'sales order', '-order', '.hidden', '_x', 'ordér', ...[99, 100, 101, 128, 129].map((length) => 'x'.repeat(length))]
+    const candidates = [
+      'sales-order',
+      'order.v2',
+      'a',
+      '9lives',
+      'Order',
+      'sales order',
+      '-order',
+      '.hidden',
+      '_x',
+      'ordér',
+      ...[99, 100, 101, 128, 129].map((length) => 'x'.repeat(length)),
+    ]
     for (const id of candidates) {
       const answer = await admin.publish(id, null, {} as Bundle)
       expect(isFormId(id), `${id} (${String(id.length)})`).toBe(!answer.ok && answer.code === 'invalid-bundle')

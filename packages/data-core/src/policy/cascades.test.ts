@@ -27,7 +27,12 @@ function acting(key: ForeignKeyMeta, onDelete: InboundKey['onDelete'], onUpdate:
 }
 
 /** The test snapshot with 0049's facts, its order_line key onto order doing `onDelete`. */
-function lines(onDelete: InboundKey['onDelete'], enforced = true, edit: (objects: ObjectMeta[]) => void = () => {}, mayDelete?: (object: ObjectMeta) => boolean) {
+function lines(
+  onDelete: InboundKey['onDelete'],
+  enforced = true,
+  edit: (objects: ObjectMeta[]) => void = () => {},
+  mayDelete?: (object: ObjectMeta) => boolean,
+) {
   return factsSnapshot(
     'sqlserver',
     (objects) => {
@@ -43,10 +48,14 @@ function lines(onDelete: InboundKey['onDelete'], enforced = true, edit: (objects
 function noted(onDelete: InboundKey['onDelete'] = 'cascade') {
   return (objects: ObjectMeta[]) => {
     objects.push(
-      table('line_note', [col('id', 1, INT32, { generated: 'identity-always' }), col('order_id', 2, INT64), col('line_no', 3, INT32), col('note', 4, text(50))], {
-        primaryKey: { name: 'pk_line_note', columns: ['id'] },
-        foreignKeys: [acting(fk('fk_line_note_line', ['order_id', 'line_no'], 'order_line', ['order_id', 'line_no']), onDelete)],
-      }),
+      table(
+        'line_note',
+        [col('id', 1, INT32, { generated: 'identity-always' }), col('order_id', 2, INT64), col('line_no', 3, INT32), col('note', 4, text(50))],
+        {
+          primaryKey: { name: 'pk_line_note', columns: ['id'] },
+          foreignKeys: [acting(fk('fk_line_note_line', ['order_id', 'line_no'], 'order_line', ['order_id', 'line_no']), onDelete)],
+        },
+      ),
     )
   }
 }
@@ -79,7 +88,17 @@ const MEMO_COPY_KEY: CascadeRule = { table: sales('memo_copy'), foreignKey: 'fk_
 function copied(onDelete: InboundKey['onDelete']) {
   return factsSnapshot('sqlserver', (objects: ObjectMeta[]) => {
     const order = objects.find((object) => object.ref.name === 'order') as ObjectMeta
-    order.referencedBy = [{ table: { schema: 'audit', name: 'order_copy' }, name: 'fk_copy', columns: ['order_id', 'kept'], referencedColumns: ['id', 'tenant_id'], onDelete, onUpdate: 'no-action', enforced: true }]
+    order.referencedBy = [
+      {
+        table: { schema: 'audit', name: 'order_copy' },
+        name: 'fk_copy',
+        columns: ['order_id', 'kept'],
+        referencedColumns: ['id', 'tenant_id'],
+        onDelete,
+        onUpdate: 'no-action',
+        enforced: true,
+      },
+    ]
   })
 }
 const COPY_KEY = (onDelete: CascadeRule['onDelete']): CascadeRule => ({ table: { schema: 'audit', name: 'order_copy' }, foreignKey: 'fk_copy', onDelete })
@@ -167,7 +186,9 @@ describe('deleteProblems', () => {
     expect(problems(lines('cascade'), accepting(LINE_KEY, { table: sales('customer'), foreignKey: 'fk_customer_country', onDelete: 'cascade' }))).toEqual([
       'cascades[1] accepts fk_customer_country of sales.customer, and no such key refers to a table a delete of sales.order reaches',
     ])
-    expect(problems(lines('no-action'), accepting(LINE_KEY))).toEqual(['cascades[0] accepts fk_order_line_order of sales.order_line as ON DELETE CASCADE, and it is ON DELETE NO ACTION'])
+    expect(problems(lines('no-action'), accepting(LINE_KEY))).toEqual([
+      'cascades[0] accepts fk_order_line_order of sales.order_line as ON DELETE CASCADE, and it is ON DELETE NO ACTION',
+    ])
   })
 
   // A delete keeps the rows whose reference it clears, so a key onto a
@@ -178,7 +199,7 @@ describe('deleteProblems', () => {
   test("refuses an acceptance of a key onto a table the delete only clears, whatever that key's ON DELETE", () => {
     expect(problems(lines('no-action', true, memo('no-action', 'cascade')), accepting(MEMO_KEY))).toEqual([])
     expect(problems(lines('no-action', true, memo('no-action', 'cascade')), accepting(MEMO_KEY, MEMO_COPY_KEY))).toEqual([
-      "cascades[1] accepts fk_memo_copy_memo of sales.memo_copy, and a delete of sales.order does not act through it: it refers to sales.order_memo, whose rows a delete keeps and clears a reference in",
+      'cascades[1] accepts fk_memo_copy_memo of sales.memo_copy, and a delete of sales.order does not act through it: it refers to sales.order_memo, whose rows a delete keeps and clears a reference in',
     ])
   })
 
@@ -214,7 +235,12 @@ describe('deleteProblems', () => {
   // refused here.
   test('refuses a grant while the account may not DELETE from a table the delete reaches', () => {
     const notLines = (object: ObjectMeta) => object.ref.name !== 'order_line'
-    expect(problems(lines('cascade', true, () => {}, notLines), accepting(LINE_KEY))).toEqual([
+    expect(
+      problems(
+        lines('cascade', true, () => {}, notLines),
+        accepting(LINE_KEY),
+      ),
+    ).toEqual([
       "operations.delete grants roles, and deleting a record of sales.order reaches sales.order_line, which this connection's account may not DELETE from: a delete is held to the account's DELETE on every table it reaches",
     ])
     const notMemo = (object: ObjectMeta) => object.ref.name !== 'order_memo'
@@ -231,11 +257,17 @@ describe('deleteProblems', () => {
       'operations.delete grants roles, and this snapshot does not record what refers to sales.order, so what a delete also does cannot be seen: discover again',
     ])
     const scope = gapped(MS_FACTS, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'this account lacks VIEW DEFINITION on the database' }])
-    expect(problems(scope, DELETING)).toEqual(['operations.delete grants roles, and this snapshot cannot show everything that refers to sales.order: this account lacks VIEW DEFINITION on the database'])
+    expect(problems(scope, DELETING)).toEqual([
+      'operations.delete grants roles, and this snapshot cannot show everything that refers to sales.order: this account lacks VIEW DEFINITION on the database',
+    ])
     const elsewhere = gapped(MS_FACTS, [{ subject: { kind: 'object', object: sales('employee') }, aspect: 'referenced-by', detail: 'a key onto a partition' }])
     expect(problems(elsewhere, DELETING)).toEqual([])
-    const below = gapped(lines('cascade'), [{ subject: { kind: 'object', object: sales('order_line') }, aspect: 'referenced-by', detail: 'a key onto a partition' }])
-    expect(problems(below, accepting(LINE_KEY))).toEqual(['operations.delete grants roles, and this snapshot cannot show everything that refers to sales.order_line, which a delete of sales.order reaches: a key onto a partition'])
+    const below = gapped(lines('cascade'), [
+      { subject: { kind: 'object', object: sales('order_line') }, aspect: 'referenced-by', detail: 'a key onto a partition' },
+    ])
+    expect(problems(below, accepting(LINE_KEY))).toEqual([
+      'operations.delete grants roles, and this snapshot cannot show everything that refers to sales.order_line, which a delete of sales.order reaches: a key onto a partition',
+    ])
   })
 })
 
@@ -258,7 +290,10 @@ describe('deleteReach', () => {
   // by. Whether the database may refuse it while the record is referred to
   // is what a page tells a person before they confirm.
   test('is the root, every table a cascade reaches, and every key the policy accepts', () => {
-    expect(deleteReach(lines('no-action'), sales('order'), DELETING)).toEqual({ reach: { removed: [sales('order')], cleared: [], accepted: [] }, restricted: true })
+    expect(deleteReach(lines('no-action'), sales('order'), DELETING)).toEqual({
+      reach: { removed: [sales('order')], cleared: [], accepted: [] },
+      restricted: true,
+    })
     expect(deleteReach(lines('restrict'), sales('order'), DELETING).restricted).toBe(true)
     expect(deleteReach(MS_FACTS, sales('order_line'), DELETING).restricted).toBe(false)
     expect(deleteReach(lines('cascade', true, noted()), sales('order'), accepting(LINE_KEY, NOTE_KEY))).toEqual({
@@ -273,7 +308,11 @@ describe('deleteReach', () => {
       restricted: false,
     })
     expect(deleteReach(lines('no-action', true, memo('no-action')), sales('order'), accepting(MEMO_KEY))).toEqual({
-      reach: { removed: [sales('order')], cleared: [{ table: sales('order_memo'), columns: ['order_id'] }], accepted: [{ from: sales('order_memo'), name: 'fk_order_memo_order', onto: sales('order'), onDelete: 'set-null' }] },
+      reach: {
+        removed: [sales('order')],
+        cleared: [{ table: sales('order_memo'), columns: ['order_id'] }],
+        accepted: [{ from: sales('order_memo'), name: 'fk_order_memo_order', onto: sales('order'), onDelete: 'set-null' }],
+      },
       restricted: true,
     })
   })
@@ -300,7 +339,9 @@ describe('deleteReach', () => {
       )
     }
     const REORDER_KEY: CascadeRule = { table: sales('order_memo'), foreignKey: 'fk_order_memo_reorder', onDelete: 'set-null' }
-    expect(deleteReach(lines('no-action', true, twice('no-action')), sales('order'), accepting(MEMO_KEY, REORDER_KEY)).reach.cleared).toEqual([{ table: sales('order_memo'), columns: ['order_id', 'reorder_id'] }])
+    expect(deleteReach(lines('no-action', true, twice('no-action')), sales('order'), accepting(MEMO_KEY, REORDER_KEY)).reach.cleared).toEqual([
+      { table: sales('order_memo'), columns: ['order_id', 'reorder_id'] },
+    ])
     expect(problems(lines('no-action', true, twice('cascade')), accepting(MEMO_KEY, REORDER_KEY))).toEqual([
       'operations.delete grants roles, and deleting a record of sales.order also sets reorder_id of sales.order_memo to NULL in the rows that refer to it (fk_order_memo_reorder, ON DELETE SET NULL), and fk_reorder_copy_memo of sales.reorder_copy follows reorder_id ON UPDATE CASCADE, which a delete does not follow',
     ])
@@ -319,7 +360,11 @@ describe('deleteEffects', () => {
   // whether a key may refuse the delete -- never which tables.
   test('says whether an accepted key cascades or clears, and whether one restricts', () => {
     expect(deleteEffects(lines('cascade'), sales('order'), accepting(LINE_KEY))).toEqual({ cascades: true, clears: false, restricted: false })
-    expect(deleteEffects(lines('no-action', true, memo('no-action')), sales('order'), accepting(MEMO_KEY))).toEqual({ cascades: false, clears: true, restricted: true })
+    expect(deleteEffects(lines('no-action', true, memo('no-action')), sales('order'), accepting(MEMO_KEY))).toEqual({
+      cascades: false,
+      clears: true,
+      restricted: true,
+    })
     expect(deleteEffects(lines('no-action'), sales('order'), DELETING)).toEqual({ cascades: false, clears: false, restricted: true })
   })
 })
@@ -366,7 +411,9 @@ describe('deleteReview', () => {
     const country: CascadeRule = { table: sales('customer'), foreignKey: 'fk_customer_country', onDelete: 'cascade' }
     expect(review(lines('cascade'), accepting(LINE_KEY, country)).stray).toEqual([{ index: 1, rule: country }])
     expect(review(lines('set-null'), accepting(LINE_KEY)).stray).toEqual([{ index: 0, rule: LINE_KEY }])
-    expect(review(lines('no-action', true, memo('no-action', 'cascade')), accepting(MEMO_KEY, MEMO_COPY_KEY)).stray).toEqual([{ index: 1, rule: MEMO_COPY_KEY }])
+    expect(review(lines('no-action', true, memo('no-action', 'cascade')), accepting(MEMO_KEY, MEMO_COPY_KEY)).stray).toEqual([
+      { index: 1, rule: MEMO_COPY_KEY },
+    ])
     expect(review(lines('cascade'), accepting(LINE_KEY)).stray).toEqual([])
   })
 
@@ -387,14 +434,23 @@ describe('deleteReview', () => {
     ]
     for (const snapshot of cases) {
       const said = review(snapshot, DELETING)
-      const everyKey = accepting(...said.acting.map(({ key }) => ({ table: key.table, foreignKey: key.name, onDelete: key.onDelete as CascadeRule['onDelete'] })))
+      const everyKey = accepting(
+        ...said.acting.map(({ key }) => ({ table: key.table, foreignKey: key.name, onDelete: key.onDelete as CascadeRule['onDelete'] })),
+      )
       expect(problems(snapshot, everyKey)).toEqual(said.blocked.map((clause) => `operations.delete grants roles, and ${clause}`))
     }
-    expect(review(lines('cascade', true, () => {}, notLines), DELETING).blocked).toEqual([
+    expect(
+      review(
+        lines('cascade', true, () => {}, notLines),
+        DELETING,
+      ).blocked,
+    ).toEqual([
       "deleting a record of sales.order reaches sales.order_line, which this connection's account may not DELETE from: a delete is held to the account's DELETE on every table it reaches",
     ])
     expect(review(lines('cascade', true, noted()), DELETING).blocked).toEqual([])
-    expect(deleteReview(MS, sales('order'), DELETING).blocked).toEqual(['this snapshot does not record what refers to sales.order, so what a delete also does cannot be seen: discover again'])
+    expect(deleteReview(MS, sales('order'), DELETING).blocked).toEqual([
+      'this snapshot does not record what refers to sales.order, so what a delete also does cannot be seen: discover again',
+    ])
   })
 
   // "These are every key the catalog shows" is true only where nothing in
@@ -411,6 +467,12 @@ describe('deleteReview', () => {
   // never called complete, or the studio would say that no key acts on a
   // table it never saw (fail closed; watched failing with `complete: true`).
   test('lists nothing for a root the snapshot lacks, and never calls that every key', () => {
-    expect(deleteReview(lines('cascade'), sales('invoice'), accepting(LINE_KEY))).toEqual({ acting: [], restricting: [], stray: [], blocked: [], complete: false })
+    expect(deleteReview(lines('cascade'), sales('invoice'), accepting(LINE_KEY))).toEqual({
+      acting: [],
+      restricting: [],
+      stray: [],
+      blocked: [],
+      complete: false,
+    })
   })
 })

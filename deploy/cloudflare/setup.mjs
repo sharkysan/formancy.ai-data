@@ -54,7 +54,16 @@ const withoutSecret = (text, secret) => (secret === undefined || secret === '' ?
  * terminal attached, so its URL reaches the operator as it is printed.
  * Returns the exit code.
  */
-export function setup({ argv, doors = readDoors(), dir = CONFIG_DIR, cloudflared = 'cloudflared', owner = CLOUDFLARED_USER, print = console.log, report = console.error, interactive = true }) {
+export function setup({
+  argv,
+  doors = readDoors(),
+  dir = CONFIG_DIR,
+  cloudflared = 'cloudflared',
+  owner = CLOUDFLARED_USER,
+  print = console.log,
+  report = console.error,
+  interactive = true,
+}) {
   const parsed = parseInputs(argv, 'setup')
   if (!parsed.ok) {
     for (const problem of parsed.problems) report(problem)
@@ -75,7 +84,10 @@ export function setup({ argv, doors = readDoors(), dir = CONFIG_DIR, cloudflared
     return 1
   }
 
-  const zone = inputs.app === undefined ? `the zone that holds ${inputs.admin}` : `the zone that holds ${inputs.admin} and ${inputs.app}; both must be in that one zone, where setup routes them`
+  const zone =
+    inputs.app === undefined
+      ? `the zone that holds ${inputs.admin}`
+      : `the zone that holds ${inputs.admin} and ${inputs.app}; both must be in that one zone, where setup routes them`
   print(`Log cloudflared in to your Cloudflare account: open the URL it prints in any browser, and choose ${zone}.`)
   const login = spawnSync(cloudflared, ['tunnel', 'login'], interactive ? { stdio: 'inherit' } : { encoding: 'utf8' })
   if (!interactive) for (const line of `${login.stdout ?? ''}${login.stderr ?? ''}`.trim().split('\n')) if (line !== '') print(line)
@@ -95,7 +107,9 @@ export function setup({ argv, doors = readDoors(), dir = CONFIG_DIR, cloudflared
     const said = withoutSecret(`${created.stdout ?? ''}${created.stderr ?? ''}`, secret).trim()
     if (created.status !== 0 || !existsSync(credentials)) {
       if (said !== '') report(said)
-      report(`cloudflared could not create the tunnel ${TUNNEL_NAME}, as it says above. If a tunnel by that name already exists in this account without its credentials in this volume, delete it under Networking → Tunnels and run setup again.`)
+      report(
+        `cloudflared could not create the tunnel ${TUNNEL_NAME}, as it says above. If a tunnel by that name already exists in this account without its credentials in this volume, delete it under Networking → Tunnels and run setup again.`,
+      )
       return 1
     }
     if (said !== '') print(said)
@@ -113,7 +127,9 @@ export function setup({ argv, doors = readDoors(), dir = CONFIG_DIR, cloudflared
 
   const routes = privateRoutes(run(['tunnel', 'route', 'ip', 'show', '--filter-tunnel-id', id, '--output', 'json']), id)
   if (routes === undefined) {
-    print(`cloudflared could not list the account's private network routes, so setup could not tell whether a private network route sends traffic to the tunnel ${TUNNEL_NAME}. A tunnel setup has just created has none; nothing else checks it: look under Networking → Routes.`)
+    print(
+      `cloudflared could not list the account's private network routes, so setup could not tell whether a private network route sends traffic to the tunnel ${TUNNEL_NAME}. A tunnel setup has just created has none; nothing else checks it: look under Networking → Routes.`,
+    )
   } else if (routes.length > 0) {
     report(
       `${String(routes.length)} private network route${routes.length === 1 ? ' sends' : 's send'} traffic to the tunnel ${TUNNEL_NAME} (${routes.join(', ')}): every device your organisation lets reach ${routes.length === 1 ? 'it' : 'them'} reaches what cloudflared reaches, the web front without Access among it, and no setting of cloudflared stops that. Delete ${routes.length === 1 ? 'it' : 'them'} under Networking → Routes, then run setup again. No hostname was routed.`,
@@ -142,12 +158,18 @@ export function setup({ argv, doors = readDoors(), dir = CONFIG_DIR, cloudflared
   if (!result.ok) return 1
 
   print('')
-  print(`Tunnel ${TUNNEL_NAME}, id ${id}. ${newlyRouted.length === 0 ? 'No hostname needed routing.' : `Routed in DNS by this run: ${newlyRouted.join(', ')}.`}`)
-  print("Revoke the login now: My Profile → API Tokens → 'Cloudflare Tunnel API Token' (or 'Argo Tunnel API Token') → Delete. Its cert.pem was only in this container's memory, and the running tunnel needs only its credentials.")
+  print(
+    `Tunnel ${TUNNEL_NAME}, id ${id}. ${newlyRouted.length === 0 ? 'No hostname needed routing.' : `Routed in DNS by this run: ${newlyRouted.join(', ')}.`}`,
+  )
+  print(
+    "Revoke the login now: My Profile → API Tokens → 'Cloudflare Tunnel API Token' (or 'Argo Tunnel API Token') → Delete. Its cert.pem was only in this container's memory, and the running tunnel needs only its credentials.",
+  )
   print('Then start the stack with cloudflared:')
   print('  docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml --profile stack --profile cloudflare up -d --build --wait --wait-timeout 900')
   print('or, if cloudflared is running, start it again on this configuration and wait until it is connected:')
-  print('  docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml --profile stack --profile cloudflare up -d --wait --no-deps --force-recreate cloudflared')
+  print(
+    '  docker compose -f compose.yaml -f deploy/cloudflare/compose.yaml --profile stack --profile cloudflare up -d --wait --no-deps --force-recreate cloudflared',
+  )
   return 0
 }
 

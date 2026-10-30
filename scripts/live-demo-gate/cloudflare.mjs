@@ -184,8 +184,29 @@ export class DockerContainer {
    * went through. Empty when it can write none.
    */
   async writableCode() {
-    const owned = await docker(['exec', '--user', 'node', this.name, 'find', '/app', '!', '-type', 'l', '(', '-user', 'node', '-o', '-perm', '-0002', ')', '-print'])
-    const wrote = await docker(['exec', '--user', 'node', this.name, 'touch', '/app/dist/main.mjs']).then(() => true, () => false)
+    const owned = await docker([
+      'exec',
+      '--user',
+      'node',
+      this.name,
+      'find',
+      '/app',
+      '!',
+      '-type',
+      'l',
+      '(',
+      '-user',
+      'node',
+      '-o',
+      '-perm',
+      '-0002',
+      ')',
+      '-print',
+    ])
+    const wrote = await docker(['exec', '--user', 'node', this.name, 'touch', '/app/dist/main.mjs']).then(
+      () => true,
+      () => false,
+    )
     return [...owned.split('\n').filter((line) => line !== ''), ...(wrote ? ['/app/dist/main.mjs, which it wrote'] : [])]
   }
 
@@ -196,7 +217,10 @@ export class DockerContainer {
    */
   async serverVariable(variable) {
     const environ = await docker(['exec', '--user', 'node', this.name, 'cat', '/proc/1/environ'])
-    return environ.split('\0').find((entry) => entry.startsWith(`${variable}=`))?.slice(variable.length + 1)
+    return environ
+      .split('\0')
+      .find((entry) => entry.startsWith(`${variable}=`))
+      ?.slice(variable.length + 1)
   }
 }
 

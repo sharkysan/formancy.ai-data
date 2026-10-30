@@ -140,7 +140,9 @@ function readPackage(directory, within) {
     files.push(...found.files)
   }
   if (problems.length === 0 && !own.files.some((file) => file.licence && file.text.trim() !== '')) {
-    problems.push(`${id} is bundled and ships no licence text: no file at its root whose name begins LICENSE, LICENCE or COPYING, and is not a script or data, holds any`)
+    problems.push(
+      `${id} is bundled and ships no licence text: no file at its root whose name begins LICENSE, LICENCE or COPYING, and is not a script or data, holds any`,
+    )
   }
   return { id, name: String(manifest.name), version: String(manifest.version), declared: manifest.license, files, problems }
 }
@@ -158,7 +160,10 @@ function bundledPackages(ids, workspace) {
   const problems = []
   for (const id of ids) {
     if (id.startsWith('\0')) {
-      if (!BUNDLER_MODULES.has(id)) problems.push(`${JSON.stringify(id.slice(1))} is a module a plugin or the bundler wrote, and not one of the reviewed BUNDLER_MODULES in scripts/third-party-notices.mjs`)
+      if (!BUNDLER_MODULES.has(id))
+        problems.push(
+          `${JSON.stringify(id.slice(1))} is a module a plugin or the bundler wrote, and not one of the reviewed BUNDLER_MODULES in scripts/third-party-notices.mjs`,
+        )
       continue
     }
     if (WORKER.test(id)) {
@@ -168,7 +173,10 @@ function bundledPackages(ids, workspace) {
     const path = pathOf(id)
     const directory = packageDirectory(path)
     if (directory === undefined) {
-      if (!path.startsWith(own)) problems.push(`${path} is bundled and is neither in a package under node_modules nor this repository's own, so whose it is and under what terms is unknown`)
+      if (!path.startsWith(own))
+        problems.push(
+          `${path} is bundled and is neither in a package under node_modules nor this repository's own, so whose it is and under what terms is unknown`,
+        )
       continue
     }
     const within = directories.get(directory) ?? new Set()
@@ -251,7 +259,10 @@ export function thirdPartyNotices({ workspace } = {}) {
       const problems = []
       for (const item of items) {
         if (item.type === 'chunk' || stylesheets.has(item.fileName) || maps.has(item.fileName)) continue
-        if (item.originalFileNames.length === 0) problems.push(`${item.fileName} is written from no source file Vite names -- a worker's code, which Vite bundles in a build of its own, or a file a plugin emits -- so whose it is is unknown`)
+        if (item.originalFileNames.length === 0)
+          problems.push(
+            `${item.fileName} is written from no source file Vite names -- a worker's code, which Vite bundles in a build of its own, or a file a plugin emits -- so whose it is is unknown`,
+          )
         for (const name of item.originalFileNames) ids.push(resolve(root, name))
       }
       const found = bundledPackages(ids, workspace ?? fileURLToPath(new URL('..', import.meta.url)))

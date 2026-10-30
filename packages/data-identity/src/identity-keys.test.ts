@@ -42,7 +42,14 @@ describe('a provider’s document', () => {
   // an issuer of its own, and no alg. A reader that wanted alg, or refused a
   // member it does not know, would refuse the most common provider's document.
   test('an Entra-shaped set is read for RS256 with every key in force', () => {
-    const keys = ['k1', 'k2'].map((kid) => ({ ...rsa(), kid, use: 'sig', x5t: 'nOo3ZDrODXEK1jKWhXslHR_KXEg', x5c: ['MIIC/TCCAeWgAwIBAgII'], issuer: 'https://login.microsoftonline.com/{tenantid}/v2.0' }))
+    const keys = ['k1', 'k2'].map((kid) => ({
+      ...rsa(),
+      kid,
+      use: 'sig',
+      x5t: 'nOo3ZDrODXEK1jKWhXslHR_KXEg',
+      x5c: ['MIIC/TCCAeWgAwIBAgII'],
+      issuer: 'https://login.microsoftonline.com/{tenantid}/v2.0',
+    }))
     const read = readKeySet(set(...keys), 'RS256')
     expect(read.kids).toEqual(['k1', 'k2'])
     expect(read.leftOut).toEqual([])
@@ -98,27 +105,67 @@ describe('a refused set', () => {
   // file where the kid cannot be named, and never quotes a value.
   const p256Key = p256()
   const cases: Array<{ why: string; text: string; algorithm: Parameters<typeof readKeySet>[1]; says: RegExp }> = [
-    { why: 'a key in force without a kid', text: set(oct('a'), { kty: 'oct', k: randomBytes(32).toString('base64url') }), algorithm: 'HS256', says: /^key #2 has no "kid"/ },
+    {
+      why: 'a key in force without a kid',
+      text: set(oct('a'), { kty: 'oct', k: randomBytes(32).toString('base64url') }),
+      algorithm: 'HS256',
+      says: /^key #2 has no "kid"/,
+    },
     { why: 'two keys in force with one kid', text: set(oct('a'), oct('a')), algorithm: 'HS256', says: /^two keys in force are both "a"/ },
     { why: 'a kid outside the alphabet', text: set({ ...oct('a'), kid: 'a b' }), algorithm: 'HS256', says: /^key #1's "kid" is not/ },
     { why: 'a kid that is not a string', text: set({ ...oct('a'), kid: 7 }), algorithm: 'HS256', says: /^key #1's "kid" is not/ },
     { why: 'an HS256 key under 32 bytes', text: set(oct('short', 31)), algorithm: 'HS256', says: /^key "short" is shorter than 32 bytes/ },
     { why: 'an HS256 key with no k', text: set({ kty: 'oct', kid: 'a' }), algorithm: 'HS256', says: /^key "a" has no "k"/ },
-    { why: 'a k that is not strict base64url', text: set({ kty: 'oct', kid: 'a', k: `${randomBytes(33).toString('base64url')}=` }), algorithm: 'HS256', says: /^key "a"'s "k" is not base64url/ },
+    {
+      why: 'a k that is not strict base64url',
+      text: set({ kty: 'oct', kid: 'a', k: `${randomBytes(33).toString('base64url')}=` }),
+      algorithm: 'HS256',
+      says: /^key "a"'s "k" is not base64url/,
+    },
     // createPublicKey accepts an RSA modulus of no bits at all (M4); jose
     // refuses one under 2048 only when a token arrives.
-    { why: 'an RSA key whose modulus is short', text: set({ kty: 'RSA', kid: 'a', n: 'AAAA', e: 'AQAB' }), algorithm: 'RS256', says: /^key "a" is an RSA key of fewer than 2048 bits/ },
+    {
+      why: 'an RSA key whose modulus is short',
+      text: set({ kty: 'RSA', kid: 'a', n: 'AAAA', e: 'AQAB' }),
+      algorithm: 'RS256',
+      says: /^key "a" is an RSA key of fewer than 2048 bits/,
+    },
     // An off-curve point imports in jose only when the first token arrives;
     // createPublicKey refuses it when the file is read.
-    { why: 'a P-256 point off the curve', text: set({ ...p256Key, y: p256Key.x, kid: 'a' }), algorithm: 'ES256', says: /^key "a" does not import as an EC public key/ },
-    { why: 'an RSA key missing its modulus', text: set({ kty: 'RSA', kid: 'a', e: 'AQAB' }), algorithm: 'RS256', says: /^key "a" does not import as an RSA public key/ },
+    {
+      why: 'a P-256 point off the curve',
+      text: set({ ...p256Key, y: p256Key.x, kid: 'a' }),
+      algorithm: 'ES256',
+      says: /^key "a" does not import as an EC public key/,
+    },
+    {
+      why: 'an RSA key missing its modulus',
+      text: set({ kty: 'RSA', kid: 'a', e: 'AQAB' }),
+      algorithm: 'RS256',
+      says: /^key "a" does not import as an RSA public key/,
+    },
     // createPublicKey imports an RSA public exponent of 1, under which a
     // signature is its own message's padding, so anyone signs any token; and
     // one of 2 or 3 (measured on Node 22.22.1 and 22.12.0, 2026-10-13).
     // FIPS 186's floor for an RSA key pair is an odd e above 2^16.
-    { why: 'an RSA key whose public exponent is 1', text: set({ ...rsa(), e: 'AQ', kid: 'a' }), algorithm: 'RS256', says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/ },
-    { why: 'an RSA key whose public exponent is 3', text: set({ ...rsa(), e: 'Aw', kid: 'a' }), algorithm: 'RS256', says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/ },
-    { why: 'an RSA key whose public exponent is even', text: set({ ...rsa(), e: 'AQAC', kid: 'a' }), algorithm: 'RS256', says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/ },
+    {
+      why: 'an RSA key whose public exponent is 1',
+      text: set({ ...rsa(), e: 'AQ', kid: 'a' }),
+      algorithm: 'RS256',
+      says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/,
+    },
+    {
+      why: 'an RSA key whose public exponent is 3',
+      text: set({ ...rsa(), e: 'Aw', kid: 'a' }),
+      algorithm: 'RS256',
+      says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/,
+    },
+    {
+      why: 'an RSA key whose public exponent is even',
+      text: set({ ...rsa(), e: 'AQAC', kid: 'a' }),
+      algorithm: 'RS256',
+      says: /^key "a"'s RSA public exponent is not an odd number of at least 65537/,
+    },
     // createPublicKey imports every Ed25519 point of small order, and under
     // such a key a signature nobody made verifies: R the identity and S zero
     // verified 64 messages of 64 under the identity, and 34 of 64 under the
@@ -136,14 +183,34 @@ describe('a refused set', () => {
       'another point of order 8': 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
       'and its negative': 'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa',
       'zero, y written as p': `ed${'ff'.repeat(30)}7f`,
-    }).map(([point, hex]) => ({ why: `an Ed25519 key that is ${point}`, text: set({ ...ed25519(hex), kid: 'a' }), algorithm: 'EdDSA' as const, says: /^key "a" is an Ed25519 point of small order/ })),
+    }).map(([point, hex]) => ({
+      why: `an Ed25519 key that is ${point}`,
+      text: set({ ...ed25519(hex), kid: 'a' }),
+      algorithm: 'EdDSA' as const,
+      says: /^key "a" is an Ed25519 point of small order/,
+    })),
     // x = 0 with its sign bit set, and a y with no x on the curve, are no
     // point at all (RFC 8032 section 5.1.3), though createPublicKey imports
     // both: such a key verifies nothing.
-    { why: 'an Ed25519 encoding of x = 0 with its sign bit set', text: set({ ...ed25519(`01${'00'.repeat(30)}80`), kid: 'a' }), algorithm: 'EdDSA', says: /^key "a" does not import as an Ed25519 public key/ },
-    { why: 'an Ed25519 encoding whose y has no x', text: set({ ...ed25519(`02${'00'.repeat(31)}`), kid: 'a' }), algorithm: 'EdDSA', says: /^key "a" does not import as an Ed25519 public key/ },
+    {
+      why: 'an Ed25519 encoding of x = 0 with its sign bit set',
+      text: set({ ...ed25519(`01${'00'.repeat(30)}80`), kid: 'a' }),
+      algorithm: 'EdDSA',
+      says: /^key "a" does not import as an Ed25519 public key/,
+    },
+    {
+      why: 'an Ed25519 encoding whose y has no x',
+      text: set({ ...ed25519(`02${'00'.repeat(31)}`), kid: 'a' }),
+      algorithm: 'EdDSA',
+      says: /^key "a" does not import as an Ed25519 public key/,
+    },
     { why: 'an empty keys array', text: set(), algorithm: 'HS256', says: /^the identity key set is not an object with a non-empty "keys" array/ },
-    { why: 'a document with no keys member', text: JSON.stringify({ kty: 'oct', kid: 'a' }), algorithm: 'HS256', says: /^the identity key set is not an object with a non-empty "keys" array/ },
+    {
+      why: 'a document with no keys member',
+      text: JSON.stringify({ kty: 'oct', kid: 'a' }),
+      algorithm: 'HS256',
+      says: /^the identity key set is not an object with a non-empty "keys" array/,
+    },
     { why: 'a JSON array', text: JSON.stringify([oct('a')]), algorithm: 'HS256', says: /^the identity key set is not an object with a non-empty "keys" array/ },
     // The one document whose "keys" is not even undefined: null['keys']
     // throws a TypeError, which is not a sentence.
@@ -162,7 +229,9 @@ describe('a refused set', () => {
   // case, another algorithm, or a name every object has -- is a refusal,
   // never a TypeError and never a set read for no algorithm.
   test.each(['hs256', 'PS256', '__proto__', 'toString', 'constructor'])('an algorithm, %s, that is not one of the four', (algorithm) => {
-    expect(refusal(set(oct('a'), { kid: 'z' }), algorithm as Parameters<typeof readKeySet>[1])).toBe('the algorithm of a key set is RS256, ES256, EdDSA or HS256')
+    expect(refusal(set(oct('a'), { kid: 'z' }), algorithm as Parameters<typeof readKeySet>[1])).toBe(
+      'the algorithm of a key set is RS256, ES256, EdDSA or HS256',
+    )
   })
 })
 
@@ -182,19 +251,49 @@ describe('material', () => {
 
   const files: Array<{ why: string; text: string; algorithm: Parameters<typeof readKeySet>[1]; says: RegExp }> = [
     { why: 'the secret as the whole file', text: secret, algorithm: 'HS256', says: /^the identity key set file is not JSON$/ },
-    { why: 'the secret unquoted as k', text: `{"keys":[{"kty":"oct","kid":"a","k":${secret}}]}`, algorithm: 'HS256', says: /^the identity key set file is not JSON$/ },
+    {
+      why: 'the secret unquoted as k',
+      text: `{"keys":[{"kty":"oct","kid":"a","k":${secret}}]}`,
+      algorithm: 'HS256',
+      says: /^the identity key set file is not JSON$/,
+    },
     { why: 'the secret as k of a key without a kid', text: set({ kty: 'oct', k: secret }), algorithm: 'HS256', says: /^key #1 has no "kid"/ },
     { why: 'a private RSA key in force', text: set({ ...privateRsa, kid: 'p' }), algorithm: 'RS256', says: /^key "p" holds the private member "d"/ },
-    { why: 'a private RSA key that would be left out', text: set({ ...p256(), kid: 'e' }, { ...privateRsa }), algorithm: 'ES256', says: /^key #2 holds the private member "d"/ },
+    {
+      why: 'a private RSA key that would be left out',
+      text: set({ ...p256(), kid: 'e' }, { ...privateRsa }),
+      algorithm: 'ES256',
+      says: /^key #2 holds the private member "d"/,
+    },
     // A kid is logged: in a refusal, and on every planes and SIGHUP line. A
     // secret pasted where the kid belongs fits the kid's alphabet, so a kid
     // that is not beside a public key, and is its own k or as long as a
     // secret, is named by its place and refuses an HS256 set.
     { why: 'the secret as the kid of a key with no k', text: set({ kty: 'oct', kid: secret }), algorithm: 'HS256', says: /^key #1's "kid" could be a secret/ },
-    { why: 'the secret as the kid of a key in force', text: set(oct('a'), { kty: 'oct', kid: secret, k: randomBytes(32).toString('base64url') }), algorithm: 'HS256', says: /^key #2's "kid" could be a secret/ },
-    { why: 'a short secret as both the kid and k', text: set({ kty: 'oct', kid: shortSecret, k: shortSecret }), algorithm: 'HS256', says: /^key #1's "kid" could be a secret/ },
-    { why: 'the secret as the kid of a key left out', text: set({ kty: 'oct', kid: secret }), algorithm: 'RS256', says: /^no key in the file can verify RS256 \(left out: #1 \(kty\)\)$/ },
-    { why: 'the secret as the kid of a private key', text: set({ kty: 'oct', kid: secret, d: 'x' }), algorithm: 'HS256', says: /^key #1 holds the private member "d"/ },
+    {
+      why: 'the secret as the kid of a key in force',
+      text: set(oct('a'), { kty: 'oct', kid: secret, k: randomBytes(32).toString('base64url') }),
+      algorithm: 'HS256',
+      says: /^key #2's "kid" could be a secret/,
+    },
+    {
+      why: 'a short secret as both the kid and k',
+      text: set({ kty: 'oct', kid: shortSecret, k: shortSecret }),
+      algorithm: 'HS256',
+      says: /^key #1's "kid" could be a secret/,
+    },
+    {
+      why: 'the secret as the kid of a key left out',
+      text: set({ kty: 'oct', kid: secret }),
+      algorithm: 'RS256',
+      says: /^no key in the file can verify RS256 \(left out: #1 \(kty\)\)$/,
+    },
+    {
+      why: 'the secret as the kid of a private key',
+      text: set({ kty: 'oct', kid: secret, d: 'x' }),
+      algorithm: 'HS256',
+      says: /^key #1 holds the private member "d"/,
+    },
   ]
 
   test.each(files)('$why is refused with a sentence holding none of it', ({ text, algorithm, says }) => {

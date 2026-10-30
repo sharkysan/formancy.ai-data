@@ -21,7 +21,19 @@ import {
 import type { Random } from './random.js'
 import { stream } from './random.js'
 import type { CountryWords, Region } from './words.js'
-import { COLLECTS, COUNTRIES, CREDIT_LIMITS_CENTS, FIRST_NAMES, FIXTURE_COUNTRIES, LAST_NAMES, NOTES, STEMS, TENANT_COUNTRIES, TRADES, UNIT_PRICES_CENTS } from './words.js'
+import {
+  COLLECTS,
+  COUNTRIES,
+  CREDIT_LIMITS_CENTS,
+  FIRST_NAMES,
+  FIXTURE_COUNTRIES,
+  LAST_NAMES,
+  NOTES,
+  STEMS,
+  TENANT_COUNTRIES,
+  TRADES,
+  UNIT_PRICES_CENTS,
+} from './words.js'
 
 /*
  * The live demo's sample data, generated: pure, deterministic, from a seed
@@ -63,7 +75,11 @@ export function generateDemoData(seed: number = DEMO_SEED): DemoData {
   const employees = generateEmployees(stream(seed, 'employees'))
   const drawn = generateCustomers(stream(seed, 'customers'))
   const { orders, lines } = generateOrders(stream(seed, 'orders'), drawn, employees)
-  const { deliveries, parcels } = generateDeliveries(stream(seed, 'deliveries'), orders, drawn.map(({ customer }) => customer))
+  const { deliveries, parcels } = generateDeliveries(
+    stream(seed, 'deliveries'),
+    orders,
+    drawn.map(({ customer }) => customer),
+  )
   return { countries: addedCountries(), employees, customers: drawn.map(({ customer }) => customer), orders, lines, deliveries, parcels }
 }
 
@@ -137,7 +153,10 @@ function generateCustomers(random: Random): Drawn[] {
     // Every country of the tenant's list at least once, the rest by weight,
     // then shuffled, so the numbers do not run through the countries in order.
     const weights = TENANT_COUNTRIES[tenant]
-    const codes = shuffled(random, [...weights.map(([code]) => code), ...Array.from({ length: PER_TENANT.customers - weights.length }, () => random.weighted(weights))])
+    const codes = shuffled(random, [
+      ...weights.map(([code]) => code),
+      ...Array.from({ length: PER_TENANT.customers - weights.length }, () => random.weighted(weights)),
+    ])
     const taken = new Set<string>()
     codes.forEach((countryCode, i) => {
       const country = countryWords(countryCode)
@@ -234,7 +253,9 @@ function generateOrders(random: Random, customers: readonly Drawn[], employees: 
   }
 
   // Numbered in order of tenant and date, as the identity would have numbered them.
-  const sorted = drawn.map((order, index) => ({ order, index })).sort((a, b) => a.order.tenantId - b.order.tenantId || a.order.day - b.order.day || a.index - b.index)
+  const sorted = drawn
+    .map((order, index) => ({ order, index }))
+    .sort((a, b) => a.order.tenantId - b.order.tenantId || a.order.day - b.order.day || a.index - b.index)
   const orders: DemoOrder[] = []
   const lines: DemoLine[] = []
   sorted.forEach(({ order }, i) => {
@@ -264,7 +285,11 @@ function uuid(random: Random): string {
 }
 
 /** One delivery per shipped order, sometimes two, each shipped on a weekday and of one to three parcels; none for any other order. */
-function generateDeliveries(random: Random, orders: readonly DemoOrder[], customers: readonly DemoCustomer[]): { deliveries: DemoDelivery[]; parcels: DemoParcel[] } {
+function generateDeliveries(
+  random: Random,
+  orders: readonly DemoOrder[],
+  customers: readonly DemoCustomer[],
+): { deliveries: DemoDelivery[]; parcels: DemoParcel[] } {
   const anchor = dayNumber(ANCHOR)
   const deliveries: DemoDelivery[] = []
   const parcels: DemoParcel[] = []
@@ -277,7 +302,9 @@ function generateDeliveries(random: Random, orders: readonly DemoOrder[], custom
     const carriers = countryWords(customer.countryCode).carriers
     const day = dayNumber(order.orderDate)
     // The weekdays a carrier may take it: one to six days on, not after the anchor.
-    const shipping = Array.from({ length: Math.min(DAYS_TO_SHIP.max, anchor - day) - DAYS_TO_SHIP.min + 1 }, (_, i) => day + DAYS_TO_SHIP.min + i).filter(isWeekday)
+    const shipping = Array.from({ length: Math.min(DAYS_TO_SHIP.max, anchor - day) - DAYS_TO_SHIP.min + 1 }, (_, i) => day + DAYS_TO_SHIP.min + i).filter(
+      isWeekday,
+    )
     /* c8 ignore next -- a shipped order is a weekday's, a day or more before the anchor, itself a weekday; this says so if either moves */
     if (shipping.length === 0) throw new Error(`order ${String(order.id)} is shipped and no weekday is left to ship it on`)
     const count = random.chance(SHARES.split) ? DELIVERIES_PER_SHIPPED_ORDER.max : DELIVERIES_PER_SHIPPED_ORDER.min

@@ -105,7 +105,9 @@ async function insertSqlServer(admin: mssql.config): Promise<string> {
       .request()
       .input('tenant', mssql.Int, PAGED_TENANT)
       .input('rows', mssql.NVarChar(mssql.MAX), rowsJson())
-      .query("insert into sales.customer (tenant_id, customer_no, name) select @tenant, r.n, r.m from openjson(@rows) with (n int '$.n', m nvarchar(200) '$.m') as r")
+      .query(
+        "insert into sales.customer (tenant_id, customer_no, name) select @tenant, r.n, r.m from openjson(@rows) with (n int '$.n', m nvarchar(200) '$.m') as r",
+      )
     const inserted = await pool
       .request()
       .input('tenant', mssql.Int, PAGED_TENANT)

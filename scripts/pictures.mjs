@@ -63,7 +63,8 @@ export function parse(argv, scenes, { cwd = process.cwd() } = {}) {
     } else throw new Error(`${option} is not an option: ${USAGE}`)
   }
   if (options.all && options.scenes.length > 0) throw new Error('--all retakes every scene of an app, so it is not given with --scene')
-  if (options.check && (options.all || options.scenes.length > 0 || options.review !== undefined)) throw new Error('--check walks every scene of an app and writes nothing, so it takes --app and nothing else')
+  if (options.check && (options.all || options.scenes.length > 0 || options.review !== undefined))
+    throw new Error('--check walks every scene of an app and writes nothing, so it takes --app and nothing else')
   for (const id of options.scenes) {
     const { app } = scenes.find((scene) => scene.id === id)
     if (options.apps.length > 0 && !options.apps.includes(app)) throw new Error(`--scene ${id} is a ${app} scene, and --app names ${options.apps.join(', ')}`)
@@ -111,7 +112,14 @@ export function table(before, after, scenes) {
   })
   const head = ['scene', 'CSS size', 'bytes', 'picture']
   const widths = head.map((title, column) => Math.max(title.length, ...rows.map((row) => row[column].length)))
-  return [head, ...rows].map((row) => row.map((cell, column) => cell.padEnd(widths[column])).join('  ').trimEnd()).join('\n')
+  return [head, ...rows]
+    .map((row) =>
+      row
+        .map((cell, column) => cell.padEnd(widths[column]))
+        .join('  ')
+        .trimEnd(),
+    )
+    .join('\n')
 }
 
 function run(command, args) {
@@ -135,14 +143,15 @@ function main() {
   const options = parse(process.argv.slice(2), scenes)
   const { runs, fresh, write } = plan(options, scenes)
   for (const { app } of runs) {
-    if (!existsSync(join(REPO, 'apps', app, 'scripts', 'pictures.mjs'))) throw new Error(`apps/${app}/scripts/pictures.mjs does not exist, so the ${app} scenes cannot be taken or checked`)
+    if (!existsSync(join(REPO, 'apps', app, 'scripts', 'pictures.mjs')))
+      throw new Error(`apps/${app}/scripts/pictures.mjs does not exist, so the ${app} scenes cannot be taken or checked`)
   }
   const kept = readIfPresent(RECORD)
   const before = kept === undefined ? {} : JSON.parse(kept)
   if (fresh) {
     mkdirSync(IMAGES, { recursive: true })
     writeFileSync(RECORD, serialize({}, scenes), 'utf8')
-    console.log('pictures: --all without --app, so every picture is retaken on an empty record and on this machine\'s look')
+    console.log("pictures: --all without --app, so every picture is retaken on an empty record and on this machine's look")
   }
   for (const { app, args } of runs) {
     console.log(`\npictures: ${app} ${args.join(' ')}`.trimEnd())
@@ -150,7 +159,9 @@ function main() {
     if (fresh) {
       if (kept === undefined) rmSync(RECORD, { force: true })
       else writeFileSync(RECORD, kept, 'utf8')
-      console.error('pictures: captured.json is as it was before this run; pictures already retaken are not, and `git checkout docs/images/readme` puts them back')
+      console.error(
+        'pictures: captured.json is as it was before this run; pictures already retaken are not, and `git checkout docs/images/readme` puts them back',
+      )
     }
     throw new Error(`the ${app} pictures ${options.check ? 'check' : 'run'} failed`)
   }

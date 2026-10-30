@@ -68,11 +68,11 @@ export interface Pending {
   request: LeaveRequest
   risky: Array<PaneWork & { entry: PaneEntry }>
   /** Carries the request out; `discarded` says whether work was dropped for it. */
-  proceed(discarded: boolean): void
+  proceed: (discarded: boolean) => void
   /** Gives the keyboard back to what asked. */
-  back(): void
+  back: () => void
   /** Undoes what the request did before it was asked -- Back moved the address -- whether kept from or replaced. */
-  cancel(): void
+  cancel: () => void
   /** The how-manyth question this is: a second request replaces the first, and takes the focus again. */
   n: number
 }
@@ -84,7 +84,7 @@ export interface Guard {
    * cancelled first; a delete's confirmation, which holds nothing, closes
    * (0053).
    */
-  ask(request: LeaveRequest, proceed: (discarded: boolean) => void, back: () => void, cancel?: () => void): void
+  ask: (request: LeaveRequest, proceed: (discarded: boolean) => void, back: () => void, cancel?: () => void) => void
   /**
    * `ask`, for a request an answer makes -- a read come back, a record
    * created in a pane -- which closes no confirmation: the person asked for
@@ -94,8 +94,8 @@ export interface Guard {
   pending: Pending | null
   /** Whether a request is waiting for the person now: read when an answer arrives late, outside a render. */
   waiting(): boolean
-  keep(): void
-  discard(): void
+  keep: () => void
+  discard: () => void
   registry: Registry
 }
 

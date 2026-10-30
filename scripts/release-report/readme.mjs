@@ -57,7 +57,10 @@ function versions(tool) {
 function legsOf(facts, engine) {
   const groups = new Map()
   for (const image of facts.matrix[engine].slice(1)) {
-    const packages = facts.legs.filter((leg) => leg.image === image).map((leg) => leg.package).sort()
+    const packages = facts.legs
+      .filter((leg) => leg.image === image)
+      .map((leg) => leg.package)
+      .sort()
     if (packages.length === 0) throw new Error(`${image} is an image of the matrix that no leg of the test-images job runs`)
     const key = JSON.stringify(packages)
     groups.set(key, [packages, [...(groups.get(key)?.[1] ?? []), image]])
@@ -113,12 +116,25 @@ export function readmeTable(facts) {
       entry.loaded,
       declared(entry),
     ]),
-    ...facts.upstream.map((entry) => [`${code(entry.name)}${entry.direct ? '' : ' (transitive)'}`, entry.version, entry.declared === null ? '' : code(entry.declared)]),
+    ...facts.upstream.map((entry) => [
+      `${code(entry.name)}${entry.direct ? '' : ' (transitive)'}`,
+      entry.version,
+      entry.declared === null ? '' : code(entry.declared),
+    ]),
     ['Node, the workspace', '', facts.node.engines === null ? 'nothing' : code(facts.node.engines)],
-    ['Node, the server image', [...new Set(facts.node.dockerfile)].map(code).join(', ') + (new Set(facts.node.dockerfile).size === 1 && facts.node.dockerfile.length > 1 ? ', every stage' : ''), ''],
+    [
+      'Node, the server image',
+      [...new Set(facts.node.dockerfile)].map(code).join(', ') +
+        (new Set(facts.node.dockerfile).size === 1 && facts.node.dockerfile.length > 1 ? ', every stage' : ''),
+      '',
+    ],
     ['Node, CI', [...new Set(facts.node.ci.map((entry) => entry.version))].join(', '), ''],
     [facts.packageManager.name, `${facts.packageManager.version}, through corepack`, `${code(facts.packageManager.declared)}, the root's \`packageManager\``],
-    ...facts.browser.pins.map((pin) => [browserName(pin.browser), `${pin.browserVersion}, the ${pin.name} Playwright ${facts.browser.playwright} pins (revision ${pin.revision})`, '']),
+    ...facts.browser.pins.map((pin) => [
+      browserName(pin.browser),
+      `${pin.browserVersion}, the ${pin.name} Playwright ${facts.browser.playwright} pins (revision ${pin.revision})`,
+      '',
+    ]),
     ...facts.tooling.map((tool) => [code(tool.name), versions(tool), '']),
   ]
   return [
@@ -135,7 +151,9 @@ export function adapterLine(facts, engine) {
   const drivers = facts.runtime.filter((entry) => entry.package === `@formancy/data-${engine}`)
   if (drivers.length === 0) throw new Error(`@formancy/data-${engine} declares no runtime dependency, so its README has no driver to name`)
   const named = drivers.map((entry) =>
-    entry.under === undefined ? `${code(entry.name)} ${entry.loaded} (published as ${code(entry.range)})` : `the ${code(entry.name)} ${entry.loaded} under it (${declared(entry)})`,
+    entry.under === undefined
+      ? `${code(entry.name)} ${entry.loaded} (published as ${code(entry.range)})`
+      : `the ${code(entry.name)} ${entry.loaded} under it (${declared(entry)})`,
   )
   const again = legsOf(facts, engine)
     .filter(([packages]) => packages.includes(`@formancy/data-${engine}`))

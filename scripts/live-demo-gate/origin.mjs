@@ -22,7 +22,12 @@ import { headersFor } from '../demo-headers.mjs'
 /** A run_worker_first pattern as Cloudflare documents it: a path, `*` matching anything, slashes included. */
 function patternOf(glob) {
   if (glob.startsWith('!')) throw new Error(`run_worker_first's ${glob} is negated, which the gate's origin does not model`)
-  return new RegExp(`^${glob.split('*').map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, '\\$&')).join('.*')}$`)
+  return new RegExp(
+    `^${glob
+      .split('*')
+      .map((part) => part.replaceAll(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*')}$`,
+  )
 }
 
 /**
@@ -97,7 +102,8 @@ export function serveOrigin({ directory, prefix, assets, rules, worker }) {
     const pathname = new URL(incoming.url ?? '/', 'http://origin').pathname
     const decided = routeOf(pathname, { prefix, assets, exists: (path) => fileOf(path) !== undefined })
     if (decided.kind === 'redirect') return void outgoing.writeHead(307, { location: decided.location }).end()
-    if (decided.kind === 'elsewhere') return void outgoing.writeHead(404, { 'content-type': 'text/plain' }).end(`${pathname} is formancy.ai's own site, not the demo's.`)
+    if (decided.kind === 'elsewhere')
+      return void outgoing.writeHead(404, { 'content-type': 'text/plain' }).end(`${pathname} is formancy.ai's own site, not the demo's.`)
     if (decided.kind === 'asset') {
       const headers = { 'content-type': TYPES[extname(decided.file)] ?? 'application/octet-stream' }
       for (const [name, value] of Object.entries(headersFor(rules, pathname))) headers[name.toLowerCase()] = value

@@ -25,12 +25,21 @@ export interface ViewCarry {
  * goes with its view.
  */
 export function carryViews({ views, follow, bindings, report }: ViewCarry): ListView[] {
-  const columns = listColumns(bindings, bindings.fields.map((binding) => binding.field), [])
+  const columns = listColumns(
+    bindings,
+    bindings.fields.map((binding) => binding.field),
+    [],
+  )
   const carried: ListView[] = []
   for (const [index, view] of views.entries()) {
     const gone = [...view.filter, ...view.sort].find((term) => follow(term.field) === undefined)
     if (gone !== undefined) {
-      report(index, { kind: 'view-dropped', view: view.name, resolution: 'dropped', message: `View “${view.name}” names ${gone.field}, which is not in the regenerated form, so it was dropped.` })
+      report(index, {
+        kind: 'view-dropped',
+        view: view.name,
+        resolution: 'dropped',
+        message: `View “${view.name}” names ${gone.field}, which is not in the regenerated form, so it was dropped.`,
+      })
       continue
     }
     const moved: ListView = {

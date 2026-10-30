@@ -210,7 +210,16 @@ function PaneBody({
       {notice?.kind === 'unknown' ? (
         // Keyed by the notice: a second unknown save is another save, whose
         // check, confirmation and focus start again rather than inherit the first's.
-        <UnknownNotice key={notice.n} session={session} message={notice.message} label={`${named} ${noticeId}`} noticeId={noticeId} noticeLevel={noticeLevel} noticeRef={noticeRef} onLoad={onLoad} />
+        <UnknownNotice
+          key={notice.n}
+          session={session}
+          message={notice.message}
+          label={`${named} ${noticeId}`}
+          noticeId={noticeId}
+          noticeLevel={noticeLevel}
+          noticeRef={noticeRef}
+          onLoad={onLoad}
+        />
       ) : notice === null ? null : (
         <div role="region" aria-labelledby={`${named} ${noticeId}`} tabIndex={-1} ref={noticeRef} className="notice" data-kind={notice.kind}>
           <NoticeHeading level={noticeLevel} id={noticeId}>
@@ -227,7 +236,14 @@ function PaneBody({
           ) : null}
         </div>
       )}
-      <form className="sheet" aria-label={`${title}, ${name}`} data-formancy-theme="blueprint" noValidate onSubmit={(event) => event.preventDefault()} ref={setSheet}>
+      <form
+        className="sheet"
+        aria-label={`${title}, ${name}`}
+        data-formancy-theme="blueprint"
+        noValidate
+        onSubmit={(event) => event.preventDefault()}
+        ref={setSheet}
+      >
         {session.renderer === 'react' ? (
           <ReactForm engine={engine} sources={session.sources} onSubmit={(outcome) => void submit(outcome)} />
         ) : (

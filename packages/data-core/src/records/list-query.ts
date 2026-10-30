@@ -77,7 +77,8 @@ function parentOf(parent: unknown): { ok: true; parent: RecordListQuery['parent'
   if (parent === undefined || parent === null) return { ok: true, parent: null }
   if (!isRecord(parent) || !hasExactly(parent, ['field', 'record'])) return malformed('The parent is { field, record } and nothing else, or null.')
   const { field, record } = parent
-  if (typeof field !== 'string' || field === '' || (typeof record !== 'string' && record !== null)) return malformed("The parent names a lookup field by its key and the parent's record token, or null for none.")
+  if (typeof field !== 'string' || field === '' || (typeof record !== 'string' && record !== null))
+    return malformed("The parent names a lookup field by its key and the parent's record token, or null for none.")
   return { ok: true, parent: { field, record } }
 }
 
@@ -117,14 +118,18 @@ function afterOf(after: unknown): { ok: true; after: string | null } | Malformed
  */
 export function validateListQuery(query: unknown): ListQueryCheck {
   if (!isRecord(query)) return malformed('A list query is an object.')
-  if (others(query, LIST_PROPERTIES).length > 0) return malformed('A list query has a search, a sort, a parent, a filter, a cursor to continue after and a limit, and nothing else.')
+  if (others(query, LIST_PROPERTIES).length > 0)
+    return malformed('A list query has a search, a sort, a parent, a filter, a cursor to continue after and a limit, and nothing else.')
   const selected = selection(query)
   if (!selected.ok) return selected
   const after = afterOf(query['after'])
   if (!after.ok) return after
   const page = checkPage(0, query['limit'] === undefined ? LIST_PAGE_SIZE : query['limit'], LIST_PAGE_SIZE)
   if (!page.ok) return page
-  return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter, after: after.after, limit: page.limit } }
+  return {
+    ok: true,
+    query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter, after: after.after, limit: page.limit },
+  }
 }
 
 /**
@@ -135,7 +140,8 @@ export function validateListQuery(query: unknown): ListQueryCheck {
  */
 export function validateExportQuery(query: unknown): ExportQueryCheck {
   if (!isRecord(query)) return malformed('An export query is an object.')
-  if (others(query, EXPORT_PROPERTIES).length > 0) return malformed('An export query has a search, a sort, a parent and a filter, and nothing else: the file holds every page.')
+  if (others(query, EXPORT_PROPERTIES).length > 0)
+    return malformed('An export query has a search, a sort, a parent and a filter, and nothing else: the file holds every page.')
   const selected = selection(query)
   if (!selected.ok) return selected
   return { ok: true, query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter } }

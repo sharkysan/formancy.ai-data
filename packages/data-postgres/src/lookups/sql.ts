@@ -39,9 +39,7 @@ function selectList(config: LookupConfig, withDisplay: boolean): string {
 
 /** A lookup query. `where` is never empty: a search excludes NULL keys, and a key query has its keys. */
 function assemble(config: LookupConfig, select: string, where: readonly string[], tail = ''): string {
-  return [`select ${select}`, `from ${quoteTable(config.target)} as ${ROW}`, `where ${where.join(' and ')}`, tail]
-    .filter((part) => part !== '')
-    .join('\n')
+  return [`select ${select}`, `from ${quoteTable(config.target)} as ${ROW}`, `where ${where.join(' and ')}`, tail].filter((part) => part !== '').join('\n')
 }
 
 /**
@@ -85,7 +83,12 @@ function keyTuple(statement: Statement, columns: readonly LookupKeyColumn[], key
  * one-column row, which PostgreSQL reads as the value itself, so one
  * spelling serves every key.
  */
-export function keysStatement(config: LookupConfig, keys: readonly (readonly string[])[], terms: readonly RowFilterTerm[], withDisplay: boolean): LookupStatement {
+export function keysStatement(
+  config: LookupConfig,
+  keys: readonly (readonly string[])[],
+  terms: readonly RowFilterTerm[],
+  withDisplay: boolean,
+): LookupStatement {
   const statement = new Statement()
   const filters = filterSql(statement, ROW, terms)
   const target = `(${config.targetColumns.map((key) => column(key.name)).join(', ')})`

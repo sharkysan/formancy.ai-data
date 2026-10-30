@@ -108,7 +108,17 @@ export { codecFor } from './codecs/codec.js'
 export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
-export { authorizeOperation, checkSubmittedFields, checkTransition, forcedValues, lookupRowFilter, readableFields, rowFilter, stateField, throughFilters } from './policy/evaluate.js'
+export {
+  authorizeOperation,
+  checkSubmittedFields,
+  checkTransition,
+  forcedValues,
+  lookupRowFilter,
+  readableFields,
+  rowFilter,
+  stateField,
+  throughFilters,
+} from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
 export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
@@ -171,6 +181,7 @@ export { planDelete } from './records/delete.js'
 export { deleteTerms, reachesPast } from './records/delete-terms.js'
 export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
 export { copiedFields } from './records/copy.js'
+export { fieldHeading } from './records/heading.js'
 export { CURSOR_GONE, cursorRefusal, listable, listColumns, listOrder, planList, recordPage, viewProblems } from './records/list.js'
 export { decodeListCursor, listCursor } from './records/cursor.js'
 export { childFields } from './records/children.js'
@@ -184,7 +195,18 @@ export { exportColumns, exportHeader, exportRecord, exportText } from './records
 export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
 export type { CsvCell, CsvRefusal, CsvText } from './records/csv.js'
 export { browsePage, planBrowse, validateBrowseQuery } from './records/browse.js'
-export type { BrowseEqualTerm, BrowseFilterTerm, BrowsePage, BrowseQuery, BrowseQueryCheck, BrowseRefusal, BrowseRefusalCode, BrowseSortTerm, OmittedColumn, PlannedBrowse } from './records/browse.js'
+export type {
+  BrowseEqualTerm,
+  BrowseFilterTerm,
+  BrowsePage,
+  BrowseQuery,
+  BrowseQueryCheck,
+  BrowseRefusal,
+  BrowseRefusalCode,
+  BrowseSortTerm,
+  OmittedColumn,
+  PlannedBrowse,
+} from './records/browse.js'
 export { columnFilter, dayAfter, filterOffer, readFilter } from './records/filter.js'
 export type { FilterPlanning, FilterRead } from './records/filter.js'
 export { browseRelations, followTerms } from './records/follow.js'

@@ -27,10 +27,16 @@ function suiteProblems(row) {
   const skipped = row.notPassed.filter((test) => test.status !== 'failed')
   if (failed.length > 0) problems.push(`${name}: ${String(failed.length)} test(s) failed: ${list(failed.map((test) => `${test.file} › ${test.name}`))}`)
   if (skipped.length > 0) {
-    problems.push(`${name}: ${String(skipped.length)} test(s) did not run (${[...new Set(skipped.map((test) => test.status))].join(', ')}), and a suite that can be skipped is a suite that is skipped: ${list(skipped.map((test) => `${test.file} › ${test.name}`))}`)
+    problems.push(
+      `${name}: ${String(skipped.length)} test(s) did not run (${[...new Set(skipped.map((test) => test.status))].join(', ')}), and a suite that can be skipped is a suite that is skipped: ${list(skipped.map((test) => `${test.file} › ${test.name}`))}`,
+    )
   }
   for (const file of row.failedFiles) {
-    problems.push(file.testsPassed ? `${name}: ${file.file} failed though every test in it passed: a collection error, or a hook that threw` : `${name}: ${file.file} failed`)
+    problems.push(
+      file.testsPassed
+        ? `${name}: ${file.file} failed though every test in it passed: a collection error, or a hook that threw`
+        : `${name}: ${file.file} failed`,
+    )
   }
   if (!row.success) problems.push(`${name}: vitest reported the run unsuccessful`)
   if (row.numFailedTestSuites > 0) problems.push(`${name}: vitest counted ${String(row.numFailedTestSuites)} failed suite(s)`)
@@ -51,7 +57,8 @@ function gateProblems(report, browserApps, allowMissing) {
   const gated = playwright.pins.map((pin) => pin.browser)
   for (const app of browserApps) {
     for (const browser of gated) {
-      if (!allowMissing.includes('browser') && !gates.some((gate) => gate.gate === app && gate.asked === browser)) problems.push(`the browser gate of ${app} left no results in ${browserName(browser)}`)
+      if (!allowMissing.includes('browser') && !gates.some((gate) => gate.gate === app && gate.asked === browser))
+        problems.push(`the browser gate of ${app} left no results in ${browserName(browser)}`)
     }
     for (const gate of gates.filter((entry) => entry.gate === app)) {
       const which = `the browser gate of ${app} in ${browserName(gate.asked)}`
@@ -70,7 +77,10 @@ function gateProblems(report, browserApps, allowMissing) {
   }
   for (const browser of report.testedOn.browsers) {
     const launched = `the browser gates of ${browser.gates.join(', ')} launched ${browser.name} ${browser.version}`
-    if (browser.pin === null) problems.push(`${launched}, which no gate here runs: the gates hold only ${prose(gated.map(browserName))} to a build Playwright ${playwright.playwright} pins`)
+    if (browser.pin === null)
+      problems.push(
+        `${launched}, which no gate here runs: the gates hold only ${prose(gated.map(browserName))} to a build Playwright ${playwright.playwright} pins`,
+      )
     else if (browser.version !== browser.pin) problems.push(`${launched}, not the ${browser.pin} Playwright ${playwright.playwright} pins`)
   }
   return problems
@@ -99,7 +109,9 @@ function sameChecks(app, ran) {
     const [a, b] = [first, other].map((gate) => gate.made.map((entry) => entry.label))
     const [one, two] = [browserName(first.asked), browserName(other.asked)]
     if (a.join('\0') !== b.join('\0')) {
-      problems.push(`the browser gate of ${app} made its passes as ${a.map(passName).join(', ')} in ${one} and as ${b.map(passName).join(', ')} in ${two}: ${NOBODY_MEASURED}`)
+      problems.push(
+        `the browser gate of ${app} made its passes as ${a.map(passName).join(', ')} in ${one} and as ${b.map(passName).join(', ')} in ${two}: ${NOBODY_MEASURED}`,
+      )
       continue
     }
     for (const [at, entry] of first.made.entries()) {
@@ -108,7 +120,12 @@ function sameChecks(app, ran) {
         const [x, y] = [counts.get(name) ?? 0, theirs.get(name) ?? 0]
         if (x === y) continue
         const where = `"${name}" at ${passName(entry.label)}`
-        const said = y === 0 ? `${where} in ${one} and not in ${two}` : x === 0 ? `${where} in ${two} and not in ${one}` : `${where} ${times(x)} in ${one} and ${times(y)} in ${two}`
+        const said =
+          y === 0
+            ? `${where} in ${one} and not in ${two}`
+            : x === 0
+              ? `${where} in ${two} and not in ${one}`
+              : `${where} ${times(x)} in ${one} and ${times(y)} in ${two}`
         problems.push(`the browser gate of ${app} made ${said}: ${NOBODY_CHECKED}`)
       }
     }
@@ -130,7 +147,10 @@ function unheldFacts(app, ran) {
     for (const gate of ran) {
       const made = new Set(gate.made.flatMap((entry) => entry.checks))
       for (const name of fact.heldBy.checks) {
-        if (!made.has(name)) problems.push(`the browser gate of ${app} in ${browserName(gate.asked)} never made "${name}", which holds 0058's ${id}: a row no check holds is a sentence nobody measured`)
+        if (!made.has(name))
+          problems.push(
+            `the browser gate of ${app} in ${browserName(gate.asked)} never made "${name}", which holds 0058's ${id}: a row no check holds is a sentence nobody measured`,
+          )
       }
     }
   }
@@ -148,7 +168,9 @@ function buildProblems(which, browser, playwright) {
   if (pin === undefined) return []
   const { build, how } = launchedBuild(browser)
   if (build === pin.name) return []
-  return [`${which} launched ${browser.name} ${browser.version} ${how}${build === null ? '' : `, which starts ${build}`}, not the ${pin.name} Playwright ${playwright.playwright} pins`]
+  return [
+    `${which} launched ${browser.name} ${browser.version} ${how}${build === null ? '' : `, which starts ${build}`}, not the ${pin.name} Playwright ${playwright.playwright} pins`,
+  ]
 }
 
 /** The install gate passed and packed one tarball per published package, each at data-core's version; the container gate left its results. */
@@ -160,11 +182,17 @@ function packagingProblems(report, published, allowMissing) {
   } else {
     if (!install.passed) problems.push(`the install gate did not pass: ${install.error ?? 'no error was recorded'}`)
     const packed = install.tarballs.map((tarball) => tarball.name).sort()
-    if (packed.join() !== [...published].sort().join()) problems.push(`the install gate packed ${packed.join(', ') || 'nothing'}, where every published package needs exactly one tarball: ${[...published].sort().join(', ')}`)
+    if (packed.join() !== [...published].sort().join())
+      problems.push(
+        `the install gate packed ${packed.join(', ') || 'nothing'}, where every published package needs exactly one tarball: ${[...published].sort().join(', ')}`,
+      )
     // One number for every package, data-core's (bump.mjs), so a tarball at
     // another is found on the pull request rather than at the tag.
     for (const tarball of install.tarballs) {
-      if (tarball.version !== report.subject.version) problems.push(`the install gate packed ${tarball.name} ${String(tarball.version)}, where every published package is at data-core's version, ${report.subject.version}`)
+      if (tarball.version !== report.subject.version)
+        problems.push(
+          `the install gate packed ${tarball.name} ${String(tarball.version)}, where every published package is at data-core's version, ${report.subject.version}`,
+        )
     }
   }
   if (container === null && !allowMissing.includes('container')) problems.push('the container gate left no results')
@@ -183,22 +211,32 @@ function caseProblems(report, allowMissing) {
   for (const row of report.sharedCases.rows) {
     const held = heldCells(row, columns, allowMissing)
     if (held.every(([, cell]) => cell.state === 'passed')) continue
-    const said = Object.entries(row.cells).map(([image, cell]) => `${cell.state} on ${image}`).join(', ')
-    problems.push(`${row.id}: ${said}${held.some(([, cell]) => cell.state === 'missing') ? ' (declared with covers(); see packages/data-fixtures/README.md)' : ''}`)
+    const said = Object.entries(row.cells)
+      .map(([image, cell]) => `${cell.state} on ${image}`)
+      .join(', ')
+    problems.push(
+      `${row.id}: ${said}${held.some(([, cell]) => cell.state === 'missing') ? ' (declared with covers(); see packages/data-fixtures/README.md)' : ''}`,
+    )
   }
   for (const entry of report.sharedCases.unknown) problems.push(`${entry.file} › ${entry.name} declares "${entry.id}", which is no shared case`)
-  for (const entry of report.sharedCases.withoutEngine) problems.push(`${entry.file} › ${entry.name} declares shared cases on ${String(entry.engine)}, which is no engine`)
+  for (const entry of report.sharedCases.withoutEngine)
+    problems.push(`${entry.file} › ${entry.name} declares shared cases on ${String(entry.engine)}, which is no engine`)
   for (const entry of report.sharedCases.withoutImage) {
-    problems.push(`${entry.file} › ${entry.name} declares shared cases on ${entry.engine} in ${entry.leg}, and no server that leg recorded names its file, so no image can be said for it`)
+    problems.push(
+      `${entry.file} › ${entry.name} declares shared cases on ${entry.engine} in ${entry.leg}, and no server that leg recorded names its file, so no image can be said for it`,
+    )
   }
   for (const engine of report.testedOn.engines) {
     const image = engine.images.find((entry) => entry.default)
-    if (image === undefined || image.tested.length === 0) problems.push(`${engineName(engine.engine)}'s default image ${engine.defaultImage} never answered a test in this run`)
+    if (image === undefined || image.tested.length === 0)
+      problems.push(`${engineName(engine.engine)}'s default image ${engine.defaultImage} never answered a test in this run`)
     for (const other of engine.images.filter((entry) => entry.matrix && !entry.default && entry.tested.length === 0)) {
-      if (!allowMissing.includes('test-images')) problems.push(`${engineName(engine.engine)}'s matrix image ${other.image} never answered a test in a leg of its own in this run`)
+      if (!allowMissing.includes('test-images'))
+        problems.push(`${engineName(engine.engine)}'s matrix image ${other.image} never answered a test in a leg of its own in this run`)
     }
     for (const other of engine.images) {
-      if (other.callers.length === 0 && other.tested.length > 0) problems.push(`${engineName(engine.engine)} on ${other.image} answered a test whose file no record names`)
+      if (other.callers.length === 0 && other.tested.length > 0)
+        problems.push(`${engineName(engine.engine)} on ${other.image} answered a test whose file no record names`)
     }
   }
   return problems
@@ -210,7 +248,8 @@ function identityProblems(report) {
   for (const entry of report.results.buildIdentity) {
     // One hash among none is identical to itself: a tarball no job's build
     // is recorded beside is compared with nothing, and says nothing of it.
-    if (entry.tarball !== null && entry.builds.length === 0) problems.push(`${entry.package}: no job recorded its dist/, so the dist/ in its tarball is compared with nothing`)
+    if (entry.tarball !== null && entry.builds.length === 0)
+      problems.push(`${entry.package}: no job recorded its dist/, so the dist/ in its tarball is compared with nothing`)
     if (entry.identical) continue
     const byHash = new Map()
     for (const build of entry.builds) byHash.set(build.distHash, [...(byHash.get(build.distHash) ?? []), build.job])
@@ -218,7 +257,10 @@ function identityProblems(report) {
     if (tarball !== undefined && !byHash.has(tarball)) {
       problems.push(`${entry.package}: the dist/ in its tarball differs from the dist/ built in ${entry.builds.map((build) => build.job).join(', ')}`)
     }
-    if (byHash.size > 1) problems.push(`${entry.package}: two jobs built different dist/ bytes: ${[...byHash].map(([hash, jobs]) => `${jobs.join(', ')} built ${hash.slice(0, 19)}`).join('; ')}`)
+    if (byHash.size > 1)
+      problems.push(
+        `${entry.package}: two jobs built different dist/ bytes: ${[...byHash].map(([hash, jobs]) => `${jobs.join(', ')} built ${hash.slice(0, 19)}`).join('; ')}`,
+      )
   }
   return problems
 }
@@ -228,7 +270,8 @@ function limitationProblems(report) {
   const problems = report.limitations.registerProblems.map((problem) => `docs/release/limitations.json: ${problem}`)
   for (const group of report.limitations.stated) {
     for (const line of group.lines) {
-      if (line.heldBy !== undefined && line.held !== 'passed') problems.push(`${line.number}'s "${line.says}" is held by ${line.heldBy}, which ${line.held === 'absent' ? 'did not run' : 'did not pass'} in this run`)
+      if (line.heldBy !== undefined && line.held !== 'passed')
+        problems.push(`${line.number}'s "${line.says}" is held by ${line.heldBy}, which ${line.held === 'absent' ? 'did not run' : 'did not pass'} in this run`)
     }
   }
   return problems
@@ -245,7 +288,16 @@ export function needsProblems(needs, jobs) {
 
 /** How an evidence item that did not pass is said; a browser gate that ran in some browsers and not others names the others. */
 const unpassed = (item) => {
-  const what = item.kind === 'file' ? item.value : item.kind === 'browserGate' ? `the browser gate of ${item.value}` : item.kind === 'job' ? `the ${item.value} job` : item.kind === 'sharedCases' ? 'the shared cases' : item.value
+  const what =
+    item.kind === 'file'
+      ? item.value
+      : item.kind === 'browserGate'
+        ? `the browser gate of ${item.value}`
+        : item.kind === 'job'
+          ? `the ${item.value} job`
+          : item.kind === 'sharedCases'
+            ? 'the shared cases'
+            : item.value
   const where = item.missing === undefined ? '' : ` in ${item.missing.map(browserName).join(', ')}`
   return `${what} ${item.outcome === 'absent' ? `did not run${where}` : item.kind === 'job' ? `ended ${String(item.result)}` : 'did not pass'}`
 }
@@ -259,7 +311,9 @@ export function releaseGateProblems(gates, allowMissing = []) {
   return gates
     .filter((gate) => gate.state === 'failed')
     .flatMap((gate) => {
-      const allowed = (item) => item.outcome === 'absent' && ((item.kind === 'job' && allowMissing.includes(item.value)) || (item.kind === 'browserGate' && allowMissing.includes('browser')))
+      const allowed = (item) =>
+        item.outcome === 'absent' &&
+        ((item.kind === 'job' && allowMissing.includes(item.value)) || (item.kind === 'browserGate' && allowMissing.includes('browser')))
       const items = gate.evidence.filter((item) => item.kind !== 'document' && item.outcome !== 'passed' && !allowed(item))
       return items.length === 0 ? [] : [`gate ${String(gate.gate)}: its evidence did not pass in this run: ${list(items.map(unpassed))}`]
     })

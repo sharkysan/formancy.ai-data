@@ -4,6 +4,7 @@ import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-clien
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { recordName } from './crumbs.js'
 import type { OpenHow } from './grid-options.js'
+import { emptyLevelLine } from './tree-lines.js'
 
 /*
  * A form that is its own child -- an employee and the employees whose
@@ -37,7 +38,9 @@ interface Level {
 }
 
 /** An item as the arrows walk it: a record, or a level's "More". */
-type Item = { kind: 'record'; record: string; depth: number; parent: string | null; size: number; position: number } | { kind: 'more'; parent: string | null; depth: number; size: number; position: number }
+type Item =
+  | { kind: 'record'; record: string; depth: number; parent: string | null; size: number; position: number }
+  | { kind: 'more'; parent: string | null; depth: number; size: number; position: number }
 
 const key = (item: Item): string => (item.kind === 'record' ? item.record : `more:${item.parent ?? ''}`)
 
@@ -81,7 +84,6 @@ export function RecordTree({
   const [focused, setFocused] = useState<string | null>(null)
   const [line, setLine] = useState('Loading the records with no parent.')
   const items = useRef(new Map<string, HTMLLIElement>())
-  const fieldLabel = String(definition.form.model.fields.find((each) => each.key === field)?.label ?? field)
 
   const nameOf = (row: FormRecord): string => recordName(definition.form.model.fields, row.answers, field) ?? row.record ?? ''
 
@@ -96,7 +98,8 @@ export function RecordTree({
   function known(rows: readonly FormRecord[]): void {
     setNodes((before) => {
       const after = new Map(before)
-      for (const row of rows) if (!after.has(row.record as string)) after.set(row.record as string, { record: row.record as string, name: nameOf(row), expanded: false })
+      for (const row of rows)
+        if (!after.has(row.record as string)) after.set(row.record as string, { record: row.record as string, name: nameOf(row), expanded: false })
       return after
     })
   }
@@ -109,12 +112,13 @@ export function RecordTree({
       known(answer.rows)
       setRoots({ records: answer.rows.map((row) => row.record as string), next: answer.next })
       setFocused(answer.rows[0]?.record ?? null)
-      setLine(answer.rows.length === 0 ? `No records have no ${fieldLabel}.` : '')
+      setLine(answer.rows.length === 0 ? emptyLevelLine(definition, field, null) : '')
     })
     return () => {
       current = false
     }
     // Mounted again for another form or field.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- page and known are made from the client, the form, the field and the definition, and the definition is the prop openForm fetched for the view, fixed for the view's life: Workspace keys FormView by the opened entry's id and openForm passes through the asking state, which unmounts the view, so none of them changes under the tree
   }, [client, formId, field])
 
   const shown = roots === null ? [] : visible(roots, nodes)
@@ -132,8 +136,10 @@ export function RecordTree({
     const answer = await page(record, null)
     if ('refused' in answer) return setLine(answer.refused)
     known(answer.rows)
-    setNodes((before) => new Map(before).set(record, { ...node, expanded: true, below: { records: answer.rows.map((row) => row.record as string), next: answer.next } }))
-    setLine(answer.rows.length === 0 ? `No records name ${node.name} as their ${fieldLabel}.` : '')
+    setNodes((before) =>
+      new Map(before).set(record, { ...node, expanded: true, below: { records: answer.rows.map((row) => row.record as string), next: answer.next } }),
+    )
+    setLine(answer.rows.length === 0 ? emptyLevelLine(definition, field, node.name) : '')
   }
 
   function collapse(record: string): void {

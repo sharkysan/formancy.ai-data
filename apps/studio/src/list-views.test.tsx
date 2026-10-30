@@ -46,12 +46,20 @@ const options = (container: HTMLElement, name: string) =>
     .map((option) => option.textContent)
 
 /** What the panel's live line last said. */
-const said = () => within(viewsPanel()).getAllByRole('paragraph').find((paragraph) => paragraph.getAttribute('aria-live') === 'polite')?.textContent
+const said = () =>
+  within(viewsPanel())
+    .getAllByRole('paragraph')
+    .find((paragraph) => paragraph.getAttribute('aria-live') === 'polite')?.textContent
 
 /** The refusal under the form: its lead and each reason. */
 function refusal(): string[] {
   const alert = within(viewForm()).getByRole('alert')
-  return [...paragraphs(alert), ...within(alert).getAllByRole('listitem').map((item) => item.textContent ?? '')]
+  return [
+    ...paragraphs(alert),
+    ...within(alert)
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? ''),
+  ]
 }
 
 /** The bindings the studio generated, proposed again with the request it sent: what the server fits a view to. */
@@ -98,7 +106,12 @@ describe('making a view', () => {
     await within(publish).findByText('Published version 1 of sales-order.')
     const stored = (await plane.store.read('sales-order', 1)) as Bundle
     if (stored.format !== 2) throw new Error('version 1 is not a format-2 bundle')
-    const placed: ListView = { name: 'Placed, newest first', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }], default: true }
+    const placed: ListView = {
+      name: 'Placed, newest first',
+      filter: [{ field: 'status', op: 'equals', value: 'placed' }],
+      sort: [{ field: 'order_date', direction: 'desc' }],
+      default: true,
+    }
     expect(stored.presentation.views).toEqual([placed])
     // Back on the step, the view is still there: the workbench keeps it, not the panel.
     await goTo(user, 'Presentation')

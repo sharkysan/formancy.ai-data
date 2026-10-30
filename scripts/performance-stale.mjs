@@ -35,7 +35,9 @@ if (process.argv[2] === '--describe') {
   }
   const problems = compareProduct(JSON.parse(readFileSync(join(root, RESULTS), 'utf8')).product, describeProduct(root))
   if (problems.length > 0) {
-    console.error(`docs/performance.md was measured on a different product. Re-measure ("pnpm performance" on a quiet Linux machine, RELEASING.md):\n  ${problems.join('\n  ')}`)
+    console.error(
+      `docs/performance.md was measured on a different product. Re-measure ("pnpm performance" on a quiet Linux machine, RELEASING.md):\n  ${problems.join('\n  ')}`,
+    )
     process.exit(1)
   }
   console.log('The published performance figures describe this product.')

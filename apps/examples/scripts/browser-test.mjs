@@ -86,9 +86,7 @@ function widths() {
     { label: 'reflow, 320, web fonts refused', width: 320, refuseFonts: true },
     // The commonest Android width, and the second phone of 0021's hand check.
     { label: 'phone, 360', width: 360 },
-    ...[...new Set(breakpoints)]
-      .sort((left, right) => left - right)
-      .map((px) => ({ label: `one past the ${String(px)}px breakpoint`, width: px + 1 })),
+    ...[...new Set(breakpoints)].sort((left, right) => left - right).map((px) => ({ label: `one past the ${String(px)}px breakpoint`, width: px + 1 })),
     // An ordinary laptop: notes and both previews side by side.
     { label: 'laptop, 1440', width: 1440 },
   ]
@@ -141,7 +139,9 @@ function measureWidth(page) {
       if (box.width === 0 || box.height === 0) continue
       if (box.right <= edge + 0.5 && box.left >= -0.5) continue
       const part = element.getAttribute('data-formancy-part')
-      past.push(`${element.tagName.toLowerCase()}${part === null ? '' : `[${part}]`}.${String(element.className).slice(0, 24)} at ${Math.round(box.left)}..${Math.round(box.right)}`)
+      past.push(
+        `${element.tagName.toLowerCase()}${part === null ? '' : `[${part}]`}.${String(element.className).slice(0, 24)} at ${Math.round(box.left)}..${Math.round(box.right)}`,
+      )
     }
     return { overflow: root.scrollWidth - root.clientWidth, past: [...new Set(past)].slice(0, 6) }
   })
@@ -171,9 +171,7 @@ async function keyboardPath(page) {
     .getByRole('form')
     .first()
     .evaluate((form) => {
-      const tabbable = [...form.querySelectorAll('*')].filter(
-        (element) => element.tabIndex >= 0 && !element.disabled && element.getClientRects().length > 0,
-      )
+      const tabbable = [...form.querySelectorAll('*')].filter((element) => element.tabIndex >= 0 && !element.disabled && element.getClientRects().length > 0)
       const active = document.activeElement
       const describe = (element) => (element === null ? 'nothing' : `${element.tagName.toLowerCase()}#${element.id}`)
       return { reached: tabbable[0] === active, active: describe(active), expected: describe(tabbable[0] ?? null) }
@@ -221,16 +219,21 @@ async function audit(page, target) {
   // built page showed on 2026-10-16 (0072). The two rules that ask for it
   // are css-orientation-lock, experimental and outside the tags, and
   // no-autoplay-audio, for media the page has none of.
-  return subject.evaluate(async (context, tags) => {
-    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
-    const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
-    return {
-      axe: window.axe.version,
-      violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
-      measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-      undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)).slice(0, 4),
-    }
-  }, [...ACCESSIBILITY_TAGS])
+  return subject.evaluate(
+    async (context, tags) => {
+      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, preload: false })
+      const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      return {
+        axe: window.axe.version,
+        violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
+        measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
+        undecided: nodes(results.incomplete, 'color-contrast')
+          .map((node) => node.html.slice(0, 60))
+          .slice(0, 4),
+      }
+    },
+    [...ACCESSIBILITY_TAGS],
+  )
 }
 
 /**
@@ -242,11 +245,9 @@ async function failSubmit(page) {
   const buttons = page.getByRole('button', { name: 'Validate' })
   const count = await buttons.count()
   for (let at = 0; at < count; at += 1) await buttons.nth(at).click()
-  await page.waitForFunction(
-    (forms) => [...document.forms].filter((form) => form.querySelector('[aria-invalid="true"]') !== null).length >= forms,
-    count,
-    { timeout: 10_000 },
-  )
+  await page.waitForFunction((forms) => [...document.forms].filter((form) => form.querySelector('[aria-invalid="true"]') !== null).length >= forms, count, {
+    timeout: 10_000,
+  })
 }
 
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
@@ -306,7 +307,8 @@ async function run(gate, browser) {
       page.on('console', (message) => {
         const text = message.text()
         const refused = [...guard.refused].some((file) => message.location()?.url === file || text.includes(file))
-        if ((message.type() === 'error' && !refused) || /content[- ]security[- ]policy|permissions[- ]policy/i.test(text)) said.push(`${message.type()}: ${text.slice(0, 160)}`)
+        if ((message.type() === 'error' && !refused) || /content[- ]security[- ]policy|permissions[- ]policy/i.test(text))
+          said.push(`${message.type()}: ${text.slice(0, 160)}`)
       })
       page.on('pageerror', (error) => said.push(`uncaught: ${error.message.slice(0, 160)}`))
       await hearViolations(page)
@@ -317,7 +319,10 @@ async function run(gate, browser) {
       // is a check of a page sent with none.
       const sent = response?.headers() ?? {}
       const unsent = Object.entries(headersFor(HEADERS, BASE)).filter(([name, value]) => sent[name.toLowerCase()] !== value)
-      check(`the page at ${BASE} was sent with the demo's headers`, unsent.length === 0 ? null : `not as the deploy writes them: ${unsent.map(([name]) => name).join(', ')}`)
+      check(
+        `the page at ${BASE} was sent with the demo's headers`,
+        unsent.length === 0 ? null : `not as the deploy writes them: ${unsent.map(([name]) => name).join(', ')}`,
+      )
 
       // The page is what is measured, so first that it is all there: a preview
       // whose renderer did not start would make every number below smaller.
@@ -366,7 +371,8 @@ async function run(gate, browser) {
       check(`the page fetched nothing of its origin but its own files under ${BASE}`, elsewhere.size === 0 ? null : [...elsewhere].slice(0, 4).join(', '))
       const probe = await canary(page)
       check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(probe, contentSecurityPolicy()))
-      if (probe.after !== null) gate.measure({ name: 'the policy’s report of the inline script, after the script was put in the page', value: probe.after, unit: 'ms' })
+      if (probe.after !== null)
+        gate.measure({ name: 'the policy’s report of the inline script, after the script was put in the page', value: probe.after, unit: 'ms' })
 
       // Whether the page asked another origin for anything, and whether
       // every web font had loaded by the end of the pass, or, where it
@@ -377,7 +383,10 @@ async function run(gate, browser) {
       // UTF-8 (0046), or a browser guesses the encoding of their curly
       // quotes. Last, because it leaves the page.
       const notices = await page.goto(`${url}${NOTICES_FILE}`)
-      check(`${NOTICES_FILE} was sent as UTF-8 text`, noticesProblem(`${BASE}${NOTICES_FILE}`, notices?.status() ?? 0, notices?.headers()['content-type'] ?? '') ?? null)
+      check(
+        `${NOTICES_FILE} was sent as UTF-8 text`,
+        noticesProblem(`${BASE}${NOTICES_FILE}`, notices?.status() ?? 0, notices?.headers()['content-type'] ?? '') ?? null,
+      )
       await page.close()
     }
 

@@ -106,7 +106,9 @@ describe('the PostgreSQL fixture', () => {
       const filled = new Error('rolled back')
       await expect(
         sql.begin(async (tx) => {
-          const [row] = await tx<{ id: string }[]>`insert into sales.delivery (tenant_id, order_id, carrier) values (1, ${EDGE_VALUES.beyondSafeInteger}, 'Filled') returning id::text as id`
+          const [row] = await tx<
+            { id: string }[]
+          >`insert into sales.delivery (tenant_id, order_id, carrier) values (1, ${EDGE_VALUES.beyondSafeInteger}, 'Filled') returning id::text as id`
           expect(row?.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
           throw filled
         }),
@@ -136,7 +138,8 @@ describe('the PostgreSQL fixture', () => {
     const owner = postgres(pg.admin)
     const writer = postgres(pg.writer)
     try {
-      const tenants = async (sql: postgres.Sql) => (await sql<{ tenant_id: number }[]>`select tenant_id from sales.customer order by tenant_id`).map((row) => row.tenant_id)
+      const tenants = async (sql: postgres.Sql) =>
+        (await sql<{ tenant_id: number }[]>`select tenant_id from sales.customer order by tenant_id`).map((row) => row.tenant_id)
       expect(await tenants(owner)).toEqual([1, 2])
       expect(await tenants(writer)).toEqual([1])
       const [who] = await writer<{ user: string }[]>`select current_user as "user"`
@@ -173,13 +176,15 @@ describe('the SQL Server fixture', () => {
   test('holds the edge values exactly', async () => {
     const pool = await new mssql.ConnectionPool(ms.admin).connect()
     try {
-      const order = await pool.request().query<{ id: string; amount: string; order_date: string }>(
-        `select cast(id as varchar(40)) as id, cast(amount as varchar(40)) as amount, convert(varchar(10), order_date, 23) as order_date from sales.[order]`,
-      )
+      const order = await pool
+        .request()
+        .query<{ id: string; amount: string; order_date: string }>(
+          `select cast(id as varchar(40)) as id, cast(amount as varchar(40)) as amount, convert(varchar(10), order_date, 23) as order_date from sales.[order]`,
+        )
       expect(order.recordset[0]).toEqual({ id: EDGE_VALUES.beyondSafeInteger, amount: EDGE_VALUES.largestAmount, order_date: EDGE_VALUES.orderDate })
-      const limits = await pool.request().query<{ credit_limit: string }>(
-        'select cast(credit_limit as varchar(40)) as credit_limit from sales.customer order by tenant_id',
-      )
+      const limits = await pool
+        .request()
+        .query<{ credit_limit: string }>('select cast(credit_limit as varchar(40)) as credit_limit from sales.customer order by tenant_id')
       expect(limits.recordset.map((row) => row.credit_limit)).toEqual([EDGE_VALUES.largestCreditLimit, EDGE_VALUES.smallestCreditLimit])
       const line = await pool.request().query<{ line_total: string }>('select cast(line_total as varchar(40)) as line_total from sales.order_line')
       expect(line.recordset[0]?.line_total).toBe(EDGE_VALUES.computedLineTotal)
@@ -201,7 +206,12 @@ describe('the SQL Server fixture', () => {
          from sales.shipment order by id`,
       )
       expect(rows.recordset).toEqual([
-        { id: FIRST_SHIPMENT.id, carrier_code: EDGE_VALUES.largestSmallint, dispatched_at: '2026-10-08T12:34:56.500', temperature_c: '1.0000000149011612e-001' },
+        {
+          id: FIRST_SHIPMENT.id,
+          carrier_code: EDGE_VALUES.largestSmallint,
+          dispatched_at: '2026-10-08T12:34:56.500',
+          temperature_c: '1.0000000149011612e-001',
+        },
         { id: SECOND_SHIPMENT.id, carrier_code: SECOND_SHIPMENT.carrier_code, dispatched_at: '2026-10-08T12:34:56', temperature_c: null },
       ])
 
@@ -242,7 +252,9 @@ describe('the SQL Server fixture', () => {
   test('holds the deliveries the model describes, and fills a key a create leaves out', async () => {
     const pool = await new mssql.ConnectionPool(ms.admin).connect()
     try {
-      const rows = await pool.request().query<{ id: string; carrier: string }>('select convert(nchar(36), id) as id, carrier from sales.delivery order by carrier')
+      const rows = await pool
+        .request()
+        .query<{ id: string; carrier: string }>('select convert(nchar(36), id) as id, carrier from sales.delivery order by carrier')
       expect(rows.recordset.map((row) => [row.carrier, row.id])).toEqual([
         ['Express', DELIVERIES.express.toUpperCase()],
         ['Freight', DELIVERIES.freight.toUpperCase()],
@@ -250,17 +262,17 @@ describe('the SQL Server fixture', () => {
       ])
       const parcels = await pool.request().query<{ n: number }>('select count(*) as n from sales.parcel as p join sales.delivery as d on d.id = p.delivery_id')
       expect(parcels.recordset[0]?.n).toBe(2)
-      const filled = await pool
-        .request()
-        .batch<{ id: string; definition: string }>(
-          `begin transaction;
+      const filled = await pool.request().batch<{ id: string; definition: string }>(
+        `begin transaction;
            declare @made table (id uniqueidentifier);
            insert into sales.delivery (tenant_id, order_id, carrier) output inserted.id into @made values (1, ${EDGE_VALUES.beyondSafeInteger}, N'Filled');
            select convert(nchar(36), m.id) as id, object_definition(c.default_object_id) as definition
            from @made as m cross join sys.columns as c where c.object_id = object_id(N'sales.delivery') and c.name = N'id';
            rollback transaction;`,
-        )
-      expect(filled.recordset).toEqual([{ id: expect.stringMatching(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/), definition: '(newsequentialid())' }])
+      )
+      expect(filled.recordset).toEqual([
+        { id: expect.stringMatching(/^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/), definition: '(newsequentialid())' },
+      ])
     } finally {
       await pool.close()
     }
@@ -347,7 +359,9 @@ describe('the parity schema', () => {
    */
   type NamedRow = { tenant_code: string; item_no: string; fixed_code: string }
   const selectedBy = (rows: readonly NamedRow[]) =>
-    FILTER_PARITY.map((entry) => ('keys' in entry ? rows.filter((row) => row[entry.column] === entry.value).map((row) => [row.tenant_code, row.item_no]) : 'refused'))
+    FILTER_PARITY.map((entry) =>
+      'keys' in entry ? rows.filter((row) => row[entry.column] === entry.value).map((row) => [row.tenant_code, row.item_no]) : 'refused',
+    )
   const expected = FILTER_PARITY.map((entry) => ('keys' in entry ? entry.keys.map((key) => [...key]) : 'refused'))
 
   // The four named tenants differ by case, a trailing space and an accent;
@@ -359,7 +373,9 @@ describe('the parity schema', () => {
     try {
       const named = await sql<{ row: string }[]>`select tenant_code || '|' || item_no as row from parity.tenant_item where item_no < 10 order by item_no`
       expect(named.map((entry) => entry.row)).toEqual(NAMED)
-      const rows = await sql<NamedRow[]>`select tenant_code::text as tenant_code, item_no::text as item_no, fixed_code::text as fixed_code from parity.tenant_item order by item_no`
+      const rows = await sql<
+        NamedRow[]
+      >`select tenant_code::text as tenant_code, item_no::text as item_no, fixed_code::text as fixed_code from parity.tenant_item order by item_no`
       expect(selectedBy(rows)).toEqual(expected)
       const [fillers] = await sql<{ n: number }[]>`select count(*)::int as n from parity.tenant_item where label = 'Filler'`
       expect(fillers?.n).toBe(20_000)
@@ -380,14 +396,16 @@ describe('the parity schema', () => {
   test('loads on SQL Server: the same tenants, fillers and values', async () => {
     const pool = await new mssql.ConnectionPool(ms.admin).connect()
     try {
-      const named = await pool.request().query<{ row: string }>(
-        `select tenant_code + N'|' + convert(nvarchar(10), item_no) as row from parity.tenant_item where item_no < 10 order by item_no`,
-      )
+      const named = await pool
+        .request()
+        .query<{ row: string }>(`select tenant_code + N'|' + convert(nvarchar(10), item_no) as row from parity.tenant_item where item_no < 10 order by item_no`)
       expect(named.recordset.map((entry) => entry.row)).toEqual(NAMED)
       // rtrim: SQL Server keeps a char column's padding when it converts it (C1); its canonical value does not.
-      const rows = await pool.request().query<NamedRow>(
-        `select tenant_code, convert(nvarchar(10), item_no) as item_no, rtrim(fixed_code) as fixed_code from parity.tenant_item order by item_no`,
-      )
+      const rows = await pool
+        .request()
+        .query<NamedRow>(
+          `select tenant_code, convert(nvarchar(10), item_no) as item_no, rtrim(fixed_code) as fixed_code from parity.tenant_item order by item_no`,
+        )
       expect(selectedBy(rows.recordset)).toEqual(expected)
       const fillers = await pool.request().query<{ n: number }>(`select count(*) as n from parity.tenant_item where label = N'Filler'`)
       expect(fillers.recordset[0]?.n).toBe(20_000)
@@ -449,7 +467,10 @@ describe('a blocked table', () => {
     const reader = await new mssql.ConnectionPool(ms.writer).connect()
     try {
       expect(await blocked.waiting()).toBe(0)
-      const read = reader.request().query<{ n: number }>('select count(name) as n from sales.customer').then((result) => result.recordset[0]?.n)
+      const read = reader
+        .request()
+        .query<{ n: number }>('select count(name) as n from sales.customer')
+        .then((result) => result.recordset[0]?.n)
       await until(async () => (await blocked.waiting()) === 1, 'the reader waited behind the lock')
       await blocked.release()
       expect(await read).toBe(1)
@@ -479,15 +500,25 @@ describe('what each start records for the release report', () => {
     const sql = postgres(pg.admin)
     try {
       const [row] = await sql<{ version: string }[]>`select current_setting('server_version') as version`
-      expect(pg.server).toMatchObject({ engine: 'postgres', image: selectedImage('postgres'), version: row?.version, updateLevel: null, edition: null, compatibility: null, caller: here })
+      expect(pg.server).toMatchObject({
+        engine: 'postgres',
+        image: selectedImage('postgres'),
+        version: row?.version,
+        updateLevel: null,
+        edition: null,
+        compatibility: null,
+        caller: here,
+      })
     } finally {
       await sql.end()
     }
     const pool = await new mssql.ConnectionPool(ms.admin).connect()
     try {
-      const result = await pool.request().query<{ version: string; edition: string }>(
-        "select cast(serverproperty('ProductVersion') as nvarchar(128)) as version, cast(serverproperty('Edition') as nvarchar(128)) as edition",
-      )
+      const result = await pool
+        .request()
+        .query<{ version: string; edition: string }>(
+          "select cast(serverproperty('ProductVersion') as nvarchar(128)) as version, cast(serverproperty('Edition') as nvarchar(128)) as edition",
+        )
       const [row] = result.recordset
       expect(ms.server).toMatchObject({ engine: 'sqlserver', image: selectedImage('sqlserver'), version: row?.version, edition: row?.edition, caller: here })
     } finally {
@@ -509,7 +540,10 @@ describe('what each start records for the release report', () => {
   test('names the compatibility level of the database the SQL Server fixture was loaded into', async () => {
     const pool = await new mssql.ConnectionPool({ ...ms.admin, database: 'master' }).connect()
     try {
-      const result = await pool.request().input('name', mssql.NVarChar, SQLSERVER_DATABASE).query<{ level: number }>('select compatibility_level as level from sys.databases where name = @name')
+      const result = await pool
+        .request()
+        .input('name', mssql.NVarChar, SQLSERVER_DATABASE)
+        .query<{ level: number }>('select compatibility_level as level from sys.databases where name = @name')
       expect(result.recordset).toEqual([{ level: ms.server.compatibility }])
       expect(ms.server.compatibility).toEqual(expect.any(Number))
     } finally {
@@ -565,7 +599,12 @@ describe("the fixtures' containers", () => {
     ] as const) {
       const id = fixture.containerId.slice(0, 12)
       expect(running).toContainEqual(expect.objectContaining({ id, image }))
-      expect(await docker.describe(fixture.containerId)).toMatchObject({ id, image, imageId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/), limits: { nanoCpus: 0, cpuQuota: 0, memoryBytes: 0 } })
+      expect(await docker.describe(fixture.containerId)).toMatchObject({
+        id,
+        image,
+        imageId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        limits: { nanoCpus: 0, cpuQuota: 0, memoryBytes: 0 },
+      })
       const first = await docker.usage(fixture.containerId)
       const second = await docker.usage(fixture.containerId)
       expect(first.cpuNs).toBeGreaterThan(0)

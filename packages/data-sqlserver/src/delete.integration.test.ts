@@ -31,7 +31,14 @@ const CLARA = clerk({ tenant: '1' })
 
 /** Clerks read and delete, within their tenant where the table has one. */
 function deleting(fields: readonly string[], extra: Partial<FormPolicy> = {}): FormPolicy {
-  return { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: Object.fromEntries(fields.map((field) => [field, READS])), rowFilters: [], lookups: {}, ...extra }
+  return {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: Object.fromEntries(fields.map((field) => [field, READS])),
+    rowFilters: [],
+    lookups: {},
+    ...extra,
+  }
 }
 
 const POLICIES = {
@@ -57,7 +64,17 @@ beforeAll(async () => {
   parity = await discoverSqlServer(owner, PARITY_SCOPE)
   for (const table of Object.keys(POLICIES) as Table[]) {
     const lookups = table === 'removable_child' ? [{ foreignKey: 'fk_removable_child_removable', display: ['note'] }] : []
-    forms.set(table, generateForm(parity, { connection: 'test', root: { schema: 'parity', name: table }, formId: table.replaceAll('_', '-'), title: table, lookups, versionColumn: 'version' }).bindings)
+    forms.set(
+      table,
+      generateForm(parity, {
+        connection: 'test',
+        root: { schema: 'parity', name: table },
+        formId: table.replaceAll('_', '-'),
+        title: table,
+        lookups,
+        versionColumn: 'version',
+      }).bindings,
+    )
   }
   records = createSqlServerRecords(owner)
 })
@@ -111,7 +128,10 @@ async function count(sql: string): Promise<number> {
 /** Waits until the server shows `session` waiting on another's lock: polled, never a fixed delay. */
 async function blocked(session: number): Promise<void> {
   for (let attempt = 0; attempt < 400; attempt += 1) {
-    const found = await owner.request().input('session', mssql.Int, session).query<{ blocker: number }>('select blocking_session_id as blocker from sys.dm_exec_requests where session_id = @session')
+    const found = await owner
+      .request()
+      .input('session', mssql.Int, session)
+      .query<{ blocker: number }>('select blocking_session_id as blocker from sys.dm_exec_requests where session_id = @session')
     if ((found.recordset[0]?.blocker ?? 0) > 0) return
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
@@ -293,12 +313,16 @@ describe('what the database runs on a delete', () => {
   // A trigger that writes another table runs with the delete, and the
   // delete is answered done: a guard that refused every table with a DELETE
   // trigger would refuse the audit triggers a deployment keeps (0050).
-  test('after-trigger-elsewhere: a row an AFTER DELETE trigger writes elsewhere is there', covers('sqlserver', deleteCase('after-trigger-elsewhere')), async () => {
-    const id = await inserted('removable_triggered', { note: 'log' })
-    expect(answer(await records.delete(await planned('removable_triggered', CLARA, `k1:${id}`, '1')))).toBe(expected('after-trigger-elsewhere'))
-    expect(await versionOf('removable_triggered', id)).toBeNull()
-    expect(await count(`select count(*) as n from parity.removable_log where id = ${id} and note = N'log'`)).toBe(1)
-  })
+  test(
+    'after-trigger-elsewhere: a row an AFTER DELETE trigger writes elsewhere is there',
+    covers('sqlserver', deleteCase('after-trigger-elsewhere')),
+    async () => {
+      const id = await inserted('removable_triggered', { note: 'log' })
+      expect(answer(await records.delete(await planned('removable_triggered', CLARA, `k1:${id}`, '1')))).toBe(expected('after-trigger-elsewhere'))
+      expect(await versionOf('removable_triggered', id)).toBeNull()
+      expect(await count(`select count(*) as n from parity.removable_log where id = ${id} and note = N'log'`)).toBe(1)
+    },
+  )
 })
 
 describe("the account's grants and row security", () => {
@@ -321,8 +345,16 @@ describe("the account's grants and row security", () => {
   // and refuses with 33504: permission-denied, where PostgreSQL's DELETE
   // policy declines without an error and is refused (0016's difference).
   test('row-security: a row a block predicate keeps from deleting stays', covers('sqlserver', deleteCase('row-security')), async () => {
-    await owner.request().batch('create function parity.removable_self_kept(@parent_id int) returns table with schemabinding as return select 1 as kept where @parent_id is not null')
-    await owner.request().batch('create security policy parity.removable_self_policy add block predicate parity.removable_self_kept(parent_id) on parity.removable_self before delete with (state = on)')
+    await owner
+      .request()
+      .batch(
+        'create function parity.removable_self_kept(@parent_id int) returns table with schemabinding as return select 1 as kept where @parent_id is not null',
+      )
+    await owner
+      .request()
+      .batch(
+        'create security policy parity.removable_self_policy add block predicate parity.removable_self_kept(parent_id) on parity.removable_self before delete with (state = on)',
+      )
     try {
       const id = await inserted('removable_self', { parent_id: null })
       expect(answer(await records.delete(await planned('removable_self', CLARA, `k1:${id}`, '1')))).toBe(expected('row-security'))
@@ -361,7 +393,11 @@ describe('what moved since the delete was decided', () => {
       const before = await inserted('removable', { tenant_id: 1, note: 'reached' })
       const request = await planned('removable', CLARA, `k1:${before}`, '1')
       await owner.request().batch(`insert into parity.removable_copy values (${before})`)
-      await owner.request().batch('alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade')
+      await owner
+        .request()
+        .batch(
+          'alter table parity.removable_copy add constraint fk_removable_copy foreign key (removable_id) references parity.removable (id) on delete cascade',
+        )
       expect(answer(await records.delete(request))).toBe(expected('reach-moved'))
       expect(await versionOf('removable', before)).toBe('1')
       await owner.request().batch('alter table parity.removable_copy drop constraint fk_removable_copy')
@@ -387,11 +423,22 @@ describe('what moved since the delete was decided', () => {
   // the cascade back (watched failing with the guard reading foreign keys
   // alone: the node and its edge were deleted).
   test('a cascading edge constraint added before the delete deletes nothing', async () => {
-    await owner.request().batch('create table parity.noded (id int identity(1, 1) not null constraint pk_noded primary key, note nvarchar(50) null, version int not null constraint df_noded_version default 1) as node')
+    await owner
+      .request()
+      .batch(
+        'create table parity.noded (id int identity(1, 1) not null constraint pk_noded primary key, note nvarchar(50) null, version int not null constraint df_noded_version default 1) as node',
+      )
     await owner.request().batch('create table parity.linked as edge')
     try {
       const snapshot = await discoverSqlServer(owner, PARITY_SCOPE)
-      const bindings = generateForm(snapshot, { connection: 'test', root: { schema: 'parity', name: 'noded' }, formId: 'noded', title: 'Noded', lookups: [], versionColumn: 'version' }).bindings
+      const bindings = generateForm(snapshot, {
+        connection: 'test',
+        root: { schema: 'parity', name: 'noded' },
+        formId: 'noded',
+        title: 'Noded',
+        lookups: [],
+        versionColumn: 'version',
+      }).bindings
       expect(bindings.operations.delete).toBe(true)
       const id = await inserted('noded', { note: 'node' })
       const described = await records.describe({ schema: 'parity', name: 'noded' })
@@ -428,7 +475,9 @@ describe('what moved since the delete was decided', () => {
       const request = await planned('removable', CLARA, `k1:${id}`, '1', via)
       await owner.request().batch('revoke view definition to narrowed_deleter')
       await owner.request().batch('create schema hidden')
-      await owner.request().batch('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
+      await owner
+        .request()
+        .batch('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
       await owner.request().batch(`insert into hidden.copy values (${id})`)
       const outcome = await via.delete(request)
       expect(answer(outcome)).toBe(expected('visibility-narrowed'))
@@ -459,7 +508,9 @@ describe('what moved since the delete was decided', () => {
         const via = createSqlServerRecords(pool)
         const request = await planned('removable', CLARA, `k1:${id}`, '1', via)
         await owner.request().batch('create schema hidden')
-        await owner.request().batch('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
+        await owner
+          .request()
+          .batch('create table hidden.copy (removable_id int not null constraint fk_hidden_copy references parity.removable (id) on delete cascade)')
         await owner.request().batch(`insert into hidden.copy values (${id})`)
         await owner.request().batch(deny)
         expect(await via.delete(request)).toMatchObject({ ok: false, code: 'schema-changed', message: expect.stringMatching(/can no longer see every key/) })
@@ -483,7 +534,11 @@ describe('what moved since the delete was decided', () => {
     if (!described.ok) throw new Error(described.message)
     const tenant = findObject(parity, { schema: 'parity', name: 'removable' })?.columns.find((candidate) => candidate.name === 'tenant_id') as RecordColumn
     const request: DeleteRequest = {
-      target: { table: { schema: 'parity', name: 'removable' }, identity: [{ name: 'tenant_id', type: tenant.type }], concurrency: { kind: 'version-column', column: 'version' } },
+      target: {
+        table: { schema: 'parity', name: 'removable' },
+        identity: [{ name: 'tenant_id', type: tenant.type }],
+        concurrency: { kind: 'version-column', column: 'version' },
+      },
       key: [{ name: 'tenant_id', type: tenant.type, value: '9' }],
       expectedVersion: '1',
       filters: { kind: 'unrestricted' },
@@ -502,19 +557,36 @@ describe('a version that cannot tell two records apart', () => {
   // Server as on PostgreSQL: the generator offers no delete there on
   // either engine, and an update with the old version lands on a record
   // another session created again under the key. Characterised (0050).
-  test('update: recreated: an update with the old version lands on a record created again under the key', covers('sqlserver', UPDATE_RECREATED_CASE), async () => {
-    const keyed = generateForm(parity, { connection: 'test', root: { schema: 'parity', name: 'keyed' }, formId: 'keyed', title: 'Keyed', lookups: [], versionColumn: 'version' }).bindings
-    expect(keyed.operations).toMatchObject({ update: true, delete: false })
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: ['clerk'] }, fields: { code: READS, note: { read: ['clerk'], write: ['clerk'] } }, rowFilters: [], lookups: {} }
-    await owner.request().batch("insert into parity.keyed (code, note) values (N'k', N'first')")
-    const described = await records.describe({ schema: 'parity', name: 'keyed' })
-    if (!described.ok) throw new Error(described.message)
-    const plan = planUpdate(parity, keyed, policy, CLARA, 'k1:k', '1', { note: 'changed' }, undefined, described.described)
-    if (!plan.ok) throw new Error(plan.message)
-    await owner.request().batch("delete from parity.keyed where code = N'k'; insert into parity.keyed (code, note) values (N'k', N'second')")
-    const outcome = await records.update(plan.request)
-    expect(outcome.ok ? 'updated' : outcome.code).toBe(UPDATE_RECREATED)
-    const stored = await owner.request().query<{ note: string; version: number }>("select note, version from parity.keyed where code = N'k'")
-    expect(stored.recordset).toEqual([{ note: 'changed', version: 2 }])
-  })
+  test(
+    'update: recreated: an update with the old version lands on a record created again under the key',
+    covers('sqlserver', UPDATE_RECREATED_CASE),
+    async () => {
+      const keyed = generateForm(parity, {
+        connection: 'test',
+        root: { schema: 'parity', name: 'keyed' },
+        formId: 'keyed',
+        title: 'Keyed',
+        lookups: [],
+        versionColumn: 'version',
+      }).bindings
+      expect(keyed.operations).toMatchObject({ update: true, delete: false })
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: ['clerk'] },
+        fields: { code: READS, note: { read: ['clerk'], write: ['clerk'] } },
+        rowFilters: [],
+        lookups: {},
+      }
+      await owner.request().batch("insert into parity.keyed (code, note) values (N'k', N'first')")
+      const described = await records.describe({ schema: 'parity', name: 'keyed' })
+      if (!described.ok) throw new Error(described.message)
+      const plan = planUpdate(parity, keyed, policy, CLARA, 'k1:k', '1', { note: 'changed' }, undefined, described.described)
+      if (!plan.ok) throw new Error(plan.message)
+      await owner.request().batch("delete from parity.keyed where code = N'k'; insert into parity.keyed (code, note) values (N'k', N'second')")
+      const outcome = await records.update(plan.request)
+      expect(outcome.ok ? 'updated' : outcome.code).toBe(UPDATE_RECREATED)
+      const stored = await owner.request().query<{ note: string; version: number }>("select note, version from parity.keyed where code = N'k'")
+      expect(stored.recordset).toEqual([{ note: 'changed', version: 2 }])
+    },
+  )
 })

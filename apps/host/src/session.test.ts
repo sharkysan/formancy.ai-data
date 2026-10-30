@@ -3,8 +3,10 @@ import type { DataClient, FormRecord, PublishedForm } from '@formancy/data-clien
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest'
 import { CHANGED_SINCE_UNKNOWN, createSession, HELD } from './session.js'
 import type { Session } from './session.js'
-import { EDGES, ENGINES, holdingWrites, losingWrites, startPlane, TOKENS } from './test-plane.js'
-import type { Holding, Losing, Plane } from './test-plane.js'
+import { holdingWrites, losingWrites } from './test-network.js'
+import type { Holding, Losing } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import type { Plane } from './test-plane.js'
 
 /*
  * What one pane's session does with a save, against the real server on both
@@ -82,9 +84,12 @@ async function press(session: Session, holding: Holding): Promise<unknown> {
   const before = holding.held.length
   let answered = false
   const sent = vi
-    .waitFor(() => {
-      if (!answered) expect(holding.held.length).toBeGreaterThan(before)
-    }, { timeout: 5_000 })
+    .waitFor(
+      () => {
+        if (!answered) expect(holding.held.length).toBeGreaterThan(before)
+      },
+      { timeout: 5_000 },
+    )
     .then(() => (answered ? undefined : 'it sent a write'))
   const result = await Promise.race([session.save(submitted(session, {})), sent])
   answered = true
@@ -105,7 +110,13 @@ const LOST_ON_THE_WAY = 'The answer to this save was lost between this page and 
 
 /** A fresh order of tenant 1's, made beside the session, read back as a session opens it. */
 async function freshOrder(formId: string, session: Session, notes: string): Promise<FormRecord> {
-  const created = await plane.clerk.create(formId, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '20', notes })
+  const created = await plane.clerk.create(formId, {
+    customer: await customer(session, 'Muster'),
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '20',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return stored(formId, created.value.record)
 }
@@ -125,7 +136,13 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const session = createSession({ client: client(), formId, definition: await definition(formId), renderer: 'react' })
     session.open()
     expect(session.state()).toEqual({ record: undefined, version: undefined, operation: 'create' })
-    const answers = { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '7.5', notes: 'from the session suite' }
+    const answers = {
+      customer: await customer(session, 'Muster'),
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount: '7.5',
+      notes: 'from the session suite',
+    }
     const result = await session.save(submitted(session, answers))
     const { record, version } = session.state()
     expect(result).toEqual({ kind: 'created', message: `Created record ${String(record)}.` })
@@ -243,7 +260,10 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     expect((await session.save(submitted(session, answers)))?.kind).toBe('created')
     session.hold('A deletion of this record has not been answered yet; nothing was sent.')
     const sent = plane.sent.length
-    expect(await session.save(submitted(session, { notes: 'held by a deletion, pressed' }))).toEqual({ kind: 'held', message: 'A deletion of this record has not been answered yet; nothing was sent.' })
+    expect(await session.save(submitted(session, { notes: 'held by a deletion, pressed' }))).toEqual({
+      kind: 'held',
+      message: 'A deletion of this record has not been answered yet; nothing was sent.',
+    })
     expect(plane.sent.length).toBe(sent)
     session.release()
     expect((await session.save(submitted(session, { notes: 'held by a deletion, pressed' })))?.kind).toBe('saved')
@@ -286,7 +306,9 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const { session, holding } = await heldSession(formId)
     const { engine } = session.opened()
     const from = plane.sent.length
-    const first = session.save(submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '7', notes: 'first' }))
+    const first = session.save(
+      submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '7', notes: 'first' }),
+    )
     await writesHeld(holding, 1)
 
     engine.setValue(['notes'], 'typed while saving')
@@ -322,7 +344,9 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const { session, holding } = await heldSession(formId)
     const { engine } = session.opened()
     expect(session.work()).toBeNull()
-    const first = session.save(submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '12.5' }))
+    const first = session.save(
+      submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '12.5' }),
+    )
     await writesHeld(holding, 1)
     expect(session.work()).toBe('saving')
     holding.answer()
@@ -368,7 +392,7 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     const { session, holding } = await heldSession(formId)
     const data = submitted(session, { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '9' })
     plane.unreachable.add(connection)
-    let first: Promise<unknown> = Promise.resolve()
+    let first: Promise<unknown>
     try {
       first = session.save(data)
       await writesHeld(holding, 1)
@@ -377,7 +401,10 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     }
     session.open()
     holding.answer()
-    expect(await first).toEqual({ kind: 'replaced', message: 'The save sent before this form was replaced: The database cannot be reached. Nothing was saved.' })
+    expect(await first).toEqual({
+      kind: 'replaced',
+      message: 'The save sent before this form was replaced: The database cannot be reached. Nothing was saved.',
+    })
   })
 
   // The guard against a double press belongs to the form that set it. A save
@@ -416,7 +443,11 @@ describe.each(ENGINES)('a save whose answer is lost, on $engine (0031)', ({ form
     const pick = await customer(session, 'Muster')
     const from = plane.sent.length
     const result = await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '21', notes }))
-    expect(result).toMatchObject({ kind: 'unknown', message: LOST_ON_THE_WAY, unknown: { operation: 'create', record: null, version: null, origin: 'transport' } })
+    expect(result).toMatchObject({
+      kind: 'unknown',
+      message: LOST_ON_THE_WAY,
+      unknown: { operation: 'create', record: null, version: null, origin: 'transport' },
+    })
     expect(losing.lost).toEqual([`/v1/forms/${formId}/records/create`])
     expect(await plane.db.countOrders(connection, notes)).toBe(1)
     expect(session.state()).toEqual({ record: undefined, version: undefined, operation: 'create' })
@@ -440,12 +471,16 @@ describe.each(ENGINES)('a save whose answer is lost, on $engine (0031)', ({ form
   test('New clears the hold, and the new form saves', async () => {
     const { session } = await losingSession(formId, 'after')
     const pick = await customer(session, 'Muster')
-    await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '22', notes: `held, then New ${connection}` }))
+    await session.save(
+      submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '22', notes: `held, then New ${connection}` }),
+    )
     expect(session.unknown()).toMatchObject({ operation: 'create' })
     session.open()
     expect(session.unknown()).toBeUndefined()
     expect(await session.check()).toMatchObject({ ok: false, code: 'nothing-to-check' })
-    expect(await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '23' }))).toMatchObject({ kind: 'created' })
+    expect(await session.save(submitted(session, { customer: pick, order_date: EDGES.orderDate, status: 'placed', amount: '23' }))).toMatchObject({
+      kind: 'created',
+    })
   })
 
   // A save whose outcome is unknown is the work the guard must not let go
@@ -495,7 +530,11 @@ describe.each(ENGINES)('a save whose answer is lost, on $engine (0031)', ({ form
     const notes = `lost update, saved again ${connection} ${String(Date.now())}`
     expect(await session.save(submitted(session, { notes }))).toMatchObject({ kind: 'unknown' })
     const again = await session.save(submitted(session, {}))
-    expect(again).toMatchObject({ kind: 'unknown', message: CHANGED_SINCE_UNKNOWN, unknown: { operation: 'update', record: loaded.record, version: loaded.version } })
+    expect(again).toMatchObject({
+      kind: 'unknown',
+      message: CHANGED_SINCE_UNKNOWN,
+      unknown: { operation: 'update', record: loaded.record, version: loaded.version },
+    })
     expect(session.unknown()).toMatchObject({ operation: 'update', record: loaded.record, version: loaded.version })
     expect(await session.check()).toMatchObject({ ok: true, state: 'changed', current: { record: loaded.record, answers: { notes } } })
   })

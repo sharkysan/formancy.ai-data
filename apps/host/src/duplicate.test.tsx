@@ -35,7 +35,13 @@ async function freshOrder({ formId }: Engine, notes: string): Promise<string> {
   const name = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(formId, name, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '7.25', notes })
+  const created = await plane.clerk.create(formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '7.25',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return created.value.record
 }

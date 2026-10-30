@@ -75,7 +75,12 @@ describe('diffSnapshots: lookups', () => {
     }
     const retargeted = drift(twins({ schema: 'a', name: 'b.c' }), { schemas }, ORDER, snapshot(twins({ schema: 'a.b', name: 'c' }), { schemas }))
     // The generator names the lookup's field after its target, here c.
-    expect(only(retargeted)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' }, affects: ['c'] })
+    expect(only(retargeted)).toMatchObject({
+      kind: 'lookup-changed',
+      severity: 'blocking',
+      subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' },
+      affects: ['c'],
+    })
     expect(retargeted.writable).toEqual({ create: false, update: false, delete: false })
 
     // Both sides moved onto one column, and both still read (tenant_id, customer_no).
@@ -98,7 +103,12 @@ describe('diffSnapshots: lookups', () => {
   test("a lookup's target key, table or display column gone blocks the lookup too", () => {
     const keyless = (objects: ObjectMeta[]) => (object(objects, 'customer').primaryKey = null)
     const report = drift(keyless)
-    expect(only(report)).toMatchObject({ kind: 'lookup-changed', severity: 'blocking', subject: { kind: 'key', object: CUSTOMER_REF, name: 'pk_customer' }, affects: ['customer'] })
+    expect(only(report)).toMatchObject({
+      kind: 'lookup-changed',
+      severity: 'blocking',
+      subject: { kind: 'key', object: CUSTOMER_REF, name: 'pk_customer' },
+      affects: ['customer'],
+    })
     expect(report.writable).toEqual({ create: false, update: false, delete: false })
 
     const display = (objects: ObjectMeta[]) => dropColumn(objects, 'customer', 'name')
@@ -111,10 +121,24 @@ describe('diffSnapshots: lookups', () => {
 
     // Behind a gap, each of these is an access problem, said once; outside a
     // narrowed scope, a scope problem.
-    expect(only(drift(vanished, { gaps: [gap(CUSTOMER_REF, 'objects')] }))).toMatchObject({ kind: 'access-narrowed', severity: 'blocking', affects: ['customer'] })
-    expect(only(drift(keyless, { gaps: [gap(CUSTOMER_REF, 'keys')] }))).toMatchObject({ kind: 'access-narrowed', subject: { kind: 'key', object: CUSTOMER_REF, name: 'pk_customer' } })
-    expect(only(drift(display, { gaps: [gap(CUSTOMER_REF, 'columns')] }))).toMatchObject({ kind: 'access-narrowed', subject: { kind: 'column', object: CUSTOMER_REF, name: 'name' } })
-    expect(only(drift(vanished, { schemas: ['sales'] }))).toMatchObject({ kind: 'scope-narrowed', severity: 'blocking', subject: { kind: 'object', object: CUSTOMER_REF } })
+    expect(only(drift(vanished, { gaps: [gap(CUSTOMER_REF, 'objects')] }))).toMatchObject({
+      kind: 'access-narrowed',
+      severity: 'blocking',
+      affects: ['customer'],
+    })
+    expect(only(drift(keyless, { gaps: [gap(CUSTOMER_REF, 'keys')] }))).toMatchObject({
+      kind: 'access-narrowed',
+      subject: { kind: 'key', object: CUSTOMER_REF, name: 'pk_customer' },
+    })
+    expect(only(drift(display, { gaps: [gap(CUSTOMER_REF, 'columns')] }))).toMatchObject({
+      kind: 'access-narrowed',
+      subject: { kind: 'column', object: CUSTOMER_REF, name: 'name' },
+    })
+    expect(only(drift(vanished, { schemas: ['sales'] }))).toMatchObject({
+      kind: 'scope-narrowed',
+      severity: 'blocking',
+      subject: { kind: 'object', object: CUSTOMER_REF },
+    })
 
     // A candidate key declared again over the same columns, in another order,
     // still identifies one row.
@@ -144,7 +168,10 @@ describe('diffSnapshots: lookups', () => {
     })
     expect(report.writable).toEqual({ create: false, update: false, delete: false })
     // The snapshot says so by itself, even with no gap.
-    expect(only(drift(hidden))).toMatchObject({ kind: 'access-narrowed', message: expect.stringMatching(/^What fk_order_customer references is not visible to this connection\. /) })
+    expect(only(drift(hidden))).toMatchObject({
+      kind: 'access-narrowed',
+      message: expect.stringMatching(/^What fk_order_customer references is not visible to this connection\. /),
+    })
 
     const gone = drift((objects) => dropForeignKey(objects, 'fk_order_customer'), { gaps: [gap(ORDER_REF, 'foreign-keys')] })
     expect(only(gone)).toMatchObject({ kind: 'access-narrowed', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_customer' } })
@@ -168,7 +195,10 @@ describe('diffSnapshots: lookups', () => {
     })
     expect(display.writable).toEqual({ create: false, update: false, delete: false })
     // A widening too: what the lookup binds and decodes is the published type, whatever the direction.
-    expect(only(drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400))))).toMatchObject({ kind: 'lookup-changed', subject: { name: 'name' } })
+    expect(only(drift((objects) => retype(objects, 'customer', 'name', 'nvarchar(400)', text(400))))).toMatchObject({
+      kind: 'lookup-changed',
+      subject: { name: 'name' },
+    })
     // A key column the foreign key still matches, retyped on the target alone.
     expect(only(drift((objects) => retype(objects, 'customer', 'customer_no', 'bigint', INT64)))).toMatchObject({
       kind: 'lookup-changed',
@@ -240,7 +270,11 @@ describe('diffSnapshots: the identity', () => {
       order.primaryKey = null
       order.uniqueKeys.push({ name: 'pk_order', columns: ['id'] })
     })
-    expect(only(demoted)).toMatchObject({ kind: 'key-changed', severity: 'info', message: expect.stringMatching(/^pk_order changed: its role from primary to unique\./) })
+    expect(only(demoted)).toMatchObject({
+      kind: 'key-changed',
+      severity: 'info',
+      message: expect.stringMatching(/^pk_order changed: its role from primary to unique\./),
+    })
     expect(demoted.writable).toEqual({ create: true, update: true, delete: false })
   })
 
@@ -249,9 +283,17 @@ describe('diffSnapshots: the identity', () => {
   test('a key column the form does not show still blocks update when its type changes', () => {
     const node = (databaseType: string, type: NormalizedType) => (objects: ObjectMeta[]) => {
       objects.push(
-        table('node', [col('path', databaseType, type), col('label', 'nvarchar(50)', text(50)), col('row_version', 'rowversion', { kind: 'rowversion' }, { generated: 'rowversion' })], {
-          primaryKey: { name: 'pk_node', columns: ['path'] },
-        }),
+        table(
+          'node',
+          [
+            col('path', databaseType, type),
+            col('label', 'nvarchar(50)', text(50)),
+            col('row_version', 'rowversion', { kind: 'rowversion' }, { generated: 'rowversion' }),
+          ],
+          {
+            primaryKey: { name: 'pk_node', columns: ['path'] },
+          },
+        ),
       )
     }
     const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'node' }, formId: 'sales-node', title: 'Node', lookups: [] }
@@ -315,7 +357,11 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
       ['foreign-key-changed', 'info', expect.stringMatching(/^fk_order_created_by is gone/)],
     ])
     const blind = drift((objects) => (foreignKey(objects, 'fk_order_created_by').references = null))
-    expect(only(blind)).toMatchObject({ kind: 'foreign-key-changed', severity: 'info', message: expect.stringMatching(/its target from sales\.employee \(id\) to not visible/) })
+    expect(only(blind)).toMatchObject({
+      kind: 'foreign-key-changed',
+      severity: 'info',
+      message: expect.stringMatching(/its target from sales\.employee \(id\) to not visible/),
+    })
 
     // Compared by its columns, not by how they read: a key moved from two
     // columns onto one whose name has a comma in it read like the old key, and
@@ -353,11 +399,17 @@ describe('diffSnapshots: constraints the form does not rest on', () => {
   // Out of sight is not gone, for a constraint as for a table. The gap says
   // so once, and a "dropped" note beside it would contradict it.
   test('a constraint the form does not rest on, gone behind a gap, is left to the gap', () => {
-    expect(only(drift((objects) => (object(objects, 'order').checks = []), { gaps: [gap(ORDER_REF, 'checks')] }))).toMatchObject({ kind: 'access-narrowed', severity: 'info' })
+    expect(only(drift((objects) => (object(objects, 'order').checks = []), { gaps: [gap(ORDER_REF, 'checks')] }))).toMatchObject({
+      kind: 'access-narrowed',
+      severity: 'info',
+    })
     expect(kinds(drift((objects) => dropForeignKey(objects, 'fk_order_created_by'), { gaps: [gap(ORDER_REF, 'foreign-keys')] }))).toEqual(['access-narrowed'])
 
     // An expression that can no longer be read is a changed check, and noted as one.
-    const unreadable = drift((objects) => (object(objects, 'order').checks = [{ name: 'ck_order_amount', expression: null, enforced: true, validated: true }]), { gaps: [gap(ORDER_REF, 'checks')] })
+    const unreadable = drift(
+      (objects) => (object(objects, 'order').checks = [{ name: 'ck_order_amount', expression: null, enforced: true, validated: true }]),
+      { gaps: [gap(ORDER_REF, 'checks')] },
+    )
     expect(unreadable.changes.map((change) => [change.kind, change.severity])).toEqual([
       ['access-narrowed', 'info'],
       ['check-changed', 'info'],

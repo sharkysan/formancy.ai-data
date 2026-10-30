@@ -1,4 +1,15 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import type {
+  InsertRequest,
+  ObjectRef,
+  ReadRequest,
+  RecordColumn,
+  RecordConcurrency,
+  RecordTarget,
+  RecordValue,
+  RowFilterTerm,
+  ThroughTerms,
+  UpdateRequest,
+} from '@formancy/data-core'
 import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
@@ -199,7 +210,9 @@ export function existsStatement(
     ended === undefined
       ? '0'
       : `(select count(*) from ${quoteTable(table)} as ${ROW} where ${[...located(parameters, request.key, terms, through), versionIs(parameters, ended.concurrency, ended.expected), `${column(ended.open)} is not null`].join(' and ')})`
-  return parameters.statement(`select (select count(*) from ${quoteTable(table)} as ${ROW} where ${where.join(' and ')}) as [found], ${same} as [same], ${over} as [ended]`)
+  return parameters.statement(
+    `select (select count(*) from ${quoteTable(table)} as ${ROW} where ${where.join(' and ')}) as [found], ${same} as [same], ${over} as [ended]`,
+  )
 }
 
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
@@ -232,7 +245,12 @@ interface Refind {
  * a float, which do not travel as text — keeps the version the statement saw.
  */
 function versionAfterTriggers(target: RecordTarget): Refind {
-  const keys = target.identity.map((column, index) => ({ column: quoteName(column.name), type: column.type, variable: `@i${String(index)}`, name: `[i${String(index)}]` }))
+  const keys = target.identity.map((column, index) => ({
+    column: quoteName(column.name),
+    type: column.type,
+    variable: `@i${String(index)}`,
+    name: `[i${String(index)}]`,
+  }))
   const exact = (key: (typeof keys)[number]): key is (typeof keys)[number] & { type: ExactKey } => isExactKey(key.type)
   if (target.concurrency === null || keys.length === 0 || !keys.every(exact)) return { captured: [], declared: [], statements: [] }
   const where = keys.map((key) => `[stored].${key.column} = ${fromText(key.type, key.variable)}`)
@@ -358,7 +376,10 @@ export interface Write {
  *   CATCH even when the transaction was doomed, once it is rolled back
  *   (measured, the probes before 0041).
  */
-export function writeBatch(parameters: Parameters, { target, definition, operation, statement, assigned, returned, afterWrite, counted = false }: Write): string {
+export function writeBatch(
+  parameters: Parameters,
+  { target, definition, operation, statement, assigned, returned, afterWrite, counted = false }: Write,
+): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
     name: `[w${String(position)}]`,
@@ -465,7 +486,13 @@ export function versionIs(parameters: Parameters, concurrency: RecordConcurrency
  * rolls back rather than change several. The table is aliased, `update [r]
  * … from <table> as [r]`, so that the through's EXISTS can name the row.
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], expected: ExpectedVersion, definition: Buffer): Statement {
+export function updateStatement(
+  request: UpdateRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  expected: ExpectedVersion,
+  definition: Buffer,
+): Statement {
   const parameters = new Parameters()
   const { target } = request
   const assigned = request.set.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))

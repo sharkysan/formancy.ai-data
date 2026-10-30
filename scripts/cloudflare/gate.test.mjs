@@ -45,7 +45,8 @@ function resolved(overlay, baseText = BASE) {
   if (overlay !== undefined) {
     for (const [name, service] of Object.entries(YAML.parse(overlay).services ?? {})) {
       const merged = { ...(services[name] ?? {}), ...service }
-      if (services[name]?.environment !== undefined && service.environment !== undefined) merged.environment = { ...services[name].environment, ...service.environment }
+      if (services[name]?.environment !== undefined && service.environment !== undefined)
+        merged.environment = { ...services[name].environment, ...service.environment }
       services[name] = normalised(merged)
     }
   }
@@ -72,18 +73,60 @@ describe('the overlay', () => {
   // service changed under a command that names one file.
   test.each([
     ['--loglevel debug', ['"--loglevel", "info"', '"--loglevel", "debug"'], /logs below info/],
-    ['TUNNEL_TOKEN', ['    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro', '    environment:\n      TUNNEL_TOKEN: x\n    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro'], /cloudflared sets TUNNEL_TOKEN/],
-    ['--token on the command line', ['"--config", "/etc/formancy-cloudflare/config.yml", "run"]', '"--config", "/etc/formancy-cloudflare/config.yml", "--token", "x", "run"]'], /is given --token, a secret on its command line/],
-    [':latest', [`cloudflare/cloudflared:2026.10.0@${DIGEST}\n    command`, 'cloudflare/cloudflared:latest\n    command'], /not cloudflare\/cloudflared at a release tag and a digest/],
-    ['a tag without a digest', [`cloudflare/cloudflared:2026.10.0@${DIGEST}\n    command`, 'cloudflare/cloudflared:2026.10.0\n    command'], /neither built from this checkout nor pinned by digest/],
-    ['metrics on every interface', ['"--metrics", "127.0.0.1:20241", "--management', '"--metrics", "0.0.0.0:20241", "--management'], /serves its metrics past loopback/],
+    [
+      'TUNNEL_TOKEN',
+      [
+        '    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro',
+        '    environment:\n      TUNNEL_TOKEN: x\n    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro',
+      ],
+      /cloudflared sets TUNNEL_TOKEN/,
+    ],
+    [
+      '--token on the command line',
+      ['"--config", "/etc/formancy-cloudflare/config.yml", "run"]', '"--config", "/etc/formancy-cloudflare/config.yml", "--token", "x", "run"]'],
+      /is given --token, a secret on its command line/,
+    ],
+    [
+      ':latest',
+      [`cloudflare/cloudflared:2026.10.0@${DIGEST}\n    command`, 'cloudflare/cloudflared:latest\n    command'],
+      /not cloudflare\/cloudflared at a release tag and a digest/,
+    ],
+    [
+      'a tag without a digest',
+      [`cloudflare/cloudflared:2026.10.0@${DIGEST}\n    command`, 'cloudflare/cloudflared:2026.10.0\n    command'],
+      /neither built from this checkout nor pinned by digest/,
+    ],
+    [
+      'metrics on every interface',
+      ['"--metrics", "127.0.0.1:20241", "--management', '"--metrics", "0.0.0.0:20241", "--management'],
+      /serves its metrics past loopback/,
+    ],
     ['diagnostics left on', ['"--management-diagnostics=false", ', ''], /diagnostics on/],
-    ['a published port', ['    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro', '    ports: ["7844:7844"]\n    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro'], /cloudflared publishes a port/],
-    [':rw on cloudflared’s mount', ['formancy-data-tunnel:/etc/formancy-cloudflare:ro', 'formancy-data-tunnel:/etc/formancy-cloudflare:rw'], /cloudflared can write the tunnel’s volume/],
-    ['setup on compose’s network', ['    user: "0"\n    network_mode: bridge\n    environment:', '    user: "0"\n    environment:'], /tunnel-setup is on compose’s network, not bridge/],
+    [
+      'a published port',
+      [
+        '    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro',
+        '    ports: ["7844:7844"]\n    volumes:\n      - formancy-data-tunnel:/etc/formancy-cloudflare:ro',
+      ],
+      /cloudflared publishes a port/,
+    ],
+    [
+      ':rw on cloudflared’s mount',
+      ['formancy-data-tunnel:/etc/formancy-cloudflare:ro', 'formancy-data-tunnel:/etc/formancy-cloudflare:rw'],
+      /cloudflared can write the tunnel’s volume/,
+    ],
+    [
+      'setup on compose’s network',
+      ['    user: "0"\n    network_mode: bridge\n    environment:', '    user: "0"\n    environment:'],
+      /tunnel-setup is on compose’s network, not bridge/,
+    ],
     ['setup’s HOME on disk', ['    tmpfs:\n      - /tmp/login\n', ''], /HOME is not a tmpfs/],
     ['doors-check as root', ['    user: node', '    user: "0"'], /doors-check runs as root/],
-    ['the tunnel’s volume on doors-check', ['      - ./deploy/cloudflare/check.mjs:', '      - formancy-data-tunnel:/etc/formancy-cloudflare\n      - ./deploy/cloudflare/check.mjs:'], /doors-check mounts the tunnel's volume/],
+    [
+      'the tunnel’s volume on doors-check',
+      ['      - ./deploy/cloudflare/check.mjs:', '      - formancy-data-tunnel:/etc/formancy-cloudflare\n      - ./deploy/cloudflare/check.mjs:'],
+      /doors-check mounts the tunnel's volume/,
+    ],
   ])('fails with %s', (_, [from, to], sentence) => {
     expect(problems(edited(from, to)).join('\n')).toMatch(sentence)
   })
@@ -101,7 +144,7 @@ describe('the overlay', () => {
   // getting-started guide's stack and this one.
   test('fails with an overlay entry for compose.yaml’s server', () => {
     expect(problems(edited('\nservices:\n', '\nservices:\n  server:\n    environment:\n      FORMANCY_DATA_RATE_LIMIT: "100"\n\n'))).toEqual(
-      expect.arrayContaining(['deploy/cloudflare/compose.yaml changes compose.yaml\'s server, so a command naming compose.yaml alone would recreate it']),
+      expect.arrayContaining(["deploy/cloudflare/compose.yaml changes compose.yaml's server, so a command naming compose.yaml alone would recreate it"]),
     )
   })
 
@@ -118,10 +161,14 @@ describe('the overlay', () => {
     expect(problems(edited(onEdge, '    networks: [default, edge]\n')).join('\n')).toMatch(/cloudflared is on default, edge, not on edge alone/)
     const serverOnEdge = BASE.replace('    networks: [default, proxy]\n', '    networks: [default, proxy, edge]\n')
     expect(serverOnEdge).not.toBe(BASE)
-    expect(cloudflareProblems(resolved(OVERLAY, serverOnEdge), resolved(undefined, serverOnEdge), DOCKERFILE).join('\n')).toMatch(/server joins edge, beside cloudflared/)
+    expect(cloudflareProblems(resolved(OVERLAY, serverOnEdge), resolved(undefined, serverOnEdge), DOCKERFILE).join('\n')).toMatch(
+      /server joins edge, beside cloudflared/,
+    )
     const webOffEdge = BASE.replace('        ipv4_address: 172.16.238.250\n      edge:\n', '        ipv4_address: 172.16.238.250\n')
     expect(webOffEdge).not.toBe(BASE)
-    expect(cloudflareProblems(resolved(OVERLAY, webOffEdge), resolved(undefined, webOffEdge), DOCKERFILE).join('\n')).toMatch(/web is not on edge, so cloudflared cannot reach it/)
+    expect(cloudflareProblems(resolved(OVERLAY, webOffEdge), resolved(undefined, webOffEdge), DOCKERFILE).join('\n')).toMatch(
+      /web is not on edge, so cloudflared cannot reach it/,
+    )
   })
 
   // The tools must check with the binary that runs the tunnel.
@@ -136,9 +183,13 @@ describe('the overlay', () => {
   test('fails with an image that declares a volume nothing covers', () => {
     const config = resolved(OVERLAY)
     expect(imageVolumeProblems(config, resolved(), { [config.services.cloudflared.image]: null })).toEqual([])
-    expect(imageVolumeProblems(config, resolved(), { [config.services.cloudflared.image]: { '/home/nonroot': {} } })).toEqual(["cloudflared's image declares a volume at /home/nonroot that the service mounts nothing over"])
+    expect(imageVolumeProblems(config, resolved(), { [config.services.cloudflared.image]: { '/home/nonroot': {} } })).toEqual([
+      "cloudflared's image declares a volume at /home/nonroot that the service mounts nothing over",
+    ])
     // The tools share one image; setup's tmpfs covers the path, and the other two have nothing over it.
-    expect(imageVolumeProblems(config, resolved(), { [config.services['tunnel-setup'].image]: { '/tmp/login': {} } }).map((problem) => problem.split("'")[0])).toEqual(['tunnel-config', 'doors-check'])
+    expect(
+      imageVolumeProblems(config, resolved(), { [config.services['tunnel-setup'].image]: { '/tmp/login': {} } }).map((problem) => problem.split("'")[0]),
+    ).toEqual(['tunnel-config', 'doors-check'])
   })
 })
 

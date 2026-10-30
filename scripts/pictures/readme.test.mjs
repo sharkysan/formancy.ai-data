@@ -40,7 +40,7 @@ describe("the repository's README pictures", () => {
 
   // A picture edited, recompressed or deleted by hand would still have a
   // record saying it was taken from the page, and the README would show it.
-  test('each have a record, and a file whose bytes are the record\'s', () => {
+  test("each have a record, and a file whose bytes are the record's", () => {
     expect(integrityProblems(here)).toEqual([])
   })
 
@@ -69,7 +69,7 @@ describe("the repository's README pictures", () => {
 
   // A scene whose app has no pictures script is taken and checked by nothing;
   // a step that is not "<number>. <name>" cannot be found in the Steps list.
-  test('are scenes of the right shape, each taken by its app\'s script', () => {
+  test("are scenes of the right shape, each taken by its app's script", () => {
     expect(shapeProblems(here)).toEqual([])
   })
 
@@ -85,7 +85,12 @@ describe("the repository's README pictures", () => {
  * scenes after it, a host `more` scene, and an examples scene. Its snapshot
  * lines are written by hand in the shapes Playwright prints.
  */
-const LOOK = { platform: 'linux-x64', playwright: '1.63.0', chromium: '153.0.8010.12', fonts: { Archivo: 'v25', 'IBM Plex Mono': 'v20', 'IBM Plex Sans': 'v23' } }
+const LOOK = {
+  platform: 'linux-x64',
+  playwright: '1.63.0',
+  chromium: '153.0.8010.12',
+  fonts: { Archivo: 'v25', 'IBM Plex Mono': 'v20', 'IBM Plex Sans': 'v23' },
+}
 const SETTINGS = { width: 1200, height: 900, deviceScaleFactor: 2, locale: 'en-US', timezoneId: 'UTC' }
 const LINK = './docs/decisions/0008-exact-values-travel-as-strings.md'
 /** What the hero line links: the recipe, which says how the pictures are taken and what nothing checks. */
@@ -100,13 +105,58 @@ function scenes() {
       title: 'One record, both renderers',
       caption: `Its id, “9007199254740993”, and its amount, “99999999999999.9999”, digit for digit ([0008](${LINK})).`,
       alt: 'The record bar saying “Loaded record k1:9007199254740993 into both forms.” above two forms.',
-      quotes: { '9007199254740993': ['React', 'Angular'], '99999999999999.9999': ['React', 'Angular'], 'Loaded record k1:9007199254740993 into both forms.': ['Record'] },
+      quotes: {
+        '9007199254740993': ['React', 'Angular'],
+        '99999999999999.9999': ['React', 'Angular'],
+        'Loaded record k1:9007199254740993 into both forms.': ['Record'],
+      },
     },
-    { id: 'examples-order', app: 'examples', placement: 'inline', title: 'Both renderers', caption: 'Refused with “pattern”.', alt: 'Two forms.', quotes: { pattern: ['React'] } },
-    { id: 'studio-drift', app: 'studio', placement: 'inline', title: 'Drift', step: '8. Drift', caption: 'The rename is a “possible-rename”.', alt: 'The Drift step: “3 changes, 1 blocking.”', quotes: { 'possible-rename': ['Drift'], '3 changes, 1 blocking.': ['Drift'] } },
-    { id: 'studio-regenerated', app: 'studio', placement: 'more', title: 'Regenerated', caption: '“Nothing is published until you publish it.”', alt: 'A panel.', quotes: { 'Nothing is published until you publish it.': ['Regenerated'] } },
-    { id: 'studio-restored', app: 'studio', placement: 'more', title: 'Restored', caption: '“The database was not changed.”', alt: 'The versions panel.', quotes: { 'The database was not changed.': ['Versions'] } },
-    { id: 'host-other-tenant', app: 'host', placement: 'more', title: "Another tenant's record", caption: 'otto: “No such record.”', alt: 'An alert “No such record.”', quotes: { 'No such record.': ['Record'] } },
+    {
+      id: 'examples-order',
+      app: 'examples',
+      placement: 'inline',
+      title: 'Both renderers',
+      caption: 'Refused with “pattern”.',
+      alt: 'Two forms.',
+      quotes: { pattern: ['React'] },
+    },
+    {
+      id: 'studio-drift',
+      app: 'studio',
+      placement: 'inline',
+      title: 'Drift',
+      step: '8. Drift',
+      caption: 'The rename is a “possible-rename”.',
+      alt: 'The Drift step: “3 changes, 1 blocking.”',
+      quotes: { 'possible-rename': ['Drift'], '3 changes, 1 blocking.': ['Drift'] },
+    },
+    {
+      id: 'studio-regenerated',
+      app: 'studio',
+      placement: 'more',
+      title: 'Regenerated',
+      caption: '“Nothing is published until you publish it.”',
+      alt: 'A panel.',
+      quotes: { 'Nothing is published until you publish it.': ['Regenerated'] },
+    },
+    {
+      id: 'studio-restored',
+      app: 'studio',
+      placement: 'more',
+      title: 'Restored',
+      caption: '“The database was not changed.”',
+      alt: 'The versions panel.',
+      quotes: { 'The database was not changed.': ['Versions'] },
+    },
+    {
+      id: 'host-other-tenant',
+      app: 'host',
+      placement: 'more',
+      title: "Another tenant's record",
+      caption: 'otto: “No such record.”',
+      alt: 'An alert “No such record.”',
+      quotes: { 'No such record.': ['Record'] },
+    },
   ]
 }
 
@@ -131,9 +181,41 @@ function fixture() {
   for (const scene of list) {
     const picture = Buffer.from(`the picture of ${scene.id}`)
     files.set(pictureOf(scene.id), picture)
-    record[scene.id] = entry(scene.id, { captured: '2026-10-09', settings: SETTINGS, clip: { x: 0, y: 0, width: 842, height: 400 }, picture, look: structuredClone(LOOK), database: 'captured snapshots', stylesheet: 'sha256 0', text: TEXT[scene.id] })
+    record[scene.id] = entry(scene.id, {
+      captured: '2026-10-09',
+      settings: SETTINGS,
+      clip: { x: 0, y: 0, width: 842, height: 400 },
+      picture,
+      look: structuredClone(LOOK),
+      database: 'captured snapshots',
+      stylesheet: 'sha256 0',
+      text: TEXT[scene.id],
+    })
   }
-  const skeleton = ['# Formancy Data', '', 'Intro.', '', START('hero'), END, '', '## Examples', '', START('examples'), END, '', '## Studio', '', START('studio'), END, '', '## Host', '', START('host'), END, ''].join('\n')
+  const skeleton = [
+    '# Formancy Data',
+    '',
+    'Intro.',
+    '',
+    START('hero'),
+    END,
+    '',
+    '## Examples',
+    '',
+    START('examples'),
+    END,
+    '',
+    '## Studio',
+    '',
+    START('studio'),
+    END,
+    '',
+    '## Host',
+    '',
+    START('host'),
+    END,
+    '',
+  ].join('\n')
   return {
     scenes: list,
     record,
@@ -182,7 +264,9 @@ describe('each check, on a small repository', () => {
         '</details>',
       ].join('\n'),
     )
-    expect(render(list, record).hero).toMatch(/^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nEvery picture in this README is taken by `pnpm pictures`/)
+    expect(render(list, record).hero).toMatch(
+      /^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nEvery picture in this README is taken by `pnpm pictures`/,
+    )
   })
 
   // The hero line tells a reader which job goes red on a picture whose text
@@ -192,14 +276,19 @@ describe('each check, on a small repository', () => {
   test('the hero line names the job that runs the pictures’ check', () => {
     const named = /the (\S+) job fails/.exec(HERO_LINE)?.[1]
     const job = readWorkflow().jobs[named]
-    expect(job?.steps.map((step) => step.run), `the ${String(named)} job`).toContain('pnpm test:pictures')
+    expect(
+      job?.steps.map((step) => step.run),
+      `the ${String(named)} job`,
+    ).toContain('pnpm test:pictures')
   })
 
   // Watched failing with: one caption edited in scenes.json without `readme.mjs --write`.
   test('regions: a caption edited without writing the README', () => {
     const state = fixture()
     state.scenes[2].caption = 'The rename is a “possible-rename”, said differently.'
-    expect(regionProblems(state)).toEqual(['README.md\'s pictures region "studio" is not what scenes.json and captured.json render: run `node scripts/pictures/readme.mjs --write`'])
+    expect(regionProblems(state)).toEqual([
+      'README.md\'s pictures region "studio" is not what scenes.json and captured.json render: run `node scripts/pictures/readme.mjs --write`',
+    ])
   })
 
   // Watched failing with: the studio region's markers deleted from README.md.
@@ -238,14 +327,16 @@ describe('each check, on a small repository', () => {
     expect(integrityProblems(missing)).toEqual(['studio-drift has no record: `pnpm pictures --scene studio-drift` takes it'])
     const crlf = fixture()
     crlf.recordText = crlf.recordText.replaceAll('\n', '\r\n')
-    expect(integrityProblems(crlf)).toEqual(['docs/images/readme/captured.json is not as the camera writes it: pretty-printed, keyed in scenes.json order, LF only'])
+    expect(integrityProblems(crlf)).toEqual([
+      'docs/images/readme/captured.json is not as the camera writes it: pretty-printed, keyed in scenes.json order, LF only',
+    ])
   })
 
   // Watched failing with: a stray docs/images/readme/stray.webp; separately, a record with no scene.
   test('orphans: a stray picture, and a record with no scene', () => {
     const stray = fixture()
     stray.listing.push('stray.webp')
-    expect(orphanProblems(stray)).toEqual(['docs/images/readme/stray.webp is no scene\'s picture'])
+    expect(orphanProblems(stray)).toEqual(["docs/images/readme/stray.webp is no scene's picture"])
     const record = fixture()
     record.record['studio-gone'] = record.record['studio-drift']
     expect(orphanProblems(record)).toEqual(['captured.json records studio-gone, which is no scene of scenes.json'])
@@ -255,23 +346,31 @@ describe('each check, on a small repository', () => {
   test('quotes: a caption quoting what its part does not say', () => {
     const state = fixture()
     state.scenes[5].caption = 'otto: “No such order.”'
-    expect(quoteProblems(state)).toEqual(['host-other-tenant: “No such order.” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture'])
+    expect(quoteProblems(state)).toEqual([
+      'host-other-tenant: “No such order.” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture',
+    ])
     state.scenes[5].quotes['No such order.'] = ['Record']
-    expect(quoteProblems(state)).toEqual(['host-other-tenant: “No such order.” is not inside one name or value of what the part Record says, so the caption quotes what its picture does not show'])
+    expect(quoteProblems(state)).toEqual([
+      'host-other-tenant: “No such order.” is not inside one name or value of what the part Record says, so the caption quotes what its picture does not show',
+    ])
   })
 
   // Watched failing with: the hero's “99999999999999.9999” scoped to the Record part, which does not show it.
   test('quotes: a quote scoped to a part that does not say it', () => {
     const state = fixture()
     state.scenes[0].quotes['99999999999999.9999'] = ['Record']
-    expect(quoteProblems(state)).toEqual(['host-loaded: “99999999999999.9999” is not inside one name or value of what the part Record says, so the caption quotes what its picture does not show'])
+    expect(quoteProblems(state)).toEqual([
+      'host-loaded: “99999999999999.9999” is not inside one name or value of what the part Record says, so the caption quotes what its picture does not show',
+    ])
   })
 
   // Watched failing with: a curly quote added to an alt without a quotes key.
   test('quotes: a quotation in an alt with no key, and a key nothing quotes', () => {
     const state = fixture()
     state.scenes[1].alt = 'Two forms, one saying “required”.'
-    expect(quoteProblems(state)).toEqual(['examples-order: “required” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture'])
+    expect(quoteProblems(state)).toEqual([
+      'examples-order: “required” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture',
+    ])
     const unused = fixture()
     unused.scenes[1].quotes.required = ['React']
     expect(quoteProblems(unused)).toEqual([
@@ -288,14 +387,20 @@ describe('each check, on a small repository', () => {
     expect(quoteProblems(part)).toEqual(['host-loaded: “9007199254740993” must occur in the part Vue, which the picture does not have'])
     const line = fixture()
     line.record['studio-drift'].text.Drift += '\nstatus: unread'
-    expect(quoteProblems(line)).toEqual(expect.arrayContaining(['studio-drift, part Drift: line 4 is not an accessibility snapshot line: it does not start with "- " at an even indentation']))
+    expect(quoteProblems(line)).toEqual(
+      expect.arrayContaining(['studio-drift, part Drift: line 4 is not an accessibility snapshot line: it does not start with "- " at an even indentation']),
+    )
   })
 
   // Watched failing with: one record's chromium edited.
   test('one look: one record taken on another Chromium', () => {
     const state = fixture()
     state.record['studio-restored'].look.chromium = '154.0.0.0'
-    expect(lookProblems(state)).toEqual([expect.stringMatching(/^the pictures were taken on 2 looks, and every one must be taken on one: .*Chromium 153\.0\.8010\.12.*; .*Chromium 154\.0\.0\.0.*`pnpm pictures --all` retakes every picture$/)])
+    expect(lookProblems(state)).toEqual([
+      expect.stringMatching(
+        /^the pictures were taken on 2 looks, and every one must be taken on one: .*Chromium 153\.0\.8010\.12.*; .*Chromium 154\.0\.0\.0.*`pnpm pictures --all` retakes every picture$/,
+      ),
+    ])
   })
 
   // Watched failing with: a caption linking 0099-….
@@ -317,7 +422,9 @@ describe('each check, on a small repository', () => {
     expect(linkProblems(recipe)).toEqual(['README.md\'s pictures region "hero" links ./docs/images/README.md, which is no file of the repository'])
     const picture = fixture()
     picture.files.delete(pictureOf('studio-restored'))
-    expect(linkProblems(picture)).toEqual(['README.md\'s pictures region "studio" links ./docs/images/readme/studio-restored.webp, which is no file of the repository'])
+    expect(linkProblems(picture)).toEqual([
+      'README.md\'s pictures region "studio" links ./docs/images/readme/studio-restored.webp, which is no file of the repository',
+    ])
   })
 
   // Watched failing with: a scene's app set to `hosts`.
@@ -356,7 +463,9 @@ describe('each check, on a small repository', () => {
   test('shape: a title with a comma in it', () => {
     const state = fixture()
     state.scenes[3].title = 'Regenerated, keeping the presentation'
-    expect(shapeProblems(state)).toEqual(["studio-regenerated's title has a comma in it, and a <details> summary joins titles with commas, so it would read as two scenes"])
+    expect(shapeProblems(state)).toEqual([
+      "studio-regenerated's title has a comma in it, and a <details> summary joins titles with commas, so it would read as two scenes",
+    ])
   })
 
   // Watched failing with: the examples scene removed from scenes.json.
@@ -372,6 +481,8 @@ describe('each check, on a small repository', () => {
     const state = fixture()
     const rendered = render(state.scenes, state.record)
     expect(guardProblems(state, { ...rendered, examples: '*Refused with “pattern”.*' })).toEqual(['the pictures region "examples" renders no picture'])
-    expect(guardProblems({ ...state, record: {} })).toEqual([expect.stringMatching(/^the regions could not be rendered, so none drew a picture: host-loaded has no record/)])
+    expect(guardProblems({ ...state, record: {} })).toEqual([
+      expect.stringMatching(/^the regions could not be rendered, so none drew a picture: host-loaded has no record/),
+    ])
   })
 })

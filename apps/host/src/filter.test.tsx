@@ -65,7 +65,13 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
   const ids: string[] = []
   for (const amount of amounts) {
-    const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount, notes })
+    const created = await plane.clerk.create(engine.formId, {
+      customer: found.value.rows[0].token,
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount,
+      notes,
+    })
     if (!created.ok || created.value.record === null) throw new Error('the order was not created')
     ids.push(created.value.record.slice('k1:'.length))
   }
@@ -102,7 +108,11 @@ async function says(heading: string, text: string): Promise<void> {
 }
 
 /** A file's records after its header, one line each: the values these cases file hold no comma, quote or line break. */
-const dataRows = (text: string): string[] => text.split('\r\n').slice(1).filter((row) => row !== '')
+const dataRows = (text: string): string[] =>
+  text
+    .split('\r\n')
+    .slice(1)
+    .filter((row) => row !== '')
 
 /** The filter each list request in `sent` for `formId` carried, in order. */
 const filtersSent = (sent: readonly Sent[], formId: string): ListFilterTerm[][] => listsSent(sent, formId).map(({ body }) => body.filter)
@@ -183,7 +193,9 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
       { field: 'amount', op: 'range', from: '2', to: null },
     ]
     const query: RecordExportQuery = { search: '', sort: [], parent: null, filter }
-    const bodies = plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/export`).map((request) => JSON.parse(request.body ?? '{}') as unknown)
+    const bodies = plane.sent
+      .filter((request) => request.path === `/v1/forms/${engine.formId}/records/export`)
+      .map((request) => JSON.parse(request.body ?? '{}') as unknown)
     expect(bodies).toEqual([query])
     const server = await plane.clerk.exportRecords(engine.formId, query)
     if (!server.ok) throw new Error(server.message)
@@ -298,7 +310,10 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await applyCondition(user, 'Records', { field: 'Id', condition: 'is', value: String(order) })
     await waitFor(() => expect(recordKeys()).toEqual([order]), ARRIVES)
     await listsApplied('Records', [`Id is ${String(order)}`])
-    expect(filtersSent(plane.sent, engine.formId)).toEqual([[{ field: 'id', op: 'equals', value: '12x' }], [{ field: 'id', op: 'equals', value: String(order) }]])
+    expect(filtersSent(plane.sent, engine.formId)).toEqual([
+      [{ field: 'id', op: 'equals', value: '12x' }],
+      [{ field: 'id', op: 'equals', value: String(order) }],
+    ])
 
     plane.sent.length = 0
     await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between' })
@@ -357,7 +372,11 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     plane.sent.length = 0
 
     await applyCondition(user, 'Delivery', { field: 'Shipped at', condition: 'is between', from: '2026-10-08', to: '2026-10-09' })
-    expect(within(gridSection('Delivery')).getByText('Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.')).toBeTruthy()
+    expect(
+      within(gridSection('Delivery')).getByText(
+        'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.',
+      ),
+    ).toBeTruthy()
     const parent = { field: 'order', record }
     const between: ListFilterTerm = { field: 'shipped_at', op: 'range', from: '2026-10-08', to: '2026-10-09' }
     const server = await plane.clerk.list(engine.deliveries, { parent, filter: [between] })
@@ -382,7 +401,11 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await user.click(exportButton('Delivery'))
     await waitFor(() => expect(exportLine('Delivery').textContent).toBe(`Made ${engine.deliveries}.csv; your browser saves it.`), ARRIVES)
     const query: RecordExportQuery = { search: '', sort: [], parent, filter: [{ field: 'id', op: 'equals', value: String(deliveries[1]).toUpperCase() }] }
-    expect(plane.sent.filter((request) => request.path === `/v1/forms/${engine.deliveries}/records/export`).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([query])
+    expect(
+      plane.sent
+        .filter((request) => request.path === `/v1/forms/${engine.deliveries}/records/export`)
+        .map((request) => JSON.parse(request.body ?? '{}') as unknown),
+    ).toEqual([query])
     const file = await plane.clerk.exportRecords(engine.deliveries, query)
     if (!file.ok) throw new Error(file.message)
     const [saved] = kept.saved

@@ -133,8 +133,7 @@ function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: 
   else if (concurrency.kind === 'rowversion') {
     if (column.type.kind !== 'rowversion') problem = `it is ${column.databaseType}`
     else problem = column.access.select ? null : "this connection's account may not read it"
-  }
-  else problem = versionColumnProblem(column, bindings.identity ?? [], bound)
+  } else problem = versionColumnProblem(column, bindings.identity ?? [], bound)
   return problem === null ? null : `${concurrency.column} cannot be a ${concurrency.kind}: ${problem}`
 }
 

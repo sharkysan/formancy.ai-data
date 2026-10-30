@@ -9,7 +9,11 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const config = JSON.parse(readFileSync(join(repo, 'apps', 'live-demo', 'wrangler.json'), 'utf8'))
 const files = new Set(['/data/demo/index.html', '/data/demo/assets/index-abc123.js', '/data/demo/THIRD-PARTY-NOTICES.txt'])
 // Files at the paths the Worker answers too: run_worker_first must win over a file, not only over a miss.
-const shadowed = new Set([...files, '/data/demo/session', ...config.assets.run_worker_first.map((pattern) => pattern.replaceAll('*', 'forms/order/records/list'))])
+const shadowed = new Set([
+  ...files,
+  '/data/demo/session',
+  ...config.assets.run_worker_first.map((pattern) => pattern.replaceAll('*', 'forms/order/records/list')),
+])
 const route = (pathname, held = files) => routeOf(pathname, { prefix: PREFIX, assets: config.assets, exists: (path) => held.has(path) })
 
 describe('the local origin, as wrangler.json has Cloudflare route the demo', () => {
@@ -17,9 +21,10 @@ describe('the local origin, as wrangler.json has Cloudflare route the demo', () 
   // assets are asked, even where the assets hold a file of that name: a
   // session or a runtime-plane request answered as a file would never
   // reach a visitor's server.
-  test("sends every path run_worker_first names to the Worker first, read from the config", () => {
+  test('sends every path run_worker_first names to the Worker first, read from the config', () => {
     expect(config.assets.run_worker_first.length).toBeGreaterThan(0)
-    for (const pattern of config.assets.run_worker_first) expect(route(pattern.replaceAll('*', 'forms/order/records/list'), shadowed), pattern).toEqual({ kind: 'worker' })
+    for (const pattern of config.assets.run_worker_first)
+      expect(route(pattern.replaceAll('*', 'forms/order/records/list'), shadowed), pattern).toEqual({ kind: 'worker' })
     expect(route('/data/demo/session', shadowed)).toEqual({ kind: 'worker' })
     expect(route('/data/demo/v1/forms')).toEqual({ kind: 'worker' })
   })
@@ -54,7 +59,11 @@ describe('the local origin, as wrangler.json has Cloudflare route the demo', () 
   // A pattern this file cannot read the way Cloudflare does would be routed
   // wrongly in silence.
   test('refuses a negated pattern or a config holding something it does not model', () => {
-    expect(() => routeOf('/data/demo/', { prefix: PREFIX, assets: { ...config.assets, run_worker_first: ['!/data/demo/x'] }, exists: () => false })).toThrow(/negated/)
-    expect(() => routeOf('/data/demo/', { prefix: PREFIX, assets: { ...config.assets, html_handling: 'none' }, exists: () => false })).toThrow(/html_handling none/)
+    expect(() => routeOf('/data/demo/', { prefix: PREFIX, assets: { ...config.assets, run_worker_first: ['!/data/demo/x'] }, exists: () => false })).toThrow(
+      /negated/,
+    )
+    expect(() => routeOf('/data/demo/', { prefix: PREFIX, assets: { ...config.assets, html_handling: 'none' }, exists: () => false })).toThrow(
+      /html_handling none/,
+    )
   })
 })

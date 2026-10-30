@@ -91,7 +91,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
@@ -99,7 +101,14 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 
 /** The order form over each connection, proposed and published while the connection is a SQL login. */
 async function publishAsSqlLogin(): Promise<void> {
-  const address = { kind: 'sqlserver' as const, host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } }
+  const address = {
+    kind: 'sqlserver' as const,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    schemas: ['sales'],
+    tls: { enabled: false, trustServerCertificate: true },
+  }
   const sqlLogins = createConnectionRegistry(
     CONNECTIONS.map(({ id }) => ({ id, ...address, user: String(ms.admin.user), password: 'env:MS_PASSWORD' })),
     DRIVER_FACTORIES,
@@ -112,12 +121,38 @@ async function publishAsSqlLogin(): Promise<void> {
         method: 'POST',
         url: '/v1/form-proposals',
         headers: { authorization: 'Bearer admin' },
-        payload: { connection: id, root: { schema: 'sales', name: 'order' }, formId: `${id}-order`, title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] },
+        payload: {
+          connection: id,
+          root: { schema: 'sales', name: 'order' },
+          formId: `${id}-order`,
+          title: 'Order',
+          lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+        },
       })
       expect(proposed.statusCode, proposed.body).toBe(200)
-      const { form, bindings, snapshot, generation } = proposed.json() as { form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: GenerationRequest }
-      const bundle = { format: 2, connection: id, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: clerkPolicy(bindings.fields), snapshot }
-      const published = await publisher.inject({ method: 'POST', url: `/v1/forms/${id}-order/versions`, headers: { authorization: 'Bearer admin' }, payload: { expectedBase: null, bundle } })
+      const { form, bindings, snapshot, generation } = proposed.json<{
+        form: FormSchema
+        bindings: FormBindings
+        snapshot: MetadataSnapshot
+        generation: GenerationRequest
+      }>()
+      const bundle = {
+        format: 2,
+        connection: id,
+        generation,
+        base: form,
+        presentation: EMPTY_PRESENTATION,
+        form,
+        bindings,
+        policy: clerkPolicy(bindings.fields),
+        snapshot,
+      }
+      const published = await publisher.inject({
+        method: 'POST',
+        url: `/v1/forms/${id}-order/versions`,
+        headers: { authorization: 'Bearer admin' },
+        payload: { expectedBase: null, bundle },
+      })
       expect(published.statusCode, published.body).toBe(201)
       const field = form.model.fields.find((candidate) => candidate.key === 'customer') as { optionsSource?: string } | undefined
       if (field?.optionsSource === undefined) throw new Error('the order form has no customer lookup')
@@ -138,7 +173,11 @@ beforeAll(async () => {
   await publishAsSqlLogin()
 
   const address = { kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), schemas: ['sales'] }
-  const unmounted = { id: 'erp-unmounted', ...address, login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: `file:${UNMOUNTED_PATH}` } }
+  const unmounted = {
+    id: 'erp-unmounted',
+    ...address,
+    login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: `file:${UNMOUNTED_PATH}` },
+  }
   const parsed = parseConnections([...CONNECTIONS.map(({ id, login }) => ({ id, ...address, login })), unmounted])
   if (!parsed.ok) throw new Error(parsed.problems.join('\n'))
   registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES, {
@@ -170,7 +209,7 @@ afterAll(async () => {
 async function ask(method: 'GET' | 'POST', url: string, bearer: string, payload?: Record<string, unknown>): Promise<{ status: number; json: unknown }> {
   const answer = await app.inject({ method, url, headers: { authorization: `Bearer ${bearer}` }, ...(payload === undefined ? {} : { payload }) })
   answered.push(answer.body)
-  return { status: answer.statusCode, json: answer.json() as unknown }
+  return { status: answer.statusCode, json: answer.json<unknown>() }
 }
 
 /** stack.mjs's `leaks()`: where each value appears among `haystacks`, as sentences naming the value's name and the place, never the value. */
@@ -187,7 +226,10 @@ describe.each(CONNECTIONS)('a connection that logs in as an Entra principal, $id
   // connection that cannot be opened, naming the connection and nothing of
   // its principal (routes/admin.ts).
   test('the connection test answers 503 unavailable', async () => {
-    expect(await ask('POST', `/v1/connections/${id}/test`, 'admin')).toEqual({ status: 503, json: { code: 'unavailable', message: `Connection ${id} cannot be reached.` } })
+    expect(await ask('POST', `/v1/connections/${id}/test`, 'admin')).toEqual({
+      status: 503,
+      json: { code: 'unavailable', message: `Connection ${id} cannot be reached.` },
+    })
   })
 
   // A person opening the form, reading a record and searching the customer
@@ -199,14 +241,19 @@ describe.each(CONNECTIONS)('a connection that logs in as an Entra principal, $id
     if (!token.ok) throw new Error(token.message)
     expect(await ask('GET', `/v1/forms/${form}`, 'clerk')).toEqual({ status: 503, json: UNREACHABLE })
     expect(await ask('POST', `/v1/forms/${form}/records/read`, 'clerk', { record: token.token })).toEqual({ status: 503, json: UNREACHABLE })
-    expect(await ask('POST', `/v1/forms/${form}/lookups/${String(sources.get(id))}/query`, 'clerk', { operation: 'create', search: 'Muster' })).toEqual({ status: 503, json: UNREACHABLE })
+    expect(await ask('POST', `/v1/forms/${form}/lookups/${String(sources.get(id))}/query`, 'clerk', { operation: 'create', search: 'Muster' })).toEqual({
+      status: 503,
+      json: UNREACHABLE,
+    })
   })
 
   // What the operator reads is the adapter's sentence, not mssql's empty
   // message or tedious's "Login failed for user ''.", on every line that
   // says the connection could not be opened.
   test('the log says why in the adapter’s sentence', () => {
-    const opened = written.map((line) => JSON.parse(line) as { msg?: string; connection?: string; error?: string }).filter((line) => line.msg === 'connection could not be opened' && line.connection === id)
+    const opened = written
+      .map((line) => JSON.parse(line) as { msg?: string; connection?: string; error?: string })
+      .filter((line) => line.msg === 'connection could not be opened' && line.connection === id)
     expect(opened.length).toBeGreaterThanOrEqual(4)
     for (const line of opened) expect(line.error).toBe(REFUSED)
   })
@@ -219,8 +266,13 @@ describe.each(CONNECTIONS)('a connection that logs in as an Entra principal, $id
 // nothing else of the principal. The file's path is the allowlist's, never
 // the secret. Watched failing with resolveSecret's sentence naming no file.
 test('a secret file that cannot be read is named in the log, and in no answer or audit event', async () => {
-  expect(await ask('POST', '/v1/connections/erp-unmounted/test', 'admin')).toEqual({ status: 503, json: { code: 'unavailable', message: 'Connection erp-unmounted cannot be reached.' } })
-  const opened = written.map((line) => JSON.parse(line) as { msg?: string; connection?: string; error?: string }).filter((line) => line.msg === 'connection could not be opened' && line.connection === 'erp-unmounted')
+  expect(await ask('POST', '/v1/connections/erp-unmounted/test', 'admin')).toEqual({
+    status: 503,
+    json: { code: 'unavailable', message: 'Connection erp-unmounted cannot be reached.' },
+  })
+  const opened = written
+    .map((line) => JSON.parse(line) as { msg?: string; connection?: string; error?: string })
+    .filter((line) => line.msg === 'connection could not be opened' && line.connection === 'erp-unmounted')
   expect(opened.map((line) => line.error)).toEqual([`the secret file ${UNMOUNTED_PATH} cannot be read`])
   const found = leaks(
     [["unread secret's path", UNMOUNTED_PATH]],

@@ -96,7 +96,7 @@ const isName = (value: unknown): value is string => typeof value === 'string' &&
 type Read = { ok: true; entry: DraftEntry | RejectionEntry } | { ok: false; problems: string[] }
 
 /**
- * Entry `number` of `form` as stored, or why it is not one: a draft whose
+ * An entry of `form` as stored, or why it is not one: a draft whose
  * bundle validates (0019) in format 2 for this form, over a base that is
  * a version number or none, by a named submitter, with confirmations of
  * the shape a publish takes; or the rejection, by somebody, of a draft
@@ -104,7 +104,7 @@ type Read = { ok: true; entry: DraftEntry | RejectionEntry } | { ok: false; prob
  * the allowlist, this server's generator, the database -- an approval asks
  * again, so a later release cannot make a stored draft unreadable.
  */
-function entryOf(document: unknown, form: string, number: number, before: ReadonlyMap<number, DraftEntry | RejectionEntry>): Read {
+function entryOf(document: unknown, form: string, before: ReadonlyMap<number, DraftEntry | RejectionEntry>): Read {
   if (!isRecord(document)) return { ok: false, problems: ['an entry is an object'] }
   if (document['entry'] === 'rejection') {
     const draft = document['draft']
@@ -123,7 +123,16 @@ function entryOf(document: unknown, form: string, number: number, before: Readon
   if (!checked.ok) problems.push(...checked.problems.map((problem) => `bundle: ${problem}`))
   else if (checked.bundle.format !== 2 || checked.bundle.form.id !== form) problems.push(`bundle: is not a format-2 bundle of ${form}`)
   if (problems.length > 0 || !checked.ok || checked.bundle.format !== 2 || confirmed === undefined) return { ok: false, problems }
-  return { ok: true, entry: { entry: 'draft', expectedBase: base as number | null, bundle: checked.bundle, keysConfirmed: confirmed, submittedBy: document['submittedBy'] as string } }
+  return {
+    ok: true,
+    entry: {
+      entry: 'draft',
+      expectedBase: base as number | null,
+      bundle: checked.bundle,
+      keysConfirmed: confirmed,
+      submittedBy: document['submittedBy'] as string,
+    },
+  }
 }
 
 /** One JSON document's text, without the store's indentation: two documents the store wrote are the same bytes exactly when these are equal. */
@@ -164,7 +173,7 @@ export function createDrafts(versions: ConfigurationStore): Drafts {
         if (error instanceof UnparsableVersionError) throw new UnreadableDraftError(form, number, ['the entry is not valid JSON'])
         throw error
       }
-      const checked = entryOf(document, form, number, read)
+      const checked = entryOf(document, form, read)
       if (!checked.ok) throw new UnreadableDraftError(form, number, checked.problems)
       read.set(number, checked.entry)
     }

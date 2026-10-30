@@ -67,10 +67,7 @@ describe('reading the edge values', () => {
   // string, the driver sends the exact bigint.
   test('an id past 2^53 bound as a number finds nothing; bound as its decimal string it finds the row', async () => {
     const count = async (id: string | number): Promise<number | undefined> => {
-      const { recordset } = await pool
-        .request()
-        .input('id', mssql.BigInt, id)
-        .query<{ n: number }>('select count(*) as n from sales.[order] where id = @id')
+      const { recordset } = await pool.request().input('id', mssql.BigInt, id).query<{ n: number }>('select count(*) as n from sales.[order] where id = @id')
       return recordset[0]?.n
     }
     expect(await count(Number(EDGE_VALUES.beyondSafeInteger))).toBe(0)
@@ -87,9 +84,7 @@ describe('what a text length counts', () => {
   // bytes and are refused, though their String length is 3.
   test('nvarchar(n) holds n UTF-16 code units, and a UTF-8 varchar(n) holds n bytes', async () => {
     await pool.request().batch('create schema spike')
-    await pool
-      .request()
-      .batch('create table spike.text_length (n nvarchar(4) null, v varchar(4) collate Latin1_General_100_CI_AS_SC_UTF8 null)')
+    await pool.request().batch('create table spike.text_length (n nvarchar(4) null, v varchar(4) collate Latin1_General_100_CI_AS_SC_UTF8 null)')
     const insert = (columnName: 'n' | 'v', value: string) =>
       pool.request().input('value', mssql.NVarChar(mssql.MAX), value).query(`insert into spike.text_length (${columnName}) values (@value)`)
 

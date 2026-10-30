@@ -109,7 +109,10 @@ export async function closedLoop(scenario: Executable, lanes: number, budget: Bu
  * block's warm-up. The database container's CPU is read across it. A probe
  * that reports nothing for `waitMs` past the gap stops the run.
  */
-export async function idleGap(context: Pick<BlockContext, 'docker' | 'containerId' | 'calibration' | 'gapMs'>, waitMs = 10_000): Promise<{ probeMs: number; databaseCpuMs: number; seconds: number }> {
+export async function idleGap(
+  context: Pick<BlockContext, 'docker' | 'containerId' | 'calibration' | 'gapMs'>,
+  waitMs = 10_000,
+): Promise<{ probeMs: number; databaseCpuMs: number; seconds: number }> {
   const from = process.hrtime.bigint()
   const before = (await context.docker.usage(context.containerId)).cpuNs
   await new Promise((resolve) => setTimeout(resolve, context.gapMs))
@@ -169,7 +172,12 @@ export async function runBlock(scenario: Executable, lanes: number, warmup: Budg
       // An empty histogram -- a block shorter than its resolution -- has no delay to report.
       generatorLagP99Ms: lag.count === 0 ? 0 : lag.percentile(99) / 1e6,
       loadAvgAtStart: load.one,
-      idle: { probeBeforeMs: gapBefore.probeMs, probeAfterMs: gapAfter.probeMs, databaseCpuMs: gapBefore.databaseCpuMs + gapAfter.databaseCpuMs, seconds: gapBefore.seconds + gapAfter.seconds },
+      idle: {
+        probeBeforeMs: gapBefore.probeMs,
+        probeAfterMs: gapAfter.probeMs,
+        databaseCpuMs: gapBefore.databaseCpuMs + gapAfter.databaseCpuMs,
+        seconds: gapBefore.seconds + gapAfter.seconds,
+      },
       disturbances: context.observer.disturbances(disturbanceBefore, disturbanceAfter),
       reconnects: [...sessionsAfter].filter((session) => !sessionsBefore.has(session)).length,
     },

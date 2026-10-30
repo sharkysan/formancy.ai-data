@@ -1,6 +1,18 @@
 import { createHash } from 'node:crypto'
 import { describedOf, findObject } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, DeleteRequest, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
+import type {
+  ApiValue,
+  ColumnMeta,
+  DeleteRequest,
+  Described,
+  DescribedTable,
+  MetadataSnapshot,
+  ObjectRef,
+  RecordOutcome,
+  RecordTarget,
+  RecordValue,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { covers, driftingCase, driftingOn, FIXTURE_SCOPE, MODEL_CASES, PARITY_SCOPE, sharedDrifting, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { DriftingCase, SqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
@@ -56,7 +68,10 @@ beforeAll(async () => {
   } finally {
     await master.close()
   }
-  await batches(owner, [`create user ${RESTRICTED.user} for login ${RESTRICTED.user}`, `grant select, insert, update on schema::drifting to ${RESTRICTED.user}`])
+  await batches(owner, [
+    `create user ${RESTRICTED.user} for login ${RESTRICTED.user}`,
+    `grant select, insert, update on schema::drifting to ${RESTRICTED.user}`,
+  ])
   restricted = await new mssql.ConnectionPool({ ...fixture.writer, user: RESTRICTED.user, password: RESTRICTED.password }).connect()
 })
 
@@ -99,20 +114,40 @@ function target(table: string): RecordTarget & UpdateRequest['target'] {
 async function held(table: string): Promise<{ row: string | null; rows: number }> {
   const result = await owner
     .request()
-    .query<{ row: string | null; rows: number }>(`select (select * from drifting.${table} where id = 1 for json path, without_array_wrapper, include_null_values) as row, (select count(*) from drifting.${table}) as rows`)
+    .query<{ row: string | null; rows: number }>(
+      `select (select * from drifting.${table} where id = 1 for json path, without_array_wrapper, include_null_values) as row, (select count(*) from drifting.${table}) as rows`,
+    )
   return result.recordset[0] as { row: string | null; rows: number }
 }
 
 function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string, definition: string) {
-  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
-  const values = [...Object.entries(entry.insert).map(([name, given]) => value(snapshot, entry.table, name, given)), value(snapshot, entry.table, 'memo', 'created')]
+  const update = {
+    target: target(entry.table),
+    key: [{ ...ID, value: '1' }],
+    set: [value(snapshot, entry.table, 'memo', 'written')],
+    expectedVersion: version,
+    filters: { kind: 'unrestricted' } as const,
+    through: [],
+    returning: [],
+    definition,
+  }
+  const values = [
+    ...Object.entries(entry.insert).map(([name, given]) => value(snapshot, entry.table, name, given)),
+    value(snapshot, entry.table, 'memo', 'created'),
+  ]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
   // A delete of row 1 at the version given (0050).
   const removal: DeleteRequest = { ...update, reach: { removed: [ref(entry.table)], cleared: [], accepted: [] } }
   return { update, insert, removal }
 }
 
-const read = (table: string) => ({ target: target(table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] })
+const read = (table: string) => ({
+  target: target(table),
+  key: [{ ...ID, value: '1' }],
+  columns: [ID],
+  filters: { kind: 'unrestricted' } as const,
+  through: [],
+})
 
 /** The version a read found, which the next update is guarded by. */
 async function versionOf(table: string): Promise<string> {
@@ -129,75 +164,86 @@ describe('the definition, change by change', () => {
     // a column retyped to int; a definition that moved for a comment or an
     // index would refuse every write after harmless DDL; one that did not
     // move for a key or a precision would let a write through it.
-    test(`${entry.name}: the definition moves exactly when the change is one a description reads, and a write decided before it is refused`, declared(entry), async () => {
-      const records = createSqlServerRecords(owner)
-      const before = described(await records.describe(ref(entry.table)))
-      const first = await records.read(read(entry.table))
-      expect(first).toMatchObject({ ok: true, described: before, record: { version: expect.any(String) } })
-      // As the account without VIEW DEFINITION too, whose catalog is not the owner's.
-      const asRestricted = createSqlServerRecords(restricted)
-      const restrictedBefore = described(await asRestricted.describe(ref(entry.table)))
+    test(
+      `${entry.name}: the definition moves exactly when the change is one a description reads, and a write decided before it is refused`,
+      declared(entry),
+      async () => {
+        const records = createSqlServerRecords(owner)
+        const before = described(await records.describe(ref(entry.table)))
+        const first = await records.read(read(entry.table))
+        expect(first).toMatchObject({ ok: true, described: before, record: { version: expect.any(String) } })
+        // As the account without VIEW DEFINITION too, whose catalog is not the owner's.
+        const asRestricted = createSqlServerRecords(restricted)
+        const restrictedBefore = described(await asRestricted.describe(ref(entry.table)))
 
-      // The batch passes on the table as it is.
-      const unchanged = writes(entry, published, await versionOf(entry.table), before.definition)
-      succeeded(await records.update(unchanged.update))
+        // The batch passes on the table as it is.
+        const unchanged = writes(entry, published, await versionOf(entry.table), before.definition)
+        succeeded(await records.update(unchanged.update))
 
-      const version = await versionOf(entry.table)
-      await batches(owner, entry.alter.sqlserver as readonly string[])
-      const altered = await held(entry.table)
-      const now = described(await records.describe(ref(entry.table)))
-      expect(now.definition !== before.definition, 'the definition moved').toBe(entry.moves)
-      expect(await records.read(read(entry.table))).toMatchObject({ ok: true, described: now })
-      // A definition that moved for the owner and not for an account that
-      // reads less of the catalog would let that account's write through the
-      // change; one that moved only for it would refuse it after harmless DDL.
-      // What it describes is what discovery as it reports.
-      const restrictedNow = described(await asRestricted.describe(ref(entry.table)))
-      expect(restrictedNow.definition !== restrictedBefore.definition, 'the definition moved for the account without VIEW DEFINITION').toBe(entry.moves)
-      const { definition: _restrictedDefinition, ...restrictedDescription } = restrictedNow
-      expect(restrictedDescription).toEqual(describedOf(await discoverSqlServer(restricted, SCOPE), ref(entry.table)))
+        const version = await versionOf(entry.table)
+        await batches(owner, entry.alter.sqlserver as readonly string[])
+        const altered = await held(entry.table)
+        const now = described(await records.describe(ref(entry.table)))
+        expect(now.definition !== before.definition, 'the definition moved').toBe(entry.moves)
+        expect(await records.read(read(entry.table))).toMatchObject({ ok: true, described: now })
+        // A definition that moved for the owner and not for an account that
+        // reads less of the catalog would let that account's write through the
+        // change; one that moved only for it would refuse it after harmless DDL.
+        // What it describes is what discovery as it reports.
+        const restrictedNow = described(await asRestricted.describe(ref(entry.table)))
+        expect(restrictedNow.definition !== restrictedBefore.definition, 'the definition moved for the account without VIEW DEFINITION').toBe(entry.moves)
+        const { definition: _restrictedDefinition, ...restrictedDescription } = restrictedNow
+        expect(restrictedDescription).toEqual(describedOf(await discoverSqlServer(restricted, SCOPE), ref(entry.table)))
 
-      if (entry.moves) {
-        // Decided over the old definition: refused, and rolled back.
-        const stale = writes(entry, published, version, before.definition)
-        expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
-        expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
-        // A delete at the row's own version too (0050): rolled back, the row as the ALTER left it.
-        expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
-        expect(await asRestricted.insert(writes(entry, published, version, restrictedBefore.definition).insert)).toMatchObject({ ok: false, code: 'schema-changed' })
-        expect(await held(entry.table)).toEqual(altered)
-      }
-      if (entry.name === 'masked-after-publication') {
-        // The limitation 0041 registers, held: the definition did not move, and
-        // the account without UNMASK reads the mask where the owner reads the
-        // value, so nothing the runtime asks tells it the form now shows, and
-        // would save back, something else.
-        const note = { name: 'note', type: column(published, entry.table, 'note').type }
-        const shown = await asRestricted.read({ ...read(entry.table), columns: [note] })
-        expect(shown).toMatchObject({ ok: true, record: { values: { note: 'xxxx' } } })
-        expect(await records.read({ ...read(entry.table), columns: [note] })).toMatchObject({ ok: true, record: { values: { note: 'seed' } } })
-        // A save that sends back every field it was shown, as a renderer does (0022), writes the mask over the value.
-        const version = (shown as { record: { version: string } }).record.version
-        succeeded(await asRestricted.update({ ...writes(entry, published, version, restrictedNow.definition).update, set: [{ ...note, value: 'xxxx' }] }))
-        expect(await records.read({ ...read(entry.table), columns: [note] })).toMatchObject({ ok: true, record: { values: { note: 'xxxx' } } })
-      }
-      if (entry.name === 'sequence-default') {
-        // The limitation 0026 registers, held: the owner reads a sequence's
-        // number, the account without VIEW DEFINITION an ordinary default it
-        // cannot see -- so review as that account calls the column loosened,
-        // and the runtime, reading the same catalog, allows its writes.
-        expect(now.columns.find((candidate) => candidate.name === 'quantity')).toMatchObject({ generated: 'identity-by-default', hasDefault: true })
-        expect(restrictedNow.columns.find((candidate) => candidate.name === 'quantity')).toMatchObject({ generated: 'none', hasDefault: true, defaultExpression: null })
-      }
-      // Decided over the table as it is now, they are what the column now does.
-      const after = await discoverSqlServer(owner, SCOPE)
-      const fresh = writes(entry, after, await versionOf(entry.table), now.definition)
-      expect(succeeded(await records.update(fresh.update)).values).toEqual({})
-      // A wall clock has no write path (0009): this adapter refuses to bind one, before the guard is asked.
-      if (!fresh.insert.values.some((given) => given.type.kind === 'timestamp' && !given.type.withTimeZone)) {
-        expect(succeeded(await records.insert(fresh.insert)).values).toEqual({ id: expect.any(String) })
-      }
-    })
+        if (entry.moves) {
+          // Decided over the old definition: refused, and rolled back.
+          const stale = writes(entry, published, version, before.definition)
+          expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+          // A delete at the row's own version too (0050): rolled back, the row as the ALTER left it.
+          expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await asRestricted.insert(writes(entry, published, version, restrictedBefore.definition).insert)).toMatchObject({
+            ok: false,
+            code: 'schema-changed',
+          })
+          expect(await held(entry.table)).toEqual(altered)
+        }
+        if (entry.name === 'masked-after-publication') {
+          // The limitation 0041 registers, held: the definition did not move, and
+          // the account without UNMASK reads the mask where the owner reads the
+          // value, so nothing the runtime asks tells it the form now shows, and
+          // would save back, something else.
+          const note = { name: 'note', type: column(published, entry.table, 'note').type }
+          const shown = await asRestricted.read({ ...read(entry.table), columns: [note] })
+          expect(shown).toMatchObject({ ok: true, record: { values: { note: 'xxxx' } } })
+          expect(await records.read({ ...read(entry.table), columns: [note] })).toMatchObject({ ok: true, record: { values: { note: 'seed' } } })
+          // A save that sends back every field it was shown, as a renderer does (0022), writes the mask over the value.
+          const version = (shown as { record: { version: string } }).record.version
+          succeeded(await asRestricted.update({ ...writes(entry, published, version, restrictedNow.definition).update, set: [{ ...note, value: 'xxxx' }] }))
+          expect(await records.read({ ...read(entry.table), columns: [note] })).toMatchObject({ ok: true, record: { values: { note: 'xxxx' } } })
+        }
+        if (entry.name === 'sequence-default') {
+          // The limitation 0026 registers, held: the owner reads a sequence's
+          // number, the account without VIEW DEFINITION an ordinary default it
+          // cannot see -- so review as that account calls the column loosened,
+          // and the runtime, reading the same catalog, allows its writes.
+          expect(now.columns.find((candidate) => candidate.name === 'quantity')).toMatchObject({ generated: 'identity-by-default', hasDefault: true })
+          expect(restrictedNow.columns.find((candidate) => candidate.name === 'quantity')).toMatchObject({
+            generated: 'none',
+            hasDefault: true,
+            defaultExpression: null,
+          })
+        }
+        // Decided over the table as it is now, they are what the column now does.
+        const after = await discoverSqlServer(owner, SCOPE)
+        const fresh = writes(entry, after, await versionOf(entry.table), now.definition)
+        expect(succeeded(await records.update(fresh.update)).values).toEqual({})
+        // A wall clock has no write path (0009): this adapter refuses to bind one, before the guard is asked.
+        if (!fresh.insert.values.some((given) => given.type.kind === 'timestamp' && !given.type.withTimeZone)) {
+          expect(succeeded(await records.insert(fresh.insert)).values).toEqual({ id: expect.any(String) })
+        }
+      },
+    )
   }
 })
 
@@ -270,11 +316,13 @@ describe('a trigger that ended the transaction of a write decided before a chang
   // that is still the batch's own.
   test('is unknown-outcome, never schema-changed, and what the trigger committed is stored', async () => {
     await owner.request().batch('create table drifting.ended_moved (id int not null constraint pk_ended_moved primary key, note nvarchar(20) null)')
-    await owner.request().batch(
-      'create trigger drifting.ended_moved_insert on drifting.ended_moved after insert as begin set nocount on; ' +
-        "declare @note nvarchar(20) = (select top (1) note from inserted); if @note = N'commit' commit transaction; " +
-        "else if @note = N'reopen' begin commit transaction; begin transaction; end; else if @note = N'raise' begin commit transaction; raiserror(N'a refusal of the customer''s own', 16, 1); end; end",
-    )
+    await owner
+      .request()
+      .batch(
+        'create trigger drifting.ended_moved_insert on drifting.ended_moved after insert as begin set nocount on; ' +
+          "declare @note nvarchar(20) = (select top (1) note from inserted); if @note = N'commit' commit transaction; " +
+          "else if @note = N'reopen' begin commit transaction; begin transaction; end; else if @note = N'raise' begin commit transaction; raiserror(N'a refusal of the customer''s own', 16, 1); end; end",
+      )
     const records = createSqlServerRecords(owner)
     const old = described(await records.describe(ref('ended_moved'))).definition
     await owner.request().batch('alter table drifting.ended_moved add extra int null')
@@ -315,34 +363,47 @@ describe('the description and discovery', () => {
   // the SHA-256 of the UTF-16 facts the description parsed would guard
   // something nobody read. As the owner, the reader and the writer -- whose
   // catalog SQL Server filters by permission -- over every table they see.
-  test('describe reads every fixture table as discovery does, and its digest is the SHA-256 of the facts it parsed', covers('sqlserver', MODEL_CASES.described), async () => {
-    for (const config of [fixture.admin, fixture.reader, fixture.writer]) {
-      const pool = await new mssql.ConnectionPool(config).connect()
-      try {
-        const records = createSqlServerRecords(pool)
-        for (const scope of [FIXTURE_SCOPE, PARITY_SCOPE]) {
-          const snapshot = await discoverSqlServer(pool, scope)
-          for (const object of snapshot.objects) {
-            const where = `${String(config.user)}: ${object.ref.schema}.${object.ref.name}`
-            const { definition, ...description } = described(await records.describe(object.ref))
-            expect(description, where).toEqual(describedOf(snapshot, object.ref))
-            const [row] = await run<{ facts: string; digest: Uint8Array }>(pool, describeStatement(object.ref))
-            expect(createHash('sha256').update(Buffer.from(row?.facts as string, 'utf16le')).digest('hex'), where).toBe(Buffer.from(row?.digest as Uint8Array).toString('hex'))
-            expect(definition, where).toBe(Buffer.from(row?.digest as Uint8Array).toString('hex'))
+  test(
+    'describe reads every fixture table as discovery does, and its digest is the SHA-256 of the facts it parsed',
+    covers('sqlserver', MODEL_CASES.described),
+    async () => {
+      for (const config of [fixture.admin, fixture.reader, fixture.writer]) {
+        const pool = await new mssql.ConnectionPool(config).connect()
+        try {
+          const records = createSqlServerRecords(pool)
+          for (const scope of [FIXTURE_SCOPE, PARITY_SCOPE]) {
+            const snapshot = await discoverSqlServer(pool, scope)
+            for (const object of snapshot.objects) {
+              const where = `${String(config.user)}: ${object.ref.schema}.${object.ref.name}`
+              const { definition, ...description } = described(await records.describe(object.ref))
+              expect(description, where).toEqual(describedOf(snapshot, object.ref))
+              const [row] = await run<{ facts: string; digest: Uint8Array }>(pool, describeStatement(object.ref))
+              expect(
+                createHash('sha256')
+                  .update(Buffer.from(row?.facts as string, 'utf16le'))
+                  .digest('hex'),
+                where,
+              ).toBe(Buffer.from(row?.digest as Uint8Array).toString('hex'))
+              expect(definition, where).toBe(Buffer.from(row?.digest as Uint8Array).toString('hex'))
+            }
           }
+        } finally {
+          await pool.close()
         }
-      } finally {
-        await pool.close()
       }
-    }
-  })
+    },
+  )
 
   // The text a client receives is cut to TEXTSIZE, and HASHBYTES hashes it
   // whole: decided over the cut text, the description would be guessed.
   test('a description cut by the connection’s TEXTSIZE is unavailable, never parsed', async () => {
-    const pool = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, textsize: 64 } as mssql.config['options'] }).connect()
+    const pool = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, textsize: 64 } }).connect()
     try {
-      expect(await createSqlServerRecords(pool).describe({ schema: 'sales', name: 'order' })).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringMatching(/TEXTSIZE/) })
+      expect(await createSqlServerRecords(pool).describe({ schema: 'sales', name: 'order' })).toMatchObject({
+        ok: false,
+        code: 'unavailable',
+        message: expect.stringMatching(/TEXTSIZE/),
+      })
     } finally {
       await pool.close()
     }
@@ -351,7 +412,9 @@ describe('the description and discovery', () => {
 
 /** Sessions of this database waiting for a lock, by any holder. */
 async function lockWaiters(): Promise<number> {
-  const result = await owner.request().query<{ n: number }>("select count(*) as n from sys.dm_exec_requests where database_id = db_id() and wait_type like 'LCK[_]%'")
+  const result = await owner
+    .request()
+    .query<{ n: number }>("select count(*) as n from sys.dm_exec_requests where database_id = db_id() and wait_type like 'LCK[_]%'")
   return result.recordset[0]?.n ?? 0
 }
 
@@ -382,8 +445,26 @@ describe('an ALTER that commits while a request waits for it', () => {
       await transaction.begin()
       await batches(transaction, entry.alter.sqlserver as readonly string[])
       const { target: table, columns, filters } = read(entry.table)
-      const list = { target: table, columns, filters, through: [], equal: [], filter: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], after: null, offset: 0, limit: 50 } as const
-      const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read(entry.table)), records.list(list), records.delete(stale.removal)] as const
+      const list = {
+        target: table,
+        columns,
+        filters,
+        through: [],
+        equal: [],
+        filter: [],
+        search: null,
+        sort: [{ column: 'id', direction: 'asc', nulls: null }],
+        after: null,
+        offset: 0,
+        limit: 50,
+      } as const
+      const pending = [
+        records.insert(stale.insert),
+        records.update(stale.update),
+        records.read(read(entry.table)),
+        records.list(list),
+        records.delete(stale.removal),
+      ] as const
       await waiting(5)
       await transaction.commit()
       const [inserted, updated, reread, relisted, deleted] = await Promise.all(pending)
@@ -405,23 +486,31 @@ describe('an ALTER that commits while a request waits for it', () => {
   // deadlock victim and rolled back. Never a row stored under the new one.
   test('a write holding its lock while an ALTER queues is committed before it, or rolled back; never written after it', async () => {
     const entry = await copyOf('narrowed-decimal', 'narrowed_decimal_queued')
-    await owner.request().batch("create trigger drifting.slow on drifting.narrowed_decimal_queued after update as begin set nocount on; waitfor delay '00:00:01'; end")
+    await owner
+      .request()
+      .batch("create trigger drifting.slow on drifting.narrowed_decimal_queued after update as begin set nocount on; waitfor delay '00:00:01'; end")
     const snapshot = await discoverSqlServer(owner, SCOPE)
     const records = createSqlServerRecords(owner)
     const old = described(await records.describe(ref(entry.table))).definition
     const update = { ...writes(entry, snapshot, await versionOf(entry.table), old).update, set: [value(snapshot, entry.table, 'amount', '1234.5678')] }
     const writing = records.update(update)
     for (let attempt = 0; attempt < 200; attempt += 1) {
-      const result = await owner.request().query<{ n: number }>("select count(*) as n from sys.dm_exec_requests where database_id = db_id() and wait_type = 'WAITFOR'")
+      const result = await owner
+        .request()
+        .query<{ n: number }>("select count(*) as n from sys.dm_exec_requests where database_id = db_id() and wait_type = 'WAITFOR'")
       if ((result.recordset[0]?.n ?? 0) > 0) break
       await new Promise((resolve) => setTimeout(resolve, 25))
     }
     const altering = batches(owner, entry.alter.sqlserver as readonly string[]).then(
       () => 'altered' as const,
-      (error: { number?: number }) => (error.number === 1205 ? ('victim' as const) : Promise.reject(error)),
+      (error: { number?: number }) => {
+        if (error.number === 1205) return 'victim' as const
+        throw error
+      },
     )
     const [written, alter] = await Promise.all([writing, altering])
-    const amount = (await owner.request().query<{ amount: string }>(`select convert(nvarchar(40), amount) as amount from drifting.${entry.table} where id = 1`)).recordset[0]?.amount
+    const amount = (await owner.request().query<{ amount: string }>(`select convert(nvarchar(40), amount) as amount from drifting.${entry.table} where id = 1`))
+      .recordset[0]?.amount
     if (written.ok) {
       // Written first, under the old definition. A narrowing that ran after it
       // rounded what was stored, as it rounds every row; one chosen as the

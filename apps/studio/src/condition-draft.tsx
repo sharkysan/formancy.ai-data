@@ -13,7 +13,13 @@ import { sayValue } from './related.js'
  */
 
 /** What the Condition select calls each operator. */
-export const OPS: Readonly<Record<FilterOp, string>> = { equals: 'equals', range: 'is in a range', contains: 'contains', null: 'is NULL', 'not-null': 'is not NULL' }
+export const OPS: Readonly<Record<FilterOp, string>> = {
+  equals: 'equals',
+  range: 'is in a range',
+  contains: 'contains',
+  null: 'is NULL',
+  'not-null': 'is not NULL',
+}
 
 /** What has been typed or chosen for one condition's values, and not yet sent. An operator of `null` is the first one offered. */
 export interface ValueDraft {
@@ -89,7 +95,8 @@ export function hintOf(subject: string, offer: FilterOffer, op: FilterOp): strin
   const either = 'Either may be left empty.'
   const span = 'from the start of the day From names to the end of the day To names.'
   if (op === 'range' && offer.days === 'utc') return `${subject} is filtered by whole days in UTC: ${span} ${either}`
-  if (op === 'range' && offer.days === 'wall') return `${subject} holds no time zone, so it is filtered by whole days as its values are written: ${span} ${either}`
+  if (op === 'range' && offer.days === 'wall')
+    return `${subject} holds no time zone, so it is filtered by whole days as its values are written: ${span} ${either}`
   if (op === 'range') return 'From and To are both included, and either may be left empty.'
   if (op === 'contains') return 'Found anywhere in the value, as the search finds it.'
   if (offer.input === 'text' && op === 'equals') return 'The whole value, exactly: case and spaces count.'
@@ -98,7 +105,21 @@ export function hintOf(subject: string, offer: FilterOffer, op: FilterOp): strin
 }
 
 /** One box, typed as its input asks: a day as a date, anything else as text, a boolean chosen. */
-function Box({ id, label, input, value, hint, onChange }: { id: string; label: string; input: FilterInput | null; value: string; hint: string | null; onChange: (value: string) => void }): ReactElement {
+function Box({
+  id,
+  label,
+  input,
+  value,
+  hint,
+  onChange,
+}: {
+  id: string
+  label: string
+  input: FilterInput | null
+  value: string
+  hint: string | null
+  onChange: (value: string) => void
+}): ReactElement {
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
@@ -108,7 +129,15 @@ function Box({ id, label, input, value, hint, onChange }: { id: string; label: s
           <option value="false">false</option>
         </select>
       ) : (
-        <input id={id} type={input === 'date' ? 'date' : 'text'} value={value} autoComplete="off" spellCheck={false} aria-describedby={hint ?? undefined} onChange={(event) => onChange(event.target.value)} />
+        <input
+          id={id}
+          type={input === 'date' ? 'date' : 'text'}
+          value={value}
+          autoComplete="off"
+          spellCheck={false}
+          aria-describedby={hint ?? undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
       )}
     </div>
   )
@@ -138,7 +167,14 @@ export function ConditionValues({
   return (
     <>
       {op === 'equals' || op === 'contains' ? (
-        <Box id={`${prefix}-value`} label={op === 'equals' ? 'Value' : 'Text'} input={op === 'contains' ? 'text' : input} value={draft.value} hint={described} onChange={(value) => onChange({ ...draft, value })} />
+        <Box
+          id={`${prefix}-value`}
+          label={op === 'equals' ? 'Value' : 'Text'}
+          input={op === 'contains' ? 'text' : input}
+          value={draft.value}
+          hint={described}
+          onChange={(value) => onChange({ ...draft, value })}
+        />
       ) : null}
       {op === 'range' ? (
         <div className="pair">

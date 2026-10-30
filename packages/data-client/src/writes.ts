@@ -61,7 +61,14 @@ const LOST_ON_THE_WAY = 'The answer to this save was lost between this page and 
 const DELETION_LOST_ON_THE_WAY = 'The answer to this deletion was lost between this page and the data server. It may have been deleted.'
 
 function lost(intent: WriteIntent, status: number): UnknownWrite {
-  return { ok: false, status, code: 'unknown-outcome', message: intent.operation === 'delete' ? DELETION_LOST_ON_THE_WAY : LOST_ON_THE_WAY, ...intent, origin: 'transport' }
+  return {
+    ok: false,
+    status,
+    code: 'unknown-outcome',
+    message: intent.operation === 'delete' ? DELETION_LOST_ON_THE_WAY : LOST_ON_THE_WAY,
+    ...intent,
+    origin: 'transport',
+  }
 }
 
 /**

@@ -93,7 +93,9 @@ export function PresentationStep({
   /** The sections a field may move between: each top-level one holding one grid, by its index and current label (0075). */
   const sections = (layout?.nodes ?? []).flatMap((node, index) => {
     const grid = node.kind === 'section' && node.children.length === 1 ? node.children[0] : undefined
-    return node.kind === 'section' && typeof node.label === 'string' && grid?.kind === 'table' ? [{ index, name: node.label, length: grid.children.length }] : []
+    return node.kind === 'section' && typeof node.label === 'string' && grid?.kind === 'table'
+      ? [{ index, name: node.label, length: grid.children.length }]
+      : []
   })
 
   function report(outcome: CommandOutcome, done: string): CommandOutcome {
@@ -123,7 +125,10 @@ export function PresentationStep({
     const home = path.length === 3 && path[1] === 0 && sections.some((section) => section.index === path[0]) ? path[0] : undefined
     const elsewhere = home === undefined ? [] : sections.filter((section) => section.index !== home)
     const moveTo = (target: { index: number; name: string; length: number }) => {
-      const outcome = report(session.moveLayoutNode(address, { layout: address.layout, parent: [target.index, 0], index: target.length }), `Moved ${label} to ${target.name}.`)
+      const outcome = report(
+        session.moveLayoutNode(address, { layout: address.layout, parent: [target.index, 0], index: target.length }),
+        `Moved ${label} to ${target.name}.`,
+      )
       if (outcome.ok) focusAfter(`${id}-to-${String(home)}`)
     }
     return (
@@ -132,7 +137,7 @@ export function PresentationStep({
           id={`${id}-label`}
           label={
             <>
-              Label{' '}<span className="visually-hidden">of {key}</span>
+              Label <span className="visually-hidden">of {key}</span>
             </>
           }
           value={label}
@@ -143,14 +148,21 @@ export function PresentationStep({
         </p>
         <div className="actions">
           <button type="button" id={`${id}-up`} className="button" disabled={at === 0} onClick={() => move(-1)}>
-            Move up{' '}<span className="visually-hidden">{label}</span>
+            Move up <span className="visually-hidden">{label}</span>
           </button>
           <button type="button" id={`${id}-down`} className="button" disabled={at === siblings - 1} onClick={() => move(1)}>
-            Move down{' '}<span className="visually-hidden">{label}</span>
+            Move down <span className="visually-hidden">{label}</span>
           </button>
           {elsewhere.map((target) => (
-            <button key={target.index} type="button" id={`${id}-to-${String(target.index)}`} className="button" disabled={siblings === 1} onClick={() => moveTo(target)}>
-              Move to {target.name}{' '}<span className="visually-hidden">{label}</span>
+            <button
+              key={target.index}
+              type="button"
+              id={`${id}-to-${String(target.index)}`}
+              className="button"
+              disabled={siblings === 1}
+              onClick={() => moveTo(target)}
+            >
+              Move to {target.name} <span className="visually-hidden">{label}</span>
             </button>
           ))}
           {inTable ? (
@@ -167,7 +179,7 @@ export function PresentationStep({
                 }
               />
               <label htmlFor={`${id}-span`}>
-                Full width{' '}<span className="visually-hidden">for {label}</span>
+                Full width <span className="visually-hidden">for {label}</span>
               </label>
             </span>
           ) : null}
@@ -180,7 +192,9 @@ export function PresentationStep({
     const fields = list.flatMap((node, index) => (node.kind === 'field' ? [{ node, index }] : []))
     return (
       <>
-        {fields.length === 0 ? null : <ol className="placements">{fields.map(({ node, index }) => fieldNode(node, [...parent, index], list.length, inTable))}</ol>}
+        {fields.length === 0 ? null : (
+          <ol className="placements">{fields.map(({ node, index }) => fieldNode(node, [...parent, index], list.length, inTable))}</ol>
+        )}
         {list.map((node, index) => (node.kind === 'field' || !isLayoutContainer(node) ? null : container(node, [...parent, index])))}
       </>
     )
@@ -206,7 +220,7 @@ export function PresentationStep({
           id={`${id}-label`}
           label={
             <>
-              Section label{' '}<span className="visually-hidden">of {name}</span>
+              Section label <span className="visually-hidden">of {name}</span>
             </>
           }
           value={name}
@@ -220,8 +234,8 @@ export function PresentationStep({
   return (
     <>
       <p className="lede">
-        What a person filling the form reads, in what order and in which section. Each field is a column the bindings name, so
-        nothing here adds, removes or renames one: that is the generator&rsquo;s, from the table.
+        What a person filling the form reads, in what order and in which section. Each field is a column the bindings name, so nothing here adds, removes or
+        renames one: that is the generator&rsquo;s, from the table.
       </p>
       {carried === null ? null : <CarriedPanel session={session} carried={carried} report={report} />}
       <div className="toolbar">

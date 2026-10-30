@@ -47,12 +47,22 @@ const INVALID = 'The bundle cannot be published.'
  * `unknown` is the sentence for a connection the allowlist does not know:
  * the import says why a name has to match across deployments.
  */
-export function storable(document: unknown, id: string, allowlisted: (connection: string) => boolean, unknown: (connection: string) => string = (connection) => `No connection is called ${connection}.`): Storable {
+export function storable(
+  document: unknown,
+  id: string,
+  allowlisted: (connection: string) => boolean,
+  unknown: (connection: string) => string = (connection) => `No connection is called ${connection}.`,
+): Storable {
   const checked = validateBundle(document)
   if (!checked.ok) return { ok: false, refusal: { status: 422, code: 'invalid-bundle', message: INVALID, extra: { problems: checked.problems } } }
   const bundle = checked.bundle
-  const refused = (message: string, extra?: Record<string, unknown>): Storable => ({ ok: false, refusal: { status: 422, code: 'invalid-bundle', message, ...(extra === undefined ? {} : { extra }) }, connection: bundle.connection })
-  if (bundle.format === 1) return refused(INVALID, { problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
+  const refused = (message: string, extra?: Record<string, unknown>): Storable => ({
+    ok: false,
+    refusal: { status: 422, code: 'invalid-bundle', message, ...(extra === undefined ? {} : { extra }) },
+    connection: bundle.connection,
+  })
+  if (bundle.format === 1)
+    return refused(INVALID, { problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
   if (bundle.form.id !== id) return refused(`The form's id is ${bundle.form.id}, not ${id}.`)
   if (!allowlisted(bundle.connection)) return refused(unknown(bundle.connection))
   const generated = generatedProblems(bundle)
@@ -72,7 +82,14 @@ export function storable(document: unknown, id: string, allowlisted: (connection
  * effect -- and publishing over it is how it is replaced. Any other
  * failure to read the base throws: a check that cannot answer refuses.
  */
-export async function unconfirmedAgainst(store: ConfigurationStore, id: string, expectedBase: number | null, bundle: { bindings: FormBindings; policy: FormPolicy }, confirmed: readonly ReassignedKey[], log: FastifyBaseLogger): Promise<ReassignedKey[]> {
+export async function unconfirmedAgainst(
+  store: ConfigurationStore,
+  id: string,
+  expectedBase: number | null,
+  bundle: { bindings: FormBindings; policy: FormPolicy },
+  confirmed: readonly ReassignedKey[],
+  log: FastifyBaseLogger,
+): Promise<ReassignedKey[]> {
   if (expectedBase === null || expectedBase < 1) return []
   let replaced: Awaited<ReturnType<typeof loadVersion>>
   try {
@@ -96,7 +113,14 @@ export function conflictOver(current: number | null): Refusal {
  * version somebody has replaced, the keys may say something else, so the
  * conflict is the answer then.
  */
-export async function keysRefusal(store: ConfigurationStore, id: string, expectedBase: number | null, bundle: { bindings: FormBindings; policy: FormPolicy }, confirmed: readonly ReassignedKey[], log: FastifyBaseLogger): Promise<Refusal | undefined> {
+export async function keysRefusal(
+  store: ConfigurationStore,
+  id: string,
+  expectedBase: number | null,
+  bundle: { bindings: FormBindings; policy: FormPolicy },
+  confirmed: readonly ReassignedKey[],
+  log: FastifyBaseLogger,
+): Promise<Refusal | undefined> {
   const keys = await unconfirmedAgainst(store, id, expectedBase, bundle, confirmed, log)
   if (keys.length === 0) return undefined
   const current = await store.latest(id)

@@ -77,7 +77,17 @@ describe('the fields a panel offers', () => {
     const drawnAsText = { ...definition.form.model.fields.find((given) => given.key === 'shipped_at'), type: 'text' }
     const redrawn = { ...definition, form: { ...definition.form, model: { fields: [drawnAsText] } } } as unknown as PublishedForm
     expect(panelFields(redrawn).find((offered) => offered.field === 'shipped_at')?.days).toBe('utc')
-    expect(panelFields({ ...definition, list: null } as PublishedForm)).toEqual([])
+    expect(panelFields({ ...definition, list: null })).toEqual([])
+  })
+
+  // A label may be `{ $t }`, which the page cannot resolve (0079): the panel
+  // offers the field by its key, never as "[object Object]".
+  test('offer a field whose label is a message reference by its key', () => {
+    const referenced = {
+      ...definition,
+      form: { ...definition.form, model: { fields: [{ key: 'carrier', type: 'text', label: { $t: 'shipment.carrier' } }] } },
+    } as unknown as PublishedForm
+    expect(panelFields(referenced).find((offered) => offered.field === 'carrier')?.label).toBe('carrier')
   })
 })
 
@@ -91,8 +101,14 @@ describe('the condition a draft asks for', () => {
     expect(conditionOf(draft('carrier', { value: ' Post ' }))).toEqual({ ok: true, term: { field: 'carrier', op: 'equals', value: ' Post ' } })
     expect(conditionOf(draft('carrier', { value: '', op: 'equals' }))).toEqual({ ok: true, term: { field: 'carrier', op: 'equals', value: '' } })
     expect(conditionOf(draft('notes', { op: 'contains', value: 'zug' }))).toEqual({ ok: true, term: { field: 'notes', op: 'contains', text: 'zug' } })
-    expect(conditionOf(draft('parcels', { op: 'range', from: ' 2', to: '' }))).toEqual({ ok: true, term: { field: 'parcels', op: 'range', from: ' 2', to: null } })
-    expect(conditionOf(draft('shipped_at', { from: '', to: '2026-10-08' }))).toEqual({ ok: true, term: { field: 'shipped_at', op: 'range', from: null, to: '2026-10-08' } })
+    expect(conditionOf(draft('parcels', { op: 'range', from: ' 2', to: '' }))).toEqual({
+      ok: true,
+      term: { field: 'parcels', op: 'range', from: ' 2', to: null },
+    })
+    expect(conditionOf(draft('shipped_at', { from: '', to: '2026-10-08' }))).toEqual({
+      ok: true,
+      term: { field: 'shipped_at', op: 'range', from: null, to: '2026-10-08' },
+    })
     expect(conditionOf(draft('weight', { op: 'null' }))).toEqual({ ok: true, term: { field: 'weight', op: 'null' } })
     expect(conditionOf(draft('weight', { op: 'not-null', value: 'left over' }))).toEqual({ ok: true, term: { field: 'weight', op: 'not-null' } })
     expect(conditionOf(draftFor(field('insured')))).toEqual({ ok: true, term: { field: 'insured', op: 'equals', value: 'true' } })
@@ -147,8 +163,12 @@ describe('what a panel says', () => {
   // (watched failing with one hint for every range: an instant's days not
   // said to be UTC's).
   test('says what a range, contains and no value mean', () => {
-    expect(draftHint(draft('shipped_at', {}), field('shipped_at'))).toBe('Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.')
-    expect(draftHint(draft('dispatched_at', {}), field('dispatched_at'))).toBe('Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.')
+    expect(draftHint(draft('shipped_at', {}), field('shipped_at'))).toBe(
+      'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.',
+    )
+    expect(draftHint(draft('dispatched_at', {}), field('dispatched_at'))).toBe(
+      'Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.',
+    )
     expect(draftHint(draft('due', { op: 'range' }), field('due'))).toBe('From and To are included. Either may be left empty.')
     expect(draftHint(draft('notes', { op: 'contains' }), field('notes'))).toBe('Found anywhere in the field, as Search finds text.')
     expect(draftHint(draft('notes', { op: 'null' }), field('notes'))).toBe('Text of no characters is a value.')

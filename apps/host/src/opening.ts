@@ -31,9 +31,9 @@ export interface Opened {
 
 /** What a detail does around a read: once it opened -- with the record as read -- once the server refused it, and where the keyboard goes when the person keeps editing. */
 export interface ReadHandlers {
-  opened(opened: Opened, record: FormRecord): void
+  opened: (opened: Opened, record: FormRecord) => void
   refused(message: string, discarded: boolean): void
-  back(): void
+  back: () => void
 }
 
 export interface Opening {
@@ -45,7 +45,14 @@ export interface Opening {
    * record's copy of it (0107), or Change from a date's next version, which
    * `follows` names the version of (0115); the record itself otherwise.
    */
-  read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers, as?: (record: FormRecord) => FormRecord, follows?: (record: FormRecord) => SessionState['follows']): void
+  read(
+    request: LeaveRequest,
+    token: string,
+    discarded: boolean,
+    then: ReadHandlers,
+    as?: (record: FormRecord) => FormRecord,
+    follows?: (record: FormRecord) => SessionState['follows'],
+  ): void
   /** A request that replaces what the detail shows without a read -- New: an answer still out is dropped. */
   replaced(): void
   /** A save one of the panes answered: a record it created is the detail's, and `opened` says so once the other panes hold it. */

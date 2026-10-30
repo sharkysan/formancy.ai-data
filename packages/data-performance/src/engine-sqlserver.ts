@@ -28,7 +28,11 @@ export async function observeSqlServer(admin: mssql.config): Promise<Observer> {
       const settings: Record<string, string> = Object.fromEntries(configured.map((row) => [row.name, String(row.value)]))
       settings['database collation'] = server?.collation ?? ''
       settings['physical_memory_kb'] = String(server?.memory ?? '')
-      return { version: `${server?.version ?? ''} ${server?.edition ?? ''}${server?.level === null || server?.level === undefined ? '' : ` ${server.level}`}`, settings, text: null }
+      return {
+        version: `${server?.version ?? ''} ${server?.edition ?? ''}${server?.level === null || server?.level === undefined ? '' : ` ${server.level}`}`,
+        settings,
+        text: null,
+      }
     },
     async sizes() {
       const pages = await query<{ tbl: string; index_id: number; used: number }>(
@@ -38,10 +42,13 @@ export async function observeSqlServer(admin: mssql.config): Promise<Observer> {
       const files = await query<{ allocated: number; used: number }>(
         `select sum(convert(bigint, size)) as allocated, sum(convert(bigint, fileproperty(name, 'SpaceUsed'))) as used from sys.database_files`,
       )
-      const tenants = await query<{ tenant: number; n: number }>(`select tenant_id as tenant, count(*) as n from sales.customer group by tenant_id order by tenant_id`)
+      const tenants = await query<{ tenant: number; n: number }>(
+        `select tenant_id as tenant, count(*) as n from sales.customer group by tenant_id order by tenant_id`,
+      )
       const [orders] = await query<{ n: number }>(`select count(*) as n from sales.[order]`)
       // The heap or the clustered index is the table's data; every other index is an index.
-      const bytesOf = (table: string, data: boolean): number => pages.filter((row) => row.tbl === table && (row.index_id <= 1) === data).reduce((sum, row) => sum + row.used * PAGE, 0)
+      const bytesOf = (table: string, data: boolean): number =>
+        pages.filter((row) => row.tbl === table && row.index_id <= 1 === data).reduce((sum, row) => sum + row.used * PAGE, 0)
       const perTenant = Object.fromEntries(tenants.map((row) => [String(row.tenant), row.n]))
       return {
         customerRows: { total: Object.values(perTenant).reduce((sum, rows) => sum + rows, 0), perTenant },
@@ -54,7 +61,9 @@ export async function observeSqlServer(admin: mssql.config): Promise<Observer> {
     },
     async disturbance() {
       // The counter is cumulative since the server started, whatever "/sec" says.
-      const [recompiles] = await query<{ value: number }>(`select cntr_value as value from sys.dm_os_performance_counters where counter_name = 'SQL Re-Compilations/sec'`)
+      const [recompiles] = await query<{ value: number }>(
+        `select cntr_value as value from sys.dm_os_performance_counters where counter_name = 'SQL Re-Compilations/sec'`,
+      )
       // Every user table's statistics, not only the two the run writes: an
       // update on any of them is the engine's own work in the container.
       const stats = await query<{ name: string; updated: string | null }>(
@@ -71,7 +80,9 @@ export async function observeSqlServer(admin: mssql.config): Promise<Observer> {
       return { recompiles: Number(after['recompiles']) - Number(before['recompiles']), statisticsUpdated: updated }
     },
     async createdCustomers() {
-      const [row] = await query<{ n: number }>(`select count(*) as n from (select distinct tenant_id, customer_no from sales.[order] where notes = N'performance') as created`)
+      const [row] = await query<{ n: number }>(
+        `select count(*) as n from (select distinct tenant_id, customer_no from sales.[order] where notes = N'performance') as created`,
+      )
       return row?.n ?? 0
     },
     async writerSessions() {

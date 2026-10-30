@@ -132,14 +132,22 @@ beforeAll(async () => {
       tls: { enabled: false, trustServerCertificate: true },
     },
   ]
-  registry = createConnectionRegistry(connections, { postgres: recording(DRIVER_FACTORIES.postgres), sqlserver: recording(DRIVER_FACTORIES.sqlserver) }, {
-    env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
-    readFile: async () => '',
-  })
+  registry = createConnectionRegistry(
+    connections,
+    { postgres: recording(DRIVER_FACTORIES.postgres), sqlserver: recording(DRIVER_FACTORIES.sqlserver) },
+    {
+      env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
+      readFile: async () => '',
+    },
+  )
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-drift-'))
   const store = createFileConfigurationStore(root)
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: {} })
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   // A real socket and a plain HTTP client: what any host's backend would send.
   await app.listen({ host: '127.0.0.1', port: 0 })
   base = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
@@ -171,11 +179,18 @@ interface Held {
 }
 
 /** The owner's own connection, which changes the schema and reads the rows back. */
-async function owner(engine: Engine): Promise<{ run(statements: readonly string[]): Promise<void>; held(table: string): Promise<Held>; close(): Promise<void> }> {
+async function owner(
+  engine: Engine,
+): Promise<{ run(statements: readonly string[]): Promise<void>; held(table: string): Promise<Held>; close(): Promise<void> }> {
   if (engine === 'postgres') {
     const url = new URL(pg.admin)
     const sql = connectPostgres({
-      host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      tls: { enabled: false, rejectUnauthorized: false },
     })
     return {
       run: async (statements) => {
@@ -191,7 +206,13 @@ async function owner(engine: Engine): Promise<{ run(statements: readonly string[
     }
   }
   const pool = await connectSqlServer({
-    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
   })
   return {
     run: async (statements) => {
@@ -214,7 +235,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [],
     lookups: Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []])),
   }
@@ -253,7 +276,8 @@ interface Shown {
 /** What a case must show, from its verdicts. */
 function expected(entry: DriftingCase, verdict: DriftVerdict, after: Held): Shown {
   const runtime = runtimeOf(entry) as DriftVerdict
-  const write = (allowed: boolean, status: number): Sent => (allowed ? { status, reached: true, committed: true } : { status: 409, code: 'drift', reached: false, committed: false })
+  const write = (allowed: boolean, status: number): Sent =>
+    allowed ? { status, reached: true, committed: true } : { status: 409, code: 'drift', reached: false, committed: false }
   const operations = (['read', 'create', 'update', 'delete'] as const).filter((operation) => runtime[operation])
   return {
     review: verdict,
@@ -268,9 +292,9 @@ function expected(entry: DriftingCase, verdict: DriftVerdict, after: Held): Show
   }
 }
 
-describe.each([
-  { engine: 'PostgreSQL', kind: 'postgres' as Engine },
-  { engine: 'SQL Server', kind: 'sqlserver' as Engine },
+describe.each<{ engine: string; kind: Engine }>([
+  { engine: 'PostgreSQL', kind: 'postgres' },
+  { engine: 'SQL Server', kind: 'sqlserver' },
 ])('the runtime against a changed table, on $engine', ({ kind }) => {
   const connection = `${kind}-drifting`
   let ddl: Awaited<ReturnType<typeof owner>>
@@ -283,79 +307,102 @@ describe.each([
     await ddl?.close()
   })
 
-  test.each(driftingOn(kind).filter((entry) => entry.verdict !== null))('$name: the form does exactly what the runtime allows, and nothing it stops reaches the database', async (entry) => {
-    const formId = `${kind}-${entry.table.replaceAll('_', '-')}`
-    await ddl.run(entry.setUp[kind] as readonly string[])
+  test.each(driftingOn(kind).filter((entry) => entry.verdict !== null))(
+    '$name: the form does exactly what the runtime allows, and nothing it stops reaches the database',
+    async (entry) => {
+      const formId = `${kind}-${entry.table.replaceAll('_', '-')}`
+      await ddl.run(entry.setUp[kind] as readonly string[])
 
-    // Proposed and published as the studio would, with a policy that lets the clerk do everything.
-    const proposed = await call('POST', '/v1/form-proposals', admin, {
-      connection, root: { schema: 'drifting', name: entry.table }, formId, title: entry.table, lookups: entry.lookups ?? [], ...(kind === 'postgres' ? { versionColumn: 'row_version' } : {}),
-    })
-    expect(proposed.status, JSON.stringify(proposed.json)).toBe(200)
-    const proposal = proposed.json as Proposal
-    expect(proposal.bindings.operations).toEqual({ create: true, update: true, delete: true })
-    const policy = clerkPolicy(proposal.bindings.fields)
-    const bundle = { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
-    const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
-    expect(published.status, JSON.stringify(published.json)).toBe(201)
-
-    // Before: the clerk reads the record as the host would, and holds its version.
-    const before = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
-    expect(before.status, JSON.stringify(before.json)).toBe(200)
-
-    // The owner changes the table.
-    await ddl.run(entry.alter[kind] as readonly string[])
-    const after = await ddl.held(entry.table)
-
-    // Review, as diffSnapshots says it for the published bindings, and as the drift route reports it.
-    const latest = (await call('GET', `/v1/forms/${formId}/versions/latest`, admin)).json as { version: number; bundle: PublishedBundle }
-    const open = await registry.open(connection)
-    const scope = registry.scope(connection)
-    if (open === undefined || scope === undefined) throw new Error(`${connection} is not in the registry`)
-    const direct: DriftReport = diffSnapshots(latest.bundle.snapshot, await open.adapter.discover(scope), latest.bundle.bindings, latest.bundle.policy)
-    const routed = (await call('POST', `/v1/forms/${formId}/drift`, admin)).json as DriftReport & { version: number }
-    expect(routed).toMatchObject({ blocking: direct.blocking, writable: direct.writable, changes: direct.changes })
-
-    const form = await call('GET', `/v1/forms/${formId}`, clerk)
-    const read = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
-
-    let version = before.json.version as string
-    const send = async (path: string, body: unknown, status: number): Promise<Sent> => {
-      const writes = writesAsked(connection)
-      const prior = await ddl.held(entry.table)
-      const response = await call('POST', path, clerk, body)
-      const now = await ddl.held(entry.table)
-      if (response.status === 200) version = response.json.version as string
-      return {
-        status: response.status,
-        ...(response.status === status ? {} : { code: response.json?.code as string }),
-        reached: writesAsked(connection) > writes,
-        committed: now.row !== prior.row || now.rows !== prior.rows,
+      // Proposed and published as the studio would, with a policy that lets the clerk do everything.
+      const proposed = await call('POST', '/v1/form-proposals', admin, {
+        connection,
+        root: { schema: 'drifting', name: entry.table },
+        formId,
+        title: entry.table,
+        lookups: entry.lookups ?? [],
+        ...(kind === 'postgres' ? { versionColumn: 'row_version' } : {}),
+      })
+      expect(proposed.status, JSON.stringify(proposed.json)).toBe(200)
+      const proposal = proposed.json as Proposal
+      expect(proposal.bindings.operations).toEqual({ create: true, update: true, delete: true })
+      const policy = clerkPolicy(proposal.bindings.fields)
+      const bundle = {
+        format: 2,
+        connection,
+        generation: proposal.generation,
+        base: proposal.form,
+        presentation: EMPTY_PRESENTATION,
+        form: proposal.form,
+        bindings: proposal.bindings,
+        policy,
+        snapshot: proposal.snapshot,
       }
-    }
-    const updates: Sent[] = []
-    for (const answer of entry.updates) {
-      updates.push(await send(`/v1/forms/${formId}/records/update`, { record: 'k1:1', version, answers: { [answer.field]: answer.value } }, 200))
-    }
-    const create = await send(`/v1/forms/${formId}/records/create`, { answers: entry.insert }, 201)
-    const last = await ddl.held(entry.table)
-    // Last, at the version the clerk last held: answered exactly when the runtime allows delete (0050).
-    const removal = await send(`/v1/forms/${formId}/records/delete`, { record: 'k1:1', version }, 200)
-    const runtime = runtimeOf(entry) as DriftVerdict
+      const published = await call('POST', `/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle })
+      expect(published.status, JSON.stringify(published.json)).toBe(201)
 
-    const shown: Shown = {
-      review: { read: (routed as { readable?: boolean }).readable as boolean, create: routed.writable.create, update: routed.writable.update, delete: routed.writable.delete },
-      runtime: (routed as { runtime?: unknown }).runtime,
-      form: form.status === 200 ? { status: 200, operations: form.json.operations as string[] } : { status: form.status, code: form.json?.code as string },
-      read: read.status === 200 ? { status: 200 } : { status: read.status, code: read.json?.code as string },
-      updates,
-      create,
-      rowAsAltered: runtime.update ? null : last.row === after.row,
-      delete: removal,
-      rows: (await ddl.held(entry.table)).rows,
-    }
-    expect(shown).toEqual(expected(entry, entry.verdict as DriftVerdict, after))
-    // Review alone says what diffSnapshots says: the route adds nothing of its own.
-    expect({ read: (direct as { readable?: boolean }).readable, ...direct.writable }).toEqual(entry.verdict)
-  })
+      // Before: the clerk reads the record as the host would, and holds its version.
+      const before = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
+      expect(before.status, JSON.stringify(before.json)).toBe(200)
+
+      // The owner changes the table.
+      await ddl.run(entry.alter[kind] as readonly string[])
+      const after = await ddl.held(entry.table)
+
+      // Review, as diffSnapshots says it for the published bindings, and as the drift route reports it.
+      const latest = (await call('GET', `/v1/forms/${formId}/versions/latest`, admin)).json as { version: number; bundle: PublishedBundle }
+      const open = await registry.open(connection)
+      const scope = registry.scope(connection)
+      if (open === undefined || scope === undefined) throw new Error(`${connection} is not in the registry`)
+      const direct: DriftReport = diffSnapshots(latest.bundle.snapshot, await open.adapter.discover(scope), latest.bundle.bindings, latest.bundle.policy)
+      const routed = (await call('POST', `/v1/forms/${formId}/drift`, admin)).json as DriftReport & { version: number }
+      expect(routed).toMatchObject({ blocking: direct.blocking, writable: direct.writable, changes: direct.changes })
+
+      const form = await call('GET', `/v1/forms/${formId}`, clerk)
+      const read = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
+
+      let version = before.json.version as string
+      const send = async (path: string, body: unknown, status: number): Promise<Sent> => {
+        const writes = writesAsked(connection)
+        const prior = await ddl.held(entry.table)
+        const response = await call('POST', path, clerk, body)
+        const now = await ddl.held(entry.table)
+        if (response.status === 200) version = response.json.version as string
+        return {
+          status: response.status,
+          ...(response.status === status ? {} : { code: response.json?.code as string }),
+          reached: writesAsked(connection) > writes,
+          committed: now.row !== prior.row || now.rows !== prior.rows,
+        }
+      }
+      const updates: Sent[] = []
+      for (const answer of entry.updates) {
+        updates.push(await send(`/v1/forms/${formId}/records/update`, { record: 'k1:1', version, answers: { [answer.field]: answer.value } }, 200))
+      }
+      const create = await send(`/v1/forms/${formId}/records/create`, { answers: entry.insert }, 201)
+      const last = await ddl.held(entry.table)
+      // Last, at the version the clerk last held: answered exactly when the runtime allows delete (0050).
+      const removal = await send(`/v1/forms/${formId}/records/delete`, { record: 'k1:1', version }, 200)
+      const runtime = runtimeOf(entry) as DriftVerdict
+
+      const shown: Shown = {
+        review: {
+          read: (routed as { readable?: boolean }).readable as boolean,
+          create: routed.writable.create,
+          update: routed.writable.update,
+          delete: routed.writable.delete,
+        },
+        runtime: (routed as { runtime?: unknown }).runtime,
+        form: form.status === 200 ? { status: 200, operations: form.json.operations as string[] } : { status: form.status, code: form.json?.code as string },
+        read: read.status === 200 ? { status: 200 } : { status: read.status, code: read.json?.code as string },
+        updates,
+        create,
+        rowAsAltered: runtime.update ? null : last.row === after.row,
+        delete: removal,
+        rows: (await ddl.held(entry.table)).rows,
+      }
+      expect(shown).toEqual(expected(entry, entry.verdict as DriftVerdict, after))
+      // Review alone says what diffSnapshots says: the route adds nothing of its own.
+      expect({ read: (direct as { readable?: boolean }).readable, ...direct.writable }).toEqual(entry.verdict)
+    },
+  )
 })

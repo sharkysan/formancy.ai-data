@@ -26,7 +26,13 @@ const STORE_UNAVAILABLE = { code: 'store-unavailable', message: 'The forms canno
  * damaged file hide every form from everybody, and answer with what the
  * error said.
  */
-async function entry(store: ConfigurationStore, allowed: readonly string[], id: string, context: PolicyContext, log: FastifyBaseLogger): Promise<MenuForm | undefined> {
+async function entry(
+  store: ConfigurationStore,
+  allowed: readonly string[],
+  id: string,
+  context: PolicyContext,
+  log: FastifyBaseLogger,
+): Promise<MenuForm | undefined> {
   try {
     const loaded = await loadPublished(store, id, log)
     if (!loaded.ok) return undefined
@@ -35,7 +41,10 @@ async function entry(store: ConfigurationStore, allowed: readonly string[], id: 
       log.error({ form: id, connection: bundle.connection }, 'a published form names a connection the allowlist does not have, and is not served')
       return undefined
     }
-    return menuForm({ id, title: bundle.form.title, connection: bundle.connection, snapshot: bundle.snapshot, bindings: bundle.bindings, policy: bundle.policy }, context)
+    return menuForm(
+      { id, title: bundle.form.title, connection: bundle.connection, snapshot: bundle.snapshot, bindings: bundle.bindings, policy: bundle.policy },
+      context,
+    )
   } catch (error) {
     log.error({ form: id, error: (error as Error).message }, 'a published form cannot be read, and is not served')
     return undefined

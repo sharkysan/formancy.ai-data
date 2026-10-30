@@ -113,7 +113,12 @@ const counting: IdentityVerifier = async (token) => {
 }
 
 /** The allowlist knows `erp` and opens nothing. */
-const registry = (): ConnectionRegistry => ({ ids: () => ['erp'], scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined), open: async () => undefined, close: async () => {} })
+const registry = (): ConnectionRegistry => ({
+  ids: () => ['erp'],
+  scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
+  open: async () => undefined,
+  close: async () => {},
+})
 
 /** Both planes, as main.ts serves them, auditing into `events`; listening on a free loopback port. */
 async function listening(overrides: Partial<DataServerOptions> = {}): Promise<number> {
@@ -244,7 +249,13 @@ describe('every answer says no-store (0037)', () => {
     const port = await listening({ rateLimit: { max: 1, timeWindowMs: 60_000 } })
     const undecodable = await send(port, 'POST', '/v1/forms/%E0/versions', admin)
     const tooLong = await send(port, 'GET', `/v1/forms/e${'x'.repeat(128)}/versions/latest`, admin)
-    expect([undecodable, tooLong].map(({ status, headers, body }) => ({ status, cacheControl: headers['cache-control'], code: (JSON.parse(body) as { code: string }).code }))).toEqual([
+    expect(
+      [undecodable, tooLong].map(({ status, headers, body }) => ({
+        status,
+        cacheControl: headers['cache-control'],
+        code: (JSON.parse(body) as { code: string }).code,
+      })),
+    ).toEqual([
       { status: 400, cacheControl: undefined, code: 'FST_ERR_BAD_URL' },
       { status: 414, cacheControl: undefined, code: 'FST_ERR_MAX_PARAM_LENGTH' },
     ])

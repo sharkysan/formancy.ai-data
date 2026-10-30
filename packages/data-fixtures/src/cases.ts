@@ -169,10 +169,15 @@ export function covers(engine: DatabaseKind, ...cases: string[]): TestOptions {
   if (cases.length === 0) throw new Error('covers(): name at least one shared case, or leave covers() off')
   const known = new Set(sharedCases())
   const unknown = cases.filter((id) => !known.has(id))
-  if (unknown.length > 0) throw new Error(`covers(): ${unknown.map((id) => `"${id}"`).join(', ')} is not a shared case; derive the id from the shared data with filterCase(), displayCase() and the rest`)
+  if (unknown.length > 0)
+    throw new Error(
+      `covers(): ${unknown.map((id) => `"${id}"`).join(', ')} is not a shared case; derive the id from the shared data with filterCase(), displayCase() and the rest`,
+    )
   const outer = TestRunner.getCurrentSuite().options?.meta?.covers
   if (outer !== undefined) {
-    throw new Error(`covers(): this suite already declares ${outer.join(', ')}; vitest would replace it with ${cases.join(', ')} rather than add to it, so declare every case in one place`)
+    throw new Error(
+      `covers(): this suite already declares ${outer.join(', ')}; vitest would replace it with ${cases.join(', ')} rather than add to it, so declare every case in one place`,
+    )
   }
   return { meta: { engine, covers: [...cases] } }
 }

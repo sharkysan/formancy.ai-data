@@ -473,6 +473,20 @@ apart by a space set in proportional type; and the studio's preview loses a
 field's required marker where the renderer cannot fill its options, which
 is upstream's renderer and themes.
 
+**The lint and format rules are a copy** until this repository pins
+`@formancy/code-style`: [`code-style.mjs`](../../scripts/code-style/code-style.mjs)
+and [`code-style.test.mjs`](../../scripts/code-style/code-style.test.mjs)
+are Formancy Health's, byte for byte, which
+[`eslint.config.mjs`](../../eslint.config.mjs) and
+[`prettier.config.mjs`](../../prettier.config.mjs) call with this
+repository's paths, and nothing compares them with Health's or with the
+package, so a rule changed in one reaches the others by hand alone. The
+swap pins the package exactly as a root devDependency, deletes the copy,
+has the two config files import the package, and extends
+[`upstream-deps.mjs`](../../scripts/upstream-deps.mjs) to the root
+manifest, which holds no `@formancy/*` dependency until then
+([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+
 The README's *Status* paragraph names what is not there yet: figures for a
 page of records, the menu of forms and a delete; a host page on another
 origin run in a browser; a run through a real Cloudflare tunnel; anything
@@ -587,6 +601,18 @@ split across runners, which is the next step when that is not enough.
 
 **A merged branch is deleted by a repository setting** that nothing here
 reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
+
+**The format is remembered by commit.** `.git-blame-ignore-revs` names the
+commits that formatted the code by their SHAs, so the pull request that
+brings them merges with a merge commit, which the repository allows
+beside a squash and a rebase and nothing makes it choose. A branch begun
+before the format conflicts with it;
+`node "$MAIN/scripts/prettier-merge.mjs" origin/main`, in the branch's
+worktree, `$MAIN` a checkout of main at least as new as the `origin/main`
+it merges with `pnpm install` run there, merges main into it with each
+side formatted first. What both sides changed, and code main moved to
+another file, are still the branch's to carry across by hand
+([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 **The 0.1.0 release notes are a summary written by hand**; why each change
 before it was made is in `CHANGELOG.md`, and nothing checks that the summary

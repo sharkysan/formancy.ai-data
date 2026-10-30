@@ -64,7 +64,7 @@ function sectionShapeProblems(entry: unknown, at: string, seen: Set<string>): st
     if (!Array.isArray(order) || !order.every((key) => typeof key === 'string')) problems.push(`${at}/order must be field keys`)
     else {
       const keys = new Set<string>()
-      for (const key of order as string[]) {
+      for (const key of order) {
         if (keys.has(key)) problems.push(`${at}/order: ${key} appears twice`)
         keys.add(key)
       }
@@ -168,7 +168,8 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
     }
     if (entry.section !== undefined) {
       const target = layout.sections.findIndex((section) => same(section.anchor, entry.section))
-      if (target < 0) problems.push(`${at}/section: the base has no section labelled "${entry.section.label}" at occurrence ${String(entry.section.occurrence)}`)
+      if (target < 0)
+        problems.push(`${at}/section: the base has no section labelled "${entry.section.label}" at occurrence ${String(entry.section.occurrence)}`)
       else if (target === homeOf(layout.sections, entry.field)) problems.push(`${at}/section: equals the base's; leave it out`)
       else moves.set(entry.field, { to: target, at })
     }

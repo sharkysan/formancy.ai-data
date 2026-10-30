@@ -13,7 +13,16 @@ import { col, DELETING, drift, gap, INT32, INT64, kinds, object, only, ORDER, OR
 const COPY = { schema: 'audit', name: 'order_copy' }
 
 function key(onDelete: InboundKey['onDelete'], extra: Partial<InboundKey> = {}): InboundKey {
-  return { table: COPY, name: 'fk_order_copy_order', columns: ['order_id'], referencedColumns: ['id'], onDelete, onUpdate: 'no-action', enforced: true, ...extra }
+  return {
+    table: COPY,
+    name: 'fk_order_copy_order',
+    columns: ['order_id'],
+    referencedColumns: ['id'],
+    onDelete,
+    onUpdate: 'no-action',
+    enforced: true,
+    ...extra,
+  }
 }
 
 /** The order referred to by exactly `keys` from outside the snapshot, beside what the fixture's own keys derive. */
@@ -49,8 +58,17 @@ describe('diffSnapshots: what refers to the root', () => {
   // enabled again acts without anything here noticing. So a change to it is
   // still one a delete would act through.
   test('an acting key whose enforcement changed is still one a delete acts through', () => {
-    const report = drift(referredBy(key('cascade', { enforced: false })), { facts: true, policy: DELETING }, ORDER, recorded(key('no-action', { enforced: true })))
-    expect(only(report)).toMatchObject({ kind: 'referrer-changed', severity: 'blocking', message: expect.stringMatching(/enforcement from enforced to not enforced/) })
+    const report = drift(
+      referredBy(key('cascade', { enforced: false })),
+      { facts: true, policy: DELETING },
+      ORDER,
+      recorded(key('no-action', { enforced: true })),
+    )
+    expect(only(report)).toMatchObject({
+      kind: 'referrer-changed',
+      severity: 'blocking',
+      message: expect.stringMatching(/enforcement from enforced to not enforced/),
+    })
   })
 
   // Gone, a key does nothing a delete could reach; out of sight behind a
@@ -70,7 +88,11 @@ describe('diffSnapshots: what refers to the root', () => {
   // a base that did, delete rests on facts no longer there.
   test('a current snapshot without the facts its base had stops delete', () => {
     const report = drift(undefined, { policy: DELETING }, ORDER, recorded())
-    expect(only(report)).toMatchObject({ kind: 'access-narrowed', severity: 'blocking', subject: { kind: 'object', object: { schema: 'sales', name: 'order' } } })
+    expect(only(report)).toMatchObject({
+      kind: 'access-narrowed',
+      severity: 'blocking',
+      subject: { kind: 'object', object: { schema: 'sales', name: 'order' } },
+    })
     expect(report.writable.delete).toBe(false)
   })
 })
@@ -95,7 +117,17 @@ function lined(onDelete: InboundKey['onDelete'] = 'cascade', ...onLines: Inbound
       table('order_line', [col('order_id', 'bigint', INT64), col('line_no', 'int', INT32), col('memo_id', 'int', INT32, { nullable: true })], {
         primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] },
         uniqueKeys: [{ name: 'uq_order_line_memo', columns: ['memo_id'] }],
-        foreignKeys: [{ name: 'fk_order_line_order', columns: ['order_id'], references: { table: ORDER_REF, columns: ['id'] }, onDelete, onUpdate: 'no-action', enforced: true, validated: true }],
+        foreignKeys: [
+          {
+            name: 'fk_order_line_order',
+            columns: ['order_id'],
+            references: { table: ORDER_REF, columns: ['id'] },
+            onDelete,
+            onUpdate: 'no-action',
+            enforced: true,
+            validated: true,
+          },
+        ],
       }),
     )
     if (onLines.length > 0) object(objects, 'order_line').referencedBy = onLines
@@ -126,7 +158,9 @@ describe('diffSnapshots: what refers to the tables a delete reaches', () => {
       kind: 'referrer-added',
       severity: 'blocking',
       subject: { kind: 'foreign-key', object: COPY, name: 'fk_line_copy_line' },
-      message: expect.stringMatching(/refers to sales\.order_line, which a delete of sales\.order reaches\. Deleting a record of sales\.order also deletes rows of audit\.order_copy/),
+      message: expect.stringMatching(
+        /refers to sales\.order_line, which a delete of sales\.order reaches\. Deleting a record of sales\.order also deletes rows of audit\.order_copy/,
+      ),
     })
     expect(cascading.writable.delete).toBe(false)
     const refusing = drift(lined('cascade', onLines('no-action')), { facts: true, policy: ACCEPTING }, ORDER, base)
@@ -141,14 +175,18 @@ describe('diffSnapshots: what refers to the tables a delete reaches', () => {
     const base = snapshot(lined(), { facts: true })
     expect(drift(lined(), { facts: true, policy: ACCEPTING }, ORDER, base).changes).toEqual([])
     const changed = drift(lined('set-null'), { facts: true, policy: ACCEPTING }, ORDER, base)
-    expect(only(changed)).toMatchObject({ kind: 'referrer-changed', severity: 'blocking', message: expect.stringMatching(/on delete from cascade to set-null/) })
+    expect(only(changed)).toMatchObject({
+      kind: 'referrer-changed',
+      severity: 'blocking',
+      message: expect.stringMatching(/on delete from cascade to set-null/),
+    })
   })
 
   // The adapters hold a delete to the account's DELETE on every table it
   // reaches: PostgreSQL's statement and SQL Server's batch each ask it.
   // Review stops it first, as it does for the root (watched failing with
   // the root's grant alone compared).
-  test("DELETE revoked on a table the delete reaches stops delete", () => {
+  test('DELETE revoked on a table the delete reaches stops delete', () => {
     const base = snapshot(lined(), { facts: true })
     const revoked = drift(
       (objects) => {
@@ -159,7 +197,12 @@ describe('diffSnapshots: what refers to the tables a delete reaches', () => {
       ORDER,
       base,
     )
-    expect(only(revoked)).toMatchObject({ kind: 'privilege-narrowed', severity: 'blocking', subject: { kind: 'object', object: LINES }, message: expect.stringMatching(/may no longer DELETE from sales\.order_line, which a delete of sales\.order reaches/) })
+    expect(only(revoked)).toMatchObject({
+      kind: 'privilege-narrowed',
+      severity: 'blocking',
+      subject: { kind: 'object', object: LINES },
+      message: expect.stringMatching(/may no longer DELETE from sales\.order_line, which a delete of sales\.order reaches/),
+    })
     expect(revoked.writable.delete).toBe(false)
   })
 
@@ -206,7 +249,11 @@ describe('diffSnapshots: what refers to the tables a delete reaches', () => {
       ORDER,
       snapshot(memo, { facts: true }),
     )
-    expect(only(refusing)).toMatchObject({ kind: 'referrer-added', severity: 'review', message: expect.stringMatching(/On update it takes no action: the database refuses to clear memo_id while rows of audit\.order_copy refer to them\./) })
+    expect(only(refusing)).toMatchObject({
+      kind: 'referrer-added',
+      severity: 'review',
+      message: expect.stringMatching(/On update it takes no action: the database refuses to clear memo_id while rows of audit\.order_copy refer to them\./),
+    })
     expect(refusing.writable.delete).toBe(true)
   })
 })

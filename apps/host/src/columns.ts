@@ -99,10 +99,15 @@ const only = (value: Record<string, unknown>, keys: readonly string[]): boolean 
 
 const distinct = (fields: readonly string[]): boolean => new Set(fields).size === fields.length
 
-const isChoice = (value: unknown): value is ColumnChoice => isRecord(value) && only(value, ['field', 'shown']) && typeof value['field'] === 'string' && value['field'] !== '' && typeof value['shown'] === 'boolean'
+const isChoice = (value: unknown): value is ColumnChoice =>
+  isRecord(value) && only(value, ['field', 'shown']) && typeof value['field'] === 'string' && value['field'] !== '' && typeof value['shown'] === 'boolean'
 
 const isSortTerm = (value: unknown): value is ListSortTerm =>
-  isRecord(value) && only(value, ['field', 'direction']) && typeof value['field'] === 'string' && value['field'] !== '' && (value['direction'] === 'asc' || value['direction'] === 'desc')
+  isRecord(value) &&
+  only(value, ['field', 'direction']) &&
+  typeof value['field'] === 'string' &&
+  value['field'] !== '' &&
+  (value['direction'] === 'asc' || value['direction'] === 'desc')
 
 /**
  * The value kept, read: null for anything but exactly `KeptGrid` -- another

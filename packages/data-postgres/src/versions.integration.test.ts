@@ -46,7 +46,16 @@ beforeAll(async () => {
   owner = postgres(fixture.admin, { onnotice: () => {} })
   parity = await discoverPostgres(owner, PARITY_SCOPE)
   for (const table of ['price', 'price_declined'] as const) {
-    const request = { connection: 'test', root: { schema: 'parity', name: table }, formId: table.replace('_', '-'), title: table, lookups: [], pinned: ['tenant_id'], versionColumn: 'version', validity: { from: 'valid_from', to: 'valid_to' } }
+    const request = {
+      connection: 'test',
+      root: { schema: 'parity', name: table },
+      formId: table.replace('_', '-'),
+      title: table,
+      lookups: [],
+      pinned: ['tenant_id'],
+      versionColumn: 'version',
+      validity: { from: 'valid_from', to: 'valid_to' },
+    }
     forms.set(table, generateForm(parity, request).bindings)
   }
   records = createPostgresRecords(owner)
@@ -59,21 +68,25 @@ afterAll(async () => {
 
 /** A version inserted as the owner, open unless `ends` says, and its token. */
 async function inserted(table: Table, row: { tenant?: number; product: number; from: string; ends?: string; amount?: string; note?: string }): Promise<string> {
-  await owner.unsafe(`insert into parity.${table} (tenant_id, product_no, valid_from, valid_to, amount, note) values ($1, $2, $3::date, $4::date, $5::numeric, $6)`, [
-    row.tenant ?? 1,
-    row.product,
-    row.from,
-    row.ends ?? null,
-    row.amount ?? '9.5000',
-    row.note ?? null,
-  ])
-  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: String(row.tenant ?? 1), product_no: String(row.product), valid_from: row.from })
+  await owner.unsafe(
+    `insert into parity.${table} (tenant_id, product_no, valid_from, valid_to, amount, note) values ($1, $2, $3::date, $4::date, $5::numeric, $6)`,
+    [row.tenant ?? 1, row.product, row.from, row.ends ?? null, row.amount ?? '9.5000', row.note ?? null],
+  )
+  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], {
+    tenant_id: String(row.tenant ?? 1),
+    product_no: String(row.product),
+    valid_from: row.from,
+  })
   if (!token.ok) throw new Error(token.message)
   return token.token
 }
 
 /** One product's versions as the owner reads them, by start. */
-async function versionsOf(table: Table, product: number, tenant = 1): Promise<Array<{ from: string; to: string | null; amount: string; note: string | null; version: string }>> {
+async function versionsOf(
+  table: Table,
+  product: number,
+  tenant = 1,
+): Promise<Array<{ from: string; to: string | null; amount: string; note: string | null; version: string }>> {
   return owner.unsafe(
     `select valid_from::text as "from", valid_to::text as "to", amount::text as amount, note, version::text as version from parity.${table} where tenant_id = $1 and product_no = $2 order by valid_from`,
     [tenant, product],
@@ -96,7 +109,13 @@ async function asRead(table: Table, token: string): Promise<FormRecord> {
 }
 
 /** A change from a date planned over `read` and sent; its answer, as VERSION_PARITY names one. */
-async function changed(table: Table, token: string, version: string, answers: Record<string, unknown>, read: FormRecord): Promise<{ answer: string; outcome: RecordOutcome }> {
+async function changed(
+  table: Table,
+  token: string,
+  version: string,
+  answers: Record<string, unknown>,
+  read: FormRecord,
+): Promise<{ answer: string; outcome: RecordOutcome }> {
   const plan = planSupersede(parity, form(table), POLICY, CLARA, token, version, answers, read, await described(table))
   if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
   const outcome = await records.supersede(plan.request)
@@ -111,7 +130,11 @@ describe('a change from a date on PostgreSQL (0113)', () => {
     const token = await inserted('price', { product: 1, from: '2026-01-01' })
     const { answer, outcome } = await changed('price', token, '1', { valid_from: '2026-07-01', amount: '10.0000' }, await asRead('price', token))
     expect(answer).toBe(expected('changed'))
-    expect(outcome).toMatchObject({ ok: true, values: { tenant_id: '1', product_no: '1', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' }, version: '1' })
+    expect(outcome).toMatchObject({
+      ok: true,
+      values: { tenant_id: '1', product_no: '1', valid_from: '2026-07-01', valid_to: null, amount: '10.0000' },
+      version: '1',
+    })
     expect(await versionsOf('price', 1)).toEqual([
       { from: '2026-01-01', to: '2026-07-01', amount: '9.5000', note: null, version: '2' },
       { from: '2026-07-01', to: null, amount: '10.0000', note: null, version: '1' },
@@ -142,7 +165,11 @@ describe('a change from a date on PostgreSQL (0113)', () => {
   // sends: not found, and nothing written.
   test('finds no other tenant’s version', covers('postgres', versionCase('other-tenant')), async () => {
     const token = await inserted('price', { tenant: 2, product: 4, from: '2026-01-01' })
-    const read: FormRecord = { record: token, version: '1', answers: { tenant_id: 2, product_no: 4, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null } }
+    const read: FormRecord = {
+      record: token,
+      version: '1',
+      answers: { tenant_id: 2, product_no: 4, valid_from: '2026-01-01', valid_to: null, amount: '9.5000', note: null },
+    }
     expect((await changed('price', token, '1', { valid_from: '2026-07-01', amount: '10.0000' }, read)).answer).toBe(expected('other-tenant'))
     expect(await versionsOf('price', 4, 2)).toEqual([{ from: '2026-01-01', to: null, amount: '9.5000', note: null, version: '1' }])
   })
@@ -169,7 +196,14 @@ describe('a change from a date on PostgreSQL (0113)', () => {
   test('creates a chain’s first version only where it has none', covers('postgres', versionCase('chain-exists')), async () => {
     await inserted('price', { product: 6, from: '2026-01-01' })
     const create = async (product: number) => {
-      const plan = planCreate(parity, form('price'), POLICY, CLARA, { product_no: product, valid_from: '2026-03-01', amount: '1.0000' }, await described('price'))
+      const plan = planCreate(
+        parity,
+        form('price'),
+        POLICY,
+        CLARA,
+        { product_no: product, valid_from: '2026-03-01', amount: '1.0000' },
+        await described('price'),
+      )
       if (!plan.ok) throw new Error(`expected a create, got ${plan.code}`)
       const outcome = await records.insert(plan.request)
       return outcome.ok ? 'created' : outcome.code
@@ -186,7 +220,10 @@ describe('a change from a date on PostgreSQL (0113)', () => {
   // two versions ended: the end stood, answered as a change.
   test('is undone where the database declines the next version', covers('postgres', versionCase('next-declined')), async () => {
     const token = await inserted('price_declined', { product: 8, from: '2026-01-01', note: 'open' })
-    expect((await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token))).answer).toBe(expected('next-declined'))
+    expect(
+      (await changed('price_declined', token, '1', { valid_from: '2026-07-01', amount: '10.0000', note: 'next' }, await asRead('price_declined', token)))
+        .answer,
+    ).toBe(expected('next-declined'))
     expect(await versionsOf('price_declined', 8)).toEqual([{ from: '2026-01-01', to: null, amount: '9.5000', note: 'open', version: '1' }])
   })
 })

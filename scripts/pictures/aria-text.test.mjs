@@ -28,7 +28,12 @@ describe('decode', () => {
   test('reads a double-quoted value, with an escaped quotation mark and a \\x escape', () => {
     // studio-carried, part Carried.
     expect(decode('      - paragraph: "The label \\"Remarks\\" you chose for notes was dropped: column notes is not in the regenerated form."')).toEqual([
-      { depth: 3, role: 'paragraph', name: undefined, value: 'The label "Remarks" you chose for notes was dropped: column notes is not in the regenerated form.' },
+      {
+        depth: 3,
+        role: 'paragraph',
+        name: undefined,
+        value: 'The label "Remarks" you chose for notes was dropped: column notes is not in the regenerated form.',
+      },
     ])
     // Made by hand: no pictured page has a DEL character. The escaped
     // backslash before "x41" keeps that "x41" text, not an escape.
@@ -59,7 +64,9 @@ describe('decode', () => {
   // a field says; they are read, under their own key, rather than refused.
   test('reads a property line', () => {
     // host-refused, part React.
-    expect(decode('          - /url: "#f:pg-order-react:customer:control"')).toEqual([{ depth: 5, role: '/url', name: undefined, value: '#f:pg-order-react:customer:control' }])
+    expect(decode('          - /url: "#f:pg-order-react:customer:control"')).toEqual([
+      { depth: 5, role: '/url', name: undefined, value: '#f:pg-order-react:customer:control' },
+    ])
   })
 
   // A line the format above does not describe would otherwise be skipped, and
@@ -78,7 +85,15 @@ describe('decode', () => {
 
 describe('occursIn', () => {
   // host-loaded, part React, shortened: the lines are as printed.
-  const snapshot = ['- region "React":', '  - heading "React" [level=2]', '  - form "Order, React":', '    - textbox "Amount*": "99999999999999.9999"', '    - paragraph:', '      - text: blocking', '      - code: column-dropped'].join('\n')
+  const snapshot = [
+    '- region "React":',
+    '  - heading "React" [level=2]',
+    '  - form "Order, React":',
+    '    - textbox "Amount*": "99999999999999.9999"',
+    '    - paragraph:',
+    '      - text: blocking',
+    '      - code: column-dropped',
+  ].join('\n')
 
   // A quote is held by what one element says: a run that only exists when two
   // lines are read together is not something a person reads in one place.
@@ -120,7 +135,9 @@ describe('steadied', () => {
   // failing with the snapshot returned as it came.
   test("says a link's object URL without the UUID drawn for it", () => {
     expect(steadied(printed('a8b9269c-3444-4978-83af-3c0831fd1f49'))).toBe(steadied(printed('0f9940ee-531a-413c-ab0d-0fa64ffb2db4')))
-    expect(steadied(printed('a8b9269c-3444-4978-83af-3c0831fd1f49'))).toBe(['- region "Download a version":', '  - link "Download version 3":', '    - /url: blob:http://studio.invalid/<uuid>'].join('\n'))
+    expect(steadied(printed('a8b9269c-3444-4978-83af-3c0831fd1f49'))).toBe(
+      ['- region "Download a version":', '  - link "Download version 3":', '    - /url: blob:http://studio.invalid/<uuid>'].join('\n'),
+    )
   })
 
   // Made by hand: anything else is what the page says, and a record that
@@ -128,7 +145,13 @@ describe('steadied', () => {
   // that only looks like an object URL. Watched failing with every UUID in
   // the snapshot replaced.
   test('leaves every other address and every text as printed', () => {
-    const other = ['- link "Order pg-order":', '  - /url: "#form=pg-order&layout=stacked&view=records"', '- link "Download":', '  - /url: https://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49', '- paragraph: blob:http://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49'].join('\n')
+    const other = [
+      '- link "Order pg-order":',
+      '  - /url: "#form=pg-order&layout=stacked&view=records"',
+      '- link "Download":',
+      '  - /url: https://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49',
+      '- paragraph: blob:http://studio.invalid/a8b9269c-3444-4978-83af-3c0831fd1f49',
+    ].join('\n')
     expect(steadied(other)).toBe(other)
   })
 })

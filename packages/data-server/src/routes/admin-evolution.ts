@@ -90,7 +90,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-type Regenerated = { ok: true; generated: GeneratedForm; generation: GenerationRequest; dropped: Regeneration['lookupsDropped'] } | { ok: false; message: string }
+type Regenerated =
+  { ok: true; generated: GeneratedForm; generation: GenerationRequest; dropped: Regeneration['lookupsDropped'] } | { ok: false; message: string }
 
 /**
  * The form generated again from the stored request against the database as
@@ -172,7 +173,12 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     trail.formVersion = loaded.version
     trail.connection = bundle.connection
     if (bundle.format === 1) {
-      return refuse(reply, 409, 'published-before-0030', `Version ${String(loaded.version)} was published before 0030 and kept no generation request: propose the form again.`)
+      return refuse(
+        reply,
+        409,
+        'published-before-0030',
+        `Version ${String(loaded.version)} was published before 0030 and kept no generation request: propose the form again.`,
+      )
     }
     const current = await discover(bundle.connection, reply)
     if (current === undefined) return reply
@@ -189,12 +195,16 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
 
     let carried
     try {
-      carried = rebasePresentation({ base: bundle.base, presentation: bundle.presentation, bindings: bundle.bindings }, { base: generated.form, bindings: generated.bindings })
+      carried = rebasePresentation(
+        { base: bundle.base, presentation: bundle.presentation, bindings: bundle.bindings },
+        { base: generated.form, bindings: generated.bindings },
+      )
     } catch (error) {
       return internal(reply, id, error)
     }
     const valid = validateSchema(carried.form)
-    if (!valid.valid) return internal(reply, id, new Error(`the carried form is not one formancy accepts: ${valid.errors.map((entry) => entry.message).join('; ')}`))
+    if (!valid.valid)
+      return internal(reply, id, new Error(`the carried form is not one formancy accepts: ${valid.errors.map((entry) => entry.message).join('; ')}`))
 
     const regeneration: Regeneration = {
       version: loaded.version,
@@ -238,10 +248,17 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
       return internal(reply, id, error)
     }
     if (!served.ok && served.code === 'other-engine') {
-      return refuse(reply, 422, 'other-engine', `Version ${String(version)} cannot be restored: connection ${loaded.bundle.connection} is a ${served.database} database now, and the version is bound to ${served.bound}. A form's bindings belong to one engine.`)
+      return refuse(
+        reply,
+        422,
+        'other-engine',
+        `Version ${String(version)} cannot be restored: connection ${loaded.bundle.connection} is a ${served.database} database now, and the version is bound to ${served.bound}. A form's bindings belong to one engine.`,
+      )
     }
     if (!served.ok) {
-      return refuse(reply, 409, 'incompatible', `Version ${String(version)} cannot be restored: the database has changed in a way it cannot serve.`, { changes: served.changes })
+      return refuse(reply, 409, 'incompatible', `Version ${String(version)} cannot be restored: the database has changed in a way it cannot serve.`, {
+        changes: served.changes,
+      })
     }
     const drift = served.drift
     // The document as it was read and validated, written as the store writes every version: a copy, never a re-generation.

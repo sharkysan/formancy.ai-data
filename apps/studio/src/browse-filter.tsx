@@ -93,7 +93,14 @@ function AddCondition({ available, onAdd }: { available: Filterable[]; onAdd: (t
           </select>
         </div>
       </div>
-      <ConditionValues prefix="filter" op={op} input={input} draft={draft} hint={hint} onChange={(values) => setDraft({ ...draft, ...values, column: chosen.column })} />
+      <ConditionValues
+        prefix="filter"
+        op={op}
+        input={input}
+        draft={draft}
+        hint={hint}
+        onChange={(values) => setDraft({ ...draft, ...values, column: chosen.column })}
+      />
       <div className="actions">
         <button type="submit" id="filter-apply" className="button">
           Apply
@@ -115,7 +122,15 @@ function AddCondition({ available, onAdd }: { available: Filterable[]; onAdd: (t
  * Mounted afresh for every page a move reaches, so the form starts shut
  * and empty there; a page, a sort or a condition keeps it as it is.
  */
-export function FilterPanel({ columns, active, onFilter }: { columns: Filterable[]; active: BrowseFilterTerm[]; onFilter: (filter: BrowseFilterTerm[], focus: string) => Promise<boolean> }): ReactElement {
+export function FilterPanel({
+  columns,
+  active,
+  onFilter,
+}: {
+  columns: Filterable[]
+  active: BrowseFilterTerm[]
+  onFilter: (filter: BrowseFilterTerm[], focus: string) => Promise<boolean>
+}): ReactElement {
   const [open, setOpen] = useState(false)
   if (columns.length === 0 && active.length === 0) return <p className="hint">No column this page shows can be filtered.</p>
   const remove = (at: number) => {
@@ -135,7 +150,7 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
                 <li key={term.column}>
                   <span>{said}</span>
                   <button type="button" id={`filter-remove-${String(index)}`} className="filter-remove" onClick={() => remove(index)}>
-                    Remove{' '}<span className="visually-hidden">{said}</span>
+                    Remove <span className="visually-hidden">{said}</span>
                   </button>
                 </li>
               )
@@ -147,7 +162,14 @@ export function FilterPanel({ columns, active, onFilter }: { columns: Filterable
         </div>
       )}
       <p className="actions">
-        <button type="button" id="filter-toggle" className="button filter-toggle" aria-expanded={open} aria-controls={open ? 'filter-add' : undefined} onClick={() => setOpen((was) => !was)}>
+        <button
+          type="button"
+          id="filter-toggle"
+          className="button filter-toggle"
+          aria-expanded={open}
+          aria-controls={open ? 'filter-add' : undefined}
+          onClick={() => setOpen((was) => !was)}
+        >
           Filter rows
         </button>
       </p>

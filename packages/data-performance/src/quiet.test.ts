@@ -66,12 +66,16 @@ describe('the preconditions of a publish run', () => {
   // An image pulled during the run would land in a timed window, and might
   // be a different image from the one the suites tested.
   test('refuse a database image that is not present locally', () => {
-    expect(preconditions({ ...CLEAR, missingImages: ['postgres:17-alpine'] })).toEqual(['Pull postgres:17-alpine before the run; it is not on this machine, and a pull must not happen inside it.'])
+    expect(preconditions({ ...CLEAR, missingImages: ['postgres:17-alpine'] })).toEqual([
+      'Pull postgres:17-alpine before the run; it is not on this machine, and a pull must not happen inside it.',
+    ])
   })
 
   // Without P13's tolerance the calibration would wave every block through.
   test('refuse a protocol without a calibration tolerance', () => {
-    expect(preconditions({ ...CLEAR, tolerance: null })).toEqual(['The publish protocol has no calibration tolerance: measure P13 and write it into protocol.ts first.'])
+    expect(preconditions({ ...CLEAR, tolerance: null })).toEqual([
+      'The publish protocol has no calibration tolerance: measure P13 and write it into protocol.ts first.',
+    ])
   })
 })
 
@@ -80,7 +84,15 @@ describe('the quiet check', () => {
 
   // Ten quiet seconds: nothing else holds a whole CPU.
   test('passes a window below both limits', () => {
-    expect(quietVerdict([{ loadAverage: 0.2, busyVcpus: 0.3 }, { loadAverage: 0.3, busyVcpus: 0.9 }], rule)).toEqual({ quiet: true })
+    expect(
+      quietVerdict(
+        [
+          { loadAverage: 0.2, busyVcpus: 0.3 },
+          { loadAverage: 0.3, busyVcpus: 0.9 },
+        ],
+        rule,
+      ),
+    ).toEqual({ quiet: true })
   })
 
   // A load average at or above one says something has been running for the last minute.
@@ -90,7 +102,15 @@ describe('the quiet check', () => {
 
   // A second in which more than one vCPU was busy is something running now.
   test('refuses a busy second above one vCPU', () => {
-    expect(quietVerdict([{ loadAverage: 0.1, busyVcpus: 0.2 }, { loadAverage: 0.1, busyVcpus: 1.4 }], rule)).toEqual({ quiet: false, reason: 'one second had 1.4 vCPUs busy, more than 1' })
+    expect(
+      quietVerdict(
+        [
+          { loadAverage: 0.1, busyVcpus: 0.2 },
+          { loadAverage: 0.1, busyVcpus: 1.4 },
+        ],
+        rule,
+      ),
+    ).toEqual({ quiet: false, reason: 'one second had 1.4 vCPUs busy, more than 1' })
   })
 
   test('refuses a window with no samples', () => {
@@ -111,7 +131,9 @@ describe('the container set at a block boundary', () => {
   // A container started mid-run shares the CPUs from then on; one that
   // went away was one the run needed.
   test('names a newcomer and a container that went away', () => {
-    expect(containerSetChange(recorded, [...recorded, { id: 'c3', name: 'newcomer', image: 'redis:7' }])).toBe('a container started during the run: newcomer (redis:7, c3)')
+    expect(containerSetChange(recorded, [...recorded, { id: 'c3', name: 'newcomer', image: 'redis:7' }])).toBe(
+      'a container started during the run: newcomer (redis:7, c3)',
+    )
     expect(containerSetChange(recorded, recorded.slice(0, 1))).toBe('a container stopped during the run: ms (mcr.microsoft.com/mssql/server:2022-latest, b2)')
   })
 })
@@ -185,6 +207,8 @@ describe('a block judged by the probe', () => {
   // run refuses rather than publishing either attempt.
   test('refuses the run on a second miss, naming the block', async () => {
     await expect(judged('pg read at 8 in flight', attempts([5, 5], [4, 5]), 4, 1.1)).rejects.toThrow(Refusal)
-    await expect(judged('pg read at 8 in flight', attempts([5, 5], [4, 5]), 4, 1.1)).rejects.toThrow(/pg read at 8 in flight: the probe ran slower than the quiet baseline/)
+    await expect(judged('pg read at 8 in flight', attempts([5, 5], [4, 5]), 4, 1.1)).rejects.toThrow(
+      /pg read at 8 in flight: the probe ran slower than the quiet baseline/,
+    )
   })
 })

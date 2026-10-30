@@ -14,11 +14,21 @@ import type { GridColumn } from './grid-datasource.js'
  */
 
 const column = (key: string, label: string, sortable = true): GridColumn => ({ key, label, sortable, source: null })
-const COLUMNS = [column('id', 'Id'), column('customer', 'Customer', false), column('order_date', 'Order date'), column('amount', 'Amount'), column('notes', 'Notes')]
+const COLUMNS = [
+  column('id', 'Id'),
+  column('customer', 'Customer', false),
+  column('order_date', 'Order date'),
+  column('amount', 'Amount'),
+  column('notes', 'Notes'),
+]
 const choice = (field: string, shown = true): ColumnChoice => ({ field, shown })
 
 const NEWEST: ListView = { name: 'Newest first', filter: [], sort: [{ field: 'id', direction: 'desc' }], default: true }
-const LARGE: ListView = { name: 'Large orders', filter: [{ field: 'amount', op: 'range', from: '1000', to: null }], sort: [{ field: 'amount', direction: 'desc' }] }
+const LARGE: ListView = {
+  name: 'Large orders',
+  filter: [{ field: 'amount', op: 'range', from: '1000', to: null }],
+  sort: [{ field: 'amount', direction: 'desc' }],
+}
 const LIST: ListColumns = { searchable: ['notes'], sortable: ['id', 'order_date', 'amount', 'notes'], filterable: [], views: [NEWEST, LARGE] }
 
 describe('a kept arrangement over the columns a form offers now', () => {
@@ -118,7 +128,14 @@ describe('the value a browser keeps', () => {
 })
 
 describe('what is written for a list', () => {
-  const state = (filter: ListFilterTerm[], sort: GridState['sort'], kept: Partial<GridState> = {}): GridState => ({ choices: defaultChoices(COLUMNS), filter, sort, columnsKept: false, listKept: true, ...kept })
+  const state = (filter: ListFilterTerm[], sort: GridState['sort'], kept: Partial<GridState> = {}): GridState => ({
+    choices: defaultChoices(COLUMNS),
+    filter,
+    sort,
+    columnsKept: false,
+    listKept: true,
+    ...kept,
+  })
 
   // A view is kept by its name, so an administrator's change to it reaches
   // the person (watched failing with the view's sort kept instead:
@@ -165,7 +182,10 @@ describe('what is written for a list', () => {
   test('keeps only what the person chose', () => {
     expect(keptOf(state(NEWEST.filter, NEWEST.sort, { listKept: false }), LIST.views)).toBeNull()
     const moved = [choice('notes'), ...defaultChoices(COLUMNS).slice(0, -1)]
-    expect(keptOf(state(NEWEST.filter, NEWEST.sort, { listKept: false, columnsKept: true, choices: moved }), LIST.views)).toEqual({ version: 1, columns: moved })
+    expect(keptOf(state(NEWEST.filter, NEWEST.sort, { listKept: false, columnsKept: true, choices: moved }), LIST.views)).toEqual({
+      version: 1,
+      columns: moved,
+    })
     expect(keptOf(state([], [], { columnsKept: false }), LIST.views)).toEqual({ version: 1, sort: [] })
   })
 })
@@ -230,7 +250,13 @@ describe('what a section opens on', () => {
   // sort sent as kept: "status", which the list no longer sorts by; and
   // with an empty sort taken as nothing kept: the default view's).
   test('opens on a kept sort’s terms that are still sortable, with no filter', () => {
-    const kept: KeptGrid = { version: 1, sort: [{ field: 'status', direction: 'asc' }, { field: 'amount', direction: 'desc' }] }
+    const kept: KeptGrid = {
+      version: 1,
+      sort: [
+        { field: 'status', direction: 'asc' },
+        { field: 'amount', direction: 'desc' },
+      ],
+    }
     expect(openGrid(kept, COLUMNS, LIST)).toMatchObject({ filter: [], sort: [{ field: 'amount', direction: 'desc' }], listKept: true })
     expect(openGrid({ version: 1, sort: [] }, COLUMNS, LIST)).toMatchObject({ filter: [], sort: [], listKept: true })
     expect(openGrid({ version: 1, sort: [{ field: 'amount', direction: 'desc' }] }, COLUMNS, null)).toMatchObject({ filter: [], sort: [] })

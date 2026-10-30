@@ -33,22 +33,38 @@ const STATE: UnreadyInspection['State'] = {
 }
 
 /** As Docker's inspect answers, as much of it as the report reads. */
-const inspected = (state: Partial<UnreadyInspection['State']> = {}): UnreadyInspection => ({ Id: '5f3805f3f3b4c0ffee', Config: { Image: IMAGE }, State: { ...STATE, ...state } })
+const inspected = (state: Partial<UnreadyInspection['State']> = {}): UnreadyInspection => ({
+  Id: '5f3805f3f3b4c0ffee',
+  Config: { Image: IMAGE },
+  State: { ...STATE, ...state },
+})
 
 describe('logLines', () => {
   // The header is eight bytes the reader must skip: read as text, each line
   // would start with a stream byte and a length, and a payload length taken
   // little-endian would swallow every frame after the first.
   test('reads the payloads of both streams in the order they were written, one line each', () => {
-    const log = Buffer.concat([frame(1, 'SQL Server 2025 will run as non-root by default.\n'), frame(2, 'sqlservr: This program requires a machine with at least 2000 megabytes of memory.\n'), frame(1, 'done\n')])
-    expect(logLines(log)).toEqual(['SQL Server 2025 will run as non-root by default.', 'sqlservr: This program requires a machine with at least 2000 megabytes of memory.', 'done'])
+    const log = Buffer.concat([
+      frame(1, 'SQL Server 2025 will run as non-root by default.\n'),
+      frame(2, 'sqlservr: This program requires a machine with at least 2000 megabytes of memory.\n'),
+      frame(1, 'done\n'),
+    ])
+    expect(logLines(log)).toEqual([
+      'SQL Server 2025 will run as non-root by default.',
+      'sqlservr: This program requires a machine with at least 2000 megabytes of memory.',
+      'done',
+    ])
   })
 
   // Docker frames a write, not a line: a line the server wrote in two
   // writes arrives in two frames, and cut at the frame it would read as two
   // lines, the second without its start.
   test('joins a line written in two frames, and drops the empty lines and the carriage returns', () => {
-    const log = Buffer.concat([frame(1, '2026-10-17 10:29:50.11 Server      Setup step is copy'), frame(1, "ing system data file 'master.mdf'.\r\n\n"), frame(1, 'last')])
+    const log = Buffer.concat([
+      frame(1, '2026-10-17 10:29:50.11 Server      Setup step is copy'),
+      frame(1, "ing system data file 'master.mdf'.\r\n\n"),
+      frame(1, 'last'),
+    ])
     expect(logLines(log)).toEqual(["2026-10-17 10:29:50.11 Server      Setup step is copying system data file 'master.mdf'.", 'last'])
   })
 
@@ -104,6 +120,10 @@ describe('reportingUnready', () => {
     const reporting = reportingUnready(inner)
     expect(reporting.isStartupTimeoutSet()).toBe(false)
     expect(reporting.withStartupTimeout(120_000)).toBe(reporting)
-    expect({ inner: inner.getStartupTimeout(), set: inner.isStartupTimeoutSet(), reporting: reporting.getStartupTimeout() }).toEqual({ inner: 120_000, set: true, reporting: 120_000 })
+    expect({ inner: inner.getStartupTimeout(), set: inner.isStartupTimeoutSet(), reporting: reporting.getStartupTimeout() }).toEqual({
+      inner: 120_000,
+      set: true,
+      reporting: 120_000,
+    })
   })
 })

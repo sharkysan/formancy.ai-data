@@ -140,11 +140,13 @@ function chosenLookups(spec: DemoFormSpec, bindings: FormBindings): Array<{ bind
   const lookups = bindings.fields.filter((binding): binding is LookupBinding => binding.kind === 'lookup')
   const chosen = lookups.map((binding) => {
     const choice = spec.lookups.find((candidate) => candidate.foreignKey === binding.foreignKey)
-    if (choice === undefined) throw new Error(`${spec.id}: the generated form has a lookup over ${binding.foreignKey}, and the demo says nothing of which of its rows it may offer`)
+    if (choice === undefined)
+      throw new Error(`${spec.id}: the generated form has a lookup over ${binding.foreignKey}, and the demo says nothing of which of its rows it may offer`)
     return { binding, choice }
   })
   for (const choice of spec.lookups) {
-    if (!lookups.some((binding) => binding.foreignKey === choice.foreignKey)) throw new Error(`${spec.id}: the demo names a lookup over ${choice.foreignKey}, and the generated form has none`)
+    if (!lookups.some((binding) => binding.foreignKey === choice.foreignKey))
+      throw new Error(`${spec.id}: the demo names a lookup over ${choice.foreignKey}, and the generated form has none`)
   }
   return chosen
 }
@@ -200,7 +202,11 @@ export function demoPolicy(spec: DemoFormSpec, bindings: FormBindings): FormPoli
 
 /** The labels the demo gives its lookups, each on the field its foreign key has in the base, in the base's field order (0030). */
 export function demoPresentation(spec: DemoFormSpec, base: GeneratedForm['form'], bindings: FormBindings): PresentationOverrides {
-  const labelled = new Map(chosenLookups(spec, bindings).flatMap(({ binding, choice }) => (choice.label === undefined ? [] : [[binding.field, { binding, label: choice.label }] as const])))
+  const labelled = new Map(
+    chosenLookups(spec, bindings).flatMap(({ binding, choice }) =>
+      choice.label === undefined ? [] : [[binding.field, { binding, label: choice.label }] as const],
+    ),
+  )
   const fields = base.model.fields.flatMap((field) => {
     const entry = labelled.get(field.key)
     return entry === undefined ? [] : [{ field: field.key, anchor: fieldAnchor(entry.binding), label: entry.label }]

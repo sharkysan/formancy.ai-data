@@ -53,7 +53,7 @@ export async function runLookup(sql: Sql, statement: LookupStatement, signal: Lo
  * driver settles the statement, as it does for every other.
  */
 function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal): Promise<TextResult> {
-  if (signal.aborted) return Promise.reject(signal.reason as Error)
+  if (signal.aborted) return Promise.reject(signal.reason)
   const { query, rows } = start(sql, statement.text, statement.params)
   const cancel = cancellerOf(query)
   let settled = false
@@ -62,7 +62,7 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
   }
   return new Promise<TextResult>((resolve, reject) => {
     const stop = (): void => {
-      reject(signal.reason as Error)
+      reject(signal.reason)
       whenSent(query, unlessSettled)
       whenExecuteSent(query, unlessSettled)
     }
@@ -75,7 +75,7 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
       (error: unknown) => {
         settled = true
         signal.removeEventListener('abort', stop)
-        reject(error as Error)
+        reject(error)
       },
     )
     signal.addEventListener('abort', stop, { once: true })

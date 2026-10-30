@@ -2,7 +2,21 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, test } from 'vitest'
-import { agGridRowProblem, canaryProblem, declaredFamilies, focusScrollProblem, fontProblem, foreignProblem, isFontFile, isForeign, lostCreate, refusedProblem, rowUnmeasured, systemOf, unlikeTheTable } from './browser-gate.mjs'
+import {
+  agGridRowProblem,
+  canaryProblem,
+  declaredFamilies,
+  focusScrollProblem,
+  fontProblem,
+  foreignProblem,
+  isFontFile,
+  isForeign,
+  lostCreate,
+  refusedProblem,
+  rowUnmeasured,
+  systemOf,
+  unlikeTheTable,
+} from './browser-gate.mjs'
 
 /**
  * What every browser gate does to a page in every browser (0058), in the
@@ -52,17 +66,22 @@ describe('declaredFamilies', () => {
   // earlier build's stylesheet can lie beside the page's; and a stylesheet on
   // another host is the static guard's to refuse, not a face of this build.
   test('reads no stylesheet the page does not link, nor one on another host', () => {
-    const dir = built('<!doctype html><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo"><link rel="stylesheet" href="./assets/index-a.css">', {
-      'assets/index-a.css': 'body{}',
-      'assets/index-old.css': FACES,
-    })
+    const dir = built(
+      '<!doctype html><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo"><link rel="stylesheet" href="./assets/index-a.css">',
+      {
+        'assets/index-a.css': 'body{}',
+        'assets/index-old.css': FACES,
+      },
+    )
     expect(declaredFamilies(dir)).toEqual([])
   })
 
   // A link that climbs out of dist would have the gate read a file the
   // browser is never sent.
   test('refuses a stylesheet whose path leaves dist', () => {
-    expect(() => declaredFamilies(built('<link rel="stylesheet" href="/assets/..%2F..%2Foutside.css">'))).toThrow('dist/index.html links /assets/..%2F..%2Foutside.css, which is outside dist')
+    expect(() => declaredFamilies(built('<link rel="stylesheet" href="/assets/..%2F..%2Foutside.css">'))).toThrow(
+      'dist/index.html links /assets/..%2F..%2Foutside.css, which is outside dist',
+    )
   })
 })
 
@@ -76,14 +95,20 @@ describe('fontProblem', () => {
   // 119 checks passed.
   test('fails a pass that does not refuse the web fonts unless every family the build declares loaded', () => {
     expect(fontProblem({ families, loaded: [...families], refused: false })).toBeNull()
-    expect(fontProblem({ families, loaded: ['Archivo Variable'], refused: false })).toBe('IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place')
+    expect(fontProblem({ families, loaded: ['Archivo Variable'], refused: false })).toBe(
+      'IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place',
+    )
   })
 
   // A pass whose faces never arrived is told from a page that stopped
   // declaring them by how many font files the page fetched.
   test('says how many font files the page fetched when it fails', () => {
-    expect(fontProblem({ families, loaded: [], fetched: 0, refused: false })).toBe('Archivo Variable, IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place (the page fetched 0 font files)')
-    expect(fontProblem({ families, loaded: ['Archivo Variable'], fetched: 1, refused: true })).toBe('Archivo Variable loaded anyway, so this pass measured the web fonts, not the fallback stack (the page fetched 1 font file)')
+    expect(fontProblem({ families, loaded: [], fetched: 0, refused: false })).toBe(
+      'Archivo Variable, IBM Plex Mono and IBM Plex Sans did not load, so this pass measured the fallback stack in their place (the page fetched 0 font files)',
+    )
+    expect(fontProblem({ families, loaded: ['Archivo Variable'], fetched: 1, refused: true })).toBe(
+      'Archivo Variable loaded anyway, so this pass measured the web fonts, not the fallback stack (the page fetched 1 font file)',
+    )
   })
 
   // Nothing checked that the refusing pass refused: a route that stopped
@@ -91,7 +116,9 @@ describe('fontProblem', () => {
   // fallback stack never.
   test('fails the refusing pass unless none loaded', () => {
     expect(fontProblem({ families, loaded: [], refused: true })).toBeNull()
-    expect(fontProblem({ families, loaded: ['IBM Plex Sans'], refused: true })).toBe('IBM Plex Sans loaded anyway, so this pass measured the web fonts, not the fallback stack')
+    expect(fontProblem({ families, loaded: ['IBM Plex Sans'], refused: true })).toBe(
+      'IBM Plex Sans loaded anyway, so this pass measured the web fonts, not the fallback stack',
+    )
   })
 
   // A build whose stylesheets the gate cannot read would pass both checks
@@ -99,7 +126,9 @@ describe('fontProblem', () => {
   // says anything about the page.
   test('fails both kinds of pass for a build that declares no face', () => {
     for (const refused of [false, true]) {
-      expect(fontProblem({ families: [], loaded: [], refused })).toBe("the built page's stylesheets declare no font face; the gate reads its families from the stylesheets dist/index.html links")
+      expect(fontProblem({ families: [], loaded: [], refused })).toBe(
+        "the built page's stylesheets declare no font face; the gate reads its families from the stylesheets dist/index.html links",
+      )
     }
   })
 })
@@ -135,7 +164,9 @@ describe('the requests a pass refuses (0072)', () => {
   // The check names what was asked, each once, so a red leg says which host.
   test('are named, each once, in what the check fails with', () => {
     expect(foreignProblem([])).toBeNull()
-    expect(foreignProblem(['https://fonts.googleapis.com/css2?family=A', 'https://fonts.googleapis.com/css2?family=A'])).toBe('1 address on another origin, each refused: https://fonts.googleapis.com/css2?family=A')
+    expect(foreignProblem(['https://fonts.googleapis.com/css2?family=A', 'https://fonts.googleapis.com/css2?family=A'])).toBe(
+      '1 address on another origin, each refused: https://fonts.googleapis.com/css2?family=A',
+    )
     expect(foreignProblem(['https://a.example/1', 'https://a.example/2', 'https://a.example/3', 'https://a.example/4', 'https://a.example/5'])).toBe(
       '5 addresses on another origin, each refused: https://a.example/1, https://a.example/2, https://a.example/3, https://a.example/4, …',
     )
@@ -174,7 +205,9 @@ describe('what a page is refused under its policy (0069, 0083)', () => {
     const policy = "default-src 'none'; script-src 'self'"
     const left = 'style-src-elem refused inline (http://127.0.0.1:4391/:1)'
     expect(canaryProblem({ ran: false, heard: 1, unread: [] }, policy)).toBeNull()
-    expect(canaryProblem({ ran: false, heard: 1, unread: [left, left] }, policy)).toBe(`refused and heard, but before it the document had heard what no check read: ${left}`)
+    expect(canaryProblem({ ran: false, heard: 1, unread: [left, left] }, policy)).toBe(
+      `refused and heard, but before it the document had heard what no check read: ${left}`,
+    )
   })
 })
 
@@ -189,7 +222,12 @@ describe('systemOf', () => {
   // Playwright's, so the report says which versions each run had: an image
   // update that moved libsoup moves 0058's WebKit facts with no change here.
   test('records the fallback family and the version of every package the browser takes from the system', () => {
-    const run = answers({ 'fc-match sans-serif': 'DejaVu Sans,DejaVu Sans Condensed', 'dpkg-query libsoup-3.0-0': '3.4.4-5ubuntu0.5', 'dpkg-query glib-networking': '2.80.0-1build1', 'dpkg-query libegl-mesa0': '25.0.7-0ubuntu0.24.04.2' })
+    const run = answers({
+      'fc-match sans-serif': 'DejaVu Sans,DejaVu Sans Condensed',
+      'dpkg-query libsoup-3.0-0': '3.4.4-5ubuntu0.5',
+      'dpkg-query glib-networking': '2.80.0-1build1',
+      'dpkg-query libegl-mesa0': '25.0.7-0ubuntu0.24.04.2',
+    })
     expect(systemOf('webkit', { run })).toEqual({
       fallback: { family: 'DejaVu Sans' },
       packages: [
@@ -221,7 +259,9 @@ describe('unlikeTheTable', () => {
   // which browser did what, what 0058's table says, and what to do: a
   // browser release changed it, and the table is measured again.
   test('names the browser, what it did, what the table says and what changed it', () => {
-    expect(unlikeTheTable('firefox', { did: 'reached the skip link', says: 'it does not' })).toBe('Firefox reached the skip link; 0058’s table says it does not: a Firefox release changed this, measure it again')
+    expect(unlikeTheTable('firefox', { did: 'reached the skip link', says: 'it does not' })).toBe(
+      'Firefox reached the skip link; 0058’s table says it does not: a Firefox release changed this, measure it again',
+    )
     expect(unlikeTheTable('webkit', { did: 'sent the lost create twice on a fresh connection', says: 'once', changedBy: 'WebKit or libsoup' })).toBe(
       'WebKit sent the lost create twice on a fresh connection; 0058’s table says once: a WebKit or libsoup release changed this, measure it again',
     )
@@ -258,11 +298,15 @@ describe('lostCreate', () => {
       took: 'WebKit sent it on a connection that had carried 2 request(s); 0058’s table says it takes a new one for every POST: a WebKit or libsoup release changed this, measure it again',
       often: null,
     })
-    expect(lostCreate('webkit', sent([3, 0], [9, 0])).often).toBe('WebKit sent the lost create 2 times on a fresh connection; 0058’s table says once: a WebKit or libsoup release changed this, measure it again')
+    expect(lostCreate('webkit', sent([3, 0], [9, 0])).often).toBe(
+      'WebKit sent the lost create 2 times on a fresh connection; 0058’s table says once: a WebKit or libsoup release changed this, measure it again',
+    )
   })
 
   test('fails a browser that sent the lost create once where the table says twice, and a marker that never crossed', () => {
-    expect(lostCreate('firefox', sent([4, 25])).often).toBe('Firefox sent the lost create once on a reused connection; 0058’s table says twice: a Firefox release changed this, measure it again')
+    expect(lostCreate('firefox', sent([4, 25])).often).toBe(
+      'Firefox sent the lost create once on a reused connection; 0058’s table says twice: a Firefox release changed this, measure it again',
+    )
     expect(lostCreate('chromium', [])).toEqual({ connection: null, took: 'the marker never crossed the hop', often: 'the marker never crossed the hop' })
   })
 })
@@ -277,19 +321,31 @@ describe('rowUnmeasured', () => {
     expect(rowUnmeasured('chromium', new Set(['fresh']))).toBe(
       'Chromium sent every lost create of this run on a new connection, so 0058’s row for a reused one -- sent again, which 0031 rests on -- was measured by nothing',
     )
-    expect(rowUnmeasured('firefox', new Set())).toBe('no lost create of this run crossed the hop, so 0058’s row for Firefox on a reused connection -- sent again, which 0031 rests on -- was measured by nothing')
+    expect(rowUnmeasured('firefox', new Set())).toBe(
+      'no lost create of this run crossed the hop, so 0058’s row for Firefox on a reused connection -- sent again, which 0031 rests on -- was measured by nothing',
+    )
     expect(rowUnmeasured('chromium', new Set(['fresh', 'reused']))).toBeNull()
     expect(rowUnmeasured('webkit', new Set(['fresh']))).toBeNull()
-    expect(rowUnmeasured('webkit', new Set(['reused']))).toBe('WebKit sent every lost create of this run on a reused connection, so 0058’s row for a fresh one -- sent once -- was measured by nothing')
+    expect(rowUnmeasured('webkit', new Set(['reused']))).toBe(
+      'WebKit sent every lost create of this run on a reused connection, so 0058’s row for a fresh one -- sent once -- was measured by nothing',
+    )
   })
 })
 
 describe('agGridRowProblem', () => {
   // What each browser said it was, as the gates recorded it on 2026-10-13.
   const SAID = {
-    chromium: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36', platform: 'Linux x86_64', maxTouchPoints: 0 },
+    chromium: {
+      userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36',
+      platform: 'Linux x86_64',
+      maxTouchPoints: 0,
+    },
     firefox: { userAgent: 'Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0', platform: 'Linux x86_64', maxTouchPoints: 0 },
-    webkit: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15', platform: 'Linux x86_64', maxTouchPoints: 0 },
+    webkit: {
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15',
+      platform: 'Linux x86_64',
+      maxTouchPoints: 0,
+    },
   }
 
   test('passes each browser as it said it was', () => {

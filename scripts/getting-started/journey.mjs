@@ -159,7 +159,9 @@ export function writeServerRecord(record, dir = repo) {
   for (;;) {
     recorded += 1
     try {
-      writeFileSync(join(folder, `${record.script}-${record.engine}-${String(process.pid)}-${String(recorded)}.json`), `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx' })
+      writeFileSync(join(folder, `${record.script}-${record.engine}-${String(process.pid)}-${String(recorded)}.json`), `${JSON.stringify(record, null, 2)}\n`, {
+        flag: 'wx',
+      })
       return
     } catch (error) {
       if (error.code !== 'EEXIST') throw error
@@ -197,7 +199,11 @@ async function publish(base, admin, form, journey, policyOf = (policy) => policy
   const createOnly = bindings.fields.find((binding) => binding.field === journey.generator.createOnly)
   expectEqual(`${at} what the proposal writes ${journey.generator.createOnly} on`, createOnly?.writes, { create: true, update: false })
   const { field, table } = journey.generator.rowLevelSecurity
-  if (!notes.some((note) => note.subject === field && note.kind === 'access' && note.message.startsWith(`Row-level security applies to this connection on ${table}`))) {
+  if (
+    !notes.some(
+      (note) => note.subject === field && note.kind === 'access' && note.message.startsWith(`Row-level security applies to this connection on ${table}`),
+    )
+  ) {
     throw new Error(`${at} the proposal does not note that row-level security applies on ${table}`)
   }
   // The labels the guide's host table names, as the generator wrote them.
@@ -207,7 +213,17 @@ async function publish(base, admin, form, journey, policyOf = (policy) => policy
 
   const policy = policyOf({ version: 1, ...journey.policy })
   policy.fields = fieldsFromOperations(policy, bindings)
-  const bundle = { format: 2, connection: form.connection, generation, base: generated, presentation: EMPTY_PRESENTATION, form: generated, bindings, policy, snapshot }
+  const bundle = {
+    format: 2,
+    connection: form.connection,
+    generation,
+    base: generated,
+    presentation: EMPTY_PRESENTATION,
+    form: generated,
+    bindings,
+    policy,
+    snapshot,
+  }
   const published = await call(base, 'POST', `/v1/forms/${form.formId}/versions`, { token: admin, body: { expectedBase: null, bundle } })
   expectStatus(`${at} POST /v1/forms/${form.formId}/versions`, published, 201)
 }
@@ -224,7 +240,11 @@ async function use(base, tokens, form, journey) {
   const { customer } = journey.order
   const options = await call(base, 'POST', path(`lookups/${source}/query`), { token: tokens.clerk1, body: { operation: 'create', search: customer.search } })
   expectStatus(`${at} the customer lookup for "${customer.search}"`, options, 200)
-  expectEqual(`${at} the customers tenant 1 finds for "${customer.search}"`, options.json.rows.map((option) => option.label), [customer.choose])
+  expectEqual(
+    `${at} the customers tenant 1 finds for "${customer.search}"`,
+    options.json.rows.map((option) => option.label),
+    [customer.choose],
+  )
 
   const answers = { customer: options.json.rows[0].token, ...Object.fromEntries(journey.order.create.map((entry) => [entry.field, entry.value])) }
   const id = writeId()
@@ -367,9 +387,17 @@ export async function deleteOrder(base, tokens, formId, record, at) {
   const read = await call(base, 'POST', path('records/read'), { token: tokens.clerk1, body: { record } })
   expectStatus(`${at} reading the order on ${formId}`, read, 200)
   const { version } = read.json
-  const theirs = await call(base, 'POST', path('records/delete'), { token: tokens.clerk2, body: { record, version }, headers: { 'formancy-write-id': writeId() } })
+  const theirs = await call(base, 'POST', path('records/delete'), {
+    token: tokens.clerk2,
+    body: { record, version },
+    headers: { 'formancy-write-id': writeId() },
+  })
   expectStatus(`${at} tenant 2 deleting tenant 1's order`, theirs, 404)
-  const deleted = await call(base, 'POST', path('records/delete'), { token: tokens.clerk1, body: { record, version }, headers: { 'formancy-write-id': writeId() } })
+  const deleted = await call(base, 'POST', path('records/delete'), {
+    token: tokens.clerk1,
+    body: { record, version },
+    headers: { 'formancy-write-id': writeId() },
+  })
   expectStatus(`${at} records/delete of tenant 1's order`, deleted, 200)
   expectEqual(`${at} what records/delete answered`, deleted.json, { record, deleted: true })
   const gone = await call(base, 'POST', path('records/read'), { token: tokens.clerk1, body: { record } })
@@ -388,20 +416,23 @@ export async function journeyFor(base, tokens, form, journey) {
 function asWritten(base, method, target) {
   const { hostname, port } = new URL(base)
   return new Promise((resolve, reject) => {
-    const outgoing = httpRequest({ host: hostname, port, method, path: target, headers: { accept: 'application/json' }, agent: false, timeout: 60_000 }, (incoming) => {
-      let text = ''
-      incoming.setEncoding('utf8')
-      incoming.on('data', (chunk) => (text += chunk))
-      incoming.on('end', () => {
-        let json
-        try {
-          json = JSON.parse(text)
-        } catch {
-          json = undefined
-        }
-        resolve({ status: incoming.statusCode, json })
-      })
-    })
+    const outgoing = httpRequest(
+      { host: hostname, port, method, path: target, headers: { accept: 'application/json' }, agent: false, timeout: 60_000 },
+      (incoming) => {
+        let text = ''
+        incoming.setEncoding('utf8')
+        incoming.on('data', (chunk) => (text += chunk))
+        incoming.on('end', () => {
+          let json
+          try {
+            json = JSON.parse(text)
+          } catch {
+            json = undefined
+          }
+          resolve({ status: incoming.statusCode, json })
+        })
+      },
+    )
     outgoing.on('timeout', () => outgoing.destroy(new Error(`${method} ${target} had no answer within 60 seconds`)))
     outgoing.on('error', reject)
     outgoing.end()
@@ -429,7 +460,9 @@ export async function proxyProblems(base, token, formId) {
   const target = '/v1/forms/a/versions/..%2F..%2Fb'
   const refused = await asWritten(base, 'GET', target)
   if (refused.status !== 400 || refused.json?.code !== 'path-not-plain') {
-    problems.push(`GET ${target}, sent as written, answered ${String(refused.status)} ${String(refused.json?.code)}, not 400 path-not-plain: nginx did not forward it as sent, or the server routed it`)
+    problems.push(
+      `GET ${target}, sent as written, answered ${String(refused.status)} ${String(refused.json?.code)}, not 400 path-not-plain: nginx did not forward it as sent, or the server routed it`,
+    )
   }
   return problems
 }

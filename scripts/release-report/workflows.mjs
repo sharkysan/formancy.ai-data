@@ -89,7 +89,10 @@ function matrixPairs(job, first, second, where) {
   const [a, b] = [matrixField(first, where), matrixField(second, where)]
   const matrix = job.strategy?.matrix ?? {}
   const crossed = Object.keys(matrix).filter((key) => key !== 'include')
-  if (crossed.length > 0) throw new Error(`${where} collects with --package and --variant, and its matrix lists ${crossed.join(', ')} beside include, whose pairs alone a key can name`)
+  if (crossed.length > 0)
+    throw new Error(
+      `${where} collects with --package and --variant, and its matrix lists ${crossed.join(', ')} beside include, whose pairs alone a key can name`,
+    )
   const pairs = (matrix.include ?? []).map((entry) => [entry?.[a], entry?.[b]])
   if (pairs.length === 0) throw new Error(`${where}: the job's matrix includes no ${a} and ${b}`)
   const partial = pairs.findIndex((pair) => pair.includes(undefined))

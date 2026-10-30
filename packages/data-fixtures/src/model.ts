@@ -70,7 +70,12 @@ const INT16 = { kind: 'integer', min: '-32768', max: '32767' } as const
 const INT32 = { kind: 'integer', min: '-2147483648', max: '2147483647' } as const
 const INT64 = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } as const
 const BYTEA = { kind: 'binary', maxLength: null, fixedLength: false } as const
-const text = (maxLength: number | null, fixedLength: boolean, lengthUnit: TextLengthUnit): ExpectedType => ({ kind: 'text', maxLength, fixedLength, lengthUnit })
+const text = (maxLength: number | null, fixedLength: boolean, lengthUnit: TextLengthUnit): ExpectedType => ({
+  kind: 'text',
+  maxLength,
+  fixedLength,
+  lengthUnit,
+})
 const decimal = (precision: number, scale: number): ExpectedType => ({ kind: 'decimal', precision, scale })
 
 /**

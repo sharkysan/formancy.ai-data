@@ -272,7 +272,11 @@ const WITH_CERTIFICATE = [
  * the module's 120-second timeout; a start that never logs it fails with
  * how Docker says the container ended and the last lines it wrote (0082).
  */
-async function launchSqlServer(image: string, start: SqlServerStart, caller: string | null): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer; certificate: string | undefined }> {
+async function launchSqlServer(
+  image: string,
+  start: SqlServerStart,
+  caller: string | null,
+): Promise<{ container: StartedMSSQLServerContainer; answer: ServerAnswer; certificate: string | undefined }> {
   const container = await (start.certificate === true ? new MSSQLServerContainer(image).withCommand(WITH_CERTIFICATE) : new MSSQLServerContainer(image))
     .withWaitStrategy(reportingUnready(Wait.forLogMessage(/.*Recovery is complete.*/, 1)))
     .withLabels(labelled(caller))

@@ -43,10 +43,18 @@ export const integrityOf = (bytes) => `sha512-${createHash('sha512').update(byte
  */
 export function publishOrder(packages) {
   const names = new Set(packages.map((entry) => entry.name))
-  const needs = new Map(packages.map(({ name, manifest }) => [name, new Set(FIELDS.flatMap((field) => Object.keys(manifest[field] ?? {})).filter((dependency) => names.has(dependency) && dependency !== name))]))
+  const needs = new Map(
+    packages.map(({ name, manifest }) => [
+      name,
+      new Set(FIELDS.flatMap((field) => Object.keys(manifest[field] ?? {})).filter((dependency) => names.has(dependency) && dependency !== name)),
+    ]),
+  )
   const order = []
   while (order.length < packages.length) {
-    const ready = [...needs].filter(([name, deps]) => !order.includes(name) && [...deps].every((dependency) => order.includes(dependency))).map(([name]) => name).sort()
+    const ready = [...needs]
+      .filter(([name, deps]) => !order.includes(name) && [...deps].every((dependency) => order.includes(dependency)))
+      .map(([name]) => name)
+      .sort()
     if (ready.length === 0) throw new Error(`the tarballs depend on one another in a cycle: ${[...names].filter((name) => !order.includes(name)).join(', ')}`)
     order.push(ready[0])
   }
@@ -80,7 +88,8 @@ export function toPublish({ files, report, checked, release, version, commit, ru
     .map(({ path, bytes }) => {
       const file = basename(path)
       const sha256 = createHash('sha256').update(bytes).digest('hex')
-      if (gate.get(file)?.sha256 !== sha256) problems.push(`${file} is not the tarball the install gate installed and ran: sha256 ${sha256}, recorded ${String(gate.get(file)?.sha256)}`)
+      if (gate.get(file)?.sha256 !== sha256)
+        problems.push(`${file} is not the tarball the install gate installed and ran: sha256 ${sha256}, recorded ${String(gate.get(file)?.sha256)}`)
       const manifest = JSON.parse(readTarball(bytes).get('package/package.json')?.toString('utf8') ?? '{}')
       return { file, path, name: manifest.name, version: manifest.version, manifest, integrity: integrityOf(bytes) }
     })
@@ -106,7 +115,8 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/publ
     if (value === undefined || value === '') throw new Error(`publish.mjs needs ${name}`)
     return value
   }
-  for (const name of ['GITHUB_SHA', 'GITHUB_RUN_ID', 'RELEASE', 'VERSION']) if (!process.env[name]) throw new Error(`publish.mjs holds the report to this run, and ${name} is not set`)
+  for (const name of ['GITHUB_SHA', 'GITHUB_RUN_ID', 'RELEASE', 'VERSION'])
+    if (!process.env[name]) throw new Error(`publish.mjs holds the report to this run, and ${name} is not set`)
   const reportFile = resolve(option('--report'))
   const inside = (dir) =>
     readdirSync(dir, { withFileTypes: true })

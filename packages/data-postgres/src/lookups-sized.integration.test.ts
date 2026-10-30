@@ -1,7 +1,16 @@
 import { buildLookupConfig, encodeKeyToken, generateForm, listCursor, planList, recordPage } from '@formancy/data-core'
 import type { FormPolicy, LookupConfig, LookupResult, PolicyContext, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { loadSizedCustomers, sizedListPage, sizedLookupPage, sizedResolveKeys, sizedRowsRead, sizedTerms, startPostgresFixture, versionFact } from '@formancy/data-fixtures'
+import {
+  loadSizedCustomers,
+  sizedListPage,
+  sizedLookupPage,
+  sizedResolveKeys,
+  sizedRowsRead,
+  sizedTerms,
+  startPostgresFixture,
+  versionFact,
+} from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -94,7 +103,13 @@ beforeAll(async () => {
   // As a deployment builds the order form's customer lookup: discovered,
   // generated with `name` displayed, then derived with no option set.
   const sales = await discoverPostgres(owner, { schemas: ['sales'] })
-  const { bindings } = generateForm(sales, { connection: 'test', root: { schema: 'sales', name: 'order' }, formId: 'sized', title: 'Sized', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+  const { bindings } = generateForm(sales, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'sized',
+    title: 'Sized',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  })
   const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
   if (field === undefined) throw new Error('the generator made no customer lookup')
   config = buildLookupConfig(bindings, field.field, { snapshot: sales })
@@ -141,12 +156,12 @@ interface Explained {
 
 /** The captured statement, replayed exactly as the writer under EXPLAIN (ANALYZE), serially or under the defaults. */
 async function explain(statement: (typeof sent)[number], session: 'serial' | 'defaults'): Promise<Explained> {
-  return explainer.begin(async (tx) => {
+  return explainer.begin<Promise<Explained>>(async (tx) => {
     if (session === 'serial') await tx.unsafe('set local max_parallel_workers_per_gather = 0')
     const parameters = statement.parameters.map((value, index) => tx.typed(value as string, statement.types[index] as number))
     const [row] = await tx.unsafe<Array<{ 'QUERY PLAN': Explained[] }>>(`explain (analyze, format json) ${statement.text}`, parameters)
     return row?.['QUERY PLAN'][0] as Explained
-  }) as Promise<Explained>
+  })
 }
 
 function nodes(node: PlanNode): PlanNode[] {
@@ -177,7 +192,9 @@ function rowsRead(plan: Explained): { read: number; bound: number } {
 function shape(plan: Explained): string[] {
   return customerScans(plan).map((node) => {
     const index = (node.Plans ?? []).find((child) => child['Node Type'] === 'Bitmap Index Scan')
-    return index === undefined ? node['Node Type'] : `${node['Node Type']} <- ${index['Node Type']} using ${String(index['Index Name'])} ${String(index['Index Cond'])}`
+    return index === undefined
+      ? node['Node Type']
+      : `${node['Node Type']} <- ${index['Node Type']} using ${String(index['Index Name'])} ${String(index['Index Cond'])}`
   })
 }
 
@@ -188,10 +205,16 @@ function expectedPage(search: string): LookupResult {
 }
 
 /** The tenant's index condition as the server prints it: with each key's `is not null` where it keeps them (VERSION_FACTS.notNullTestsRemoved). */
-const tenantCondition = (): string => (versionFact('notNullTestsRemoved', fixture.server) ? '(tenant_id = 1)' : '((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL))')
+const tenantCondition = (): string =>
+  versionFact('notNullTestsRemoved', fixture.server) ? '(tenant_id = 1)' : '((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL))'
 
 describe.each([
-  ['the order form, filtered to the tenant', TENANT_1, TENANT_ROWS, (): string => `Bitmap Heap Scan <- Bitmap Index Scan using pk_customer ${tenantCondition()}`],
+  [
+    'the order form, filtered to the tenant',
+    TENANT_1,
+    TENANT_ROWS,
+    (): string => `Bitmap Heap Scan <- Bitmap Index Scan using pk_customer ${tenantCondition()}`,
+  ],
   ['a form with no tenant row filter', NO_TENANT_FILTER, TABLE_ROWS, (): string => 'Seq Scan'],
 ] as const)('lookups over the sized customers on %s', (_form, filters, pinned, family) => {
   // The answer both engines must give, row for row, in code-point order on
@@ -226,7 +249,13 @@ describe.each([
     const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NEVER))
     const plan = await explain(statement, 'defaults')
     const { read, bound } = rowsRead(plan)
-    console.log(`${_form}, ${name}: workers launched ${JSON.stringify(nodes(plan.Plan).map((node) => node['Workers Launched']).filter((n) => n !== undefined))}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`)
+    console.log(
+      `${_form}, ${name}: workers launched ${JSON.stringify(
+        nodes(plan.Plan)
+          .map((node) => node['Workers Launched'])
+          .filter((n) => n !== undefined),
+      )}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`,
+    )
     expect(plan.Plan['Actual Rows']).toBeLessThanOrEqual(51)
     expect(Math.abs(read - pinned), `read ${String(read)}, pinned ${String(pinned)}, rounding bound ${String(bound)}`).toBeLessThanOrEqual(bound)
     expect(shape(plan)).toEqual([family()])
@@ -245,7 +274,14 @@ describe('resolving and checking keys on the sized customers', () => {
     [1, 'defaults'],
   ] as const)('resolving %i keys reads at most one row per key (%s)', async (n, session) => {
     const keys = sizedResolveKeys(n)
-    const { answer, statement } = await capture(() => createPostgresLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1, NEVER))
+    const { answer, statement } = await capture(() =>
+      createPostgresLookups(writer).resolve(
+        config,
+        keys.map((key) => tokenOf(key.tenantId, key.customerNo)),
+        TENANT_1,
+        NEVER,
+      ),
+    )
     expect(answer).toHaveLength(n)
     const plan = await explain(statement, session)
     expect(rowsRead(plan).read).toBeGreaterThan(0)
@@ -278,7 +314,14 @@ describe('a page of the sized customers deep in key order (0108)', () => {
   /** The customer form a deployment generates, and the clerk's page of it after the anchor, `deep.size` to a page. */
   const planned = async () => {
     const sales = await discoverPostgres(owner, { schemas: ['sales'] })
-    const { bindings } = generateForm(sales, { connection: 'test', root: { schema: 'sales', name: 'customer' }, formId: 'customers', title: 'Customers', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'] })
+    const { bindings } = generateForm(sales, {
+      connection: 'test',
+      root: { schema: 'sales', name: 'customer' },
+      formId: 'customers',
+      title: 'Customers',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      pinned: ['tenant_id'],
+    })
     const after = listCursor(bindings.identity as string[], { tenant_id: String(deep.anchor.tenantId), customer_no: String(deep.anchor.customerNo) })
     const plan = planList(sales, bindings, POLICY, CLERK, { search: '', sort: [], parent: null, filter: [], after, limit: deep.size })
     if (!plan.ok) throw new Error(plan.message)
@@ -307,7 +350,9 @@ describe('a page of the sized customers deep in key order (0108)', () => {
     if (!offset.answer.ok) throw new Error(offset.answer.message)
     expect(recordPage(bindings, plan, offset.answer.rows).rows.map((row) => row.answers['customer_no'])).toEqual(deep.page)
     const atOffset = await explain(offset.statement, 'serial')
-    console.log(`a page after the ${String(deep.before)}th customer: read ${String(rowsRead(after).read)} by ${JSON.stringify(customerScans(after).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}; at the offset, read ${String(rowsRead(atOffset).read)} by ${JSON.stringify(customerScans(atOffset).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}`)
+    console.log(
+      `a page after the ${String(deep.before)}th customer: read ${String(rowsRead(after).read)} by ${JSON.stringify(customerScans(after).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}; at the offset, read ${String(rowsRead(atOffset).read)} by ${JSON.stringify(customerScans(atOffset).map((node) => `${node['Node Type']} ${String(node['Index Name'])} ${String(node['Index Cond'])}`))}`,
+    )
     // PostgreSQL 15's window reads one row past the page and its extra row, under either way (VERSION_FACTS.windowReadsAhead).
     const ahead = versionFact('windowReadsAhead', fixture.server) ? 1 : 0
     expect({ after: rowsRead(after).read, offset: rowsRead(atOffset).read }).toEqual({ after: deep.read.after + ahead, offset: deep.read.offset + ahead })

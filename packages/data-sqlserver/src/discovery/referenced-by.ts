@@ -129,5 +129,7 @@ export async function readReferencedBy(pool: ConnectionPool, schemas: readonly s
 export function referencedByGaps(described: number, visibility: Visibility): CoverageGap[] {
   const reasons = unseenDefinitions(visibility, 'foreign key on a table in any schema')
   if (reasons.length === 0 || described === 0) return []
-  return [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: `${reasons.join('; ')}, so a key on a table it cannot see may refer to any table in scope` }]
+  return [
+    { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: `${reasons.join('; ')}, so a key on a table it cannot see may refer to any table in scope` },
+  ]
 }

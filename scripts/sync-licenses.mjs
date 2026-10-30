@@ -40,9 +40,7 @@ for (const dir of packages) {
   // A package that publishes from a subdirectory packs from there, so the files
   // have to land where the tarball is actually made from.
   const manifest = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'))
-  const target = manifest.publishConfig?.directory
-    ? join(dir, manifest.publishConfig.directory)
-    : dir
+  const target = manifest.publishConfig?.directory ? join(dir, manifest.publishConfig.directory) : dir
 
   if (!existsSync(target)) {
     // The dist has not been built yet. Not an error: the build will call this

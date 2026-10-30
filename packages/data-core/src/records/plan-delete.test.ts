@@ -97,9 +97,17 @@ describe('planDelete', () => {
   // the auditor, granted no delete, is refused as such whatever the form
   // offers, and so is a clerk on a form whose policy grants delete to nobody.
   test('the policy refuses before the form says it offers no delete', () => {
-    expect(planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, AUDITOR, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, MS_DELETABLE))).toMatchObject({ ok: false, code: 'operation-denied' })
-    expect(planDelete(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, ROWVERSION, described(MS, MS_ORDER))).toMatchObject({ ok: false, code: 'operation-denied' })
-    expect(planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, { ...CLERK, attributes: {} }, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, MS_DELETABLE))).toMatchObject({
+    expect(planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, AUDITOR, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, MS_DELETABLE))).toMatchObject({
+      ok: false,
+      code: 'operation-denied',
+    })
+    expect(planDelete(MS, MS_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, ROWVERSION, described(MS, MS_ORDER))).toMatchObject({
+      ok: false,
+      code: 'operation-denied',
+    })
+    expect(
+      planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, { ...CLERK, attributes: {} }, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, MS_DELETABLE)),
+    ).toMatchObject({
       ok: false,
       code: 'missing-attribute',
     })
@@ -112,7 +120,10 @@ describe('planDelete', () => {
     const tokenless = edited(MS_DELETABLE, (draft) => {
       draft.concurrency = null
     })
-    expect(planDelete(MS_FACTS, tokenless, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, tokenless))).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planDelete(MS_FACTS, tokenless, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(MS_FACTS, tokenless))).toMatchObject({
+      ok: false,
+      code: 'operation-unavailable',
+    })
     const claimed = edited(MS_ORDER, (draft) => {
       draft.operations.delete = true
     })
@@ -137,16 +148,28 @@ describe('planDelete', () => {
       factsSnapshot('postgres', (objects) => {
         const order = objects.find((object) => object.ref.name === 'order')
         const id = order?.columns.find((candidate) => candidate.name === 'id')
-        if (id !== undefined) Object.assign(id, { databaseType: 'uuid', type: { kind: 'uuid' }, generated: 'none', hasDefault: true, defaultExpression: expression })
+        if (id !== undefined)
+          Object.assign(id, { databaseType: 'uuid', type: { kind: 'uuid' }, generated: 'none', hasDefault: true, defaultExpression: expression })
         if (referring) {
-          order?.foreignKeys.push({ name: 'fk_order_parent', columns: ['id'], references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true })
+          order?.foreignKeys.push({
+            name: 'fk_order_parent',
+            columns: ['id'],
+            references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] },
+            onUpdate: 'no-action',
+            onDelete: 'no-action',
+            enforced: true,
+            validated: true,
+          })
         }
       })
     const token = 'k1:1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51'
     const drawn = keyed('gen_random_uuid()')
     const bindings = orderForm(drawn).bindings
     expect(bindings.operations.delete).toBe(true)
-    expect(planDelete(drawn, bindings, DELETE_ORDERS, CLERK, token, '1', described(drawn, bindings))).toMatchObject({ ok: true, request: { key: [{ name: 'id', value: '1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51' }], expectedVersion: '1' } })
+    expect(planDelete(drawn, bindings, DELETE_ORDERS, CLERK, token, '1', described(drawn, bindings))).toMatchObject({
+      ok: true,
+      request: { key: [{ name: 'id', value: '1d3e5a70-9c2b-4f61-8e44-3c0a7d9b2e51' }], expectedVersion: '1' },
+    })
     const constant = keyed("'2b7e1516-28ae-4d2a-a6f7-15880945cf4f'::uuid")
     const claimed = edited(orderForm(constant).bindings, (draft) => {
       draft.operations.delete = true
@@ -168,12 +191,21 @@ describe('planDelete', () => {
     const stamped = factsSnapshot('sqlserver', (objects) => {
       const order = objects.find((object) => object.ref.name === 'order')
       if (order === undefined) return
-      order.columns.push({ ...order.columns[3], name: 'created_at', ordinal: 13, type: { kind: 'timestamp', withTimeZone: true, precision: 6 }, databaseType: 'datetimeoffset' } as never)
+      order.columns.push({
+        ...order.columns[3],
+        name: 'created_at',
+        ordinal: 13,
+        type: { kind: 'timestamp', withTimeZone: true, precision: 6 },
+        databaseType: 'datetimeoffset',
+      } as never)
       order.primaryKey = { name: 'pk_order', columns: ['created_at'] }
     })
     const bindings = orderForm(stamped).bindings
     expect(bindings.operations.delete).toBe(true)
-    expect(planDelete(stamped, bindings, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(stamped, bindings))).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planDelete(stamped, bindings, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(stamped, bindings))).toMatchObject({
+      ok: false,
+      code: 'operation-unavailable',
+    })
   })
 
   // A line form published before 0043 scoped nothing of its own rows:
@@ -200,7 +232,9 @@ describe('planDelete', () => {
     expect(planDelete(cascading, bindings, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(cascading, bindings))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringMatching(/deleting a record of sales\.order also deletes rows of sales\.order_line \(fk_order_line_order, ON DELETE CASCADE\), which cascades does not accept/),
+      message: expect.stringMatching(
+        /deleting a record of sales\.order also deletes rows of sales\.order_line \(fk_order_line_order, ON DELETE CASCADE\), which cascades does not accept/,
+      ),
     })
   })
 
@@ -251,7 +285,13 @@ describe('planDelete', () => {
     const description = described(MS_FACTS, MS_DELETABLE)
     expect(planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, CLERK, 'k1:x', ROWVERSION, description)).toMatchObject({ ok: false, code: 'invalid-record-token' })
     expect(planDelete(MS_FACTS, MS_DELETABLE, DELETE_ORDERS, CLERK, ORDER_TOKEN, '1', description)).toMatchObject({ ok: false, code: 'invalid-version' })
-    expect(planDelete(PG_FACTS, PG_DELETABLE, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(PG_FACTS, PG_DELETABLE))).toMatchObject({ ok: false, code: 'invalid-version' })
-    expect(planDelete(PG_FACTS, PG_DELETABLE, DELETE_ORDERS, CLERK, ORDER_TOKEN, 7 as unknown as string, described(PG_FACTS, PG_DELETABLE))).toMatchObject({ ok: false, code: 'invalid-version' })
+    expect(planDelete(PG_FACTS, PG_DELETABLE, DELETE_ORDERS, CLERK, ORDER_TOKEN, ROWVERSION, described(PG_FACTS, PG_DELETABLE))).toMatchObject({
+      ok: false,
+      code: 'invalid-version',
+    })
+    expect(planDelete(PG_FACTS, PG_DELETABLE, DELETE_ORDERS, CLERK, ORDER_TOKEN, 7 as unknown as string, described(PG_FACTS, PG_DELETABLE))).toMatchObject({
+      ok: false,
+      code: 'invalid-version',
+    })
   })
 })

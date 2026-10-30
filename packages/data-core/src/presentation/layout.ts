@@ -85,14 +85,21 @@ export function readGeneratedLayout(form: FormSchema): LayoutReading {
     const children = node['children']
     if (!Array.isArray(children) || children.length !== 1) return refused(`${at}/children`)
     const grid: unknown = children[0]
-    if (!isRecord(grid) || !hasKeys(grid, ['kind', 'columns', 'children']) || grid['kind'] !== 'table' || grid['columns'] !== 2 || !Array.isArray(grid['children'])) {
+    if (
+      !isRecord(grid) ||
+      !hasKeys(grid, ['kind', 'columns', 'children']) ||
+      grid['kind'] !== 'table' ||
+      grid['columns'] !== 2 ||
+      !Array.isArray(grid['children'])
+    ) {
       return refused(`${at}/children/0`)
     }
     const keys: string[] = []
     const wide = new Set<string>()
     for (const [position, child] of (grid['children'] as unknown[]).entries()) {
       const where = `${at}/children/0/children/${String(position)}`
-      if (!isRecord(child) || !hasKeys(child, ['kind', 'path'], ['span']) || child['kind'] !== 'field' || typeof child['path'] !== 'string') return refused(where)
+      if (!isRecord(child) || !hasKeys(child, ['kind', 'path'], ['span']) || child['kind'] !== 'field' || typeof child['path'] !== 'string')
+        return refused(where)
       if (child['span'] !== undefined && child['span'] !== 'all') return refused(where)
       if (placed.has(child['path'])) return refused(where)
       placed.add(child['path'])

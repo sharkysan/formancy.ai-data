@@ -49,7 +49,9 @@ export function preconditions(inputs: PreconditionInputs): string[] {
       .map((entry) => entry.trim())
       .filter((entry) => entry !== '')
     if (!listed.includes('127.0.0.1') || !listed.includes('localhost')) {
-      problems.push(`A proxy is set (${proxies.join(', ')}), so NO_PROXY must list both 127.0.0.1 and localhost; it lists ${listed.length === 0 ? 'nothing' : listed.join(', ')}.`)
+      problems.push(
+        `A proxy is set (${proxies.join(', ')}), so NO_PROXY must list both 127.0.0.1 and localhost; it lists ${listed.length === 0 ? 'nothing' : listed.join(', ')}.`,
+      )
     }
   }
   for (const image of inputs.missingImages) problems.push(`Pull ${image} before the run; it is not on this machine, and a pull must not happen inside it.`)
@@ -78,7 +80,8 @@ export interface QuietSample {
 export function quietVerdict(samples: readonly QuietSample[], rule: Protocol['quiet']): { quiet: true } | { quiet: false; reason: string } {
   if (samples.length === 0) return { quiet: false, reason: 'no seconds were sampled' }
   const load = Math.max(...samples.map((sample) => sample.loadAverage))
-  if (load >= rule.loadAverageBelow) return { quiet: false, reason: `the 1-minute load average reached ${String(load)}, at least ${String(rule.loadAverageBelow)}` }
+  if (load >= rule.loadAverageBelow)
+    return { quiet: false, reason: `the 1-minute load average reached ${String(load)}, at least ${String(rule.loadAverageBelow)}` }
   const busy = Math.max(...samples.map((sample) => sample.busyVcpus))
   if (busy > rule.busyVcpusAtMost) return { quiet: false, reason: `one second had ${String(busy)} vCPUs busy, more than ${String(rule.busyVcpusAtMost)}` }
   return { quiet: true }
@@ -118,12 +121,19 @@ export function gapRatio(idle: BlockResult['counters']['idle'], baselineMs: numb
  * once more and the second attempt is kept, marked repeated; a second miss
  * refuses the run.
  */
-export async function judged(name: string, block: () => Promise<BlockResult>, baselineMs: number, tolerance: Protocol['calibration']['tolerance']): Promise<Measured> {
+export async function judged(
+  name: string,
+  block: () => Promise<BlockResult>,
+  baselineMs: number,
+  tolerance: Protocol['calibration']['tolerance'],
+): Promise<Measured> {
   const first = await block()
   if (calibrationVerdict(gapRatio(first.counters.idle, baselineMs), tolerance, 1) === 'pass') return { block: first }
   const second = await block()
   if (calibrationVerdict(gapRatio(second.counters.idle, baselineMs), tolerance, 2) === 'refuse') {
-    throw new Refusal(`The run stopped: ${name}: the probe ran slower than the quiet baseline by more than the tolerance in the idle gaps around it, twice; something else is using the machine.`)
+    throw new Refusal(
+      `The run stopped: ${name}: the probe ran slower than the quiet baseline by more than the tolerance in the idle gaps around it, twice; something else is using the machine.`,
+    )
   }
   return { block: second, repeated: true }
 }

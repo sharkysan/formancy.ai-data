@@ -25,7 +25,8 @@ const VERSION_1_1 = '**Version 1.1 — in force from 11 October 2026. Not review
 const VERSION_1_1_SECTION =
   '## 9. Obtaining a production licence\n\nProduction licences are requested from the Rightsholder at info@formancy.ai.\nThe separate commercial agreement that Redistribution requires, which section 3\ndescribes, is requested at the same address.\n'
 const VERSION_0 = '**Version 0 — DRAFT of 8 October 2026. Not yet reviewed by a lawyer.**'
-const VERSION_0_SECTION = "## 9. Obtaining a production licence\n\nThe Software is new and has no published price. Until it does, write to the\nRightsholder through the repository's contact details.\n"
+const VERSION_0_SECTION =
+  "## 9. Obtaining a production licence\n\nThe Software is new and has no published price. Until it does, write to the\nRightsholder through the repository's contact details.\n"
 
 describe('reading the licence', () => {
   // The line at the top, and the one address its section 9 names, are what
@@ -46,11 +47,19 @@ describe('reading the licence', () => {
   // what the documents say of one is decided when it exists, not assumed
   // here. A line nobody wrote would otherwise render a guess.
   test('refuses a draft, a reviewed licence, and a version line it does not read', () => {
-    expect(() => readLicence(licence(VERSION_0, VERSION_0_SECTION))).toThrow(/version line, \*\*Version 0 — DRAFT of 8 October 2026\. Not yet reviewed by a lawyer\.\*\*, is not one scripts\/licence-status\.mjs reads/)
+    expect(() => readLicence(licence(VERSION_0, VERSION_0_SECTION))).toThrow(
+      /version line, \*\*Version 0 — DRAFT of 8 October 2026\. Not yet reviewed by a lawyer\.\*\*, is not one scripts\/licence-status\.mjs reads/,
+    )
     expect(() => readLicence(licence(VERSION_0))).toThrow(/is not one scripts\/licence-status\.mjs reads/)
-    expect(() => readLicence(licence('**Version 2 — in force from 1 December 2026. Reviewed by a lawyer.**'))).toThrow(/is not one scripts\/licence-status\.mjs reads/)
-    expect(() => readLicence(licence('**Version 1.1 — DRAFT of 11 October 2026. Not yet reviewed by a lawyer.**'))).toThrow(/is not one scripts\/licence-status\.mjs reads/)
-    expect(() => readLicence(licence('**Version 1.1 — in force from 1 December 2026. Reviewed by a lawyer.**'))).toThrow(/is not one scripts\/licence-status\.mjs reads/)
+    expect(() => readLicence(licence('**Version 2 — in force from 1 December 2026. Reviewed by a lawyer.**'))).toThrow(
+      /is not one scripts\/licence-status\.mjs reads/,
+    )
+    expect(() => readLicence(licence('**Version 1.1 — DRAFT of 11 October 2026. Not yet reviewed by a lawyer.**'))).toThrow(
+      /is not one scripts\/licence-status\.mjs reads/,
+    )
+    expect(() => readLicence(licence('**Version 1.1 — in force from 1 December 2026. Reviewed by a lawyer.**'))).toThrow(
+      /is not one scripts\/licence-status\.mjs reads/,
+    )
     expect(() => readLicence(licence('**Version 1 — in force from 31 Octember 2026. Not reviewed by a lawyer.**'))).toThrow(/is not one/)
     expect(() => readLicence(licence('**Version 1.1.1 — in force from 11 October 2026. Not reviewed by a lawyer.**'))).toThrow(/is not one/)
     expect(() => readLicence(licence('**Version 1. — in force from 11 October 2026. Not reviewed by a lawyer.**'))).toThrow(/is not one/)

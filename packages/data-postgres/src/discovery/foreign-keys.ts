@@ -34,7 +34,8 @@ export function action(code: string, constraint: string): ReferentialAction {
   // Never reached on PostgreSQL 17, whose catalog has exactly the five codes
   // above. Kept so that a sixth, in some later release, fails discovery with
   // the constraint's name instead of reporting an action nobody declared.
-  if (found === undefined) throw new Error(`foreign key ${constraint} has a referential action PostgreSQL code ${JSON.stringify(code)} this adapter does not know`)
+  if (found === undefined)
+    throw new Error(`foreign key ${constraint} has a referential action PostgreSQL code ${JSON.stringify(code)} this adapter does not know`)
   return found
 }
 

@@ -95,7 +95,13 @@ describe("the admin's palette", () => {
   // two, one of them nobody upstream knows about. Said as each stylesheet and
   // the variable it declares, so a failure names what to remove.
   test('is declared by no stylesheet of any app', () => {
-    const copied = apps.flatMap(({ sheets }) => sheets.flatMap(({ path, text }) => declared(text).filter((name) => variables.includes(name)).map((name) => `${path} ${name}`)))
+    const copied = apps.flatMap(({ sheets }) =>
+      sheets.flatMap(({ path, text }) =>
+        declared(text)
+          .filter((name) => variables.includes(name))
+          .map((name) => `${path} ${name}`),
+      ),
+    )
     expect(copied).toEqual([])
   })
 })

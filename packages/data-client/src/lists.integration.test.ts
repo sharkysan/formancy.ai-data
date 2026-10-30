@@ -60,11 +60,27 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
   // of the body the client builds.
   test('sends exactly the query, in the body of a POST, the token in the header only', async () => {
     const filter = [{ field: 'notes', op: 'contains' as const, text: 'filter-marker-1d3c' }]
-    const query = { search: 'placed', sort: [{ field: 'order_date', direction: 'desc' as const }], parent: null, filter, after: null, limit: 10, columns: ['tenant_id'], offset: 50 }
+    const query = {
+      search: 'placed',
+      sort: [{ field: 'order_date', direction: 'desc' as const }],
+      parent: null,
+      filter,
+      after: null,
+      limit: 10,
+      columns: ['tenant_id'],
+      offset: 50,
+    }
     expectOk(await plane.client().list(formId, query))
     const [sent] = plane.sent
     expect(sent).toMatchObject({ method: 'POST', url: `${plane.base}/v1/forms/${formId}/records/list` })
-    expect(JSON.parse(sent?.body ?? 'null')).toEqual({ search: 'placed', sort: [{ field: 'order_date', direction: 'desc' }], parent: null, filter, after: null, limit: 10 })
+    expect(JSON.parse(sent?.body ?? 'null')).toEqual({
+      search: 'placed',
+      sort: [{ field: 'order_date', direction: 'desc' }],
+      parent: null,
+      filter,
+      after: null,
+      limit: 10,
+    })
     expect(sent?.url).not.toMatch(/placed|filter-marker/)
     expect(sent?.headers['authorization']).toBe(`Bearer ${plane.tokens.clerk}`)
     expect(sent?.body).not.toContain(plane.tokens.clerk)
@@ -101,7 +117,12 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
     const from = every.find((row) => row.answers['notes'] === 'paged 15')
     if (from === undefined) throw new Error('tenant 3 has an order noted paged 15')
     const first = BigInt(String(from.answers['id']))
-    const kept = await pages({ filter: [{ field: 'notes', op: 'contains', text: ' PAGED 1 ' }, { field: 'id', op: 'range', from: String(first), to: null }] })
+    const kept = await pages({
+      filter: [
+        { field: 'notes', op: 'contains', text: ' PAGED 1 ' },
+        { field: 'id', op: 'range', from: String(first), to: null },
+      ],
+    })
     expect(notes(kept)).toEqual(notes(every.filter((row) => String(row.answers['notes']).includes('paged 1') && BigInt(String(row.answers['id'])) >= first)))
     expect(notes(kept)).toEqual(['paged 15', 'paged 16', 'paged 17', 'paged 18', 'paged 19'])
   })

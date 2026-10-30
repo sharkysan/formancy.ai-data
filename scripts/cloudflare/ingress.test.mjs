@@ -3,7 +3,20 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import YAML from 'yaml'
-import { CLIMBS, hostilePaths, ingressYaml, matchedRule, MEASURED, parseInputs, probes, rules, SERVICES, STATIC_FILES, staticClimbs, tunnelIdOf } from '../../deploy/cloudflare/ingress.mjs'
+import {
+  CLIMBS,
+  hostilePaths,
+  ingressYaml,
+  matchedRule,
+  MEASURED,
+  parseInputs,
+  probes,
+  rules,
+  SERVICES,
+  STATIC_FILES,
+  staticClimbs,
+  tunnelIdOf,
+} from '../../deploy/cloudflare/ingress.mjs'
 import { staticLocations } from './gate.mjs'
 
 /**
@@ -118,7 +131,12 @@ describe('the configuration file', () => {
       { hostname: 'app.example.com', service: 'http://hostapp:3000' },
       { service: 'http_status:404' },
     ])
-    expect(rules({ ...inputs, app: 'app.example.com', appService: 'http://hostapp:3000' })).toEqual({ administrator: 0, runtime: 1, 'app-service': 2, 'catch-all': 3 })
+    expect(rules({ ...inputs, app: 'app.example.com', appService: 'http://hostapp:3000' })).toEqual({
+      administrator: 0,
+      runtime: 1,
+      'app-service': 2,
+      'catch-all': 3,
+    })
   })
 
   // A team or a tag of digits alone would be a YAML number.
@@ -149,7 +167,14 @@ describe('the probes', () => {
       expect(list).toContainEqual(expect.objectContaining({ url: `https://formancy.example.com${route.sample}`, rule: 0 }))
       expect(list).toContainEqual(expect.objectContaining({ url: `https://app.example.com${route.sample}`, rule: route.plane === 'runtime' ? 1 : 2 }))
     }
-    expect(urls(list)).toEqual(expect.arrayContaining(['https://app.example.com/studio/', 'https://app.example.com/host/', 'https://app.example.com/health', 'https://app.example.com/v1/whoami']))
+    expect(urls(list)).toEqual(
+      expect.arrayContaining([
+        'https://app.example.com/studio/',
+        'https://app.example.com/host/',
+        'https://app.example.com/health',
+        'https://app.example.com/v1/whoami',
+      ]),
+    )
     expect(list).toContainEqual(expect.objectContaining({ url: 'https://app.example.com/v1/forms/order/', rule: 2 }))
     expect(list).toContainEqual(expect.objectContaining({ url: 'https://app.example.com/v1/forms/order?next=/v1/connections', rule: 1 }))
     expect(list).toContainEqual(expect.objectContaining({ url: 'https://not-a-door.formancy.example.com/v1/whoami', rule: 2 }))
@@ -268,7 +293,11 @@ describe('the climbs out of the web front’s file locations', () => {
       const location = statics.find((prefix) => entry.route.endsWith(prefix))
       const nginx = asNginxReadsIt(entry.path)
       if (entry.climb.startsWith('%2F')) expect(nginx, entry.path).toMatch(/^\/v1\/forms\//)
-      else expect(Object.values(STATIC_FILES).map((file) => `${location}${file}`), entry.path).toContain(nginx)
+      else
+        expect(
+          Object.values(STATIC_FILES).map((file) => `${location}${file}`),
+          entry.path,
+        ).toContain(nginx)
     }
     expect(hostilePaths(doors, { statics })).toEqual(expect.arrayContaining(climbs))
   })
@@ -295,7 +324,9 @@ describe('the climbs out of the web front’s file locations', () => {
       path,
       passed: /^\s*proxy_pass\s+http:\/\/server:4390;$/m.test(body),
     }))
-    const chosen = (path) => locations.find((entry) => entry.exact && entry.path === path) ?? locations.filter((entry) => !entry.exact && path.startsWith(entry.path)).sort((a, b) => b.path.length - a.path.length)[0]
+    const chosen = (path) =>
+      locations.find((entry) => entry.exact && entry.path === path) ??
+      locations.filter((entry) => !entry.exact && path.startsWith(entry.path)).sort((a, b) => b.path.length - a.path.length)[0]
     for (const route of doors.routes.filter((entry) => entry.plane === 'runtime')) expect(chosen(route.sample)?.passed, route.sample).toBe(true)
     // And nothing else: every other path is nginx's own 404.
     expect(locations).toEqual([

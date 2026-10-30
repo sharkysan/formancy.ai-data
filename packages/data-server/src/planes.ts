@@ -42,6 +42,17 @@ export function servedPlanes(found: ServedConfiguration): Pick<DataServerOptions
   const sink: AuditSink = (event) => logAuditSink(found.log())(event)
   return {
     runtime: { registry, store, origins, lookupDeadlineMs, audit: { sink, ...(auditKey === undefined ? {} : { key: auditKey }) } },
-    ...(adminRoles.length === 0 ? {} : { admin: { registry, store, adminRoles, ...(publisherRoles === undefined ? {} : { publisherRoles }), ...(browseRoles === undefined ? {} : { browseRoles }), audit: { sink } } }),
+    ...(adminRoles.length === 0
+      ? {}
+      : {
+          admin: {
+            registry,
+            store,
+            adminRoles,
+            ...(publisherRoles === undefined ? {} : { publisherRoles }),
+            ...(browseRoles === undefined ? {} : { browseRoles }),
+            audit: { sink },
+          },
+        }),
   }
 }
