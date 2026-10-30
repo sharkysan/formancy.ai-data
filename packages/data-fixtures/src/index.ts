@@ -21,6 +21,7 @@ export {
   throughCase,
   UPDATE_RECREATED_CASE,
   uuidCase,
+  versionCase,
 } from './cases.js'
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
 export { BROWSE_PARITY } from './browse.js'
@@ -62,6 +63,8 @@ export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './
 export { renamedColumn } from './rename.js'
 export { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 export { DELIVERIES, UUID_PARITY, UUID_ROWS, uuidOrder } from './uuid.js'
+export { VERSION_PARITY } from './chains.js'
+export type { VersionCase } from './chains.js'
 export type { UuidCase } from './uuid.js'
 export { answerBytes, startTcpHop } from './tcp-hop.js'
 export { PRELOGIN_ENCRYPTION, preloginAnswer, preloginPayload, startPreloginStandIn, TDS_PACKET, tdsPacket } from './prelogin.js'

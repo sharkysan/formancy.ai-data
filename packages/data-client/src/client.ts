@@ -236,7 +236,11 @@ export function createDataClient(options: DataClientOptions) {
     })
   }
 
-  async function write(formId: string, intent: WriteIntent & { operation: 'create' | 'update' }, body: Record<string, unknown>): Promise<WriteOutcome> {
+  async function write(
+    formId: string,
+    intent: WriteIntent & { operation: 'create' | 'update' | 'supersede' },
+    body: Record<string, unknown>,
+  ): Promise<WriteOutcome> {
     const answer = await sendWrite(formId, intent, body)
     // Nothing was sent: a refusal like any other.
     return 'sent' in answer ? invalidName : writeOutcome(answer, intent)
@@ -349,6 +353,23 @@ export function createDataClient(options: DataClientOptions) {
       write(
         formId,
         { operation: 'update', record: change.record, version: change.version },
+        { record: change.record, version: change.version, answers: change.answers },
+      ),
+
+    /**
+     * `POST …/records/supersede` (0113): the open version of a chain, ended
+     * where the answers start the next one, only if it is still at
+     * `version` -- otherwise 409 `stale`, or `version-ended` for a version
+     * that had ended -- and the next version inserted. The answer is the
+     * next version, with its own token and version; an `UnknownWrite` when
+     * nobody can say whether it was saved, and sending it again with the
+     * same version is stored at most once. Exactly the route's keys are
+     * sent.
+     */
+    supersede: (formId: string, change: { record: string; version: string; answers: Readonly<Record<string, unknown>> }): Promise<WriteOutcome> =>
+      write(
+        formId,
+        { operation: 'supersede', record: change.record, version: change.version },
         { record: change.record, version: change.version, answers: change.answers },
       ),
 

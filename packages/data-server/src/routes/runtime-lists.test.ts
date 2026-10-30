@@ -246,6 +246,9 @@ function registry(): ConnectionRegistry {
     update: async () => {
       throw new Error('a list never updates')
     },
+    supersede: async () => {
+      throw new Error('these routes never change a version from a date')
+    },
     delete: async () => {
       throw new Error('a list never deletes')
     },

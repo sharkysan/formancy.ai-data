@@ -21,7 +21,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, delete, reconcile, query, resolve }
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, reconcile, query, resolve }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve, maxRows } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
@@ -31,19 +31,20 @@ fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applySer
 Every client function resolves to an `Outcome`: `{ ok: true, value }` or a
 `Refusal` — `{ ok: false, status, code, message, fieldErrors? }`. It rejects
 only for an abort the caller asked for, with the AbortError it raised.
-`create` and `update` resolve to a `WriteOutcome`, which is that or an
+`create`, `update` and `supersede` resolve to a `WriteOutcome`, which is that or an
 `UnknownWrite` — see below; `delete` to a `DeleteOutcome`, the server's
 `{ record, deleted: true }` or a refusal, or an `UnknownWrite`.
 
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
 | `create(formId, answers)` | `POST /v1/forms/:id/records/create` |
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
+| `supersede(formId, { record, version, answers })` | `POST /v1/forms/:id/records/supersede` → the next version (0113) |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |

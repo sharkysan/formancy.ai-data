@@ -11,8 +11,18 @@ import {
   readableFields,
   runtimeOperations,
   toFormAnswers,
+  versionFields,
 } from '@formancy/data-core'
-import type { DescribedTable, DriftChange, PlanRefusal, PolicyContext, PolicyOperation, PublishedForm, RecordFailure } from '@formancy/data-core'
+import type {
+  DescribedTable,
+  DriftChange,
+  PlanRefusal,
+  PolicyContext,
+  PolicyOperation,
+  PublishedForm,
+  RecordFailure,
+  UnknownOutcome,
+} from '@formancy/data-core'
 import type { HostIdentity } from '@formancy/data-identity'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -27,7 +37,8 @@ import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
-import { registerWriteRoutes } from './runtime-writes.js'
+import { registerSupersedeRoute } from './runtime-supersede.js'
+import { memberships, readForWrite, registerWriteRoutes, withoutEchoes } from './runtime-writes.js'
 import { createWriteOnce } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
 
@@ -75,6 +86,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/create': 'create',
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
+  'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
 }
@@ -173,7 +185,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   function lost(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: 'create' | 'update' | 'delete',
+    operation: UnknownOutcome['operation'],
     record: string | null,
     version: string | null,
     failure: string,
@@ -189,7 +201,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: 'create' | 'update' | 'delete',
+    operation: UnknownOutcome['operation'],
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
@@ -323,7 +335,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
     // What a copy of a record carries into a new one: only where a create is offered (0107).
     const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied } satisfies PublishedForm
+    // Where a version may be changed from a date: it ends one and creates the next (0113).
+    const versions = operations.includes('create') && operations.includes('update') ? versionFields(bundle.bindings) : null
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied, versions } satisfies PublishedForm
   })
 
   /**
@@ -365,6 +379,20 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })
+
+  // A change from a date (0113): the update's read and steps, a create's answer.
+  registerSupersedeRoute(app, {
+    published,
+    connection,
+    context,
+    sendOnce,
+    lost,
+    refusal,
+    answered,
+    readForWrite: (bundle, open, actor, record) => readForWrite(describedRoot, bundle, open, actor, record),
+    withoutEchoes,
+    memberships: (open, checks, log) => memberships(open, checks, log, options.lookupDeadlineMs),
+  })
 
   // A lookup's options and labels, each one statement that stops when its request is abandoned or its deadline passes (0061).
   registerLookupRoutes(app, { published, connection, context, lookupDeadlineMs: options.lookupDeadlineMs })

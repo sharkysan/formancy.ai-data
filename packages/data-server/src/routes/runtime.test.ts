@@ -290,6 +290,9 @@ function registry(): ConnectionRegistry {
       calls.updates.push(request)
       return writeOutcome
     },
+    supersede: async () => {
+      throw new Error('these routes never change a version from a date')
+    },
     delete: async () => {
       throw new Error('these routes never delete')
     },

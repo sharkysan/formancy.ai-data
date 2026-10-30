@@ -3,7 +3,7 @@ import type { ColumnMeta, Generation, ObjectMeta } from '../metadata.js'
 import type { ConcurrencyBinding, FormBindings } from './types.js'
 
 /** A write a form may offer, as its bindings say: the operations other than read, which every form offers. */
-export type OfferedOperation = 'create' | 'update' | 'delete'
+export type OfferedOperation = 'create' | 'update' | 'delete' | 'supersede'
 
 /**
  * Whether the bindings offer `operation` (0050): exactly when they say

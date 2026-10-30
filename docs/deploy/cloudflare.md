@@ -359,7 +359,7 @@ ingress:
         audTag:
           - '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
   - hostname: app.example.com
-    path: '^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$'
+    path: '^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update)$'
     service: http://web:8081
   - service: http_status:404
 ```
@@ -399,6 +399,7 @@ that does, so they hold either way:
 | `POST` | `/v1/forms/:id/records/export` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/list` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/read` | runtime | behind Access | forwarded |
+| `POST` | `/v1/forms/:id/records/supersede` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/records/update` | runtime | behind Access | forwarded |
 | `POST` | `/v1/forms/:id/regenerations` | administrator | behind Access | not forwarded |
 | `POST` | `/v1/forms/:id/restorations` | administrator | behind Access | not forwarded |
@@ -411,7 +412,7 @@ that does, so they hold either way:
 The runtime door forwards a path only when it matches this pattern, which setup writes into the tunnel’s configuration and checks against cloudflared:
 
 ```text
-^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/update)$
+^(?:/v1/forms|/v1/forms/[^/]+|/v1/forms/[^/]+/lookups/[^/]+/query|/v1/forms/[^/]+/lookups/[^/]+/resolve|/v1/forms/[^/]+/records/create|/v1/forms/[^/]+/records/delete|/v1/forms/[^/]+/records/export|/v1/forms/[^/]+/records/list|/v1/forms/[^/]+/records/read|/v1/forms/[^/]+/records/supersede|/v1/forms/[^/]+/records/update)$
 ```
 
 <!-- end generated -->
@@ -659,6 +660,7 @@ pass  POST https://formancy.example.com/v1/forms/order/records/delete  Access an
 pass  POST https://formancy.example.com/v1/forms/order/records/export  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/list  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/read  Access answered first
+pass  POST https://formancy.example.com/v1/forms/order/records/supersede  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/records/update  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/regenerations  Access answered first
 pass  POST https://formancy.example.com/v1/forms/order/restorations  Access answered first
@@ -668,7 +670,7 @@ pass  GET https://formancy.example.com/v1/forms/order/versions/1  Access answere
 pass  GET https://formancy.example.com/v1/forms/order/versions/latest  Access answered first
 pass  GET https://formancy.example.com/v1/whoami  Access answered first
 pass  GET http://formancy.example.com/studio/  redirected to HTTPS
-34 requests, 34 as expected, 0 not.
+35 requests, 35 as expected, 0 not.
 ```
 
 <!-- end generated -->

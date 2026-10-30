@@ -279,4 +279,41 @@ create table parity.party_company (
   version int not null default 1
 );
 
+-- A product's prices per tenant (0113): each version valid from valid_from
+-- until, not including, valid_to, the open one NULL there. The key is the
+-- chain's -- tenant and product -- and the start, so one product's prices
+-- are one chain. Versioned by a column the module moves. price_declined is
+-- the same, but a BEFORE INSERT trigger keeps a version noted 'next' from
+-- being inserted, returning NULL, as declined's keeps every insert out:
+-- the next version a change from a date would start.
+create table parity.price (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount numeric(18, 4) not null,
+  note varchar(50) null,
+  version int not null default 1,
+  constraint pk_price primary key (tenant_id, product_no, valid_from)
+);
+create table parity.price_declined (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount numeric(18, 4) not null,
+  note varchar(50) null,
+  version int not null default 1,
+  constraint pk_price_declined primary key (tenant_id, product_no, valid_from)
+);
+create function parity.decline_next_price() returns trigger language plpgsql as $$
+begin
+  if new.note = 'next' then
+    return null;
+  end if;
+  return new;
+end
+$$;
+create trigger tr_price_declined before insert on parity.price_declined for each row execute function parity.decline_next_price();
+
 analyze parity.tenant_item;

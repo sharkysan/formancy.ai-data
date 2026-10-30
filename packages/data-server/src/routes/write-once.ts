@@ -106,7 +106,7 @@ export function createWriteOnce(now: () => number = Date.now) {
      * arrive together cannot both perform.
      */
     async once(
-      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete'; id: string; body: unknown },
+      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede'; id: string; body: unknown },
       perform: () => Promise<WriteAnswer>,
     ): Promise<WriteAnswer & { repeated: boolean }> {
       prune()

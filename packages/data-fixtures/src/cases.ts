@@ -19,6 +19,8 @@ import type { FilterParityCase, RefusalParityCase } from './parity.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import { UUID_PARITY } from './uuid.js'
 import type { UuidCase } from './uuid.js'
+import { VERSION_PARITY } from './chains.js'
+import type { VersionCase } from './chains.js'
 import { EDGE_VALUES } from './values.js'
 
 declare module 'vitest' {
@@ -101,6 +103,9 @@ export const browseCase = (name: BrowseCase): string => `browse: ${name}`
 /** What a person's conditions on a list's or a browse's columns narrow it to on each engine (0104), by the name of its entry in COLUMN_FILTER_PARITY. */
 export const columnFilterCase = (name: ColumnFilterCase): string => `column filter: ${name}`
 
+/** What a form over versions does on each engine (0113), by the name of its entry in VERSION_PARITY. */
+export const versionCase = (name: VersionCase): string => `versions: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -109,7 +114,8 @@ export const columnFilterCase = (name: ColumnFilterCase): string => `column filt
  * a form's records shows (0044), then what a delete does (0050) and what it
  * does past its record (0051), then what a uuid key does (0056), then what a
  * file of a form's records holds (0079), then what a browse shows (0099),
- * then what a person's conditions on its columns narrow a list to (0104).
+ * then what a person's conditions on its columns narrow a list to (0104),
+ * then what a form over versions does (0113).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -133,6 +139,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
     ...(Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
     ...(Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
+    ...(Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

@@ -73,7 +73,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * the stale one it is (0098). An unedited instant or time the actor may write
  * is the planner's to remove, against the same read (0040).
  */
-function withoutEchoes(
+export function withoutEchoes(
   bundle: PublishedBundle,
   actor: PolicyContext,
   operation: 'create' | 'update',
@@ -108,7 +108,7 @@ function withoutEchoes(
  * past its deadline keeps the answer every failed check has, nothing
  * saved, and the log says the deadline passed.
  */
-async function memberships(
+export async function memberships(
   open: OpenConnection,
   checks: readonly MembershipCheck[],
   log: FastifyBaseLogger,
@@ -207,24 +207,9 @@ async function updated(
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'update')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
-  let current: FormRecord | undefined
-  let unread: RecordFailure | undefined
-  let described: DescribedTable | undefined
-  const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
-  if (reading.ok) {
-    const stored = await open.records.read(reading.request)
-    if (!stored.ok) unread = stored
-    else {
-      described = stored.described
-      if (stored.record === null) unread = NOT_FOUND
-      else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
-    }
-  }
-  if (described === undefined) {
-    const root = await steps.describedRoot(bundle, open)
-    if (!root.ok) return root.answer
-    described = root.described
-  }
+  const read = await readForWrite(steps.describedRoot, bundle, open, actor, record)
+  if (!read.ok) return read.answer
+  const { current, unread, described } = read
   // The record as read now is newer than the one the person saved over: the
   // database will answer stale, and an echo the change moved is not theirs.
   const behind = current !== undefined && current.version !== null && current.version !== version
@@ -251,6 +236,42 @@ async function updated(
   if (!outcome.ok && outcome.code === 'unknown-outcome') return steps.lost(request, 'update', record, version, outcome.message)
   if (!outcome.ok) return recordFailure(bundle.bindings, outcome)
   return { status: 200, body: toFormAnswers(bundle.bindings, plan.fields, outcome) }
+}
+
+/**
+ * The record a write decides over, as this actor reads it, and the root's
+ * description that read carried -- or, for an actor who may not read, or
+ * after a read that failed, the root described in a statement of its own.
+ * `unread` is the read's failure, which the caller answers where only the
+ * read could tell an echo from a change (0040). An update's, and a change
+ * from a date's (0113).
+ */
+export async function readForWrite(
+  describedRoot: WriteRouteSteps['describedRoot'],
+  bundle: PublishedBundle,
+  open: OpenConnection,
+  actor: PolicyContext,
+  record: string,
+): Promise<{ ok: true; current: FormRecord | undefined; unread: RecordFailure | undefined; described: DescribedTable } | { ok: false; answer: WriteAnswer }> {
+  let current: FormRecord | undefined
+  let unread: RecordFailure | undefined
+  let described: DescribedTable | undefined
+  const reading = planRead(bundle.snapshot, bundle.bindings, bundle.policy, actor, record)
+  if (reading.ok) {
+    const stored = await open.records.read(reading.request)
+    if (!stored.ok) unread = stored
+    else {
+      described = stored.described
+      if (stored.record === null) unread = NOT_FOUND
+      else current = toFormAnswers(bundle.bindings, reading.fields, { ok: true, ...stored.record })
+    }
+  }
+  if (described === undefined) {
+    const root = await describedRoot(bundle, open)
+    if (!root.ok) return { ok: false, answer: root.answer }
+    described = root.described
+  }
+  return { ok: true, current, unread, described }
 }
 
 /**

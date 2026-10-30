@@ -5,6 +5,7 @@ import type {
   DeleteRequest,
   DeleteTerms,
   DescribedRead,
+  InsertRequest,
   ListOutcome,
   ListRequest,
   ObjectRef,
@@ -15,6 +16,7 @@ import type {
   RecordRead,
   RecordTarget,
   RowFilterTerm,
+  SupersedeRequest,
   ThroughTerms,
   UpdateRequest,
 } from '@formancy/data-core'
@@ -28,7 +30,7 @@ import { deleteStatement, whyNotDeletedStatement } from './delete.js'
 import { connectionLost, recordFailure, sqlState } from './errors.js'
 import type { Phase } from './errors.js'
 import { listStatement } from './list.js'
-import { checkInsert, checkKey, checkUpdate, isVersion } from './requests.js'
+import { checkInsert, checkKey, checkSupersede, checkUpdate, isVersion } from './requests.js'
 import {
   definitionStatement,
   DESCRIBED_COLUMNS,
@@ -41,9 +43,31 @@ import {
   updateStatement,
 } from './sql.js'
 import type { RecordStatement, WritePath } from './sql.js'
+import { freshStatement, supersedeStatement } from './versions.js'
 
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
 const STALE: RecordFailure = { ok: false, code: 'stale', message: 'The record changed after it was read; its version is no longer the one sent.' }
+const VERSION_ENDED: RecordFailure = {
+  ok: false,
+  code: 'version-ended',
+  message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).',
+}
+const CHAIN_EXISTS: RecordFailure = {
+  ok: false,
+  code: 'chain-exists',
+  message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).',
+}
+/**
+ * A change from a date whose own check undid it (0113): it ended a version
+ * and inserted none -- a trigger or a rule declined the next one -- or the
+ * key matched more than one row. Nothing was written either way.
+ */
+const DECLINED_CHANGE: RecordFailure = {
+  ok: false,
+  code: 'refused',
+  message:
+    'PostgreSQL undid the change from a date: the next version was declined by a trigger or a rule, or the key matched more than one row. Nothing was written.',
+}
 
 /**
  * A write the server completed without writing the row, and without an
@@ -296,7 +320,7 @@ async function moved(sql: Sql, table: ObjectRef, definition: Definition, path: W
  */
 async function whyNothingChanged(
   sql: Sql,
-  request: UpdateRequest,
+  request: Pick<UpdateRequest, 'target' | 'key' | 'expectedVersion' | 'open'>,
   scope: { terms: readonly RowFilterTerm[]; through: readonly ThroughTerms[] },
   withVersion: boolean,
   definition: Definition,
@@ -304,11 +328,13 @@ async function whyNothingChanged(
 ): Promise<RecordFailure> {
   const asked = await attempt(sql, nothingChangedStatement(request, scope.terms, scope.through, withVersion, definition), 'read')
   if (!asked.ok) return asked.failure
-  const [same, isolation, unchanged] = asked.result.rows[0] as TextRow
+  const [same, isolation, unchanged, open] = asked.result.rows[0] as TextRow
   if (same !== 'true') return DEFINITION_MOVED
   if (path === 'read-committed' && isolation !== READ_COMMITTED) return ISOLATION_DIFFERS
   if (unchanged === null || unchanged === undefined) return NOT_FOUND
-  return unchanged === 'true' ? DECLINED_UPDATE : STALE
+  if (unchanged !== 'true') return STALE
+  // At the version sent and ended: the person's read was of an ended version (0113).
+  return open === 'false' ? VERSION_ENDED : DECLINED_UPDATE
 }
 
 /**
@@ -340,6 +366,17 @@ async function whyNotDeleted(
   if (path === 'read-committed' && isolation !== READ_COMMITTED) return ISOLATION_DIFFERS
   if (unchanged === null || unchanged === undefined) return NOT_FOUND
   return unchanged === 'true' ? DECLINED_DELETE : STALE
+}
+
+/**
+ * `chain-exists` for a create of a chain's first version that inserted
+ * nothing where its chain now has a version (0113), or `undefined`: another
+ * cause, or a create that starts no chain. Asked after the write, as a read.
+ */
+async function chainThere(sql: Sql, request: InsertRequest): Promise<RecordFailure | undefined> {
+  if (request.fresh === undefined) return undefined
+  const asked = await attempt(sql, freshStatement(request), 'read')
+  return asked.ok && (asked.result.rows[0] as TextRow)[0] === 'false' ? CHAIN_EXISTS : undefined
 }
 
 /** The path a definition's isolation chooses, before anything is sent, so a write is never sent twice (0015). */
@@ -430,8 +467,29 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // INSERT 0 0, and no error: the guard, a trigger or a rule. Without
       // RETURNING there is no row to read either way, so the command tag is
       // what says whether one was written.
-      if (ran.result.count !== 1) return (await moved(sql, table, definition, path)) ?? DECLINED_INSERT
+      if (ran.result.count !== 1) return (await moved(sql, table, definition, path)) ?? (await chainThere(sql, request)) ?? DECLINED_INSERT
       return { ok: true, ...recordOf(request.target, request.returning, ran.result.rows[0] ?? []) }
+    },
+
+    async supersede(request): Promise<RecordOutcome> {
+      const terms = rowFilterTerms(request.filters)
+      const scope = { terms, through: throughTerms(request.through) }
+      checkSupersede(request)
+      const definition = parseDefinition(request.definition)
+      const path = pathOf(definition)
+      const table = request.target.table
+      const located = { target: request.target, key: request.key, expectedVersion: request.expectedVersion, open: request.ends }
+      if (!isVersion(request.expectedVersion)) return whyNothingChanged(sql, located, scope, false, definition, path)
+      const ran = await sendWrite(sql, lockStatement(table, 'row exclusive'), path, supersedeStatement(request, terms, scope.through, definition, path))
+      if (!ran.ok) {
+        if (ran.state === CARDINALITY) return DECLINED_CHANGE
+        return ran.state === '40001' ? whyNothingChanged(sql, located, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
+      }
+      // Always one row: `one` NULL where nothing was ended, the next version beside it otherwise.
+      const row = onlyRow(ran.result) as TextRow
+      return row[0] === null
+        ? whyNothingChanged(sql, located, scope, true, definition, path)
+        : { ok: true, ...recordOf(request.target, request.returning, row.slice(1)) }
     },
 
     async update(request): Promise<RecordOutcome> {

@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:018c039a41a47c6326408eb617694d7bcf15799e19c48f4d7df0cad92e42d763",
+      "reviewed": "sha256:70f4af6c63dc720b4a6824eb28411dbbfa867ede44ee819ea2760cd6c7da0ba5",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:dfafcf138921ffba38db957dbc885da649a0717496199611c6bb9270e4e51b6d",
+      "reviewed": "sha256:0d74f897564c1be05d0f777f5cab1c935758391d312585162d4c9263b3a86924",
       "limitations": [
         {
           "area": "operations",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:2ab2b697c7ec785952035c796ad183809518b993e4b867e9a4293b0267b3f3b4",
+      "reviewed": "sha256:fa2f9c35db8b11d8788a0b8a9098dab1cfb17216494e6223060255e8b2b0add0",
       "limitations": [
         {
           "area": "writes",
@@ -1423,7 +1423,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:1deb888de814a88866c564b19102ef7e23113b83ff904c83e5798046400556a6",
+      "reviewed": "sha256:adec72050ff4442e8a8fd306912bf385aec4b56b37febeab3926d45a1c802def",
       "limitations": [
         {
           "area": "writes",
@@ -3377,8 +3377,65 @@
         }
       ]
     },
+    "0113": {
+      "reviewed": "sha256:7ef99c0ae6ad7888f281d89d054ac819253b16c4004caa22a9bac53db478f78e",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A chain of versions is read in one spelling only: two columns of one kind, a date or an instant, half-open, the open version NULL in its end; an inclusive end, or an open end spelled 9999-12-31, is not a chain.",
+          "heldBy": "packages/data-core/src/generate/validity.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Append only: an ended version is read-only through the form, and a form over versions offers no delete; a version in the middle of a chain is corrected, inserted or removed in the database.",
+          "heldBy": "packages/data-core/src/generate/validity.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL two creates of one chain at once may both find no version and both insert, two open versions, unless the table holds one open version per chain itself, as a unique index over the chain's key where the end IS NULL does; SQL Server's range lock makes the second wait and find the first."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a change from a date is two statements, an UPDATE and an INSERT, in the one transaction of its batch, rolled back together; the batch's checks of what was stored are the INSERT's.",
+          "heldBy": "packages/data-sqlserver/src/versions.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A create whose chain's key the database fills in part is not checked against the chain, and a row written outside the runtime plane can break a chain.",
+          "heldBy": "packages/data-core/src/records/supersede.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A list of versions shows every version; which are open is a filter a person or a list view applies, and there is no list as of a date."
+        },
+        {
+          "area": "host",
+          "says": "The host page offers no change from a date: a chain is changed through @formancy/data-client."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client reads a form without versions as unexpected, so a host and its server are upgraded together.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0114": {
+      "reviewed": "sha256:42d660125261cd0dcc6c769a7d4944670bb37f025a88fb53557c295c512331ed",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The Versions box is offered from what the snapshot says a column could be, not from whether the pair holds a chain; a pair the generator refuses is refused when the form is generated, in its words.",
+          "heldBy": "apps/studio/src/choose-versions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "Ticked, Versions chooses the first column that could start a version and the first that could end one; a table with several is the administrator's to set.",
+          "heldBy": "apps/studio/src/choose-versions.test.tsx"
+        }
+      ]
+    },
     "0116": {
-      "reviewed": "sha256:db721158cf9e5c6dfb524d31f59e6ee6fbf48c01ab9b0c8498e0474eeb465ced",
+      "reviewed": "sha256:ae497e29b0827d284be06ccddd9113d12797699a151e8deeb5138a66be514c48",
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
     }
   }

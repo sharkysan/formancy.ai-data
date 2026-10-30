@@ -81,7 +81,12 @@ sends again is answered rather than applied
 another replica, or this one after a restart, is applied again. "It may
 have been saved" is also said where nothing was. A create whose key the
 database numbers cannot be reconciled, so a person who confirms "Enter it
-again anyway" may make a duplicate.
+again anyway" may make a duplicate. A chain of versions is kept whole only by
+the runtime plane's writes: on PostgreSQL two creates of one chain at once
+can both start it, two open versions, unless the table's own unique index
+over the chain's key where the end is NULL refuses the second, and a write
+by another application can leave a gap or an overlap
+([0113](../decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
 
 ### Two engines that mean different things
 

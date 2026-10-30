@@ -187,6 +187,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const { generation, snapshot, base, bindings, notes, form, version } = regeneration
     const { connection, root, formId, title, lookups } = generation
     const versionColumn = generation.versionColumn ?? null
+    // A chain of versions (0113) is the request's too: left out, the next version would be a form of records of their own.
+    const validity = generation.validity ?? null
     const request: ProposalRequest = {
       connection,
       root,
@@ -195,9 +197,10 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       lookups,
       pinned: generation.pinned ?? [],
       ...(versionColumn === null ? {} : { versionColumn }),
+      ...(validity === null ? {} : { validity }),
     }
     setDiscovered({ connection, snapshot })
-    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn } })
+    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, validity } })
     setPolicy(withRequiredLookupPins(regeneration.policy, bindings))
     setGenerated({
       request,

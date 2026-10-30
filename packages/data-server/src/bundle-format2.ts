@@ -62,7 +62,7 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
 /**
  * What the stored request alone decides, against the base and bindings it is
  * said to have produced (0030): the title, the root, a confirmed version
- * column, the pins and the lookups. A regeneration generates from this
+ * column, the pins, the lookups and a chain of versions. A regeneration generates from this
  * request and its draft is checked at publish against the same request, so
  * an edit to it alone would reach the next version unannounced. None of
  * these asks the generator, so a later release cannot fail a stored version
@@ -94,6 +94,11 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
   if (generation.versionColumn === undefined && confirmed !== undefined) {
     problems.push(`generation: confirms no version column, and the bindings use ${confirmed} as a confirmed one`)
   }
+
+  // A chain of versions (0113) is in the bindings exactly as the request names it.
+  const chain = isRecord(bindings.validity) ? bindings.validity : undefined
+  const span = (named: { from: string; to: string } | undefined) => (named === undefined ? 'none' : `from ${named.from} to ${named.to}`)
+  if (span(generation.validity) !== span(chain)) problems.push(`generation: names versions ${span(generation.validity)}, and the bindings ${span(chain)}`)
 
   for (const column of generation.pinned ?? []) {
     const field = bindings.fields.find((binding) => binding.kind === 'column' && binding.column === column)

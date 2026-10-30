@@ -10,6 +10,7 @@ import { failureFor } from './errors.js'
 import type { Phase } from './errors.js'
 import { listStatement } from './list.js'
 import { describeStatement, existsStatement, insertStatement, readStatement, updateStatement } from './statements.js'
+import { supersedeStatement } from './versions.js'
 import type { ExpectedVersion } from './statements.js'
 
 /** A row as every record statement selects it: `[found]`, `[c0]…` canonical text, and `[version]`. */
@@ -17,6 +18,16 @@ type Row = Record<string, unknown>
 
 const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record is visible to this request.' }
 const STALE: RecordFailure = { ok: false, code: 'stale', message: 'The record has changed since it was read.' }
+const VERSION_ENDED: RecordFailure = {
+  ok: false,
+  code: 'version-ended',
+  message: 'The version has ended, at the version sent: only the open version of a chain is changed (0113).',
+}
+const CHAIN_EXISTS: RecordFailure = {
+  ok: false,
+  code: 'chain-exists',
+  message: 'The chain this create would start has a version already: its open version is changed from a date instead (0113).',
+}
 /** The table moved under an update that matched nothing, or that was never sent (0041). */
 const DEFINITION_MOVED: RecordFailure = {
   ok: false,
@@ -74,6 +85,21 @@ function expectedVersion(concurrency: RecordConcurrency, token: string): Expecte
   if (typeof token !== 'string' || !CANONICAL_INTEGER.test(token) || token === '-0') return undefined
   const value = BigInt(token)
   return value > BIGINT_MAX || value < -BIGINT_MAX - 1n ? undefined : { kind: 'version-column', value: token }
+}
+
+/**
+ * Why an update or a change from a date changed nothing, from one more read
+ * inside the same filters and throughs (0043): the table moved, a version
+ * that had ended at the version sent (0113), the version moved, or no such
+ * record for this actor -- in that order. The write changed nothing, so the
+ * read's failure is the answer.
+ */
+async function whyNothingChanged(pool: ConnectionPool, statement: Statement): Promise<RecordFailure> {
+  const found = await attempt(pool, statement, 'read')
+  if (!Array.isArray(found)) return found
+  if (Number(found[0]?.same ?? 0) !== 1) return DEFINITION_MOVED
+  if (Number(found[0]?.ended ?? 0) > 0) return VERSION_ENDED
+  return Number(found[0]?.found ?? 0) > 0 ? STALE : NOT_FOUND
 }
 
 /** The token for the version a row came back with: `encodeRowversion`'s hex, or a version column's decimal string. */
@@ -192,7 +218,9 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const rows = await attempt(pool, insertStatement(request, definition), 'write', request.values)
       if (!Array.isArray(rows)) return rows
       const row = rows[0]
-      // An INSERT … VALUES writes one row, and the batch selects it back.
+      // An INSERT … VALUES writes one row, and the batch selects it back. One
+      // that starts a chain inserts none where the chain has a version (0113).
+      if (row === undefined && request.fresh !== undefined) return CHAIN_EXISTS
       if (row === undefined) throw new Error('SQL Server reported no inserted row')
       return { ok: true, ...recordFrom(row, request.returning, request.target.concurrency) }
     },
@@ -218,10 +246,30 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       // such record for this actor. A second query tells them apart, in that
       // order, inside the same filters and throughs; the write changed
       // nothing, so its failure is a read's.
-      const found = await attempt(pool, existsStatement(request, terms, through, definition), 'read')
-      if (!Array.isArray(found)) return found
-      if (Number(found[0]?.same ?? 0) !== 1) return DEFINITION_MOVED
-      return Number(found[0]?.found ?? 0) > 0 ? STALE : NOT_FOUND
+      const ended = request.open === undefined || expected === undefined ? undefined : { open: request.open, concurrency: target.concurrency, expected }
+      return whyNothingChanged(pool, existsStatement(request, terms, through, definition, ended))
+    },
+
+    async supersede(request) {
+      const { target } = request
+      const terms = rowFilterTerms(request.filters)
+      const through = throughTerms(request.through)
+      checkKey(target, request.key)
+      const written = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
+      if (new Set(written).size !== written.length || written.includes(request.ends))
+        throw new Error('A change from a date writes each column of the next version once, and never its end')
+      checkAssigned([request.start, ...request.values], target.concurrency.column)
+      const definition = definitionBytes(request.definition)
+      const expected = expectedVersion(target.concurrency, request.expectedVersion)
+      if (expected !== undefined) {
+        const rows = await attempt(pool, supersedeStatement(request, terms, through, expected, definition), 'write', [request.start, ...request.values])
+        if (!Array.isArray(rows)) return rows
+        const row = onlyRow(rows)
+        if (row !== undefined) return { ok: true, ...recordFrom(row, request.returning, target.concurrency) }
+      }
+      // Nothing was ended: read once more, as for an update, whether it had ended already.
+      const ended = expected === undefined ? undefined : { open: request.ends, concurrency: target.concurrency, expected }
+      return whyNothingChanged(pool, existsStatement(request, terms, through, definition, ended))
     },
 
     async delete(request): Promise<DeleteOutcome> {

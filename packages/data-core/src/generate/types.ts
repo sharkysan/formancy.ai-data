@@ -55,6 +55,23 @@ export interface GenerationRequest {
    * the policy refused, and no submission could pass both.
    */
   pinned?: string[]
+  /**
+   * The root's rows are versions of one thing (0113): `from` is the column a
+   * version starts at, `to` the one it ends at, NULL while it is open. The
+   * generator refuses a pair it cannot hold a chain to (`validityFor`).
+   */
+  validity?: { from: string; to: string }
+}
+
+/**
+ * A chain of versions (0113), as the bindings keep it: the columns a version
+ * starts and ends at, and the chain's key -- the columns one thing's
+ * versions share, a primary or unique key of the root less `from`.
+ */
+export interface ValidityBinding {
+  from: string
+  to: string
+  key: string[]
 }
 
 /**
@@ -128,8 +145,10 @@ export interface FormBindings {
    * `false`. What a delete also does to other tables is the policy's to
    * accept (`deleteProblems`), never the generator's.
    */
-  operations: { create: boolean; update: boolean; delete?: boolean }
+  operations: { create: boolean; update: boolean; delete?: boolean; supersede?: boolean }
   fields: FieldBinding[]
+  /** The chain the rows are versions of (0113); absent for a form whose rows are records of their own. */
+  validity?: ValidityBinding
   /** The snapshot this was generated from. Drift review compares against it. */
   snapshotFingerprint: string
 }

@@ -788,6 +788,24 @@ describe('a format-2 bundle (0030)', () => {
       ])
     })
 
+    // A chain of versions is the request's too (0113): one named by hand in
+    // the bindings would end and start versions the request never asked
+    // for, and one taken from them would offer delete again. Watched failing
+    // with the chain left out of the comparison.
+    test('a chain the bindings do not have, or one they have that the request does not name', () => {
+      const named = ordered()
+      named.generation.validity = { from: 'order_date', to: 'shipped_on' }
+      expect(refused(named)).toEqual(['generation: names versions from order_date to shipped_on, and the bindings none'])
+      const bound = ordered()
+      bound.bindings.validity = { from: 'order_date', to: 'shipped_on', key: ['tenant_id'] }
+      expect(refused(bound)).toEqual(['generation: names versions none, and the bindings from order_date to shipped_on'])
+      for (const validity of [{}, { from: 'a' }, { from: 'a', to: 1 }, { from: 'a', to: 'b', key: [] }]) {
+        const odd = ordered() as unknown as { generation: Record<string, unknown> }
+        odd.generation['validity'] = validity
+        expect(refused(odd as unknown as BundleV2), JSON.stringify(validity)).toEqual(['generation: validity must be { from, to }, two columns'])
+      }
+    })
+
     // A section is read as strictly as the rest of a request: its condition
     // is a column and a value, both text, or null, and nothing else.
     test('a section of another shape', () => {

@@ -17,6 +17,13 @@ function sectionOf(value: unknown): { section: LookupChoice['section'] } | null 
   return { section: { when: { column: when['column'], value: when['value'] } } }
 }
 
+/** A chain of versions (0113): absent, or exactly `{ from, to }`, both text; `null` for anything else. */
+function validityOf(value: unknown): GenerationRequest['validity'] | null {
+  if (value === undefined) return undefined
+  if (!isRecord(value) || Object.keys(value).length !== 2 || typeof value['from'] !== 'string' || typeof value['to'] !== 'string') return null
+  return { from: value['from'], to: value['to'] }
+}
+
 function lookupChoices(value: unknown): LookupChoice[] | undefined {
   if (value === undefined) return []
   if (!Array.isArray(value)) return undefined
@@ -38,15 +45,15 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
  * bundle says it was generated from are read by the same rules.
  *
  * Normalised: `lookups` and `pinned` are always lists, `versionColumn` is
- * present only when it is a string, and a lookup's `section` only when it
- * marks one (0109). Other properties are not carried, so a
+ * present only when it is a string, a lookup's `section` only when it
+ * marks one (0109), and `validity` only when it names a chain (0113). Other properties are not carried, so a
  * stored request that is not equal to its own reading holds something this
  * reading would not have produced.
  */
 export function readGeneration(value: unknown): GenerationReading {
   if (!isRecord(value)) return { ok: false, problems: ['a generation request is an object'] }
   const problems: string[] = []
-  const { connection, root, formId, title, versionColumn, pinned } = value
+  const { connection, root, formId, title, versionColumn, pinned, validity } = value
   if (typeof connection !== 'string') problems.push('connection must name a connection')
   if (!isRecord(root) || typeof root['schema'] !== 'string' || typeof root['name'] !== 'string') problems.push('root must be { schema, name }')
   if (typeof formId !== 'string' || !FORM_ID.test(formId)) problems.push('formId must be a lower-case form id')
@@ -56,7 +63,9 @@ export function readGeneration(value: unknown): GenerationReading {
   const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...pinned] : undefined
   if (pinnedColumns === undefined) problems.push('pinned must be a list of columns')
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')
-  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root)) return { ok: false, problems }
+  const chain = validityOf(validity)
+  if (chain === null) problems.push('validity must be { from, to }, two columns')
+  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null) return { ok: false, problems }
   return {
     ok: true,
     generation: {
@@ -67,6 +76,7 @@ export function readGeneration(value: unknown): GenerationReading {
       lookups,
       pinned: pinnedColumns,
       ...(typeof versionColumn === 'string' ? { versionColumn } : {}),
+      ...(chain === undefined ? {} : { validity: chain }),
     },
   }
 }

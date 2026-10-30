@@ -587,6 +587,33 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
 
 See [0018](../../docs/decisions/0018-one-planner-turns-answers-into-requests.md).
 
+### Versions of one thing
+
+A root whose rows are versions -- a product's price per date -- is
+generated with `validity: { from, to }`, and its bindings keep the chain:
+the two columns and the key one thing's versions share
+([0113](../../docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
+
+```ts
+const { bindings } = generateForm(snapshot, { …, validity: { from: 'valid_from', to: 'valid_to' } })
+bindings.validity // { from: 'valid_from', to: 'valid_to', key: ['tenant_id', 'product_no'] }
+const change = planSupersede(snapshot, bindings, policy, context, token, version, { valid_from: '2026-07-01', amount: '10.00' }, asRead, described)
+if (change.ok) await records.supersede(change.request) // the open version ended, the next one inserted
+```
+
+- `validityFor` refuses a pair no chain can be held to: not both dates or
+  both instants, a start that may be NULL or an end that may not, no
+  version column, no key holding the start and another column.
+- The end is never written by the form, the start and the chain's key on
+  create only, and no delete is offered; `versionFields` names the start
+  and end fields where a change is offered.
+- `planSupersede` asks update and create of the policy, drops a copy's
+  echoes of the chain's key and the empty end, refuses an ended version
+  and an early start from the version as read at the version named, and
+  decodes the next version as a create. A create of a form over versions
+  carries `fresh`, the chain's key it must not find, and an update `open`,
+  the end it must find NULL.
+
 ## Licence
 
 Source-available, not open source. See [`LICENSE.md`](./LICENSE.md): free to

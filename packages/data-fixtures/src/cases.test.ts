@@ -27,6 +27,7 @@ import {
   throughCase,
   UPDATE_RECREATED_CASE,
   uuidCase,
+  versionCase,
 } from './cases.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
@@ -41,6 +42,8 @@ import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from '
 import type { RefusalParityCase } from './parity.js'
 import { UUID_PARITY } from './uuid.js'
 import type { UuidCase } from './uuid.js'
+import { VERSION_PARITY } from './chains.js'
+import type { VersionCase } from './chains.js'
 import { EDGE_VALUES, FIRST_SHIPMENT, SECOND_SHIPMENT } from './values.js'
 
 /**
@@ -74,6 +77,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   EXPORT_PARITY: (Object.keys(EXPORT_PARITY) as ExportCase[]).map(exportCase),
   BROWSE_PARITY: (Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
   COLUMN_FILTER_PARITY: (Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
+  VERSION_PARITY: (Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],

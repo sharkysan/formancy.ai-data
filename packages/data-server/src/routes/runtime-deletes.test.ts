@@ -180,6 +180,7 @@ function registry(): ConnectionRegistry {
     list: refused('lists'),
     insert: refused('inserts'),
     update: refused('updates'),
+    supersede: refused('changes from a date'),
     delete: async (request) => {
       deletes.push(request)
       return deleteOutcome ?? { ok: true, deleted: { values: { id: '7' }, version: VERSION } }
