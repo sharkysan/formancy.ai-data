@@ -12,11 +12,11 @@ import { COOKIE_NAME, IDLE_MINUTES, KEY_LIFETIME_MS, NOT_RUNNING, PAGE_SAFE_HEAD
 
 /** How the image publishes its forms' parents: customers' orders, and an order's deliveries and lines (apps/live-demo/src/image/forms.ts). */
 const CHILDREN = {
-  customer: [{ form: 'order', field: 'customer' }],
+  customer: [{ form: 'order', field: 'customer', one: false, when: null }],
   delivery: [],
   order: [
-    { form: 'delivery', field: 'order' },
-    { form: 'order-line', field: 'order' },
+    { form: 'delivery', field: 'order', one: false, when: null },
+    { form: 'order-line', field: 'order', one: false, when: null },
   ],
   'order-line': [],
 }

@@ -21,6 +21,7 @@ import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import { LAYOUTS } from './layout.js'
 import type { Layout, View } from './layout.js'
+import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
 import { operationTags } from './operations.js'
 import { renderersOf } from './panes.js'
@@ -28,6 +29,7 @@ import type { RendererChoice } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
+import { sectionShown } from './section.js'
 import { Segmented, focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
@@ -168,6 +170,8 @@ export function FormView({
   const [loadRefusal, setLoadRefusal] = useState<string | null>(null)
   /** What the record's crumb calls it, from what is stored (crumbs.ts). */
   const [masterName, setMasterName] = useState<string | null>(null)
+  /** The open record's answers as stored -- as read, or as its last save left them -- which a section's condition is read from (0109); null for a new record. */
+  const [stored, setStored] = useState<Readonly<Record<string, unknown>> | null>(null)
   /** How many times the separator has been let go: each grid in the lanes fits its columns again. */
   const [released, setReleased] = useState(0)
   const deleteButton = useRef<HTMLButtonElement>(null)
@@ -252,6 +256,7 @@ export function FormView({
     drill.dropAll()
     setOpen({ kind: 'record', token })
     setMasterName(sessions[0] === undefined ? null : nameOf(sessions[0]))
+    setStored(sessions[0]?.saved().answers ?? null)
     setLoadRefusal(null)
     if (said !== undefined) say(said)
   }
@@ -293,6 +298,7 @@ export function FormView({
         for (const session of sessions) session.open()
         setOpen({ kind: 'new' })
         setMasterName(null)
+        setStored(null)
         setLoadRefusal(null)
         say([...(discarded ? DISCARDED : []), both ? 'Both forms are empty, for a new record.' : 'The form is empty, for a new record.'])
         toDetail()
@@ -324,6 +330,7 @@ export function FormView({
               drill.dropAll()
               setOpen({ kind: 'new' })
               setMasterName(null)
+              setStored(null)
               setLoadRefusal(null)
               say([...(done.discarded ? DISCARDED : []), ...copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both)])
               toDetail()
@@ -389,13 +396,16 @@ export function FormView({
   function answered(result: SaveResult, session: Session): void {
     grid.current?.reload()
     opening.answered(result, session, (now) => opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined))
-    if (result.kind === 'saved') setMasterName(nameOf(session))
+    if (result.kind !== 'saved') return
+    setMasterName(nameOf(session))
+    setStored(session.saved().answers)
   }
 
   /** A pane's "Load the saved record": the grid and the crumb say what is stored, as after a save. */
   function loadedSaved(session: Session): void {
     grid.current?.reload()
     setMasterName(nameOf(session))
+    setStored(session.saved().answers)
   }
 
   /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
@@ -542,7 +552,12 @@ export function FormView({
         >
           {parent === null
             ? null
-            : childForms.map((form, index) => (
+            : childForms.map((form, index) =>
+                form.child.one ? (
+                  sectionShown(form.child, stored) ? (
+                    <OneChild key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`} client={client} form={form} index={index} parentNoun={title} parent={parent} renderer={renderer} />
+                  ) : null
+                ) : (
                 <ChildSection
                   key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
                   client={client}
@@ -557,7 +572,8 @@ export function FormView({
                   levels={drill.levels}
                   drill={drilling && parent.kind === 'record' ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token }) : undefined}
                 />
-              ))}
+                ),
+              )}
         </Detail>
         {drill.path.map((step) => (
           <DrillLevel key={step.key} client={client} step={step} childForms={drill.childrenOf(step.form.child.form)} renderer={renderer} hidden={!drilling || drill.shown !== step.level} refit={released} drill={drill} />

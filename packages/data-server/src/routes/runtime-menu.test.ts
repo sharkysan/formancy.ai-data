@@ -136,7 +136,7 @@ describe('the menu route', () => {
     expect(clerk.statusCode, clerk.body).toBe(200)
     expect(clerk.json()).toEqual({
       forms: [
-        { id: 'order', title: 'Order', operations: ['read', 'create', 'update'], children: [{ form: 'order-line', field: 'order' }] },
+        { id: 'order', title: 'Order', operations: ['read', 'create', 'update'], children: [{ form: 'order-line', field: 'order', one: false, when: null }] },
         { id: 'order-line', title: 'Order line', operations: ['read', 'create', 'update'], children: [] },
       ],
     })

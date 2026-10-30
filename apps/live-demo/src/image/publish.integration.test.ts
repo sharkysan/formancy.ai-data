@@ -151,15 +151,15 @@ describe('the demo forms, published over the demo account', () => {
     const menu = (await call(as(each.id), '/v1/forms')).json as FormMenu
     const grants = ROLE_GRANTS[each.roles[0] as keyof typeof ROLE_GRANTS].may
     expect(menu.forms).toEqual([
-      { id: 'customer', title: 'Customer', operations: grants.customer, children: [{ form: 'order', field: 'customer' }] },
+      { id: 'customer', title: 'Customer', operations: grants.customer, children: [{ form: 'order', field: 'customer', one: false, when: null }] },
       { id: 'delivery', title: 'Delivery', operations: grants.delivery, children: [] },
       {
         id: 'order',
         title: 'Order',
         operations: grants.order,
         children: [
-          { form: 'delivery', field: 'order' },
-          { form: 'order-line', field: 'order' },
+          { form: 'delivery', field: 'order', one: false, when: null },
+          { form: 'order-line', field: 'order', one: false, when: null },
         ],
       },
       { id: 'order-line', title: 'Order line', operations: grants['order-line'], children: [] },

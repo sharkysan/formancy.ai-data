@@ -144,8 +144,13 @@ child form and the lookup field its rows name this form's records by, so a
 host lists one record's children with
 `list(child.form, { parent: { field: child.field, record } })`. The server
 asks no database for it: `form(formId)` says what the database allows now,
-and can still refuse a form the menu named. An answer whose entries lack
-a title, operations or children is `unexpected`.
+and can still refuse a form the menu named. A child that is `one` is a
+section of the record (0109): at most one of its rows references it, a page
+shows that row in a form under the record, and `when`, when it is not
+`null`, is the field whose answer shows it and the answer, compared as the
+record holds it. An answer whose entries lack a title, operations or
+children, or a child without `one`, or a section whose `when` is not a
+field and a text, a number or a yes/no, is `unexpected`.
 
 ## The rules it keeps for a host
 

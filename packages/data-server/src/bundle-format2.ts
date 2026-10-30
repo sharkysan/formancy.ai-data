@@ -98,10 +98,12 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
     if (field !== undefined && (field.writes.create || field.writes.update)) problems.push(`generation: pins ${column}, and its field ${field.field} is written by the form`)
   }
 
-  // Compared as foreign key and display columns, the whole of a lookup choice.
-  type Choice = { foreignKey: string; display: readonly string[] }
-  const same = (left: Choice) => (right: Choice) => left.foreignKey === right.foreignKey && canonicalize(left.display) === canonicalize(right.display)
-  const shown = (lookup: Choice) => `${lookup.foreignKey} showing ${lookup.display.join(', ')}`
+  // Compared as foreign key, display columns and section (0109), the whole of a lookup choice.
+  type Choice = { foreignKey: string; display: readonly string[]; section?: { when: { column: string; value: string } | null } | undefined }
+  const sectionOf = (lookup: Choice) => (lookup.section === undefined ? null : { when: lookup.section.when === null ? null : { column: lookup.section.when.column, value: lookup.section.when.value } })
+  const same = (left: Choice) => (right: Choice) =>
+    left.foreignKey === right.foreignKey && canonicalize(left.display) === canonicalize(right.display) && canonicalize(sectionOf(left)) === canonicalize(sectionOf(right))
+  const shown = (lookup: Choice) => `${lookup.foreignKey} showing ${lookup.display.join(', ')}${lookup.section === undefined ? '' : ' as a section'}`
   const bound = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding] : []))
   for (const lookup of generation.lookups) if (!bound.some(same(lookup))) problems.push(`generation: chooses a lookup over ${shown(lookup)}, which the bindings do not have`)
   for (const lookup of bound) if (!generation.lookups.some(same(lookup))) problems.push(`generation: the bindings have a lookup over ${shown(lookup)}, which it does not choose`)

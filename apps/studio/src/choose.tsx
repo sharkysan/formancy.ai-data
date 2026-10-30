@@ -1,12 +1,13 @@
 import { useId, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
-import type { ForeignKeyMeta, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
+import type { ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
 import type { Failure, ProposalRequest } from './api.js'
 import type { Choice } from './choice.js'
 import {
   choiceFor,
   choiceProblems,
+  conditionColumns,
   describeRef,
   displayBlocker,
   gapsAbout,
@@ -15,12 +16,56 @@ import {
   proposalFor,
   rootBlocker,
   rowversionOf,
+  sectionCandidate,
   suggestedDisplay,
   versionCandidates,
 } from './choice.js'
 
 /** The attribute a newly pinned column is given until somebody types another: the one tenant isolation uses. */
 const DEFAULT_ATTRIBUTE = 'tenant'
+
+/**
+ * Whether a lookup makes the form a section of the records it references
+ * (0109), offered only where its foreign key is the root's key: shown under
+ * each one as one form, while a column of it holds a value, or always.
+ */
+function SectionChoice({ id, root, target, lookup, onLookup }: { id: string; root: ObjectMeta; target: ObjectMeta; lookup: LookupChoice; onLookup: (next: LookupChoice) => void }): ReactElement {
+  const columns = conditionColumns(target)
+  const when = lookup.section?.when ?? null
+  const { section: _section, ...plain } = lookup
+  return (
+    <fieldset className="nested">
+      <legend>{root.ref.name} as a section of {target.ref.name}</legend>
+      <div className="check">
+        <input type="checkbox" id={`${id}-section`} checked={lookup.section !== undefined} aria-describedby={`${id}-section-about`} onChange={(event) => onLookup(event.target.checked ? { ...plain, section: { when: null } } : plain)} />
+        <label htmlFor={`${id}-section`}>Show it under each {target.ref.name} as one form</label>
+      </div>
+      <p id={`${id}-section-about`} className="hint">
+        Its key is its foreign key onto {target.ref.name}, so a {target.ref.name} has at most one of its rows. A page shows that row under the{' '}
+        {target.ref.name} as a form of its own, not a grid.
+      </p>
+      {lookup.section === undefined ? null : (
+        <div className="condition">
+          <label htmlFor={`${id}-when`}>Shown while</label>
+          <select id={`${id}-when`} value={when?.column ?? ''} onChange={(event) => onLookup({ ...plain, section: { when: event.target.value === '' ? null : { column: event.target.value, value: when?.value ?? '' } } })}>
+            <option value="">always</option>
+            {columns.map((column) => (
+              <option key={column.name} value={column.name}>
+                {target.ref.name}.{column.name}
+              </option>
+            ))}
+          </select>
+          {when === null ? null : (
+            <>
+              <label htmlFor={`${id}-value`}>holds</label>
+              <input type="text" id={`${id}-value`} value={when.value} onChange={(event) => onLookup({ ...plain, section: { when: { column: when.column, value: event.target.value } } })} />
+            </>
+          )}
+        </div>
+      )}
+    </fieldset>
+  )
+}
 
 function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: MetadataSnapshot; root: ObjectMeta; choice: Choice; onChoice: (next: Choice) => void }): ReactElement {
   const hidden = gapsAbout(snapshot, root.ref).filter((gap) => gap.aspect === 'foreign-keys')
@@ -101,6 +146,15 @@ function LookupChoices({ snapshot, root, choice, onChoice }: { snapshot: Metadat
                     )
                   })}
                 </fieldset>
+              )}
+              {chosen === undefined || target === undefined || !sectionCandidate(root, foreignKey) ? null : (
+                <SectionChoice
+                  id={id}
+                  root={root}
+                  target={target}
+                  lookup={chosen}
+                  onLookup={(next) => onChoice({ ...choice, lookups: choice.lookups.map((lookup) => (lookup.foreignKey === foreignKey.name ? next : lookup)) })}
+                />
               )}
             </div>
           )

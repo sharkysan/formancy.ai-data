@@ -228,4 +228,22 @@ create table parity.removable_null (
 );
 GO
 
+-- A party, and its company details (0109): a table whose key is its foreign
+-- key onto the party's, so a party has at most one row of it, which a form
+-- generated as a section of the party shows under it while its kind is
+-- company. Both versioned by a column the module moves, so both update.
+create table parity.party (
+  id int identity(1, 1) not null constraint pk_party primary key,
+  tenant_id int not null,
+  name nvarchar(100) not null,
+  kind nvarchar(20) not null,
+  version int not null constraint df_party_version default 1
+);
+create table parity.party_company (
+  party_id int not null constraint pk_party_company primary key constraint fk_party_company_party references parity.party (id),
+  vat_no nvarchar(20) not null,
+  version int not null constraint df_party_company_version default 1
+);
+GO
+
 update statistics parity.tenant_item with fullscan;

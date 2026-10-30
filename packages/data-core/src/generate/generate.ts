@@ -8,6 +8,7 @@ import { assertReadableLookup, assertReadableRoot, identityFor, rowSecurityNotes
 import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
+import { sectionFor } from './section.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
 import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
 
@@ -79,7 +80,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     const lookup = lookupByColumn.get(column.name)
     if (lookup !== undefined) {
       // A lookup takes the place of its first column; its other columns are part of it.
-      if (lookup.foreignKey.columns[0] === column.name) planned.push(planLookup(root, lookup, request, allocate, isView, notes))
+      if (lookup.foreignKey.columns[0] === column.name) planned.push(planLookup(root, lookup, request, identity, allocate, isView, notes))
       continue
     }
     const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), notes)
@@ -116,6 +117,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
 }
 
 function resolveLookups(snapshot: MetadataSnapshot, root: ObjectMeta, choices: readonly LookupChoice[]): ResolvedLookup[] {
+  const sections = choices.filter((choice) => choice.section !== undefined)
+  // A record is a section of one record: two would put one row under two parents' pages.
+  if (sections.length > 1) throw new Error(`${sections.map((choice) => choice.foreignKey).join(' and ')} are both marked as sections; a form is a section of one table's records`)
   const seen = new Map<string, string>()
   return choices.map((choice) => {
     const foreignKey = root.foreignKeys.find((candidate) => candidate.name === choice.foreignKey)
@@ -152,6 +156,7 @@ function planLookup(
   root: ObjectMeta,
   lookup: ResolvedLookup,
   request: GenerationRequest,
+  identity: readonly string[] | null,
   allocate: (wanted: string) => string,
   isView: boolean,
   notes: GenerationNote[],
@@ -159,6 +164,7 @@ function planLookup(
   const { choice, foreignKey } = lookup
   const target = foreignKey.references
   if (target === null) throw new Error('unreachable: resolveLookups refused an unknown target')
+  const section = sectionFor(root, identity, choice, foreignKey, lookup.target)
   // The snapshot refused a foreign key over a column the table does not have.
   const columns = foreignKey.columns.map((name) => root.columns.find((column) => column.name === name) as ColumnMeta)
   const nullable = columns.some((column) => column.nullable)
@@ -198,6 +204,7 @@ function planLookup(
       source,
       nullable,
       writes,
+      ...(section === undefined ? {} : { section }),
     },
     system: false,
     multiline: false,

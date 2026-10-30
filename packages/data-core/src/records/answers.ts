@@ -125,8 +125,8 @@ function readValue(record: RecordRead, column: string): ApiValue {
   return record.values[column] as ApiValue
 }
 
-/** A column's canonical value as the generated control holds it. */
-function formValue(binding: ColumnBinding, value: ApiValue): ApiValue {
+/** A column's canonical value as the generated control holds it: what a record's answer is, and what the menu compares a section's condition with (0109). */
+export function formValue(binding: ColumnBinding, value: ApiValue): ApiValue {
   const shape = shapeOf(binding)
   if (value === null || shape === 'as-is') return value
   if (shape === 'three-state') {

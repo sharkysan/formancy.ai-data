@@ -389,7 +389,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     await signIn(reader, TOKENS.clerk)
     await formLink(engine.formId)
     const menu = await plane.clerk.forms()
-    expect(menu.ok && menu.value.forms.find((form) => form.id === engine.formId)?.children).toContainEqual({ form: engine.lines, field: 'order' })
+    expect(menu.ok && menu.value.forms.find((form) => form.id === engine.formId)?.children).toContainEqual({ form: engine.lines, field: 'order', one: false, when: null })
     const lines = (await plane.store.read(engine.lines, 1)) as { policy: { fields: Record<string, { read: string[] }> } }
     const lineNo = lines.policy.fields['line_no']
     if (lineNo === undefined) throw new Error('the lines form has no line_no field')

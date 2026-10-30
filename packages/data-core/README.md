@@ -519,7 +519,13 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   row's field can spell the key otherwise than the parent's token does.
   The menu names a child only when this person may list it (`listable`)
   and read that field. It asks no database: what the table allows now is
-  decided when a form is opened.
+  decided when a form is opened. A child through a lookup the generator
+  made a section of the parent's records (0109, `generate/section.ts`:
+  the child's key is that foreign key, with an optional condition on a
+  column of the parent's table) is `one`, and its `when` is the parent's
+  field this person may read bound to that column, with the condition's
+  value as the field's answer holds it (`formValue`), or `null` to show it
+  always.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

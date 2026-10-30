@@ -1,5 +1,5 @@
 import { canonicalize } from '@formancy/spec'
-import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { FieldBinding, FormBindings, SectionBinding } from '../generate/types.js'
 import type { MetadataSnapshot } from '../metadata.js'
 import { findObject } from '../snapshot.js'
 
@@ -51,6 +51,8 @@ export interface ChildLookup {
   table: string
   references: string[]
   types: string[] | null
+  /** The lookup's section (0109), or `null` when it is not one. */
+  section: SectionBinding | null
 }
 
 /**
@@ -77,6 +79,7 @@ export function childLookups(form: PublishedTable): ChildLookup[] {
       table: binding.target.table.name,
       references: [...binding.target.columns],
       types: typesOf(form.snapshot, form.bindings, binding.columns),
+      section: binding.section ?? null,
     }))
 }
 
