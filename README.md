@@ -1287,7 +1287,17 @@ corepack enable pnpm
 pnpm install
 pnpm build
 pnpm test        # starts each engine's default image, through testcontainers
+pnpm lint        # after pnpm build: the type-aware rules read the built declarations
+pnpm format      # Prettier, over every TypeScript and JavaScript file, before committing
 ```
+
+CI fails a TypeScript or JavaScript file that breaks a lint rule or that
+Prettier would write otherwise; the rules and the style are the four
+formancy repositories' shared ones, a copy until formancy.ai publishes
+them ([0113](./docs/decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)). A branch begun before the format
+takes `main` through `scripts/prettier-merge.mjs`, as
+[`CONTRIBUTING.md`](./CONTRIBUTING.md#a-branch-begun-before-the-format)
+says.
 
 There is no mocked driver and no `--skip-db` flag. Database behaviour is proved
 against real servers or it is not proved
@@ -1306,8 +1316,9 @@ guide's section 0 names.
 
 The gates are [`.github/workflows/gates.yml`](./.github/workflows/gates.yml),
 which CI runs on every pull request and a release runs before it publishes:
-`pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
-`node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
+`pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`,
+`pnpm check:pkg`, `node scripts/verify-licenses.mjs` and `pnpm test:repo`
+in one job; each
 package's `test:coverage` in a job of its own, and data-fixtures' and each
 engine's adapter's again in the `test-images` job, once on every other image
 of the engine's matrix; in jobs of their own

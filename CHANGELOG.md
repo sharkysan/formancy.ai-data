@@ -378,9 +378,31 @@ later.
   server whether it can write its own code and runs the image on a read-only
   root, and the live demo's gate asks its image the same. Found by the
   formancy.ai-report repository's review of its own server.
+- **CI fails a change that breaks the lint rules or the format** (0113).
+  Why: style was held by habit, and a promise nobody awaits, an `any` from
+  a parse or an object printed as "[object Object]" by nobody; the linter
+  found two such defects here, fixed below. `verify` now runs `pnpm lint`,
+  typescript-eslint's type-aware recommended rules at error, and
+  `pnpm format:check`, Prettier over every TypeScript and JavaScript file.
+  The rules and the style are the four formancy repositories' shared ones,
+  a copy of Formancy Health's until formancy.ai publishes them as
+  `@formancy/code-style`. Every file was formatted in one commit, which
+  `.git-blame-ignore-revs` has blame skip, five files split first so that
+  none passes the 600-line budget once formatted, and every finding fixed.
+  A branch begun before the format takes `main` through
+  `scripts/prettier-merge.mjs`, which formats each side of a file before
+  git merges it (`CONTRIBUTING.md`). The packages' API is what it was but
+  for `fieldHeading`, below.
 
 ### Fixed
 
+- **`createSnapshot` names what it refuses as it was given** (0068,
+  0049). A server fact given as a bigint was refused with
+  `JSON.stringify`'s own TypeError instead of the sentence naming it, NaN
+  was written "null", and an inbound key's referenced column given as an
+  object "[object Object]". What a snapshot is made of is an embedder's
+  and untrusted, so the refusal says what it was handed. Found through the
+  linter's `no-base-to-string`.
 - **A field whose label is a message reference is named by its key, not
   "[object Object]"**, in the host's grid columns, the filter panel, a
   child's title, the line that says what a copy left out and the line a

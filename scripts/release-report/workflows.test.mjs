@@ -263,6 +263,25 @@ describe('gates.yml', () => {
     expect(filtered).not.toContain(undefined)
   })
 
+  // The lint rules and the format are held by CI alone (0113): a step
+  // dropped from verify lets a change that breaks either merge green. After
+  // the build and the typecheck, since the type-aware rules read the
+  // packages' built declarations, and before the guards, so that a guard
+  // that fails does not hide them. A step not found is at -1, so the build
+  // is found first: renamed, it would leave every order below holding of
+  // nothing.
+  test('verify runs the linter and the formatter’s check after the typecheck', () => {
+    const verify = gates.jobs.verify.steps
+    const at = (command) => verify.findIndex((step) => step.run === command)
+    const typecheck = at('pnpm typecheck')
+    expect(at('pnpm build'), 'pnpm build').toBeGreaterThanOrEqual(0)
+    expect(typecheck).toBeGreaterThan(at('pnpm build'))
+    for (const command of ['pnpm lint', 'pnpm format:check']) {
+      expect(at(command), command).toBeGreaterThan(typecheck)
+      expect(at(command), command).toBeLessThan(at('pnpm test:repo'))
+    }
+  })
+
   // A job whose results the report never waits for is a job whose failure
   // it cannot see; one that is cancelled must still leave the report to run.
   test('ends in a report that waits for every other job and runs unless cancelled', () => {

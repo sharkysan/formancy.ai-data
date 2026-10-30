@@ -51,7 +51,7 @@ const TEST = /\.(test|spec)(\.[cm]?[jt]sx?)$/
 /** The install fixtures, which import the packed tarballs and are linted without types. */
 const UNTYPED = 'scripts/install-fixture/'
 
-/** What 0017 relaxes in a test, and nothing else. */
+/** What the shared rules relax in a test, and nothing else (0113). */
 const RELAXED_IN_TESTS = [
   '@typescript-eslint/no-unsafe-assignment',
   '@typescript-eslint/no-unsafe-member-access',

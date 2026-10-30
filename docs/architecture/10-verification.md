@@ -115,7 +115,7 @@ of them in different SQL dialects, by somebody who knows both.
 
 | Job | Runs | What it proves |
 |---|---|---|
-| `verify` | `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`, `pnpm test:repo` | The tree builds and type-checks; each published package passes `publint` and `attw`; every tarball declares the source-available licence and carries `LICENSE.md` and `NOTICE` ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)); the repository's own guards (§10.4) |
+| `verify` | `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`, `pnpm test:repo` | The tree builds and type-checks, the vitest, Vite and tsdown configs with it through `tsconfig.tools.json`; every TypeScript and JavaScript file git does not ignore holds to the shared lint rules -- `@eslint/js`'s recommended set and typescript-eslint's type-aware one, every rule at error, a disable comment only with its reason -- and is as Prettier writes it, which the check reads and never writes; each was watched failing on 30 October 2026, on a floating promise and a double-quoted string planted in `packages/data-core/src/records/heading.ts`, the file put back byte for byte ([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)); each published package passes `publint` and `attw`; every tarball declares the source-available licence and carries `LICENSE.md` and `NOTICE` ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)); the repository's own guards (§10.4) |
 | `test`, one per package | `turbo run test:coverage --force --summarize` | Each package's suite, its databases included, on a runner of its own; `--force` so a cached result is never reported as this run's |
 | `test-images`, one per image of the matrix but the defaults | the `test` job's command, `FORMANCY_IMAGES` set to the leg's image | data-fixtures and that engine's adapter suite on that image (0067); no coverage is uploaded |
 | `browser`, one per browser | `pnpm test:browser` | §10.5 |
@@ -185,6 +185,21 @@ and each of these fails on the change that breaks what it holds:
   A path given from inside a package, or whose first directory is
   misspelled, is not read as one, a package named that the workspace does
   not have passes, and whether a sentence is still true is review's.
+- **The lint rules and the format.** `scripts/code-style/code-style.test.mjs`:
+  the rules the four repositories share, a copy of Formancy Health's, each
+  at error on the kind of file it is for and each path a repository passes
+  doing what it says, on a repository of real files it writes.
+  `scripts/lint.test.mjs`: this repository's wiring -- every TypeScript and
+  JavaScript file git holds linted by the rules its kind is held to and
+  none at `warn`, in a program lint types it with unless it is an install
+  fixture, and in the shared style, and the format check naming a
+  misformatted file of every extension git holds.
+  `scripts/prettier-merge.test.mjs`: a merge across the format through
+  `scripts/prettier-merge.mjs` takes a change against main's format of the
+  same lines without a conflict, and still conflicts where both sides
+  changed what a line says ([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)). What a rule
+  reports is no defect until somebody reads it, and a disable comment's
+  reason is review's.
 - **Derived files.** `scripts/codecov-config.test.mjs`: `codecov.yml` is
   what its generator makes of the workspace.
   `scripts/generated-block.test.mjs`: every generated region of the
@@ -195,7 +210,8 @@ and each of these fails on the change that breaks what it holds:
   `.github/workflows/ci.yml`, `.github/workflows/gates.yml` and
   `.github/workflows/release.yml` to the shape a release depends on: every job
   collects and uploads, `report` needs them all, third-party actions pinned
-  to a commit, no secret passed to the gates
+  to a commit, no secret passed to the gates, and `verify`'s lint and
+  format check after the typecheck and before the guards
   ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 - **What a gate measures without a browser or Docker.**
   `scripts/browsers.test.mjs` and `scripts/browser-gate.test.mjs` for the
@@ -459,8 +475,12 @@ and a number typed here would drift from the next run.
   ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md));
   what a picture looks like
   ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md));
-  and that a merged branch is deleted, which a repository setting does
-  ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
+  that a merged branch is deleted, which a repository setting does
+  ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md));
+  and that the pull request bringing the format merges with a merge commit,
+  so that `.git-blame-ignore-revs` names commits on `main`, and that the
+  lint rules are Formancy Health's and those formancy.ai publishes, which
+  nothing compares ([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **"Tested on" is not "accepted by".** Nothing in the product refuses a
   server version no test ran but SQL Server discovery before 2019; a
   snapshot records the server it was read from, and the studio and drift

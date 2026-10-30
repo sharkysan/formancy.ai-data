@@ -474,9 +474,18 @@ age, by name and exact version, and nothing else is
 package outside the scope, a pattern, or a version the lockfile no longer
 installs each fail. That no upstream source is copied is held by review.
 
+One copy is carried until upstream releases it: the lint rules and the
+format, `scripts/code-style/`, Formancy Health's byte for byte, which is
+what formancy.ai will publish as `@formancy/code-style` for the four
+repositories. A rule changes there first and is copied here, and the copy
+goes when this repository pins the package
+([0113](../decisions/0113-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+
 **What it costs.** A generic improvement waits for another repository's
 release. For an adopted release's first day, only the bump's own review
-stands between this repository and a compromised publish.
+stands between this repository and a compromised publish. Until the lint
+rules' package is pinned, nothing compares the copy with Formancy Health's
+or with what formancy.ai publishes.
 
 ## 8.12 Every page under a Content-Security-Policy
 
