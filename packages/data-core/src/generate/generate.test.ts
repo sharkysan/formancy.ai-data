@@ -1,4 +1,5 @@
-import { createFormEngine, runScenarios } from '@formancy/core'
+import { createFormEngine } from '@formancy/core'
+import { runScenarios } from '@formancy/core/authoring'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
@@ -191,7 +192,7 @@ describe('generateForm', () => {
   })
 
   // A column is named by whoever made the table, and `__proto__` is a name
-  // SQL takes. formancy 0.7.0's validator refuses it as a key, so generated as
+  // SQL takes. formancy's validator refuses it as a key from 0.7.0, so generated as
   // it is the form is refused at publish, after a person had reviewed it
   // (0093); the field keeps its column under the next key the rules allow.
   test('a column named __proto__ generates a document formancy accepts, bound to that column', () => {

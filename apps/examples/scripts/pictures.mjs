@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { field, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
+import { field, fillField, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -53,8 +53,8 @@ const acts = {
       Angular: page.getByRole('region', { name: 'sales.order Angular', exact: true }),
     }
     for (const part of Object.values(parts)) {
-      await part.getByRole('textbox', { name: 'Status', exact: true }).fill('placed')
-      await part.getByRole('textbox', { name: field('Amount') }).fill(AMOUNT)
+      await fillField(part, part.getByRole('textbox', { name: 'Status', exact: true }), 'placed', { within: WITHIN })
+      await fillField(part, part.getByRole('textbox', { name: field('Amount') }), AMOUNT, { within: WITHIN })
       await part.getByRole('button', { name: 'Validate' }).click()
     }
     for (const [name, part] of Object.entries(parts)) {

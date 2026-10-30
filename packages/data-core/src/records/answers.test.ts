@@ -246,11 +246,12 @@ describe('a round trip', () => {
   // The released engine is the other half of the check: what toFormAnswers
   // gives a form must pass the form's own server-side validation, or a
   // person who opens a record and saves it unchanged is told it is wrong. A
-  // whole number left as the codec's canonical text is reported by the
-  // engine as below its minimum.
+  // whole number left as the codec's canonical text is refused by the
+  // engine as an answer of another type (formancy.ai 0189; through 0.7.0
+  // it was reported as below the field's minimum).
   test('gives answers the released engine accepts for the generated form, which canonical text would not be', () => {
     const answers = toFormAnswers(PG_FORM.bindings, ALL_FIELDS, read(STORED)).answers
     expect(engineErrors(PG_FORM.form, answers)).toEqual({})
-    expect(engineErrors(PG_FORM.form, { ...answers, approved_by: '2' })).toEqual({ approved_by: ['min'] })
+    expect(engineErrors(PG_FORM.form, { ...answers, approved_by: '2' })).toEqual({ approved_by: ['type'] })
   })
 })

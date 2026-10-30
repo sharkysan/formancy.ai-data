@@ -12,7 +12,7 @@
 // saying so. Every check has one name in every browser (0058).
 //
 // Where the sentence is drawn, held as 0085's cost: every reference theme of
-// formancy 0.6.0 and 0.7.0, whose stylesheets are byte-identical, places the open list at the foot of the box (`top: 100%`,
+// formancy 0.6.0 to 0.11.0, whose rules for it are the same in each, places the open list at the foot of the box (`top: 100%`,
 // `z-index: 20`, up to 14rem tall), over the line under it, which is where
 // the status is. Measured on 2026-10-18 in Chromium 153 and Firefox 155 on
 // Windows at 1280 and 320 px: the window showed the option "First 01" at
@@ -94,7 +94,7 @@ function listSaysMore(name, { check }) {
       }
     })
     check(
-      `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 and 0.7.0 draw it`,
+      `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 to 0.11.0 draw it`,
       under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again',
     )
     check(

@@ -18,11 +18,11 @@
     "app": "examples",
     "placement": "inline",
     "title": "Both renderers, before any server",
-    "caption": "The examples page runs the generator in the browser over a snapshot captured from PostgreSQL, with no server, and renders `sales.order` with both renderers. An amount with five decimals for a `numeric(18,4)` column is refused in both with the same code, “pattern”, and the empty required fields with “required” ([0021](./docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).",
-    "alt": "Two order forms on white paper, labelled React and Angular, each with Status placed, Amount 12.34567 marked pattern, and Customer and Order date marked required.",
+    "caption": "The examples page runs the generator in the browser over a snapshot captured from PostgreSQL, with no server, and renders `sales.order` with both renderers. An amount with five decimals for a `numeric(18,4)` column is refused in both with the same sentence, “Enter it in the form this question asks for.”, and the empty required fields with “This question needs an answer.” ([0021](./docs/decisions/0021-generated-forms-preview-in-both-frameworks.md)).",
+    "alt": "Two order forms on white paper, labelled React and Angular, each with Status placed, Amount 12.34567 refused as not in the form the question asks for, Customer and Order date refused as unanswered, and a count under each box with a limit.",
     "quotes": {
-      "pattern": ["React", "Angular"],
-      "required": ["React", "Angular"]
+      "Enter it in the form this question asks for.": ["React", "Angular"],
+      "This question needs an answer.": ["React", "Angular"]
     }
   },
   {

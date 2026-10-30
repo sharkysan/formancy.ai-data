@@ -27,7 +27,7 @@ function definition(operations: PublishedForm['operations']): PublishedForm {
       model: {
         fields: [
           { key: 'order', type: 'select', label: 'Order', optionsSource: 'pg-order-line.order' },
-          { key: 'line_no', type: 'integer', label: 'Line' },
+          { key: 'line_no', type: 'number', label: 'Line' },
           { key: 'notes', type: 'text', label: 'Notes' },
         ],
       },

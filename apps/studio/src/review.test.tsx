@@ -7,7 +7,7 @@ import { describeReassigned } from '@formancy/data-core'
 import type { FormPolicy, ListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import { ReviewStep } from './review.js'
-import { audit, focusedName, goTo, mount, paragraphs, pressEnter, servedDocument, signIn, unnamed } from './test-studio.js'
+import { audit, findStatus, focusedName, goTo, mount, paragraphs, pressEnter, servedDocument, signIn, statuses, unnamed } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { client, ORDER, orderBundle, OWN_DRAFT, publishReviewed, PUBLISHER_REQUIRED, readOnly, submit } from './test-review.js'
 import { OWNER_SNAPSHOT, renamedOrderColumn, startPlane, TOKENS, withColumn, withoutColumn } from './test-server.js'
@@ -123,7 +123,7 @@ describe('the review queue', () => {
     const { user, review } = await reviewAs(TOKENS.publisher)
     const region = await open(user, review, 1)
     await pressEnter(user, within(region).getByRole('button', { name: 'Approve and publish' }))
-    expect((await within(region).findByRole('status')).textContent).toBe('Published as version 1.')
+    expect((await findStatus(region)).textContent).toBe('Published as version 1.')
     expect(paragraphs(region)).toContain('Nothing it rests on has changed since it was generated.')
     expect(await plane.store.read('sales-order', 1)).toEqual(sent)
     expect(await within(review).findByText('No draft is waiting for review.')).toBeTruthy()
@@ -141,7 +141,7 @@ describe('the review queue', () => {
     const { user, review } = await reviewAs(TOKENS.publisher)
     const region = await open(user, review, 1)
     await user.click(within(region).getByRole('button', { name: 'Approve and publish' }))
-    expect((await within(region).findByRole('status')).textContent).toBe('Published as version 1.')
+    expect((await findStatus(region)).textContent).toBe('Published as version 1.')
     const differs = within(region).getByRole('list', { name: 'What differs from the database now, and blocks nothing' })
     expect(
       within(differs)
@@ -159,7 +159,7 @@ describe('the review queue', () => {
     const { user, review } = await reviewAs(TOKENS.publisher)
     const region = await open(user, review, 1)
     await pressEnter(user, within(region).getByRole('button', { name: 'Reject' }))
-    expect((await within(region).findByRole('status')).textContent).toBe('Rejected draft 1 of sales-order: nothing was published.')
+    expect((await findStatus(region)).textContent).toBe('Rejected draft 1 of sales-order: nothing was published.')
     expect(await plane.store.latest('sales-order')).toBeNull()
     expect(await within(review).findByText('No draft is waiting for review.')).toBeTruthy()
     await waitFor(() => expect(focusedName()).toBe('Draft 1 of sales-order'))
@@ -190,7 +190,7 @@ describe('what a draft offers whom', () => {
     expect(decisions(mine)).toEqual(['Withdraw'])
     expect(paragraphs(mine)).toContain(PUBLISHER_REQUIRED)
     await pressEnter(user, within(mine).getByRole('button', { name: 'Withdraw' }))
-    expect((await within(mine).findByRole('status')).textContent).toBe('Withdrew draft 2 of sales-order: nothing was published.')
+    expect((await findStatus(mine)).textContent).toBe('Withdrew draft 2 of sales-order: nothing was published.')
     await waitFor(async () => expect(await queued(review)).toEqual(['sales-order, draft 1: “Order”, submitted by lin as the first version.']))
     expect(await audit()).toEqual([])
   })
@@ -479,9 +479,9 @@ describe('a decision the server refuses', () => {
     const review = await goTo(user, 'Review')
     const region = await open(user, review, 1)
     await pressEnter(user, within(region).getByRole('button', { name: 'Approve and publish' }))
-    expect((await within(region).findByRole('status')).textContent).toBe('Published as version 1.')
+    expect((await findStatus(region)).textContent).toBe('Published as version 1.')
     await waitFor(() => expect(paragraphs(region)).toContain('The draft could not be read again: The data server could not be reached from this page.'))
-    expect(within(region).getByRole('status').textContent).toBe('Published as version 1.')
+    expect(statuses(region).map((status) => status.textContent)).toEqual(['Published as version 1.'])
     expect(decisions(region)).toEqual([])
     expect(await plane.store.versions('sales-order')).toEqual([1])
     expect(await audit()).toEqual([])

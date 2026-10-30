@@ -290,14 +290,16 @@ describe('planCreate', () => {
     }
   })
 
-  // formancy's server-side replay does not check a checkbox's type: it
-  // accepts the string 'true', and anything else. The codec is the only gate,
-  // so a client that sends 'true' passes the form and must still be refused
-  // here rather than having a string bound to a bit.
-  test('refuses a checkbox answered with text, which formancy’s own replay accepts', () => {
+  // formancy's server-side replay refuses a checkbox answered with anything
+  // but a boolean, as `type`, from 0.8.0 (formancy.ai 0189); through 0.7.0 it
+  // accepted the string 'true', and anything else. This server never runs
+  // that replay, so the codec is the gate either way: a client that sends
+  // 'true' past the form must still be refused here rather than having a
+  // string bound to a bit, with the code the engine gives it.
+  test('refuses a checkbox answered with text, as formancy’s own replay does', () => {
     const source = customerSource()
     const { form, bindings } = customerForm(source)
-    for (const answer of ['true', 'abc', 1]) expect(engineErrors(form, { active: answer }), String(answer)).not.toHaveProperty('active')
+    for (const answer of ['true', 'abc', 1]) expect(engineErrors(form, { active: answer }), String(answer)).toMatchObject({ active: ['type'] })
     expect(planCreate(source, bindings, CUSTOMER_POLICY, CLERK, { customer_no: 7, name: 'X', active: 'true' }, described(source, bindings))).toMatchObject({
       ok: false,
       fieldErrors: [{ field: 'active', code: 'type' }],

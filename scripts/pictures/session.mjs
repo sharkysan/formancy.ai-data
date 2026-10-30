@@ -82,6 +82,40 @@ export function notShot({ options, id, record, text }) {
 }
 
 /**
+ * Fills `box`, a form's field inside `part`, and waits for what its count
+ * says. From formancy 0.8.0 a field with a limit shows its count under the
+ * box at once and says it in a status region of its own once typing pauses,
+ * a second later (formancy.ai 0203), so a picture taken in that second
+ * changes under the camera, which refuses it -- measured: the host's stale
+ * scene, on 2026-10-30. The count is the element the box's
+ * `aria-describedby` names by formancy's `:count` id, read from the DOM,
+ * since a description has no role to find it by. Angular draws the new
+ * count a moment after the fill, so it is waited for too (measured: the
+ * examples scene read the old one, on 2026-10-30). A count says only the
+ * answer's length, so a field with no limit, or a value as long as the one
+ * it replaces, says nothing new and is only filled.
+ */
+export async function fillField(part, box, value, { within }) {
+  const count = async () => {
+    const [id] = ((await box.getAttribute('aria-describedby')) ?? '').split(/\s+/).filter((name) => name.endsWith(':count'))
+    return id === undefined ? undefined : ((await part.page().locator(`[id="${id}"]`).textContent()) ?? undefined)
+  }
+  const before = await count()
+  const says = before !== undefined && (await box.inputValue()).length !== value.length
+  await box.fill(value)
+  if (!says) return
+  const deadline = Date.now() + within
+  let after = await count()
+  while (after === before) {
+    if (Date.now() > deadline) throw new Error(`the count under a field still said “${String(before)}” ${String(within)} ms after it was filled`)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    after = await count()
+  }
+  const exactly = new RegExp(`^${String(after).replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`)
+  await part.getByRole('status').filter({ hasText: exactly }).first().waitFor({ timeout: within })
+}
+
+/**
  * Waits until `locator`'s accessibility snapshot matches `pattern`, polling
  * it: how an act waits for a state, since it reads the tree the record holds
  * and never a CSS selector. Refuses after `within` ms with what it last said.
@@ -111,7 +145,7 @@ export function said(error, secrets) {
 
 /**
  * The renderers search a lookup DEBOUNCE_MS after its text changes -- 250 in
- * @formancy/react and @formancy/angular, at 0.3.0 to 0.7.0, with no minimum
+ * @formancy/react and @formancy/angular, at 0.3.0 to 0.11.0, with no minimum
  * length, so a Load that fills a lookup starts one, unless a rule disables
  * it, which from 0.6.0 asks only for its label -- and mark its box
  * `aria-busy="true"` while the answer is out (react dist/index.mjs, the
