@@ -175,7 +175,7 @@ describe('planUpdate', () => {
     expect(planUpdate(PG, claimed, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, claimed))).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
-      message: expect.stringContaining('concurrency') as unknown as string,
+      message: expect.stringContaining('concurrency'),
     })
     const none = edited(PG_ORDER, (draft) => {
       draft.concurrency = null
@@ -299,7 +299,7 @@ describe('planUpdate', () => {
     expect(planUpdate(PG, bindings, policy, CLERK, 'k1:5', '1', { name: 'Muster' }, undefined, described(PG, bindings))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('tenant_id is the version column') as unknown as string,
+      message: expect.stringContaining('tenant_id is the version column'),
     })
     // The same form unfiltered: the version column alone is no reason to refuse.
     expect(planUpdate(PG, bindings, { ...policy, rowFilters: [] }, CLERK, 'k1:5', '1', { name: 'Muster' }, undefined, described(PG, bindings))).toMatchObject({
@@ -393,7 +393,7 @@ describe('bindings that claim more than the account may do (0027)', () => {
     ).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
-      message: expect.stringContaining("notes is written on create, and this connection's account may not INSERT notes") as unknown as string,
+      message: expect.stringContaining("notes is written on create, and this connection's account may not INSERT notes"),
     })
   })
 
@@ -407,7 +407,7 @@ describe('bindings that claim more than the account may do (0027)', () => {
     })
     expect(planRead(hiddenNotes, withNotes, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
       code: 'invalid-bindings',
-      message: expect.stringContaining("notes is bound to notes, which this connection's account may not read") as unknown as string,
+      message: expect.stringContaining("notes is bound to notes, which this connection's account may not read"),
     })
 
     const hiddenKey = snapshot('postgres', (objects) => restrict(objects, 'order', 'id', { select: false }))
@@ -416,7 +416,7 @@ describe('bindings that claim more than the account may do (0027)', () => {
     })
     expect(planRead(hiddenKey, keyed, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
       code: 'invalid-bindings',
-      message: expect.stringContaining("the identity names id, which this connection's account may not read") as unknown as string,
+      message: expect.stringContaining("the identity names id, which this connection's account may not read"),
     })
 
     const hiddenVersion = snapshot('sqlserver', (objects) => restrict(objects, 'order', 'row_version', { select: false }))
@@ -425,7 +425,7 @@ describe('bindings that claim more than the account may do (0027)', () => {
     })
     expect(planRead(hiddenVersion, versioned, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
       code: 'invalid-bindings',
-      message: expect.stringContaining("row_version cannot be a rowversion: this connection's account may not read it") as unknown as string,
+      message: expect.stringContaining("row_version cannot be a rowversion: this connection's account may not read it"),
     })
   })
 

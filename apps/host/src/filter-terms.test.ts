@@ -77,7 +77,7 @@ describe('the fields a panel offers', () => {
     const drawnAsText = { ...definition.form.model.fields.find((given) => given.key === 'shipped_at'), type: 'text' }
     const redrawn = { ...definition, form: { ...definition.form, model: { fields: [drawnAsText] } } } as unknown as PublishedForm
     expect(panelFields(redrawn).find((offered) => offered.field === 'shipped_at')?.days).toBe('utc')
-    expect(panelFields({ ...definition, list: null } as PublishedForm)).toEqual([])
+    expect(panelFields({ ...definition, list: null })).toEqual([])
   })
 })
 

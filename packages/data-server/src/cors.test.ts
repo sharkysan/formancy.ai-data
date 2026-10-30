@@ -110,7 +110,7 @@ describe('runtime.origins', () => {
     expect(originsProblem(['https://app.example', 'http://localhost:5173'])).toBeUndefined()
     expect(originsProblem(['https://app.example', '*'])).toMatch(/^runtime\.origins\[1\] /)
     expect(originsProblem([7])).toMatch(/^runtime\.origins\[0\] /)
-    expect(originsProblem(' https://app.example' as unknown as string[])).toMatch(/^runtime\.origins is not a list/)
+    expect(originsProblem(' https://app.example')).toMatch(/^runtime\.origins is not a list/)
     expect(originsProblem([' https://app.example'])).toMatch(/^runtime\.origins\[0\] /)
   })
 })

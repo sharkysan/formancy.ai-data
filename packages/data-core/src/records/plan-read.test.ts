@@ -120,7 +120,7 @@ describe('planRead', () => {
     expect(planRead(PG, bindings, LINE_POLICY, actor(['clerk'], {}), `k1:${ORDER_ID},1`)).toMatchObject({
       ok: false,
       code: 'missing-attribute',
-      message: expect.stringMatching(/^lookups\.order: /) as unknown as string,
+      message: expect.stringMatching(/^lookups\.order: /),
     })
     expect(planRead(PG, bindings, LINE_POLICY, AUDITOR, `k1:${ORDER_ID},1`)).toMatchObject({
       ok: true,
@@ -134,7 +134,7 @@ describe('planRead', () => {
     expect(planRead(textual, orderForm(textual).bindings, { ...ORDER_POLICY, through: ['employee'] }, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringMatching(/^through: employee joins sales\.employee\.id, which a through cannot compare/) as unknown as string,
+      message: expect.stringMatching(/^through: employee joins sales\.employee\.id, which a through cannot compare/),
     })
   })
 
@@ -172,7 +172,7 @@ describe('planRead', () => {
     expect(planRead(PG, PG_ORDER, misfit, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('fields.total') as unknown as string,
+      message: expect.stringContaining('fields.total'),
     })
   })
 
@@ -184,7 +184,7 @@ describe('planRead', () => {
     expect(planRead(PG, PG_ORDER, onFlag, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('paid is boolean, which a row filter cannot compare') as unknown as string,
+      message: expect.stringContaining('paid is boolean, which a row filter cannot compare'),
     })
   })
 
@@ -219,14 +219,14 @@ describe('planRead', () => {
     expect(planRead(PG, view, ORDER_POLICY, CLERK, 'k1:1')).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
-      message: expect.stringContaining('no primary or unique key') as unknown as string,
+      message: expect.stringContaining('no primary or unique key'),
     })
     const bindings = orderForm(STAMPED).bindings
     expect(bindings.operations.update).toBe(true)
     expect(planRead(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026')).toMatchObject({
       ok: false,
       code: 'operation-unavailable',
-      message: expect.stringContaining('no settled spelling') as unknown as string,
+      message: expect.stringContaining('no settled spelling'),
     })
     expect(planUpdate(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026', '1', { notes: 'x' }, undefined, described(STAMPED, bindings))).toMatchObject({
       ok: false,
@@ -341,7 +341,7 @@ describe('planRead', () => {
       expect(planRead(PG, edited(PG_ORDER, edit), ORDER_POLICY, CLERK, ORDER_TOKEN), reason).toMatchObject({
         ok: false,
         code: 'invalid-bindings',
-        message: expect.stringContaining(reason) as unknown as string,
+        message: expect.stringContaining(reason),
       })
     }
     // A version column must be a non-nullable integer; on SQL Server the generated rowversion is the only proof.
@@ -356,7 +356,7 @@ describe('planRead', () => {
     expect(planRead(nullableVersion, forged, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
-      message: expect.stringContaining('row_version cannot be a version-column') as unknown as string,
+      message: expect.stringContaining('row_version cannot be a version-column'),
     })
   })
 
@@ -375,7 +375,7 @@ describe('planRead', () => {
     expect(planRead(customers, asKey, CUSTOMER_POLICY, CLERK, 'k1:1,1001')).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
-      message: expect.stringContaining("tenant_id cannot be a version-column: it is part of the record's key") as unknown as string,
+      message: expect.stringContaining("tenant_id cannot be a version-column: it is part of the record's key"),
     })
     // The order's tenant is no key, and the customer lookup writes it.
     const asField = edited(PG_ORDER, (draft) => {
@@ -384,7 +384,7 @@ describe('planRead', () => {
     expect(planUpdate(PG, asField, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, described(PG, asField))).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
-      message: expect.stringContaining('tenant_id cannot be a version-column: a field is bound to it') as unknown as string,
+      message: expect.stringContaining('tenant_id cannot be a version-column: a field is bound to it'),
     })
     const generated = edited(PG_ORDER, (draft) => {
       if (draft.concurrency !== null) draft.concurrency.column = 'id'
@@ -392,7 +392,7 @@ describe('planRead', () => {
     expect(planRead(PG, generated, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
       ok: false,
       code: 'invalid-bindings',
-      message: expect.stringContaining('id cannot be a version-column: the database generates it') as unknown as string,
+      message: expect.stringContaining('id cannot be a version-column: the database generates it'),
     })
   })
 })

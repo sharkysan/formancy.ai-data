@@ -113,7 +113,7 @@ describe('planList', () => {
     expect(planList(PG, bindings, LINE_POLICY, actor(['clerk'], {}), FIRST)).toMatchObject({
       ok: false,
       code: 'missing-attribute',
-      message: expect.stringMatching(/^lookups\.order: /) as unknown as string,
+      message: expect.stringMatching(/^lookups\.order: /),
     })
   })
 
@@ -145,7 +145,7 @@ describe('planList', () => {
     const listed = planList(customerSource(), customers, hiddenTenant, CLERK, FIRST)
     expect(listed).toMatchObject({
       ok: true,
-      request: { columns: expect.arrayContaining([column('tenant_id', INT32), column('customer_no', INT32)]) as unknown as [] },
+      request: { columns: expect.arrayContaining([column('tenant_id', INT32), column('customer_no', INT32)]) },
     })
     if (listed.ok) expect(listed.fields).not.toContain('tenant_id')
     // A key column bound by a lookup is read through that lookup's field: a line's order.

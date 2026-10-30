@@ -576,7 +576,7 @@ describe('the administrator plane', () => {
             throw new Error('timeout on 10.0.0.5')
           },
           close: async () => {},
-        } as DatabaseAdapter,
+        },
         lookups: {} as LookupAdapter,
         records: {} as RecordAdapter,
       }),

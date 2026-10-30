@@ -397,7 +397,7 @@ describe('the description and discovery', () => {
   // The text a client receives is cut to TEXTSIZE, and HASHBYTES hashes it
   // whole: decided over the cut text, the description would be guessed.
   test('a description cut by the connection’s TEXTSIZE is unavailable, never parsed', async () => {
-    const pool = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, textsize: 64 } as mssql.config['options'] }).connect()
+    const pool = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, textsize: 64 } }).connect()
     try {
       expect(await createSqlServerRecords(pool).describe({ schema: 'sales', name: 'order' })).toMatchObject({
         ok: false,

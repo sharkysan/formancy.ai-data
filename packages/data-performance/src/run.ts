@@ -183,7 +183,7 @@ async function measureOn(protocol: Protocol, options: RunOptions, setup: Setup):
     const created: FormRecord[] = []
     for (let i = 0; i <= lanes; i += 1) {
       const outcome = await client.create(formId, {
-        customer: setup.expected.rotation[50 + i] as string,
+        customer: setup.expected.rotation[50 + i],
         order_date: '2026-10-09',
         status: 'placed',
         amount: '5',

@@ -19,7 +19,7 @@ const LINE_ORDER = {
 } as unknown as Through
 
 /** A copy of the line's through with one part replaced, as a careless caller might send it. */
-const with_ = (part: Record<string, unknown>): Through => ({ ...LINE_ORDER, ...part }) as unknown as Through
+const with_ = (part: Record<string, unknown>): Through => ({ ...LINE_ORDER, ...part })
 
 describe('throughTerms', () => {
   // What the planner makes is read as it is: the pairs in order, the target,
@@ -37,7 +37,7 @@ describe('throughTerms', () => {
   // read every tenant's lines.
   test('refuses throughs that are not a list', () => {
     for (const through of [undefined, null, {}, LINE_ORDER]) {
-      expect(() => throughTerms(through as unknown as Through[]), String(through)).toThrow(/A request's throughs are a list/)
+      expect(() => throughTerms(through as Through[]), String(through)).toThrow(/A request's throughs are a list/)
     }
   })
 

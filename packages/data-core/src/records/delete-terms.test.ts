@@ -12,7 +12,7 @@ import type { DeleteRequest } from './types.js'
  */
 
 const REQUEST: DeleteRequest = {
-  target: ORDER_TARGET.sqlserver as unknown as DeleteRequest['target'],
+  target: ORDER_TARGET.sqlserver,
   key: [value('id', INT64, ORDER_ID)],
   expectedVersion: '00000000000007d1',
   filters: TENANT_ONE as unknown as DeleteRequest['filters'],
@@ -21,7 +21,7 @@ const REQUEST: DeleteRequest = {
   definition: 'd',
 }
 
-const altered = (change: Record<string, unknown>): DeleteRequest => ({ ...REQUEST, ...change }) as DeleteRequest
+const altered = (change: Record<string, unknown>): DeleteRequest => ({ ...REQUEST, ...change })
 
 describe('deleteTerms', () => {
   // The terms are fresh, and hold what the request said and nothing more.

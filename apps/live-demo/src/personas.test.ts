@@ -81,6 +81,6 @@ describe('the personas', () => {
   // Every role a persona carries has a row in the table, which is what the
   // policy is derived from: a role with none would be granted nothing.
   test('carry only roles the table grants', () => {
-    for (const persona of PERSONAS) for (const role of persona.roles) expect(Object.keys(ROLE_GRANTS)).toContain(role as DemoRole)
+    for (const persona of PERSONAS) for (const role of persona.roles) expect(Object.keys(ROLE_GRANTS)).toContain(role)
   })
 })

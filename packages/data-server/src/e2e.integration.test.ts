@@ -180,7 +180,7 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg', versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg', versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms', versionColumn: undefined },
 ])('the journey on $engine', ({ connection, versionColumn }) => {
   const formId = `${connection}-order`
@@ -489,7 +489,7 @@ const customerPolicy = (fields: readonly FieldBinding[]): FormPolicy => ({
 const CUSTOMERS = { root: { schema: 'sales', name: 'customer' }, lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
 ])("a file of a form's records on $engine (0079)", ({ connection, versionColumn }) => {
   const orders = `${connection}-export-order`
@@ -902,7 +902,7 @@ describe('deleting an order line through its order on SQL Server', () => {
 const writerWrites = new Map<string, Array<[string, FieldWrites]>>()
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg-writer', versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg-writer', versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms-writer', versionColumn: undefined },
 ])("a form proposed through the order form's own account on $engine", ({ connection, versionColumn }) => {
   const formId = `${connection}-order`
@@ -1002,7 +1002,7 @@ const ORDER_CASCADES: NonNullable<FormPolicy['cascades']> = [
 ]
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg-writer', db: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg-writer', db: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms-writer', db: 'ms' as const, versionColumn: undefined },
 ])("deleting an order with what it reaches, through the order form's own account on $engine", ({ connection, db, versionColumn }) => {
   const formId = `${connection}-order-delete`
@@ -1225,7 +1225,7 @@ const sectionsOf = (form: FormSchema) => (form.layouts?.[0]?.nodes ?? []) as Arr
 const orderOf = (form: FormSchema) => (sectionsOf(form)[0]?.children[0] as Grid).children.map((node) => node.path)
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
 ])('a published form through a change to its table on $engine (plan section 14, step 8)', ({ connection, versionColumn }) => {
   const formId = `${connection}-evolve`

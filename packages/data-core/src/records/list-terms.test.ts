@@ -28,7 +28,7 @@ const REQUEST: ListRequest = {
   limit: 50,
 }
 
-const altered = (change: Record<string, unknown>): ListRequest => ({ ...REQUEST, ...change }) as ListRequest
+const altered = (change: Record<string, unknown>): ListRequest => ({ ...REQUEST, ...change })
 
 describe('listTerms', () => {
   // The terms are fresh, and hold what the request said and nothing more.

@@ -24,7 +24,7 @@ const DOCUMENT: FormSchema = {
   id: 'mount-test',
   title: 'Mount',
   model: { fields: [{ key: 'name', label: 'Name', type: 'text' }] },
-} as FormSchema
+}
 
 function engine(): FormEngine {
   return createFormEngine({ schema: DOCUMENT, formId: 'mount-test-angular' })

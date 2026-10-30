@@ -64,7 +64,7 @@ function sectionShapeProblems(entry: unknown, at: string, seen: Set<string>): st
     if (!Array.isArray(order) || !order.every((key) => typeof key === 'string')) problems.push(`${at}/order must be field keys`)
     else {
       const keys = new Set<string>()
-      for (const key of order as string[]) {
+      for (const key of order) {
         if (keys.has(key)) problems.push(`${at}/order: ${key} appears twice`)
         keys.add(key)
       }

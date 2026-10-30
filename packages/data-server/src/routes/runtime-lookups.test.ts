@@ -171,7 +171,7 @@ async function post(base: string, path: string, body: unknown, signal?: AbortSig
     body: JSON.stringify(body),
     ...(signal === undefined ? {} : { signal }),
   })
-  return { status: response.status, json: (await response.json()) as unknown }
+  return { status: response.status, json: await response.json() }
 }
 
 beforeEach(async () => {

@@ -213,7 +213,7 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, other: 'ms' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, other: 'ms' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, other: 'pg' as const, versionColumn: undefined },
 ])('a version of the order form moved between deployments on $engine', ({ connection, other, versionColumn }) => {
   let development: Deployment

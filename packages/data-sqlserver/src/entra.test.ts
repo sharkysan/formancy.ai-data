@@ -196,7 +196,7 @@ function tediousError(message: string, code: string): Error {
 }
 
 /** What mssql rejects `connect()` with for each of tedious's failures: its own ConnectionError, the original kept enumerable. */
-const asMssql = (original: Error) => new mssql.ConnectionError(original as unknown as string)
+const asMssql = (original: Error) => new mssql.ConnectionError(original)
 
 describe('entraLoginFailure', () => {
   // tedious 20.3.3 rejects a token failure with an AggregateError whose

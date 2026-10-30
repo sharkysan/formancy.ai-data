@@ -228,7 +228,7 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
 const spelled = (bundle: unknown) => `${JSON.stringify(bundle, null, 2)}\n`
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' as string | undefined },
+  { engine: 'PostgreSQL', connection: 'pg' as const, versionColumn: 'row_version' },
   { engine: 'SQL Server', connection: 'ms' as const, versionColumn: undefined },
 ])('two drafts of the order form reviewed on $engine', ({ connection, versionColumn }) => {
   let deployed: Deployment

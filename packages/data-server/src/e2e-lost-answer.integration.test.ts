@@ -209,7 +209,7 @@ function asProposed(connection: string, { form, bindings, snapshot, generation }
 
 /** A clerk of a tenant may do what the form offers, on the fields it writes. */
 function clerkPolicy(bindings: FormBindings): FormPolicy {
-  const fields = bindings.fields as FieldBinding[]
+  const fields = bindings.fields
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: bindings.operations.update ? ['clerk'] : [] },
@@ -243,7 +243,7 @@ async function publishDeleting(connection: string, formId: string, generation: R
   const policy: FormPolicy = {
     version: 1,
     operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
-    fields: Object.fromEntries((proposed.bindings.fields as FieldBinding[]).map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+    fields: Object.fromEntries(proposed.bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
     rowFilters: [],
     lookups: {},
   }
@@ -290,7 +290,7 @@ const CUSTOMERS_NAMED = {
 }
 
 describe.each([
-  { engine: 'PostgreSQL', connection: 'pg' as const, kind: 'postgres' as DatabaseKind, versionColumn: 'row_version' as string | undefined, customerNo: 5101 },
+  { engine: 'PostgreSQL', connection: 'pg' as const, kind: 'postgres' as DatabaseKind, versionColumn: 'row_version', customerNo: 5101 },
   { engine: 'SQL Server', connection: 'ms' as const, kind: 'sqlserver' as DatabaseKind, versionColumn: undefined, customerNo: 5102 },
 ])('an answer lost after the commit on $engine', ({ engine, connection, kind, versionColumn, customerNo }) => {
   const orderForm = `${connection}-order`

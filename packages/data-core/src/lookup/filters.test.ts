@@ -207,7 +207,7 @@ describe('scopeRowFilters', () => {
       expect(scopeRowFilters(ITEM, [{ column, value: '1' }], 'rowFilters'), column).toMatchObject({
         ok: false,
         code: 'invalid-policy',
-        message: expect.stringMatching(/^rowFilters: /) as unknown as string,
+        message: expect.stringMatching(/^rowFilters: /),
       })
     }
   })

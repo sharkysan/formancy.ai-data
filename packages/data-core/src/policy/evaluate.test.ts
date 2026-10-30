@@ -226,7 +226,7 @@ describe('delete', () => {
   // lookup no delete request carries.
   test('offers no lookup to search for a delete', () => {
     const deleting = { ...LINE_POLICY, operations: { ...LINE_POLICY.operations, delete: BOTH } }
-    expect(lookupRowFilter(deleting, MANAGER, DELETABLE_LINE, 'delete' as 'read', 'order')).toMatchObject({ ok: false, code: 'operation-denied' })
+    expect(lookupRowFilter(deleting, MANAGER, DELETABLE_LINE, 'delete', 'order')).toMatchObject({ ok: false, code: 'operation-denied' })
   })
 })
 

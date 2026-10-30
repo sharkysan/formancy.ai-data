@@ -325,7 +325,7 @@ export async function startPlane(
       const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
       // `read` the clerk may only read, so a record of it is drawn with every field disabled;
       // `withheld` they may read too, but for Amount, which its default view is on.
-      const readOnly = { ...base, operations: offered(bindings as unknown as Proposed, true) }
+      const readOnly = { ...base, operations: offered(bindings as Proposed, true) }
       const policy: FormPolicy =
         formId === read
           ? readOnly
@@ -377,7 +377,7 @@ export async function startPlane(
         ...(child.versionColumn === undefined ? {} : { versionColumn: child.versionColumn }),
         ...(child.pinned === undefined ? {} : { pinned: child.pinned }),
       })
-      const proposed = bindings as unknown as Proposed & FormBindings
+      const proposed = bindings as Proposed & FormBindings
       const presentation: PresentationOverrides = {
         ...EMPTY_PRESENTATION,
         fields: lookupsOf(proposed).flatMap(({ field, foreignKey }) => {

@@ -159,7 +159,7 @@ function customerProblems(data: DemoData): string[] {
 function customerCountryProblems(customer: DemoCustomer, key: string, known: ReadonlySet<string>): string[] {
   if (!known.has(customer.countryCode)) return [`customer ${key} is in ${customer.countryCode}, which is no country of the demo's`]
   const problems: string[] = []
-  const tenantCountries = TENANT_COUNTRIES[customer.tenantId as 1 | 2] ?? []
+  const tenantCountries = TENANT_COUNTRIES[customer.tenantId] ?? []
   if (!tenantCountries.some(([code]) => code === customer.countryCode))
     problems.push(`customer ${key} is in ${customer.countryCode}, where tenant ${String(customer.tenantId)} has no customers`)
   const country = COUNTRIES.find((each) => each.isoCode === customer.countryCode)

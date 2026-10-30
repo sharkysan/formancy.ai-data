@@ -64,14 +64,14 @@ function keyOf(request: DeleteRequest): RecordValue[] {
 /** Each part of the reach, read: well formed, every table once, and every column and key named. */
 function partsOf(reach: Record<string, unknown>): ReachTerms {
   const removed = reach['removed'] as unknown[]
-  if (!removed.every(isRef) || removed.some((table, index) => removed.findIndex((other) => sameRef(other as ObjectRef, table)) !== index)) {
+  if (!removed.every(isRef) || removed.some((table, index) => removed.findIndex((other) => sameRef(other, table)) !== index)) {
     throw refuse('names each table it removes rows of once')
   }
   const cleared = (reach['cleared'] as unknown[]).map((entry) => {
     if (!isRecord(entry) || !isRef(entry['table']) || !Array.isArray(entry['columns']) || entry['columns'].length === 0 || !entry['columns'].every(isName)) {
       throw refuse('names each table it clears with the columns it clears')
     }
-    return { table: copy(entry['table']), columns: [...(entry['columns'] as string[])] }
+    return { table: copy(entry['table']), columns: [...entry['columns']] }
   })
   if (cleared.some((entry, index) => cleared.findIndex((other) => sameRef(other.table, entry.table)) !== index))
     throw refuse('names each table it clears with the columns it clears')
@@ -81,7 +81,7 @@ function partsOf(reach: Record<string, unknown>): ReachTerms {
     }
     return { from: copy(entry['from']), name: entry['name'], onto: copy(entry['onto']), onDelete: entry['onDelete'] as DeleteAction }
   })
-  return { removed: (removed as ObjectRef[]).map(copy), cleared, accepted }
+  return { removed: removed.map(copy), cleared, accepted }
 }
 
 /**

@@ -32,7 +32,7 @@ const ID = EDGE_VALUES.beyondSafeInteger
 describe('reading sales.order through the postgres driver', () => {
   /** A driver set up the way a composition root may set it up: its choice, not the adapter's. */
   function configured(types: Record<string, postgres.PostgresType>): Sql<Record<string, unknown>> {
-    return postgres(fixture.admin, { onnotice: () => {}, types }) as unknown as Sql<Record<string, unknown>>
+    return postgres(fixture.admin, { onnotice: () => {}, types })
   }
 
   // The default is what every query gets unless it asks for something else.

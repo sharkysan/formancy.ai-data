@@ -132,7 +132,7 @@ describe('planCreate', () => {
     ).toMatchObject({
       ok: false,
       code: 'over-posting',
-      message: expect.stringContaining('tenant_id is pinned by a row filter') as unknown as string,
+      message: expect.stringContaining('tenant_id is pinned by a row filter'),
     })
     for (const key of ['id', 'row_version']) {
       expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, [key]: '1' }, described(PG, PG_ORDER)), key).toMatchObject({
@@ -486,7 +486,7 @@ describe('planCreate', () => {
     expect(planCreate(PG, PG_ORDER, byRegion, CLERK, ANSWERS, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('employee has no column region') as unknown as string,
+      message: expect.stringContaining('employee has no column region'),
     })
   })
 
@@ -539,7 +539,7 @@ describe('planCreate', () => {
     expect(planCreate(PG, PG_ORDER, onIdentity, CLERK, ANSWERS, described(PG, PG_ORDER))).toMatchObject({
       ok: false,
       code: 'invalid-policy',
-      message: expect.stringContaining('id cannot be written from the context') as unknown as string,
+      message: expect.stringContaining('id cannot be written from the context'),
     })
     expect(planCreate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ANSWERS, described(PG, PG_ORDER))).toMatchObject({ ok: false, code: 'operation-denied' })
   })

@@ -112,7 +112,7 @@ describe('nginx.conf sends each page its policy (0083)', () => {
   test('fails a location that serves files with no policy, and a policy for a location that serves none', () => {
     const third = conf.replace('    location /v1/ {', '    location /docs/ {\n        alias /usr/share/formancy-data/docs/;\n    }\n\n    location /v1/ {')
     expect(nginxPolicyProblems(third)).toEqual(['location /docs/ serves files, and scripts/web-policies.mjs has no policy for a page there'])
-    const gone = conf.replace(/    location \/host\/ \{[^}]*\}\n/, '')
+    const gone = conf.replace(/ {4}location \/host\/ \{[^}]*\}\n/, '')
     expect(nginxPolicyProblems(gone)).toEqual([`scripts/web-policies.mjs has a policy for /host/, and no location of ${NGINX_CONF} serves files there`])
   })
 

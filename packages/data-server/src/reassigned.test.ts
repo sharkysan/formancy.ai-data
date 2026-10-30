@@ -15,18 +15,17 @@ const WRITES = { create: true, update: true }
 const TEXT = { kind: 'text', maxLength: 40, lengthUnit: 'code-points', fixedLength: false } as const
 
 const columnBinding = (field: string, column: string): FieldBinding => ({ kind: 'column', field, column, type: TEXT, nullable: true, writes: WRITES })
-const lookupBinding = (field: string, foreignKey: string): FieldBinding =>
-  ({
-    kind: 'lookup',
-    field,
-    foreignKey,
-    columns: [`${field}_id`],
-    target: { table: { schema: 'sales', name: field }, columns: ['id'] },
-    display: ['name'],
-    source: `erp-${foreignKey}`,
-    nullable: true,
-    writes: WRITES,
-  }) as FieldBinding
+const lookupBinding = (field: string, foreignKey: string): FieldBinding => ({
+  kind: 'lookup',
+  field,
+  foreignKey,
+  columns: [`${field}_id`],
+  target: { table: { schema: 'sales', name: field }, columns: ['id'] },
+  display: ['name'],
+  source: `erp-${foreignKey}`,
+  nullable: true,
+  writes: WRITES,
+})
 
 const bindings = (...fields: FieldBinding[]): FormBindings => ({
   version: 2,

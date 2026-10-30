@@ -196,7 +196,7 @@ export function registerLookupRoutes(app: FastifyInstance, steps: LookupRouteSte
       request,
       reply,
       'resolve',
-      async (open, config, filters, signal) => ({ rows: await open.lookups.resolve(config, tokens as string[], filters, signal) }) satisfies ResolvedLookup,
+      async (open, config, filters, signal) => ({ rows: await open.lookups.resolve(config, tokens, filters, signal) }) satisfies ResolvedLookup,
       body['operation'],
     )
   })

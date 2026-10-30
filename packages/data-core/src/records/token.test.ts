@@ -149,7 +149,7 @@ describe('intendedRecord', () => {
   test('is null when the database supplies the key, a value is NULL or not text, or the key has no settled spelling', () => {
     expect(intendedRecord(insert(ORDER, [tenant, { name: 'notes', type: text(null), value: 'x' }]))).toBeNull()
     expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: null }]))).toBeNull()
-    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: 8 as unknown as string }]))).toBeNull()
+    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: 8 }]))).toBeNull()
     const at: NormalizedType = { kind: 'timestamp', withTimeZone: true, precision: 6 }
     expect(intendedRecord(insert([{ name: 'at', type: at }], [{ name: 'at', type: at, value: '2026-10-09T12:00:00Z' }]))).toBeNull()
     const code = text(null)

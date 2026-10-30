@@ -46,7 +46,7 @@ function perfect(kind: DatabaseKind): ObjectMeta[] {
       const facts = { ...check, ...(check.byKind?.[kind] ?? {}) }
       return { name: check.name, expression: null, enforced: facts.enforced ?? true, validated: facts.validated ?? true }
     }),
-    rowSecurity: typeof entry.rowSecurity === 'string' ? entry.rowSecurity : (entry.rowSecurity[kind] as RowSecurity),
+    rowSecurity: typeof entry.rowSecurity === 'string' ? entry.rowSecurity : entry.rowSecurity[kind],
   }))
 }
 

@@ -142,7 +142,7 @@ export function scenariosFor(engine: EngineKey, via: 'direct' | 'hop', context: 
       formId: null,
       send: async () => {
         const response = await context.fetch(`${context.base}/health`)
-        return { status: response.status, body: (await response.json()) as unknown }
+        return { status: response.status, body: await response.json() }
       },
       check(answer) {
         const { status, body } = answer as { status: number; body: unknown }

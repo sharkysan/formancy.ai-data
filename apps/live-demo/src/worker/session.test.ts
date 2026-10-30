@@ -139,7 +139,7 @@ describe('the session', () => {
       body: endless,
       headers: { origin: PAGE, 'content-type': 'application/json' },
       duplex: 'half',
-    } as RequestInit)
+    })
     expect((await refusal(request)).status).toBe(400)
     expect(pulled).toBeLessThan(SIGN_IN_BYTES / 256 + 4)
   })

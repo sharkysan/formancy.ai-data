@@ -250,7 +250,7 @@ export default {
   fetch(request, env) {
     return handle(request, (name) => {
       const stub = env.DEMO.get(env.DEMO.idFromName(name))
-      return { signIn: async (persona) => (await stub.signIn(persona)) as SignInResult, fetch: (forwarded) => stub.fetch(forwarded) }
+      return { signIn: async (persona) => await stub.signIn(persona), fetch: (forwarded) => stub.fetch(forwarded) }
     })
   },
 } satisfies ExportedHandler<Env>
