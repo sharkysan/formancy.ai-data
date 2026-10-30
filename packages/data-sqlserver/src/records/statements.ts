@@ -429,7 +429,7 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
   const table = quoteTable(request.target.table)
   const columns = assigned.map(({ value }) => quoteName(value.name)).join(', ')
   const values = assigned.map(({ sql }) => sql).join(', ')
-  const fresh = freshPredicate(request, assigned)
+  const fresh: string | undefined = freshPredicate({ ...request, fresh: undefined }, assigned)
   const sql = writeBatch(parameters, {
     target: request.target,
     definition,
@@ -475,7 +475,6 @@ export function updateStatement(request: UpdateRequest, terms: readonly RowFilte
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${version} + 1`)
   const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected)]
   // A version that has ended is not updated (0113).
-  if (request.open !== undefined) where.push(`${column(request.open)} is null`)
   const sql = writeBatch(parameters, {
     target,
     definition,

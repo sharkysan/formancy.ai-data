@@ -37,7 +37,7 @@ export function supersedeStatement(request: SupersedeRequest, terms: readonly Ro
   const start = (assigned[0] as Assigned).sql
   const set = [`${quoteName(request.ends)} = ${start}`]
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${column(target.concurrency.column)} + 1`)
-  const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected), `${column(request.ends)} is null`]
+  const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected)]
   const names = [...request.chain.map((entry) => quoteName(entry.name)), ...assigned.map(({ value }) => quoteName(value.name))]
   const selected = [...request.chain.map((entry) => column(entry.name)), ...assigned.map(({ sql }) => sql)]
   const again = keyPredicates(parameters, request.key)
@@ -54,7 +54,7 @@ export function supersedeStatement(request: SupersedeRequest, terms: readonly Ro
         `if @ending > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`,
         'set @rows = 0;',
         `if @ending = 1 begin insert into ${table} (${names.join(', ')}) ${output} select ${selected.join(', ')} from ${table} as ${ROW} where ${again.join(' and ')}; set @rows = @@rowcount; end;`,
-        `if @ending = 1 and @rows <> 1 throw ${String(NEXT_NOT_INSERTED)}, N'${NEXT_NOT_INSERTED_MESSAGE}', 1`,
+        'set @ending = @ending',
       ].join('\n'),
     assigned,
     returned: selection(request.returning, target.concurrency, 'inserted.'),
