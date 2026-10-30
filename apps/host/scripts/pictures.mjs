@@ -62,7 +62,7 @@ import postgres from 'postgres'
 import journey from '../../../scripts/getting-started/journey.json' with { type: 'json' }
 import { EMPTY_PRESENTATION, fieldsFromOperations } from '../../../scripts/getting-started/journey.mjs'
 import { HOST } from '../../../scripts/getting-started/walk.mjs'
-import { field, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
+import { field, fillField, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
@@ -251,11 +251,11 @@ function actsOver(plane) {
     },
 
     'host-stale': async (page) => {
-      await box(page, 'React', journey.order.update.label).fill(journey.order.update.value)
+      await fillField(paper(page, 'React'), box(page, 'React', journey.order.update.label), journey.order.update.value, { within: WITHIN })
       await save(page, 'React')
       await pane(page, 'React').getByRole('status').filter({ hasText: HOST.saved }).waitFor()
       // Angular, still at the version it read.
-      await box(page, 'Angular', 'Notes').fill(NOTES)
+      await fillField(paper(page, 'Angular'), box(page, 'Angular', 'Notes'), NOTES, { within: WITHIN })
       await save(page, 'Angular')
       await pane(page, 'Angular').getByRole('region', { name: 'Angular Not saved', exact: true }).waitFor()
       const stored = await row()
@@ -276,7 +276,7 @@ function actsOver(plane) {
       const named = page.waitForResponse((response) => response.request().method() === 'POST' && /\/lookups\/[^/]+\/resolve$/.test(new URL(response.url()).pathname))
       await paper(page, 'React').getByRole('option', { name: DELETED.name, exact: true }).click()
       if ((await named).status() !== 200) throw new Error('the page could not have the chosen customer named')
-      for (const entry of journey.order.create) await box(page, 'React', entry.label).fill(entry.value)
+      for (const entry of journey.order.create) await fillField(paper(page, 'React'), box(page, 'React', entry.label), entry.value, { within: WITHIN })
       await owner`delete from sales.customer where tenant_id = 1 and customer_no = ${DELETED.no}`
       await save(page, 'React')
       await paper(page, 'React').getByRole('heading', { name: 'There is 1 problem to fix', exact: true }).waitFor()
@@ -294,7 +294,7 @@ function actsOver(plane) {
     'host-unknown': async (page) => {
       await load(page)
       // Notes, not Status: a status outside draft, placed and shipped is refused by ck_order_status, and nothing would be stored.
-      await box(page, 'React', 'Notes').fill(NOTES)
+      await fillField(paper(page, 'React'), box(page, 'React', 'Notes'), NOTES, { within: WITHIN })
       let sent = 0
       const answers = []
       const lost = '**/v1/forms/*/records/update'
@@ -396,7 +396,7 @@ function actsOver(plane) {
         await route.fallback()
       })
       const answered = page.waitForResponse((response) => response.request().method() === 'POST' && /\/records\/update$/.test(new URL(response.url()).pathname))
-      await box(page, 'React', 'Notes').fill(DRIFT_NOTES)
+      await fillField(paper(page, 'React'), box(page, 'React', 'Notes'), DRIFT_NOTES, { within: WITHIN })
       await save(page, 'React')
       const answer = await answered
       const { code } = await answer.json()

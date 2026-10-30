@@ -68,6 +68,29 @@ export function notShot({ options, id, record, text }) {
 }
 
 /**
+ * Fills `box`, a form's field inside `part`, and waits for what its count
+ * says. From formancy 0.8.0 a field with a limit shows its count under the
+ * box at once and says it in a status region of its own once typing pauses,
+ * a second later (formancy.ai 0203), so a picture taken in that second
+ * changes under the camera, which refuses it -- measured: the host's stale
+ * scene, on 2026-10-30. The count is the element the box's
+ * `aria-describedby` names by formancy's `:count` id, read from the DOM,
+ * since a description has no role to find it by. A field with no limit, or
+ * one whose count the value leaves as it was, says nothing more.
+ */
+export async function fillField(part, box, value, { within }) {
+  const count = async () => {
+    const [id] = ((await box.getAttribute('aria-describedby')) ?? '').split(/\s+/).filter((name) => name.endsWith(':count'))
+    return id === undefined ? undefined : ((await part.page().locator(`[id="${id}"]`).textContent()) ?? undefined)
+  }
+  const before = await count()
+  await box.fill(value)
+  const after = await count()
+  if (after === undefined || after === before) return
+  await part.getByRole('status').filter({ hasText: after }).first().waitFor({ timeout: within })
+}
+
+/**
  * Waits until `locator`'s accessibility snapshot matches `pattern`, polling
  * it: how an act waits for a state, since it reads the tree the record holds
  * and never a CSS selector. Refuses after `within` ms with what it last said.
