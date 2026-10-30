@@ -64,7 +64,7 @@ only enforcement is "we remember" says so plainly.
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028; extended by 0079 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109 |
-| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068 |
+| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068, 0111 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
@@ -165,3 +165,4 @@ only enforcement is "we remember" says so plainly.
 | [0108](0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md) | A form's list pages after the last row it showed, found again by its key, not by an offset | accepted |
 | [0109](0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md) | A form whose key is its foreign key onto its parent's is shown under the parent's record as one section, while the record holds the value its generation names | accepted |
 | [0110](0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md) | A form that is its own child is shown as a tree of its records: its roots, and under each record those naming it | accepted |
+| [0111](0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md) | A deploy pipeline checks drift with a command the image ships, which fails on a blocking change and never passes a form it could not check | accepted |

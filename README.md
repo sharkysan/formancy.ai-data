@@ -1110,6 +1110,13 @@ copy ([0014](./docs/decisions/0014-host-identity-is-verified-offline.md),
 [the data server's README](./packages/data-server/README.md#rotating-the-identity-key)
 says how).
 
+A deploy pipeline checks drift after its migrations with the image's
+`dist/drift-check-cli.mjs`: it asks the server about each form it names and
+exits 1 on a `blocking` change and 2 on a form it could not check, never 0
+for one it could not
+([0111](./docs/decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md);
+[the data server's README](./packages/data-server/README.md#checking-drift-in-a-deploy-pipeline)).
+
 A host page on an origin of its own calls the runtime plane directly once
 `FORMANCY_DATA_CORS_ORIGINS` lists that origin exactly, as a browser sends
 it: each runtime route grants its own preflight, no wildcard, pattern or

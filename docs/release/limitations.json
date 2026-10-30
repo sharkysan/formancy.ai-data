@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:f3f20c5b14e9912fd3d8e120072cb2bbdd97ad356e4cc0f74eb5506213a3fa7d",
+      "reviewed": "sha256:e8a3a675ff274a1e954f629a03d77fd81540ce1029a8ad230916cf10d14faf3a",
       "limitations": [
         {
           "area": "forms",
@@ -3321,6 +3321,21 @@
         {
           "area": "host",
           "says": "Whether a record has records below it is known only once it is expanded, one list request per level, and the browser gates do not measure the tree."
+        }
+      ]
+    },
+    "0111": {
+      "reviewed": "sha256:6d2da9629790550f90103ccaf0948011083a780a37f8cca5c817f273cde82654",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The drift check needs the server running against the migrated database with its administrator's plane on, an administrator token, and the ids of the forms to check; it checks each form's published version, never a draft.",
+          "heldBy": "packages/data-server/src/drift-check.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The drift check is a command in the server image, or in an installed @formancy/data-server, and prints lines for a log; a program reads the drift route's JSON instead.",
+          "heldBy": "packages/data-server/src/drift-check.test.ts"
         }
       ]
     }
