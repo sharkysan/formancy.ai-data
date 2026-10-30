@@ -1,5 +1,5 @@
 import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
+import type { ColumnMeta, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
@@ -766,6 +766,44 @@ describe('a format-2 bundle (0030)', () => {
       const dropped = ordered()
       dropped.generation.lookups = []
       expect(refused(dropped)).toEqual(['generation: the bindings have a lookup over fk_order_employee showing name, which it does not choose'])
+    })
+
+    // A section is part of the choice (0109): one marked by hand would show
+    // the next version's rows under their parent as one form, and one taken
+    // away would put them back in a grid, unasked. Watched failing with the
+    // section left out of the comparison.
+    test('a section the bindings do not have, or one they have that the request does not mark', () => {
+      const marked = ordered()
+      marked.generation.lookups = [{ foreignKey: 'fk_order_employee', display: ['name'], section: { when: null } }]
+      expect(refused(marked)).toEqual([
+        'generation: chooses a lookup over fk_order_employee showing name as a section, which the bindings do not have',
+        'generation: the bindings have a lookup over fk_order_employee showing name, which it does not choose',
+      ])
+      const unmarked = ordered()
+      const lookup = unmarked.bindings.fields.find((binding) => binding.kind === 'lookup') as Extract<FormBindings['fields'][number], { kind: 'lookup' }>
+      lookup.section = { when: { column: 'tenant_id', type: INT32, value: '1' } }
+      expect(refused(unmarked)).toEqual([
+        'generation: chooses a lookup over fk_order_employee showing name, which the bindings do not have',
+        'generation: the bindings have a lookup over fk_order_employee showing name as a section, which it does not choose',
+      ])
+    })
+
+    // A section is read as strictly as the rest of a request: its condition
+    // is a column and a value, both text, or null, and nothing else.
+    test('a section of another shape', () => {
+      for (const section of [
+        {},
+        { when: { column: 'kind' } },
+        { when: { column: 'kind', value: 1 } },
+        { when: null, note: 'x' },
+        { when: { column: 'kind', value: 'a', and: 'b' } },
+      ]) {
+        const bundle = ordered() as unknown as { generation: { lookups: Array<Record<string, unknown>> } }
+        ;(bundle.generation.lookups[0] as Record<string, unknown>)['section'] = section
+        expect(refused(bundle as unknown as BundleV2), JSON.stringify(section)).toEqual([
+          'generation: lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null } }',
+        ])
+      }
     })
   })
 

@@ -87,9 +87,9 @@ async function press(user: User, control: HTMLElement, key = '{Enter}'): Promise
   await user.keyboard(key)
 }
 
-/** The filter and sort of each list request sent for `formId`, with its offset. */
-const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'offset'>> =>
-  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, offset: body.offset }))
+/** The filter and sort of each list request sent for `formId`, with the cursor it continues after. */
+const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> =>
+  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
 
 /** Fresh orders of tenant 1's, noted `notes`, one per amount, made beside the page. */
 async function freshOrders(engine: Engine, notes: string, amounts: readonly string[]): Promise<string[]> {
@@ -272,7 +272,7 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     const expected = await plane.clerk.list(engine.formId, { filter: LARGE.filter, sort: LARGE.sort })
     if (!expected.ok) throw new Error(expected.message)
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Rows 1–${String(expected.value.rows.length)}. Filtered by Notes and Amount.`), ARRIVES)
-    expect(asked(engine.formId)).toEqual([{ filter: LARGE.filter, sort: LARGE.sort, offset: 0 }])
+    expect(asked(engine.formId)).toEqual([{ filter: LARGE.filter, sort: LARGE.sort, after: null }])
     expect(headers('Records')).not.toContain('Amount')
     expect(await floor('a view on a hidden column')).toEqual(CLEAN('a view on a hidden column'))
   })

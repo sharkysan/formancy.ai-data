@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription as computeDescription } from 'dom-accessibility-api'
 import { createDataClient, fieldHeading } from '@formancy/data-client'
+import { STARTED_AGAIN } from './grid-datasource.js'
 import { focusedName } from './test-accessible.js'
 import {
   answer,
@@ -237,7 +238,7 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await waitFor(() => expect(rowsOf(records()).map((cells) => cells[0])).toEqual([record.slice(3)]), { timeout: 15_000 })
     expect(await answeredOnce('Records')).toBe('Rows 1–1.')
     const sent = plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)
-    expect(JSON.parse(sent?.body ?? '{}')).toMatchObject({ search: stamp, offset: 0, limit: 50 })
+    expect(JSON.parse(sent?.body ?? '{}')).toMatchObject({ search: stamp, after: null, limit: 50 })
 
     await user.clear(within(search).getByRole('textbox', { name: 'Search' }))
     await user.type(within(search).getByRole('textbox', { name: 'Search' }), `${stamp}nothing`)
@@ -272,10 +273,12 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     expect(customer.getAttribute('aria-sort')).toBeNull()
   })
 
-  // Pages of LIST_PAGE_SIZE: Next asks for the next offset and Previous asks
-  // for the first page again -- a page no longer shown is never reused --
-  // and the line says the range each time.
-  test('pages by offset, asks again on Previous, and says the range', async () => {
+  // Pages of LIST_PAGE_SIZE: Next asks for the page after the last row
+  // shown (0108) and Previous asks for the first page again -- a page no
+  // longer shown is never reused -- and the line says the range each time.
+  // Watched failing with no page's cursor kept: Next showed the first page
+  // again, as "Rows 51–100; more follow."
+  test('pages after the last row shown, asks again on Previous, and says the range', async () => {
     const stamp = `pg${String(Date.now())}`
     await plane.db.insertOrders(engine.connection, 53, stamp)
     const user = await workspace(engine.formId)
@@ -298,8 +301,35 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     expect(
       lists()
         .slice(before)
-        .map((body) => body['offset']),
-    ).toEqual([50, 0])
+        .map((body) => [body['after'], body['offset']]),
+    ).toEqual([
+      [expect.stringMatching(/^c1:/), undefined],
+      [null, undefined],
+    ])
+  })
+
+  // The row the next page comes after, deleted by another application
+  // before Next is pressed, leaves that page nowhere to start (0108): the
+  // grid starts again at the first page and says why, never an empty page
+  // or a refusal with nothing to do. Watched failing with the server's
+  // cursor-gone said as any refusal: the line was the server's sentence,
+  // beside Ask again.
+  test('starts again at the first page when the row the next page comes after is gone', async () => {
+    const stamp = `gone${String(Date.now())}`
+    await plane.db.insertOrders(engine.connection, 53, stamp)
+    const user = await workspace(engine.formId)
+    const search = screen.getByRole('search', { name: 'Search records' })
+    await user.type(within(search).getByRole('textbox', { name: 'Search' }), stamp)
+    await user.click(within(search).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–50; more follow.'), { timeout: 15_000 })
+    const page = await plane.clerk.list(engine.formId, { search: stamp })
+    if (!page.ok) throw new Error(page.message)
+    await plane.db.deleteOrder(engine.connection, page.value.rows.at(-1)?.record as string)
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`${STARTED_AGAIN} Rows 1–50; more follow.`), { timeout: 15_000 })
+    expect(within(gridSection('Records')).getByRole('button', { name: 'Previous rows' }).getAttribute('aria-disabled')).toBe('true')
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 51–52.'), { timeout: 15_000 })
   })
 
   // A list the server refuses is said in its words, never AG Grid's, and

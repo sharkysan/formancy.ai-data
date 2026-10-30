@@ -436,9 +436,17 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   may be sorted and searched by, which `GET /v1/forms/:id` sends as `list`.
   `validateListQuery` checks a body from a browser; `planList` plans a
   `ListRequest` -- the read's columns, filters and throughs, the order
-  `listOrder` makes total with the key, the search and the parent -- and
-  `recordPage` builds `{ rows, hasMore }` from the `limit + 1` rows an
-  adapter fetched, each row what `toFormAnswers` makes of a read of it. An
+  `listOrder` makes total with the key, the search, the parent -- or no
+  parent, `record: null`, planned as `null` conditions on the field's
+  columns (0110) -- and the key
+  the page continues after, which `decodeListCursor` reads from a body's
+  `after` (`invalid-cursor`, 0108) -- and `recordPage` builds `{ rows,
+  hasMore, next }` from the `limit + 1` rows an adapter fetched, each row
+  what `toFormAnswers` makes of a read of it, `next` the cursor
+  `listCursor` spells of the last row shown. `listTerms` gives an adapter
+  the key and the seek, the order less every column the scope holds to one
+  value; `cursorRefusal` refuses a page whose statement found the row gone
+  (`cursor-gone`). An
   adapter reads a request through `listTerms`, which throws on anything
   `planList` would not have produced. A page is decided over the
   description its own statement carried by `driftRefusal(…, 'list')`: a
@@ -446,8 +454,8 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   unique and NOT NULL.
 - **A file of records** (0079). `validateExportQuery` checks an export's
   body: a list's `search`, `sort` and `parent`, read by the same checks,
-  and nothing else -- an `offset` or a `limit` is `malformed`, since the
-  server reads every page. The pages are `planList`'s. `exportColumns(form,
+  and nothing else -- a cursor or a limit is `malformed`, since the
+  server reads every page, each after the last row of the one before. The pages are `planList`'s. `exportColumns(form,
   bindings, readable)` is the file's columns: the readable fields in the
   form's `model.fields` order, headed by a string label or else the key, a
   lookup as two, its label and then its token under `<header> (key)`.
@@ -515,7 +523,13 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   row's field can spell the key otherwise than the parent's token does.
   The menu names a child only when this person may list it (`listable`)
   and read that field. It asks no database: what the table allows now is
-  decided when a form is opened.
+  decided when a form is opened. A child through a lookup the generator
+  made a section of the parent's records (0109, `generate/section.ts`:
+  the child's key is that foreign key, with an optional condition on a
+  column of the parent's table) is `one`, and its `when` is the parent's
+  field this person may read bound to that column, with the condition's
+  value as the field's answer holds it (`formValue`), or `null` to show it
+  always.
 - **Membership is the database's.** A lookup token whose key carries the tenant
   is refused when the tenant is not the context's; one that does not — a
   surrogate id — cannot be judged without a query. Every selection comes back

@@ -118,15 +118,15 @@ async function serverLists(formId: string, query: Partial<RecordListQuery>): Pro
   return page.value.rows.map((row) => String(row.answers['id']))
 }
 
-/** The filter and sort of each list request in `sent` for `formId`, with its offset and parent: what a page was asked for with. */
-const asked = (sent: readonly Sent[], formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'offset' | 'parent'>> =>
-  listsSent(sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, offset: body.offset, parent: body.parent }))
+/** The filter and sort of each list request in `sent` for `formId`, with the cursor it continues after and its parent: what a page was asked for with. */
+const asked = (sent: readonly Sent[], formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after' | 'parent'>> =>
+  listsSent(sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after, parent: body.parent }))
 
 /** A first page asked with `view`'s filter and sort, under `parent`. */
 const firstPage = (view: { filter: ListFilterTerm[]; sort: ListSortTerm[] }, parent: RecordListQuery['parent'] = null) => ({
   filter: view.filter,
   sort: view.sort,
-  offset: 0,
+  after: null,
   parent,
 })
 

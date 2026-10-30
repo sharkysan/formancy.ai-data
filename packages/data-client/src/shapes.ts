@@ -147,8 +147,21 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
 }
 
 /** A child in a menu: the child form, and the field its list is narrowed by. */
+/**
+ * A section's condition (0109): `null`, or a field and the answer that shows
+ * the section -- text, a number or a yes/no, as a record's answers hold it.
+ */
+function isSectionWhen(value: unknown): boolean {
+  if (value === null) return true
+  if (!isRecord(value) || typeof value['field'] !== 'string') return false
+  const equals = value['equals']
+  return typeof equals === 'string' || typeof equals === 'number' || typeof equals === 'boolean'
+}
+
+/** One child: its form and field, whether it is a section (0109), and only a section with a condition. */
 function isMenuChild(value: unknown): boolean {
-  return isRecord(value) && typeof value['form'] === 'string' && typeof value['field'] === 'string'
+  if (!isRecord(value) || typeof value['form'] !== 'string' || typeof value['field'] !== 'string' || typeof value['one'] !== 'boolean') return false
+  return value['one'] ? isSectionWhen(value['when']) : value['when'] === null
 }
 
 /** One menu entry: a page draws a link from it, and a grid per child. */
@@ -177,9 +190,11 @@ export function isFormRecord(body: unknown): body is FormRecord {
   return isRecord(body) && isNullableString(body['record']) && isNullableString(body['version']) && isRecord(body['answers'])
 }
 
-/** A page of records (0044): every row a record, and whether more follow. */
+/** A page of records (0044): every row a record, whether more follow, and the cursor the next is asked for after (0108). */
 export function isRecordList(body: unknown): body is RecordList {
-  return isRecord(body) && Array.isArray(body['rows']) && body['rows'].every(isFormRecord) && typeof body['hasMore'] === 'boolean'
+  if (!isRecord(body) || !Array.isArray(body['rows']) || !body['rows'].every(isFormRecord) || typeof body['hasMore'] !== 'boolean') return false
+  // A cursor exactly when more follow (0108): a page from a server that pages by offset has none, and a host could never ask for the next.
+  return body['hasMore'] ? typeof body['next'] === 'string' && body['next'] !== '' : body['next'] === null
 }
 
 export function isLookupResult(body: unknown): body is LookupResult {

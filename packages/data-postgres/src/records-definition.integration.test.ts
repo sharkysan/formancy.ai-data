@@ -460,6 +460,7 @@ describe('an ALTER that commits while a request waits for it', () => {
             filter: [],
             search: null,
             sort: [{ column: 'id', direction: 'asc', nulls: null }],
+            after: null,
             offset: 0,
             limit: 50,
           } as const

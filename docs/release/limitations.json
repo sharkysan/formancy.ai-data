@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:db9ffe17065d989267aebdb2b3bd0b220a2ea5e1c5f57e5d4d2514578d8d4bd4",
+      "reviewed": "sha256:31d6cdb8bb4e61fcff6f25cecf4f0de1741829abd658abb5c93c84ba271ec1e2",
       "limitations": [
         {
           "area": "forms",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:f3f20c5b14e9912fd3d8e120072cb2bbdd97ad356e4cc0f74eb5506213a3fa7d",
+      "reviewed": "sha256:e8a3a675ff274a1e954f629a03d77fd81540ce1029a8ad230916cf10d14faf3a",
       "limitations": [
         {
           "area": "forms",
@@ -1198,7 +1198,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:ae4771a11a452145680eea8e34411927db7a98e780729eebedcac14d9eff1d73",
+      "reviewed": "sha256:6c61dd7d45394dcf7fccac08e124df097104b7add5de740f9523b9843b8b71ef",
       "limitations": [
         {
           "area": "forms",
@@ -1256,7 +1256,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:2793225d9e048aac53f111fb1bebef4ab5a83dd07ade67bb30ba1ad73a4b24d1",
+      "reviewed": "sha256:5651601c8ffd25f46730cd105ce9172c4a073901f6cddfeb20331a8c65370084",
       "limitations": [
         {
           "area": "server",
@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:abc8fdd78f53f293441395c39cd579ab6b6be5f649b3ff51c8145451b0c0bf38",
+      "reviewed": "sha256:298a944b0199525938fe0663c17f80680eecfda5610b7a19e5c5ec36e1c1bc01",
       "limitations": [
         {
           "area": "host",
@@ -2593,7 +2593,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:102ceeaad97c926565b592e6405358eb1983e2ca681ec0e237fdaf990e751a4a",
+      "reviewed": "sha256:c5c3d62fb10a8628f556e87c346ee9c9b6b8bc436ac780991722102cac302a4f",
       "limitations": [
         {
           "area": "server",
@@ -3239,6 +3239,103 @@
           "area": "server",
           "says": "@formancy/data-client refuses a form that offers create without saying what a copy carries as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0108": {
+      "reviewed": "sha256:1a7788b132eed3eb00d3a77bc52219a40ca6ef7448bd9f34accec2fe4004493c",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A page continues after the row the page before ended with, wherever that row is now: edited between two pages in a column the list is sorted by, it moves the next page with it, and rows are skipped or shown again; a file refuses a record shown twice, never one skipped.",
+          "heldBy": "packages/data-postgres/src/list.integration.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "When the row the next page comes after has been deleted meanwhile, or is no longer one the person may read, the grid starts again at its first page, and a file of records is refused as moved.",
+          "heldBy": "apps/host/src/workspace.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "Pages are walked, never jumped to: there is no page number, no total and no last page, and an order no index serves still reads and sorts every row the list admits for every page.",
+          "heldBy": "packages/data-postgres/src/lookups-sized.integration.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "Browse still pages by offset, so a row inserted or deleted before a page between two pages shows a row twice or skips one."
+        },
+        {
+          "area": "server",
+          "says": "The server refuses an older client's offset as malformed, and @formancy/data-client refuses an older server's page, which has no cursor, as unexpected, so a host and its server are upgraded together.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0109": {
+      "reviewed": "sha256:a3970c7527f54120a24ed638d529311584bb7e35b1d16b9c39114f6070ef3f9b",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A record and its section are two forms with two saves, never one transaction, and the section is shown by the record as stored: a kind changed and not yet saved shows the section as it was.",
+          "heldBy": "apps/host/src/sections.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record whose kind changes away hides its section and keeps the section's row in the database, and a section offers no Delete; the section's own form, opened on its own, deletes it.",
+          "heldBy": "apps/host/src/sections.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A section is shown by one column holding one value, or always; one whose column the parent's form does not show the person is shown always.",
+          "heldBy": "packages/data-core/src/records/menu.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Drift review does not name a section's condition column: dropped or retyped, the section is shown always, and regenerating its form is refused until the condition is chosen again."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client refuses a menu without its children's one and when as unexpected, so a host and its server are upgraded together.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0110": {
+      "reviewed": "sha256:ef030453b27c8d5a84d00a4758ad3fb0dcd11a5c802b7ff80d646f20074b8237",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A tree of records has no search, filter, sort or columns: each level is in key order and a record is its name, and the panel opens as a grid every time.",
+          "heldBy": "apps/host/src/tree.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record whose parent the person may not read, or that is gone, or that is in a cycle with no root, is in no level of the tree; the grid lists it.",
+          "heldBy": "apps/host/src/tree.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A record of a composite self-reference is a root only with every column of its field NULL; one with some of them NULL is in no level of the tree.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Whether a record has records below it is known only once it is expanded, one list request per level, and the browser gates do not measure the tree."
+        }
+      ]
+    },
+    "0111": {
+      "reviewed": "sha256:6d2da9629790550f90103ccaf0948011083a780a37f8cca5c817f273cde82654",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The drift check needs the server running against the migrated database with its administrator's plane on, an administrator token, and the ids of the forms to check; it checks each form's published version, never a draft.",
+          "heldBy": "packages/data-server/src/drift-check.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The drift check is a command in the server image, or in an installed @formancy/data-server, and prints lines for a log; a program reads the drift route's JSON instead.",
+          "heldBy": "packages/data-server/src/drift-check.test.ts"
         }
       ]
     }

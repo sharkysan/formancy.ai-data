@@ -187,6 +187,54 @@ later.
     and a copy holds what a read returns, an instant to the second and a
     time to the minute.
 
+- **A form whose key is its foreign key onto its parent's is shown under
+  the parent's record as one section, while the record holds a value**
+  (0109). Why: a record's details often live in a second table holding at
+  most one row per record -- a party's company details -- which the page
+  showed under every record as a grid of one row, whatever its kind. What
+  you notice:
+  - **A lookup choice may say `section: { when }`**: in the studio's Choose
+    step, "Show it under each <table> as one form", offered where the
+    foreign key is the root's whole key, then "Shown while" a column of the
+    referenced table "holds" a value, or always. The generator refuses a
+    section over any other key, on a column it cannot read, or by a value
+    the column could not hold.
+  - **The menu's children gain `one` and `when`**: the field of the parent
+    whose answer shows the section, and that answer as the record holds
+    it, or `null` to show it always. This release's `@formancy/data-client`
+    answers `unexpected` to an older server's menu, so the host and the
+    server are upgraded together.
+  - **The host draws such a child as the record's own section**: its one
+    row in its own form, or a line saying it has none and Add, which a
+    save creates under the record -- shown while the record as stored holds
+    the value, so a kind is saved before its details are added.
+  - The extension is still its own form, with its own Save: a record and
+    its section are never one transaction, and a section offers no Delete.
+
+- **A form that is its own child shows its records as a tree** (0110). Why:
+  a table that references itself -- an employee and their manager -- holds
+  a hierarchy, which the grid showed flat and Drill down one record at a
+  time. What you notice:
+  - **The Records panel offers "Show the records as" Grid or Tree** where
+    the menu names the form as its own child. The tree lists the records
+    with no parent, and under a record, once it is expanded, those naming
+    it, a page at a time with "More records"; the arrows walk it, Enter
+    opens a record and Space opens it beside, as a row does.
+  - **A list's `parent` may be `{ field, record: null }`**: the rows whose
+    field references nothing, every column of it NULL -- a tree's roots.
+  - The tree has no search, filter, sort or columns, and a record whose
+    parent is out of the person's reach, or in a cycle, is in none of its
+    levels.
+
+- **A deploy pipeline checks drift with `dist/drift-check-cli.mjs`** (0111).
+  Why: a migration that breaks a published form was found when somebody
+  opened the studio, or when the runtime refused the form -- after the
+  deploy. The server image ships a command that asks the server's drift
+  route for each form it names, with the administrator's token from
+  `FORMANCY_DATA_ADMIN_TOKEN`, and exits 0 with nothing failing, 1 with a
+  `blocking` change -- or a `review` one, with `--fail-on review` -- and 2
+  for a form it could not check, never 0.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
@@ -232,6 +280,36 @@ later.
     2026-10-22 -- so the README's pictures keep their stylesheet digests,
     and every comment that named a renderer's behaviour at 0.6.0 names 0.7.0
     too.
+- **A form's list pages after the last row a page showed, not at an
+  offset** (0108). Why: a page at an offset read every row before it --
+  tenant 1's page after its 50,001st customer read 50,052 rows of the sized
+  table to show fifty -- and an offset counts rows, not records, so a row
+  inserted or deleted before it between two pages showed a record twice or
+  skipped one, and a file of records left a record deleted meanwhile out,
+  unseen. The page after a row finds that row again by its key in its own
+  statement and compares every row with it column against column, so it
+  reads 52 rows at that depth, on both engines, and a page starts where the
+  last one ended. What you notice:
+  - **`POST /v1/forms/:id/records/list` takes `after`, not `offset`**: the
+    `next` a page answers beside `hasMore`, the cursor of its last row
+    when more follow and `null` when none do. An `offset` is `400
+    malformed`; a cursor that names no key of the form is `400
+    invalid-cursor`; a page after a row deleted meanwhile, or no longer one
+    the person may read, is `409 cursor-gone`, and the first page is where
+    to start again.
+  - **The host and the server are upgraded together.** This release's
+    server refuses an older client's `offset`, and this release's
+    `@formancy/data-client` answers `unexpected` to an older server's page,
+    which has no `next`.
+  - **The host's grid starts again at its first page** when the row the
+    next page comes after is gone, and says so; Previous and Next are as
+    they were.
+  - **A file of records pages the same way**, and is refused `409 moved`
+    when the row a page continues after is deleted while it is made.
+  - A page continues after where its row is now: edited between two pages
+    in a sorted column, it moves the next page with it. An order no index
+    serves still reads and sorts every row the list admits. The studio's
+    Browse still pages by offset: a view has no key to continue after.
 - **A nullable yes/no column is generated as a select of Yes and No, not a
   radio group** (0095). Why: a radio group, once answered, could never be
   taken back to no answer, the NULL the column held; and neither formancy

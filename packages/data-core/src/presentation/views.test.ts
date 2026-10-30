@@ -22,7 +22,7 @@ import { viewShapeProblems } from './views.js'
 
 const OPEN: ListView = { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }] }
 const view = (change: Record<string, unknown>): Record<string, unknown> => ({ ...OPEN, ...change })
-const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], offset: 0, limit: 50 }
+const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 
 describe('viewShapeProblems', () => {
   // The views a studio writes must read back: a filter and a sort exactly as

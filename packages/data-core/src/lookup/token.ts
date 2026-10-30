@@ -97,6 +97,32 @@ function escapeValue(value: string): string {
 }
 
 /**
+ * How a key is spelled as one string: a select's token, here, or a list's
+ * cursor (`records/cursor.ts`, 0108). One grammar, so the two never spell a
+ * value differently; each its own prefix, so neither is read as the other,
+ * and its own bound.
+ */
+export interface KeySpelling {
+  prefix: string
+  maxLength: number
+  /** A prefix that looks like another version of this spelling. */
+  versioned: RegExp
+  /** What a refusal calls it. */
+  name: string
+  /** The refusal of a key that would need `length` characters. */
+  tooLong(length: number): string
+}
+
+const TOKEN: KeySpelling = {
+  prefix: PREFIX,
+  maxLength: KEY_TOKEN_MAX_LENGTH,
+  versioned: VERSIONED,
+  name: 'key token',
+  tooLong: (length) =>
+    `This key needs ${String(length)} characters as a token, and formancy stores a select's answer in at most ${String(KEY_TOKEN_MAX_LENGTH)}. It is refused rather than truncated.`,
+}
+
+/**
  * The token for a key: each column's canonical API string — a decimal string
  * for a number, the text itself for text — in the key's column order.
  *
@@ -105,29 +131,29 @@ function escapeValue(value: string): string {
  * different key, or none.
  */
 export function encodeKeyToken(values: readonly string[]): KeyTokenEncoding {
+  return encodeKey(TOKEN, values)
+}
+
+/** A key in `spelling`, as `encodeKeyToken` spells a token: refused rather than truncated past its bound. */
+export function encodeKey(spelling: KeySpelling, values: readonly string[]): KeyTokenEncoding {
   if (!Array.isArray(values)) return refuse('not-text', 'A key is a list of column values.')
   if (values.length === 0) return refuse('empty-key', 'A key has at least one column, and this one has none.')
 
   // Measured before anything is built, so an oversized value costs a count and not a copy.
-  let length = PREFIX.length + values.length - 1
+  let length = spelling.prefix.length + values.length - 1
   for (const [index, value] of values.entries()) {
     const position = String(index + 1)
     if (typeof value !== 'string') {
-      return refuse('not-text', `Key value ${position} is not text; a token carries each column's canonical string.`)
+      return refuse('not-text', `Key value ${position} is not text; a ${spelling.name} carries each column's canonical string.`)
     }
     if (LONE_SURROGATE.test(value)) {
       return refuse('ill-formed-text', `Key value ${position} holds an unpaired UTF-16 surrogate, which PostgreSQL cannot store and UTF-8 cannot carry.`)
     }
     for (let unit = 0; unit < value.length; unit += 1) length += isLiteral(value.charCodeAt(unit)) ? 1 : ESCAPE_LENGTH
   }
-  if (length > KEY_TOKEN_MAX_LENGTH) {
-    return refuse(
-      'too-long',
-      `This key needs ${String(length)} characters as a token, and formancy stores a select's answer in at most ${String(KEY_TOKEN_MAX_LENGTH)}. It is refused rather than truncated.`,
-    )
-  }
+  if (length > spelling.maxLength) return refuse('too-long', spelling.tooLong(length))
 
-  return { ok: true, token: `${PREFIX}${values.map(escapeValue).join(SEPARATOR)}` }
+  return { ok: true, token: `${spelling.prefix}${values.map(escapeValue).join(SEPARATOR)}` }
 }
 
 /**
@@ -141,19 +167,25 @@ export function encodeKeyToken(values: readonly string[]): KeyTokenEncoding {
  * position and a code unit, never a character from the input.
  */
 export function decodeKeyToken(token: string): KeyTokenDecoding {
-  if (typeof token !== 'string') return refuse('not-text', 'A key token is a string.')
-  if (token.length > KEY_TOKEN_MAX_LENGTH) {
-    return refuse('too-long', `A key token is at most ${String(KEY_TOKEN_MAX_LENGTH)} characters, and this one has ${String(token.length)}.`)
+  return decodeKey(TOKEN, token)
+}
+
+/** The key a string in `spelling` names, read as strictly as `decodeKeyToken` reads a token. */
+export function decodeKey(spelling: KeySpelling, token: string): KeyTokenDecoding {
+  const { prefix, name } = spelling
+  if (typeof token !== 'string') return refuse('not-text', `A ${name} is a string.`)
+  if (token.length > spelling.maxLength) {
+    return refuse('too-long', `A ${name} is at most ${String(spelling.maxLength)} characters, and this one has ${String(token.length)}.`)
   }
-  if (!token.startsWith(PREFIX)) {
-    return VERSIONED.test(token)
-      ? refuse('unsupported-version', 'This key token is from a version of the encoding this release does not read.')
-      : refuse('not-a-token', `This is not a key token: it does not start with ${PREFIX}`)
+  if (!token.startsWith(prefix)) {
+    return spelling.versioned.test(token)
+      ? refuse('unsupported-version', `This ${name} is from a version of the encoding this release does not read.`)
+      : refuse('not-a-token', `This is not a ${name}: it does not start with ${prefix}`)
   }
 
   const values: string[] = []
   let current = ''
-  for (let index = PREFIX.length; index < token.length; index += 1) {
+  for (let index = prefix.length; index < token.length; index += 1) {
     const unit = token.charCodeAt(index)
     const position = String(index + 1)
     if (token.charAt(index) === SEPARATOR) {
@@ -173,7 +205,7 @@ export function decodeKeyToken(token: string): KeyTokenDecoding {
       current += String.fromCharCode(escaped)
       index += ESCAPE_LENGTH - 1
     } else {
-      return refuse('malformed', `U+${hex(unit)} at position ${position} is not part of a key token.`)
+      return refuse('malformed', `U+${hex(unit)} at position ${position} is not part of a ${name}.`)
     }
   }
   values.push(current)

@@ -7,6 +7,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+/** A lookup's `section` (0109): absent, or `{ when }`, its condition `null` or exactly a column and a value, both text. */
+function sectionOf(value: unknown): { section: LookupChoice['section'] } | null {
+  if (value === undefined) return { section: undefined }
+  if (!isRecord(value) || Object.keys(value).length !== 1 || !Object.hasOwn(value, 'when')) return null
+  const when = value['when']
+  if (when === null) return { section: { when: null } }
+  if (!isRecord(when) || Object.keys(when).length !== 2 || typeof when['column'] !== 'string' || typeof when['value'] !== 'string') return null
+  return { section: { when: { column: when['column'], value: when['value'] } } }
+}
+
 function lookupChoices(value: unknown): LookupChoice[] | undefined {
   if (value === undefined) return []
   if (!Array.isArray(value)) return undefined
@@ -15,7 +25,9 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
     if (!isRecord(entry) || typeof entry['foreignKey'] !== 'string') return undefined
     const display = entry['display']
     if (!Array.isArray(display) || !display.every((column) => typeof column === 'string')) return undefined
-    choices.push({ foreignKey: entry['foreignKey'], display: [...display] })
+    const read = sectionOf(entry['section'])
+    if (read === null) return undefined
+    choices.push({ foreignKey: entry['foreignKey'], display: [...display], ...(read.section === undefined ? {} : { section: read.section }) })
   }
   return choices
 }
@@ -25,8 +37,9 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
  * bundle check (0030), so what a proposal was generated from and what a
  * bundle says it was generated from are read by the same rules.
  *
- * Normalised: `lookups` and `pinned` are always lists, and `versionColumn` is
- * present only when it is a string. Other properties are not carried, so a
+ * Normalised: `lookups` and `pinned` are always lists, `versionColumn` is
+ * present only when it is a string, and a lookup's `section` only when it
+ * marks one (0109). Other properties are not carried, so a
  * stored request that is not equal to its own reading holds something this
  * reading would not have produced.
  */
@@ -39,7 +52,7 @@ export function readGeneration(value: unknown): GenerationReading {
   if (typeof formId !== 'string' || !FORM_ID.test(formId)) problems.push('formId must be a lower-case form id')
   if (typeof title !== 'string') problems.push('title must be text')
   const lookups = lookupChoices(value['lookups'])
-  if (lookups === undefined) problems.push('lookups must be a list of { foreignKey, display: [columns] }')
+  if (lookups === undefined) problems.push('lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null } }')
   const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...pinned] : undefined
   if (pinnedColumns === undefined) problems.push('pinned must be a list of columns')
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')

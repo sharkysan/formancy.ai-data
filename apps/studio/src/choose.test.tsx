@@ -372,4 +372,37 @@ describe('choosing', () => {
     expect(plane.requests.length).toBe(sent)
     expect(await audit()).toEqual([])
   })
+
+  // A lookup over the root's whole key can make the form a section of what
+  // it references (0109): offered there, with a column of the referenced
+  // table and a value it holds while the section is shown, and sent to the
+  // generator as part of the lookup's choice. Over a key that is not the
+  // root's -- the order's customer -- it is not offered at all. Watched
+  // failing with the section left out of the proposal: the request held
+  // the lookup alone.
+  test("offers a lookup over the root's key as a section, shown by a column and a value", async () => {
+    await plane.close()
+    plane = await startPlane({ sections: true })
+    const user = await signIn(plane)
+    const choose = await toChoose(user, 'fixture-sections')
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer_company')
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_company_customer as a lookup' }))
+    await user.click(within(choose).getByRole('checkbox', { name: 'Show it under each customer as one form' }))
+    await user.selectOptions(within(choose).getByLabelText('Shown while'), 'kind')
+    await user.type(within(choose).getByLabelText('holds'), 'company')
+    expect(await audit()).toEqual([])
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const sent = plane.requests.filter((request) => request.method === 'POST' && request.path === '/v1/form-proposals').at(-1)?.body as ProposalRequest
+    expect(sent.lookups).toEqual([
+      { foreignKey: 'fk_customer_company_customer', display: expect.any(Array) as unknown, section: { when: { column: 'kind', value: 'company' } } },
+    ])
+    const generated = await proposalFromServer(sent)
+    expect(generated.bindings.fields.find((binding) => binding.kind === 'lookup')).toMatchObject({ section: { when: { column: 'kind', value: 'company' } } })
+
+    await goToChoose(user)
+    await user.selectOptions(within(step('Choose')).getByLabelText('Root table or view'), 'sales.order')
+    await user.click(within(step('Choose')).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    expect(within(step('Choose')).queryByRole('checkbox', { name: /^Show it under each/ })).toBeNull()
+  })
 })

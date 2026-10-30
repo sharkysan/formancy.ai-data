@@ -209,7 +209,7 @@ const RETYPED: DescribedTable = (() => {
   return { ...described, columns: described.columns.map((column) => (column.name === 'name' ? { ...column, type: INT32, databaseType: 'int' } : column)) }
 })()
 
-/** The rows the fake table holds, paged as an adapter pages them: from the offset, one row past the limit. */
+/** The rows the fake table holds, in key order, paged as an adapter pages them (`pageOf`). */
 let table: Stored[]
 let lists: ListRequest[]
 /** Runs before a page is answered: to hold it, to move the clock, or to answer it otherwise. */
@@ -225,6 +225,23 @@ const apps: FastifyInstance[] = []
 
 const LABELS = new Map([['k1:CH', 'Switzerland']])
 
+/**
+ * A page of the fake table as an adapter answers one (0108): after the row
+ * whose key the request names -- gone when no row has it -- or from its
+ * offset, and one row past the limit. The table is in key order and the
+ * request's own order is not applied: what is held here is what the route
+ * asks for, and the adapters' suites hold the order.
+ */
+function pageOf(request: ListRequest): ListOutcome {
+  const described = describedAs(request.target.table)
+  if (request.after === null) return { ok: true, described, rows: table.slice(request.offset, request.offset + request.limit + 1), after: null }
+  const keyOf = (row: Stored): string => JSON.stringify(request.target.identity.map((column) => row.values[column.name]))
+  const wanted = JSON.stringify(request.after.map((value) => value.value))
+  const at = table.findIndex((row) => keyOf(row) === wanted)
+  if (at === -1) return { ok: true, described, rows: [], after: 'gone' }
+  return { ok: true, described, rows: table.slice(at + 1, at + 2 + request.limit), after: 'found' }
+}
+
 function registry(): ConnectionRegistry {
   const records: RecordAdapter = {
     describe: async (target) => ({ ok: true, described: describedAs(target) }),
@@ -234,7 +251,7 @@ function registry(): ConnectionRegistry {
     list: async (request) => {
       lists.push(request)
       const answered = await beforePage(request)
-      return answered ?? { ok: true, described: describedAs(request.target.table), rows: table.slice(request.offset, request.offset + request.limit + 1) }
+      return answered ?? pageOf(request)
     },
     insert: async () => {
       throw new Error('an export never inserts')
@@ -381,12 +398,13 @@ describe('the export route', () => {
 
   // An export is every page a list would page through for the same search,
   // sort, parent and filter, from the first: each page the list's own
-  // request at the next offset, the body's terms on every one -- the
-  // filter's conditions as the planner spells them (0104). Watched failing
-  // with every page asked at offset 0 (a file of the first page, repeated,
-  // until the moved check refused it), with the sort dropped after the
-  // first page, and with the filter dropped after the first page.
-  test('pages the list from offset 0 with the body’s search, sort, parent and filter on every page', async () => {
+  // request after the last row of the one before (0108), the body's terms
+  // on every one -- the filter's conditions as the planner spells them
+  // (0104). Watched failing with every page asked from the first row (a
+  // file of the first page, repeated, until the moved check refused it),
+  // with the sort dropped after the first page, and with the filter dropped
+  // after the first page.
+  test('pages the list from the first row, each page after the one before, with the body’s search, sort, parent and filter on every page', async () => {
     table = many(120)
     const body = {
       search: ' Customer ',
@@ -399,10 +417,10 @@ describe('the export route', () => {
     }
     const response = await exported('customer', body)
     expect(response.statusCode, response.body).toBe(200)
-    expect(lists.map(({ offset, limit }) => [offset, limit])).toEqual([
-      [0, LIST_PAGE_SIZE],
-      [50, LIST_PAGE_SIZE],
-      [100, LIST_PAGE_SIZE],
+    expect(lists.map(({ after, offset, limit }) => [after?.map(({ value }) => value) ?? null, offset, limit])).toEqual([
+      [null, 0, LIST_PAGE_SIZE],
+      [['1', '50'], 0, LIST_PAGE_SIZE],
+      [['1', '100'], 0, LIST_PAGE_SIZE],
     ])
     for (const page of lists) {
       expect(page).toMatchObject({
@@ -470,8 +488,9 @@ describe('the export route', () => {
   // (0104) -- before any statement, so no page of a file is made under a
   // filter a grid would have been refused. Watched failing with
   // `not-filterable` left out of `planRefusal`: each was a 500.
-  test('refuses an offset, a limit, a filter not offered or anything else in the body 400, asking nothing', async () => {
+  test('refuses a cursor, an offset, a limit, a filter not offered or anything else in the body 400, asking nothing', async () => {
     for (const body of [
+      { after: 'c1:1,50' },
       { offset: 0 },
       { limit: 10 },
       { columns: ['name'] },
@@ -547,17 +566,58 @@ describe('the export route', () => {
   // of the first two reaches the body.
   test('refuses a file whose third page drift stops 409, with nothing of the first two', async () => {
     table = many(120)
-    beforePage = async (request) => (request.offset === 100 ? { ok: true, described: RETYPED, rows: table.slice(100) } : undefined)
+    beforePage = async (request) => (request.after?.[1]?.value === '100' ? { ok: true, described: RETYPED, rows: table.slice(100), after: 'found' } : undefined)
     const response = await exported('customer')
     expect({ status: response.statusCode, code: response.json().code }).toEqual({ status: 409, code: 'drift' })
     expect(response.body).not.toContain('Customer 1')
     expect(lists).toHaveLength(3)
   })
 
-  // Each page is its own statement, so a row deleted before the offset
-  // between two pages moves the next page up a row, and a record already
-  // written appears again. The file is refused rather than holding a
-  // record twice. Watched failing with the tokens kept per page only.
+  // Each page is its own statement after the last row of the one before
+  // (0108). A row deleted before that one between two pages, already
+  // written, moves nothing: the file holds every record once, none skipped
+  // -- where at an offset the next page would have started a row late, and
+  // the 51st customer never been written. Watched failing with every page
+  // after the first asked at the offset a page before 0108 was.
+  test('holds every record once when one before the next page is deleted between two pages', async () => {
+    table = many(120)
+    // Between the first page and the second, however the second is asked for.
+    beforePage = async () => {
+      if (lists.length === 2) table = table.filter((row) => row.values['customer_no'] !== '10')
+      return undefined
+    }
+    const response = await exported('customer')
+    expect(response.statusCode, response.body).toBe(200)
+    const numbers = response.body
+      .split('\r\n')
+      .slice(1, -1)
+      .map((line) => line.split(',')[1])
+    expect(numbers).toEqual(many(120).map((row) => row.values['customer_no']))
+  })
+
+  // The row a page continues after, deleted between two pages, leaves the
+  // next nowhere to start: the file is refused as moved, with nothing of
+  // the first page. Watched failing with the outcome's answer left unread:
+  // a file of the first page alone, sent 200.
+  test('refuses a file whose next page continues after a row deleted meanwhile 409 moved', async () => {
+    table = many(120)
+    // Between the first page and the second, however the second is asked for.
+    beforePage = async () => {
+      if (lists.length === 2) table = table.filter((row) => row.values['customer_no'] !== '50')
+      return undefined
+    }
+    const response = await exported('customer')
+    expect({ status: response.statusCode, body: response.json() }).toEqual({
+      status: 409,
+      body: { code: 'moved', message: 'The records changed while the file was made. Try again.' },
+    })
+    expect(response.body).not.toContain('Customer 1')
+  })
+
+  // A record whose place in the order moved past the row the next page
+  // continues after, between two pages, appears again on it. The file is
+  // refused rather than holding a record twice. Watched failing with the
+  // tokens kept per page only.
   test('refuses a file in which a record would appear twice 409 moved', async () => {
     table = many(60)
     table[50] = table[0] as Stored

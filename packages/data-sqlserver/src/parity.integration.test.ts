@@ -245,6 +245,7 @@ describe('FILTER_PARITY: a row filter compares the canonical value exactly', () 
           { column: 'tenant_code', direction: 'asc', nulls: null },
           { column: 'item_no', direction: 'asc', nulls: null },
         ],
+        after: null,
         offset: 0,
         limit: 50,
       })

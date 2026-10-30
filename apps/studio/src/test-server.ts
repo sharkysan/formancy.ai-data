@@ -72,6 +72,62 @@ export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
 export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
 
 /**
+ * The owner's snapshot with a customer's `kind` and its company details: a
+ * table whose key is its foreign key onto the customer's, which a form can
+ * be generated as a section of (0109). Made here, never captured: the
+ * fixture has no such table, and this one is the Choose step's alone.
+ */
+export const SECTIONS_SNAPSHOT: MetadataSnapshot = (() => {
+  const { fingerprint: _fingerprint, ...contents } = OWNER_SNAPSHOT
+  const objects = structuredClone(contents.objects)
+  const customer = objects.find((object) => object.ref.schema === 'sales' && object.ref.name === 'customer')
+  if (customer === undefined) throw new Error('the owner snapshot has no sales.customer')
+  const named = (name: string): ColumnMeta => structuredClone(customer.columns.find((column) => column.name === name) as ColumnMeta)
+  const text = { ...named('name'), defaultExpression: null, hasDefault: false }
+  customer.columns.push({ ...text, name: 'kind', ordinal: customer.columns.length + 1 })
+  objects.push({
+    ref: { schema: 'sales', name: 'customer_company' },
+    kind: 'table',
+    comment: null,
+    columns: [
+      { ...named('tenant_id'), ordinal: 1 },
+      { ...named('customer_no'), ordinal: 2 },
+      { ...text, name: 'vat_no', ordinal: 3 },
+    ],
+    primaryKey: { name: 'pk_customer_company', columns: ['tenant_id', 'customer_no'] },
+    uniqueKeys: [],
+    foreignKeys: [
+      {
+        name: 'fk_customer_company_customer',
+        columns: ['tenant_id', 'customer_no'],
+        references: { table: { schema: 'sales', name: 'customer' }, columns: ['tenant_id', 'customer_no'] },
+        onUpdate: 'no-action',
+        onDelete: 'no-action',
+        enforced: true,
+        validated: true,
+      },
+    ],
+    checks: [],
+    rowSecurity: 'none',
+    access: { delete: true },
+    referencedBy: [],
+  })
+  customer.referencedBy = [
+    ...(customer.referencedBy ?? []),
+    {
+      table: { schema: 'sales', name: 'customer_company' },
+      name: 'fk_customer_company_customer',
+      columns: ['tenant_id', 'customer_no'],
+      referencedColumns: ['tenant_id', 'customer_no'],
+      onDelete: 'no-action',
+      onUpdate: 'no-action',
+      enforced: true,
+    },
+  ]
+  return createSnapshot({ ...contents, objects })
+})()
+
+/**
  * The tokens the fake verifier accepts, and who each one is. Under review
  * (0065), `admin` is an author -- an administrator without a publisher
  * role; `publisher` holds the publisher role alone, which a reviewed plane
@@ -199,9 +255,10 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
  * `FORMANCY_DATA_PUBLISHER_ROLES=data-publisher` would (0065): nobody
  * publishes directly, an administrator submits a draft, and a publisher
  * who did not submit it approves it. `browse: true` starts it as
- * `FORMANCY_DATA_BROWSE_ROLES=data-browser` would (0099).
+ * `FORMANCY_DATA_BROWSE_ROLES=data-browser` would (0099). `sections: true`
+ * adds `fixture-sections`, over `SECTIONS_SNAPSHOT` (0109).
  */
-export async function startPlane(options: { administrator?: boolean; review?: boolean; browse?: boolean } = {}): Promise<TestPlane> {
+export async function startPlane(options: { administrator?: boolean; review?: boolean; browse?: boolean; sections?: boolean } = {}): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
@@ -210,6 +267,7 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
     ['fixture-sqlserver', SQLSERVER_SNAPSHOT],
     ['fixture-sqlserver-reader', SQLSERVER_READER_SNAPSHOT],
     ['fixture-writer', WRITER_SNAPSHOT],
+    ...(options.sections === true ? [['fixture-sections', SECTIONS_SNAPSHOT] as const] : []),
   ])
   const unreachable = new Set<string>()
   const rows = new Map<string, Array<Record<string, ApiValue>>>()

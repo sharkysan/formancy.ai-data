@@ -11,8 +11,11 @@ import { readFilter } from './filter.js'
  * form: which fields may sort, search, filter or name a parent is the
  * planner's (`planList`), against the policy.
  *
- * The search and the page are a lookup's (`checkSearch`, `checkPage`), so
- * the same text and the same page mean the same in a select and in a grid.
+ * The search and the page's size are a lookup's (`checkSearch`,
+ * `checkPage`), so the same text and the same bound mean the same in a
+ * select and in a grid. Where the page starts is a cursor (0108), read here
+ * only as text: which key it names, and whether that is a key of this form,
+ * is the planner's.
  * An export's body (0079) is a list's search, sort, parent and filter, read
  * by the same checks, so a file is of the records the grid shows.
  */
@@ -28,7 +31,7 @@ export type ExportQueryRefusal = { ok: false; code: SearchErrorCode | 'not-filte
 
 export type ExportQueryCheck = { ok: true; query: RecordExportQuery } | ExportQueryRefusal
 
-const LIST_PROPERTIES = new Set(['search', 'sort', 'parent', 'filter', 'offset', 'limit'])
+const LIST_PROPERTIES = new Set(['search', 'sort', 'parent', 'filter', 'after', 'limit'])
 const EXPORT_PROPERTIES = new Set(['search', 'sort', 'parent', 'filter'])
 const DIRECTIONS: ReadonlySet<unknown> = new Set(['asc', 'desc'])
 
@@ -69,13 +72,13 @@ export function readSort(sort: unknown): { ok: true; sort: ListSortTerm[] } | Ma
   return { ok: true, sort: terms }
 }
 
-/** The parent: absent or `null` for none, otherwise exactly a field key and a record token, both text. */
+/** The parent: absent or `null` for none, otherwise exactly a field key and a record token, both text, or the token `null` for the rows referencing none (0110). */
 function parentOf(parent: unknown): { ok: true; parent: RecordListQuery['parent'] } | Malformed {
   if (parent === undefined || parent === null) return { ok: true, parent: null }
   if (!isRecord(parent) || !hasExactly(parent, ['field', 'record'])) return malformed('The parent is { field, record } and nothing else, or null.')
   const { field, record } = parent
-  if (typeof field !== 'string' || field === '' || typeof record !== 'string')
-    return malformed("The parent names a lookup field by its key and the parent's record token.")
+  if (typeof field !== 'string' || field === '' || (typeof record !== 'string' && record !== null))
+    return malformed("The parent names a lookup field by its key and the parent's record token, or null for none.")
   return { ok: true, parent: { field, record } }
 }
 
@@ -95,32 +98,44 @@ function selection(query: Record<string, unknown>): ({ ok: true } & RecordExport
 /** The properties of `query` outside `allowed`. */
 const others = (query: Record<string, unknown>, allowed: ReadonlySet<string>): string[] => Object.keys(query).filter((key) => !allowed.has(key))
 
+/** The cursor: absent or `null` for the first page, otherwise text, whose key the planner reads (`decodeListCursor`). */
+function afterOf(after: unknown): { ok: true; after: string | null } | Malformed {
+  if (after === undefined || after === null) return { ok: true, after: null }
+  if (typeof after !== 'string') return malformed("The cursor is the text a page's next gave, or null.")
+  return { ok: true, after }
+}
+
 /**
  * The list query an adapter may be planned from, from a request's body.
  *
  * Every property may be left out -- `search` is then `''`, `sort` `[]`,
- * `parent` `null`, `filter` `[]`, `offset` 0 and `limit` `LIST_PAGE_SIZE`
- * -- and any other is refused: a property ignored today is one somebody
- * reads tomorrow. A filter is `readFilter`'s, by field (0104).
+ * `parent` `null`, `filter` `[]`, `after` `null` and `limit`
+ * `LIST_PAGE_SIZE` -- and any other is refused: a property ignored today is
+ * one somebody reads tomorrow. An `offset` among them, which a list took
+ * before it paged by cursor (0108): a client that still sends one is told,
+ * rather than shown the first page again. A filter is `readFilter`'s, by
+ * field (0104).
  */
 export function validateListQuery(query: unknown): ListQueryCheck {
   if (!isRecord(query)) return malformed('A list query is an object.')
   if (others(query, LIST_PROPERTIES).length > 0)
-    return malformed('A list query has a search, a sort, a parent, a filter, an offset and a limit, and nothing else.')
+    return malformed('A list query has a search, a sort, a parent, a filter, a cursor to continue after and a limit, and nothing else.')
   const selected = selection(query)
   if (!selected.ok) return selected
-  const page = checkPage(query['offset'] === undefined ? 0 : query['offset'], query['limit'] === undefined ? LIST_PAGE_SIZE : query['limit'], LIST_PAGE_SIZE)
+  const after = afterOf(query['after'])
+  if (!after.ok) return after
+  const page = checkPage(0, query['limit'] === undefined ? LIST_PAGE_SIZE : query['limit'], LIST_PAGE_SIZE)
   if (!page.ok) return page
   return {
     ok: true,
-    query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter, offset: page.offset, limit: page.limit },
+    query: { search: selected.search, sort: selected.sort, parent: selected.parent, filter: selected.filter, after: after.after, limit: page.limit },
   }
 }
 
 /**
  * The query an export pages the list by (0079), from a request's body: a
  * list's search, sort, parent and filter, each left out as a list's may
- * be, and nothing else. An offset or a limit is refused with the rest: the server
+ * be, and nothing else. A cursor or a limit is refused with the rest: the server
  * reads every page, from the first record to the last.
  */
 export function validateExportQuery(query: unknown): ExportQueryCheck {

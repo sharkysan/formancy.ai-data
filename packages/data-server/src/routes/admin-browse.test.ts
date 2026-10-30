@@ -131,7 +131,7 @@ const rows = (...names: string[]) => names.map((name, index) => ({ values: { id:
 beforeEach(async () => {
   requests = []
   events = []
-  answer = { ok: true, described: describedOf(SNAPSHOT, { schema: 'sales', name: 'employee' }) as DescribedTable, rows: rows('Ada', VALUE) }
+  answer = { ok: true, described: describedOf(SNAPSHOT, { schema: 'sales', name: 'employee' }) as DescribedTable, rows: rows('Ada', VALUE), after: null }
   root = await mkdtemp(join(tmpdir(), 'formancy-data-browse-'))
   store = createFileConfigurationStore(root)
 })
@@ -208,7 +208,7 @@ describe('a page', () => {
 
   // A view has no key, and is browsed anyway: the answer says its order is every column, so the studio can say what that costs.
   test('a view is ordered by its columns, and says so', async () => {
-    answer = { ok: true, described: describedOf(SNAPSHOT, { schema: 'sales', name: 'headcount' }) as DescribedTable, rows: [] }
+    answer = { ok: true, described: describedOf(SNAPSHOT, { schema: 'sales', name: 'headcount' }) as DescribedTable, rows: [], after: null }
     const server = await serve()
     const response = await browse(server, 'browser', { object: { schema: 'sales', name: 'headcount' } })
     expect(response.json()).toMatchObject({ kind: 'view', ordered: 'columns', rows: [], hasMore: false })

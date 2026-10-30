@@ -71,6 +71,37 @@ describe('when the data server is not what answers', () => {
     expect(await createDataClient({ token: () => 't', base }).form('pg-order')).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
   })
 
+  // A page's `next` is the cursor the next page is asked for after (0108):
+  // text when more follow, `null` when none do. A page without one -- a
+  // server that paged by offset -- or with one that disagrees with
+  // `hasMore` is not this server's page: a grid would offer Next rows and
+  // have nothing to ask for. Watched failing with `next` left unchecked.
+  test("a page without the server's cursor, or with one that disagrees with hasMore, is unexpected", async () => {
+    let body: unknown
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const page of [
+      { rows: [], hasMore: true },
+      { rows: [], hasMore: false },
+      { rows: [], hasMore: true, next: null },
+      { rows: [], hasMore: true, next: '' },
+      { rows: [], hasMore: false, next: 'c1:7' },
+      { rows: [], hasMore: true, next: 7 },
+    ]) {
+      body = page
+      expect(await client.list('pg-order'), JSON.stringify(page)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const page of [
+      { rows: [], hasMore: true, next: 'c1:7' },
+      { rows: [], hasMore: false, next: null },
+    ]) {
+      body = page
+      expect(await client.list('pg-order'), JSON.stringify(page)).toEqual({ ok: true, value: page })
+    }
+  })
+
   // A form's `list` says whether a grid may be offered (0044). A reply
   // without one -- a server older than lists -- is not this server's form:
   // taken for one, `list !== null` would hold for `undefined`, and a host
@@ -152,9 +183,13 @@ describe('when the data server is not what answers', () => {
   // page draws a link per entry and a grid per child, and an entry without
   // `children` -- a proxy's, or a server's that has no menu -- would be
   // drawn as a form with none. Watched failing with only `forms` checked
-  // for being a list: the entries below were taken for the server's.
+  // for being a list: the entries below were taken for the server's. A
+  // child without `one` -- a server older than sections (0109) -- or a
+  // section whose condition a page could not compare is not this server's
+  // either: a page would draw a section as a grid, or show it never.
+  // Watched failing with `one` unchecked.
   test("a menu is GET /v1/forms, taken only in the server's shape", async () => {
-    const ENTRY = { id: 'pg-order', title: 'Order', operations: ['read'], children: [{ form: 'pg-order-line', field: 'order' }] }
+    const ENTRY = { id: 'pg-order', title: 'Order', operations: ['read'], children: [{ form: 'pg-order-line', field: 'order', one: false, when: null }] }
     let body: unknown = { forms: [ENTRY] }
     const { base, asked } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -163,6 +198,27 @@ describe('when the data server is not what answers', () => {
     expect(await client.forms()).toEqual({ ok: true, value: body })
     expect(asked).toEqual(['GET /v1/forms Bearer t'])
     const { children: _children, ...childless } = ENTRY
+    const child = { form: 'pg-order-line', field: 'order', one: false, when: null }
+    const sections = [
+      { ...child, one: true, when: null },
+      { ...child, one: true, when: { field: 'kind', equals: 'company' } },
+      { ...child, one: true, when: { field: 'customer_no', equals: 1001 } },
+      { ...child, one: true, when: { field: 'is_company', equals: true } },
+    ]
+    for (const section of sections) {
+      body = { forms: [{ ...ENTRY, children: [section] }] }
+      expect(await client.forms(), JSON.stringify(section)).toMatchObject({ ok: true })
+    }
+    const unread = [
+      { form: 'pg-order-line' },
+      { form: 1, field: 'order', one: false, when: null },
+      { form: 'pg-order-line', field: 'order' },
+      { ...child, one: 'yes' },
+      { ...child, when: { field: 'kind', equals: 'company' } },
+      { ...child, one: true, when: { field: 'kind' } },
+      { ...child, one: true, when: { field: 'kind', equals: null } },
+      { ...child, one: true, when: { equals: 'company' } },
+    ]
     for (const forms of [
       undefined,
       {},
@@ -170,8 +226,7 @@ describe('when the data server is not what answers', () => {
       [{ ...ENTRY, id: 7 }],
       [{ ...ENTRY, title: null }],
       [{ ...ENTRY, operations: 'read' }],
-      [{ ...ENTRY, children: [{ form: 'pg-order-line' }] }],
-      [{ ...ENTRY, children: [{ form: 1, field: 'order' }] }],
+      ...unread.map((entry) => [{ ...ENTRY, children: [entry] }]),
     ]) {
       body = { forms }
       expect(await client.forms(), JSON.stringify(forms)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })

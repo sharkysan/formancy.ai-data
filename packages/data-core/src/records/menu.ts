@@ -1,9 +1,11 @@
+import { canonicalize } from '@formancy/spec'
 import { offers } from '../generate/offers.js'
-import type { FormBindings } from '../generate/types.js'
-import { authorizeOperation } from '../policy/evaluate.js'
+import type { FieldBinding, FormBindings, SectionBinding } from '../generate/types.js'
+import { authorizeOperation, readableFields } from '../policy/evaluate.js'
 import { byCodepoint, OPERATIONS } from '../policy/inputs.js'
 import type { FormPolicy, PolicyContext, PolicyOperation } from '../policy/types.js'
 import type { FormMenu, FormMenuChild } from '../runtime.js'
+import { formValue } from './answers.js'
 import { childLookups, parentKey, referencingFields } from './children.js'
 import type { ChildLookup, ParentKey, PublishedTable } from './children.js'
 import { listable } from './list.js'
@@ -54,7 +56,11 @@ export interface MenuForm {
   listedBy: string[] | null
   key: ParentKey | null
   lookups: ChildLookup[]
+  /** The column fields this person may read, each with the column it is bound to: what a section's condition is read from (0109). */
+  readable: ColumnBinding[]
 }
+
+type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
 
 /**
  * `bundle`'s `MenuForm` for this person. Everything the menu reads of a
@@ -64,8 +70,11 @@ export interface MenuForm {
  */
 export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const operations = grantedOperations(bundle.bindings, bundle.policy, context)
-  if (!operations.includes('read')) return { id: bundle.id, title: bundle.title, operations, listedBy: null, key: null, lookups: [] }
+  if (!operations.includes('read')) return { id: bundle.id, title: bundle.title, operations, listedBy: null, key: null, lookups: [], readable: [] }
   const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, context)
+  const fields = readableFields(bundle.policy, context, bundle.bindings)
+  const read = new Set(fields.ok ? fields.fields : [])
+  const readable = bundle.bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && read.has(binding.field))
   return {
     id: bundle.id,
     title: bundle.title,
@@ -73,7 +82,23 @@ export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
     listedBy: listed.ok ? [...listed.fields] : null,
     key: parentKey(bundle),
     lookups: childLookups(bundle),
+    readable,
   }
+}
+
+/**
+ * Where a section's child shows under `parent`'s records (0109): the
+ * parent's field this person may read that is bound to the condition's
+ * column, as the same type, and the condition's value as that field's
+ * answer holds it -- or `null`, which shows the section always: no
+ * condition, or one on a column the parent does not show this person.
+ */
+function sectionWhen(parent: MenuForm, section: SectionBinding): FormMenuChild['when'] {
+  const when = section.when
+  if (when === null) return null
+  const binding = parent.readable.find((candidate) => candidate.column === when.column && canonicalize(candidate.type) === canonicalize(when.type))
+  if (binding === undefined) return null
+  return { field: binding.field, equals: formValue(binding, when.type.kind === 'boolean' ? when.value === 'true' : when.value) }
 }
 
 /**
@@ -98,7 +123,11 @@ export function formMenu(forms: readonly MenuForm[]): FormMenu {
       const children: FormMenuChild[] = []
       for (const child of named) {
         if (child.listedBy === null) continue
-        for (const field of referencingFields(parent.key, child.lookups)) if (child.listedBy.includes(field)) children.push({ form: child.id, field })
+        for (const field of referencingFields(parent.key, child.lookups)) {
+          if (!child.listedBy.includes(field)) continue
+          const section = child.lookups.find((lookup) => lookup.field === field)?.section ?? null
+          children.push({ form: child.id, field, one: section !== null, when: section === null ? null : sectionWhen(parent, section) })
+        }
       }
       return { id: parent.id, title: parent.title, operations: [...parent.operations], children }
     }),

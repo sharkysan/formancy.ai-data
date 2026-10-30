@@ -42,7 +42,13 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'not-sortable':
     case 'not-searchable':
     case 'not-filterable':
+    case 'invalid-cursor':
       return { status: 400, body: { code, message } }
+    case 'cursor-gone':
+      // The row a page continues after is deleted, or no longer one the
+      // person may read (0108): the request was sound, the data moved under
+      // it, and the first page is where to start again.
+      return { status: 409, body: { code, message } }
     case 'record-not-read':
       // The update route plans with the record it read and answers a read
       // that failed itself (0040), so only a read that came back as another

@@ -82,9 +82,9 @@ async function reopen(formId: string): Promise<User> {
   return workspace(formId)
 }
 
-/** The filter and sort of each list request sent for `formId`, with its offset. */
-const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'offset'>> =>
-  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, offset: body.offset }))
+/** The filter and sort of each list request sent for `formId`, with the cursor it continues after. */
+const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> =>
+  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
 
 /** What the grid's View picker shows. */
 const shown = (heading: string): string =>
@@ -160,7 +160,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await reopen(engine.formId)
     await headed('Records', arranged)
     await says('Records', /^Rows 1–\d+\. Filtered by Notes and Amount\.$/)
-    expect(asked(engine.formId)).toEqual([{ filter: LARGE.filter, sort: LARGE.sort, offset: 0 }])
+    expect(asked(engine.formId)).toEqual([{ filter: LARGE.filter, sort: LARGE.sort, after: null }])
     expect(shown('Records')).toBe(LARGE.name)
     expect([sortOf('Records', 'Amount'), sortOf('Records', 'Id')]).toEqual(['descending', 'ascending'])
     await openColumns(user, 'Records')
@@ -189,7 +189,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
 
     const again = await reopen(engine.formId)
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
-    expect(asked(engine.formId)).toEqual([{ filter: [], sort: [], offset: 0 }])
+    expect(asked(engine.formId)).toEqual([{ filter: [], sort: [], after: null }])
     expect(shown('Records')).toBe('All records')
     expect(sortOf('Records', 'Id')).toBeNull()
     expect(await floor('all records brought back')).toEqual(CLEAN('all records brought back'))
@@ -205,7 +205,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
 
     await reopen(engine.formId)
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
-    expect(asked(engine.formId)).toEqual([{ filter: [], sort: byDate, offset: 0 }])
+    expect(asked(engine.formId)).toEqual([{ filter: [], sort: byDate, after: null }])
     expect(sortOf('Records', 'Order date')).toBe('ascending')
     expect(shown('Records')).toBe(OWN)
     expect(await floor('a header’s sort brought back')).toEqual(CLEAN('a header’s sort brought back'))
@@ -230,7 +230,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await reopen(engine.formId)
     await says('Records', /^Rows 1–\d+(; more follow)?\.$/)
     expect(applied('Records')).toEqual([])
-    expect(asked(engine.formId)).toEqual([{ filter: [], sort: NEWEST.sort, offset: 0 }])
+    expect(asked(engine.formId)).toEqual([{ filter: [], sort: NEWEST.sort, after: null }])
     expect(sortOf('Records', 'Id')).toBe('descending')
     expect(shown('Records')).toBe(OWN)
     expect(await floor('a filter of your own, not brought back')).toEqual(CLEAN('a filter of your own, not brought back'))

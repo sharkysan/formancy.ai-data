@@ -102,6 +102,8 @@ export const ENGINES = [
     removable: 'pg-removable',
     read: 'pg-order-read',
     withheld: 'pg-order-withheld',
+    party: 'pg-party',
+    company: 'pg-party-company',
   },
   {
     engine: 'SQL Server',
@@ -116,6 +118,8 @@ export const ENGINES = [
     removable: 'ms-removable',
     read: 'ms-order-read',
     withheld: 'ms-order-withheld',
+    party: 'ms-party',
+    company: 'ms-party-company',
   },
 ] as const
 
@@ -176,6 +180,8 @@ export interface Plane {
     countOrders(connection: Engine['connection'], notes: string): Promise<number>
     /** `count` orders of tenant 1's, for Muster AG, noted `<notes> <n>`, written by the owner in one statement: more than a page. */
     insertOrders(connection: Engine['connection'], count: number, notes: string): Promise<void>
+    /** The order `record` names, with no lines, deleted by the owner, as another application would. */
+    deleteOrder(connection: Engine['connection'], record: string): Promise<void>
     /** A row of `parity.removable_child` that refers to the removable record `record`, with NO ACTION: a delete of it is refused while this row is there. */
     referToRemovable(connection: Engine['connection'], record: string): Promise<void>
     /**
@@ -251,10 +257,13 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
  * With `views` (0105), the order form is published with `ORDER_VIEWS`, the
  * deliveries with `DELIVERY_VIEWS`, and the order form again as `withheld`
  * of `ENGINES`, which the clerk may read but for Amount, with
- * `WITHHELD_VIEWS` (test-forms.ts).
+ * `WITHHELD_VIEWS` (test-forms.ts). With `sections` (0109), `party` of
+ * `ENGINES` is published over `parity.party`, and `company` over
+ * `parity.party_company` as a section of it, shown while its kind is
+ * `company`.
  */
 export async function startPlane(
-  options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; views?: boolean } = {},
+  options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; sections?: boolean; views?: boolean } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
@@ -367,6 +376,52 @@ export async function startPlane(
       bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
     })
   }
+  for (const { parity: connection, party, company } of options.sections === true ? ENGINES : []) {
+    // A party, its tenant pinned to the clerk's, and its company details as a section of it while its kind is company (0109).
+    const CLERK_RW = { read: ['clerk'], write: ['clerk'] }
+    const parties = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'party' },
+      formId: party,
+      title: 'Party',
+      lookups: [],
+      versionColumn: 'version',
+      pinned: ['tenant_id'],
+    })
+    const partyPolicy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, name: CLERK_RW, kind: CLERK_RW },
+      rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+      lookups: {},
+    }
+    const companies = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'party_company' },
+      formId: company,
+      title: 'Company details',
+      lookups: [{ foreignKey: 'fk_party_company_party', display: ['name'], section: { when: { column: 'kind', value: 'company' } } }],
+      versionColumn: 'version',
+    })
+    const companyPolicy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+      fields: { party: CLERK_RW, vat_no: CLERK_RW },
+      rowFilters: [],
+      lookups: { party: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['party'],
+    }
+    for (const [formId, proposed, policy] of [
+      [party, parties, partyPolicy],
+      [company, companies, companyPolicy],
+    ] as const) {
+      const { form, bindings, snapshot, generation } = proposed
+      await admin(`/v1/forms/${formId}/versions`, {
+        expectedBase: null,
+        bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+      })
+    }
+  }
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
@@ -471,6 +526,11 @@ export async function startPlane(
         const id = Number(record.slice('k1:'.length))
         if (connection === 'pg') await pgAdmin`insert into parity.removable_child (removable_id, note) values (${id}, 'refers to it')`
         else await msAdmin.request().input('id', mssql.Int, id).query("insert into parity.removable_child (removable_id, note) values (@id, N'refers to it')")
+      },
+      deleteOrder: async (connection, record) => {
+        const id = record.slice('k1:'.length)
+        if (connection === 'pg') await pgAdmin`delete from sales."order" where id = ${id}::bigint`
+        else await msAdmin.request().input('id', mssql.BigInt, id).query('delete from sales.[order] where id = @id')
       },
       countOrders: async (connection, notes) => {
         if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0

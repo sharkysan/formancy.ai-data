@@ -24,11 +24,11 @@ import {
 
 /** How the image publishes its forms' parents: customers' orders, and an order's deliveries and lines (apps/live-demo/src/image/forms.ts). */
 const CHILDREN = {
-  customer: [{ form: 'order', field: 'customer' }],
+  customer: [{ form: 'order', field: 'customer', one: false, when: null }],
   delivery: [],
   order: [
-    { form: 'delivery', field: 'order' },
-    { form: 'order-line', field: 'order' },
+    { form: 'delivery', field: 'order', one: false, when: null },
+    { form: 'order-line', field: 'order', one: false, when: null },
   ],
   'order-line': [],
 }
@@ -152,17 +152,17 @@ const said = (answer) => (typeof answer.json?.message === 'string' ? ` (${String
 const expectStatus = (where, answer, status) =>
   answer.status === status ? null : `${where} answered ${String(answer.status)}, not ${String(status)}${said(answer)}`
 
-/** Every page of `form`'s records `token` may read, in the key's order: the rows, and how many pages it took. */
-async function allRows(visit, token, form, query = {}) {
+/** Every page of `form`'s records `token` may read, in the key's order, each after the one before (0108): the rows, and how many pages it took. */
+export async function allRows(visit, token, form, query = {}) {
   const rows = []
   let pages = 0
-  for (let offset = 0; ;) {
-    const page = await visit.api('POST', `/v1/forms/${form}/records/list`, { token, body: { ...query, offset } })
-    if (page.status !== 200) throw new Error(`${form}'s records/list at ${String(offset)} answered ${String(page.status)}${said(page)}`)
+  for (let after = null; ;) {
+    const page = await visit.api('POST', `/v1/forms/${form}/records/list`, { token, body: { ...query, after } })
+    if (page.status !== 200) throw new Error(`${form}'s records/list after ${String(rows.length)} rows answered ${String(page.status)}${said(page)}`)
     pages += 1
     rows.push(...page.json.rows)
     if (!page.json.hasMore) return { rows, pages }
-    offset += page.json.rows.length
+    after = page.json.next
   }
 }
 

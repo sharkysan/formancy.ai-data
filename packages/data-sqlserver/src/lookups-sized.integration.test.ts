@@ -1,14 +1,15 @@
-import { buildLookupConfig, encodeKeyToken, generateForm } from '@formancy/data-core'
-import type { LookupConfig, LookupResult, RowFilters } from '@formancy/data-core'
+import { buildLookupConfig, encodeKeyToken, generateForm, listCursor, planList, recordPage } from '@formancy/data-core'
+import type { FormPolicy, LookupConfig, LookupResult, PolicyContext, RowFilters } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { loadSizedCustomers, sizedLookupPage, sizedResolveKeys, sizedRowsRead, sizedTerms, startSqlServerFixture } from '@formancy/data-fixtures'
+import { loadSizedCustomers, sizedListPage, sizedLookupPage, sizedResolveKeys, sizedRowsRead, sizedTerms, startSqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import type { ConnectionPool } from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import { connectSqlServer, createSqlServerLookups, discoverSqlServer } from './index.js'
+import { connectSqlServer, createSqlServerLookups, createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
- * What a lookup costs SQL Server on the sized `sales.customer` (0034): a
+ * What a lookup, and a page of records deep in key order (0108), cost SQL
+ * Server on the sized `sales.customer` (0034): a
  * million customers, a tenth of them the writer's tenant. Held without a
  * clock, by the actual plan of each statement the adapter ran as the writer,
  * through a pool `connectSqlServer` opened (0025):
@@ -260,5 +261,56 @@ describe('resolving and checking keys on the sized customers', () => {
     const cost = await costOf(() => createSqlServerLookups(writer).rejects(config, [tokenOf(key.tenantId, key.customerNo)], TENANT_1, NOT_ABORTED))
     expect(cost.answer).toEqual([])
     expect(cost.read).toBe(PER_KEY)
+  })
+})
+
+describe('a page of the sized customers deep in key order (0108)', () => {
+  const deep = sizedListPage()
+  const CLERK: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: { tenant: '1' } }
+  const READ = { read: ['clerk'], write: [] }
+  const POLICY: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [] },
+    // The columns the sized writer may read (`*.restricted.sql`), and no other.
+    fields: { tenant_id: READ, customer_no: READ, name: READ },
+    rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
+    lookups: { country: [] },
+  }
+
+  // After a row, a page in key order is a seek of the key's clustered index
+  // from that row: the row found by its key, then the page and its extra
+  // row -- whatever the page's depth. The same request at the offset that
+  // reaches the same page, as a list was paged before 0108, reads every row
+  // of the tenant before it and discards them. Watched failing with the
+  // tenant compared in the seek too: the page read the tenant's rows from
+  // the first to the anchor, as the offset does.
+  test('reads the row it continues after and the page, where the offset reads every row before it', async () => {
+    const sales = await discoverSqlServer(owner, { schemas: ['sales'] })
+    const { bindings } = generateForm(sales, {
+      connection: 'test',
+      root: { schema: 'sales', name: 'customer' },
+      formId: 'customers',
+      title: 'Customers',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      pinned: ['tenant_id'],
+    })
+    const after = listCursor(bindings.identity as string[], { tenant_id: String(deep.anchor.tenantId), customer_no: String(deep.anchor.customerNo) })
+    const plan = planList(sales, bindings, POLICY, CLERK, { search: '', sort: [], parent: null, filter: [], after, limit: deep.size })
+    if (!plan.ok) throw new Error(plan.message)
+
+    const keyset = await costOf(() => createSqlServerRecords(writer).list(plan.request))
+    if (!keyset.answer.ok) throw new Error(keyset.answer.message)
+    expect(keyset.answer.after).toBe('found')
+    const page = recordPage(bindings, plan, keyset.answer.rows)
+    expect({ numbers: page.rows.map((row) => row.answers['customer_no']), hasMore: page.hasMore }).toEqual({ numbers: deep.page, hasMore: true })
+
+    const offset = await costOf(() => createSqlServerRecords(writer).list({ ...plan.request, after: null, offset: deep.before }))
+    if (!offset.answer.ok) throw new Error(offset.answer.message)
+    expect(recordPage(bindings, plan, offset.answer.rows).rows.map((row) => row.answers['customer_no'])).toEqual(deep.page)
+    console.log(
+      `a page after the ${String(deep.before)}th customer: read ${String(keyset.read)} by ${JSON.stringify(keyset.access)} at degree ${keyset.dop}; at the offset, read ${String(offset.read)} by ${JSON.stringify(offset.access)} at degree ${offset.dop}`,
+    )
+    expect({ after: keyset.read, offset: offset.read }).toEqual(deep.read)
+    expect(keyset.access).toEqual(['Clustered Index Seek'])
   })
 })

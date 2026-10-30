@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import type { Refusal } from './client.js'
 import { LIST_PAGE_SIZE } from './index.js'
-import type { FormRecord, RecordListQuery } from './index.js'
+import type { FormRecord, RecordList, RecordListQuery } from './index.js'
 import { ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 
@@ -65,9 +65,10 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
       sort: [{ field: 'order_date', direction: 'desc' as const }],
       parent: null,
       filter,
-      offset: 0,
+      after: null,
       limit: 10,
       columns: ['tenant_id'],
+      offset: 50,
     }
     expectOk(await plane.client().list(formId, query))
     const [sent] = plane.sent
@@ -77,7 +78,7 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
       sort: [{ field: 'order_date', direction: 'desc' }],
       parent: null,
       filter,
-      offset: 0,
+      after: null,
       limit: 10,
     })
     expect(sent?.url).not.toMatch(/placed|filter-marker/)
@@ -103,10 +104,12 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
     )
     const pages = async (query: Partial<RecordListQuery>): Promise<FormRecord[]> => {
       const rows: FormRecord[] = []
-      for (let offset = 0; ; offset += LIST_PAGE_SIZE) {
-        const page = expectOk(await third.list(formId, { ...query, offset }))
+      let after: string | null = null
+      for (;;) {
+        const page: RecordList = expectOk(await third.list(formId, { ...query, after }))
         rows.push(...page.rows)
-        if (!page.hasMore) return rows
+        if (page.next === null) return rows
+        after = page.next
       }
     }
     const notes = (rows: readonly FormRecord[]) => rows.map((row) => String(row.answers['notes']))

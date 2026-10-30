@@ -40,6 +40,8 @@ export type {
   GenerationNote,
   GenerationRequest,
   LookupChoice,
+  SectionBinding,
+  SectionCondition,
 } from './generate/types.js'
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
 export type { DescribedRoot } from './drift/diff.js'
@@ -164,7 +166,8 @@ export { deleteTerms, reachesPast } from './records/delete-terms.js'
 export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
 export { copiedFields } from './records/copy.js'
 export { fieldHeading } from './records/heading.js'
-export { listable, listColumns, listOrder, planList, recordPage, viewProblems } from './records/list.js'
+export { CURSOR_GONE, cursorRefusal, listable, listColumns, listOrder, planList, recordPage, viewProblems } from './records/list.js'
+export { decodeListCursor, listCursor } from './records/cursor.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
 export { formMenu, grantedOperations, menuForm } from './records/menu.js'

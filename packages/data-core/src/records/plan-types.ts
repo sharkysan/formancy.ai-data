@@ -44,6 +44,11 @@ import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, UpdateRequ
  * - `not-filterable` — a list filtered by a field this actor may not filter
  *   it by: one they may not read, a lookup, an operator its column does not
  *   offer, or a value its column cannot hold (0104).
+ * - `invalid-cursor` — a page asked for after a cursor that names no key of
+ *   this form, spelled as its key holds it (0108).
+ * - `cursor-gone` — a page asked for after a row that is gone: deleted, or
+ *   no longer inside the actor's read filter and throughs (0108). Decided
+ *   from the page's own statement, never before it.
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -58,6 +63,8 @@ export type PlanRefusalCode =
   | 'not-sortable'
   | 'not-searchable'
   | 'not-filterable'
+  | 'invalid-cursor'
+  | 'cursor-gone'
 
 export interface PlanRefusal {
   ok: false

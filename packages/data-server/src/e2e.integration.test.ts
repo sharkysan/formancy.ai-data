@@ -385,6 +385,10 @@ describe.each([
     const page = (await call('POST', `/v1/forms/${formId}/records/list`, clerk, { limit: 1 })).json()
     expect(page.hasMore).toBe(true)
     expect((await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: page.rows[0].record })).json()).toEqual(page.rows[0])
+    // The next page continues after that row (0108): the second of the first two, through the real server and driver.
+    const two = (await call('POST', `/v1/forms/${formId}/records/list`, clerk, { limit: 2 })).json()
+    const next = (await call('POST', `/v1/forms/${formId}/records/list`, clerk, { limit: 1, after: page.next })).json()
+    expect(next.rows.map((row: { record: string }) => row.record)).toEqual([two.rows[1].record])
   })
 
   // Step 10: nothing changed in the database, so drift reports nothing.
@@ -454,11 +458,13 @@ async function everyListed(
   body: Record<string, unknown> = {},
 ): Promise<Array<{ record: string; answers: Record<string, unknown> }>> {
   const rows: Array<{ record: string; answers: Record<string, unknown> }> = []
-  for (let offset = 0; ; offset += 50) {
-    const page = await call('POST', `/v1/forms/${form}/records/list`, bearer, { ...body, offset })
+  let after: string | null = null
+  for (;;) {
+    const page = await call('POST', `/v1/forms/${form}/records/list`, bearer, { ...body, after })
     expect(page.statusCode, page.body).toBe(200)
     rows.push(...(page.json().rows as typeof rows))
     if (page.json().hasMore !== true) return rows
+    after = page.json().next as string
   }
 }
 

@@ -10,6 +10,9 @@ import {
   AUDITOR,
   CLERK,
   CLERK_RW,
+  companyForm,
+  CUSTOMER_POLICY,
+  customerForm,
   fk,
   INTAKE,
   LINE_POLICY,
@@ -19,6 +22,7 @@ import {
   orderForm,
   PG,
   sales,
+  sectioned,
   snapshot,
   TENANT,
 } from './test-support.js'
@@ -120,10 +124,10 @@ describe('formMenu over menuForm', () => {
     const menu = menuOf([ORDER, LINES, EMPLOYEES], CLERK)
     expect(Object.fromEntries(menu.forms.map((entry) => [entry.id, entry.children]))).toEqual({
       employee: [
-        { form: 'employee', field: 'employee' },
-        { form: 'order', field: 'employee' },
+        { form: 'employee', field: 'employee', one: false, when: null },
+        { form: 'order', field: 'employee', one: false, when: null },
       ],
-      order: [{ form: 'order-line', field: 'order' }],
+      order: [{ form: 'order-line', field: 'order', one: false, when: null }],
       'order-line': [],
     })
   })
@@ -152,7 +156,9 @@ describe('formMenu over menuForm', () => {
       ...ORDER_POLICY,
       fields: { ...ORDER_POLICY.fields, employee: { read: [], write: ['clerk'] } },
     })
-    expect(menuOf([EMPLOYEES, hidden], CLERK).forms.find((entry) => entry.id === 'employee')?.children).toEqual([{ form: 'employee', field: 'employee' }])
+    expect(menuOf([EMPLOYEES, hidden], CLERK).forms.find((entry) => entry.id === 'employee')?.children).toEqual([
+      { form: 'employee', field: 'employee', one: false, when: null },
+    ])
   })
 
   // A child the person may not read is not named under anything: the menu
@@ -171,5 +177,94 @@ describe('formMenu over menuForm', () => {
   test('names no child on another connection', () => {
     const elsewhere = bundle('order-line', 'Order line', PG, lineForm(PG).bindings, LINE_POLICY, 'archive')
     expect(menuOf([ORDER, elsewhere], CLERK).forms.find((entry) => entry.id === 'order')?.children).toEqual([])
+  })
+})
+
+describe('a section under its parent (0109)', () => {
+  const SECTIONED = sectioned('postgres')
+  const CUSTOMER_FIELDS = { ...CUSTOMER_POLICY.fields, kind: CLERK_RW }
+  // Generated without a version column, the customer form offers no update.
+  const READ_CREATE = { read: ['clerk'], create: ['clerk'], update: [] }
+  const CUSTOMERS = bundle('customer', 'Customer', SECTIONED, customerForm(SECTIONED).bindings, {
+    ...CUSTOMER_POLICY,
+    operations: READ_CREATE,
+    fields: CUSTOMER_FIELDS,
+  })
+  const COMPANY_POLICY: FormPolicy = {
+    version: 1,
+    operations: READ_CREATE,
+    fields: { customer: CLERK_RW, vat_no: CLERK_RW, rating: CLERK_RW },
+    rowFilters: [],
+    lookups: { customer: TENANT },
+    through: ['customer'],
+  }
+  const company = (section?: Parameters<typeof companyForm>[1]) =>
+    bundle('company', 'Company', SECTIONED, companyForm(SECTIONED, section).bindings, COMPANY_POLICY)
+
+  // The child of a section's lookup is one form under the record, shown
+  // while the parent's answer is the condition's -- the column's value as
+  // the parent's own field holds it, so a page compares like with like.
+  test("is one form under the record, shown by the parent's field and answer", () => {
+    const children = (bundles: MenuBundle[], context = CLERK) => menuOf(bundles, context).forms.find((entry) => entry.id === 'customer')?.children
+    expect(children([CUSTOMERS, company()])).toEqual([{ form: 'company', field: 'customer', one: true, when: { field: 'kind', equals: 'company' } }])
+    expect(children([CUSTOMERS, company({ when: null })])).toEqual([{ form: 'company', field: 'customer', one: true, when: null }])
+    expect(children([CUSTOMERS, company(null)])).toEqual([{ form: 'company', field: 'customer', one: false, when: null }])
+  })
+
+  // A yes/no is the parent's answer as its control holds it, and a whole
+  // number its number: the page compares with `===`. Watched failing with
+  // the condition sent as its canonical text: customer_no's 1001 went as
+  // the text "1001", which the record's number never equals.
+  test("compares the parent's answer as its control holds a yes/no and a whole number", () => {
+    const withFlag = sectioned('postgres', (objects) => {
+      ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).columns.push({
+        ...(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).columns[0],
+        name: 'is_company',
+        ordinal: 9,
+        databaseType: 'boolean',
+        type: { kind: 'boolean' },
+        nullable: true,
+      } as ObjectMeta['columns'][number])
+    })
+    const flagged = bundle('customer', 'Customer', withFlag, customerForm(withFlag).bindings, {
+      ...CUSTOMER_POLICY,
+      operations: READ_CREATE,
+      fields: { ...CUSTOMER_FIELDS, is_company: CLERK_RW },
+    })
+    const flaggedCompany = bundle(
+      'company',
+      'Company',
+      withFlag,
+      companyForm(withFlag, { when: { column: 'is_company', value: 'true' } }).bindings,
+      COMPANY_POLICY,
+    )
+    expect(menuOf([flagged, flaggedCompany], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
+      { form: 'company', field: 'customer', one: true, when: { field: 'is_company', equals: 'true' } },
+    ])
+    const numbered = bundle(
+      'company',
+      'Company',
+      SECTIONED,
+      companyForm(SECTIONED, { when: { column: 'customer_no', value: '1001' } }).bindings,
+      COMPANY_POLICY,
+    )
+    expect(menuOf([CUSTOMERS, numbered], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
+      { form: 'company', field: 'customer', one: true, when: { field: 'customer_no', equals: 1001 } },
+    ])
+  })
+
+  // What a page shows is never a permission: a person the parent's policy
+  // does not let read the condition's field sees the section always, as
+  // its own policy lets them, rather than never. Watched failing with the
+  // condition kept for them: a field they may not read named in the menu.
+  test('is shown always to a person who may not read the condition', () => {
+    const hidden = bundle('customer', 'Customer', SECTIONED, customerForm(SECTIONED).bindings, {
+      ...CUSTOMER_POLICY,
+      operations: READ_CREATE,
+      fields: { ...CUSTOMER_FIELDS, kind: { read: [], write: [] } },
+    })
+    expect(menuOf([hidden, company()], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
+      { form: 'company', field: 'customer', one: true, when: null },
+    ])
   })
 })

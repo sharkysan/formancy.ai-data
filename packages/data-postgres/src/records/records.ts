@@ -241,17 +241,21 @@ function readAnswer(request: Parameters<RecordAdapter['read']>[0], ran: Ran): { 
 /**
  * A list's answer from its statement's rows (0044): the page's records in
  * the statement's order, with the description the first row carries and the
- * isolation it was read under. One row with no record when the page is empty.
+ * isolation it was read under, and whether the row the page continues after
+ * was found (0108), which every row says. One row with no record when the
+ * page is empty.
  */
 function listAnswer(request: ListRequest, ran: Ran): { answer: ListOutcome; isolation?: string } {
   if (!ran.ok) return { answer: ran.failure }
   // Always a row: the description's, with the page's first record beside it or none.
-  const { described, isolation } = describedBy(ran.result.rows[0] as TextRow)
+  const first = ran.result.rows[0] as TextRow
+  const { described, isolation } = describedBy(first)
   if (described === undefined) return { answer: NOT_DESCRIBED, isolation }
+  const after = request.after === null ? null : first[DESCRIBED_COLUMNS] === 'true' ? 'found' : 'gone'
   const rows = ran.result.rows
-    .filter((row) => row[DESCRIBED_COLUMNS] !== null)
-    .map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 1)))
-  return { answer: { ok: true, described, rows }, isolation }
+    .filter((row) => row[DESCRIBED_COLUMNS + 1] !== null)
+    .map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 2)))
+  return { answer: { ok: true, described, rows, after }, isolation }
 }
 
 /**

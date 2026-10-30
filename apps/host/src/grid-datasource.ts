@@ -62,29 +62,29 @@ export function sortOfModel(sortModel: readonly SortModelItem[]): ListSortTerm[]
   return sortModel.map((item) => ({ field: item.colId, direction: item.sort }))
 }
 
-/** The list request for one block: the submitted search, the section's sort (0105), the parent, the applied filter (0104), and the block as offset and limit. */
+/** The list request for one block: the submitted search, the section's sort (0105), the parent, the applied filter (0104), and the block as the cursor it continues after and its size (0108). */
 export function listQuery({
   search,
   sort,
   parent,
   filter,
-  startRow,
-  endRow,
+  after,
+  size,
 }: {
   search: string
   sort: readonly ListSortTerm[]
   parent: RecordListQuery['parent']
   filter: readonly ListFilterTerm[]
-  startRow: number
-  endRow: number
+  after: string | null
+  size: number
 }): RecordListQuery {
   return {
     search,
     sort: [...sort],
     parent,
     filter: [...filter],
-    offset: startRow,
-    limit: endRow - startRow,
+    after,
+    limit: size,
   }
 }
 
@@ -166,6 +166,9 @@ export function answered({
   return { text: `${shown}${hasMore ? '; more follow.' : '.'}${narrowed}${tail}`, help: null, clear: false }
 }
 
+/** What the line says before the first page, once a page had nowhere to start (0108). */
+export const STARTED_AGAIN = 'The record those rows came after is gone, so the list starts again at its first page.'
+
 /** What the datasource tells the grid component as it goes. */
 export interface DatasourceHooks {
   /** A block asked for. */
@@ -174,6 +177,8 @@ export interface DatasourceHooks {
   answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[]): void
   /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). */
   refused(message: string, code: string): void
+  /** A block with nowhere to start: the row it comes after is gone (0108), and the first page is where the list starts again. */
+  restart(): void
 }
 
 /**
@@ -184,6 +189,15 @@ export interface DatasourceHooks {
  * (0104), and the same sort, the section's (0105). One request at a time,
  * the grid's own `maxConcurrentDatasourceRequests`; a block AG Grid no
  * longer wants is answered as failed and says nothing.
+ *
+ * A block is asked for after the row the block before it ended with (0108):
+ * each answered block's `next` is kept by the row the block after it
+ * starts at, the first block's by row 0 as none, and every answer of a block
+ * -- asked again after a save, a delete or Ask again -- keeps it anew.
+ * The pager only steps a page at a time, so the block asked for is one
+ * whose start an answer gave. A block whose start no answer gave, or whose
+ * row the server found gone (`cursor-gone`), has nowhere to start; it is
+ * answered as failed and the grid starts again at the first page.
  *
  * A block AG Grid asks for under another order than this list's is
  * answered as failed too, and asks the server nothing: the grid's headers
@@ -214,12 +228,14 @@ export function createDatasource({
 }): IDatasource & { abort(): void } {
   let current: AbortController | undefined
   const lookups = columns.filter((column) => column.source !== null)
+  /** The cursor each block is asked for after, by the row it starts at. */
+  const cursors = new Map<number, string | null>([[0, null]])
 
   async function rowsFor(
     params: IGetRowsParams,
     query: RecordListQuery,
     signal: AbortSignal,
-  ): Promise<{ rows: GridRow[]; hasMore: boolean } | { refused: string; code: string }> {
+  ): Promise<{ rows: GridRow[]; hasMore: boolean; next: string | null } | { refused: string; code: string }> {
     const page = await client.list(formId, query, signal)
     if (!page.ok) return { refused: page.message, code: page.code }
     const rows = rowsOf(page.value.rows, params.startRow)
@@ -236,7 +252,7 @@ export function createDatasource({
         if (label !== undefined) row.labels = { ...row.labels, [column.key]: label }
       }
     }
-    return { rows, hasMore: page.value.hasMore }
+    return { rows, hasMore: page.value.hasMore, next: page.value.next }
   }
 
   return {
@@ -246,18 +262,26 @@ export function createDatasource({
         params.failCallback()
         return
       }
+      const after = cursors.get(params.startRow)
+      if (after === undefined) {
+        params.failCallback()
+        hooks.restart()
+        return
+      }
       const controller = new AbortController()
       current = controller
-      const query = listQuery({ search, sort, parent, filter, startRow: params.startRow, endRow: params.endRow })
+      const query = listQuery({ search, sort, parent, filter, after, size: params.endRow - params.startRow })
       hooks.loading(params.startRow, params.endRow)
       rowsFor(params, query, controller.signal).then(
         (answer) => {
           if (controller.signal.aborted) return params.failCallback()
           if ('refused' in answer) {
             params.failCallback()
-            hooks.refused(answer.refused, answer.code)
+            if (answer.code === 'cursor-gone') hooks.restart()
+            else hooks.refused(answer.refused, answer.code)
             return
           }
+          if (answer.next !== null) cursors.set(params.startRow + answer.rows.length, answer.next)
           params.successCallback(answer.rows, answer.hasMore ? undefined : params.startRow + answer.rows.length)
           hooks.answered(params.startRow, answer.rows, answer.hasMore, filter)
         },

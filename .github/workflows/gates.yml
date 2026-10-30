@@ -929,6 +929,31 @@ jobs:
           esac
           rm -rf "$material" "$identity"
 
+      # The drift check a deploy pipeline runs (0111) is an entry the image
+      # ships beside main.mjs, as the key set tool is: drift-check.test.ts
+      # holds what it says and its exit statuses on the source; only the image
+      # shows the entry is there and runs. Without a token it asks nothing and
+      # exits 2 with its usage; with one, a server that is not there is a
+      # form it could not check, 2 again, never a clean 0.
+      - name: The image ships the drift check, which never passes what it could not check
+        run: |
+          set +e
+          usage=$(docker run --rm formancy/data-server:ci node dist/drift-check-cli.mjs 2>&1)
+          status=$?
+          set -e
+          if [ "$status" != 2 ] || ! printf '%s' "$usage" | grep -q 'FORMANCY_DATA_ADMIN_TOKEN'; then
+            echo "::error::drift-check-cli.mjs without a token exited $status: $usage"
+            exit 1
+          fi
+          set +e
+          away=$(docker run --rm -e FORMANCY_DATA_ADMIN_TOKEN=pipeline formancy/data-server:ci node dist/drift-check-cli.mjs http://127.0.0.1:9/ employee 2>&1)
+          status=$?
+          set -e
+          if [ "$status" != 2 ] || ! printf '%s' "$away" | grep -q 'could not be reached'; then
+            echo "::error::drift-check-cli.mjs against no server exited $status: $away"
+            exit 1
+          fi
+
       # FORMANCY_DATA_CORS_ORIGINS (0060). cors.test.ts and
       # cross-origin.test.ts hold the setting, the grants and the refusals on
       # the source; only the image shows that main.ts reads the setting and

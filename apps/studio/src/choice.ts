@@ -124,6 +124,26 @@ export function lookupBlocker(snapshot: MetadataSnapshot, root: ObjectMeta, fore
 }
 
 /**
+ * Whether a lookup over `foreignKey` can make the form a section of the
+ * records it references (0109): its columns are the root's key -- its
+ * primary key, or without one its first unique key -- in any order, so a
+ * referenced record has at most one row of the root. The generator asks
+ * again, by its own rule, and refuses the request where they disagree.
+ */
+export function sectionCandidate(root: ObjectMeta, foreignKey: ForeignKeyMeta): boolean {
+  const key = root.primaryKey ?? root.uniqueKeys[0] ?? null
+  return key !== null && key.columns.length === foreignKey.columns.length && key.columns.every((name) => foreignKey.columns.includes(name))
+}
+
+/** The kinds a section is shown by (0109): those whose values have one spelling, as the generator takes them. */
+const CONDITION_KINDS: ReadonlySet<string> = new Set(['text', 'integer', 'decimal', 'uuid', 'date', 'boolean'])
+
+/** The columns of the referenced table a section can be shown by: readable, of a kind with one spelling. */
+export function conditionColumns(target: ObjectMeta): ColumnMeta[] {
+  return target.columns.filter((column) => column.access.select && CONDITION_KINDS.has(column.type.kind))
+}
+
+/**
  * Why a target column cannot be shown by a lookup, or `null`: the generator
  * refuses a display column the account may not read (0027), and one with no
  * text form for a label, as the server's lookup config does (0066). Asked of
@@ -213,7 +233,11 @@ export function proposalFor(connection: string, choice: Choice, rowFilters: read
     root: { ...choice.root },
     formId: choice.formId,
     title: choice.title,
-    lookups: choice.lookups.map((lookup) => ({ foreignKey: lookup.foreignKey, display: [...lookup.display] })),
+    lookups: choice.lookups.map((lookup) => ({
+      foreignKey: lookup.foreignKey,
+      display: [...lookup.display],
+      ...(lookup.section === undefined ? {} : { section: { when: lookup.section.when === null ? null : { ...lookup.section.when } } }),
+    })),
     pinned: rowFilters.map((rule) => rule.column),
     ...(choice.versionColumn === null ? {} : { versionColumn: choice.versionColumn }),
   }

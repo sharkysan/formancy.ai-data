@@ -8,11 +8,12 @@ import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { viewFit } from '../presentation/views.js'
 import type { FilterableField, ListColumns, ListView, RecordList, RecordListQuery } from '../runtime.js'
 import { lookupAnswer, toFormAnswers } from './answers.js'
+import { decodeListCursor, listCursor } from './cursor.js'
 import { columnFilter, filterOffer } from './filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
 import { columnsOf, keyOrderProblem, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFor } from './scope.js'
-import type { ListRequest, RecordFilter, RecordRead, RecordSort, RecordValue, Through } from './types.js'
+import type { ListOutcome, ListRequest, RecordFilter, RecordRead, RecordSort, RecordValue, Through } from './types.js'
 
 /*
  * A form's records, a page at a time (0044): when a list is offered at all,
@@ -53,9 +54,10 @@ export interface Listable {
  * person it does not let read is told only that, as `GET` tells them.
  *
  * A key that can be NULL -- a nullable unique key, which PostgreSQL lets hold
- * many NULLs -- gives rows tied on it no order, so offset paging would repeat
- * or skip them. Refused on both engines, by the snapshot; a page decided over
- * its own description asks again (`driftRefusal`'s `list`).
+ * many NULLs -- gives rows tied on it no order, and a page could not
+ * continue after a row it cannot find by its key (0108). Refused on both
+ * engines, by the snapshot; a page decided over its own description asks
+ * again (`driftRefusal`'s `list`).
  *
  * Rows nothing scopes -- no row filter, no through -- while a lookup's
  * options are filtered (`unscopedLookups`) are what a child form looked like
@@ -162,9 +164,9 @@ export function viewProblems(views: readonly ListView[], bindings: FormBindings)
 /**
  * The order a list runs in, made total: the requested columns, then every
  * identity column the request did not name, ascending. Without the key, a
- * page boundary can fall between two rows that sort equal, and offset paging
- * shows one twice and the other never; a key column the request names is
- * not named again.
+ * page boundary can fall between two rows that sort equal, and a page after
+ * one of them (0108) could not say which comes after it; a key column the
+ * request names is not named again.
  *
  * NULLs go last, the lookups' rule, spelled only where the snapshot says the
  * column is nullable: a NOT NULL column holds none, and spelled with no
@@ -182,7 +184,9 @@ export function listOrder(prepared: Prepared, requested: ReadonlyArray<{ column:
 
 /**
  * The parent a list is narrowed to: the root's foreign-key columns of a
- * lookup the actor may read, each with the value the parent's token names.
+ * lookup the actor may read, each with the value the parent's token names
+ * -- or, for no parent (0110), each NULL, a condition of the list's filter
+ * as a person's `null` is (0104).
  * The token is decoded by `lookupAnswer`, the one decision about whether a
  * token is a value of that lookup, through the root columns' codecs: a value
  * those columns cannot hold, such as an int8 for an int4 foreign key, names
@@ -193,12 +197,14 @@ function parentEqual(
   bindings: FormBindings,
   fields: readonly string[],
   parent: RecordListQuery['parent'],
-): { ok: true; equal: RecordValue[] } | PlanRefusal {
-  if (parent === null) return { ok: true, equal: [] }
+): { ok: true; equal: RecordValue[]; none: RecordFilter[] } | PlanRefusal {
+  if (parent === null) return { ok: true, equal: [], none: [] }
   const binding = bindings.fields.find((candidate) => candidate.field === parent.field)
   if (binding === undefined || binding.kind !== 'lookup' || !fields.includes(parent.field)) {
     return refuse('invalid-request', `${parent.field} is not a lookup field you may read, so it cannot name a parent.`)
   }
+  // No parent (0110): every column of the field NULL, so the row references nothing -- a tree's roots.
+  if (parent.record === null) return { ok: true, equal: [], none: binding.columns.map((column): RecordFilter => ({ op: 'null', column })) }
   const decoded = lookupAnswer(
     binding,
     binding.columns.map((name) => prepared.columns.get(name) as ColumnMeta),
@@ -206,7 +212,7 @@ function parentEqual(
     new Map(),
   )
   if (!decoded.ok) return refuse('invalid-record-token', `The parent's record is not a token of a row ${parent.field} can reference.`)
-  return { ok: true, equal: decoded.values }
+  return { ok: true, equal: decoded.values, none: [] }
 }
 
 /**
@@ -217,9 +223,11 @@ function parentEqual(
  * is one `listColumns` calls sortable (`not-sortable`); that every filter
  * condition is on a readable column field, one its column offers, with
  * values it can hold (`not-filterable`, 0104); that a search has a field to
- * match (`not-searchable`); and the parent. Each row the adapter returns is
- * read as `planRead` would read it, the key and the readable fields'
- * columns and nothing else.
+ * match (`not-searchable`); the parent; and that a cursor names a key of
+ * this form (`invalid-cursor`, 0108), which says nothing of whether the row
+ * is there: the page's own statement looks for it. Each row the adapter
+ * returns is read as `planRead` would read it, the key and the readable
+ * fields' columns and nothing else.
  */
 export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, query: RecordListQuery): PlannedList {
   const found = listable(snapshot, bindings, policy, context)
@@ -246,6 +254,12 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   if (query.search !== '' && offered.searchable.length === 0) return refuse('not-searchable', 'This form has no field you may read that a search can match.')
   const parent = parentEqual(prepared, bindings, fields, query.parent)
   if (!parent.ok) return parent
+  let after: RecordValue[] | null = null
+  if (query.after !== null) {
+    const decoded = decodeListCursor(prepared.target.identity, query.after)
+    if (!decoded.ok) return refuse('invalid-cursor', "The page's cursor is not one this list's pages give.")
+    after = decoded.key
+  }
 
   const search = offered.searchable.map((field): LookupSearchColumn => {
     const column = (byField.get(field) as ColumnBinding).column
@@ -257,10 +271,11 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     filters: found.filters,
     through: found.through,
     equal: parent.equal,
-    filter,
+    filter: [...filter, ...parent.none],
     search: query.search === '' ? null : { text: query.search, columns: search },
     sort: listOrder(prepared, requested),
-    offset: query.offset,
+    after,
+    offset: 0,
     limit: query.limit,
   }
   return { ok: true, request, fields }
@@ -268,22 +283,50 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
 
 /**
  * One page as the API carries it, from the rows an adapter fetched for it:
- * up to `limit + 1`, in the request's order. Each row is what `toFormAnswers`
- * makes of a read of it, so a listed record is the record its token reads.
+ * up to `limit + 1`, in the planned request's order. Each row is what
+ * `toFormAnswers` makes of a read of it, so a listed record is the record
+ * its token reads.
  *
  * The extra row says whether more follow, without a COUNT, and is never
- * shown. A row whose key does not fit a token stays in its place with
- * `record: null`: dropped, it would shift every row after it on a page whose
- * arithmetic a grid relies on. A token twice on one page is an adapter that
- * joined wrongly, and is thrown here, where the message can say so.
+ * shown. When more follow, `next` is the cursor of the last row shown, which
+ * the page after it continues after (0108). A row whose key does not fit a token stays in its place with
+ * `record: null`: dropped, it would shift every row after it on a page
+ * whose arithmetic a grid relies on, and it has a cursor all the same. A
+ * token twice on one page is an adapter that joined wrongly, and is thrown
+ * here, where the message can say so.
  */
-export function recordPage(bindings: FormBindings, fields: readonly string[], rows: ReadonlyArray<Omit<RecordRead, 'ok'>>, limit: number): RecordList {
-  const page = rows.slice(0, limit).map((row) => toFormAnswers(bindings, fields, { ok: true, ...row }))
+export function recordPage(
+  bindings: FormBindings,
+  planned: { request: ListRequest; fields: readonly string[] },
+  rows: ReadonlyArray<Omit<RecordRead, 'ok'>>,
+): RecordList {
+  const { request, fields } = planned
+  const { limit } = request
+  const shown = rows.slice(0, limit)
+  const page = shown.map((row) => toFormAnswers(bindings, fields, { ok: true, ...row }))
   const seen = new Set<string>()
   for (const row of page) {
     if (row.record === null) continue
     if (seen.has(row.record)) throw new Error('A record appears twice in one page: the list statement repeats a row.')
     seen.add(row.record)
   }
-  return { rows: page, hasMore: rows.length > limit }
+  const hasMore = rows.length > limit
+  const last = shown.at(-1)
+  const identity = request.target.identity.map((column) => column.name)
+  return { rows: page, hasMore, next: hasMore && last !== undefined ? listCursor(identity, last.values) : null }
+}
+
+/** What a person is told when the row a page continues after is gone (0108): the page has no place to start. */
+export const CURSOR_GONE = 'The record this page continues after has been deleted, or is no longer one you may read. Start again from the first page.'
+
+/**
+ * A page refused because the row it continues after is gone (0108): deleted,
+ * or moved out of the person's read filter or a through since the page
+ * before. Its rows -- none, without a place to start -- are never shown.
+ * `undefined` for every other outcome, a page after a row that is there
+ * and a page from the start alike. Asked after the page is decided over its
+ * description, as every page is (0041).
+ */
+export function cursorRefusal(outcome: Extract<ListOutcome, { ok: true }>): PlanRefusal | undefined {
+  return outcome.after === 'gone' ? refuse('cursor-gone', CURSOR_GONE) : undefined
 }

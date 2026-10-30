@@ -6,13 +6,18 @@ import type { NormalizedType } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
 import { throughTerms } from './through.js'
 import type { ThroughTerms } from './through.js'
-import type { EqualsFilterType, ListRequest, RangeFilterType, RecordFilter, RecordSort, RecordValue } from './types.js'
+import type { EqualsFilterType, ListRequest, RangeFilterType, RecordColumn, RecordFilter, RecordSort, RecordValue } from './types.js'
 
 /**
  * A list request as an adapter builds its statement from it (0044): the
  * filters and throughs as `rowFilterTerms` and `throughTerms` read them, and
  * the parent, the person's filter (0104), the search, the order and the
  * page, each checked.
+ *
+ * `after` (0108): the key of the row the page continues after, and `seek`,
+ * the columns of the order a row is compared with that row by -- the order
+ * without every column the scope holds to one value, which every row the
+ * page could hold has alike. `null` for a page from the start.
  */
 export interface ListTerms {
   terms: RowFilterTerm[]
@@ -21,6 +26,7 @@ export interface ListTerms {
   filter: RecordFilter[]
   search: { text: string; columns: LookupSearchColumn[] } | null
   sort: RecordSort[]
+  after: { key: RecordValue[]; seek: RecordSort[] } | null
   offset: number
   limit: number
 }
@@ -171,27 +177,73 @@ function sortOf(given: unknown, identity: readonly string[]): RecordSort[] {
 }
 
 /**
+ * The key a page continues after: every identity column, in the identity's
+ * order, each of a key kind and spelled as it holds it, as a record key is.
+ */
+function afterKey(given: unknown, identity: readonly RecordColumn[]): RecordValue[] {
+  if (!Array.isArray(given) || given.length !== identity.length) throw refuse('continues after a key of every identity column')
+  return (given as unknown[]).map((entry, index) => {
+    const column = identity[index] as RecordColumn
+    if (!isRecord(entry) || entry['name'] !== column.name) throw refuse("continues after a key in the identity's order")
+    const value = entry['value']
+    if (!isLookupKeyType(column.type) || typeof value !== 'string' || !isKeyValue(column.type, value))
+      throw refuse(`continues after a ${column.name} spelled as it holds it`)
+    return { name: column.name, type: column.type, value }
+  })
+}
+
+/**
+ * The columns of `sort` a row is compared with the row a page continues
+ * after by: every one but those the scope holds to one value -- a trusted
+ * filter's equality, the parent's, the person's own `equals`. Every row the
+ * page could hold has that value, so it ties there with the row it continues
+ * after and never comes after it by that column; compared anyway, a key
+ * whose first column is the tenant would be a comparison of two columns no
+ * index seeks by, where the column after it alone is a range of the key's
+ * index.
+ */
+function seekOf(sort: readonly RecordSort[], terms: readonly RowFilterTerm[], equal: readonly RecordValue[], filter: readonly RecordFilter[]): RecordSort[] {
+  const held = new Set([
+    ...terms.map((term) => term.column),
+    ...equal.map((value) => value.name),
+    ...filter.filter((term) => term.op === 'equals').map((term) => term.column),
+  ])
+  return sort.filter((term) => !held.has(term.column))
+}
+
+/**
  * The terms an adapter builds a list statement from, read as `rowFilterTerms`
  * reads the filters: at run time, where a caller in JavaScript or a request
  * rebuilt from JSON is not held to the types. Anything `planList` would not
  * have produced -- an order that is not total, a page larger than
  * `LIST_PAGE_SIZE`, a search over a kind the engines spell apart, a parent
  * value its column cannot hold, a filter condition `columnFilter` would not
- * have planned -- throws before a statement is built. The result is fresh,
- * so nothing else the request carried reaches SQL.
+ * have planned, a key to continue after that is not one of the identity's,
+ * or both a key and an offset -- throws before a statement is built. The
+ * result is fresh, so nothing else the request carried reaches SQL.
  */
 export function listTerms(request: ListRequest): ListTerms {
   const identity = request.target.identity.map((column) => column.name)
   if (identity.length === 0) throw refuse('lists a target with an identity')
   const page = checkPage(request.offset, request.limit, LIST_PAGE_SIZE)
   if (!page.ok) throw refuse(`pages from an offset of zero or more, at most ${String(LIST_PAGE_SIZE)} rows at a time`)
+  const terms = rowFilterTerms(request.filters)
+  const equal = equalOf(request.equal)
+  const filter = filterOf(request.filter)
+  const sort = sortOf(request.sort, identity)
+  let after: ListTerms['after'] = null
+  if (request.after !== null) {
+    if (page.offset !== 0) throw refuse('starts either after a key or at an offset, never both')
+    after = { key: afterKey(request.after, request.target.identity), seek: seekOf(sort, terms, equal, filter) }
+  }
   return {
-    terms: rowFilterTerms(request.filters),
+    terms,
     through: throughTerms(request.through),
-    equal: equalOf(request.equal),
-    filter: filterOf(request.filter),
+    equal,
+    filter,
     search: searchOf(request.search),
-    sort: sortOf(request.sort, identity),
+    sort,
+    after,
     offset: page.offset,
     limit: page.limit,
   }

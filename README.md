@@ -265,6 +265,11 @@ until then the address is formancy.ai's 404
   [host page](#host-example) draws them in an AG Grid Community grid
   ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md),
   [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+  Each page continues after the last row the page before showed, found
+  again by its key in the page's own statement, so a row inserted or
+  deleted before it moves nothing, and a page deep in an order an index
+  serves reads from that row rather than every row before it
+  ([0108](./docs/decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)).
   Ordered by a uuid key, a list comes in each engine's own order of uuid --
   PostgreSQL's bytes in turn, SQL Server's byte groups -- total and stable on
   both, and not the same
@@ -374,7 +379,8 @@ until then the address is formancy.ai's 404
   ([0050](./docs/decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
   performance measured through the shipped server on both engines, for every
   runtime request but a page of records, the menu of forms and a delete, and held in CI by rows read and
-  round trips, never a time
+  round trips, never a time -- a page of records deep in key order held by
+  the rows it reads, untimed
   ([0034](./docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 - **A host identity key rotates without a restart.** A JSON Web Key Set
   file, each key selected by the `kid` a token names and read again on
@@ -603,7 +609,16 @@ the record is drawn by `@formancy/react`, `@formancy/angular` or both, as you
 choose, and the choice is kept in this browser with where you left the
 separator between the records and the record. Below the record, each form
 whose rows reference it lists them -- an order's lines -- and each child row
-opens in its own form; a new one is created under the open record. The
+opens in its own form; a new one is created under the open record. A form
+generated as a section of the record -- a table whose key is its foreign
+key onto the record's, holding at most one row of it -- is its one row in
+its own form instead, or Add, shown while the record as stored holds the
+value its generation names
+([0109](./docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
+A form that is its own child -- an employee and their manager -- shows its
+records as a grid or as a tree: the records with no parent, and under each
+record, once it is expanded, those naming it
+([0110](./docs/decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md)). The
 records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
 token loads one by its token.
@@ -1094,6 +1109,13 @@ copy ([0014](./docs/decisions/0014-host-identity-is-verified-offline.md),
 [0059](./docs/decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md);
 [the data server's README](./packages/data-server/README.md#rotating-the-identity-key)
 says how).
+
+A deploy pipeline checks drift after its migrations with the image's
+`dist/drift-check-cli.mjs`: it asks the server about each form it names and
+exits 1 on a `blocking` change and 2 on a form it could not check, never 0
+for one it could not
+([0111](./docs/decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md);
+[the data server's README](./packages/data-server/README.md#checking-drift-in-a-deploy-pipeline)).
 
 A host page on an origin of its own calls the runtime plane directly once
 `FORMANCY_DATA_CORS_ORIGINS` lists that origin exactly, as a browser sends

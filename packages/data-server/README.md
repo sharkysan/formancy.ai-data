@@ -65,7 +65,11 @@ existed would be documented and inert.
   Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md)
   a bundle is format 2: it also keeps the generation request, the generated
   base and the presentation chosen over it, and its form must be that base
-  with that presentation applied. Format 1 is still read and served, and no
+  with that presentation applied. A lookup of the request may be a section
+  of the records it references, `section: { when: { column, value } | null }`
+  ([0109](../../docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)),
+  and a request and bindings that disagree about it are refused, as for any
+  part of a lookup choice. Format 1 is still read and served, and no
   longer published. Publish also checks that this server's generator writes
   the stored base and bindings from the stored snapshot and request; reads
   do not, so a later generator never makes a stored version corrupt. A
@@ -238,7 +242,15 @@ existed would be documented and inert.
   `records/read` returns for its token, a POST so the search and a filter's
   values are in no URL, and audited as `list` with no record and never the
   search, the sort, the parent or the filter. Its body is `{ search?, sort?,
-  parent?, filter?, offset?, limit? }`, and nothing else (400 `malformed`).
+  parent?, filter?, after?, limit? }`, and nothing else (400 `malformed`):
+  `after` is the `next` of the page before, the cursor of its last row
+  (0108), which the page's own statement finds again by its key under the
+  read filter and every through -- 400 `invalid-cursor` for one naming no
+  key of the form, 409 `cursor-gone` when the row is deleted or no longer
+  one the person may read. A page answers `{ rows, hasMore, next }`.
+  `parent` is `{ field, record }`, the rows naming that record through a
+  lookup field the person may read, or `{ field, record: null }`, the rows
+  whose field names none, every column of it NULL (0110).
   `GET /v1/forms/:id` sends `list` -- what a page may be searched, sorted
   and filtered by, `{ searchable, sortable, filterable }` -- or `null` where
   the person would be refused one: a key
@@ -303,13 +315,15 @@ existed would be documented and inert.
   sends a `list`, and refused as a list is, a filter it does not offer
   `not-filterable` among them. Its body is those four keys and nothing else
   (400 `malformed`). The server pages the list itself, the list's own
-  request -- the filter planned once -- at each offset, one guarded statement a page decided
+  request -- the filter planned once -- after the last row of each page
+  (0108), one guarded statement a page decided
   as a list page is, with one resolve a page per lookup field under the
   person's read filter for it, and builds the whole file before it sends
   a byte: 200 with `content-type: text/csv; charset=utf-8`,
   `content-disposition: attachment; filename="<form id>.csv"` and its
   length, or a JSON refusal and nothing of the file -- 409 `drift`,
-  `moved` when a record would appear twice because the rows moved between
+  `moved` when the row a page continues after is gone, or a record would
+  appear twice because the rows moved between
   two pages -- known by its key's values, so a record whose key fits no
   token is held to it too -- or `unencodable` for text UTF-8 cannot carry,
   which names the column, and for a lookup whose key is too long for a
@@ -702,6 +716,25 @@ the database's size and the date it was measured on, is in
 [`docs/performance.md`](../../docs/performance.md)
 ([0034](../../docs/decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md));
 lists came after those figures, and 0044 says what measuring them needs.
+
+### Checking drift in a deploy pipeline
+
+After a pipeline's migrations run against staging, and before the deploy
+goes on, it asks the server whether a published form still fits the
+database
+([0111](../../docs/decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md)):
+
+```sh
+docker run --rm -e FORMANCY_DATA_ADMIN_TOKEN ghcr.io/sharkysan/formancy-data-server:<version> \
+  node dist/drift-check-cli.mjs https://staging.example/ order order-line
+```
+
+It asks `POST /v1/forms/:id/drift` of each form named, prints one line a
+form and one a change, and exits 0 when no form has a `blocking` change, 1
+when one has, and 2 when a form could not be checked -- unreachable,
+refused, unknown -- or it was given what it cannot run with.
+`--fail-on review` fails on `review` changes too. The token, an
+administrator's, is read from the environment and never printed.
 
 ### Rotating the identity key
 

@@ -49,7 +49,7 @@ import { demoPass } from '../apps/host/scripts/browser/demo.mjs'
 import { parseHeadersFile } from './demo-headers.mjs'
 import { DockerContainer, docker, durableObjects, loadWorker } from './live-demo-gate/cloudflare.mjs'
 import { leaks, quotaOf } from './live-demo-gate/docker.mjs'
-import { apiJourney, visitor } from './live-demo-gate/journey.mjs'
+import { allRows, apiJourney, visitor } from './live-demo-gate/journey.mjs'
 import { serveOrigin } from './live-demo-gate/origin.mjs'
 import { liveHeadersFile } from './live-demo-headers.mjs'
 
@@ -240,15 +240,12 @@ async function main() {
     check("the token of before the reset is refused by the new start's key", old.status === 401 ? null : `answered ${String(old.status)}`)
     const after = await journey.a.api('POST', '/v1/forms/order/records/read', { token: fresh, body: { record: journey.record } })
     const restored = await journey.a.api('POST', '/v1/forms/order/records/read', { token: fresh, body: { record: journey.touched.record } })
-    const listed = await journey.a.api('POST', '/v1/forms/order/records/list', { token: fresh, body: { limit: 1, offset: PER_TENANT.orders - 1 } })
+    const listed = await allRows(journey.a, fresh, 'order')
     check(
       'after the reset the created order is gone and the generated data is as generated',
-      after.status === 404 &&
-        (restored.json?.answers?.notes ?? null) === journey.touched.before &&
-        listed.json?.rows?.length === 1 &&
-        listed.json?.hasMore === false
+      after.status === 404 && (restored.json?.answers?.notes ?? null) === journey.touched.before && listed.rows.length === PER_TENANT.orders
         ? null
-        : `the created order answered ${String(after.status)}, the changed one says ${JSON.stringify(restored.json?.answers?.notes)}, the last page ${JSON.stringify(listed.json?.rows?.length)}`,
+        : `the created order answered ${String(after.status)}, the changed one says ${JSON.stringify(restored.json?.answers?.notes)}, the orders listed ${String(listed.rows.length)}`,
     )
 
     // The page, in Chromium, as a third visitor: their own container.

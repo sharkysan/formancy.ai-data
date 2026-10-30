@@ -1,4 +1,5 @@
 import type { FormSchema } from '@formancy/spec'
+import type { ApiValue } from './codecs/codec.js'
 import { DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 import type { LookupRow } from './lookup/types.js'
 import type { PolicyOperation } from './policy/types.js'
@@ -141,6 +142,21 @@ export interface PublishedForm {
 export interface FormMenuChild {
   form: string
   field: string
+  /**
+   * Whether the child form is a section of this form's records (0109): its
+   * rows' key is the field's foreign key, so a record has at most one of
+   * them, which a page shows under the record as a form of its own rather
+   * than a grid.
+   */
+  one: boolean
+  /**
+   * Where `one`, the field of this form whose answer shows the section and
+   * the answer that does, as the record's own answers hold it; `null` shows
+   * it always -- a section with no condition, and one whose condition is on
+   * a column this person may not read here, since what a page shows is
+   * never a permission.
+   */
+  when: { field: string; equals: ApiValue } | null
 }
 
 /**
@@ -191,11 +207,19 @@ export type ListFilterTerm = { field: string } & FilterCondition
  * `POST /v1/forms/:id/records/list`: one page of a form's records (0044), as
  * `validateListQuery` returns it from a body. A POST, so the search never
  * appears in a URL a proxy logs. In a body every property may be left out:
- * `search` is then `''`, `sort` `[]`, `parent` `null`, `offset` 0 and
+ * `search` is then `''`, `sort` `[]`, `parent` `null`, `after` `null` and
  * `limit` `LIST_PAGE_SIZE`.
  *
+ * `after` is the `next` of the page before, in the same order (0108): the
+ * page holds the rows that come after the row that page ended with, and
+ * `null` asks for the first page. A cursor is the server's spelling of a
+ * row's key, read by nothing else; sent with another sort, it continues
+ * after that row in the new order.
+ *
  * `parent` narrows the list to the rows whose lookup field `field` holds
- * `record`, a token of the row it references -- the children of one parent.
+ * `record`, a token of the row it references -- the children of one parent
+ * -- or, with `record` `null`, to the rows whose field references no row,
+ * every one of its columns NULL: a tree's roots (0110).
  * `filter` narrows it to the rows every condition holds for, each field
  * named once (0104); `[]` when left out. Both are narrowings and never a
  * permission: the form's own read filter and throughs still decide which
@@ -204,16 +228,16 @@ export type ListFilterTerm = { field: string } & FilterCondition
 export interface RecordListQuery {
   search: string
   sort: ListSortTerm[]
-  parent: { field: string; record: string } | null
+  parent: { field: string; record: string | null } | null
   filter: ListFilterTerm[]
-  offset: number
+  after: string | null
   limit: number
 }
 
 /**
  * `POST /v1/forms/:id/records/export`: one CSV file of every record a list
  * would page through for the same search, sort, parent and filter (0079,
- * 0104), as `validateExportQuery` returns it from a body. No offset and no
+ * 0104), as `validateExportQuery` returns it from a body. No cursor and no
  * limit: the server pages the list itself, from the first record to the
  * last, under the read right a list has and no other. A POST, so the search
  * never appears in a URL, as a list's does not. In a body every property
@@ -234,7 +258,7 @@ export type RecordExportQuery = Pick<RecordListQuery, 'search' | 'sort' | 'paren
  * export at a time per allowlisted connection, stays at tens of megabytes
  * for a deployment of a few connections; nothing has measured an export.
  * Not a row cap, which would bound neither memory, since a row can be wide,
- * nor time, since a page's cost grows with its offset.
+ * nor time, since what a page reads depends on the order and the indexes.
  */
 export const EXPORT_MAX_BYTES = 16 * 1024 * 1024
 
@@ -255,10 +279,15 @@ export function exportFileName(formId: string): string {
  * COUNT would read every admitted row on every page. A row whose key does
  * not fit a token is in its place with `record: null`, so the page's
  * arithmetic holds; it cannot be opened.
+ *
+ * `next` is the cursor of the page's last row, which the request for the
+ * page after it sends as `after` (0108): a string when more follow, `null`
+ * when none do.
  */
 export interface RecordList {
   rows: FormRecord[]
   hasMore: boolean
+  next: string | null
 }
 
 /**
