@@ -1,5 +1,5 @@
-import { fieldHeading } from '@formancy/data-client'
 import type { PublishedForm } from '@formancy/data-client'
+import { headingOf } from './heading.js'
 
 /**
  * A child section's title: its form's, and where the form is a child twice
@@ -8,5 +8,5 @@ import type { PublishedForm } from '@formancy/data-client'
  */
 export function childTitle(title: string, twice: boolean, definition: PublishedForm, childField: string): string {
   if (!twice) return title
-  return `${title}, ${fieldHeading(definition.form.model.fields.find((field) => field.key === childField) ?? { key: childField })}`
+  return `${title}, ${headingOf(definition, childField)}`
 }

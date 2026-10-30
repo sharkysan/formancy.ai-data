@@ -118,7 +118,7 @@ export function RecordTree({
       current = false
     }
     // Mounted again for another form or field.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- page, known and the definition are made from the client, the form and the field, and a form's view is mounted again whenever a form is opened, so none of them changes under the tree
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- page and known are made from the client, the form, the field and the definition, and the definition is the prop openForm fetched for the view, fixed for the view's life: Workspace keys FormView by the opened entry's id and openForm passes through the asking state, which unmounts the view, so none of them changes under the tree
   }, [client, formId, field])
 
   const shown = roots === null ? [] : visible(roots, nodes)

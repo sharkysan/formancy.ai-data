@@ -1,5 +1,5 @@
-import { fieldHeading } from '@formancy/data-client'
 import type { PublishedForm } from '@formancy/data-client'
+import { headingOf } from './heading.js'
 
 /**
  * What a tree of a form's records (0110) says of a level that holds no
@@ -8,6 +8,6 @@ import type { PublishedForm } from '@formancy/data-client'
  * heading the field has everywhere else (a `{ $t }` label is its key).
  */
 export function emptyLevelLine(definition: PublishedForm, field: string, under: string | null): string {
-  const heading = fieldHeading(definition.form.model.fields.find((each) => each.key === field) ?? { key: field })
+  const heading = headingOf(definition, field)
   return under === null ? `No records have no ${heading}.` : `No records name ${under} as their ${heading}.`
 }

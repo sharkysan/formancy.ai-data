@@ -113,7 +113,7 @@ export function OneChild({
     )
     return () => controller.abort()
     // The section is mounted again for every record; nothing else asks again.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the section is mounted again for every record and level, so its owner is fixed, and the mount's opening reads only its sessions, a ref and the guard's stable callbacks, which are current
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the section is mounted again for every record and level, so its owner is fixed; its definition never changes while it is mounted, since Workspace keys FormView by the opened entry's id and openForm passes through the asking state, which unmounts the view; so the mount's opening, which reads only its sessions, a ref and the guard's stable callbacks, is current
   }, [client, child.form, child.field, parentToken])
 
   function startNew(): void {

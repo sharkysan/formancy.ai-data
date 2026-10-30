@@ -24,7 +24,7 @@ export function RolesInput({
   useEffect(() => {
     if (formatRoles(parseRoles(draft)) !== formatRoles(roles)) setDraft(formatRoles(roles))
     // Only an outside change to the roles resets the draft.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on the draft would reset it on every keystroke, the comma just typed with it
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- with the draft a dependency, a keystroke would reset the draft, the comma just typed with it, whenever the parent has not yet applied, or has normalised, the roles the draft parses to
   }, [roles])
   return (
     <div className="field">
