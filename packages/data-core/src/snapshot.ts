@@ -164,10 +164,19 @@ function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
 
 /**
  * A value a refusal names, as it was given: a primitive as `String` spells it
- * (JSON throws on a bigint and writes NaN as null), an object as JSON, never
- * "[object Object]". The values are an embedder's, so nothing here may throw.
+ * (JSON throws on a bigint and writes NaN as null); an object as JSON, a
+ * bigint inside it as its digits, never "[object Object]" -- but for an
+ * object JSON cannot write at all, a cycle, which is named by its tag. The
+ * values are an embedder's, so the refusal is never JSON's own error.
  */
-const shown = (value: unknown): string => (typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value))
+function shown(value: unknown): string {
+  if (typeof value !== 'object' || value === null) return String(value)
+  try {
+    return JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'bigint' ? String(inner) : inner))
+  } catch {
+    return Object.prototype.toString.call(value)
+  }
+}
 
 /**
  * The server facts (0068), when there are any, as the contract names them:

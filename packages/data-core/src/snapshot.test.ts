@@ -229,14 +229,22 @@ describe('createSnapshot', () => {
   })
 
   // The facts come from an embedder and are untrusted: a refusal that names
-  // one must say what it was. A bigint made JSON.stringify throw its own
-  // TypeError, NaN was written as "null", and an object as "[object Object]".
+  // one must say what it was. `String` wrote an object as "[object Object]".
+  // A primitive is still written as `String` writes it, which the bigint and
+  // NaN hold: JSON, which an object is now written as, throws on a bigint
+  // and writes NaN as "null". And the refusal is the sentence, never JSON's
+  // own TypeError, for an object JSON cannot write -- one holding a bigint,
+  // or a cycle.
   test('names a server fact it refuses as it was given, whatever it was', () => {
     const objects = [table('a', [column('x', 1)])]
     const major = (value: unknown) => () => snapshot(objects, { server: { product: 'postgresql', major: value as never } })
     expect(major(10n)).toThrow(/the server's major 10 is neither/)
     expect(major(Number.NaN)).toThrow(/the server's major NaN is neither/)
     expect(major({ v: 1 })).toThrow(/the server's major \{"v":1\} is neither/)
+    expect(major({ v: 10n })).toThrow(/the server's major \{"v":"10"\} is neither/)
+    const cyclic: Record<string, unknown> = { v: 1 }
+    cyclic['self'] = cyclic
+    expect(major(cyclic)).toThrow(/the server's major \[object Object\] is neither/)
   })
 
   // A revoked column grant is a change to what a form bound to the column can

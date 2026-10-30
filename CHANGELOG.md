@@ -403,12 +403,13 @@ later.
 ### Fixed
 
 - **`createSnapshot` names what it refuses as it was given** (0068,
-  0049). A server fact given as a bigint was refused with
-  `JSON.stringify`'s own TypeError instead of the sentence naming it, NaN
-  was written "null", and an inbound key's referenced column given as an
-  object "[object Object]". What a snapshot is made of is an embedder's
-  and untrusted, so the refusal says what it was handed. Found through the
-  linter's `no-base-to-string`.
+  0049). A server fact, or an inbound key's referenced column, given as an
+  object was refused as "[object Object]"; it is now written as JSON, a
+  bigint inside it as its digits, and one JSON cannot write, a cycle, by
+  its tag, so the refusal is always the sentence and never JSON's own
+  error. A primitive is written as before. What a snapshot is made of is
+  an embedder's and untrusted, so the refusal says what it was handed.
+  Found through the linter's `no-base-to-string`.
 - **A field whose label is a message reference is named by its key, not
   "[object Object]"**, in the host's grid columns, the filter panel, a
   child's title, the line that says what a copy left out and the line a

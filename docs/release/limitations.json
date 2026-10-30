@@ -3378,7 +3378,7 @@
       ]
     },
     "0114": {
-      "reviewed": "sha256:e96e0252be284c16ebc1b9d60646a79670e81464ff560da60b56f2b919f605d8",
+      "reviewed": "sha256:51b434930f276fd018cee7176dceed24ac493c214c436b32f7590c9646a19cd4",
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
     }
   }

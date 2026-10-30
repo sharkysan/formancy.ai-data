@@ -140,19 +140,21 @@ while this was open, and each came into this branch unformatted.
   move, byte for byte but for the report's line naming the new file.
 - **Every finding fixed.** A disable comment is for a finding that is
   deliberate, and says why after `--`. Two of the findings were defects,
-  each fixed test-first, watched failing, in commits of their own:
+  each fixed with tests that failed against the code before the fix:
   - the host page named a field whose label is a `{ $t }` message
     reference "[object Object]" in its grid's columns, its filter panel,
     a child's title and Duplicate record's line (01cf13a), and so did a
     tree of records' line for a level that holds none, which main brought
-    while this was open -- what a page or a file calls a field
-    is now one function, data-core's `fieldHeading`, re-exported by
-    data-client, which the CSV export, the host page and the examples
-    page call;
-  - `createSnapshot` named a server fact it refused, given as a bigint,
-    with `JSON.stringify`'s own TypeError instead of the fact, NaN as
-    "null", and a referenced column given as an object as "[object
-    Object]" (`snapshot.ts`'s `shown`).
+    while this was open -- what a page or a file calls a field is now one
+    function, data-core's `fieldHeading`, re-exported by data-client,
+    which the CSV export, the host page and the examples page call;
+  - `createSnapshot` refused a server fact, or an inbound key's
+    referenced column, given as an object as "[object Object]"
+    (`snapshot.ts`'s `shown`, over several commits). An object is now
+    written as JSON, a bigint inside it as its digits, and one JSON cannot
+    write, a cycle, by its tag. The branch's first fix wrote every value as
+    JSON, which threw on a bigint and wrote NaN as "null"; a primitive is
+    written as `String` writes it, as on main, and the tests hold both.
 - **The gate:** `verify` runs `pnpm lint` and `pnpm format:check` after the
   build and the typecheck, and before the guards. In `verify` rather than a
   job of its own, which would need a collect step, an upload and a reader
