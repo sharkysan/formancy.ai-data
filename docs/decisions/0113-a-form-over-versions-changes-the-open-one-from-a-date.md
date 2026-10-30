@@ -34,6 +34,13 @@
   its real server, every case of `VERSION_PARITY` declared with `covers()`:
   a change, stale, ended, another tenant's, an update of an ended version,
   a chain that exists, and a next version the database declines, undone.
+  Each guard watched failing on both engines, in CI while Docker was down
+  on the workstation: with the NULL end left out of the change, an ended
+  version was changed; with `open` left out of the update, an ended version
+  was updated; with the create's condition left out, a second chain was
+  created; and with the self-check narrowed on PostgreSQL the end stood,
+  answered as a change, and with the batch's check left out on SQL Server
+  the end committed and nothing was inserted, answered `not-found`.
   `packages/data-client/src/transport.test.ts` -- `supersede` is one of the
   calls every request is held to.
 

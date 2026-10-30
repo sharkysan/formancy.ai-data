@@ -164,7 +164,8 @@ describe('a change from a date on PostgreSQL (0113)', () => {
     expect((await versionsOf('price', 5)).map((row) => row.amount)).toEqual(['9.5000', '11.0000'])
   })
 
-  // A create starts a chain only where the chain has none.
+  // A create starts a chain only where the chain has none. Watched failing
+  // with the insert's condition left out: a second chain was created.
   test('creates a chain’s first version only where it has none', covers('postgres', versionCase('chain-exists')), async () => {
     await inserted('price', { product: 6, from: '2026-01-01' })
     const create = async (product: number) => {
