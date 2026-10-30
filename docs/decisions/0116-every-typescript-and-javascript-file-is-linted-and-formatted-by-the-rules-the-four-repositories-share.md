@@ -94,8 +94,8 @@ columns, measured that day with Prettier 3.9.10: `apps/host/src/form-view.tsx`,
 `*.integration.test.ts`, and every file of `data-client` and `apps/host`,
 which start both databases in a global setup (0003), and Docker did not
 run on the machine the change was made on. And branches here are many and
-short: main took eight pull requests, #131 to #137 and #139, on 30
-October 2026 while this was open, and each came into this branch
+short: main took nine pull requests, #131 to #137, #139 and #140, on
+30 October 2026 while this was open, and each came into this branch
 unformatted.
 
 ## Decision
@@ -169,7 +169,7 @@ unformatted.
   ([0035](0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 - **The format commits, merged as they are.** The format is one commit of
   Prettier's output and nothing else; main was merged into the branch
-  three times while it was open, and what it brought unformatted was
+  four times while it was open, and what it brought unformatted was
   formatted in a commit of Prettier's output after each merge.
   `.git-blame-ignore-revs` names those commits by their SHAs, each under a
   line saying what it formatted. **The pull request that brings this
@@ -185,11 +185,12 @@ unformatted.
   format rewrote conflicts only where both sides changed what it says.
   Prettier and the style are the script's own checkout's, so a branch
   begun before the format, which has neither, runs it from a checkout of
-  main, as CONTRIBUTING.md says. This branch took main three times
+  main, as CONTRIBUTING.md says. This branch took main four times
   through the same driver: of the files both sides had changed, 72 of 76
   merged clean the first time, where `git merge-file` on the same
   unformatted versions conflicted in 38, 17 of 19 the second, where it
-  conflicted in 9, and 36 of 37 the third, where it conflicted in 8.
+  conflicted in 9, 36 of 37 the third, where it conflicted in 8, and all
+  14 the fourth, where it conflicted in 6.
 - **A copy until formancy.ai releases.** The swap is a pull request of its
   own, as Formancy Health's is: the package pinned exactly as a root
   devDependency, `scripts/code-style/` deleted, the two config files
@@ -208,7 +209,7 @@ not a habit, and the same in the four repositories.
 
 **What it costs.**
 - **Blame.** The format rewrote 638 files, 25,448 lines added and 6,973
-  removed; the three later format commits 9, 6 and 13 files. GitHub's
+  removed; the four later format commits 9, 6, 13 and 1 files. GitHub's
   blame skips them by `.git-blame-ignore-revs`; `git blame` only with
   `--ignore-revs-file` or `blame.ignoreRevsFile` set; and `git log -S` and
   `-L` see them, as does any tool that reads neither.
