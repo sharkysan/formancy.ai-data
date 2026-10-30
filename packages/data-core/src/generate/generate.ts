@@ -9,6 +9,7 @@ import { controlFor } from './controls.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
 import { sectionFor } from './section.js'
+import { narrowForValidity, validityFor, validityOperations } from './validity.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
 import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
 
@@ -73,6 +74,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   // A pinned column is written from context, so it can no more be the version
   // column than a lookup's column can.
   const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], new Set([...lookupColumns, ...pinned]), notes)
+  const validity = validityFor(root, request.validity, concurrency, pinned)
   const planned: Planned[] = []
 
   for (const column of root.columns) {
@@ -87,7 +89,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     if (plan !== null) planned.push(plan)
   }
 
-  const operations = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut }, notes)
+  if (validity !== undefined) narrowForValidity(validity, planned, notes)
+  const offered = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut }, notes)
+  const operations = validity === undefined ? offered : validityOperations(root, validity, offered, notes)
   rowSecurityNotes(snapshot, [root, ...lookups.map((entry) => entry.target)], notes)
   const rules: LogicRule[] = planned
     .filter((entry) => !entry.binding.writes.create && !entry.binding.writes.update)
@@ -111,6 +115,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     operations,
     fields: planned.map((entry) => entry.binding),
     snapshotFingerprint: snapshot.fingerprint,
+    ...(validity === undefined ? {} : { validity }),
   }
 
   return { form, bindings, notes }
