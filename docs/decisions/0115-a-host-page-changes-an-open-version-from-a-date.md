@@ -10,7 +10,12 @@
   and the end drawn unwritable, every control named and axe clean; saved,
   the version it followed ends on the start given and the next is the
   record the detail shows, open; an ended version is drawn read-only and
-  offers no change, and the open one after it does. `leave.test.ts` -- the
+  offers no change, and the open one after it does. Each watched failing,
+  in CI while Docker was down on the workstation: with the next version
+  drawn as a new record its product was writable; saved as a create,
+  nothing was created; with the button on every version the ended one had
+  it; and with no version taken for ended its amount was writable.
+  `leave.test.ts` -- the
   request drops the record and every child section, as Duplicate record
   does, and says what it starts. `apps/host/src/plane.test.tsx` -- every
   runtime route the page sends is the server's, and the journey sends

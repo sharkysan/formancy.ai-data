@@ -81,7 +81,8 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
   // The next version holds the open one's answers but its start, which the
   // person gives, and its end; the chain's key and the end are drawn
   // unwritable, as the server takes them from the version it follows.
-  // Every control is named and axe finds nothing.
+  // Every control is named and axe finds nothing. Watched failing with the
+  // next version drawn as a new record: its product was writable.
   test('opens the next version of an open one, the chain’s key and end unwritable', async () => {
     await nextOpen(engine, await openVersion(engine))
     expect(control('Amount').value).not.toBe('')
@@ -93,6 +94,8 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
 
   // Saved, the version it followed ends on the date given and the next is
   // the record the detail shows, open: one write, through supersede.
+  // Watched failing with the next version saved as a create: nothing was
+  // created, the chain having a version.
   test('a save of the next version ends the one it follows there', async () => {
     const record = await openVersion(engine)
     const user = await nextOpen(engine, record)
@@ -109,7 +112,8 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
   })
 
   // A version that has ended is history: no change is offered from it. The
-  // open one after it offers the change.
+  // open one after it offers the change. Watched failing with the button
+  // offered on every version: the ended one had it.
   test('offers no change from an ended version, and offers it from the open one', async () => {
     const { ended, open } = await endedVersion(engine)
     await priceOpen(engine, ended)
@@ -120,7 +124,8 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
   })
 
   // And its fields are drawn as nothing to write, as a record the person
-  // may not update is: the server would refuse its update.
+  // may not update is: the server would refuse its update. Watched failing
+  // with no version taken for ended: its amount was writable.
   test('draws an ended version read-only', async () => {
     const { ended } = await endedVersion(engine)
     await priceOpen(engine, ended)
