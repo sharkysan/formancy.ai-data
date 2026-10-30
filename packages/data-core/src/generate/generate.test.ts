@@ -1,4 +1,5 @@
-import { createFormEngine, runScenarios } from '@formancy/core'
+import { createFormEngine } from '@formancy/core'
+import { runScenarios } from '@formancy/core/authoring'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
