@@ -604,7 +604,8 @@ if (change.ok) await records.supersede(change.request) // the open version ended
   version column, no key holding the start and another column.
 - The end is never written by the form, the start and the chain's key on
   create only, and no delete is offered; `versionFields` names the start
-  and end fields where a change is offered.
+  and end fields where a change is offered, and the chain's key fields a
+  next version takes from the one it follows (0115).
 - `planSupersede` asks update and create of the policy, drops a copy's
   echoes of the chain's key and the empty end, refuses an ended version
   and an early start from the version as read at the version named, and

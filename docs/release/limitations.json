@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:298a944b0199525938fe0663c17f80680eecfda5610b7a19e5c5ec36e1c1bc01",
+      "reviewed": "sha256:fd7780c6e329153518348154a373834e825ac31c0b9308d8050d721b175ce6a6",
       "limitations": [
         {
           "area": "host",
@@ -3378,7 +3378,7 @@
       ]
     },
     "0113": {
-      "reviewed": "sha256:7ef99c0ae6ad7888f281d89d054ac819253b16c4004caa22a9bac53db478f78e",
+      "reviewed": "sha256:09dbe5c4fd9200c79ddd13d2365a938027454159e4a54dde6ce30d8a78e30900",
       "limitations": [
         {
           "area": "forms",
@@ -3409,10 +3409,6 @@
           "says": "A list of versions shows every version; which are open is a filter a person or a list view applies, and there is no list as of a date."
         },
         {
-          "area": "host",
-          "says": "The host page offers no change from a date: a chain is changed through @formancy/data-client."
-        },
-        {
           "area": "server",
           "says": "@formancy/data-client reads a form without versions as unexpected, so a host and its server are upgraded together.",
           "heldBy": "packages/data-client/src/transport.test.ts"
@@ -3431,6 +3427,25 @@
           "area": "studio",
           "says": "Ticked, Versions chooses the first column that could start a version and the first that could end one; a table with several is the administrator's to set.",
           "heldBy": "apps/studio/src/choose-versions.test.tsx"
+        }
+      ]
+    },
+    "0115": {
+      "reviewed": "sha256:d81bc7e4c2d197e65b834fe5e84fb25ce5d175103f03a69830f5931671c62fdc",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A next version holds the open one's answers but its start and end; nothing is computed for it, and its child sections wait until it is saved, as a new record's do.",
+          "heldBy": "apps/host/src/change.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Whether a version has ended is read from its end as the person reads it: one whose end they may not read is drawn writable, and its update is refused by the server."
+        },
+        {
+          "area": "testing",
+          "says": "The host's plane test sends no change from a date: its journey's forms carry the tenant in a lookup's token, and a form whose tenant is a column a renderer echoes would fail its rule that no body names a tenant; change.test.tsx sends the change through the page, and the live demo has no form over versions.",
+          "heldBy": "apps/host/src/plane.test.tsx"
         }
       ]
     }
