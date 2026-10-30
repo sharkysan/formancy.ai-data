@@ -358,6 +358,13 @@ later.
     an empty choice that takes an answer back to "unknown", still holds.
   - **The studio's review tests read its own status line**, not the
     paper's: a draft's paper now holds a status region per counted field.
+  - **The README's pictures were retaken on 0.11.0**, every one, on CI's
+    runner, the look they are recorded in: seventeen now show the counts
+    and the sentences, and six came back byte-identical. The examples
+    picture's caption quotes the sentences rather than the codes. A
+    picture's act types into a form's field through `fillField`, which
+    waits for the count to be said, since the camera refused a picture
+    whose count spoke a second after it was taken.
     Upstream `@formancy/*` 0.7.0 → 0.11.0.
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's
   release of 2026-10-21, adopted the day after it was published, and
