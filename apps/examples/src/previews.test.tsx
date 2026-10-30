@@ -136,9 +136,9 @@ function describedFor(field: FieldDef | undefined, code: string | null, value: u
   return [count, code === null ? undefined : errorSentence(TEXT, field, code)].filter((said) => said !== undefined).join(' ')
 }
 
-/** The generated field a label names. */
+/** The generated field a label names, by the heading `requiredLabels` names it with. */
 function fieldOf(subject: Example, label: string): FieldDef | undefined {
-  return subject.generated.form.model.fields.find((field) => String(field.label) === label)
+  return subject.generated.form.model.fields.find((field) => fieldHeading(field) === label)
 }
 
 /** Every required field invalid and described as `required`: what an empty submit must produce. */
