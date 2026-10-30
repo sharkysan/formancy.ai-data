@@ -316,9 +316,16 @@ describe.each(['pg', 'ms'] as const)('%s, only the temporal columns writable, th
 // -- an edit, written, as 0040 writes every changed value. An echo rule that
 // compared at the control's minute would drop this edit; this is also how a
 // person meets the control's precision, which is upstream's (0040's cost).
+//
+// The instant is fixed off the minute rather than the column's default. A
+// default the clock put in the first second of a minute is read, cut to the
+// second, as exactly the minute the control shows, so the move back is the
+// record as read -- an unedited echo, rightly left as stored. A CI run on
+// 2026-10-30 inserted 14:04:00.1219035 and failed so, about one run in sixty.
 describe.each(['pg', 'ms'] as const)('%s, React, the person changes the shown instant', (engine) => {
   test(`${ENGINE_NAME[engine]}: moved away and back, it is saved as the minute the control holds`, async () => {
-    const { record } = await insertDefaulted(engine)
+    const createdAt = engine === 'pg' ? '2026-10-08 10:34:56.123456+00' : '2026-10-08 10:34:56.1234567 +00:00'
+    const record = await insertStamped(owners, SCHEMA, engine, { note: 'as inserted', atTime: '10:34:56', createdAt })
     const user = await openRecord(formId(engine, 'owner'), record)
     const shown = control('React', 'Created at').value
     expect(shown, 'the control shows a minute').toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
