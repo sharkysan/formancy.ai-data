@@ -109,4 +109,23 @@ describe('a merge of main into a branch begun before the format', () => {
     expect(merged.text).toContain("export const status = 'shipped'")
     expect(git('diff', '--name-only', '--diff-filter=U').stdout).toBe(`${FILE}\n`)
   })
+
+  // A side Prettier cannot parse -- left mid-edit -- cannot be formatted,
+  // and a driver that failed on it would leave git the branch's file as the
+  // result, with main's side of it gone and nothing said. The three are
+  // merged as they were written instead: a conflict, each side whole, and a
+  // line saying why the file was not formatted.
+  test('merges a file a side of which does not parse unformatted, as a conflict that keeps both sides, and says so', async () => {
+    const unparsed = BASE.replace('export function total(lines: number[]) {', 'export function total(lines: number[] {')
+    const main = await formatted(BASE.replace('"placed"', '"shipped"'))
+    commit('main', 'base', main)
+    commit('feature', 'base', unparsed)
+
+    const merged = mergeThroughScript()
+    expect(merged.status, merged.output).toBe(1)
+    expect(merged.output).toContain(`prettier-merge: ${FILE} merged unformatted:`)
+    expect(merged.text).toContain('<<<<<<<')
+    for (const line of [...unparsed.split('\n'), ...main.split('\n')].filter(Boolean)) expect(merged.text).toContain(line)
+    expect(git('diff', '--name-only', '--diff-filter=U').stdout).toBe(`${FILE}\n`)
+  })
 })

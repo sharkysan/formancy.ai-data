@@ -601,9 +601,12 @@ reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
 commits that formatted the code by their SHAs, so the pull request that
 brings them merges with a merge commit, which the repository allows
 beside a squash and a rebase and nothing makes it choose. A branch begun
-before the format conflicts with it; `scripts/prettier-merge.mjs`, run
-from a checkout of main, merges main into it with each side formatted
-first, and what both sides changed is still the branch's to resolve
+before the format conflicts with it;
+`node "$MAIN/scripts/prettier-merge.mjs" origin/main`, in the branch's
+worktree, `$MAIN` a checkout of main at least as new as the `origin/main`
+it merges with `pnpm install` run there, merges main into it with each
+side formatted first. What both sides changed, and code main moved to
+another file, are still the branch's to carry across by hand
 ([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 
 **The 0.1.0 release notes are a summary written by hand**; why each change

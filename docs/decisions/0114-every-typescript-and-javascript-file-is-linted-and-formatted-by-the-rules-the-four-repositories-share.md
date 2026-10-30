@@ -47,10 +47,13 @@
     its own: a change on one side, against main's format of the same
     lines, merges without a conflict and comes in formatted, where git's
     own merge of the same three versions conflicts; a change of what a
-    line says on both sides still conflicts. Watched failing with the
-    driver formatting nothing (both cases), with `git merge-file --union`
-    keeping both sides of a conflict (the second), and with the
-    attributes naming JavaScript alone (both).
+    line says on both sides still conflicts; and a side Prettier cannot
+    parse merges unformatted, as a conflict that keeps both sides whole,
+    with a line saying so. Watched failing with the driver formatting
+    nothing (the first two), with `git merge-file --union` keeping both
+    sides of a conflict (the second), with the attributes naming
+    JavaScript alone (the first two), and with the fallback removed (the
+    third).
 
   **Measured** on 30 October 2026, once each, after `pnpm build`, on an
   Apple M2 with 8 cores and 16 GB under macOS 26.5.2, with Node 22.23.3
@@ -208,7 +211,10 @@ not a habit, and the same in the four repositories.
   `scripts/prettier-merge.mjs` most of those conflicts go, but not all: a
   line both sides changed is still a conflict, a file only the branch
   changed comes in as it was written, for `pnpm format` after the merge,
-  and the script needs a checkout of main with its dependencies installed.
+  code main moved to another file is carried across by hand, since the
+  driver merges a file with itself, and the script needs a checkout of
+  main at least as new as the main it merges, its dependencies
+  installed.
 - **A copy that can drift.** Until the swap, nothing compares
   `scripts/code-style/` with Formancy Health's or with formancy.ai's
   package, and a change to one reaches the others by hand alone.

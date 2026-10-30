@@ -197,8 +197,9 @@ and each of these fails on the change that breaks what it holds:
   naming a misformatted file of every extension git holds.
   `scripts/prettier-merge.test.mjs`: a merge across the format through
   `scripts/prettier-merge.mjs` takes a change against main's format of the
-  same lines without a conflict, and still conflicts where both sides
-  changed what a line says
+  same lines without a conflict, still conflicts where both sides changed
+  what a line says, and merges a side Prettier cannot parse unformatted,
+  as a conflict that keeps both sides
   ([0114](../decisions/0114-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
   What a rule reports is no defect until somebody reads it, and a disable
   comment's reason is review's.

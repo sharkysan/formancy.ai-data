@@ -352,10 +352,13 @@ No stacked pull requests. Branch from `main`, target `main`, and where a branch
 replaces another say "supersedes #N" in the description rather than stacking.
 
 A branch begun before 0114's format conflicts with it nearly everywhere it
-changed a line. Take `main` into it with `node scripts/prettier-merge.mjs
-main`, run from a checkout of `main` with its dependencies installed, as
+changed a line. Take `main` into it with
+`node "$MAIN/scripts/prettier-merge.mjs" origin/main` in the branch's
+worktree, `$MAIN` a checkout of `main` at least as new as the
+`origin/main` it merges, with `pnpm install` run there, as
 `CONTRIBUTING.md` shows: each side is formatted before git merges a file,
-and only what both sides changed is left to resolve. A pull request that
+and only what both sides changed, and code `main` moved to another file,
+are left to carry across by hand. A pull request that
 brings a commit `.git-blame-ignore-revs` names -- a format, or a Prettier
 release's reformat -- merges with a merge commit, never a squash or a
 rebase, which would leave the file naming nothing on `main`.

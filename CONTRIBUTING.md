@@ -62,8 +62,9 @@ branch begun before it conflicts with `main` nearly everywhere it changed
 a line. Merge `main` into it through `scripts/prettier-merge.mjs`, which
 formats each side of a file both changed before git merges it, so that
 only a line both sides changed is a conflict. The branch has neither the
-script nor Prettier, so run it from a checkout of `main` that has them --
-`$MAIN` below, after `pnpm install` there -- in the branch's worktree:
+script nor Prettier, so run it from `$MAIN`, a checkout of `main` at least
+as new as the `origin/main` you merge, so that it formats as that `main`
+does, with `pnpm install` run there. In the branch's worktree:
 
 ```bash
 git fetch origin
@@ -71,7 +72,11 @@ node "$MAIN/scripts/prettier-merge.mjs" origin/main   # git merge origin/main, e
 ```
 
 It takes whatever `git merge` takes and writes nothing to your git
-configuration. Resolve what still conflicts; then `pnpm install`,
+configuration. The driver merges a file with itself and never follows
+code to another: where `main` moved code to a file of its own, as the
+format's own branch did with five files before it, a change the branch
+made to that code meets a conflict in the file it left, and is carried to
+the new file by hand. Resolve what still conflicts; then `pnpm install`,
 `pnpm format` for a file only the branch changed, which no driver saw and
 which comes in as it was written, `pnpm build` and `pnpm lint`; fix what
 it finds, and commit.

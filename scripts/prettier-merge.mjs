@@ -15,8 +15,11 @@ import { EXTENSIONS } from './code-style/code-style.mjs'
  * conflicts with main wherever it changed a line at all; formatted alike,
  * the versions conflict only where both sides changed what a line says.
  *
- *   node <a checkout of main>/scripts/prettier-merge.mjs main   in the branch's worktree: git merge main, through the driver
- *   node scripts/prettier-merge.mjs --driver %O %A %B %P %L      the driver, as git calls it
+ *   node "$MAIN/scripts/prettier-merge.mjs" origin/main       in the branch's worktree: git merge origin/main, through the driver
+ *   node scripts/prettier-merge.mjs --driver %O %A %B %P %L   the driver, as git calls it
+ *
+ * `$MAIN` is a checkout of main at least as new as the `origin/main` it
+ * merges, with `pnpm install` run there, as CONTRIBUTING.md says.
  *
  * The first writes nothing to git's configuration: it hands git the driver
  * and an attributes file naming every extension the shared style formats,
@@ -24,7 +27,9 @@ import { EXTENSIONS } from './code-style/code-style.mjs'
  * are this script's own checkout's, so a branch that has neither is merged
  * by main's. A file only one side changed is not the driver's -- one only
  * the branch changed comes in as it was written -- so `pnpm format` follows
- * the merge. `prettier-merge.test.mjs` holds both merges.
+ * the merge; and the driver merges a file with itself, so code main moved
+ * to another file is carried across by hand. `prettier-merge.test.mjs`
+ * holds both merges, and the fallback.
  */
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
