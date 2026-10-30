@@ -26,8 +26,11 @@
     `apps/host/src/duplicate.test.tsx`, which TypeScript's `include`
     dropped beside `duplicate.test.ts`, and with
     `scripts/getting-started/walk.d.mts`, which no tsconfig named). Like
-    Health's, it never hands ESLint a text other than a file's own: on
-    Linux ESLint lints the file on disk instead (formancy.ai-health 0017).
+    Health's, it never hands ESLint a text other than a file's own, and
+    lints each file once: on CI, where `CI=true`, typescript-eslint infers
+    a single run, so a text for a path on disk is typed as the file on disk
+    and a file linted twice gives no findings the second time
+    (formancy.ai-health 0017).
   - **`verify`'s `pnpm lint` and `pnpm format:check`**, on every pull
     request and before a release publishes. With `Promise.resolve()`
     planted as a statement at the end of
