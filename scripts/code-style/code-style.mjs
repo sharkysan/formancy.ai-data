@@ -38,9 +38,11 @@ export const FILES = filesOf(EXTENSIONS)
 /**
  * Prettier's options, and its defaults otherwise. Of the widths measured,
  * 160 columns rewrote the fewest lines (formancy.ai-health 0017), and one
- * width across the four repositories is the point.
+ * width across the four repositories is the point. Code embedded in a
+ * string is left as written: Prettier reflowed an Angular component's
+ * inline template, whose whitespace renders (formancy.ai-health 0017).
  */
-export const prettierConfig = { semi: false, singleQuote: true, trailingComma: 'all', printWidth: 160 }
+export const prettierConfig = { semi: false, singleQuote: true, trailingComma: 'all', printWidth: 160, embeddedLanguageFormatting: 'off' }
 
 /**
  * Unused names fail unless they begin with `_` -- arguments, variables,
@@ -67,9 +69,12 @@ const UNUSED_NAMES = {
  * on 30 October 2026, 201 of 220 were in tests, nearly all such doubles
  * (`fetch: async () => new Response(...)`, `readFile: async (p) => ...`,
  * `until(async () => cond)`); removing the `async` turns a rejection into a
- * synchronous throw, which changes what the code under test meets. Nothing
- * else is relaxed, and test support -- a corpus, a package's test helpers --
- * is held to every rule.
+ * synchronous throw, which changes what the code under test meets.
+ * `no-explicit-any` is off there for the same reason as the `no-unsafe-*`
+ * family: a test types the untyped body it reads as `any` (seven disables
+ * in formancy.ai-data's lint fixes quoted it word for word); source is still
+ * held to it. Nothing else is relaxed, and test support -- a corpus, a
+ * package's test helpers -- is held to every rule.
  */
 const TEST_RELAXATIONS = {
   '@typescript-eslint/no-unsafe-assignment': 'off',
@@ -79,7 +84,18 @@ const TEST_RELAXATIONS = {
   '@typescript-eslint/no-unsafe-return': 'off',
   '@typescript-eslint/unbound-method': 'off',
   '@typescript-eslint/require-await': 'off',
+  '@typescript-eslint/no-explicit-any': 'off',
 }
+
+/**
+ * `only-throw-error` allows throwing a value typed `any` or `unknown` by
+ * default, and rejecting with the same forwarded value is the same act, so
+ * `prefer-promise-reject-errors` allows it too, everywhere: a signal's
+ * `reason`, a driver's rejection passed on (nine disable comments in
+ * formancy.ai-data's lint fixes gave exactly that reason). A rejection with
+ * a known non-Error value, a string or object literal, is still refused.
+ */
+const REJECT_ERRORS = ['error', { allowThrowingAny: true, allowThrowingUnknown: true }]
 
 /**
  * The ESLint configuration for one repository, given its paths:
@@ -126,7 +142,7 @@ export function eslintConfig({ root, project, ignoreFiles, tests, untyped = [], 
       files: [FILES],
       extends: [js.configs.recommended, tseslint.configs.recommendedTypeChecked],
       languageOptions: { parserOptions: { project, tsconfigRootDir: root } },
-      rules: { '@typescript-eslint/no-unused-vars': ['error', UNUSED_NAMES] },
+      rules: { '@typescript-eslint/no-unused-vars': ['error', UNUSED_NAMES], '@typescript-eslint/prefer-promise-reject-errors': REJECT_ERRORS },
     },
     {
       // JavaScript, and TypeScript that no tsconfig holds, are linted without

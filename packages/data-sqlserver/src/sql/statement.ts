@@ -103,7 +103,6 @@ export function runUntil<Row>(pool: ConnectionPool, statement: Statement, signal
   return new Promise<Row[]>((resolve, reject) => {
     const stop = (): void => {
       request.cancel()
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an aborted statement rejects with the reason its caller gave the signal, whatever that is
       reject(signal.reason)
     }
     signal.addEventListener('abort', stop, { once: true })
@@ -114,7 +113,6 @@ export function runUntil<Row>(pool: ConnectionPool, statement: Statement, signal
       },
       (error: unknown) => {
         signal.removeEventListener('abort', stop)
-        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the driver's own rejection, passed on unchanged so the caller sees what the driver threw
         reject(error)
       },
     )

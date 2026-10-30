@@ -160,7 +160,6 @@ const POLICY = {
 }
 
 /** A proposal published as proposed, format 2 (0030). */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 function bundleOf(proposal: any) {
   return {
     format: 2,

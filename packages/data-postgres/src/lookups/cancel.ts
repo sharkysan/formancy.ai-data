@@ -53,7 +53,6 @@ export async function runLookup(sql: Sql, statement: LookupStatement, signal: Lo
  * driver settles the statement, as it does for every other.
  */
 function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal): Promise<TextResult> {
-  // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an aborted lookup rejects with the reason its caller gave the signal, as AbortSignal.throwIfAborted does, whatever that is
   if (signal.aborted) return Promise.reject(signal.reason)
   const { query, rows } = start(sql, statement.text, statement.params)
   const cancel = cancellerOf(query)
@@ -63,7 +62,6 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
   }
   return new Promise<TextResult>((resolve, reject) => {
     const stop = (): void => {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an aborted lookup rejects with the reason its caller gave the signal, as AbortSignal.throwIfAborted does, whatever that is
       reject(signal.reason)
       whenSent(query, unlessSettled)
       whenExecuteSent(query, unlessSettled)
@@ -77,7 +75,6 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
       (error: unknown) => {
         settled = true
         signal.removeEventListener('abort', stop)
-        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the driver's own rejection, passed on unchanged so the caller sees what the driver threw
         reject(error)
       },
     )

@@ -194,7 +194,6 @@ async function publish(on: FastifyInstance, expectedBase: number | null = null, 
 }
 
 /** The export: development's version read through the route the studio downloads it from. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
 async function exported(version = 1): Promise<Record<string, any>> {
   const read = await source.app.inject({ method: 'GET', url: `/v1/forms/employee/versions/${String(version)}`, headers: ADMIN })
   expect(read.statusCode, read.body).toBe(200)

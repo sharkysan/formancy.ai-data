@@ -286,7 +286,6 @@ function connectTo(options: { host: string; port: number; family: number; localA
     const onAbort = (): void => {
       settle()
       socket.destroy()
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an aborted connection attempt rejects with the reason its caller gave the signal, whatever that is
       reject(signal.reason)
     }
     const onError = (error: Error): void => {
@@ -311,7 +310,6 @@ async function lookupAll(host: string, lookup: LookupFunction, signal: AbortSign
   if (net.isIPv4(host)) return [{ address: host, family: 4 }]
   return new Promise((resolve, reject) => {
     const onAbort = (): void => {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- an aborted connection attempt rejects with the reason its caller gave the signal, whatever that is
       reject(signal.reason)
     }
     signal.addEventListener('abort', onAbort)

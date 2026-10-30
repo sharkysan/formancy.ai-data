@@ -71,7 +71,6 @@ async function psql(args: string[], env: Record<string, string> = {}): Promise<v
 
 interface Answer {
   status: number
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- a test reads an untyped body on purpose, and asserts on the part it names
   json: any
 }
 

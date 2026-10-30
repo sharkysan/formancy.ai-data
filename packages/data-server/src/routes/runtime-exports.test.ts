@@ -259,7 +259,6 @@ function registry(): ConnectionRegistry {
             'abort',
             () => {
               stopping(signal.reason, performance.now() - started)
-              // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the double rejects with the reason the caller gave the signal, as a driver that honours it does
               reject(signal.reason)
             },
             { once: true },

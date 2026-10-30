@@ -106,7 +106,6 @@ function run<T>(signal: LookupSignal, answer: T): Promise<T> {
   signals.push(signal)
   if (behaviour === 'answer') return Promise.resolve(answer)
   return new Promise((_resolve, reject) => {
-    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the double rejects with the signal's own reason, as a driver that honours it does
     signal.addEventListener('abort', () => reject(behaviour === 'wait' ? signal.reason : new Error('the database was told to stop')), { once: true })
   })
 }
