@@ -145,7 +145,7 @@ export const ADMIN_ROLE = 'data-admin'
 export const PUBLISHER_ROLE = 'data-publisher'
 export const BROWSE_ROLE = 'data-browser'
 
-const verified = (token: string): Awaited<ReturnType<IdentityVerifier>> => {
+const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: [ADMIN_ROLE] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-7', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.publisher) return { ok: true, identity: { actor: { id: 'grace', roles: [PUBLISHER_ROLE] }, attributes: { tenant: '1' } } }
@@ -153,7 +153,6 @@ const verified = (token: string): Awaited<ReturnType<IdentityVerifier>> => {
   if (token === TOKENS.browser) return { ok: true, identity: { actor: { id: 'bo', roles: [ADMIN_ROLE, BROWSE_ROLE] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
-const verifyIdentity: IdentityVerifier = (token) => Promise.resolve(verified(token))
 
 export interface TestPlane {
   /** The `fetch` the studio is given: every call is answered by the real server. */
@@ -294,8 +293,8 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
           if (now.server === undefined) throw new Error(`the snapshot of ${id} records no server, so nothing can answer its ping`)
           return { kind: now.kind, version: now.serverVersion, ...now.server }
         },
-        discover: () => Promise.resolve(databases.get(id) ?? now),
-        close: () => Promise.resolve(),
+        discover: async () => databases.get(id) ?? now,
+        close: async () => {},
       }
       // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103), filtered or not (0104).
       const records = {

@@ -169,7 +169,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     }
   }
 
-  app.get('/v1/connections', () => ({ connections: registry.ids() }))
+  app.get('/v1/connections', async () => ({ connections: registry.ids() }))
 
   app.post<{ Params: { id: string } }>('/v1/connections/:id/test', async (request, reply) => {
     const open = await connection(request.params.id, reply)

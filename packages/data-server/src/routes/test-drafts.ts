@@ -93,9 +93,9 @@ export function registry(): ConnectionRegistry {
   }
   const adapter = {
     kind: 'sqlserver',
-    ping: () => Promise.resolve({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
     discover,
-    close: () => Promise.resolve(),
+    close: async () => {},
   } as DatabaseAdapter
   return {
     ids: () => [...db.allowlist],
@@ -124,12 +124,12 @@ const IDENTITIES: Record<string, HostIdentity> = {
   submitter: { actor: { id: 'submitter', roles: ['data-admin', 'data-publisher'] }, attributes: {} },
   clerk: { actor: { id: 'clerk', roles: ['clerk'] }, attributes: {} },
 }
-export const verifyIdentity: IdentityVerifier = (token) => {
+export const verifyIdentity: IdentityVerifier = async (token) => {
   const identity = IDENTITIES[token]
-  return Promise.resolve(identity === undefined ? { ok: false, reason: 'bad' } : { ok: true, identity })
+  return identity === undefined ? { ok: false, reason: 'bad' } : { ok: true, identity }
 }
-function authenticate(request: FastifyRequest): Promise<HostIdentity | undefined> {
-  return Promise.resolve(IDENTITIES[/^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1] ?? ''])
+async function authenticate(request: FastifyRequest): Promise<HostIdentity | undefined> {
+  return IDENTITIES[/^Bearer (.+)$/.exec(request.headers.authorization ?? '')?.[1] ?? '']
 }
 
 let roots: string[] = []

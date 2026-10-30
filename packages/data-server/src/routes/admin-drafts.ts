@@ -127,7 +127,7 @@ export function reviewRoutes(app: FastifyInstance, options: ReviewOptions): void
   const caller = (request: FastifyRequest): Caller => callerOf(request.identity as HostIdentity, publisherRoles, options.browseRoles)
   const send = (reply: FastifyReply, refusal: Refusal) => refuse(reply, refusal.status, refusal.code, refusal.message, refusal.extra)
 
-  app.get('/v1/administration', (request) => administrationOf(caller(request), review))
+  app.get('/v1/administration', async (request) => administrationOf(caller(request), review))
 
   if (!review) return
   const drafts = createDrafts(store)

@@ -269,7 +269,7 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
 
   // An orchestrator polls this every few seconds; limiting it would mark a
   // healthy server unhealthy exactly when it is busiest.
-  app.get('/health', { config: { rateLimit: false } }, () => ({ status: 'ok' }))
+  app.get('/health', { config: { rateLimit: false } }, async () => ({ status: 'ok' }))
 
   app.get('/v1/whoami', async (request, reply) => {
     const identity = await authenticate(request)

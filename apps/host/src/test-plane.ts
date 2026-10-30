@@ -39,14 +39,13 @@ export const TOKENS = {
   thirdClerk: 'host-test-clerk-tenant-3',
 } as const
 
-const verified = (token: string): Awaited<ReturnType<IdentityVerifier>> => {
+const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
   if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
-const verifyIdentity: IdentityVerifier = (token) => Promise.resolve(verified(token))
 
 /**
  * With `demoKey`, the literal tokens and the live demo's (0070): a token
@@ -277,7 +276,7 @@ export async function startPlane(
   ]
   const real = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
-    readFile: () => Promise.resolve(''),
+    readFile: async () => '',
   })
   const unreachable = new Set<string>()
   const lose = new Map<string, 'after' | 'before'>()
