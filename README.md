@@ -158,6 +158,14 @@ until then the address is formancy.ai's 404
   step checks a delete grant with the function the server's publish check
   refuses one by
   ([0052](./docs/decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)).
+  A status field can be held to the moves the policy lists, each for named
+  roles -- a clerk ships a placed order, a dispatcher delivers a shipped
+  one, nobody moves one back -- in the Policy step's State moves: any other
+  change of it is refused before a statement, checked from the record as
+  read and guarded by its version, and the audit says that a record moved,
+  never from where or to where. A create that leaves the field to its
+  default is not checked, and the form still offers every value
+  ([0112](./docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
   order, full width, and a field moved to another generated section --
   carried through a regeneration by what each field stands for

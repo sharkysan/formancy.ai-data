@@ -1,4 +1,5 @@
 import { offers } from '../generate/offers.js'
+import { isKeyValue } from '../lookup/values.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { byCodepoint, type ParsedPolicy, readPolicy } from './inputs.js'
 import { unscopedLookups } from './through.js'
@@ -85,6 +86,40 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
     if (binding.kind === 'lookup') problems.push(...lookupProblems(binding, policy, pinned))
   }
   problems.push(...throughFitProblems(policy, byField))
+  problems.push(...transitionFitProblems(policy, byField))
+  return problems
+}
+
+/**
+ * A state field's moves (0112) must be about this form: a column field of
+ * text or a whole number, whose states have one spelling each, every state
+ * spelled as its column holds it -- one spelled otherwise names no value a
+ * record can hold -- and every role of a move one that may make it: write
+ * the field, read it, as the move is checked against the record as read,
+ * and the operation, `create` for a move from nothing, `update` otherwise.
+ * A role a move names that could make no change of the field anyway is a
+ * rule that says something untrue.
+ */
+function transitionFitProblems(policy: ParsedPolicy, byField: ReadonlyMap<string, FieldBinding>): string[] {
+  const rule = policy.transitions
+  if (rule === null) return []
+  const binding = byField.get(rule.field)
+  if (binding === undefined || binding.kind !== 'column') return [`transitions: ${rule.field} is not a column field of this form`]
+  const { type } = binding
+  if (type.kind !== 'text' && type.kind !== 'integer') return [`transitions: ${rule.field} is ${type.kind}; a state field is text or a whole number`]
+  const grant = policy.fields.get(rule.field)
+  const problems: string[] = []
+  for (const [index, move] of rule.moves.entries()) {
+    const at = `transitions.moves[${String(index)}]`
+    for (const [which, value] of [['from', move.from], ['to', move.to]] as const) {
+      if (value !== null && !isKeyValue(type, value)) problems.push(`${at}.${which} is not spelled as ${binding.column} holds its values`)
+    }
+    const operation = move.from === null ? 'create' : 'update'
+    for (const role of [...move.roles].sort(byCodepoint)) {
+      if (!policy.operations[operation].has(role)) problems.push(`${at} grants ${role}, who may not ${operation} with this form`)
+      else if (grant?.write.has(role) !== true || !grant.read.has(role)) problems.push(`${at} grants ${role}, who may not read and write ${rule.field}`)
+    }
+  }
   return problems
 }
 

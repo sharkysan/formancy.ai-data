@@ -87,6 +87,31 @@ export interface FormPolicy {
   lookups: Record<string, RowFilterRule[]>
   through?: string[]
   cascades?: CascadeRule[]
+  transitions?: TransitionRule
+}
+
+/**
+ * A field whose value is a state, and the moves between its states that
+ * roles may make (0112). Where a policy names one, every change of the
+ * field is a move it lists: an update from the value the record holds to
+ * the one submitted, a create -- `from: null` -- to the value it gives. A
+ * role still needs write on the field and the operation; a move only
+ * narrows what those grant. A create that leaves the field out is the
+ * column's default, the schema's own start, and moves nothing.
+ *
+ * Optional, and absent means no rule: a policy written before it keeps
+ * its meaning, and a server older than it refuses a policy that names one.
+ */
+export interface TransitionRule {
+  field: string
+  moves: TransitionMove[]
+}
+
+/** One move of a state field: from a value, or from nothing on create, to a value, for these roles. */
+export interface TransitionMove {
+  from: string | null
+  to: string
+  roles: string[]
 }
 
 /** What a foreign key does on delete to the rows that refer to the record deleted, where it does anything: deletes them, or sets their reference to NULL or to its default. */
@@ -129,6 +154,8 @@ export type RowFilter = ReadonlyArray<{ column: string; value: string }>
  * `over-posting` — a submitted key the actor may not write.
  * `field-denied` — a lookup on a field the actor may neither read nor write.
  * `unknown-lookup` — the policy says nothing about which rows a lookup offers.
+ * `transition-denied` — a change of a state field that is no move the
+ *   actor's roles may make (0112).
  */
 export type PolicyRefusalCode =
   | 'invalid-context'
@@ -138,6 +165,7 @@ export type PolicyRefusalCode =
   | 'over-posting'
   | 'field-denied'
   | 'unknown-lookup'
+  | 'transition-denied'
 
 export interface PolicyRefusal {
   ok: false

@@ -229,6 +229,18 @@
   margin-bottom: 0.625rem;
 }
 
+/* A state move (0112): from, the arrow, to, its roles, and its Remove. */
+.move {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(0, 1.5fr) auto;
+  gap: 0.5rem;
+  align-items: end;
+}
+
+.move .button {
+  margin-bottom: 0.625rem;
+}
+
 /* ------------------------------------------------------- presentation */
 
 .toolbar {

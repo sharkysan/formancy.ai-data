@@ -215,7 +215,11 @@ strings, and there is no wildcard. A row filter is an equality between a
 column from approved metadata and an attribute of the context, and a missing
 attribute is a refusal. A pinned column is written from the context, and a
 submitted value for it is over-posting. `validatePolicy` refuses a policy
-that does not fit its form.
+that does not fit its form. A field holding a record's state can be held to
+the moves the policy lists, each a pair of values for named roles, any
+other change refused from the record as read and the move guarded by the
+version its person read
+([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 
 **The policy is asked on every request**, nothing cached per actor, and only
 an echo it can prove harmless is removed from a submission
@@ -306,6 +310,9 @@ throws is logged and does not fail the request. A runtime event carries
 `rows`: for an `export`, the records its file held, or held when it was
 refused, and `null` for every other operation -- a count, never which
 ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+And `moved`: whether a create or an update moved its policy's state field,
+never from where or to where
+([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 An administrator event carries `object`: for a `browse`, the table or view
 it read as `schema.name`, once the server's snapshot holds it, and `null`
 for every other operation -- never the search or a row

@@ -62,6 +62,7 @@ describe('planUpdate', () => {
       },
       fields: CLERK_FIELDS,
       memberships: [{ field: 'customer', config: buildLookupConfig(PG_ORDER, 'customer', { snapshot: PG }), tokens: ['k1:1,1002'], filters: TENANT_ONE }],
+      moved: null,
     })
   })
 

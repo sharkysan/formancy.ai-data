@@ -72,6 +72,15 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * of them.
    */
   rows: number | null
+  /**
+   * `create` and `update` only, on a form whose policy names its state
+   * field's moves (0112): whether the write, as planned, moves that field
+   * -- the outcome says whether it was saved, and a move refused is
+   * `transition-denied`. `null` for every other operation, a form without
+   * moves, a write refused before it was planned and one answered again
+   * (0031). Whether, never from where or to where: a state is a value.
+   */
+  moved: boolean | null
 }
 
 /**

@@ -1,6 +1,6 @@
 # 0011 — Every operation carries a trusted policy context
 
-- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a row may also be scoped one foreign-key hop away, to a row a lookup's equality filter admits (`through`); extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a fourth operation, `delete`, optional and nobody's when absent, scoped as an update is, and granted only to roles that may read
+- **Status:** accepted; extended by [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md): a row may also be scoped one foreign-key hop away, to a row a lookup's equality filter admits (`through`); extended by [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md): a fourth operation, `delete`, optional and nobody's when absent, scoped as an update is, and granted only to roles that may read; extended by [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md): a policy may name one state field and the moves it is held to, each a pair of values for named roles, read and fitted with the rest of it
 - **Date:** 2026-10-08
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/policy/evaluate.test.ts` — a

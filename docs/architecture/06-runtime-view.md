@@ -310,7 +310,13 @@ are walked, never jumped to (0108); the rest is 0044's and 0061's, in
    read at a version newer than the one sent, every echo of a field the
    actor may not write is removed, and the statement answers the save stale
    ([0098](../decisions/0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md)),
-   and `planUpdate` needs a confirmed concurrency token.
+   and `planUpdate` needs a confirmed concurrency token. Where the policy
+   names a state field, a change of it is a listed move for one of the
+   actor's roles from the record as read -- a create's from nothing -- or
+   403 `transition-denied` before any statement; read at a newer version,
+   the move is left to the stale answer, and the plan's `moved` reaches
+   the audit event
+   ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 4. Each lookup selection is checked by `lookups.rejects` under the actor's
    filters, with a deadline and no abandonment, since a write goes on after
    its client leaves; one that cannot answer is 503, nothing saved (6.8).

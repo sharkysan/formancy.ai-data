@@ -20,8 +20,8 @@ const rules = (list: readonly RowFilterRule[]) => list.map((rule) => `${rule.col
  * A draft's policy, as the publisher approving it reads it (0065): who may
  * read, create, update and delete; each field's read and write roles;
  * which rows of the root and of each lookup's table are in reach, and
- * through which lookups the root's are reached; and the foreign keys a
- * delete may act through. In the Policy step's words, and nothing to edit:
+ * through which lookups the root's are reached; the moves its state field
+ * is held to (0112); and the foreign keys a delete may act through. In the Policy step's words, and nothing to edit:
  * a change is another draft. The paper beside it shows what the people
  * filling the form in see; this says who they are, and what approving it
  * grants them.
@@ -31,6 +31,7 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
   const lookups = lookupBindings(bindings)
   const through = lookups.filter((binding) => (policy.through ?? []).includes(binding.field)).map((binding) => labelOf(document, binding.field))
   const cascades = policy.cascades ?? []
+  const moves = policy.transitions
   const reach =
     policy.rowFilters.length > 0
       ? `Row filters on ${root}: ${rules(policy.rowFilters)}.`
@@ -65,6 +66,17 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
           return <li key={binding.field}>{`Rows the ${label} list may offer: ${what}.${scoping}`}</li>
         })}
       </ul>
+      {moves === undefined ? null : (
+        <>
+          <h5 id="draft-moves">{`Moves of ${labelOf(document, moves.field)} (${moves.field})`}</h5>
+          <ul aria-labelledby="draft-moves">
+            {moves.moves.map((move) => (
+              <li key={`${move.from ?? ''}/${move.to}`}>{`${move.from === null ? 'A new record starts at' : `From ${move.from} to`} ${move.to}: roles ${roles(move.roles)}.`}</li>
+            ))}
+          </ul>
+          <p>Every other change of it is refused.</p>
+        </>
+      )}
       {cascades.length === 0 ? null : (
         <>
           <h5 id="draft-delete">What a delete also does</h5>

@@ -17,6 +17,7 @@ import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedIns
 import { columnsOf, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFields, throughFor } from './scope.js'
 import { decodeRecordKey } from './token.js'
+import { planMove } from './transition.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
 /*
@@ -231,6 +232,8 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'create', decoded.selections)
   if (!memberships.ok) return memberships
+  const move = planMove(policy, context, bindings, decoded.values, null)
+  if (!move.ok) return move
 
   const { fields, returning } = readBack(prepared, bindings, policy, context)
   return {
@@ -238,6 +241,7 @@ export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, p
     request: { target: prepared.target, values: inCatalogValues(prepared.root, [...pinned.values, ...decoded.values]), returning, definition: described.definition },
     fields,
     memberships: memberships.checks,
+    moved: move.moved,
   }
 }
 
@@ -368,6 +372,8 @@ export function planUpdate(
   if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   if (!memberships.ok) return memberships
+  const move = planMove(policy, context, bindings, decoded.values, asRead, expectedVersion)
+  if (!move.ok) return move
 
   return {
     ok: true,
@@ -383,5 +389,6 @@ export function planUpdate(
     },
     fields,
     memberships: memberships.checks,
+    moved: move.moved,
   }
 }

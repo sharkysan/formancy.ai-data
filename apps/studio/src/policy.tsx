@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { findObject, offers, rowFilterColumnProblem, unscopedLookups } from '@formancy/data-core'
@@ -11,49 +10,18 @@ import { LookupFilters, RowFilters } from './policy-filters.js'
 import {
   boundColumns,
   fillFromOperations,
-  formatRoles,
   lookupBindings,
   orphanFields,
   orphanLookups,
-  parseRoles,
   policyCheck,
   withFieldRoles,
   withOperationRoles,
   withoutLookup,
   withThrough,
 } from './policy-model.js'
+import { StateMoves } from './policy-moves.js'
 import { ReassignedKeys } from './reassigned.js'
-
-/**
- * A list of roles as text, kept as typed.
- *
- * The draft is the person's; the roles are what it parses to. A change from
- * outside -- "fill every field" -- replaces the draft, and typing never does:
- * otherwise the comma just typed would vanish before the next role could be.
- */
-function RolesInput({ id, label, roles, onRoles }: { id: string; label: ReactElement | string; roles: readonly string[]; onRoles: (roles: string[]) => void }): ReactElement {
-  const [draft, setDraft] = useState(formatRoles(roles))
-  useEffect(() => {
-    if (formatRoles(parseRoles(draft)) !== formatRoles(roles)) setDraft(formatRoles(roles))
-    // Only an outside change to the roles resets the draft.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roles])
-  return (
-    <div className="field">
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        value={draft}
-        spellCheck={false}
-        autoComplete="off"
-        onChange={(event) => {
-          setDraft(event.target.value)
-          onRoles(parseRoles(event.target.value))
-        }}
-      />
-    </div>
-  )
-}
+import { RolesInput } from './roles-input.js'
 
 const OPERATIONS = ['read', 'create', 'update', 'delete'] as const
 
@@ -289,6 +257,8 @@ export function PolicyStep({
           </div>
         )}
       </fieldset>
+
+      <StateMoves bindings={bindings} labels={labels} policy={policy} onPolicy={onPolicy} />
 
       <RowFilters
         root={describeRef(bindings.root)}
