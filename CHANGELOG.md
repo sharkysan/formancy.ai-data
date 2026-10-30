@@ -254,7 +254,8 @@ later.
     person read it is answered `stale`, not refused.
   - **Every runtime audit event gains `moved`**: whether a create or an
     update moved the state field, `null` otherwise -- never from where or
-    to where. A sink that matches events exactly sees the new property.
+    to where. A sink that matches events exactly sees the new property,
+    and TypeScript code that builds a `RuntimeAuditEvent` must give it.
   - **The studio's Policy step has State moves**, and a draft's review
     lists each move with its roles for the publisher approving it.
   - The form still offers every value the field accepts: a move the person
