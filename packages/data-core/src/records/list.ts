@@ -172,21 +172,25 @@ export function listOrder(prepared: Prepared, requested: ReadonlyArray<{ column:
 
 /**
  * The parent a list is narrowed to: the root's foreign-key columns of a
- * lookup the actor may read, each with the value the parent's token names.
+ * lookup the actor may read, each with the value the parent's token names
+ * -- or, for no parent (0110), each NULL, a condition of the list's filter
+ * as a person's `null` is (0104).
  * The token is decoded by `lookupAnswer`, the one decision about whether a
  * token is a value of that lookup, through the root columns' codecs: a value
  * those columns cannot hold, such as an int8 for an int4 foreign key, names
  * no row of theirs and is refused.
  */
-function parentEqual(prepared: Prepared, bindings: FormBindings, fields: readonly string[], parent: RecordListQuery['parent']): { ok: true; equal: RecordValue[] } | PlanRefusal {
-  if (parent === null) return { ok: true, equal: [] }
+function parentEqual(prepared: Prepared, bindings: FormBindings, fields: readonly string[], parent: RecordListQuery['parent']): { ok: true; equal: RecordValue[]; none: RecordFilter[] } | PlanRefusal {
+  if (parent === null) return { ok: true, equal: [], none: [] }
   const binding = bindings.fields.find((candidate) => candidate.field === parent.field)
   if (binding === undefined || binding.kind !== 'lookup' || !fields.includes(parent.field)) {
     return refuse('invalid-request', `${parent.field} is not a lookup field you may read, so it cannot name a parent.`)
   }
+  // No parent (0110): every column of the field NULL, so the row references nothing -- a tree's roots.
+  if (parent.record === null) return { ok: true, equal: [], none: binding.columns.map((column): RecordFilter => ({ op: 'null', column })) }
   const decoded = lookupAnswer(binding, binding.columns.map((name) => prepared.columns.get(name) as ColumnMeta), parent.record, new Map())
   if (!decoded.ok) return refuse('invalid-record-token', `The parent's record is not a token of a row ${parent.field} can reference.`)
-  return { ok: true, equal: decoded.values }
+  return { ok: true, equal: decoded.values, none: [] }
 }
 
 /**
@@ -244,7 +248,7 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     filters: found.filters,
     through: found.through,
     equal: parent.equal,
-    filter,
+    filter: [...filter, ...parent.none],
     search: query.search === '' ? null : { text: query.search, columns: search },
     sort: listOrder(prepared, requested),
     after,

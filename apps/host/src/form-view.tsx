@@ -262,6 +262,11 @@ export function FormView({
   }
 
   function askRow(token: string, how: OpenHow, at: RowAt): void {
+    openFrom(token, how, () => grid.current?.focusAt(at))
+  }
+
+  /** A record opened from the grid or the tree (0110), through the guard; `toRow` gives the keyboard back to where it was opened from. */
+  function openFrom(token: string, how: OpenHow, toRow: () => void): void {
     // In Drill down every open goes down a level: a click and Space too (0090).
     const moves = how === 'enter' || drilling
     if (open?.kind === 'record' && open.token === token) {
@@ -269,7 +274,6 @@ export function FormView({
       return
     }
     const request = { kind: 'row', record: token } as const
-    const toRow = (): void => grid.current?.focusAt(at)
     ask(
       request,
       (discarded) =>
@@ -508,6 +512,8 @@ export function FormView({
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
           after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" /> : null}
           drilling={drilling}
+          tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
+          onTreeOpen={openFrom}
         />
         {sideBySide ? (
           <Split

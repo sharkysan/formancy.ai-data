@@ -614,7 +614,11 @@ generated as a section of the record -- a table whose key is its foreign
 key onto the record's, holding at most one row of it -- is its one row in
 its own form instead, or Add, shown while the record as stored holds the
 value its generation names
-([0109](./docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)). The
+([0109](./docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
+A form that is its own child -- an employee and their manager -- shows its
+records as a grid or as a tree: the records with no parent, and under each
+record, once it is expanded, those naming it
+([0110](./docs/decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md)). The
 records and the record are side by side, stacked, or separate views, and
 the address says which form and layout, never which record. Open by record
 token loads one by its token.

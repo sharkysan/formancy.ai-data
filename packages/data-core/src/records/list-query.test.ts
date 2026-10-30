@@ -69,7 +69,8 @@ describe('validateListQuery', () => {
   // The parent is a field key and a token, both text, and nothing else: a
   // parent carrying columns or values of its own would be SQL's to read.
   test('refuses a parent that is not exactly a field and a record token', () => {
-    for (const parent of ['k1:7', { field: 'order' }, { field: 'order', record: 7 }, { field: '', record: 'k1:7' }, { field: 'order', record: 'k1:7', column: 'order_id' }, []]) {
+    expect(validateListQuery({ parent: { field: 'manager', record: null } })).toMatchObject({ ok: true, query: { parent: { field: 'manager', record: null } } })
+    for (const parent of ['k1:7', { field: 'order' }, { field: 'order', record: 7 }, { field: '', record: 'k1:7' }, { field: 'order', record: 'k1:7', column: 'order_id' }, [], { field: 'order', record: undefined }]) {
       expect(validateListQuery({ parent }), JSON.stringify(parent)).toMatchObject({ ok: false, code: 'malformed' })
     }
   })

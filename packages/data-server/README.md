@@ -248,6 +248,9 @@ existed would be documented and inert.
   read filter and every through -- 400 `invalid-cursor` for one naming no
   key of the form, 409 `cursor-gone` when the row is deleted or no longer
   one the person may read. A page answers `{ rows, hasMore, next }`.
+  `parent` is `{ field, record }`, the rows naming that record through a
+  lookup field the person may read, or `{ field, record: null }`, the rows
+  whose field names none, every column of it NULL (0110).
   `GET /v1/forms/:id` sends `list` -- what a page may be searched, sorted
   and filtered by, `{ searchable, sortable, filterable }` -- or `null` where
   the person would be refused one: a key

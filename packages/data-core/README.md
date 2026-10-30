@@ -436,7 +436,9 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   may be sorted and searched by, which `GET /v1/forms/:id` sends as `list`.
   `validateListQuery` checks a body from a browser; `planList` plans a
   `ListRequest` -- the read's columns, filters and throughs, the order
-  `listOrder` makes total with the key, the search, the parent and the key
+  `listOrder` makes total with the key, the search, the parent -- or no
+  parent, `record: null`, planned as `null` conditions on the field's
+  columns (0110) -- and the key
   the page continues after, which `decodeListCursor` reads from a body's
   `after` (`invalid-cursor`, 0108) -- and `recordPage` builds `{ rows,
   hasMore, next }` from the `limit + 1` rows an adapter fetched, each row

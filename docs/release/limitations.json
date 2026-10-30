@@ -1198,7 +1198,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:7c3f927d5bd1fc394d2b4972bf5f16f9786636b386350b29732d26b179e20e80",
+      "reviewed": "sha256:6c61dd7d45394dcf7fccac08e124df097104b7add5de740f9523b9843b8b71ef",
       "limitations": [
         {
           "area": "forms",
@@ -1321,7 +1321,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:b40508613cad8289fba1b46565a242962eca95827b0d28193358a43ce5e4ae99",
+      "reviewed": "sha256:298a944b0199525938fe0663c17f80680eecfda5610b7a19e5c5ec36e1c1bc01",
       "limitations": [
         {
           "area": "host",
@@ -3297,6 +3297,30 @@
           "area": "server",
           "says": "@formancy/data-client refuses a menu without its children's one and when as unexpected, so a host and its server are upgraded together.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0110": {
+      "reviewed": "sha256:ef030453b27c8d5a84d00a4758ad3fb0dcd11a5c802b7ff80d646f20074b8237",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A tree of records has no search, filter, sort or columns: each level is in key order and a record is its name, and the panel opens as a grid every time.",
+          "heldBy": "apps/host/src/tree.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record whose parent the person may not read, or that is gone, or that is in a cycle with no root, is in no level of the tree; the grid lists it.",
+          "heldBy": "apps/host/src/tree.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A record of a composite self-reference is a root only with every column of its field NULL; one with some of them NULL is in no level of the tree.",
+          "heldBy": "packages/data-core/src/records/plan-list.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Whether a record has records below it is known only once it is expanded, one list request per level, and the browser gates do not measure the tree."
         }
       ]
     }

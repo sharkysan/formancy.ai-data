@@ -211,6 +211,21 @@ later.
   - The extension is still its own form, with its own Save: a record and
     its section are never one transaction, and a section offers no Delete.
 
+- **A form that is its own child shows its records as a tree** (0110). Why:
+  a table that references itself -- an employee and their manager -- holds
+  a hierarchy, which the grid showed flat and Drill down one record at a
+  time. What you notice:
+  - **The Records panel offers "Show the records as" Grid or Tree** where
+    the menu names the form as its own child. The tree lists the records
+    with no parent, and under a record, once it is expanded, those naming
+    it, a page at a time with "More records"; the arrows walk it, Enter
+    opens a record and Space opens it beside, as a row does.
+  - **A list's `parent` may be `{ field, record: null }`**: the rows whose
+    field references nothing, every column of it NULL -- a tree's roots.
+  - The tree has no search, filter, sort or columns, and a record whose
+    parent is out of the person's reach, or in a cycle, is in none of its
+    levels.
+
 ### Changed
 
 - **Every `@formancy/*` dependency moves from 0.6.0 to 0.7.0, upstream's

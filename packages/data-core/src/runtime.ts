@@ -217,7 +217,9 @@ export type ListFilterTerm = { field: string } & FilterCondition
  * after that row in the new order.
  *
  * `parent` narrows the list to the rows whose lookup field `field` holds
- * `record`, a token of the row it references -- the children of one parent.
+ * `record`, a token of the row it references -- the children of one parent
+ * -- or, with `record` `null`, to the rows whose field references no row,
+ * every one of its columns NULL: a tree's roots (0110).
  * `filter` narrows it to the rows every condition holds for, each field
  * named once (0104); `[]` when left out. Both are narrowings and never a
  * permission: the form's own read filter and throughs still decide which
@@ -226,7 +228,7 @@ export type ListFilterTerm = { field: string } & FilterCondition
 export interface RecordListQuery {
   search: string
   sort: ListSortTerm[]
-  parent: { field: string; record: string } | null
+  parent: { field: string; record: string | null } | null
   filter: ListFilterTerm[]
   after: string | null
   limit: number
