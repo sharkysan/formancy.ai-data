@@ -45,9 +45,7 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/verify-licenses.mjs
     if (manifest.private === true) continue
 
     // Wherever the tarball is actually made from.
-    const packRoot = manifest.publishConfig?.directory
-      ? join(dir, manifest.publishConfig.directory)
-      : dir
+    const packRoot = manifest.publishConfig?.directory ? join(dir, manifest.publishConfig.directory) : dir
 
     checked += 1
 

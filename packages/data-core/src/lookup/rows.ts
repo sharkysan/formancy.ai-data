@@ -32,7 +32,8 @@ export interface FoundRow {
 /** A row's label, each display value spelled by its column's type. */
 function labelOf(config: LookupConfig, row: FoundRow): string {
   const display = config.display
-  if (row.display.length !== display.length) throw new Error(`A found row has ${String(row.display.length)} display values and the lookup shows ${String(display.length)}.`)
+  if (row.display.length !== display.length)
+    throw new Error(`A found row has ${String(row.display.length)} display values and the lookup shows ${String(display.length)}.`)
   return formatLabel(
     row.display.map((value, index) => displayText((display[index] as LookupConfig['display'][number]).type, value)),
     row.key,

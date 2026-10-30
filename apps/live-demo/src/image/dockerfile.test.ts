@@ -130,8 +130,8 @@ describe('the demo image', () => {
   test('holds every file its scripts name, the fixture byte for byte as the suites load it', () => {
     const copied = copiedToDemo()
     const named = new Set(
-      [read('deploy', 'demo', 'build.sh'), read('deploy', 'demo', 'start.sh'), runtime.instructions.map((instruction) => instruction.args).join('\n')].flatMap((text) =>
-        [...text.matchAll(/\/demo\/([a-z][a-z0-9.-]*)/g)].map((match) => match[1] as string),
+      [read('deploy', 'demo', 'build.sh'), read('deploy', 'demo', 'start.sh'), runtime.instructions.map((instruction) => instruction.args).join('\n')].flatMap(
+        (text) => [...text.matchAll(/\/demo\/([a-z][a-z0-9.-]*)/g)].map((match) => match[1] as string),
       ),
     )
     expect([...named].filter((name) => !copied.has(name))).toEqual([])

@@ -95,7 +95,13 @@ afterAll(async () => {
 })
 
 /** A lookup config as a deployment builds one: discovered, generated, then derived. */
-function lookupOver(snapshot: MetadataSnapshot, root: ObjectRef, foreignKey: string, display: string[], options: Omit<LookupOptions, 'snapshot'> = {}): LookupConfig {
+function lookupOver(
+  snapshot: MetadataSnapshot,
+  root: ObjectRef,
+  foreignKey: string,
+  display: string[],
+  options: Omit<LookupOptions, 'snapshot'> = {},
+): LookupConfig {
   const { bindings } = generateForm(snapshot, { connection: 'test', root, formId: 'lookup-test', title: 'Lookup test', lookups: [{ foreignKey, display }] })
   const field = bindings.fields.find((candidate) => candidate.kind === 'lookup' && candidate.foreignKey === foreignKey)
   if (field === undefined) throw new Error(`the generator made no lookup for ${foreignKey}`)
@@ -244,13 +250,9 @@ describe('the order and the page', () => {
     const byCountry = (nulls: 'first' | 'last'): LookupConfig =>
       lookupOver(sales, ORDER, 'fk_order_customer', ['name', 'country_code'], { sort: [{ column: 'country_code', direction: 'desc', nulls }] })
     const first = await lookups.search(byCountry('first'), FIRST_PAGE, TENANT_1, NEVER)
-    expect(first.rows.map((row) => row.token)).toEqual(
-      ['1002', '1005', '1003', '1006', '1001', '1004', '1007'].map((number) => tokenOf('1', number)),
-    )
+    expect(first.rows.map((row) => row.token)).toEqual(['1002', '1005', '1003', '1006', '1001', '1004', '1007'].map((number) => tokenOf('1', number)))
     const last = await lookups.search(byCountry('last'), FIRST_PAGE, TENANT_1, NEVER)
-    expect(last.rows.map((row) => row.token)).toEqual(
-      ['1003', '1006', '1001', '1004', '1007', '1002', '1005'].map((number) => tokenOf('1', number)),
-    )
+    expect(last.rows.map((row) => row.token)).toEqual(['1003', '1006', '1001', '1004', '1007', '1002', '1005'].map((number) => tokenOf('1', number)))
   })
 
   // Characterisation, not a promise: the order of text is the collation's
@@ -271,7 +273,9 @@ describe('the order and the page', () => {
     const config = customers()
     const forged = (direction: string, nulls: string) => ({ ...config, sort: [{ column: 'name', direction, nulls }] }) as unknown as LookupConfig
     const lookups = createPostgresLookups(owner)
-    await expect(lookups.search(forged('asc; drop table sales.customer; --', 'last'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
+    await expect(lookups.search(forged('asc; drop table sales.customer; --', 'last'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(
+      /no order this adapter can spell/,
+    )
     // Every object has a `constructor`; a table kept in an object literal would find one.
     await expect(lookups.search(forged('constructor', 'last'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
     await expect(lookups.search(forged('asc', 'toString'), FIRST_PAGE, TENANT_1, NEVER)).rejects.toThrow(/no order this adapter can spell/)
@@ -337,14 +341,18 @@ describe('membership', () => {
   // The fixture's order id is 2^53 + 1. A key that went through a JavaScript
   // number would be 2^53 and name no row, or the neighbouring one. This one
   // runs as the restricted reader, who may read sales.order.
-  test('offers, resolves and accepts a bigint key past 2^53 exactly, as the restricted reader', covers('postgres', edgeCase('beyondSafeInteger'), edgeCase('orderDate')), async () => {
-    const config = lookupOver(sales, { schema: 'sales', name: 'order_line' }, 'fk_order_line_order', ['order_date'])
-    const lookups = createPostgresLookups(reader)
-    const token = tokenOf(EDGE_VALUES.beyondSafeInteger)
-    expect(await lookups.search(config, FIRST_PAGE, TENANT_1, NEVER)).toEqual({ rows: [{ token, label: EDGE_VALUES.orderDate }], hasMore: false, omitted: 0 })
-    expect(await lookups.resolve(config, [token], TENANT_1, NEVER)).toEqual([{ token, label: EDGE_VALUES.orderDate }])
-    expect(await lookups.rejects(config, [token, tokenOf('9007199254740992')], TENANT_1, NEVER)).toEqual([tokenOf('9007199254740992')])
-  })
+  test(
+    'offers, resolves and accepts a bigint key past 2^53 exactly, as the restricted reader',
+    covers('postgres', edgeCase('beyondSafeInteger'), edgeCase('orderDate')),
+    async () => {
+      const config = lookupOver(sales, { schema: 'sales', name: 'order_line' }, 'fk_order_line_order', ['order_date'])
+      const lookups = createPostgresLookups(reader)
+      const token = tokenOf(EDGE_VALUES.beyondSafeInteger)
+      expect(await lookups.search(config, FIRST_PAGE, TENANT_1, NEVER)).toEqual({ rows: [{ token, label: EDGE_VALUES.orderDate }], hasMore: false, omitted: 0 })
+      expect(await lookups.resolve(config, [token], TENANT_1, NEVER)).toEqual([{ token, label: EDGE_VALUES.orderDate }])
+      expect(await lookups.rejects(config, [token, tokenOf('9007199254740992')], TENANT_1, NEVER)).toEqual([tokenOf('9007199254740992')])
+    },
+  )
 
   // formancy refuses a submission when its members port throws (formancy.ai
   // 0022). A reader the database refuses must reach that refusal; an empty

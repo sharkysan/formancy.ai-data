@@ -105,7 +105,10 @@ describe("the driver's array of rows after a statement that failed part-way", ()
   test("places the next statement's rows after one empty slot for each row the failed one sent, and nothing of it", async () => {
     const sql = postgres(fixture.admin, { max: 1, onnotice: () => {} })
     try {
-      const failure = await sql`select 'theirs' as owner, 1 / (x - 3) as n from pg_catalog.generate_series(1, 5) as x`.then(() => undefined, (error: unknown) => error)
+      const failure = await sql`select 'theirs' as owner, 1 / (x - 3) as n from pg_catalog.generate_series(1, 5) as x`.then(
+        () => undefined,
+        (error: unknown) => error,
+      )
       expect(failure).toMatchObject({ code: '22012' })
       const rows = await sql<Array<{ owner: string }>>`select 'mine' as owner`
       expect(rows.length).toBe(3)

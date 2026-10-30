@@ -37,7 +37,10 @@ describe('validateLookupQuery', () => {
   // A database source that searched for the whitespace would make one control
   // behave two ways depending on where its list came from.
   test('a query formancy treats as no filter is no filter here', () => {
-    const options = [{ value: 'a', label: 'Acme' }, { value: 'b', label: 'Beta' }]
+    const options = [
+      { value: 'a', label: 'Acme' },
+      { value: 'b', label: 'Beta' },
+    ]
     for (const search of ['', ' ', '\t\n ']) {
       expect(narrowOptionsByLabel(options, search)).toEqual(options)
       expect(validateLookupQuery(CONFIG, { search, offset: 0, limit: 10 })).toEqual({ ok: true, query: { search: '', offset: 0, limit: 10 } })
@@ -96,7 +99,14 @@ describe('validateLookupQuery', () => {
   // properties is refused rather than ignored: a `filters` property that
   // was ignored today is one somebody reads tomorrow.
   test('refuses anything that is not exactly a search, an offset and a limit', () => {
-    for (const query of [null, 'Acme', [], { search: 'a', offset: 0 }, { search: 1, offset: 0, limit: 10 }, { search: 'a', offset: 0, limit: 10, filters: [] }]) {
+    for (const query of [
+      null,
+      'Acme',
+      [],
+      { search: 'a', offset: 0 },
+      { search: 1, offset: 0, limit: 10 },
+      { search: 'a', offset: 0, limit: 10, filters: [] },
+    ]) {
       expect(validateLookupQuery(CONFIG, query), JSON.stringify(query)).toMatchObject({ ok: false, code: 'malformed' })
     }
   })

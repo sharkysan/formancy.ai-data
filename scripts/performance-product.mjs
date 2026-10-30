@@ -64,7 +64,8 @@ function workspace(root) {
 }
 
 /** `import`/`export … from` statements, multi-line braces included, and bare `import '…'`. */
-const FROM = /^[ \t]*(import|export)[ \t]+(type[ \t]+)?(\{[^}]*\}|\*(?:[ \t]+as[ \t]+[\w$]+)?|[\w$]+(?:[ \t]*,[ \t]*(?:\{[^}]*\}|\*[ \t]+as[ \t]+[\w$]+))?)[ \t]*from[ \t]*['"]([^'"]+)['"]/gm
+const FROM =
+  /^[ \t]*(import|export)[ \t]+(type[ \t]+)?(\{[^}]*\}|\*(?:[ \t]+as[ \t]+[\w$]+)?|[\w$]+(?:[ \t]*,[ \t]*(?:\{[^}]*\}|\*[ \t]+as[ \t]+[\w$]+))?)[ \t]*from[ \t]*['"]([^'"]+)['"]/gm
 const BARE = /^[ \t]*import[ \t]+['"]([^'"]+)['"]/gm
 
 /**
@@ -76,10 +77,16 @@ function clauseNames(kind, clause) {
   if (clause.startsWith('*')) return { all: true, names: new Map() }
   const names = new Map()
   const braces = /\{([^}]*)\}/.exec(clause)
-  const bare = clause.replace(/\{[^}]*\}/, '').replace(/,/g, ' ').trim()
+  const bare = clause
+    .replace(/\{[^}]*\}/, '')
+    .replace(/,/g, ' ')
+    .trim()
   if (bare.startsWith('*')) return { all: true, names }
   if (bare !== '') names.set(kind === 'import' ? 'default' : bare, 'default')
-  for (const part of (braces?.[1] ?? '').split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')) {
+  for (const part of (braces?.[1] ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '')) {
     if (/^type\s/.test(part)) continue
     const [source, , alias] = part.split(/\s+/)
     names.set(alias ?? source, source)
@@ -141,7 +148,8 @@ export function productFiles(root) {
     for (const statement of statements(text)) {
       let target
       if (statement.specifier.startsWith('.')) target = relativeFile(root, file, statement.specifier)
-      else if (packages.has(statement.specifier) && statement.specifier.startsWith('@formancy/data-')) target = `${packages.get(statement.specifier)}/src/index.ts`
+      else if (packages.has(statement.specifier) && statement.specifier.startsWith('@formancy/data-'))
+        target = `${packages.get(statement.specifier)}/src/index.ts`
       else continue
       if (isIndex && !all && statement.kind === 'export') {
         // A re-export line is followed only for the names it exports that were asked for.
@@ -214,9 +222,7 @@ export function runtimeClosure(root) {
     }
   }
   for (const name of RUNTIME) visit(join(root, packages.get(name)), name)
-  return Object.fromEntries(
-    [...versions.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, set]) => [name, [...set].sort().join(', ')]),
-  )
+  return Object.fromEntries([...versions.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, set]) => [name, [...set].sort().join(', ')]))
 }
 
 /** The build's inputs: each reached package's tsdown and TypeScript configuration, the base, and the two tools' versions. */
@@ -258,7 +264,8 @@ export function compareProduct(recorded, current) {
     else if (recorded.files[file] !== current.files[file]) problems.push(`changed: ${file}`)
   }
   for (const name of keys(recorded.packages, current.packages)) {
-    if (recorded.packages[name] !== current.packages[name]) problems.push(`${name}: measured ${recorded.packages[name] ?? 'nothing'}, installed ${current.packages[name] ?? 'nothing'}`)
+    if (recorded.packages[name] !== current.packages[name])
+      problems.push(`${name}: measured ${recorded.packages[name] ?? 'nothing'}, installed ${current.packages[name] ?? 'nothing'}`)
   }
   for (const input of keys(recorded.build, current.build)) {
     if (recorded.build[input] !== current.build[input]) problems.push(`build input changed: ${input}`)

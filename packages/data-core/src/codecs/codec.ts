@@ -67,9 +67,7 @@ function valueParser(column: ColumnMeta): ((value: unknown) => CodecOutcome) | s
 
     case 'integer':
       return (value) =>
-        typeof value === 'number' || typeof value === 'string'
-          ? parseInteger(value, type.min, type.max)
-          : refuse('type', 'Expected a whole number.')
+        typeof value === 'number' || typeof value === 'string' ? parseInteger(value, type.min, type.max) : refuse('type', 'Expected a whole number.')
 
     case 'decimal':
       return (value) =>
@@ -86,25 +84,20 @@ function valueParser(column: ColumnMeta): ((value: unknown) => CodecOutcome) | s
       }
 
     case 'date':
-      return (value) =>
-        typeof value === 'string' && isDate(value) ? { ok: true, value } : refuse('not-a-date', 'Expected a real date as YYYY-MM-DD.')
+      return (value) => (typeof value === 'string' && isDate(value) ? { ok: true, value } : refuse('not-a-date', 'Expected a real date as YYYY-MM-DD.'))
 
     case 'time':
-      return (value) =>
-        typeof value === 'string' && isTime(value) ? { ok: true, value } : refuse('not-a-time', 'Expected a time of day as HH:MM.')
+      return (value) => (typeof value === 'string' && isTime(value) ? { ok: true, value } : refuse('not-a-time', 'Expected a time of day as HH:MM.'))
 
     case 'timestamp':
       if (!type.withTimeZone) {
         return 'a timestamp without a time zone has no formancy field: formancy datetime is an instant, and converting would guess a zone'
       }
       return (value) =>
-        typeof value === 'string' && isInstant(value)
-          ? { ok: true, value }
-          : refuse('not-an-instant', 'Expected an instant as YYYY-MM-DDTHH:MM:SSZ, in UTC.')
+        typeof value === 'string' && isInstant(value) ? { ok: true, value } : refuse('not-an-instant', 'Expected an instant as YYYY-MM-DDTHH:MM:SSZ, in UTC.')
 
     case 'uuid':
-      return (value) =>
-        typeof value === 'string' && UUID.test(value) ? { ok: true, value: value.toLowerCase() } : refuse('not-a-uuid', 'Expected a UUID.')
+      return (value) => (typeof value === 'string' && UUID.test(value) ? { ok: true, value: value.toLowerCase() } : refuse('not-a-uuid', 'Expected a UUID.'))
 
     case 'rowversion':
       return 'a rowversion is a concurrency token the database writes'

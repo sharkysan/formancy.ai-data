@@ -4,7 +4,28 @@ import { describe, expect, test } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { ConfigurationStore } from '../config-store.js'
 import { REFUSALS } from '../governance.js'
-import { ADMIN_ROLES, answer, approve, as, db, INTERNAL, lines, proposed, published, PUBLISHER_ROLES, queue, read, registry, reject, root, serve, store, submit, useDrafts, verifyIdentity } from './test-drafts.js'
+import {
+  ADMIN_ROLES,
+  answer,
+  approve,
+  as,
+  db,
+  INTERNAL,
+  lines,
+  proposed,
+  published,
+  PUBLISHER_ROLES,
+  queue,
+  read,
+  registry,
+  reject,
+  root,
+  serve,
+  store,
+  submit,
+  useDrafts,
+  verifyIdentity,
+} from './test-drafts.js'
 
 /*
  * The drafts under review (0065) as files on the volume: a store beside
@@ -28,17 +49,26 @@ describe('the drafts store', () => {
     await submit('author', { expectedBase: null, bundle: await proposed() })
     await submit('author', { expectedBase: null, bundle: await proposed({ formId: 'staff', title: 'Staff' }) }, 'staff')
     const file = join(root, '.drafts', 'employee', '1.json')
-    const entry = JSON.parse(await readFile(file, 'utf8')) as { bundle: { snapshot: { objects: Array<{ columns: Array<{ name: string; type: { maxLength?: number } }> }> } } }
+    const entry = JSON.parse(await readFile(file, 'utf8')) as {
+      bundle: { snapshot: { objects: Array<{ columns: Array<{ name: string; type: { maxLength?: number } }> }> } }
+    }
     const name = entry.bundle.snapshot.objects[0]?.columns.find((column) => column.name === 'name')
     if (name !== undefined) name.type.maxLength = 4000
     await writeFile(file, JSON.stringify(entry, null, 2))
     lines.length = 0
-    for (const response of [await read('publisher', 1), await approve('publisher', 1), await reject('publisher', 1), await submit('author', { expectedBase: null, bundle: await proposed() })]) {
+    for (const response of [
+      await read('publisher', 1),
+      await approve('publisher', 1),
+      await reject('publisher', 1),
+      await submit('author', { expectedBase: null, bundle: await proposed() }),
+    ]) {
       expect(answer(response)).toEqual([500, INTERNAL])
     }
     expect(await store.latest('employee')).toBeNull()
     expect(await store.drafts().versions('employee')).toEqual([1])
-    expect(lines.filter((line) => line.msg === 'a draft entry does not validate, and is not served').map(({ form, entry: number }) => ({ form, entry: number }))).toEqual(Array.from({ length: 4 }, () => ({ form: 'employee', entry: 1 })))
+    expect(
+      lines.filter((line) => line.msg === 'a draft entry does not validate, and is not served').map(({ form, entry: number }) => ({ form, entry: number })),
+    ).toEqual(Array.from({ length: 4 }, () => ({ form: 'employee', entry: 1 })))
     expect((await queue('publisher')).json()).toEqual({ drafts: [expect.objectContaining({ form: 'staff', draft: 1 })], unreadable: ['employee'] })
 
     await writeFile(file, '{ broken')
@@ -74,8 +104,12 @@ describe('the drafts store', () => {
         publish: async (_id, expectedBase) => ({ ok: false, reason: 'conflict', current: expectedBase }),
       }),
     }
-    const broken = await createDataServer({ verifyIdentity, admin: { registry: registry(), store: failing, adminRoles: ADMIN_ROLES, publisherRoles: PUBLISHER_ROLES, audit: { sink: () => {} } } })
-    const call = (method: 'GET' | 'POST', url: string, token: string, payload?: Record<string, unknown>) => broken.inject({ method, url, headers: as(token), ...(payload === undefined ? {} : { payload }) })
+    const broken = await createDataServer({
+      verifyIdentity,
+      admin: { registry: registry(), store: failing, adminRoles: ADMIN_ROLES, publisherRoles: PUBLISHER_ROLES, audit: { sink: () => {} } },
+    })
+    const call = (method: 'GET' | 'POST', url: string, token: string, payload?: Record<string, unknown>) =>
+      broken.inject({ method, url, headers: as(token), ...(payload === undefined ? {} : { payload }) })
     for (const response of [
       await call('GET', '/v1/drafts', 'publisher'),
       await call('GET', '/v1/forms/staff/drafts/1', 'publisher'),
@@ -110,11 +144,17 @@ describe('the drafts store', () => {
     }
     const broken = await serve(true, failing)
     lines.length = 0
-    for (const response of [await submit('author', { expectedBase: 1, bundle: await proposed({ role: 'auditor' }) }, 'employee', broken), await approve('publisher', 1, 'employee', broken)]) {
+    for (const response of [
+      await submit('author', { expectedBase: 1, bundle: await proposed({ role: 'auditor' }) }, 'employee', broken),
+      await approve('publisher', 1, 'employee', broken),
+    ]) {
       expect(answer(response)).toEqual([500, INTERNAL])
       expect(response.body).not.toContain('EACCES')
     }
-    expect(lines.filter((line) => line.msg === 'the drafts or the versions could not be read or written').map(({ form }) => form)).toEqual(['employee', 'employee'])
+    expect(lines.filter((line) => line.msg === 'the drafts or the versions could not be read or written').map(({ form }) => form)).toEqual([
+      'employee',
+      'employee',
+    ])
     expect(await store.versions('employee')).toEqual([1])
     expect(await store.drafts().versions('employee')).toEqual([1])
   })
@@ -162,8 +202,14 @@ describe('the drafts store', () => {
       { form: 'staff', draft: 1, expectedBase: null, submittedBy: 'submitter', title: 'Staff', refuses: refuses[2] },
     ]
     expect((await queue('publisher')).json()).toEqual({ drafts: entries([{}, {}, {}]), unreadable: [] })
-    expect((await queue('submitter')).json()).toEqual({ drafts: entries([{}, {}, { approve: { code: 'own-draft', message: REFUSALS['own-draft'].message } }]), unreadable: [] })
-    expect((await queue('author')).json()).toEqual({ drafts: entries([{ approve: PR }, { approve: PR, reject: PR }, { approve: PR, reject: PR }]), unreadable: [] })
+    expect((await queue('submitter')).json()).toEqual({
+      drafts: entries([{}, {}, { approve: { code: 'own-draft', message: REFUSALS['own-draft'].message } }]),
+      unreadable: [],
+    })
+    expect((await queue('author')).json()).toEqual({
+      drafts: entries([{ approve: PR }, { approve: PR, reject: PR }, { approve: PR, reject: PR }]),
+      unreadable: [],
+    })
   })
 
   // A number in a path is a draft's number or nothing: a whole number
@@ -177,7 +223,12 @@ describe('the drafts store', () => {
         expect([response.statusCode, response.json().code], bad).toEqual([400, 'invalid-request'])
       }
     }
-    for (const [draft, form] of [[2, 'employee'], [7, 'employee'], [1, 'staff'], [1, 'Employee']] as const) {
+    for (const [draft, form] of [
+      [2, 'employee'],
+      [7, 'employee'],
+      [1, 'staff'],
+      [1, 'Employee'],
+    ] as const) {
       for (const response of [await read('publisher', draft, form), await approve('publisher', draft, form), await reject('publisher', draft, form)]) {
         expect([response.statusCode, response.json().code], `${form} ${String(draft)}`).toEqual([404, 'unknown-draft'])
       }
@@ -191,7 +242,14 @@ describe('the drafts store', () => {
   test('a submit body of another shape is 400 before a database is asked', async () => {
     const bundle = await proposed()
     db.reachable = false
-    for (const payload of [{ bundle }, { expectedBase: '1', bundle }, { expectedBase: 1.5, bundle }, { expectedBase: null }, { expectedBase: null, bundle: [bundle] }, { expectedBase: null, bundle, keysConfirmed: 'job_title' }]) {
+    for (const payload of [
+      { bundle },
+      { expectedBase: '1', bundle },
+      { expectedBase: 1.5, bundle },
+      { expectedBase: null },
+      { expectedBase: null, bundle: [bundle] },
+      { expectedBase: null, bundle, keysConfirmed: 'job_title' },
+    ]) {
       const response = await submit('author', payload)
       expect([response.statusCode, response.json().code], JSON.stringify(Object.keys(payload))).toEqual([400, 'invalid-request'])
     }

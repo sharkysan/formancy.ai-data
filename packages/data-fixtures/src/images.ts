@@ -60,7 +60,8 @@ export function selectedImages(env: NodeJS.ProcessEnv = process.env): Record<Dat
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
-  if (named.length === 0) throw new Error(`${IMAGES_VARIABLE} is set and names no image: unset it for the defaults, or name one image per engine from the matrix`)
+  if (named.length === 0)
+    throw new Error(`${IMAGES_VARIABLE} is set and names no image: unset it for the defaults, or name one image per engine from the matrix`)
   const seen = new Map<DatabaseKind, string>()
   for (const image of named) {
     const kind = DATABASE_KINDS.find((candidate) => MATRIX_IMAGES[candidate].includes(image))

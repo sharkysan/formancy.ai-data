@@ -60,7 +60,9 @@ describe('createDataServer runtime.lookupDeadlineMs', () => {
   const verifyIdentity = async () => ({ ok: false as const, reason: 'none' })
   test.each([0, -1, 1.5, Number.NaN, MAX_LOOKUP_DEADLINE_MS + 1, Number.POSITIVE_INFINITY])('refuses %s at construction, naming the option', async (ms) => {
     const store = createFileConfigurationStore('unused')
-    await expect(createDataServer({ verifyIdentity, runtime: { registry, store, lookupDeadlineMs: ms } })).rejects.toThrow(`runtime.lookupDeadlineMs is a whole number of milliseconds from 1 to 2147483647; it is ${String(ms)}.`)
+    await expect(createDataServer({ verifyIdentity, runtime: { registry, store, lookupDeadlineMs: ms } })).rejects.toThrow(
+      `runtime.lookupDeadlineMs is a whole number of milliseconds from 1 to 2147483647; it is ${String(ms)}.`,
+    )
   })
 
   // Both ends are the variable's too.

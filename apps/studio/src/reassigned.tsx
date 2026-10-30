@@ -20,7 +20,15 @@ const keep = (key: string) => `reassigned-${key}-keep`
  * keyboard goes to the next entry's Keep, and after the last to `after`, the
  * policy check whose verdict the decisions feed.
  */
-export function ReassignedKeys({ keys, after, onDecide }: { keys: readonly ReassignedKey[]; after: string; onDecide: (key: string, decision: Decision) => void }): ReactElement | null {
+export function ReassignedKeys({
+  keys,
+  after,
+  onDecide,
+}: {
+  keys: readonly ReassignedKey[]
+  after: string
+  onDecide: (key: string, decision: Decision) => void
+}): ReactElement | null {
   const focusAfter = useFocusAfterRender()
   if (keys.length === 0) return null
   function decide(entry: ReassignedKey, at: number, decision: Decision): void {

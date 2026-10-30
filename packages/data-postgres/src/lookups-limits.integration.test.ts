@@ -56,7 +56,13 @@ beforeAll(async () => {
   const target = new URL(fixture.admin)
   hop = await startTcpHop({ kind: 'postgres', host: target.hostname, port: Number(target.port) })
   const sales = await discoverPostgres(owner, { schemas: ['sales'] })
-  const { bindings } = generateForm(sales, { connection: 'test', root: { schema: 'sales', name: 'order' }, formId: 'limits', title: 'Limits', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+  const { bindings } = generateForm(sales, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'limits',
+    title: 'Limits',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  })
   const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
   if (field === undefined) throw new Error('the generator made no customer lookup')
   config = buildLookupConfig(bindings, field.field, { snapshot: sales })
@@ -88,7 +94,16 @@ const parts = () => {
 /** A lookups client of one connection through the hop, named so pg_stat_activity finds its backend. */
 function lookupClient(application: string): Sql {
   const { database, user, password } = parts()
-  const client = postgres({ host: '127.0.0.1', port: hop.port, database, username: user, password, max: 1, onnotice: () => {}, connection: { application_name: application } })
+  const client = postgres({
+    host: '127.0.0.1',
+    port: hop.port,
+    database,
+    username: user,
+    password,
+    max: 1,
+    onnotice: () => {},
+    connection: { application_name: application },
+  })
   clients.push(client)
   return client
 }
@@ -126,12 +141,13 @@ function tokenOf(...key: string[]): string {
 }
 
 /** What a rejected promise rejected with. */
-const failure = (pending: Promise<unknown>): Promise<unknown> => pending.then(
-  () => {
-    throw new Error('the lookup answered')
-  },
-  (error: unknown) => error,
-)
+const failure = (pending: Promise<unknown>): Promise<unknown> =>
+  pending.then(
+    () => {
+      throw new Error('the lookup answered')
+    },
+    (error: unknown) => error,
+  )
 
 /** The backend `application` holds, as pg_stat_activity sees it from another connection. */
 async function backendOf(application: string): Promise<{ pid: number; state: string } | undefined> {
@@ -144,7 +160,10 @@ async function backendOf(application: string): Promise<{ pid: number; state: str
  * a parameter so postgres.js has PostgreSQL describe it first, as it does
  * every lookup. Named by its column, so pg_stat_activity tells it apart.
  */
-const sleeping = (name: string, seconds = '30') => ({ text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`, params: [seconds] })
+const sleeping = (name: string, seconds = '30') => ({
+  text: `select pg_catalog.pg_sleep($1::pg_catalog.text::pg_catalog.float8) as ${name}`,
+  params: [seconds],
+})
 
 /**
  * A statement that sends tenant 2's customers, key and name as a search
@@ -174,7 +193,9 @@ async function asleep(application: string): Promise<boolean> {
  * idle only once a statement's Sync is done.
  */
 async function finished(application: string, name: string): Promise<boolean> {
-  const [row] = await owner<Array<{ state: string; query: string }>>`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
+  const [row] = await owner<
+    Array<{ state: string; query: string }>
+  >`select state, query from pg_catalog.pg_stat_activity where application_name = ${application}`
   return row?.state === 'idle' && row.query.includes(name)
 }
 
@@ -195,25 +216,28 @@ describe('an aborted lookup is stopped in the database', () => {
   // docs/performance.md measured as "the database finishes every scan it
   // started". The answer after it, on the same backend, shows the cancel cost
   // no connection and left no setting behind.
-  test.each(OPERATIONS)('a %s waiting on a lock stops waiting before the lock is released, and the next lookup on its connection answers', async (operation) => {
-    const application = `limits-abort-${operation}`
-    const sql = lookupClient(application)
-    const expected = await ask(sql, operation, NEVER)
-    const before = await backendOf(application)
-    const blocked = await block()
-    const controller = new AbortController()
-    const pending = failure(ask(sql, operation, controller.signal))
-    await until(async () => (await blocked.waiting()) === 1, `the ${operation} waited behind the lock`)
-    const reason = new Error('the person typed on')
-    controller.abort(reason)
-    expect(await pending).toBe(reason)
-    await until(async () => (await blocked.waiting()) === 0, `the ${operation} stopped waiting while the lock was held`)
-    await release(blocked)
-    expect(await ask(sql, operation, AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
-    expect((await backendOf(application))?.pid).toBe(before?.pid)
-    const [setting] = await sql<Array<{ timeout: string }>>`select current_setting('statement_timeout') as timeout`
-    expect(setting?.timeout).toBe('0')
-  })
+  test.each(OPERATIONS)(
+    'a %s waiting on a lock stops waiting before the lock is released, and the next lookup on its connection answers',
+    async (operation) => {
+      const application = `limits-abort-${operation}`
+      const sql = lookupClient(application)
+      const expected = await ask(sql, operation, NEVER)
+      const before = await backendOf(application)
+      const blocked = await block()
+      const controller = new AbortController()
+      const pending = failure(ask(sql, operation, controller.signal))
+      await until(async () => (await blocked.waiting()) === 1, `the ${operation} waited behind the lock`)
+      const reason = new Error('the person typed on')
+      controller.abort(reason)
+      expect(await pending).toBe(reason)
+      await until(async () => (await blocked.waiting()) === 0, `the ${operation} stopped waiting while the lock was held`)
+      await release(blocked)
+      expect(await ask(sql, operation, AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
+      expect((await backendOf(application))?.pid).toBe(before?.pid)
+      const [setting] = await sql<Array<{ timeout: string }>>`select current_setting('statement_timeout') as timeout`
+      expect(setting?.timeout).toBe('0')
+    },
+  )
 
   // The server tells a deadline from a database failure by `error ===
   // signal.reason`. Translated into the driver's 57014, a deadline would be

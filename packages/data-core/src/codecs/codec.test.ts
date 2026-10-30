@@ -286,9 +286,17 @@ describe('32-bit floats', () => {
   // (232) but stores 1e-50 as 0 without a word. Refused here on both engines,
   // so neither silently stores a zero the person never wrote.
   test('a value a real would store as infinity or zero is refused', () => {
-    expect(parse(REAL, 3.5e38)).toEqual({ ok: false, code: 'out-of-range', message: 'Too large for a 32-bit floating-point number, which holds up to about 3.4e38.' })
+    expect(parse(REAL, 3.5e38)).toEqual({
+      ok: false,
+      code: 'out-of-range',
+      message: 'Too large for a 32-bit floating-point number, which holds up to about 3.4e38.',
+    })
     expect(parse(REAL, -3.5e38)).toMatchObject({ ok: false, code: 'out-of-range' })
-    expect(parse(REAL, 1e-50)).toEqual({ ok: false, code: 'out-of-range', message: 'Too close to zero for a 32-bit floating-point number, which would store it as 0.' })
+    expect(parse(REAL, 1e-50)).toEqual({
+      ok: false,
+      code: 'out-of-range',
+      message: 'Too close to zero for a 32-bit floating-point number, which would store it as 0.',
+    })
     expect(accepted(REAL, 1e-45)).toBe(1e-45)
     expect(accepted(REAL, 0)).toBe(0)
     expect(accepted(REAL, Number.POSITIVE_INFINITY)).toBe('refused:not-finite')
@@ -346,7 +354,10 @@ describe('everything else', () => {
   // codec is never written at all. Each says why.
   test('generated, zoneless, rowversion, binary and unsupported columns are not editable, with a reason', () => {
     expect(codecFor(column(INT64, { generated: 'identity-always' }))).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/identity-always/) })
-    expect(codecFor(column({ kind: 'timestamp', withTimeZone: false, precision: 7 }))).toMatchObject({ status: 'read-only', reason: expect.stringMatching(/guess a zone/) })
+    expect(codecFor(column({ kind: 'timestamp', withTimeZone: false, precision: 7 }))).toMatchObject({
+      status: 'read-only',
+      reason: expect.stringMatching(/guess a zone/),
+    })
     expect(codecFor(column({ kind: 'rowversion' }))).toMatchObject({ status: 'read-only' })
     expect(codecFor(column({ kind: 'binary', maxLength: null, fixedLength: false }))).toMatchObject({ status: 'unsupported' })
     const shape = codecFor(column({ kind: 'unsupported' }, { databaseType: 'geography' }))
@@ -374,12 +385,34 @@ describe('agreement with the generated form', () => {
   // If the codec refused something the pattern accepted, a person would pass
   // the form and fail the save. Every value the pattern accepts must pass here.
   test('every decimal the generated pattern accepts, the codec accepts', () => {
-    for (const [precision, scale] of [[18, 4], [14, 2], [5, 0], [2, 2]] as const) {
+    for (const [precision, scale] of [
+      [18, 4],
+      [14, 2],
+      [5, 0],
+      [2, 2],
+    ] as const) {
       const type: NormalizedType = { kind: 'decimal', precision, scale }
       const plan = controlFor(type, false)
       if (!('field' in plan) || plan.field.pattern === undefined) throw new Error('a decimal must have a pattern')
       const pattern = new RegExp(plan.field.pattern)
-      const candidates = ['0', '1', '-1', '12', '007', '-0', '12.5', '0.99', '.5', '-.5', '0.5', '99999', '99999999999999.9999', '999999999999.99', '1.2', '12.34']
+      const candidates = [
+        '0',
+        '1',
+        '-1',
+        '12',
+        '007',
+        '-0',
+        '12.5',
+        '0.99',
+        '.5',
+        '-.5',
+        '0.5',
+        '99999',
+        '99999999999999.9999',
+        '999999999999.99',
+        '1.2',
+        '12.34',
+      ]
       for (const text of candidates.filter((candidate) => pattern.test(candidate))) {
         expect(accepted(type, text), `${text} in numeric(${String(precision)},${String(scale)})`).not.toMatch(/^refused:/)
       }

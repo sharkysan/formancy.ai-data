@@ -62,7 +62,11 @@ describe('reconcile', () => {
   // would send the person to a record their change is not in.
   test('an update whose record is still at the version sent is unchanged, from one read of that record', async () => {
     const { base, asked } = await reading(200, stored('v1'))
-    expect(await createDataClient({ token: () => 't', base }).reconcile('pg-order', unknown({}))).toEqual({ ok: true, state: 'unchanged', current: stored('v1') })
+    expect(await createDataClient({ token: () => 't', base }).reconcile('pg-order', unknown({}))).toEqual({
+      ok: true,
+      state: 'unchanged',
+      current: stored('v1'),
+    })
     expect(asked).toEqual(['POST /v1/forms/pg-order/records/read {"record":"k1:7"}'])
   })
 
@@ -98,7 +102,10 @@ describe('reconcile', () => {
     const { base, asked } = await reading(500, {})
     const client = createDataClient({ token: () => 't', base })
     expect(await client.reconcile('pg-order', unknown({ operation: 'create', record: null, version: null }))).toEqual({ ok: true, state: 'unverifiable' })
-    expect(await client.reconcile('pg-order', unknown({ operation: 'create', record: null, version: null, origin: 'transport', status: 0 }))).toEqual({ ok: true, state: 'unverifiable' })
+    expect(await client.reconcile('pg-order', unknown({ operation: 'create', record: null, version: null, origin: 'transport', status: 0 }))).toEqual({
+      ok: true,
+      state: 'unverifiable',
+    })
     expect(asked).toEqual([])
   })
 
@@ -113,11 +120,23 @@ describe('reconcile', () => {
     expect(await createDataClient({ token: () => 't', base: missing.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'absent' })
     expect(missing.asked).toEqual(['POST /v1/forms/pg-ticket/records/read {"record":"k1:7"}'])
     const there = await reading(200, stored('v1'))
-    expect(await createDataClient({ token: () => 't', base: there.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'unchanged', current: stored('v1') })
+    expect(await createDataClient({ token: () => 't', base: there.base }).reconcile('pg-ticket', deletion)).toEqual({
+      ok: true,
+      state: 'unchanged',
+      current: stored('v1'),
+    })
     const moved = await reading(200, stored('v2'))
-    expect(await createDataClient({ token: () => 't', base: moved.base }).reconcile('pg-ticket', deletion)).toEqual({ ok: true, state: 'changed', current: stored('v2') })
+    expect(await createDataClient({ token: () => 't', base: moved.base }).reconcile('pg-ticket', deletion)).toEqual({
+      ok: true,
+      state: 'changed',
+      current: stored('v2'),
+    })
     const denied = await reading(403, { code: 'operation-denied', message: 'This form is not available to you.' })
-    expect(await createDataClient({ token: () => 't', base: denied.base }).reconcile('pg-ticket', deletion)).toMatchObject({ ok: false, status: 403, code: 'operation-denied' })
+    expect(await createDataClient({ token: () => 't', base: denied.base }).reconcile('pg-ticket', deletion)).toMatchObject({
+      ok: false,
+      status: 403,
+      code: 'operation-denied',
+    })
   })
 
   // A read that is refused says nothing about the write: a person who may
@@ -134,6 +153,10 @@ describe('reconcile', () => {
       message: 'This form is not available to you.',
     })
     const down = await reading(503, { code: 'unavailable', message: 'The database cannot be reached. Nothing was saved.' })
-    expect(await createDataClient({ token: () => 't', base: down.base }).reconcile('pg-order', unknown({}))).toMatchObject({ ok: false, status: 503, code: 'unavailable' })
+    expect(await createDataClient({ token: () => 't', base: down.base }).reconcile('pg-order', unknown({}))).toMatchObject({
+      ok: false,
+      status: 503,
+      code: 'unavailable',
+    })
   })
 })

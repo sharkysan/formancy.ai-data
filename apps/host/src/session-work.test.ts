@@ -74,7 +74,13 @@ describe('what a pane would lose', () => {
   // A new record preset with its parent holds nothing until a person types:
   // the page's own answer is not the person's work.
   test('does not count a preset answer as a change', () => {
-    const session = createSession({ client, formId: 'pg-order-line', definition: definition(['read', 'create', 'update']), renderer: 'react', fixed: ['order'] })
+    const session = createSession({
+      client,
+      formId: 'pg-order-line',
+      definition: definition(['read', 'create', 'update']),
+      renderer: 'react',
+      fixed: ['order'],
+    })
     session.open({ record: null, version: null, answers: { order: 'k1:7' } })
     expect(session.work()).toBeNull()
     expect(session.state().operation).toBe('create')

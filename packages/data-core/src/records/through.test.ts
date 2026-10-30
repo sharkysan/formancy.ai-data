@@ -11,7 +11,12 @@ import type { Through } from './types.js'
  * that scopes less than the policy said, or into SQL nobody approved.
  */
 
-const LINE_ORDER = { columns: [{ name: 'order_id', type: INT64 }], target: sales('order'), targetColumns: [{ name: 'id', type: INT64 }], filters: TENANT_ONE } as unknown as Through
+const LINE_ORDER = {
+  columns: [{ name: 'order_id', type: INT64 }],
+  target: sales('order'),
+  targetColumns: [{ name: 'id', type: INT64 }],
+  filters: TENANT_ONE,
+} as unknown as Through
 
 /** A copy of the line's through with one part replaced, as a careless caller might send it. */
 const with_ = (part: Record<string, unknown>): Through => ({ ...LINE_ORDER, ...part }) as unknown as Through
@@ -21,7 +26,9 @@ describe('throughTerms', () => {
   // and the filter's typed terms, fresh, so nothing else the request carried
   // reaches a statement.
   test('reads a through the planner makes, pair by pair, with its typed terms', () => {
-    expect(throughTerms([LINE_ORDER])).toEqual([{ target: sales('order'), pairs: [{ column: 'order_id', references: 'id' }], terms: [{ column: 'tenant_id', type: INT32, value: '1' }] }])
+    expect(throughTerms([LINE_ORDER])).toEqual([
+      { target: sales('order'), pairs: [{ column: 'order_id', references: 'id' }], terms: [{ column: 'tenant_id', type: INT32, value: '1' }] },
+    ])
     expect(throughTerms([])).toEqual([])
   })
 
@@ -50,7 +57,12 @@ describe('throughTerms', () => {
       { columns: [{ name: 'order_id', type: text(10) }], targetColumns: [{ name: 'id', type: text(10) }] },
       { targetColumns: [{ name: 'id', type: text(10) }] },
       { columns: [], targetColumns: [] },
-      { columns: [{ name: 'order_id', type: INT64 }, { name: 'line_no', type: INT32 }] },
+      {
+        columns: [
+          { name: 'order_id', type: INT64 },
+          { name: 'line_no', type: INT32 },
+        ],
+      },
       { columns: [{ name: '', type: INT64 }] },
       { columns: [{ name: 'order_id', type: { kind: 'float', bits: 64 } }] },
       { target: { schema: 'sales' } },

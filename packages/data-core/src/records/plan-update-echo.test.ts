@@ -18,7 +18,10 @@ import { actor, CLERK, CLERK_RW, col, CUSTOMER_POLICY, customerForm, described, 
 /** The customer table with a rowversion, so it offers update, and a time with seconds beside its defaulted instant. */
 const SOURCE = snapshot('sqlserver', (objects) => {
   const customer = objects.find((object) => object.ref.name === 'customer')
-  customer?.columns.push(col('row_version', 8, { kind: 'rowversion' }, { generated: 'rowversion' }), col('at_time', 9, { kind: 'time', precision: 7 }, { nullable: true }))
+  customer?.columns.push(
+    col('row_version', 8, { kind: 'rowversion' }, { generated: 'rowversion' }),
+    col('at_time', 9, { kind: 'time', precision: 7 }, { nullable: true }),
+  )
 })
 const { bindings: BINDINGS } = customerForm(SOURCE)
 
@@ -33,7 +36,16 @@ const POLICY: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...CUSTOMER_POLICY.fi
 const AS_READ: FormRecord = {
   record: TOKEN,
   version: VERSION,
-  answers: { tenant_id: 1, customer_no: 1001, name: 'Muster AG', country: null, credit_limit: null, active: true, created_at: '2026-10-08T10:34:56Z', at_time: '10:34' },
+  answers: {
+    tenant_id: 1,
+    customer_no: 1001,
+    name: 'Muster AG',
+    country: null,
+    credit_limit: null,
+    active: true,
+    created_at: '2026-10-08T10:34:56Z',
+    at_time: '10:34',
+  },
 }
 
 /** The columns a planned update sets, by name, with the values it carries. */
@@ -56,14 +68,21 @@ describe('planUpdate and the record as read (0040)', () => {
       code: 'record-not-read',
       message: 'created_at, at_time are read cut to the shape, so only the record as read tells an unedited one from a change: plan the update with it.',
     })
-    expect(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { at_time: '11:22' }, undefined, described(SOURCE, BINDINGS))).toMatchObject({ ok: false, code: 'record-not-read' })
-    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { name: 'Muster AG, edited' }, undefined, described(SOURCE, BINDINGS)))).toEqual({ name: 'Muster AG, edited' })
+    expect(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { at_time: '11:22' }, undefined, described(SOURCE, BINDINGS))).toMatchObject({
+      ok: false,
+      code: 'record-not-read',
+    })
+    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { name: 'Muster AG, edited' }, undefined, described(SOURCE, BINDINGS)))).toEqual({
+      name: 'Muster AG, edited',
+    })
   })
 
   // The rule itself: equal to the record as read, at the version the update
   // is guarded by, an instant or a time is an echo and is not set.
   test('an unedited instant and time are removed against the record as read, and the rest is set', () => {
-    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, UNEDITED, AS_READ, described(SOURCE, BINDINGS)))).toEqual({ name: 'Muster AG, edited' })
+    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, UNEDITED, AS_READ, described(SOURCE, BINDINGS)))).toEqual({
+      name: 'Muster AG, edited',
+    })
   })
 
   // Removing every instant and time, equal or not, passes the case above and
@@ -71,7 +90,10 @@ describe('planUpdate and the record as read (0040)', () => {
   test('a changed instant or time is set as sent', () => {
     const changed = { ...UNEDITED, created_at: '2026-01-02T03:04:05Z', at_time: '11:22' }
     expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, changed, AS_READ, described(SOURCE, BINDINGS)))).toEqual(changed)
-    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { ...UNEDITED, at_time: null }, AS_READ, described(SOURCE, BINDINGS)))).toEqual({ name: 'Muster AG, edited', at_time: null })
+    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { ...UNEDITED, at_time: null }, AS_READ, described(SOURCE, BINDINGS)))).toEqual({
+      name: 'Muster AG, edited',
+      at_time: null,
+    })
   })
 
   // Read at another version, an equal value is still the person's older read:
@@ -118,7 +140,11 @@ describe('planUpdate and the record as read (0040)', () => {
   // left to set, and is refused as every empty patch is, once, here.
   test('an update whose only change was an unedited instant and time is nothing-to-update', () => {
     const { name: _name, ...temporal } = UNEDITED
-    expect(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, temporal, AS_READ, described(SOURCE, BINDINGS))).toEqual({ ok: false, code: 'nothing-to-update', message: 'These answers change no column.' })
+    expect(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, temporal, AS_READ, described(SOURCE, BINDINGS))).toEqual({
+      ok: false,
+      code: 'nothing-to-update',
+      message: 'These answers change no column.',
+    })
   })
 
   // What no shape names -- PostgreSQL's `infinity` and `24:00` -- is read in a
@@ -127,8 +153,34 @@ describe('planUpdate and the record as read (0040)', () => {
   // another such spelling it is the person's, and the codec refuses it.
   test('an unedited value no shape names is removed before the codec; one entered is refused by it', () => {
     const odd: FormRecord = { ...AS_READ, answers: { ...AS_READ.answers, created_at: 'infinity', at_time: '24:00' } }
-    expect(setBy(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { ...UNEDITED, created_at: 'infinity', at_time: '24:00' }, odd, described(SOURCE, BINDINGS)))).toEqual({ name: 'Muster AG, edited' })
-    expect(planUpdate(SOURCE, BINDINGS, POLICY, CLERK, TOKEN, VERSION, { ...UNEDITED, created_at: 'infinity', at_time: '24:00' }, AS_READ, described(SOURCE, BINDINGS))).toMatchObject({
+    expect(
+      setBy(
+        planUpdate(
+          SOURCE,
+          BINDINGS,
+          POLICY,
+          CLERK,
+          TOKEN,
+          VERSION,
+          { ...UNEDITED, created_at: 'infinity', at_time: '24:00' },
+          odd,
+          described(SOURCE, BINDINGS),
+        ),
+      ),
+    ).toEqual({ name: 'Muster AG, edited' })
+    expect(
+      planUpdate(
+        SOURCE,
+        BINDINGS,
+        POLICY,
+        CLERK,
+        TOKEN,
+        VERSION,
+        { ...UNEDITED, created_at: 'infinity', at_time: '24:00' },
+        AS_READ,
+        described(SOURCE, BINDINGS),
+      ),
+    ).toMatchObject({
       ok: false,
       code: 'invalid-values',
       fieldErrors: [

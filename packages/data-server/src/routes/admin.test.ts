@@ -2,7 +2,16 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, serverStanding } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, RecordAdapter, ServerIdentity } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  LookupAdapter,
+  MetadataSnapshot,
+  NormalizedType,
+  ObjectMeta,
+  RecordAdapter,
+  ServerIdentity,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -13,7 +22,17 @@ import type { ConnectionRegistry } from '../connections.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** The database as it is "now", and who discovers it; a test changes either to make drift. */
@@ -22,30 +41,68 @@ let account: MetadataSnapshot['account']
 /** Off unless a test turns it on: an employee's department, a lookup target whose `region` a policy can filter on. */
 let department: { region: NormalizedType } | null
 function snapshot(): MetadataSnapshot {
-  const departmentObjects: ObjectMeta[] = department === null ? [] : [{
-    ref: { schema: 'sales', name: 'dept' }, kind: 'table', comment: null,
-    columns: [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('region', 3, department.region)],
-    primaryKey: { name: 'pk_dept', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-  }]
+  const departmentObjects: ObjectMeta[] =
+    department === null
+      ? []
+      : [
+          {
+            ref: { schema: 'sales', name: 'dept' },
+            kind: 'table',
+            comment: null,
+            columns: [
+              col('id', 1, INT32),
+              col('name', 2, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }),
+              col('region', 3, department.region),
+            ],
+            primaryKey: { name: 'pk_dept', columns: ['id'] },
+            uniqueKeys: [],
+            foreignKeys: [],
+            checks: [],
+            rowSecurity: 'none',
+          },
+        ]
   return createSnapshot({
-    kind: 'sqlserver', serverVersion: '16.0', account, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null,
-      columns: department === null ? columns : [...columns, col('dept_id', 9, INT32)],
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [],
-      foreignKeys: department === null ? [] : [{
-        name: 'fk_employee_dept', columns: ['dept_id'], references: { table: { schema: 'sales', name: 'dept' }, columns: ['id'] },
-        onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true,
-      }],
-      checks: [], rowSecurity: 'none',
-    }, ...departmentObjects],
+    kind: 'sqlserver',
+    serverVersion: '16.0',
+    account,
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns: department === null ? columns : [...columns, col('dept_id', 9, INT32)],
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys:
+          department === null
+            ? []
+            : [
+                {
+                  name: 'fk_employee_dept',
+                  columns: ['dept_id'],
+                  references: { table: { schema: 'sales', name: 'dept' }, columns: ['id'] },
+                  onUpdate: 'no-action',
+                  onDelete: 'no-action',
+                  enforced: true,
+                  validated: true,
+                },
+              ],
+        checks: [],
+        rowSecurity: 'none',
+      },
+      ...departmentObjects,
+    ],
   })
 }
 
 /** Accepts three literal tokens: an administrator, a clerk, and nothing else. */
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
-    : token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: 't' } } }
+  token === 'admin'
+    ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
+    : token === 'clerk'
+      ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: 't' } } }
       : { ok: false, reason: 'bad' }
 
 let root: string
@@ -87,7 +144,11 @@ const POLICY = {
 }
 
 beforeEach(async () => {
-  columns = [col('id', 1, INT32), col('name', 2, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })]
+  columns = [
+    col('id', 1, INT32),
+    col('name', 2, { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
+    col('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' }),
+  ]
   account = { user: 'dbo', login: 'sa' }
   department = null
   reachable = true
@@ -103,7 +164,17 @@ afterEach(async () => {
 
 /** A proposal published as proposed: format 2, with nothing chosen over the generated base (0030). */
 function bundleOf(proposal: any, policy: unknown = POLICY) {
-  return { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+  return {
+    format: 2,
+    connection: 'erp',
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation: EMPTY_PRESENTATION,
+    form: proposal.form,
+    bindings: proposal.bindings,
+    policy,
+    snapshot: proposal.snapshot,
+  }
 }
 
 /** Propose, then publish what was proposed with a policy, as an administrator would. */
@@ -128,9 +199,17 @@ describe('the administrator plane', () => {
   // hosts and ports.
   test('tests and discovers allowlisted connections, and says nothing about an unreachable one', async () => {
     expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json()).toEqual({
-      kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160, standing: { tested: true, says: serverStanding('sqlserver', identity).says },
+      kind: 'sqlserver',
+      version: '16.0',
+      product: 'sqlserver',
+      major: 16,
+      compatibility: 160,
+      standing: { tested: true, says: serverStanding('sqlserver', identity).says },
     })
-    expect((await app.inject({ method: 'GET', url: '/v1/connections/erp/metadata', headers: as('admin') })).json()).toMatchObject({ kind: 'sqlserver', objects: [{ ref: { name: 'employee' } }] })
+    expect((await app.inject({ method: 'GET', url: '/v1/connections/erp/metadata', headers: as('admin') })).json()).toMatchObject({
+      kind: 'sqlserver',
+      objects: [{ ref: { name: 'employee' } }],
+    })
     expect((await app.inject({ method: 'GET', url: '/v1/connections/elsewhere/metadata', headers: as('admin') })).statusCode).toBe(404)
     reachable = false
     const down = await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })
@@ -151,7 +230,10 @@ describe('the administrator plane', () => {
     expect(tested.json()).toEqual({ ...identity, standing: { tested: false, says: serverStanding('sqlserver', identity).says } })
     expect(tested.json().standing.says).toMatch(/compatibility level, 140, is below/)
     identity = { kind: 'sqlserver', version: '12.0.2000.8', product: 'azure-sql-database', major: 12 }
-    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json().standing).toEqual({ tested: false, says: serverStanding('sqlserver', identity).says })
+    expect((await app.inject({ method: 'POST', url: '/v1/connections/erp/test', headers: as('admin') })).json().standing).toEqual({
+      tested: false,
+      says: serverStanding('sqlserver', identity).says,
+    })
   })
 
   // A proposal is generateForm over a fresh discovery: the form, its bindings,
@@ -165,15 +247,31 @@ describe('the administrator plane', () => {
     expect(proposal.snapshot.fingerprint).toBe(proposal.bindings.snapshotFingerprint)
     // What it was generated from, normalised, so a format-2 bundle can keep
     // it and a regeneration can ask for the same form again (0030).
-    expect(proposal.generation).toEqual({ connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee', lookups: [], pinned: [] })
-    const refused = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, root: { schema: 'sales', name: 'nope' } } })
+    expect(proposal.generation).toEqual({
+      connection: 'erp',
+      root: { schema: 'sales', name: 'employee' },
+      formId: 'employee',
+      title: 'Employee',
+      lookups: [],
+      pinned: [],
+    })
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/form-proposals',
+      headers: as('admin'),
+      payload: { ...PROPOSAL, root: { schema: 'sales', name: 'nope' } },
+    })
     expect(refused.statusCode).toBe(422)
-    expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId: 'Employee' } })).statusCode).toBe(400)
+    expect(
+      (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId: 'Employee' } })).statusCode,
+    ).toBe(400)
     // The policy's pinned columns reach the generator, so the field the tenant
     // comes from is read-only rather than a required field nobody may fill.
     const pinned = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: ['name'] } })).json()
     expect(pinned.bindings.fields.find((binding: { field: string }) => binding.field === 'name')).toMatchObject({ writes: { create: false, update: false } })
-    expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: 'name' } })).statusCode).toBe(400)
+    expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, pinned: 'name' } })).statusCode).toBe(
+      400,
+    )
   })
 
   // The store takes a form id of up to 128 characters, and Fastify's router
@@ -213,11 +311,27 @@ describe('the administrator plane', () => {
   test('refuses a bundle that does not validate, belongs to another form, or names an unknown connection', async () => {
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
     const bundle = bundleOf(proposal)
-    const loose = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, policy: { ...POLICY, fields: { ghost: { read: [], write: [] } } } } } })
+    const loose = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, policy: { ...POLICY, fields: { ghost: { read: [], write: [] } } } } },
+    })
     expect(loose.statusCode).toBe(422)
     expect(loose.json().problems).toContainEqual(expect.stringMatching(/ghost/))
-    expect((await app.inject({ method: 'POST', url: '/v1/forms/other/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })).statusCode).toBe(422)
-    expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, connection: 'elsewhere' } } })).statusCode).toBe(422)
+    expect(
+      (await app.inject({ method: 'POST', url: '/v1/forms/other/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })).statusCode,
+    ).toBe(422)
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/forms/employee/versions',
+          headers: as('admin'),
+          payload: { expectedBase: null, bundle: { ...bundle, connection: 'elsewhere' } },
+        })
+      ).statusCode,
+    ).toBe(422)
     expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { bundle } })).statusCode).toBe(400)
     expect(await store.latest('employee')).toBeNull()
   })
@@ -230,7 +344,10 @@ describe('the administrator plane', () => {
     const bundle = { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
     const refused = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
     expect(refused.statusCode).toBe(422)
-    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
+    expect(refused.json()).toMatchObject({
+      code: 'invalid-bundle',
+      problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'],
+    })
     expect(await store.latest('employee')).toBeNull()
   })
 
@@ -247,15 +364,37 @@ describe('the administrator plane', () => {
     const grids = (form: { layouts: Array<{ nodes: Grid[] }> }) => form.layouts[0]?.nodes.map((node) => node.children[0]?.children ?? []) ?? []
     const moved = JSON.parse(JSON.stringify(bundle.form)) as { layouts: Array<{ nodes: Grid[] }> }
     const [main, record] = grids(moved)
-    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'name'), 1) ?? []))
+    record?.push(
+      ...(main?.splice(
+        main.findIndex((node) => node.path === 'name'),
+        1,
+      ) ?? []),
+    )
 
-    const bare = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, form: moved } } })
+    const bare = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, form: moved } },
+    })
     expect(bare.statusCode).toBe(422)
-    expect(bare.json()).toMatchObject({ code: 'invalid-bundle', problems: ['form: is not the base with its presentation applied; the form, the base or the presentation was edited'] })
+    expect(bare.json()).toMatchObject({
+      code: 'invalid-bundle',
+      problems: ['form: is not the base with its presentation applied; the form, the base or the presentation was edited'],
+    })
     expect(await store.latest('employee')).toBeNull()
 
-    const presentation = { version: 1, fields: [{ field: 'name', anchor: { kind: 'column', column: 'name' }, section: { label: 'Record', occurrence: 0 } }], sections: [] }
-    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation, form: moved } } })
+    const presentation = {
+      version: 1,
+      fields: [{ field: 'name', anchor: { kind: 'column', column: 'name' }, section: { label: 'Record', occurrence: 0 } }],
+      sections: [],
+    }
+    const published = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, presentation, form: moved } },
+    })
     expect(published.statusCode, published.body).toBe(201)
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
     expect(served.bundle.presentation).toEqual(presentation)
@@ -271,13 +410,23 @@ describe('the administrator plane', () => {
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
     const bundle = bundleOf(proposal)
     const misfit = { ...EMPTY_PRESENTATION, views: [{ name: 'Seventh', filter: [{ field: 'id', op: 'equals', value: 'seven' }], sort: [] }] }
-    const refused = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation: misfit } } })
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, presentation: misfit } },
+    })
     expect(refused.statusCode).toBe(422)
     expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: [expect.stringMatching(/^presentation: \/views\/0 \(“Seventh”\): .*id/)] })
     expect(await store.latest('employee')).toBeNull()
 
     const views = [{ name: 'By name', filter: [{ field: 'name', op: 'contains', text: 'Ada' }], sort: [{ field: 'name', direction: 'asc' }], default: true }]
-    const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle: { ...bundle, presentation: { ...EMPTY_PRESENTATION, views } } } })
+    const published = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, presentation: { ...EMPTY_PRESENTATION, views } } },
+    })
     expect(published.statusCode, published.body).toBe(201)
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
     expect(served.bundle.presentation.views).toEqual(views)
@@ -311,7 +460,9 @@ describe('the administrator plane', () => {
     const file = join(root, 'employee', '1.json')
     // Widen the snapshot's column: the planner would then accept names the
     // database refuses. The form and bindings are left exactly as published.
-    const stored = JSON.parse(await readFile(file, 'utf8')) as { snapshot: { objects: Array<{ columns: Array<{ name: string; type: { maxLength?: number } }> }> } }
+    const stored = JSON.parse(await readFile(file, 'utf8')) as {
+      snapshot: { objects: Array<{ columns: Array<{ name: string; type: { maxLength?: number } }> }> }
+    }
     const name = stored.snapshot.objects[0]?.columns.find((entry) => entry.name === 'name')
     if (name !== undefined) name.type.maxLength = 4000
     await writeFile(file, JSON.stringify(stored, null, 2))
@@ -324,7 +475,11 @@ describe('the administrator plane', () => {
   // form's bindings: a dropped bound column blocks the form.
   test('reports drift between the published version and the database now', async () => {
     await publish()
-    expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()).toMatchObject({ version: 1, changes: [], blocking: false })
+    expect((await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()).toMatchObject({
+      version: 1,
+      changes: [],
+      blocking: false,
+    })
     columns = columns.filter((entry) => entry.name !== 'name')
     const drift = (await app.inject({ method: 'POST', url: '/v1/forms/employee/drift', headers: as('admin') })).json()
     expect(drift.blocking).toBe(true)
@@ -339,8 +494,18 @@ describe('the administrator plane', () => {
   // handed it any other policy would report nothing here.
   test('drift sees a lookup filter column retyped, from the published policy', async () => {
     department = { region: { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false } }
-    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'] }] } })).json()
-    const fields = (proposal.bindings.fields as Array<{ field: string; writable: boolean }>).map((binding) => [binding.field, { read: ['clerk'], write: binding.writable ? ['clerk'] : [] }])
+    const proposal = (
+      await app.inject({
+        method: 'POST',
+        url: '/v1/form-proposals',
+        headers: as('admin'),
+        payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'] }] },
+      })
+    ).json()
+    const fields = (proposal.bindings.fields as Array<{ field: string; writable: boolean }>).map((binding) => [
+      binding.field,
+      { read: ['clerk'], write: binding.writable ? ['clerk'] : [] },
+    ])
     const policy = { ...POLICY, fields: Object.fromEntries(fields), lookups: { dept: [{ column: 'region', attribute: 'tenant' }] } }
     const bundle = bundleOf(proposal, policy)
     const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
@@ -373,13 +538,26 @@ describe('the administrator plane', () => {
       expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups } })).statusCode).toBe(400)
     }
     for (const wrong of [{ connection: 1 }, { root: 'sales.employee' }, { root: { schema: 'sales' } }, { title: 7 }, { versionColumn: 1 }]) {
-      expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, ...wrong } })).statusCode, JSON.stringify(wrong)).toBe(400)
+      expect(
+        (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, ...wrong } })).statusCode,
+        JSON.stringify(wrong),
+      ).toBe(400)
     }
-    const unknownKey = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_nope', display: ['name'] }] } })
+    const unknownKey = await app.inject({
+      method: 'POST',
+      url: '/v1/form-proposals',
+      headers: as('admin'),
+      payload: { ...PROPOSAL, lookups: [{ foreignKey: 'fk_nope', display: ['name'] }] },
+    })
     expect(unknownKey.statusCode).toBe(422)
     expect(unknownKey.json().message).toMatch(/no foreign key fk_nope/)
-    expect((await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: { ...as('admin'), 'content-type': 'application/json' }, payload: '[1]' })).statusCode).toBe(400)
-    expect((await app.inject({ method: 'POST', url: '/v1/forms/Employee/versions', headers: as('admin'), payload: { expectedBase: null } })).statusCode).toBe(400)
+    expect(
+      (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: { ...as('admin'), 'content-type': 'application/json' }, payload: '[1]' }))
+        .statusCode,
+    ).toBe(400)
+    expect((await app.inject({ method: 'POST', url: '/v1/forms/Employee/versions', headers: as('admin'), payload: { expectedBase: null } })).statusCode).toBe(
+      400,
+    )
     expect((await app.inject({ method: 'GET', url: '/v1/forms/Employee/versions/latest', headers: as('admin') })).statusCode).toBe(404)
   })
 
@@ -389,14 +567,27 @@ describe('the administrator plane', () => {
     const failing: ConnectionRegistry = {
       ...registry(),
       open: async () => ({
-        adapter: { kind: 'sqlserver', ping: async () => { throw new Error('login failed for sa on 10.0.0.5') }, discover: async () => { throw new Error('timeout on 10.0.0.5') }, close: async () => {} } as DatabaseAdapter,
+        adapter: {
+          kind: 'sqlserver',
+          ping: async () => {
+            throw new Error('login failed for sa on 10.0.0.5')
+          },
+          discover: async () => {
+            throw new Error('timeout on 10.0.0.5')
+          },
+          close: async () => {},
+        } as DatabaseAdapter,
         lookups: {} as LookupAdapter,
         records: {} as RecordAdapter,
       }),
     }
     await publish()
     const broken = await createDataServer({ verifyIdentity, admin: { registry: failing, store, adminRoles: ['data-admin'], audit } })
-    for (const [method, url] of [['POST', '/v1/connections/erp/test'], ['GET', '/v1/connections/erp/metadata'], ['POST', '/v1/forms/employee/drift']] as const) {
+    for (const [method, url] of [
+      ['POST', '/v1/connections/erp/test'],
+      ['GET', '/v1/connections/erp/metadata'],
+      ['POST', '/v1/forms/employee/drift'],
+    ] as const) {
       const response = await broken.inject({ method, url, headers: as('admin') })
       expect(response.statusCode, url).toBe(503)
       expect(response.body).not.toContain('10.0.0.5')

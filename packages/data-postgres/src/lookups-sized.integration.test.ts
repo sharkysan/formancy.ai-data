@@ -93,7 +93,13 @@ beforeAll(async () => {
   // As a deployment builds the order form's customer lookup: discovered,
   // generated with `name` displayed, then derived with no option set.
   const sales = await discoverPostgres(owner, { schemas: ['sales'] })
-  const { bindings } = generateForm(sales, { connection: 'test', root: { schema: 'sales', name: 'order' }, formId: 'sized', title: 'Sized', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+  const { bindings } = generateForm(sales, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'sized',
+    title: 'Sized',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  })
   const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
   if (field === undefined) throw new Error('the generator made no customer lookup')
   config = buildLookupConfig(bindings, field.field, { snapshot: sales })
@@ -176,7 +182,9 @@ function rowsRead(plan: Explained): { read: number; bound: number } {
 function shape(plan: Explained): string[] {
   return customerScans(plan).map((node) => {
     const index = (node.Plans ?? []).find((child) => child['Node Type'] === 'Bitmap Index Scan')
-    return index === undefined ? node['Node Type'] : `${node['Node Type']} <- ${index['Node Type']} using ${String(index['Index Name'])} ${String(index['Index Cond'])}`
+    return index === undefined
+      ? node['Node Type']
+      : `${node['Node Type']} <- ${index['Node Type']} using ${String(index['Index Name'])} ${String(index['Index Cond'])}`
   })
 }
 
@@ -187,10 +195,16 @@ function expectedPage(search: string): LookupResult {
 }
 
 /** The tenant's index condition as the server prints it: with each key's `is not null` where it keeps them (VERSION_FACTS.notNullTestsRemoved). */
-const tenantCondition = (): string => (versionFact('notNullTestsRemoved', fixture.server) ? '(tenant_id = 1)' : '((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL))')
+const tenantCondition = (): string =>
+  versionFact('notNullTestsRemoved', fixture.server) ? '(tenant_id = 1)' : '((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL))'
 
 describe.each([
-  ['the order form, filtered to the tenant', TENANT_1, TENANT_ROWS, (): string => `Bitmap Heap Scan <- Bitmap Index Scan using pk_customer ${tenantCondition()}`],
+  [
+    'the order form, filtered to the tenant',
+    TENANT_1,
+    TENANT_ROWS,
+    (): string => `Bitmap Heap Scan <- Bitmap Index Scan using pk_customer ${tenantCondition()}`,
+  ],
   ['a form with no tenant row filter', NO_TENANT_FILTER, TABLE_ROWS, (): string => 'Seq Scan'],
 ] as const)('lookups over the sized customers on %s', (_form, filters, pinned, family) => {
   // The answer both engines must give, row for row, in code-point order on
@@ -225,7 +239,13 @@ describe.each([
     const { statement } = await capture(() => createPostgresLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NEVER))
     const plan = await explain(statement, 'defaults')
     const { read, bound } = rowsRead(plan)
-    console.log(`${_form}, ${name}: workers launched ${JSON.stringify(nodes(plan.Plan).map((node) => node['Workers Launched']).filter((n) => n !== undefined))}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`)
+    console.log(
+      `${_form}, ${name}: workers launched ${JSON.stringify(
+        nodes(plan.Plan)
+          .map((node) => node['Workers Launched'])
+          .filter((n) => n !== undefined),
+      )}, JIT ${JSON.stringify(plan.JIT ?? null)}, read ${String(read)} ± ${String(bound)}`,
+    )
     expect(plan.Plan['Actual Rows']).toBeLessThanOrEqual(51)
     expect(Math.abs(read - pinned), `read ${String(read)}, pinned ${String(pinned)}, rounding bound ${String(bound)}`).toBeLessThanOrEqual(bound)
     expect(shape(plan)).toEqual([family()])
@@ -244,7 +264,14 @@ describe('resolving and checking keys on the sized customers', () => {
     [1, 'defaults'],
   ] as const)('resolving %i keys reads at most one row per key (%s)', async (n, session) => {
     const keys = sizedResolveKeys(n)
-    const { answer, statement } = await capture(() => createPostgresLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1, NEVER))
+    const { answer, statement } = await capture(() =>
+      createPostgresLookups(writer).resolve(
+        config,
+        keys.map((key) => tokenOf(key.tenantId, key.customerNo)),
+        TENANT_1,
+        NEVER,
+      ),
+    )
     expect(answer).toHaveLength(n)
     const plan = await explain(statement, session)
     expect(rowsRead(plan).read).toBeGreaterThan(0)

@@ -129,7 +129,9 @@ describe('connectSqlServer, for a SQL login', () => {
     const pool = await connectSqlServer({ ...address(), user: container.getUsername(), password: container.getPassword() })
     try {
       expect(tediousConfigOf(pool).options.connector).toBe(encryptedConnector)
-      const session = await pool.request().query<{ encrypted: string }>('select encrypt_option as encrypted from sys.dm_exec_connections where session_id = @@spid')
+      const session = await pool
+        .request()
+        .query<{ encrypted: string }>('select encrypt_option as encrypted from sys.dm_exec_connections where session_id = @@spid')
       expect(session.recordset).toEqual([{ encrypted: 'TRUE' }])
     } finally {
       await pool.close()
@@ -179,7 +181,11 @@ describe('connectSqlServer, for an Entra principal', () => {
   test('is refused at TLS on the run’s image, before any login reaches the server', async () => {
     const asked = vi.spyOn(ManagedIdentityCredential.prototype, 'getToken').mockRejectedValue(new Error('a test asks Entra nothing'))
     const before = await failedLogins()
-    const error = await connectSqlServer({ ...address(), trustServerCertificate: false, entra: { type: 'managed-identity', clientId: '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f' } }).then(
+    const error = await connectSqlServer({
+      ...address(),
+      trustServerCertificate: false,
+      entra: { type: 'managed-identity', clientId: '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f' },
+    }).then(
       () => undefined,
       (rejected: unknown) => rejected,
     )
@@ -196,6 +202,9 @@ function address(): { host: string; port: number; database: string; encrypt: boo
 }
 
 /** What mssql hands tedious for each connection it opens: the pool's private `_config()`. */
-function tediousConfigOf(pool: mssql.ConnectionPool): { authentication: { type: string; options: Record<string, unknown> }; options: { debug?: unknown; connector?: unknown } } {
+function tediousConfigOf(pool: mssql.ConnectionPool): {
+  authentication: { type: string; options: Record<string, unknown> }
+  options: { debug?: unknown; connector?: unknown }
+} {
   return (pool as unknown as { _config(): ReturnType<typeof tediousConfigOf> })._config()
 }

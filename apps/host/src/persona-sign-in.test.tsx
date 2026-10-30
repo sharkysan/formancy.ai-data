@@ -36,7 +36,9 @@ const REPOSITORY = (
   JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'packages', 'data-core', 'package.json'), 'utf8')) as {
     repository: { url: string }
   }
-).repository.url.replace(/^git\+/, '').replace(/\.git$/, '')
+).repository.url
+  .replace(/^git\+/, '')
+  .replace(/\.git$/, '')
 
 /** How long a sign-in and the menu may take: the server publishes nothing here, but Angular may still be arriving from the last test. */
 const ARRIVES_WITHIN = { timeout: 15_000 }
@@ -89,7 +91,11 @@ describe('signed out, the demo', () => {
       const button = await screen.findByRole('button', { name: `Sign in as ${persona.name}` }, ARRIVES_WITHIN)
       expect({ persona: persona.id, description: computeAccessibleDescription(button) }).toEqual({ persona: persona.id, description: persona.description })
     }
-    expect(within(screen.getByRole('list', { name: 'People' })).getAllByRole('button').map((button) => button.textContent)).toEqual(PERSONAS.map((persona) => `Sign in as ${persona.name}`))
+    expect(
+      within(screen.getByRole('list', { name: 'People' }))
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(PERSONAS.map((persona) => `Sign in as ${persona.name}`))
     expect(screen.queryByLabelText('Host token')).toBeNull()
     expect(lines(door)).toEqual([`GET ${PREFIX}/session`])
     expect(door.tokens).toEqual([])
@@ -116,7 +122,8 @@ describe('signed out, the demo', () => {
   // lost it -- has nobody to offer. It says so, and offers no button that
   // could only fail.
   test('without the Worker, says the demo did not answer, and offers nobody; and passes the floor', async () => {
-    const notTheWorker: typeof globalThis.fetch = async () => new Response('<!doctype html><p>Not found', { status: 404, headers: { 'content-type': 'text/html' } })
+    const notTheWorker: typeof globalThis.fetch = async () =>
+      new Response('<!doctype html><p>Not found', { status: 404, headers: { 'content-type': 'text/html' } })
     mount(notTheWorker, { base: PREFIX, session: demoSession(notTheWorker, PREFIX) })
     expect((await screen.findByRole('alert', {}, ARRIVES_WITHIN)).textContent).toBe('The demo did not answer in a way this page understands.')
     expect(screen.queryByRole('list', { name: 'People' })).toBeNull()
@@ -135,7 +142,10 @@ describe('signing in as a person', () => {
     await screen.findByRole('navigation', { name: 'Forms' }, ARRIVES_WITHIN)
     expect(lines(door)).toEqual([`GET ${PREFIX}/session`, `POST ${PREFIX}/session`, `GET ${PREFIX}/v1/forms`])
     const [, signIn, menu] = door.sent
-    expect({ body: signIn?.body, authorization: signIn?.headers['authorization'] }).toEqual({ body: JSON.stringify({ persona: 'clara' }), authorization: undefined })
+    expect({ body: signIn?.body, authorization: signIn?.headers['authorization'] }).toEqual({
+      body: JSON.stringify({ persona: 'clara' }),
+      authorization: undefined,
+    })
     const [token] = door.tokens
     expect(menu?.headers['authorization']).toBe(`Bearer ${String(token)}`)
     for (const sent of door.sent) {

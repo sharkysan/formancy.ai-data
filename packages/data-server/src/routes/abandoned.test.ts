@@ -91,7 +91,12 @@ describe('abandonment', () => {
   test("aborts the route's signal with an AbortError when the client's fetch aborts", async () => {
     const { port, started } = await serve(10_000)
     const controller = new AbortController()
-    const sent = fetch(`http://127.0.0.1:${String(port)}/slow`, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: controller.signal })
+    const sent = fetch(`http://127.0.0.1:${String(port)}/slow`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body,
+      signal: controller.signal,
+    })
     const seen = await started()
     controller.abort()
     await expect(sent).rejects.toThrow()
@@ -164,11 +169,14 @@ describe('abandonment', () => {
 /** One POST on `agent`, its body as text. */
 function post(port: number, agent: http.Agent): Promise<string> {
   return new Promise((resolve, reject) => {
-    const request = http.request({ port, host: '127.0.0.1', method: 'POST', path: '/slow', agent, headers: { 'content-type': 'application/json' } }, (response) => {
-      const chunks: Buffer[] = []
-      response.on('data', (chunk: Buffer) => chunks.push(chunk))
-      response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-    })
+    const request = http.request(
+      { port, host: '127.0.0.1', method: 'POST', path: '/slow', agent, headers: { 'content-type': 'application/json' } },
+      (response) => {
+        const chunks: Buffer[] = []
+        response.on('data', (chunk: Buffer) => chunks.push(chunk))
+        response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
+      },
+    )
     request.on('error', reject)
     request.end(body)
   })

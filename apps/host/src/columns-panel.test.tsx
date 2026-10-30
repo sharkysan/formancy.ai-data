@@ -87,7 +87,8 @@ async function press(user: User, control: HTMLElement, key = '{Enter}'): Promise
 }
 
 /** The filter and sort of each list request sent for `formId`, with its offset. */
-const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'offset'>> => listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, offset: body.offset }))
+const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'offset'>> =>
+  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, offset: body.offset }))
 
 /** Fresh orders of tenant 1's, noted `notes`, one per amount, made beside the page. */
 async function freshOrders(engine: Engine, notes: string, amounts: readonly string[]): Promise<string[]> {
@@ -97,7 +98,13 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
   const records: string[] = []
   for (const amount of amounts) {
-    const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount, notes })
+    const created = await plane.clerk.create(engine.formId, {
+      customer: found.value.rows[0].token,
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount,
+      notes,
+    })
     if (!created.ok || created.value.record === null) throw new Error('the order was not created')
     records.push(created.value.record)
   }
@@ -197,7 +204,9 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await headed('Records', [last, 'Delete'])
     const box = showBox('Records', last)
     expect(box.getAttribute('aria-disabled')).toBe('true')
-    expect(within(gridSection('Records')).getByRole('checkbox', { name: `Show ${last}`, description: 'One column stays shown: a row is opened through its cells.' })).toBe(box)
+    expect(
+      within(gridSection('Records')).getByRole('checkbox', { name: `Show ${last}`, description: 'One column stays shown: a row is opened through its cells.' }),
+    ).toBe(box)
     await press(user, box, ' ')
     expect(box.checked).toBe(true)
     expect(focusedName()).toBe(`Show ${last}`)
@@ -291,7 +300,10 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await openColumns(user, 'Delivery')
     expect(listed('Delivery')).toEqual(labels.map((label) => ({ label, shown: true })))
     await press(user, showBox('Delivery', 'Carrier'), ' ')
-    await headed('Delivery', labels.filter((label) => label !== 'Carrier'))
+    await headed(
+      'Delivery',
+      labels.filter((label) => label !== 'Carrier'),
+    )
     expect(keptFor(childGrid('order'), engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
     expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
     expect(headers('Records')).toContain('Notes')

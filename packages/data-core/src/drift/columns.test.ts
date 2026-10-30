@@ -57,7 +57,12 @@ describe('diffSnapshots: columns', () => {
   // column the form never bound is somebody else's change.
   test('a dropped bound column blocks the writes that use it; a dropped unbound one is only noted', () => {
     const notes = drift((objects) => dropColumn(objects, 'order', 'notes'))
-    expect(only(notes)).toMatchObject({ kind: 'column-dropped', severity: 'blocking', subject: { kind: 'column', object: ORDER_REF, name: 'notes' }, affects: ['notes'] })
+    expect(only(notes)).toMatchObject({
+      kind: 'column-dropped',
+      severity: 'blocking',
+      subject: { kind: 'column', object: ORDER_REF, name: 'notes' },
+      affects: ['notes'],
+    })
     expect(notes.writable).toEqual({ create: false, update: false, delete: false })
 
     const attachment = drift((objects) => dropColumn(objects, 'order', 'attachment'))
@@ -74,7 +79,12 @@ describe('diffSnapshots: columns', () => {
   // code page, so the database's spelling counts too.
   test('a bound column whose type changed blocks the form, including a change only the spelling shows', () => {
     const float = drift((objects) => retype(objects, 'order', 'amount', 'float', { kind: 'float', bits: 64 }))
-    expect(only(float)).toMatchObject({ kind: 'column-type-changed', severity: 'blocking', affects: ['amount'], message: expect.stringMatching(/from decimal\(18,4\) to float/) })
+    expect(only(float)).toMatchObject({
+      kind: 'column-type-changed',
+      severity: 'blocking',
+      affects: ['amount'],
+      message: expect.stringMatching(/from decimal\(18,4\) to float/),
+    })
     expect(float.writable).toEqual({ create: false, update: false, delete: false })
 
     const spelling = drift((objects) => (column(objects, 'order', 'notes').databaseType = 'varchar(max)'))
@@ -104,7 +114,12 @@ describe('diffSnapshots: columns', () => {
     ]
     for (const [field, edit] of tightened) {
       const report = drift(edit)
-      expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'blocking', affects: [field], message: expect.stringMatching(/database now refuses/) })
+      expect(only(report)).toMatchObject({
+        kind: 'column-tightened',
+        severity: 'blocking',
+        affects: [field],
+        message: expect.stringMatching(/database now refuses/),
+      })
       expect(report.writable).toEqual({ create: false, update: false, delete: false })
     }
 
@@ -121,7 +136,10 @@ describe('diffSnapshots: columns', () => {
     }
 
     // A different default refuses nothing; it changes what an omitted value becomes.
-    expect(only(drift((objects) => (column(objects, 'order', 'status').defaultExpression = "('draft')")))).toMatchObject({ kind: 'column-default-changed', severity: 'info' })
+    expect(only(drift((objects) => (column(objects, 'order', 'status').defaultExpression = "('draft')")))).toMatchObject({
+      kind: 'column-default-changed',
+      severity: 'info',
+    })
   })
 
   // Narrowing a column cannot break a field that never writes it: every value
@@ -131,10 +149,15 @@ describe('diffSnapshots: columns', () => {
   // update that never names it is unaffected.
   test('a tightened column written on create only stops create and not update', () => {
     const createOnly = (objects: ObjectMeta[]) => restrict(objects, 'order', 'status', { update: false })
-    const report = drift((objects) => {
-      createOnly(objects)
-      retype(objects, 'order', 'status', 'nvarchar(10)', text(10))
-    }, {}, ORDER, snapshot(createOnly))
+    const report = drift(
+      (objects) => {
+        createOnly(objects)
+        retype(objects, 'order', 'status', 'nvarchar(10)', text(10))
+      },
+      {},
+      ORDER,
+      snapshot(createOnly),
+    )
     expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'blocking', affects: ['status'] })
     expect(report.writable).toEqual({ create: false, update: true, delete: false })
   })
@@ -144,7 +167,9 @@ describe('diffSnapshots: columns', () => {
     expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: ['id'] })
     expect(report.writable).toEqual({ create: true, update: true, delete: false })
     // Nor one no field binds at all.
-    expect(only(drift((objects) => retype(objects, 'order', 'attachment', 'varbinary(100)', { kind: 'binary', maxLength: 100, fixedLength: false })))).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: [] })
+    expect(
+      only(drift((objects) => retype(objects, 'order', 'attachment', 'varbinary(100)', { kind: 'binary', maxLength: 100, fixedLength: false }))),
+    ).toMatchObject({ kind: 'column-tightened', severity: 'info', affects: [] })
   })
 
   // But one no field writes, made NOT NULL with no default, must now be given
@@ -156,7 +181,12 @@ describe('diffSnapshots: columns', () => {
   // never names the column would be lost.
   test('a column no field writes, made NOT NULL with no default, stops create and only create', () => {
     const report = drift((objects) => (column(objects, 'order', 'attachment').nullable = false))
-    expect(only(report)).toMatchObject({ kind: 'column-tightened', severity: 'blocking', affects: [], message: expect.stringMatching(/no field of this form can/) })
+    expect(only(report)).toMatchObject({
+      kind: 'column-tightened',
+      severity: 'blocking',
+      affects: [],
+      message: expect.stringMatching(/no field of this form can/),
+    })
     expect(report.writable).toEqual({ create: false, update: true, delete: false })
   })
 
@@ -166,16 +196,31 @@ describe('diffSnapshots: columns', () => {
   // into it is saved as false. Both are silent data changes.
   test('a widened column the published field cannot hold blocks writes of it', () => {
     const wide = drift((objects) => retype(objects, 'order', 'created_by', 'bigint', INT64))
-    expect(only(wide)).toMatchObject({ kind: 'column-outgrew-field', severity: 'blocking', affects: ['created_by'], message: expect.stringMatching(/published number field/) })
+    expect(only(wide)).toMatchObject({
+      kind: 'column-outgrew-field',
+      severity: 'blocking',
+      affects: ['created_by'],
+      message: expect.stringMatching(/published number field/),
+    })
     expect(wide.writable).toEqual({ create: false, update: false, delete: false })
-    expect(only(drift((objects) => (column(objects, 'order', 'paid').nullable = true)))).toMatchObject({ kind: 'column-outgrew-field', severity: 'blocking', affects: ['paid'] })
+    expect(only(drift((objects) => (column(objects, 'order', 'paid').nullable = true)))).toMatchObject({
+      kind: 'column-outgrew-field',
+      severity: 'blocking',
+      affects: ['paid'],
+    })
 
     // Longer text becomes a textarea on regeneration, and both hold any string.
-    expect(only(drift((objects) => retype(objects, 'order', 'status', 'nvarchar(400)', text(400))))).toMatchObject({ kind: 'column-loosened', severity: 'info' })
+    expect(only(drift((objects) => retype(objects, 'order', 'status', 'nvarchar(400)', text(400))))).toMatchObject({
+      kind: 'column-loosened',
+      severity: 'info',
+    })
     // A lookup's select holds an encoded key, never the column's value as a number.
     expect(only(drift((objects) => retype(objects, 'order', 'customer_no', 'bigint', INT64)))).toMatchObject({ kind: 'column-loosened', severity: 'info' })
     // A field that only shows the value shows it rounded and never writes it back: for review.
-    expect(only(drift((objects) => retype(objects, 'customer_summary', 'tenant_id', 'bigint', INT64), {}, SUMMARY))).toMatchObject({ kind: 'column-outgrew-field', severity: 'review' })
+    expect(only(drift((objects) => retype(objects, 'customer_summary', 'tenant_id', 'bigint', INT64), {}, SUMMARY))).toMatchObject({
+      kind: 'column-outgrew-field',
+      severity: 'review',
+    })
   })
 
   // SQL Server refuses an INSERT naming an identity column, and both engines
@@ -187,7 +232,12 @@ describe('diffSnapshots: columns', () => {
     expect(computed.writable).toEqual({ create: false, update: false, delete: false })
 
     const plain = drift((objects) => (column(objects, 'order', 'id').generated = 'none'))
-    expect(only(plain)).toMatchObject({ kind: 'column-generation-changed', severity: 'blocking', affects: ['id'], message: expect.stringMatching(/no field of this form can/) })
+    expect(only(plain)).toMatchObject({
+      kind: 'column-generation-changed',
+      severity: 'blocking',
+      affects: ['id'],
+      message: expect.stringMatching(/no field of this form can/),
+    })
     expect(plain.writable).toEqual({ create: false, update: true, delete: false })
 
     expect(only(drift((objects) => (column(objects, 'order', 'attachment').generated = 'computed')))).toMatchObject({ severity: 'info' })
@@ -206,7 +256,6 @@ describe('diffSnapshots: columns', () => {
       affects: ['status'],
       message: expect.stringMatching(/^status: its length now counts utf8-bytes where it counted code-page-bytes.*blocked until it is reviewed\.$/),
     })
-
   })
 
   // A by-default identity accepts a written value, and the form would go on
@@ -272,7 +321,10 @@ describe('diffSnapshots: columns', () => {
       ['column-added', 'blocking', { kind: 'column', object: ORDER_REF, name: 'placed_on' }],
       ['possible-rename', 'review', { kind: 'column', object: ORDER_REF, name: 'order_date' }],
     ])
-    expect(report.changes[2]).toMatchObject({ affects: ['order_date'], message: expect.stringMatching(/^order_date is gone and placed_on is new with the same definition \(date\)\. .*confirm/) })
+    expect(report.changes[2]).toMatchObject({
+      affects: ['order_date'],
+      message: expect.stringMatching(/^order_date is gone and placed_on is new with the same definition \(date\)\. .*confirm/),
+    })
     expect(report.writable).toEqual({ create: false, update: false, delete: false })
 
     // Every candidate is named, and a column of another definition is none.

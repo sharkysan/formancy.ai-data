@@ -37,9 +37,13 @@ const UNSUPPORTED: NormalizedType = { kind: 'unsupported' }
 type Normalize = (facts: TypeFacts) => NormalizedType
 
 const length = (bytes: number, bytesPerUnit: number): number | null => (bytes === -1 ? null : bytes / bytesPerUnit)
-const integer = (min: string, max: string): Normalize => () => ({ kind: 'integer', min, max })
+const integer =
+  (min: string, max: string): Normalize =>
+  () => ({ kind: 'integer', min, max })
 const decimal: Normalize = (facts) => ({ kind: 'decimal', precision: facts.precision, scale: facts.scale })
-const timestamp = (withTimeZone: boolean): Normalize => (facts) => ({ kind: 'timestamp', withTimeZone, precision: facts.scale })
+const timestamp =
+  (withTimeZone: boolean): Normalize =>
+  (facts) => ({ kind: 'timestamp', withTimeZone, precision: facts.scale })
 
 /** The code page of every UTF-8 collation. */
 const UTF8_CODE_PAGE = 65001

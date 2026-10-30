@@ -10,7 +10,14 @@ import { WRITE_ID_HEADER } from '@formancy/data-core'
 import type { FormMenu, PublishedForm as OpenedForm } from '@formancy/data-core'
 import { POSTGRES_IMAGE, readFixture, startPostgresContainer } from '@formancy/data-fixtures'
 import type { StartedPostgreSqlContainer, StartedServer } from '@formancy/data-fixtures'
-import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES, parseConnections } from '@formancy/data-server'
+import {
+  createConnectionRegistry,
+  createDataServer,
+  createFileConfigurationStore,
+  createIdentityVerifier,
+  DRIVER_FACTORIES,
+  parseConnections,
+} from '@formancy/data-server'
 import type { ConnectionRegistry } from '@formancy/data-server'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import { generateDemoData } from '../data/generate.js'
@@ -100,8 +107,17 @@ beforeAll(async () => {
   registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES, { env: { FORMANCY_DEMO_DB_PASSWORD: password }, readFile: async () => '' })
   storeDir = await mkdtemp(join(tmpdir(), 'formancy-live-demo-store-'))
   const store = createFileConfigurationStore(storeDir)
-  const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: KEY }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } })
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: [ADMIN_ROLE], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const verifyIdentity = await createIdentityVerifier({
+    key: { kind: 'secret', secret: KEY },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: TENANT_CLAIM },
+  })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: [ADMIN_ROLE], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   await app.listen({ host: '127.0.0.1', port: 0 })
   const address = app.server.address()
   base = `http://127.0.0.1:${String(typeof address === 'object' && address !== null ? address.port : 0)}`
@@ -138,7 +154,10 @@ describe('the demo forms, published over the demo account', () => {
   test('offer the clerk exactly what each form offers', () => {
     for (const form of published) {
       const offered = (['create', 'update', 'delete'] as const).filter((operation) => form.offers[operation] === true)
-      expect(ROLE_GRANTS.clerk.may[form.id].filter((operation) => operation !== 'read'), form.id).toEqual(offered)
+      expect(
+        ROLE_GRANTS.clerk.may[form.id].filter((operation) => operation !== 'read'),
+        form.id,
+      ).toEqual(offered)
     }
   })
 
@@ -191,7 +210,10 @@ describe("a clerk's day on the demo's data", () => {
   test("offers each clerk their own tenant's customers, and finds none of the other's", async () => {
     const opened = (await call(as('clara'), '/v1/forms/order')).json as OpenedForm
     const source = opened.form.model.fields.find((field) => field.key === 'customer')?.optionsSource as string
-    const offered = async (who: string, search: string) => ((await call(as(who), `/v1/forms/order/lookups/${source}/query`, { operation: 'create', search })).json.rows as Array<{ label: string }>).map((row) => row.label)
+    const offered = async (who: string, search: string) =>
+      ((await call(as(who), `/v1/forms/order/lookups/${source}/query`, { operation: 'create', search })).json.rows as Array<{ label: string }>).map(
+        (row) => row.label,
+      )
     const first = await offered('clara', '')
     expect(first.length).toBeGreaterThan(0)
     for (const label of first) expect(tenantNames(1)).toContain(label)
@@ -210,7 +232,10 @@ describe("a clerk's day on the demo's data", () => {
     for (const form of ['delivery', 'order-line']) {
       const opened = (await call(as('clara'), `/v1/forms/${form}`)).json as OpenedForm
       const source = opened.form.model.fields.find((field) => field.key === 'order')?.optionsSource as string
-      const found = async (who: string, search: string) => ((await call(as(who), `/v1/forms/${form}/lookups/${source}/query`, { operation: 'create', search })).json.rows as Array<{ token: string }>).map((row) => row.token)
+      const found = async (who: string, search: string) =>
+        ((await call(as(who), `/v1/forms/${form}/lookups/${source}/query`, { operation: 'create', search })).json.rows as Array<{ token: string }>).map(
+          (row) => row.token,
+        )
       expect(await found('clara', last(1)), form).toContain(`k1:${last(1)}`)
       expect(await found('otto', last(1)), form).not.toContain(`k1:${last(1)}`)
     }
@@ -245,7 +270,8 @@ describe("a clerk's day on the demo's data", () => {
     const clara = as('clara')
     const order = (await call(clara, '/v1/forms/order')).json as OpenedForm
     const source = (key: string) => order.form.model.fields.find((field) => field.key === key)?.optionsSource as string
-    const customer = (await call(clara, `/v1/forms/order/lookups/${source('customer')}/query`, { operation: 'create', search: '' })).json.rows[0].token as string
+    const customer = (await call(clara, `/v1/forms/order/lookups/${source('customer')}/query`, { operation: 'create', search: '' })).json.rows[0]
+      .token as string
     const created = await write(clara, '/v1/forms/order/records/create', { answers: { customer, order_date: '2026-10-01', status: 'placed', amount: '12.5' } })
     expect(created.status).toBe(201)
     const record = created.json.record as string
@@ -254,17 +280,29 @@ describe("a clerk's day on the demo's data", () => {
     expect(line.status).toBe(201)
     const delivery = await write(clara, '/v1/forms/delivery/records/create', { answers: { order: record, carrier: 'Swiss Post' } })
     expect(delivery.status).toBe(201)
-    const children = async (form: string) => ((await call(clara, `/v1/forms/${form}/records/list`, { parent: { field: 'order', record } })).json.rows as Array<{ record: string }>).map((row) => row.record)
+    const children = async (form: string) =>
+      ((await call(clara, `/v1/forms/${form}/records/list`, { parent: { field: 'order', record } })).json.rows as Array<{ record: string }>).map(
+        (row) => row.record,
+      )
     expect(await children('order-line')).toEqual([line.json.record])
     expect(await children('delivery')).toEqual([delivery.json.record])
 
     expect((await call(as('otto'), '/v1/forms/order/records/read', { record })).status).toBe(404)
     const read = await call(as('vera'), '/v1/forms/order/records/read', { record })
     expect(read.status).toBe(200)
-    expect((await write(as('vera'), '/v1/forms/order/records/update', { record, version: read.json.version, answers: { ...read.json.answers, status: 'shipped' } })).status).toBe(403)
-    expect((await write(as('vera'), '/v1/forms/order/records/create', { answers: { customer, order_date: '2026-10-01', status: 'placed', amount: '1' } })).status).toBe(403)
+    expect(
+      (await write(as('vera'), '/v1/forms/order/records/update', { record, version: read.json.version, answers: { ...read.json.answers, status: 'shipped' } }))
+        .status,
+    ).toBe(403)
+    expect(
+      (await write(as('vera'), '/v1/forms/order/records/create', { answers: { customer, order_date: '2026-10-01', status: 'placed', amount: '1' } })).status,
+    ).toBe(403)
 
-    const changed = await write(clara, '/v1/forms/order/records/update', { record, version: read.json.version, answers: { ...read.json.answers, status: 'shipped' } })
+    const changed = await write(clara, '/v1/forms/order/records/update', {
+      record,
+      version: read.json.version,
+      answers: { ...read.json.answers, status: 'shipped' },
+    })
     expect(changed.status).toBe(200)
     const deleted = await write(clara, '/v1/forms/order/records/delete', { record, version: changed.json.version })
     expect(deleted.status).toBe(200)
@@ -293,7 +331,9 @@ describe('a publish that cannot', () => {
     await expect(refused).rejects.toThrow(/^customer: POST \/v1\/form-proposals answered 403, not 200: \S+ \S/)
     await expect(refused).rejects.not.toThrow(as('clara'))
     // The forms are there already, and expectedBase null says they are not.
-    await expect(publishDemoForms({ base, token: as('image-build') })).rejects.toThrow(/^customer: POST \/v1\/forms\/customer\/versions answered 409, not 201: /)
+    await expect(publishDemoForms({ base, token: as('image-build') })).rejects.toThrow(
+      /^customer: POST \/v1\/forms\/customer\/versions answered 409, not 201: /,
+    )
   })
 
   // A refused bundle's reasons are its problems; without them a build log
@@ -307,7 +347,9 @@ describe('a publish that cannot', () => {
       return fetch(input, { ...init, body: JSON.stringify(body) })
     }
     const refused = publishDemoForms({ base, token: as('image-build'), fetch: withoutCascades }, [spec('order')])
-    await expect(refused).rejects.toThrow(/^order: POST \/v1\/forms\/order\/versions answered 422, not 201: invalid-bundle .+\n {2}policy: .*fk_order_line_order/s)
+    await expect(refused).rejects.toThrow(
+      /^order: POST \/v1\/forms\/order\/versions answered 422, not 201: invalid-bundle .+\n {2}policy: .*fk_order_line_order/s,
+    )
   })
 
   // A proxy's error page is not JSON; reading it as JSON would fail with a
@@ -319,7 +361,9 @@ describe('a publish that cannot', () => {
         response.end('<html><body>Bad gateway</body></html>')
       },
       async (origin) => {
-        await expect(publishDemoForms({ base: origin, token: as('image-build') })).rejects.toThrow(/^customer: POST \/v1\/form-proposals answered 502, not 200$/)
+        await expect(publishDemoForms({ base: origin, token: as('image-build') })).rejects.toThrow(
+          /^customer: POST \/v1\/form-proposals answered 502, not 200$/,
+        )
       },
     )
   })
@@ -338,18 +382,24 @@ describe('a publish that cannot', () => {
     )
     // And one that never listens: the socket of a server closed already.
     let closed = ''
-    await serving(() => {}, async (origin) => {
-      closed = origin
-    })
+    await serving(
+      () => {},
+      async (origin) => {
+        closed = origin
+      },
+    )
     await expect(waitForHealth(closed, { deadlineMs: 300, pollMs: 50 })).rejects.toThrow(`The server at ${closed} did not answer /health within 300 ms.`)
   })
 
   // A label that says what the generator already says is refused by the
   // server (0030); refused before it is sent, with applyPresentation's reason.
-  test("refuses a label the generated form already has", async () => {
+  test('refuses a label the generated form already has', async () => {
     const order = spec('order')
     const proposal = (await call(as('image-build'), '/v1/form-proposals', generationRequest(order))).json as Proposal
-    const same: DemoFormSpec = { ...order, lookups: order.lookups.map((lookup) => (lookup.foreignKey === 'fk_order_created_by' ? { ...lookup, label: 'Employee' } : lookup)) }
+    const same: DemoFormSpec = {
+      ...order,
+      lookups: order.lookups.map((lookup) => (lookup.foreignKey === 'fk_order_created_by' ? { ...lookup, label: 'Employee' } : lookup)),
+    }
     expect(() => demoBundle(same, proposal)).toThrow(/^order: the demo's labels do not apply to the generated form: .*equals the base's/)
   })
 })

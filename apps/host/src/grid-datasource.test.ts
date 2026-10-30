@@ -12,7 +12,11 @@ import type { PublishedForm } from '@formancy/data-client'
 describe('the status line', () => {
   // A page, the last page, and a page some of whose rows have no token.
   test('says the range shown and whether more follow', () => {
-    expect(answered({ start: 0, count: 50, hasMore: true, search: '', untokened: 0, canCreate: true })).toEqual({ text: 'Rows 1–50; more follow.', help: null, clear: false })
+    expect(answered({ start: 0, count: 50, hasMore: true, search: '', untokened: 0, canCreate: true })).toEqual({
+      text: 'Rows 1–50; more follow.',
+      help: null,
+      clear: false,
+    })
     expect(answered({ start: 50, count: 23, hasMore: false, search: '', untokened: 0, canCreate: true }).text).toBe('Rows 51–73.')
     expect(answered({ start: 0, count: 5, hasMore: false, search: '', untokened: 1, canCreate: true }).text).toBe('Rows 1–5. 1 of these rows cannot be opened.')
   })
@@ -21,15 +25,27 @@ describe('the status line', () => {
   // searched for and offers to clear it, so "No records." never reads as
   // an empty table when it is an empty search.
   test('tells no records from no match', () => {
-    expect(answered({ start: 0, count: 0, hasMore: false, search: '', untokened: 0, canCreate: true })).toEqual({ text: 'No records.', help: 'New record starts the first one.', clear: false })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', untokened: 0, canCreate: true })).toEqual({
+      text: 'No records.',
+      help: 'New record starts the first one.',
+      clear: false,
+    })
     expect(answered({ start: 0, count: 0, hasMore: false, search: '', untokened: 0, canCreate: false }).help).toBeNull()
-    expect(answered({ start: 0, count: 0, hasMore: false, search: ' Zug ', untokened: 0, canCreate: true })).toEqual({ text: 'No records match “Zug”.', help: null, clear: true })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: ' Zug ', untokened: 0, canCreate: true })).toEqual({
+      text: 'No records match “Zug”.',
+      help: null,
+      clear: true,
+    })
   })
 
   // A child grid's sentences name it, so a screen reader hears whose rows.
   test("names a child's rows", () => {
     expect(answered({ start: 0, count: 5, hasMore: false, search: '', untokened: 0, canCreate: true, noun: 'Order line' }).text).toBe('Order line rows 1–5.')
-    expect(answered({ start: 0, count: 0, hasMore: false, search: '', untokened: 0, canCreate: true, noun: 'Order line' })).toEqual({ text: 'No Order line rows.', help: 'New Order line starts the first one.', clear: false })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', untokened: 0, canCreate: true, noun: 'Order line' })).toEqual({
+      text: 'No Order line rows.',
+      help: 'New Order line starts the first one.',
+      clear: false,
+    })
     expect(loading(50, 50, 'Order line')).toBe('Loading Order line rows 51–100.')
     expect(loading(0, 50)).toBe('Loading rows 1–50.')
   })
@@ -43,11 +59,27 @@ describe('the status line', () => {
   // records." for an empty one).
   test('says the filter is on, and by which fields', () => {
     const filtered = ['Notes', 'Amount']
-    expect(answered({ start: 0, count: 3, hasMore: false, search: '', filtered, untokened: 1, canCreate: true }).text).toBe('Rows 1–3. Filtered by Notes and Amount. 1 of these rows cannot be opened.')
-    expect(answered({ start: 50, count: 50, hasMore: true, search: '', filtered: ['Order date'], untokened: 0, canCreate: true }).text).toBe('Rows 51–100; more follow. Filtered by Order date.')
-    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered, untokened: 0, canCreate: true })).toEqual({ text: 'No records match the filter on Notes and Amount.', help: null, clear: false })
-    expect(answered({ start: 0, count: 0, hasMore: false, search: 'Zug', filtered, untokened: 0, canCreate: true })).toEqual({ text: 'No records match “Zug” and the filter on Notes and Amount.', help: null, clear: true })
-    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered: ['Carrier'], untokened: 0, canCreate: true, noun: 'Delivery' })).toEqual({ text: 'No Delivery rows match the filter on Carrier.', help: null, clear: false })
+    expect(answered({ start: 0, count: 3, hasMore: false, search: '', filtered, untokened: 1, canCreate: true }).text).toBe(
+      'Rows 1–3. Filtered by Notes and Amount. 1 of these rows cannot be opened.',
+    )
+    expect(answered({ start: 50, count: 50, hasMore: true, search: '', filtered: ['Order date'], untokened: 0, canCreate: true }).text).toBe(
+      'Rows 51–100; more follow. Filtered by Order date.',
+    )
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered, untokened: 0, canCreate: true })).toEqual({
+      text: 'No records match the filter on Notes and Amount.',
+      help: null,
+      clear: false,
+    })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: 'Zug', filtered, untokened: 0, canCreate: true })).toEqual({
+      text: 'No records match “Zug” and the filter on Notes and Amount.',
+      help: null,
+      clear: true,
+    })
+    expect(answered({ start: 0, count: 0, hasMore: false, search: '', filtered: ['Carrier'], untokened: 0, canCreate: true, noun: 'Delivery' })).toEqual({
+      text: 'No Delivery rows match the filter on Carrier.',
+      help: null,
+      clear: false,
+    })
     expect(answered({ start: 0, count: 2, hasMore: false, search: '', filtered: [], untokened: 0, canCreate: true }).text).toBe('Rows 1–2.')
   })
 
@@ -81,7 +113,10 @@ describe('what a grid asks for', () => {
       offset: 50,
       limit: 50,
     })
-    expect(listQuery({ search: '', sort: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({ parent: { field: 'order', record: 'k1:1' }, filter: [] })
+    expect(listQuery({ search: '', sort: [], parent: { field: 'order', record: 'k1:1' }, filter: [], startRow: 0, endRow: 50 })).toMatchObject({
+      parent: { field: 'order', record: 'k1:1' },
+      filter: [],
+    })
   })
 
   // AG Grid's sort model, in its order, is what the datasource holds to the
@@ -89,7 +124,12 @@ describe('what a grid asks for', () => {
   // failing with the direction read as AG Grid's sort type: "direction":
   // undefined).
   test("reads AG Grid's sort model as a list request's sort", () => {
-    expect(sortOfModel([{ colId: 'amount', sort: 'desc' }, { colId: 'id', sort: 'asc' }])).toEqual([
+    expect(
+      sortOfModel([
+        { colId: 'amount', sort: 'desc' },
+        { colId: 'id', sort: 'asc' },
+      ]),
+    ).toEqual([
       { field: 'amount', direction: 'desc' },
       { field: 'id', direction: 'asc' },
     ])

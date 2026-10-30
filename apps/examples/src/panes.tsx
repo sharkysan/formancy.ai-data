@@ -23,7 +23,13 @@ interface PaneProps {
  * browser's bubbles never stand in for the engine's errors, and each renderer
  * gets its own, so the two never share a radio group's form owner.
  */
-function Pane({ tableId, table, renderer, children, sheet }: {
+function Pane({
+  tableId,
+  table,
+  renderer,
+  children,
+  sheet,
+}: {
   tableId: string
   table: string
   renderer: 'React' | 'Angular'

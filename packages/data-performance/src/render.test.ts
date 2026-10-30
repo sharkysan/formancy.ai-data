@@ -115,7 +115,9 @@ describe('the generated region', () => {
     update.roundTrips = 7
     const table = section(renderPerformance(results), 'Refused, counted and never timed')
     expect(table).toContain('| Operation | Answer | Database round trips, PostgreSQL | Database round trips, SQL Server |')
-    expect(rows(table, 'Update, on a form whose table narrowed after it was published |')).toEqual(['| Update, on a form whose table narrowed after it was published | 409 `drift` | 2 | 7 |'])
+    expect(rows(table, 'Update, on a form whose table narrowed after it was published |')).toEqual([
+      '| Update, on a form whose table narrowed after it was published | 409 `drift` | 2 | 7 |',
+    ])
     expect(table).not.toMatch(/\bms\b/)
   })
 
@@ -139,7 +141,10 @@ describe('the generated region', () => {
     const results: Results = structuredClone(publishedResults())
     const first = results.catalogue.scenarios.find((scenario) => scenario.name === 'lookup-first-page')
     if (first === undefined) throw new Error('no first page')
-    results.catalogue = { ...results.catalogue, scenarios: results.catalogue.scenarios.map((scenario) => (scenario === first ? { ...scenario, rowsRead: { exactly: 7 } } : scenario)) }
+    results.catalogue = {
+      ...results.catalogue,
+      scenarios: results.catalogue.scenarios.map((scenario) => (scenario === first ? { ...scenario, rowsRead: { exactly: 7 } } : scenario)),
+    }
     const [row] = rows(section(renderPerformance(results), 'One request at a time: PostgreSQL'), 'Open the customer lookup |')
     expect(row).toMatch(/^\| Open the customer lookup \| 7 \|/)
   })

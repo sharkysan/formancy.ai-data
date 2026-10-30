@@ -64,7 +64,12 @@ describe('the limitations a run shows', () => {
       report((inputs) => {
         inputs.apps.push({ path: 'apps/studio', name: '@formancy/data-studio', renderers: [{ name: 'React', version: '19.3.0' }], jsdom: '30.1.2' })
         inputs.covered.push({ path: 'apps/studio', id: 'app-studio', name: '@formancy/data-studio' })
-        inputs.results.push({ ...job(inputs, 'test-app-host'), key: 'test-app-studio', servers: [], suites: [{ ...job(inputs, 'test-app-host').suites[0], package: '@formancy/data-studio', path: 'apps/studio' }] })
+        inputs.results.push({
+          ...job(inputs, 'test-app-host'),
+          key: 'test-app-studio',
+          servers: [],
+          suites: [{ ...job(inputs, 'test-app-host').suites[0], package: '@formancy/data-studio', path: 'apps/studio' }],
+        })
       }),
     )
     expect(sentences).toContain('The suite of apps/studio, in jsdom 30.1.2, started no database; it runs on snapshots captured from PostgreSQL 17.11.')
@@ -78,11 +83,17 @@ describe('the limitations a run shows', () => {
   // would read as one of the versions that were.
   test('name the tests that ran on an image outside the matrix, and what it answered, after what was tested', () => {
     const file = 'packages/data-server/src/routes/admin-untested.integration.test.ts'
-    const sentences = derivedLimitations(report((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:14-alpine', version: '14.24', caller: file }))))
+    const sentences = derivedLimitations(
+      report((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:14-alpine', version: '14.24', caller: file }))),
+    )
     const postgres = sentences.find((sentence) => sentence.startsWith('Every PostgreSQL test'))
-    expect(postgres).toBe(`Every PostgreSQL test ran on \`postgres:17-alpine\`, which answered 17.11 in this run, except the tests in \`${file}\`, which ran on an image outside the matrix. No other version, edition or managed service was tested.`)
+    expect(postgres).toBe(
+      `Every PostgreSQL test ran on \`postgres:17-alpine\`, which answered 17.11 in this run, except the tests in \`${file}\`, which ran on an image outside the matrix. No other version, edition or managed service was tested.`,
+    )
     expect(postgres).not.toContain('postgres:14-alpine')
-    expect(sentences).toContain(`\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in \`${file}\` ran on it, and they show what that file shows; this release was not tested on it.`)
+    expect(sentences).toContain(
+      `\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in \`${file}\` ran on it, and they show what that file shows; this release was not tested on it.`,
+    )
     expect(sentences.filter((sentence) => /probe/.test(sentence))).toEqual([])
     expect(sentences.find((sentence) => sentence.startsWith('Every SQL Server test'))).toBe(
       'Every SQL Server test ran on `mcr.microsoft.com/mssql/server:2022-latest`, which answered 16.0.4295.3 (CU20, Developer Edition (64-bit)) in this run. No other version, edition or managed service was tested.',
@@ -96,13 +107,23 @@ describe('the limitations a run shows', () => {
   test('say what the tests ran on when the default image never answered', () => {
     const sentences = derivedLimitations(
       report((inputs) => {
-        for (const result of inputs.results) result.servers = result.servers.map((entry) => (entry.engine === 'postgres' ? { ...entry, image: 'postgres:14-alpine', version: '14.24' } : entry))
+        for (const result of inputs.results)
+          result.servers = result.servers.map((entry) => (entry.engine === 'postgres' ? { ...entry, image: 'postgres:14-alpine', version: '14.24' } : entry))
       }),
     )
-    const files = '`apps/host/scripts/browser-test.mjs`, `apps/host/src/test-databases.ts`, `packages/data-postgres/src/parity.integration.test.ts` and `packages/data-postgres/src/records.integration.test.ts`'
-    expect(sentences.find((sentence) => sentence.includes('PostgreSQL test'))).toBe(`No PostgreSQL test ran on the default \`postgres:17-alpine\` in this run; the tests in ${files} ran on an image outside the matrix.`)
-    expect(sentences).toContain(`\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in ${files} ran on it, and they show what those files show; this release was not tested on it.`)
-    const none = derivedLimitations(report((inputs) => (inputs.results = inputs.results.map((result) => ({ ...result, servers: result.servers.filter((entry) => entry.engine !== 'postgres') })))))
+    const files =
+      '`apps/host/scripts/browser-test.mjs`, `apps/host/src/test-databases.ts`, `packages/data-postgres/src/parity.integration.test.ts` and `packages/data-postgres/src/records.integration.test.ts`'
+    expect(sentences.find((sentence) => sentence.includes('PostgreSQL test'))).toBe(
+      `No PostgreSQL test ran on the default \`postgres:17-alpine\` in this run; the tests in ${files} ran on an image outside the matrix.`,
+    )
+    expect(sentences).toContain(
+      `\`postgres:14-alpine\` (14.24) is outside the matrix: only the tests in ${files} ran on it, and they show what those files show; this release was not tested on it.`,
+    )
+    const none = derivedLimitations(
+      report(
+        (inputs) => (inputs.results = inputs.results.map((result) => ({ ...result, servers: result.servers.filter((entry) => entry.engine !== 'postgres') }))),
+      ),
+    )
     expect(none).toContain('No PostgreSQL server answered a test in this run.')
   })
 
@@ -116,7 +137,7 @@ describe('the limitations a run shows', () => {
 
   // Neither the suites' source-not-dist nor the gate's image being rebuilt
   // by the release may go unsaid.
-  test("say the suites ran the source, which dist/ npm receives, and which image the container gate ran", () => {
+  test('say the suites ran the source, which dist/ npm receives, and which image the container gate ran', () => {
     const sentences = derivedLimitations(report())
     // The jobs named are the ones that built every published package: the
     // adapters' test jobs built data-core only, and naming them would say
@@ -126,7 +147,9 @@ describe('the limitations a run shows', () => {
       "Each package's own suites ran its source; the published dist/ was run by the install gate, and each package's is byte-identical to its dist/ built in browser-chromium, install and verify, and in every other job that built it (*Build identity* names them).",
     )
     expect(identity).not.toContain('test-data-')
-    expect(sentences).toContain('The container gate ran the image it built from this commit; the release builds the published image again, named by its digest.')
+    expect(sentences).toContain(
+      'The container gate ran the image it built from this commit; the release builds the published image again, named by its digest.',
+    )
     expect(sentences).toContain('The browser gates launched Chromium 153.0.8010.12 only.')
     expect(sentences).toContain('Every runtime dependency is published as a range; the suites ran the versions *Tested on* names.')
     expect(sentences).toContain('The suites ran on Node v22.20.0; the server image runs v22.12.0; no published package declares the Node versions it supports.')
@@ -141,7 +164,9 @@ describe('the Markdown', () => {
     const markdown = renderContent(built)
     const observations = markdown.slice(markdown.indexOf('## Observations on a shared runner'), markdown.indexOf('## Problems'))
     expect(observations).toContain('Not a performance figure (0034)')
-    expect(observations).toContain('| apps/host | Chromium | Chromium resent the create after its connection closed | 12.4, 9.6 | ms | 2 | ubuntu24 20261005.1 |')
+    expect(observations).toContain(
+      '| apps/host | Chromium | Chromium resent the create after its connection closed | 12.4, 9.6 | ms | 2 | ubuntu24 20261005.1 |',
+    )
     expect(renderSummary(built)).not.toContain('Chromium resent the create')
     expect(markdown).toContain('None: nothing here fails the run.')
   })
@@ -179,9 +204,13 @@ describe('the release gates, as a report shows them', () => {
     const built = report()
     const markdown = renderContent(built)
     const gates = markdown.slice(markdown.indexOf('## Release gates'), markdown.indexOf('## Known limitations'))
-    expect(gates).toContain('| 11 | stated, not exercised by this run | stated in `docs/release/figures.md`, last changed 2026-10-01 at `1234567`, 3 commit(s) before this one |')
+    expect(gates).toContain(
+      '| 11 | stated, not exercised by this run | stated in `docs/release/figures.md`, last changed 2026-10-01 at `1234567`, 3 commit(s) before this one |',
+    )
     expect(gates).not.toMatch(/\| \d+ \| [^|]*\bmet\b/)
-    expect(derivedLimitations(built)).toContain('Release gate 11 is stated in `docs/release/figures.md`, last changed 2026-10-01 at `1234567`, 3 commit(s) before this one; not exercised by this run.')
+    expect(derivedLimitations(built)).toContain(
+      'Release gate 11 is stated in `docs/release/figures.md`, last changed 2026-10-01 at `1234567`, 3 commit(s) before this one; not exercised by this run.',
+    )
   })
 
   // An open gate is a limitation of every release until it closes; said by
@@ -199,7 +228,9 @@ describe('the subject and the summary', () => {
     const inputs = copy(greenCiRun())
     inputs.release = 'dry-run'
     const markdown = renderReport(buildReport(inputs))
-    expect(markdown).toContain('Formancy Data 0.1.0, a rehearsal (`dry-run`); nothing is published from it. Commit `c0ffee`. Run [42](https://github.com/sharkysan/formancy.ai-data/actions/runs/42) of CI, attempt 1.')
+    expect(markdown).toContain(
+      'Formancy Data 0.1.0, a rehearsal (`dry-run`); nothing is published from it. Commit `c0ffee`. Run [42](https://github.com/sharkysan/formancy.ai-data/actions/runs/42) of CI, attempt 1.',
+    )
     expect(markdown).toContain('| getting-started-runner | 1 | ubuntu24 20261005.1 | v22.20.0 | linux x64 | 29.8.1 |')
     expect(renderReport(report(), { local: true, partial: ['install'] })).toContain('local: no NEEDS, no artefacts; partial: install allowed missing.')
     // A local run of a tree with uncommitted changes did not run that commit.
@@ -223,7 +254,9 @@ describe('the subject and the summary', () => {
     const markdown = renderContent(report(withWebKit))
     const said = markdown.slice(markdown.indexOf('What each browser said it was'))
     expect(said).toContain('| Browser | Gates | User agent | Platform | Touch points | Pointer fine | Hover | Fallback family |')
-    expect(said).toContain('| WebKit | apps/host | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15 | Linux x86_64 | 0 | yes | yes | DejaVu Sans |')
+    expect(said).toContain(
+      '| WebKit | apps/host | Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Safari/605.1.15 | Linux x86_64 | 0 | yes | yes | DejaVu Sans |',
+    )
   })
 
   // Each fact the browsers disagree on is printed with every browser's
@@ -243,6 +276,7 @@ describe('the subject and the summary', () => {
   test('say how each section was made', () => {
     const markdown = renderContent(report())
     const method = markdown.slice(markdown.indexOf('## How this report was made'), markdown.indexOf('## Problems'))
-    for (const section of ['Subject', 'Tested on', 'Results', 'Shared cases', 'Build identity', 'Release gates', 'Known limitations']) expect(method).toContain(`- **${section}:**`)
+    for (const section of ['Subject', 'Tested on', 'Results', 'Shared cases', 'Build identity', 'Release gates', 'Known limitations'])
+      expect(method).toContain(`- **${section}:**`)
   })
 })

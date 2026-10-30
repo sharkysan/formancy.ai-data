@@ -73,7 +73,8 @@ function partsOf(reach: Record<string, unknown>): ReachTerms {
     }
     return { table: copy(entry['table']), columns: [...(entry['columns'] as string[])] }
   })
-  if (cleared.some((entry, index) => cleared.findIndex((other) => sameRef(other.table, entry.table)) !== index)) throw refuse('names each table it clears with the columns it clears')
+  if (cleared.some((entry, index) => cleared.findIndex((other) => sameRef(other.table, entry.table)) !== index))
+    throw refuse('names each table it clears with the columns it clears')
   const accepted = (reach['accepted'] as unknown[]).map((entry) => {
     if (!isRecord(entry) || !isRef(entry['from']) || !isName(entry['name']) || !isRef(entry['onto']) || !ACTIONS.includes(entry['onDelete'])) {
       throw refuse('names each key it accepts by its table, its name, the table it refers to and an action that acts on delete')

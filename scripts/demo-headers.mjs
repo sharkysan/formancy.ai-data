@@ -256,14 +256,27 @@ export function policyProblems(policy, { html, stylesheets, address }, { allowed
   const links = elements(html, 'link')
   if (scripts.some((attributes) => attributes.src === undefined)) problems.push('index.html has an inline script, which script-src refuses')
   if (/<style\b/i.test(html) || elements(html, '[a-z][\\w-]*').some((attributes) => attributes.style !== undefined)) {
-    problems.push((allowed['style-src'] ?? []).includes("'unsafe-inline'") ? 'index.html has an inline style, which style-src allows only for what a script injects' : 'index.html has an inline style, which style-src refuses')
+    problems.push(
+      (allowed['style-src'] ?? []).includes("'unsafe-inline'")
+        ? 'index.html has an inline style, which style-src allows only for what a script injects'
+        : 'index.html has an inline style, which style-src refuses',
+    )
   }
 
   const faces = stylesheets.flatMap((css) => fontFaces(css).flatMap((face) => face.sources))
   const loads = {
-    'script-src': foreign(scripts.map((attributes) => attributes.src), address),
+    'script-src': foreign(
+      scripts.map((attributes) => attributes.src),
+      address,
+    ),
     'style-src': foreign([...stylesheetLinks(html), ...stylesheets.flatMap(styleImports)], address),
-    'font-src': foreign([...faces, ...links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href)], address),
+    'font-src': foreign(
+      [
+        ...faces,
+        ...links.filter((attributes) => rel(attributes).includes('preconnect') && attributes.crossorigin !== undefined).map((attributes) => attributes.href),
+      ],
+      address,
+    ),
   }
   for (const [name, sources] of Object.entries(policy)) {
     const named = origins(sources)
@@ -276,10 +289,14 @@ export function policyProblems(policy, { html, stylesheets, address }, { allowed
   }
   const fontSources = policy['font-src'] ?? []
   const own = new URL(address).origin
-  if (faces.some((source) => resolved(source, address)?.origin === own) && !fontSources.includes("'self'")) problems.push("a stylesheet names a face on the page's own origin, and font-src does not allow 'self'")
-  if (faces.some((source) => source.trim().startsWith('data:')) && !fontSources.includes('data:')) problems.push('a stylesheet inlines a face as a data: URL, which font-src refuses')
+  if (faces.some((source) => resolved(source, address)?.origin === own) && !fontSources.includes("'self'"))
+    problems.push("a stylesheet names a face on the page's own origin, and font-src does not allow 'self'")
+  if (faces.some((source) => source.trim().startsWith('data:')) && !fontSources.includes('data:'))
+    problems.push('a stylesheet inlines a face as a data: URL, which font-src refuses')
 
-  const usesData = links.some((attributes) => String(attributes.href ?? '').startsWith('data:')) || stylesheets.some((css) => /url\(\s*["']?data:/i.test(withoutFontFaces(css)))
+  const usesData =
+    links.some((attributes) => String(attributes.href ?? '').startsWith('data:')) ||
+    stylesheets.some((css) => /url\(\s*["']?data:/i.test(withoutFontFaces(css)))
   const allowsData = (policy['img-src'] ?? []).includes('data:')
   if (usesData && !allowsData) problems.push('the page or its stylesheets use a data: URL, and img-src does not allow data:')
   if (!usesData && allowsData) problems.push('img-src allows data:, and neither the page nor its stylesheets use a data: URL')

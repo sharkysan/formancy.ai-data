@@ -36,7 +36,15 @@ afterEach(async () => {
 const POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: {} }
 
 async function proposal(): Promise<Proposal> {
-  const outcome = await other.propose({ connection: 'fixture', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [], pinned: [], versionColumn: 'row_version' })
+  const outcome = await other.propose({
+    connection: 'fixture',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'sales-order',
+    title: 'Order',
+    lookups: [],
+    pinned: [],
+    versionColumn: 'row_version',
+  })
   if (!outcome.ok) throw new Error(outcome.message)
   return outcome.value
 }
@@ -48,7 +56,11 @@ async function proposal(): Promise<Proposal> {
  */
 async function publishedElsewhere(expectedBase: number | null): Promise<void> {
   const { form: base, bindings, snapshot, generation } = await proposal()
-  const presentation: PresentationOverrides = { version: 1, fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Their notes' }], sections: [] }
+  const presentation: PresentationOverrides = {
+    version: 1,
+    fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Their notes' }],
+    sections: [],
+  }
   const applied = applyPresentation(base, presentation, bindings)
   if (!applied.ok) throw new Error(applied.problems.join('; '))
   const bundle: Bundle = { format: 2, connection: 'fixture', generation, base, presentation, form: applied.form, bindings, policy: POLICY, snapshot }
@@ -103,7 +115,9 @@ describe('publishing', () => {
     // that version 1 is somebody else's -- a press the server refuses again.
     // Publishing waits for the rebase, and the keyboard, on the button that
     // turned disabled, goes to the rebase rather than to the top of the page.
-    expect(within(publish).getByText(/is published now/).textContent).toBe("Version 1 of sales-order is published now, and it is somebody else's. Publishing waits until you rebase on it.")
+    expect(within(publish).getByText(/is published now/).textContent).toBe(
+      "Version 1 of sales-order is published now, and it is somebody else's. Publishing waits until you rebase on it.",
+    )
     expect(within(publish).queryByRole('button', { name: 'Publish version 1' })).toBeNull()
     expect(within(publish).getByRole('button', { name: 'Publish' })).toHaveProperty('disabled', true)
     expect(focusedName()).toBe('Rebase on version 1')
@@ -135,7 +149,9 @@ describe('publishing', () => {
     await rm(join(plane.root, 'sales-order'), { recursive: true })
     await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
     const alert = await within(publish).findByRole('alert')
-    expect(within(publish).getByText(/changed while you worked/).textContent).toBe('Which version of sales-order is published changed while you worked. Publishing waits until you rebase on what is there.')
+    expect(within(publish).getByText(/changed while you worked/).textContent).toBe(
+      'Which version of sales-order is published changed while you worked. Publishing waits until you rebase on what is there.',
+    )
     expect(within(publish).getByRole('button', { name: 'Publish' })).toHaveProperty('disabled', true)
     await user.click(within(alert).getByRole('button', { name: 'Rebase on what is there' }))
     await user.click(within(publish).getByRole('button', { name: 'Publish version 1' }))
@@ -191,7 +207,17 @@ describe('publishing', () => {
       bindings: {
         ...generated.bindings,
         snapshotFingerprint: 'sha256:0',
-        fields: [...generated.bindings.fields, { kind: 'column', field: 'ghost', column: 'notes', type: { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }, nullable: true, writes: { create: false, update: false } }],
+        fields: [
+          ...generated.bindings.fields,
+          {
+            kind: 'column',
+            field: 'ghost',
+            column: 'notes',
+            type: { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false },
+            nullable: true,
+            writes: { create: false, update: false },
+          },
+        ],
       },
     }
     const user = userEvent.setup()
@@ -212,10 +238,11 @@ describe('publishing', () => {
     await user.click(await screen.findByRole('button', { name: 'Publish version 1' }))
     const alert = await screen.findByRole('alert')
     expect(paragraphs(alert)).toEqual(['The server refused the bundle: The bundle cannot be published.'])
-    expect(within(alert).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'the bindings were not generated from this snapshot',
-      'the bindings name ghost, which the form does not have',
-    ])
+    expect(
+      within(alert)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['the bindings were not generated from this snapshot', 'the bindings name ghost, which the form does not have'])
     expect(await audit()).toEqual([])
   })
 
@@ -236,13 +263,26 @@ describe('publishing', () => {
     expect(said.problems.length).toBe(2)
     render(
       <main aria-label="Publish">
-        <PublishStep client={other} connection="fixture" proposal={generated} session={session} policy={POLICY} stale={false} onPublished={() => {}} onDrift={() => {}} />
+        <PublishStep
+          client={other}
+          connection="fixture"
+          proposal={generated}
+          session={session}
+          policy={POLICY}
+          stale={false}
+          onPublished={() => {}}
+          onDrift={() => {}}
+        />
       </main>,
     )
     const button = await screen.findByRole('button', { name: 'Publish version 1' })
     expect(button).toHaveProperty('disabled', true)
     const note = screen.getByRole('note')
-    expect(within(note).getAllByRole('listitem').map((item) => item.textContent)).toEqual(said.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`))
+    expect(
+      within(note)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(said.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`))
     expect(plane.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/versions'))).toEqual([])
     expect(await audit()).toEqual([])
   })
@@ -259,13 +299,25 @@ describe('publishing', () => {
     const long: ListView = { name: 'Long', filter: [{ field: 'notes', op: 'contains', text: 'x'.repeat(201) }], sort: [] }
     render(
       <main aria-label="Publish">
-        <PublishStep client={other} connection="fixture" proposal={generated} session={createBuilderSession(generated.form)} views={[long]} policy={POLICY} stale={false} onPublished={() => {}} onDrift={() => {}} />
+        <PublishStep
+          client={other}
+          connection="fixture"
+          proposal={generated}
+          session={createBuilderSession(generated.form)}
+          views={[long]}
+          policy={POLICY}
+          stale={false}
+          onPublished={() => {}}
+          onDrift={() => {}}
+        />
       </main>,
     )
     expect(await screen.findByRole('button', { name: 'Publish version 1' })).toHaveProperty('disabled', true)
-    expect(within(screen.getByRole('note')).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-      'A list view the server refuses: /views/0 (“Long”): What a contains condition on notes finds is at most 200 characters, and this has 201.',
-    ])
+    expect(
+      within(screen.getByRole('note'))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['A list view the server refuses: /views/0 (“Long”): What a contains condition on notes finds is at most 200 characters, and this has 201.'])
     expect(plane.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/versions'))).toEqual([])
     expect(await audit()).toEqual([])
   })

@@ -129,7 +129,10 @@ export function FormView({
   /** What a copy carries (0107): `null` from the server where it offers no create, and then no Duplicate record. */
   const copied = definition.copied ?? []
   const columns = useMemo(() => columnsOf(definition, null), [definition])
-  const sessions = useMemo(() => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })), [client, formId, definition])
+  const sessions = useMemo(
+    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })),
+    [client, formId, definition],
+  )
   const entries = useMemo<PaneEntry[]>(
     () =>
       sessions.map((session) =>
@@ -296,7 +299,8 @@ export function FormView({
       request,
       (discarded) =>
         opening.read(request, token, discarded, {
-          opened: (now) => opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
+          opened: (now) =>
+            opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
           refused: (message) => {
             setLoadRefusal(message)
             setTokenOpen(true)
@@ -447,7 +451,11 @@ export function FormView({
           onNew={startNew}
           onOpen={askRow}
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
-          after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" /> : null}
+          after={
+            removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
+              <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" />
+            ) : null
+          }
           drilling={drilling}
         />
         {sideBySide ? (
@@ -489,7 +497,11 @@ export function FormView({
           saving={saving}
           deleteRef={deleteButton}
           onDelete={deleteOpen}
-          deleteRegion={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" /> : null}
+          deleteRegion={
+            removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? (
+              <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" />
+            ) : null
+          }
         >
           {parent === null
             ? null
@@ -506,12 +518,25 @@ export function FormView({
                   refit={released}
                   onShow={() => reveal('record')}
                   levels={drill.levels}
-                  drill={drilling && parent.kind === 'record' ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token }) : undefined}
+                  drill={
+                    drilling && parent.kind === 'record'
+                      ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token })
+                      : undefined
+                  }
                 />
               ))}
         </Detail>
         {drill.path.map((step) => (
-          <DrillLevel key={step.key} client={client} step={step} childForms={drill.childrenOf(step.form.child.form)} renderer={renderer} hidden={!drilling || drill.shown !== step.level} refit={released} drill={drill} />
+          <DrillLevel
+            key={step.key}
+            client={client}
+            step={step}
+            childForms={drill.childrenOf(step.form.child.form)}
+            renderer={renderer}
+            hidden={!drilling || drill.shown !== step.level}
+            refit={released}
+            drill={drill}
+          />
         ))}
       </div>
     </>

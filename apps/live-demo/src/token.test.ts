@@ -65,7 +65,7 @@ describe('a demo token', () => {
 
   // Each start's key is new; a token signed by the last one must stop
   // working with it, which is how a visitor's token dies with the instance.
-  test("is refused under another key", async () => {
+  test('is refused under another key', async () => {
     const { token } = await mintToken(KEY, { subject: 'vera', roles: ['auditor'], tenant: 1 })
     const outcome = await (await verifier(randomBytes(32).toString('base64url')))(token)
     expect(outcome.ok).toBe(false)

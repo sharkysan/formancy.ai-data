@@ -51,7 +51,12 @@ function verifierOver(file: KeySetFile): Promise<IdentityVerifier> {
 }
 
 async function token(held: Held): Promise<string> {
-  return new SignJWT({ sub: 'u' }).setProtectedHeader({ alg: 'HS256', kid: held.kid }).setIssuer('https://host.example').setAudience('formancy-data').setExpirationTime('5m').sign(held.key)
+  return new SignJWT({ sub: 'u' })
+    .setProtectedHeader({ alg: 'HS256', kid: held.kid })
+    .setIssuer('https://host.example')
+    .setAudience('formancy-data')
+    .setExpirationTime('5m')
+    .sign(held.key)
 }
 
 describe('openKeySetFile', () => {
@@ -124,7 +129,11 @@ describe('openKeySetFile', () => {
       { why: 'empty', act: () => replace(''), problem: /^the identity key set file is not JSON$/ },
       // A valid new key beside a refused one: taking the valid one would make
       // the set wider than any file the operator wrote validly.
-      { why: 'refused', act: () => replace(text(b, { ...hs('x'), jwk: { kty: 'oct', kid: 'x', k: 'c2hvcnQ' } })), problem: /^key "x" is shorter than 32 bytes/ },
+      {
+        why: 'refused',
+        act: () => replace(text(b, { ...hs('x'), jwk: { kty: 'oct', kid: 'x', k: 'c2hvcnQ' } })),
+        problem: /^key "x" is shorter than 32 bytes/,
+      },
     ]
     for (const { why, act, problem } of attempts) {
       await act()
@@ -196,7 +205,14 @@ describe('openKeySetFile', () => {
       return outcome
     }
     const notRegular = `the identity key set file ${fifo} is not a regular file`
-    expect(await atOnce(openKeySetFile(fifo, 'HS256').then(() => 'read', (error: unknown) => (error instanceof Error ? error.message : 'thrown')))).toBe(notRegular)
+    expect(
+      await atOnce(
+        openKeySetFile(fifo, 'HS256').then(
+          () => 'read',
+          (error: unknown) => (error instanceof Error ? error.message : 'thrown'),
+        ),
+      ),
+    ).toBe(notRegular)
 
     await writeFile(path, text(a))
     const file = await openKeySetFile(path, 'HS256')

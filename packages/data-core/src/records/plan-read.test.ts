@@ -117,8 +117,16 @@ describe('planRead', () => {
   // at publish, by the one function both ask.
   test('refuses a missing tenant, scopes an actor granted nothing on the field, and refuses a through the snapshot cannot compare', () => {
     const bindings = lineForm(PG).bindings
-    expect(planRead(PG, bindings, LINE_POLICY, actor(['clerk'], {}), `k1:${ORDER_ID},1`)).toMatchObject({ ok: false, code: 'missing-attribute', message: expect.stringMatching(/^lookups\.order: /) as unknown as string })
-    expect(planRead(PG, bindings, LINE_POLICY, AUDITOR, `k1:${ORDER_ID},1`)).toMatchObject({ ok: true, fields: ['line_total'], request: { through: [{ filters: TENANT_ONE }] } })
+    expect(planRead(PG, bindings, LINE_POLICY, actor(['clerk'], {}), `k1:${ORDER_ID},1`)).toMatchObject({
+      ok: false,
+      code: 'missing-attribute',
+      message: expect.stringMatching(/^lookups\.order: /) as unknown as string,
+    })
+    expect(planRead(PG, bindings, LINE_POLICY, AUDITOR, `k1:${ORDER_ID},1`)).toMatchObject({
+      ok: true,
+      fields: ['line_total'],
+      request: { through: [{ filters: TENANT_ONE }] },
+    })
     const textual = snapshot('postgres', (objects) => {
       const id = objects.find((object) => object.ref.name === 'employee')?.columns.find((entry) => entry.name === 'id')
       if (id !== undefined) id.type = text(10)
@@ -161,7 +169,11 @@ describe('planRead', () => {
   // root's filter is read without the form; the fields are not, and refuse it.
   test('refuses a policy that does not fit the form', () => {
     const misfit: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, total: CLERK_RW } }
-    expect(planRead(PG, PG_ORDER, misfit, CLERK, ORDER_TOKEN)).toMatchObject({ ok: false, code: 'invalid-policy', message: expect.stringContaining('fields.total') as unknown as string })
+    expect(planRead(PG, PG_ORDER, misfit, CLERK, ORDER_TOKEN)).toMatchObject({
+      ok: false,
+      code: 'invalid-policy',
+      message: expect.stringContaining('fields.total') as unknown as string,
+    })
   })
 
   // A filter compares a column's canonical value exactly. A boolean has many
@@ -185,7 +197,10 @@ describe('planRead', () => {
       order.primaryKey = null
       order.uniqueKeys = [{ name: 'uq_order_id', columns: ['id'] }]
     })
-    expect(planRead(unique, orderForm(unique).bindings, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({ ok: true, request: { key: [{ name: 'id', value: ORDER_ID }] } })
+    expect(planRead(unique, orderForm(unique).bindings, ORDER_POLICY, CLERK, ORDER_TOKEN)).toMatchObject({
+      ok: true,
+      request: { key: [{ name: 'id', value: ORDER_ID }] },
+    })
   })
 
   // Drift: the database changed since the form was generated. Bindings from
@@ -201,11 +216,22 @@ describe('planRead', () => {
   // token: neither form can address a record, so neither reads or updates one.
   test('refuses a form that cannot address a record', () => {
     const view = generateForm(PG, { connection: 'erp', root: sales('customer_summary'), formId: 'summary', title: 'Summary', lookups: [] }).bindings
-    expect(planRead(PG, view, ORDER_POLICY, CLERK, 'k1:1')).toMatchObject({ ok: false, code: 'operation-unavailable', message: expect.stringContaining('no primary or unique key') as unknown as string })
+    expect(planRead(PG, view, ORDER_POLICY, CLERK, 'k1:1')).toMatchObject({
+      ok: false,
+      code: 'operation-unavailable',
+      message: expect.stringContaining('no primary or unique key') as unknown as string,
+    })
     const bindings = orderForm(STAMPED).bindings
     expect(bindings.operations.update).toBe(true)
-    expect(planRead(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026')).toMatchObject({ ok: false, code: 'operation-unavailable', message: expect.stringContaining('no settled spelling') as unknown as string })
-    expect(planUpdate(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026', '1', { notes: 'x' }, undefined, described(STAMPED, bindings))).toMatchObject({ ok: false, code: 'operation-unavailable' })
+    expect(planRead(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026')).toMatchObject({
+      ok: false,
+      code: 'operation-unavailable',
+      message: expect.stringContaining('no settled spelling') as unknown as string,
+    })
+    expect(planUpdate(STAMPED, bindings, ORDER_POLICY, CLERK, 'k1:2026', '1', { notes: 'x' }, undefined, described(STAMPED, bindings))).toMatchObject({
+      ok: false,
+      code: 'operation-unavailable',
+    })
   })
 
   // The fingerprint covers the snapshot and not the bindings, so an edited

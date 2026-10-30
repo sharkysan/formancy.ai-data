@@ -36,7 +36,9 @@ export function measureWidth(page) {
       if (box.width === 0 || box.height === 0) continue
       if (box.right <= edge + 0.5 && box.left >= -0.5) continue
       const part = element.getAttribute('data-formancy-part')
-      past.push(`${element.tagName.toLowerCase()}${part === null ? '' : `[${part}]`}.${String(element.className).slice(0, 24)} at ${Math.round(box.left)}..${Math.round(box.right)}`)
+      past.push(
+        `${element.tagName.toLowerCase()}${part === null ? '' : `[${part}]`}.${String(element.className).slice(0, 24)} at ${Math.round(box.left)}..${Math.round(box.right)}`,
+      )
     }
     return { overflow: document.documentElement.scrollWidth - edge, past: [...new Set(past)].slice(0, 6) }
   })
@@ -59,18 +61,26 @@ export async function audit(page, target) {
   // evaluates is not held to it, as 0069 measured.
   if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
   const subject = target ?? (await page.evaluateHandle(() => document))
-  return subject.evaluate(async (context, tags) => {
-    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, elementRef: true })
-    const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
-    const undecided = nodes(results.incomplete, 'color-contrast')
-    window.formancyGateUndecided = undecided.map((node) => node.element)
-    return {
-      axe: window.axe.version,
-      violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
-      measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-      undecided: undecided.map((node, at) => ({ html: node.html.slice(0, 60), selector: node.target[0], at, reason: node.any.map((check) => check.message).join(' ') })),
-    }
-  }, [...ACCESSIBILITY_TAGS])
+  return subject.evaluate(
+    async (context, tags) => {
+      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags }, elementRef: true })
+      const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      const undecided = nodes(results.incomplete, 'color-contrast')
+      window.formancyGateUndecided = undecided.map((node) => node.element)
+      return {
+        axe: window.axe.version,
+        violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
+        measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
+        undecided: undecided.map((node, at) => ({
+          html: node.html.slice(0, 60),
+          selector: node.target[0],
+          at,
+          reason: node.any.map((check) => check.message).join(' '),
+        })),
+      }
+    },
+    [...ACCESSIBILITY_TAGS],
+  )
 }
 
 /** WCAG 2.x relative luminance of an sRGB colour, each channel 0..255. */
@@ -92,12 +102,18 @@ export function contrast(a, b) {
 export function parseColor(value) {
   let match = /^rgba?\(([^)]+)\)$/.exec(value)
   if (match !== null) {
-    const parts = match[1].split(/[\s,/]+/).filter(Boolean).map(Number)
+    const parts = match[1]
+      .split(/[\s,/]+/)
+      .filter(Boolean)
+      .map(Number)
     return { rgb: parts.slice(0, 3), alpha: parts[3] ?? 1 }
   }
   match = /^color\(srgb ([^)]+)\)$/.exec(value)
   if (match !== null) {
-    const parts = match[1].split(/[\s/]+/).filter(Boolean).map(Number)
+    const parts = match[1]
+      .split(/[\s/]+/)
+      .filter(Boolean)
+      .map(Number)
     return { rgb: parts.slice(0, 3).map((channel) => Math.round(channel * 255)), alpha: parts[3] ?? 1 }
   }
   return null
@@ -231,14 +247,16 @@ async function reveal(page, at) {
     const bottom = top + pane.clientHeight
     const box = element.getBoundingClientRect()
     if (box.top >= top && box.bottom <= bottom) return { verdict: 'left', why: 'partially obscured, and not by the edge of its pane' }
-    if (box.height > pane.clientHeight || frame.top < 0 || frame.bottom > window.innerHeight) return { verdict: 'left', why: 'cut by a pane it does not fit in, or one the window cuts' }
+    if (box.height > pane.clientHeight || frame.top < 0 || frame.bottom > window.innerHeight)
+      return { verdict: 'left', why: 'cut by a pane it does not fit in, or one the window cuts' }
     const before = pane.scrollTop
     try {
       pane.scrollTop = before + (box.top < top ? box.top - top : box.bottom - bottom)
       const results = await window.axe.run(element, { runOnly: { type: 'rule', values: ['color-contrast'] } })
       const ratio = (outcome) => outcome[0]?.nodes[0]?.any[0]?.data?.contrastRatio
       if (results.violations.length > 0) return { verdict: 'violation', ratio: ratio(results.violations) }
-      if (results.incomplete.length > 0) return { verdict: 'left', why: `shown whole in the pane that cut it, and still undecided: ${results.incomplete[0]?.nodes[0]?.any[0]?.message ?? ''}` }
+      if (results.incomplete.length > 0)
+        return { verdict: 'left', why: `shown whole in the pane that cut it, and still undecided: ${results.incomplete[0]?.nodes[0]?.any[0]?.message ?? ''}` }
       return results.passes.length > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'shown whole in the pane that cut it, and axe measured nothing' }
     } finally {
       pane.scrollTop = before
@@ -317,8 +335,15 @@ export async function decide(page, undecided) {
           if (element === undefined || !element.isConnected || cell === null || cell === undefined || element.closest('.grid-bench') === null) return null
           // What is drawn of a box: cut by every ancestor that clips it, the grid's own scrollers among them, and, `inWindow`, by the window.
           const drawnOf = (box, inWindow) => {
-            const edge = inWindow ? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: window.innerHeight } : { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity }
-            const part = { left: Math.max(box.left, edge.left), right: Math.min(box.right, edge.right), top: Math.max(box.top, edge.top), bottom: Math.min(box.bottom, edge.bottom) }
+            const edge = inWindow
+              ? { left: 0, right: document.documentElement.clientWidth, top: 0, bottom: window.innerHeight }
+              : { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity }
+            const part = {
+              left: Math.max(box.left, edge.left),
+              right: Math.min(box.right, edge.right),
+              top: Math.max(box.top, edge.top),
+              bottom: Math.min(box.bottom, edge.bottom),
+            }
             for (let ancestor = cell.parentElement; ancestor !== null; ancestor = ancestor.parentElement) {
               const style = getComputedStyle(ancestor)
               const clip = ancestor.getBoundingClientRect()
@@ -334,7 +359,10 @@ export async function decide(page, undecided) {
           // Inside the cell's top padding or, where a grid's header covers that, its bottom padding: clear of its 1px focus
           // border and its text, where the window shows the cell.
           const tried = []
-          for (const point of [{ x: part.left + 4, y: box.top + 4 }, { x: part.left + 4, y: box.bottom - 4 }]) {
+          for (const point of [
+            { x: part.left + 4, y: box.top + 4 },
+            { x: part.left + 4, y: box.bottom - 4 },
+          ]) {
             const inside = point.x < part.right - 1 && point.y >= part.top && point.y < part.bottom - 1
             const hit = inside ? document.elementFromPoint(point.x, point.y) : null
             if (hit !== null && cell.contains(hit)) return { color: getComputedStyle(element).color, points: [point], name, drawn: true }
@@ -362,7 +390,9 @@ export async function decide(page, undecided) {
         continue
       }
       if (at === null || !at.drawn) {
-        left.push(`${node.html}${at === null ? ' (outside a grid, or gone from the page)' : ` (shown, and the gate read no pixel of the cell beside it: ${at.on})`}`)
+        left.push(
+          `${node.html}${at === null ? ' (outside a grid, or gone from the page)' : ` (shown, and the gate read no pixel of the cell beside it: ${at.on})`}`,
+        )
         continue
       }
       const [background] = at.colours
@@ -390,5 +420,7 @@ export function describeFocus(page) {
 
 /** Null when `locator`'s element has the focus, otherwise where the focus is. */
 export async function focusedOn(page, locator) {
-  return (await locator.evaluate((element) => element === document.activeElement || element.contains(document.activeElement))) ? null : `the focus is on ${await describeFocus(page)}`
+  return (await locator.evaluate((element) => element === document.activeElement || element.contains(document.activeElement)))
+    ? null
+    : `the focus is on ${await describeFocus(page)}`
 }

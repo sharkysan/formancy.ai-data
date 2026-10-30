@@ -3,7 +3,24 @@ import { generateForm } from '../generate/generate.js'
 import type { ObjectMeta } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
 import { copiedFields } from './copy.js'
-import { AUDITOR, CLERK, CLERK_RW, CUSTOMER_POLICY, customerForm, customerSource, INTAKE, LINE_POLICY, lineForm, MS, ORDER_POLICY, orderForm, PG, restrict, sales, snapshot } from './test-support.js'
+import {
+  AUDITOR,
+  CLERK,
+  CLERK_RW,
+  CUSTOMER_POLICY,
+  customerForm,
+  customerSource,
+  INTAKE,
+  LINE_POLICY,
+  lineForm,
+  MS,
+  ORDER_POLICY,
+  orderForm,
+  PG,
+  restrict,
+  sales,
+  snapshot,
+} from './test-support.js'
 
 /*
  * The fields a copy of a record carries into a new one (0107): what this
@@ -36,7 +53,13 @@ describe('copiedFields', () => {
   // the copied country's, whichever key the form addresses records by.
   test('every column of a unique key is left out as well', () => {
     const country = generateForm(PG, { connection: 'erp', root: sales('country'), formId: 'sales-country', title: 'Country', lookups: [] }).bindings
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: ['clerk'], update: [] }, fields: { id: { read: ['clerk'], write: [] }, iso_code: CLERK_RW, name: CLERK_RW }, rowFilters: [], lookups: {} }
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: ['clerk'], update: [] },
+      fields: { id: { read: ['clerk'], write: [] }, iso_code: CLERK_RW, name: CLERK_RW },
+      rowFilters: [],
+      lookups: {},
+    }
     expect(copiedFields(PG, country, policy, CLERK)).toEqual(['name'])
   })
 

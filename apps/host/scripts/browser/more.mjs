@@ -66,18 +66,41 @@ function listSaysMore(name, { check }) {
     // The paper while the list is open and saying so: the gate's own audit runs after a blur, which closes it.
     const open = await audit(page, await paper(page, name).elementHandle())
     check(`a list that goes on (${name}): axe finds nothing on the paper with it open`, open.violations.length === 0 ? null : open.violations.join('; '))
-    check(`a list that goes on (${name}): contrast and target size measured on the paper, over something`, open.measured.length === 2 ? null : `only ${open.measured.join(', ') || 'nothing'}`)
+    check(
+      `a list that goes on (${name}): contrast and target size measured on the paper, over something`,
+      open.measured.length === 2 ? null : `only ${open.measured.join(', ') || 'nothing'}`,
+    )
     const under = await page.evaluate(() => {
       const list = [...document.querySelectorAll('[role="listbox"]')].find((candidate) => !candidate.hidden)?.getBoundingClientRect()
       const covered = (box) => list !== undefined && box.top < list.bottom && box.bottom > list.top && box.left < list.right && box.right > list.left
-      const elsewhere = (window.formancyGateUndecided ?? []).filter((element) => !covered(element.getBoundingClientRect())).map((element) => element.outerHTML.slice(0, 60))
-      const status = [...document.querySelectorAll('[role="status"]')].find((candidate) => (candidate.textContent ?? '').includes('there are more'))?.getBoundingClientRect()
+      const elsewhere = (window.formancyGateUndecided ?? [])
+        .filter((element) => !covered(element.getBoundingClientRect()))
+        .map((element) => element.outerHTML.slice(0, 60))
+      const status = [...document.querySelectorAll('[role="status"]')]
+        .find((candidate) => (candidate.textContent ?? '').includes('there are more'))
+        ?.getBoundingClientRect()
       const hit = status === undefined ? null : document.elementFromPoint(status.left + Math.min(20, status.width / 2), status.top + status.height / 2)
-      const within = status !== undefined && list !== undefined && status.top >= list.top - 1 && status.bottom <= list.bottom + 1 && status.left >= list.left - 1 && status.right <= list.right + 1
-      return { elsewhere, within, shown: hit === null ? 'nothing' : `${hit.getAttribute('role') ?? hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"` }
+      const within =
+        status !== undefined &&
+        list !== undefined &&
+        status.top >= list.top - 1 &&
+        status.bottom <= list.bottom + 1 &&
+        status.left >= list.left - 1 &&
+        status.right <= list.right + 1
+      return {
+        elsewhere,
+        within,
+        shown: hit === null ? 'nothing' : `${hit.getAttribute('role') ?? hit.tagName.toLowerCase()} "${(hit.textContent ?? '').trim().slice(0, 30)}"`,
+      }
     })
-    check(`a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 and 0.7.0 draw it`, under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again')
-    check(`a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`, under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`)
+    check(
+      `a list that goes on (${name}): the open list covers the sentence, as 0085 says formancy 0.6.0 and 0.7.0 draw it`,
+      under.within ? null : 'the sentence lies outside the open list: read 0085’s cost again',
+    )
+    check(
+      `a list that goes on (${name}): every text on the paper whose contrast axe left undecided lies under the open list`,
+      under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`,
+    )
     console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
   }
 }
@@ -85,26 +108,38 @@ function listSaysMore(name, { check }) {
 /** The states, in order, after every other journey of the pass. */
 export function moreJourney(plane, gate) {
   return [
-    ['A list that goes on (React)', async (page) => {
-      // Signed out from wherever the downloads left the page, which may ask about unsaved work first.
-      await carryOn(page, page.getByRole('button', { name: 'Sign out', exact: true }))
-      await page.getByLabel('Host token').fill(TOKENS.thirdClerk)
-      await page.getByRole('button', { name: 'Sign in' }).click()
-      // Signed in again, the page opens the form its address names, which the downloads left: chosen anew all the same.
-      await page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}` }).click()
-      await page.getByRole('heading', { level: 2, name: `Order ${FORM}` }).waitFor(WITHIN)
-      await until(async () => /^Rows 1–/.test((await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? ''), 'the third clerk’s orders were never listed')
-      await page.getByRole('radio', { name: 'Both', exact: true }).check()
-      await page.getByRole('radio', { name: 'Separate views', exact: true }).check()
-      await records(page).getByRole('button', { name: 'New record' }).click()
-      await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)
-      for (const name of ['React', 'Angular']) await customer(page, name).waitFor(WITHIN)
-      await listSaysMore('React', gate)(page)
-    }],
-    ['A list that goes on (Angular)', async (page) => {
-      // From React's Customer, where the last state left the keyboard before the gate's blur, onward into the Angular paper.
-      await customer(page, 'React').focus()
-      await listSaysMore('Angular', gate)(page)
-    }],
+    [
+      'A list that goes on (React)',
+      async (page) => {
+        // Signed out from wherever the downloads left the page, which may ask about unsaved work first.
+        await carryOn(page, page.getByRole('button', { name: 'Sign out', exact: true }))
+        await page.getByLabel('Host token').fill(TOKENS.thirdClerk)
+        await page.getByRole('button', { name: 'Sign in' }).click()
+        // Signed in again, the page opens the form its address names, which the downloads left: chosen anew all the same.
+        await page
+          .getByRole('navigation', { name: 'Forms' })
+          .getByRole('link', { name: `Order ${FORM}` })
+          .click()
+        await page.getByRole('heading', { level: 2, name: `Order ${FORM}` }).waitFor(WITHIN)
+        await until(
+          async () => /^Rows 1–/.test((await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? ''),
+          'the third clerk’s orders were never listed',
+        )
+        await page.getByRole('radio', { name: 'Both', exact: true }).check()
+        await page.getByRole('radio', { name: 'Separate views', exact: true }).check()
+        await records(page).getByRole('button', { name: 'New record' }).click()
+        await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)
+        for (const name of ['React', 'Angular']) await customer(page, name).waitFor(WITHIN)
+        await listSaysMore('React', gate)(page)
+      },
+    ],
+    [
+      'A list that goes on (Angular)',
+      async (page) => {
+        // From React's Customer, where the last state left the keyboard before the gate's blur, onward into the Angular paper.
+        await customer(page, 'React').focus()
+        await listSaysMore('Angular', gate)(page)
+      },
+    ],
   ]
 }

@@ -103,7 +103,11 @@ describe("the guide's steps", () => {
   // while the gate stays green.
   test.each([
     ['no block at all', 'Nothing to run.\n', /no ```sh block/],
-    ['a skipped block that does more than clone and cd', '<!-- not run by the gate: CI has it -->\n```sh\ngit clone x\ndocker compose up\n```\n', /only git clone and cd may be skipped/],
+    [
+      'a skipped block that does more than clone and cd',
+      '<!-- not run by the gate: CI has it -->\n```sh\ngit clone x\ndocker compose up\n```\n',
+      /only git clone and cd may be skipped/,
+    ],
     ['a clone without the marker', '```sh\ngit clone https://example.invalid/x.git\n```\n', /mark its block/],
     ['a marker before something else', '<!-- not run by the gate: CI has it -->\n\n```sh\ncd x\n```\n', /marker is not on the line before/],
     ['a bash block', '```bash\ndocker compose up -d\n```\n', /```bash block is neither run/],
@@ -261,7 +265,7 @@ describe("the gate's copies", () => {
   // data-core. A presentation that changed shape in data-core and not here
   // would publish a bundle the server refuses -- found in the gate's own job,
   // twenty minutes in, rather than here.
-  test('of EMPTY_PRESENTATION is data-core\'s', () => {
+  test("of EMPTY_PRESENTATION is data-core's", () => {
     expect(EMPTY_PRESENTATION).toEqual(CORE_EMPTY_PRESENTATION)
   })
 

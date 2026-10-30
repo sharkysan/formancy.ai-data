@@ -133,7 +133,8 @@ function upstream(root, packages, local) {
   for (const { dir, manifest } of packages) {
     for (const field of FIELDS) {
       for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
-        if (name.startsWith('@formancy/') && !local.has(name)) visit(join(root, dir), name, String(spec), true, field === 'dependencies' && publishing.has(manifest.name))
+        if (name.startsWith('@formancy/') && !local.has(name))
+          visit(join(root, dir), name, String(spec), true, field === 'dependencies' && publishing.has(manifest.name))
       }
     }
   }
@@ -144,7 +145,9 @@ function upstream(root, packages, local) {
 export function setupNodeVersions(root = repo) {
   const dir = join(root, '.github', 'workflows')
   const found = []
-  for (const file of readdirSync(dir).filter((name) => /\.ya?ml$/.test(name)).sort()) {
+  for (const file of readdirSync(dir)
+    .filter((name) => /\.ya?ml$/.test(name))
+    .sort()) {
     const workflow = YAML.parse(readFileSync(join(dir, file), 'utf8'))
     for (const [job, definition] of Object.entries(workflow?.jobs ?? {})) {
       for (const step of definition?.steps ?? []) {
@@ -188,7 +191,8 @@ function browser(root) {
   const builds = readJson(join(core.dir, 'browsers.json')).browsers
   const pins = BROWSERS.map((name) => {
     const build = builds.find((entry) => entry.name === PINNED_AS[name])
-    if (build === undefined) throw new Error(`playwright-core ${core.version} pins no ${String(PINNED_AS[name])}, the build scripts/browsers.mjs says ${name} launches`)
+    if (build === undefined)
+      throw new Error(`playwright-core ${core.version} pins no ${String(PINNED_AS[name])}, the build scripts/browsers.mjs says ${name} launches`)
     return { browser: name, name: build.name, revision: build.revision, browserVersion: build.browserVersion }
   })
   return { playwright: playwright.version, pins }

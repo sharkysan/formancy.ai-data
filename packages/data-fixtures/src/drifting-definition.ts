@@ -19,8 +19,14 @@ export const DEFINITION_CASES: readonly DriftingCase[] = [
     name: 'recreated-same-definition',
     table: 'recreated_same_definition',
     setUp: {
-      postgres: [pgTable('recreated_same_definition', 'code varchar(20) not null'), "insert into drifting.recreated_same_definition (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('recreated_same_definition', 'code nvarchar(20) not null'), "insert into drifting.recreated_same_definition (code, note) values (N'ABC', N'seed')"],
+      postgres: [
+        pgTable('recreated_same_definition', 'code varchar(20) not null'),
+        "insert into drifting.recreated_same_definition (code, note) values ('ABC', 'seed')",
+      ],
+      sqlserver: [
+        msTable('recreated_same_definition', 'code nvarchar(20) not null'),
+        "insert into drifting.recreated_same_definition (code, note) values (N'ABC', N'seed')",
+      ],
     },
     alter: {
       postgres: [
@@ -67,7 +73,10 @@ export const DEFINITION_CASES: readonly DriftingCase[] = [
       postgres: [pgTable('unmoved_index', 'code varchar(20) not null'), "insert into drifting.unmoved_index (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('unmoved_index', 'code nvarchar(20) not null'), "insert into drifting.unmoved_index (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'], sqlserver: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'] },
+    alter: {
+      postgres: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'],
+      sqlserver: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'],
+    },
     moves: false,
     verdict: null,
     updates: [UNTOUCHED],
@@ -81,7 +90,10 @@ export const DEFINITION_CASES: readonly DriftingCase[] = [
       postgres: [pgTable('unmoved_grant', 'code varchar(20) not null'), "insert into drifting.unmoved_grant (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('unmoved_grant', 'code nvarchar(20) not null'), "insert into drifting.unmoved_grant (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['grant select on drifting.unmoved_grant to formancy_reader'], sqlserver: ['grant select on drifting.unmoved_grant to formancy_reader'] },
+    alter: {
+      postgres: ['grant select on drifting.unmoved_grant to formancy_reader'],
+      sqlserver: ['grant select on drifting.unmoved_grant to formancy_reader'],
+    },
     moves: false,
     verdict: null,
     updates: [UNTOUCHED],
@@ -96,7 +108,10 @@ export const DEFINITION_CASES: readonly DriftingCase[] = [
     name: 'masked-after-publication',
     table: 'masked_after_publication',
     setUp: {
-      sqlserver: [msTable('masked_after_publication', 'code nvarchar(20) not null'), "insert into drifting.masked_after_publication (code, note) values (N'ABC', N'seed')"],
+      sqlserver: [
+        msTable('masked_after_publication', 'code nvarchar(20) not null'),
+        "insert into drifting.masked_after_publication (code, note) values (N'ABC', N'seed')",
+      ],
     },
     alter: { sqlserver: ["alter table drifting.masked_after_publication alter column note add masked with (function = 'default()')"] },
     moves: false,

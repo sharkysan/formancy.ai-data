@@ -77,13 +77,30 @@ function cents(value: string, scale: number): number {
 /** Every row the demo's SQL wrote, read back into the generator's shape, each list in the generator's order. */
 async function readBack(db: Db): Promise<DemoData> {
   const countries = await db.unsafe<Array<{ iso_code: string; name: string }>>('select iso_code, name from sales.country order by iso_code')
-  const employees = await db.unsafe<Array<{ id: number; name: string; manager_id: number | null }>>('select id, name, manager_id from sales.employee order by id')
-  const customers = await db.unsafe<Array<{ tenant_id: number; customer_no: number; name: string; country_code: string; credit_limit: string | null; active: boolean; created_at: Date }>>(
+  const employees = await db.unsafe<Array<{ id: number; name: string; manager_id: number | null }>>(
+    'select id, name, manager_id from sales.employee order by id',
+  )
+  const customers = await db.unsafe<
+    Array<{ tenant_id: number; customer_no: number; name: string; country_code: string; credit_limit: string | null; active: boolean; created_at: Date }>
+  >(
     'select tenant_id, customer_no, name, country_code, credit_limit::text as credit_limit, active, created_at from sales.customer order by tenant_id, customer_no',
   )
   const orders = await db.unsafe<
-    Array<{ id: string; tenant_id: number; customer_no: number; order_date: string; status: string; amount: string; notes: string | null; group: string | null; created_by: number; approved_by: number | null }>
-  >('select id::text as id, tenant_id, customer_no, order_date::text as order_date, status, amount::text as amount, notes, "group", created_by, approved_by from sales."order" o order by o.id')
+    Array<{
+      id: string
+      tenant_id: number
+      customer_no: number
+      order_date: string
+      status: string
+      amount: string
+      notes: string | null
+      group: string | null
+      created_by: number
+      approved_by: number | null
+    }>
+  >(
+    'select id::text as id, tenant_id, customer_no, order_date::text as order_date, status, amount::text as amount, notes, "group", created_by, approved_by from sales."order" o order by o.id',
+  )
   const lines = await db.unsafe<Array<{ order_id: string; line_no: number; quantity: number; unit_price: string }>>(
     // Sorted by the columns, not their text: order 10 after order 9.
     'select order_id::text as order_id, line_no, quantity, unit_price::text as unit_price from sales.order_line l order by l.order_id, l.line_no',
@@ -91,12 +108,16 @@ async function readBack(db: Db): Promise<DemoData> {
   const deliveries = await db.unsafe<Array<{ id: string; tenant_id: number; order_id: string; carrier: string; shipped_at: Date }>>(
     'select id::text as id, tenant_id, order_id::text as order_id, carrier, shipped_at from sales.delivery d order by d.order_id, d.id',
   )
-  const parcels = await db.unsafe<Array<{ id: number; delivery_id: string; label: string }>>('select id, delivery_id::text as delivery_id, label from sales.parcel order by id')
+  const parcels = await db.unsafe<Array<{ id: number; delivery_id: string; label: string }>>(
+    'select id, delivery_id::text as delivery_id, label from sales.parcel order by id',
+  )
   // `group` is no field of the generator's: the demo leaves it empty, and a value there is a difference to see.
   const grouped = orders.filter((order) => order.group !== null).map((order) => order.id)
   if (grouped.length > 0) throw new Error(`orders ${grouped.join(', ')} have a group, which the demo leaves empty`)
   return {
-    countries: countries.filter((country) => !FIXTURE_COUNTRIES.includes(country.iso_code)).map((country) => ({ isoCode: country.iso_code, name: country.name })),
+    countries: countries
+      .filter((country) => !FIXTURE_COUNTRIES.includes(country.iso_code))
+      .map((country) => ({ isoCode: country.iso_code, name: country.name })),
     employees: employees.map((employee) => ({ id: employee.id, name: employee.name, managerId: employee.manager_id })),
     customers: customers.map((customer) => ({
       tenantId: customer.tenant_id as Tenant,
@@ -119,7 +140,13 @@ async function readBack(db: Db): Promise<DemoData> {
       approvedBy: order.approved_by,
     })),
     lines: lines.map((line) => ({ orderId: Number(line.order_id), lineNo: line.line_no, quantity: line.quantity, unitPriceCents: cents(line.unit_price, 2) })),
-    deliveries: deliveries.map((delivery) => ({ id: delivery.id, tenantId: delivery.tenant_id as Tenant, orderId: Number(delivery.order_id), carrier: delivery.carrier, shippedAt: delivery.shipped_at.getTime() })),
+    deliveries: deliveries.map((delivery) => ({
+      id: delivery.id,
+      tenantId: delivery.tenant_id as Tenant,
+      orderId: Number(delivery.order_id),
+      carrier: delivery.carrier,
+      shippedAt: delivery.shipped_at.getTime(),
+    })),
     parcels: parcels.map((parcel) => ({ id: parcel.id, deliveryId: parcel.delivery_id, label: parcel.label })),
   }
 }
@@ -143,7 +170,8 @@ async function dump(db: Db): Promise<Record<string, string[]>> {
   )
   const rows: Record<string, string[]> = {}
   // The names are the catalog's own, quoted by the database.
-  for (const { name } of tables) rows[name] = (await db.unsafe<Array<{ text: string }>>(`select t::text as text from sales.${name} t order by 1`)).map((each) => each.text)
+  for (const { name } of tables)
+    rows[name] = (await db.unsafe<Array<{ text: string }>>(`select t::text as text from sales.${name} t order by 1`)).map((each) => each.text)
   return rows
 }
 
@@ -183,7 +211,9 @@ beforeAll(async () => {
   await load(first)
   const loadMs = performance.now() - loading
   await load(second)
-  const [size] = await first.unsafe<Array<{ loaded: string; empty: string }>>("select pg_database_size('demo_first')::text as loaded, pg_database_size('demo_empty')::text as empty")
+  const [size] = await first.unsafe<Array<{ loaded: string; empty: string }>>(
+    "select pg_database_size('demo_first')::text as loaded, pg_database_size('demo_empty')::text as empty",
+  )
   const counts = Object.fromEntries(Object.entries(await dump(first)).map(([table, rows]) => [table, rows.length]))
   console.log(
     `demo data, ${new Date().toISOString()}: ${JSON.stringify({
@@ -241,7 +271,9 @@ describe('the demo data, loaded after the fixture', () => {
   // manager does not exist; the demo validates it, which proves its
   // hierarchy. Every other key was checked as each row went in.
   test('leaves no foreign key unvalidated, fk_employee_manager among them', async () => {
-    expect(await first.unsafe("select conname from pg_constraint where connamespace = 'sales'::regnamespace and contype = 'f' and not convalidated")).toEqual([])
+    expect(await first.unsafe("select conname from pg_constraint where connamespace = 'sales'::regnamespace and contype = 'f' and not convalidated")).toEqual(
+      [],
+    )
     expect(await first.unsafe("select convalidated from pg_constraint where conname = 'fk_employee_manager'")).toEqual([{ convalidated: true }])
   })
 
@@ -255,7 +287,9 @@ describe('the demo data, loaded after the fixture', () => {
     expect(identities.map((identity) => identity.relation)).toEqual(['country', '"order"', 'parcel', 'shipment'])
     // The names are the catalog's own, quoted by the database.
     for (const { relation: table, attribute: column, sequence } of identities) {
-      const [{ highest } = { highest: null }] = await first.unsafe<Array<{ highest: string | null }>>(`select max(${column})::text as highest from sales.${table}`)
+      const [{ highest } = { highest: null }] = await first.unsafe<Array<{ highest: string | null }>>(
+        `select max(${column})::text as highest from sales.${table}`,
+      )
       const [state] = await first.unsafe<Array<{ last_value: string; is_called: boolean }>>(`select last_value::text as last_value, is_called from ${sequence}`)
       const next = Number(state?.last_value) + (state?.is_called === true ? 1 : 0)
       expect(next, `${table}'s next ${column}`).toBeGreaterThan(Number(highest ?? 0))
@@ -266,7 +300,7 @@ describe('the demo data, loaded after the fixture', () => {
   // employee, the two shipments -- are the adapter suites' and never the
   // demo's; its countries stay, the ones customers reference.
   test('replaces the fixture’s rows and keeps its two countries', async () => {
-    expect(await first.unsafe("select count(*)::int as n from sales.\"order\" where id > 840 or tenant_id not in (1, 2)")).toEqual([{ n: 0 }])
+    expect(await first.unsafe('select count(*)::int as n from sales."order" where id > 840 or tenant_id not in (1, 2)')).toEqual([{ n: 0 }])
     expect(await first.unsafe("select count(*)::int as n from sales.employee where name = 'Orphan'")).toEqual([{ n: 0 }])
     expect(await first.unsafe('select count(*)::int as n from sales.shipment')).toEqual([{ n: 0 }])
     expect(await first.unsafe("select iso_code, name from sales.country where iso_code in ('CH', 'DE') order by iso_code")).toEqual([

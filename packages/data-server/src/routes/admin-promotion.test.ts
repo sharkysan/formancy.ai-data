@@ -28,7 +28,17 @@ import type { ConnectionRegistry } from '../connections.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** One deployment's database as it is "now": a test changes production's to make drift. */
@@ -40,17 +50,35 @@ interface Database {
 
 function snapshotOf(database: Database): MetadataSnapshot {
   return createSnapshot({
-    kind: database.engine, serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns: database.columns,
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-    }],
+    kind: database.engine,
+    serverVersion: '16.0',
+    account: { user: 'dbo', login: 'sa' },
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns: database.columns,
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys: [],
+        checks: [],
+        rowSecurity: 'none',
+      },
+    ],
   })
 }
 
 /** Every id in `allowlist` names the deployment's one database; a database that is down throws what a driver throws, address and all. */
 function registry(database: Database, allowlist: readonly string[]): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshotOf(database), close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => snapshotOf(database),
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => [...allowlist],
     scope: (id) => (allowlist.includes(id) ? { schemas: ['sales'] } : undefined),
@@ -64,12 +92,19 @@ function registry(database: Database, allowlist: readonly string[]): ConnectionR
 }
 
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
-    : token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
+  token === 'admin'
+    ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
+    : token === 'clerk'
+      ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
       : { ok: false, reason: 'bad' }
 
 const ADMIN = { authorization: 'Bearer admin' }
-const columns = () => [col('id', 1, INT32), col('name', 2, TEXT), col('title', 3, TEXT, { nullable: true }), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })]
+const columns = () => [
+  col('id', 1, INT32),
+  col('name', 2, TEXT),
+  col('title', 3, TEXT, { nullable: true }),
+  col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+]
 
 let development: Database
 let production: Database
@@ -85,7 +120,12 @@ async function deployment(database: Database, allowlist: readonly string[], sink
   const store = createFileConfigurationStore(root)
   const app = await createDataServer({
     verifyIdentity,
-    admin: { registry: registry(database, allowlist), store, adminRoles: ['data-admin'], audit: { sink: (event) => (event.plane === 'admin' ? sink(event) : undefined) } },
+    admin: {
+      registry: registry(database, allowlist),
+      store,
+      adminRoles: ['data-admin'],
+      audit: { sink: (event) => (event.plane === 'admin' ? sink(event) : undefined) },
+    },
   })
   return { app, store, root }
 }
@@ -107,7 +147,9 @@ afterEach(async () => {
 const policyFor = (bindings: FormBindings) => ({
   version: 1,
   operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-  fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+  fields: Object.fromEntries(
+    bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+  ),
   rowFilters: [],
   lookups: {},
 })
@@ -116,17 +158,37 @@ const grid = (form: FormSchema) => ((form.layouts?.[0]?.nodes[0] as { children: 
 
 /** On `on`: propose, label `name` "Full name" and put it first, publish over `expectedBase`, as the studio does. */
 async function publish(on: FastifyInstance, expectedBase: number | null = null, connection = 'erp') {
-  const proposed = await on.inject({ method: 'POST', url: '/v1/form-proposals', headers: ADMIN, payload: { connection, root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' } })
+  const proposed = await on.inject({
+    method: 'POST',
+    url: '/v1/form-proposals',
+    headers: ADMIN,
+    payload: { connection, root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' },
+  })
   expect(proposed.statusCode, proposed.body).toBe(200)
   const proposal = proposed.json() as { form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: unknown }
   const edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
   const name = edited.model.fields.find((field) => field.key === 'name')
   if (name !== undefined) name.label = 'Full name'
   const nodes = grid(edited)
-  nodes.unshift(...nodes.splice(nodes.findIndex((node) => node.path === 'name'), 1))
+  nodes.unshift(
+    ...nodes.splice(
+      nodes.findIndex((node) => node.path === 'name'),
+      1,
+    ),
+  )
   const derived = presentationOf(proposal.form, edited, proposal.bindings)
   if (!derived.ok) throw new Error(derived.problems.join('; '))
-  const bundle = { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: derived.presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+  const bundle = {
+    format: 2,
+    connection,
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation: derived.presentation,
+    form: edited,
+    bindings: proposal.bindings,
+    policy: policyFor(proposal.bindings),
+    snapshot: proposal.snapshot,
+  }
   const published = await on.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle } })
   expect(published.statusCode, published.body).toBe(201)
 }
@@ -171,7 +233,10 @@ describe('an import', () => {
     for (const form of [bundle['base'], bundle['form']]) form.model.fields.find((field: { key: string }) => field.key === 'name').maxLength = 4000
     const refused = await importInto({ expectedBase: null, bundle })
     expect(refused.statusCode).toBe(422)
-    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: ['base: is not what this server generates from the stored snapshot and generation request'] })
+    expect(refused.json()).toMatchObject({
+      code: 'invalid-bundle',
+      problems: ['base: is not what this server generates from the stored snapshot and generation request'],
+    })
     expect(await target.store.latest('employee')).toBeNull()
   })
 
@@ -186,7 +251,8 @@ describe('an import', () => {
     expect(refused.statusCode).toBe(422)
     expect(refused.json()).toEqual({
       code: 'invalid-bundle',
-      message: "No connection is called crm in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database.",
+      message:
+        "No connection is called crm in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database.",
     })
     expect(events.at(-1)).toMatchObject({ operation: 'import', connection: null, form: 'employee', status: 422, outcome: 'invalid-bundle' })
     expect(await target.store.latest('employee')).toBeNull()
@@ -205,7 +271,10 @@ describe('an import', () => {
     const { generation: _generation, base: _base, presentation: _presentation, ...parts } = bundle
     const formatOne = await importInto({ expectedBase: null, bundle: { ...parts, format: 1 } })
     expect(formatOne.statusCode).toBe(422)
-    expect(formatOne.json()).toMatchObject({ code: 'invalid-bundle', problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'] })
+    expect(formatOne.json()).toMatchObject({
+      code: 'invalid-bundle',
+      problems: ['publish format 2: since 0030 a version keeps its generation request, generated base and presentation'],
+    })
 
     const edited = JSON.parse(JSON.stringify(bundle))
     edited.snapshot.objects[0].columns.find((column: { name: string }) => column.name === 'name').type.maxLength = 4000
@@ -254,7 +323,11 @@ describe('an import', () => {
     production.engine = 'postgres'
     const refused = await importInto({ expectedBase: null, bundle: await exported() })
     expect(refused.statusCode).toBe(422)
-    expect(refused.json()).toEqual({ code: 'other-engine', message: 'This version cannot be imported: connection erp is a postgres database here, and the version is bound to sqlserver. A form\'s bindings belong to one engine.' })
+    expect(refused.json()).toEqual({
+      code: 'other-engine',
+      message:
+        "This version cannot be imported: connection erp is a postgres database here, and the version is bound to sqlserver. A form's bindings belong to one engine.",
+    })
     expect(await target.store.latest('employee')).toBeNull()
   })
 
@@ -287,7 +360,11 @@ describe('an import', () => {
     const job = [col('job_title', 5, TEXT, { nullable: true }), col('job title', 6, TEXT, { nullable: true })]
     production.columns.push(...job)
     await publish(target.app)
-    const renumbered = (database: Database) => [...database.columns.filter((column) => column.name !== 'job_title' && column.name !== 'job title'), job[1] as ColumnMeta, col('job-title', 7, TEXT, { nullable: true })]
+    const renumbered = (database: Database) => [
+      ...database.columns.filter((column) => column.name !== 'job_title' && column.name !== 'job title'),
+      job[1] as ColumnMeta,
+      col('job-title', 7, TEXT, { nullable: true }),
+    ]
     production.columns = renumbered(production)
     development.columns = renumbered(development)
     await publish(source.app)
@@ -343,7 +420,14 @@ describe('an import', () => {
     await publish(source.app)
     const bundle = await exported()
     production.reachable = false
-    for (const payload of [{ bundle }, { expectedBase: '1', bundle }, { expectedBase: 1.5, bundle }, { expectedBase: null }, { expectedBase: null, bundle: [bundle] }, { expectedBase: null, bundle, keysConfirmed: 'job_title' }]) {
+    for (const payload of [
+      { bundle },
+      { expectedBase: '1', bundle },
+      { expectedBase: 1.5, bundle },
+      { expectedBase: null },
+      { expectedBase: null, bundle: [bundle] },
+      { expectedBase: null, bundle, keysConfirmed: 'job_title' },
+    ]) {
       const response = await importInto(payload)
       expect(response.statusCode, JSON.stringify(Object.keys(payload))).toBe(400)
       expect(response.json().code).toBe('invalid-request')

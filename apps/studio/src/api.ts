@@ -1,5 +1,30 @@
-import type { BrowseQuery, DriftChange, DriftReport, GeneratedForm, GenerationRequest, LookupChoice, MetadataSnapshot, ObjectRef, ReassignedKey } from '@formancy/data-core'
-import type { Administration, Approval, BrowseAnswer, BundleV2, ConnectionTest, DraftQueue, DraftRead, DraftRejection, DraftSubmission, HostIdentity, Importation, PublishedBundle, Regeneration, Restoration } from '@formancy/data-server'
+import type {
+  BrowseQuery,
+  DriftChange,
+  DriftReport,
+  GeneratedForm,
+  GenerationRequest,
+  LookupChoice,
+  MetadataSnapshot,
+  ObjectRef,
+  ReassignedKey,
+} from '@formancy/data-core'
+import type {
+  Administration,
+  Approval,
+  BrowseAnswer,
+  BundleV2,
+  ConnectionTest,
+  DraftQueue,
+  DraftRead,
+  DraftRejection,
+  DraftSubmission,
+  HostIdentity,
+  Importation,
+  PublishedBundle,
+  Regeneration,
+  Restoration,
+} from '@formancy/data-server'
 
 /**
  * The studio's whole vocabulary: the data server's administrator plane, and

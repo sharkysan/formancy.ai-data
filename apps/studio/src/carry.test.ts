@@ -24,7 +24,15 @@ afterEach(async () => {
   await plane.close()
 })
 
-const ORDER: ProposalRequest = { connection: 'fixture', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [], pinned: [], versionColumn: 'row_version' }
+const ORDER: ProposalRequest = {
+  connection: 'fixture',
+  root: { schema: 'sales', name: 'order' },
+  formId: 'sales-order',
+  title: 'Order',
+  lookups: [],
+  pinned: [],
+  versionColumn: 'row_version',
+}
 
 async function propose(request: ProposalRequest = ORDER): Promise<Proposal> {
   const outcome = await admin.propose(request)
@@ -75,7 +83,11 @@ describe('carrying a draft to a new proposal', () => {
     const before = await propose()
     const edited = createBuilderSession(before.form).exportDocument()
     const noted: ListView = { name: 'Noted', filter: [{ field: 'notes', op: 'not-null' }], sort: [], default: true }
-    const placed: ListView = { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }] }
+    const placed: ListView = {
+      name: 'Placed',
+      filter: [{ field: 'status', op: 'equals', value: 'placed' }],
+      sort: [{ field: 'order_date', direction: 'desc' }],
+    }
     const same = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
     expect(same.ok && same.views).toEqual([noted, placed])
     expect(same.ok && same.conflicts).toEqual([])
@@ -83,7 +95,14 @@ describe('carrying a draft to a new proposal', () => {
     const carried = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
     if (!carried.ok) throw new Error(carried.message)
     expect(carried.views).toEqual([placed])
-    expect(carried.conflicts).toEqual([{ kind: 'view-dropped', view: 'Noted', resolution: 'dropped', message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.' }])
+    expect(carried.conflicts).toEqual([
+      {
+        kind: 'view-dropped',
+        view: 'Noted',
+        resolution: 'dropped',
+        message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.',
+      },
+    ])
   })
 
   // builder-core accepts a required flag, which is not presentation. A draft
@@ -103,7 +122,14 @@ describe('carrying a draft to a new proposal', () => {
 describe('the keys a draft still asks about', () => {
   const ORDER_KEY = { field: 'order', was: { kind: 'lookup', foreignKey: 'fk_line_order' }, now: { kind: 'lookup', foreignKey: 'fk_line_quote' } } as const
   const removed: Carried = { from: 'version 1', version: 1, conflicts: [], fresh: [], undecided: [], kept: [], removed: [ORDER_KEY] }
-  const policy = (through: string[]): FormPolicy => ({ version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through })
+  const policy = (through: string[]): FormPolicy => ({
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [] },
+    fields: {},
+    rowFilters: [],
+    lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+    through,
+  })
 
   // A removed key is asked about again once the policy grants on it again,
   // by the server's test (0039). A through is such a grant (0043): ticked
@@ -137,7 +163,14 @@ describe('what "Generate again" keeps', () => {
     resolution: 'dropped',
     message: 'The section "Record" you chose for notes was dropped.',
   }
-  const followed: PresentationConflict = { kind: 'field-rekeyed', field: 'client', from: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, resolution: 'followed', message: 'customer is now client.' }
+  const followed: PresentationConflict = {
+    kind: 'field-rekeyed',
+    field: 'client',
+    from: 'customer',
+    anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' },
+    resolution: 'followed',
+    message: 'customer is now client.',
+  }
 
   // What a regeneration dropped is no longer in the draft for the next
   // rebase to report, so "Generate again" keeps every conflict that dropped
@@ -155,7 +188,12 @@ describe('what "Generate again" keeps', () => {
   // "Generate again" while the view was gone. Watched failing with the
   // conflicts kept by a list of kinds that left view-dropped out.
   test('keeps a dropped list view reported', () => {
-    const viewDropped: PresentationConflict = { kind: 'view-dropped', view: 'Noted', resolution: 'dropped', message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.' }
+    const viewDropped: PresentationConflict = {
+      kind: 'view-dropped',
+      view: 'Noted',
+      resolution: 'dropped',
+      message: 'View “Noted” names notes, which is not in the regenerated form, so it was dropped.',
+    }
     const earlier: Carried = { from: 'version 1', version: 1, conflicts: [viewDropped], fresh: [], undecided: [], kept: [], removed: [] }
     expect(carriedAgain(earlier, NO_FIELDS, { conflicts: [], fresh: [] }, NO_FIELDS).conflicts).toEqual([viewDropped])
   })

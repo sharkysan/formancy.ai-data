@@ -41,7 +41,6 @@ afterAll(async () => {
 
 afterEach(cleanup)
 
-
 /** The guide's sign-in: a token and Sign in, then the form chosen under Forms by its id, and its grid answered. */
 async function open(user: User, token: string, formId: string): Promise<void> {
   await user.type(screen.getByLabelText(HOST.token), token)

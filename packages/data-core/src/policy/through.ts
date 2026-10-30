@@ -65,7 +65,9 @@ export function throughProblems(snapshot: MetadataSnapshot, bindings: FormBindin
     const rootColumns = binding.columns.map((name) => ({ name, type: root?.columns.find((column) => column.name === name)?.type }))
     const target = `${binding.target.table.schema}.${binding.target.table.name}`
     const text = [
-      ...rootColumns.filter((column) => column.type === undefined || !isThroughKeyType(column.type)).map((column) => `${bindings.root.schema}.${bindings.root.name}.${column.name}`),
+      ...rootColumns
+        .filter((column) => column.type === undefined || !isThroughKeyType(column.type))
+        .map((column) => `${bindings.root.schema}.${bindings.root.name}.${column.name}`),
       ...targetColumns.filter((column) => !isThroughKeyType(column.type)).map((column) => `${target}.${column.name}`),
     ]
     if (text.length > 0) {

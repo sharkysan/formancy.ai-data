@@ -42,16 +42,19 @@ export async function audit(page, target) {
   // evaluates is not held to it, as 0069 measured.
   if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
   const subject = target ?? (await page.evaluateHandle(() => document))
-  return subject.evaluate(async (context, tags) => {
-    const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
-    const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
-    return {
-      axe: window.axe.version,
-      violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
-      measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-      undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({ html: node.html.slice(0, 60), target: node.target[0] })),
-    }
-  }, [...ACCESSIBILITY_TAGS])
+  return subject.evaluate(
+    async (context, tags) => {
+      const results = await window.axe.run(context, { runOnly: { type: 'tag', values: tags } })
+      const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      return {
+        axe: window.axe.version,
+        violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
+        measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
+        undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({ html: node.html.slice(0, 60), target: node.target[0] })),
+      }
+    },
+    [...ACCESSIBILITY_TAGS],
+  )
 }
 
 /**

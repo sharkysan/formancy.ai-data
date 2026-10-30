@@ -112,7 +112,11 @@ function doubtOf(comparison: Comparison, gap: CoverageGap): { stops: Operation[]
   if (onRoot && gap.aspect === 'keys' && bindings.identity !== null) block(fieldsOver(bindings, bindings.identity), ['update', 'delete'])
   if (onRoot && gap.aspect === 'referenced-by') block([], ['delete'])
   const lookupsInDoubt = [...(onRoot && gap.aspect === 'foreign-keys' ? lookups(bindings) : []), ...(TARGET_ASPECTS.has(gap.aspect) ? targeted : [])]
-  if (lookupsInDoubt.length > 0) block(lookupsInDoubt.map((lookup) => lookup.field), SELECTING)
+  if (lookupsInDoubt.length > 0)
+    block(
+      lookupsInDoubt.map((lookup) => lookup.field),
+      SELECTING,
+    )
 
   return { stops: [...stops], affects: allFields(bindings).filter((field) => affected.has(field)) }
 }

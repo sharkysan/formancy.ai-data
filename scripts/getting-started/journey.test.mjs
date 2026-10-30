@@ -21,9 +21,19 @@ const asked = []
 beforeAll(async () => {
   server = createServer((request, response) => {
     asked.push({ method: request.method, url: request.url, authorization: request.headers.authorization })
-    response
-      .writeHead(200, { 'content-type': 'application/json' })
-      .end(JSON.stringify({ kind: 'sqlserver', version: '16.0.4295.3', product: 'sqlserver', major: 16, compatibility: 160, standing: { tested: true, says: 'This release of Formancy Data was tested on SQL Server 2022 (16), and the database’s compatibility level, 160, is not below the lowest it was tested at, 150.' } }))
+    response.writeHead(200, { 'content-type': 'application/json' }).end(
+      JSON.stringify({
+        kind: 'sqlserver',
+        version: '16.0.4295.3',
+        product: 'sqlserver',
+        major: 16,
+        compatibility: 160,
+        standing: {
+          tested: true,
+          says: 'This release of Formancy Data was tested on SQL Server 2022 (16), and the database’s compatibility level, 160, is not below the lowest it was tested at, 150.',
+        },
+      }),
+    )
   })
   await new Promise((ready) => server.listen(0, '127.0.0.1', ready))
   base = `http://127.0.0.1:${String(server.address().port)}/`
@@ -83,7 +93,10 @@ describe('what a proxy in front of the stack sees', () => {
     await new Promise((ready) => stand.listen(0, '127.0.0.1', ready))
     return { seen, url: `http://127.0.0.1:${String(stand.address().port)}/`, close: () => new Promise((done) => stand.close(done)) }
   }
-  const server = (url) => (url.includes('%2F') ? { status: 400, headers: { 'cache-control': 'no-store' }, body: { code: 'path-not-plain', message: 'x' } } : { status: 200, headers: { 'cache-control': 'no-store' }, body: {} })
+  const server = (url) =>
+    url.includes('%2F')
+      ? { status: 400, headers: { 'cache-control': 'no-store' }, body: { code: 'path-not-plain', message: 'x' } }
+      : { status: 200, headers: { 'cache-control': 'no-store' }, body: {} }
 
   test('is nothing wrong when every answer says no-store and the path is refused', async () => {
     const stand = await standIn(server)
@@ -96,7 +109,9 @@ describe('what a proxy in front of the stack sees', () => {
   })
 
   test('names an answer without no-store, and a path that reached a route', async () => {
-    const stand = await standIn((url) => (url.includes('%2F') ? { status: 404, headers: {}, body: { code: 'unknown-form' } } : { status: 200, headers: { 'cache-control': 'no-cache' }, body: {} }))
+    const stand = await standIn((url) =>
+      url.includes('%2F') ? { status: 404, headers: {}, body: { code: 'unknown-form' } } : { status: 200, headers: { 'cache-control': 'no-cache' }, body: {} },
+    )
     try {
       expect(await proxyProblems(stand.url, 'clerk-token', 'pg-order')).toEqual([
         'GET /v1/forms/pg-order answered 200 with Cache-Control no-cache, not no-store',
@@ -130,7 +145,8 @@ describe('deleting an order over HTTP', () => {
         seen.push({ url: request.url, tenant, body, writeId: request.headers['formancy-write-id'] !== undefined })
         const answer = (status, json) => response.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(json))
         const visible = present && tenant === '1' && body?.record === 'k1:7'
-        if (request.url.endsWith('/records/read')) return visible ? answer(200, { record: 'k1:7', version: '3', answers: {} }) : answer(404, { code: 'not-found', message: 'No such record.' })
+        if (request.url.endsWith('/records/read'))
+          return visible ? answer(200, { record: 'k1:7', version: '3', answers: {} }) : answer(404, { code: 'not-found', message: 'No such record.' })
         if (!visible || body?.version !== '3') return answer(404, { code: 'not-found', message: 'No such record.' })
         present = false
         return answer(200, { record: 'k1:7', deleted: true })
@@ -140,7 +156,7 @@ describe('deleting an order over HTTP', () => {
     return { seen, url: `http://127.0.0.1:${String(stand.address().port)}/`, close: () => new Promise((done) => stand.close(done)) }
   }
 
-  test("tenant 2 is told not found, tenant 1 deletes the order, and it is then not found", async () => {
+  test('tenant 2 is told not found, tenant 1 deletes the order, and it is then not found', async () => {
     const stand = await plane()
     try {
       await deleteOrder(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order-delete', 'k1:7', 'pg:')
@@ -160,7 +176,9 @@ describe('deleting an order over HTTP', () => {
   test('names a delete another tenant made', async () => {
     const stand = await plane()
     try {
-      await expect(deleteOrder(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-1' }, 'pg-order-delete', 'k1:7', 'pg:')).rejects.toThrow(/tenant 2 deleting tenant 1's order answered 200, not 404/)
+      await expect(deleteOrder(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-1' }, 'pg-order-delete', 'k1:7', 'pg:')).rejects.toThrow(
+        /tenant 2 deleting tenant 1's order answered 200, not 404/,
+      )
     } finally {
       await stand.close()
     }
@@ -207,7 +225,9 @@ describe('exporting the orders over HTTP', () => {
   test("names tenant 1's order in tenant 2's file", async () => {
     const stand = await plane(true)
     try {
-      await expect(exportOrders(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order', 'k1:7', 'Id', 'pg:')).rejects.toThrow("pg: tenant 2's file of orders holds tenant 1's order")
+      await expect(exportOrders(stand.url, { clerk1: 'clerk-1', clerk2: 'clerk-2' }, 'pg-order', 'k1:7', 'Id', 'pg:')).rejects.toThrow(
+        "pg: tenant 2's file of orders holds tenant 1's order",
+      )
     } finally {
       await stand.close()
     }

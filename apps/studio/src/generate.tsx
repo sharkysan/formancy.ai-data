@@ -12,7 +12,12 @@ import { describeRef } from './choice.js'
  */
 export const NOTE_KINDS: ReadonlyArray<{ kind: GenerationNote['kind']; heading: string; means: string; none: string }> = [
   { kind: 'blocked', heading: 'Blocked', means: 'An operation the form cannot offer, and why.', none: 'No operation is blocked.' },
-  { kind: 'read-only', heading: 'Read-only', means: 'A field shown and not written, on every operation or on the one named.', none: 'No field is marked read-only.' },
+  {
+    kind: 'read-only',
+    heading: 'Read-only',
+    means: 'A field shown and not written, on every operation or on the one named.',
+    none: 'No field is marked read-only.',
+  },
   { kind: 'excluded', heading: 'Excluded', means: 'A column with no field.', none: 'No column was left without a field.' },
   { kind: 'inferred', heading: 'Inferred', means: 'Decided from the metadata, and editable.', none: 'Nothing was inferred.' },
   {
@@ -39,8 +44,8 @@ export function GenerateStep({ proposal, onNext }: { proposal: Proposal; onNext:
   return (
     <>
       <p className="lede">
-        <code>{form.id}</code>, &ldquo;{form.title}&rdquo;, generated from {describeRef(bindings.root)} as the server
-        discovered it just now: {form.model.fields.length} {form.model.fields.length === 1 ? 'field' : 'fields'}.
+        <code>{form.id}</code>, &ldquo;{form.title}&rdquo;, generated from {describeRef(bindings.root)} as the server discovered it just now:{' '}
+        {form.model.fields.length} {form.model.fields.length === 1 ? 'field' : 'fields'}.
       </p>
       <section className="notes" aria-labelledby="chose-heading">
         <h3 id="chose-heading">What the generator chose</h3>

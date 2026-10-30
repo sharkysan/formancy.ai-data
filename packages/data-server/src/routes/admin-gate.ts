@@ -43,7 +43,15 @@ export type Gated = { ok: true; bundle: BundleV2; drift: DriftReport } | { ok: f
  * whoever asks. The compare-and-swap is the caller's: the write itself,
  * or for a submit, a draft.
  */
-export async function gate(steps: GateSteps, reply: FastifyReply, id: string, expectedBase: number | null, document: unknown, confirmed: readonly ReassignedKey[], sentences: GateSentences): Promise<Gated> {
+export async function gate(
+  steps: GateSteps,
+  reply: FastifyReply,
+  id: string,
+  expectedBase: number | null,
+  document: unknown,
+  confirmed: readonly ReassignedKey[],
+  sentences: GateSentences,
+): Promise<Gated> {
   const { store, allowlisted, discover, refuse } = steps
   const trail = adminTrail(reply.request)
   const checked = storable(document, id, allowlisted, sentences.unknown)

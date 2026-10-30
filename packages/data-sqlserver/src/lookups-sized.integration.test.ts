@@ -96,7 +96,13 @@ beforeAll(async () => {
   // As a deployment builds the order form's customer lookup: discovered,
   // generated with `name` displayed, then derived with no option set.
   const snapshot = await discoverSqlServer(owner, { schemas: ['sales'] })
-  const { bindings } = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'order' }, formId: 'sized', title: 'Sized', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+  const { bindings } = generateForm(snapshot, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'sized',
+    title: 'Sized',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+  })
   const field = bindings.fields.find((candidate) => candidate.kind === 'lookup')
   if (field === undefined) throw new Error('the generator made no customer lookup')
   config = buildLookupConfig(bindings, field.field, { snapshot })
@@ -134,7 +140,10 @@ function operators(xml: string): Operator[] {
   const open: Operator[] = []
   for (const tag of xml.matchAll(/<(\/?)([\w:]+)((?:\s+[\w:]+="[^"]*")*)\s*\/?>/g)) {
     const [, closing, name, attributeText] = tag
-    const attributes = Object.fromEntries([...(attributeText ?? '').matchAll(/([\w:]+)="([^"]*)"/g)].map((match) => [match[1], match[2]])) as Record<string, string>
+    const attributes = Object.fromEntries([...(attributeText ?? '').matchAll(/([\w:]+)="([^"]*)"/g)].map((match) => [match[1], match[2]])) as Record<
+      string,
+      string
+    >
     const current = open.at(-1)
     if (name === 'RelOp' && closing === '') {
       const operator: Operator = { physical: attributes['PhysicalOp'] ?? '?', depth: open.length, object: undefined, threads: [] }
@@ -142,7 +151,8 @@ function operators(xml: string): Operator[] {
       all.push(operator)
     } else if (name === 'RelOp') open.pop()
     else if (closing === '' && name === 'RunTimeCountersPerThread' && current !== undefined) current.threads.push(attributes)
-    else if (closing === '' && name === 'Object' && current !== undefined && current.object === undefined) current.object = `${attributes['Schema'] ?? ''}.${attributes['Table'] ?? ''}`
+    else if (closing === '' && name === 'Object' && current !== undefined && current.object === undefined)
+      current.object = `${attributes['Schema'] ?? ''}.${attributes['Table'] ?? ''}`
   }
   return all
 }
@@ -156,13 +166,14 @@ async function plansOf<T>(run: () => Promise<T>): Promise<{ answer: T; plans: st
   try {
     const answer = await run()
     const read = async (): Promise<string[]> => {
-      const result = await owner
-        .request()
-        .input('session', mssql.NVarChar(128), SESSION)
-        .query<{ x: string | null }>(`select cast(t.target_data as nvarchar(max)) as x from sys.dm_xe_session_targets as t
+      const result = await owner.request().input('session', mssql.NVarChar(128), SESSION).query<{
+        x: string | null
+      }>(`select cast(t.target_data as nvarchar(max)) as x from sys.dm_xe_session_targets as t
           join sys.dm_xe_sessions as s on s.address = t.event_session_address where s.name = @session and t.target_name = N'ring_buffer'`)
       const ring = result.recordset[0]?.x ?? ''
-      return [...ring.matchAll(/<ShowPlanXML[\s\S]*?<\/ShowPlanXML>/g)].map((match) => match[0]).filter((plan) => plan.includes('Schema="[sales]" Table="[customer]"'))
+      return [...ring.matchAll(/<ShowPlanXML[\s\S]*?<\/ShowPlanXML>/g)]
+        .map((match) => match[0])
+        .filter((plan) => plan.includes('Schema="[sales]" Table="[customer]"'))
     }
     // Events reach the ring buffer within the session's dispatch latency, a
     // second. Waited for, then read once more a dispatch later, so a second
@@ -211,7 +222,7 @@ describe.each([
   // lookups.ts, returns thousands where 51 is the most. Seeks only, for the
   // tenant: a scan that a residual predicate trims to the same rows would
   // still read the table.
-  test.each(SEARCHES)('%s answers the generator\'s page, returns at most 51 and reads exactly the rows the filter admits', async (name, search) => {
+  test.each(SEARCHES)("%s answers the generator's page, returns at most 51 and reads exactly the rows the filter admits", async (name, search) => {
     const cost = await costOf(() => createSqlServerLookups(writer).search(config, { search, offset: 0, limit: 50 }, filters, NOT_ABORTED))
     console.log(`${form}, ${name}: DOP ${cost.dop}, ${cost.access.join(', ')}, read ${String(cost.read)}, returned ${String(cost.returned)}`)
     expect(cost.answer).toEqual(expectedPage(search))
@@ -228,7 +239,14 @@ describe('resolving and checking keys on the sized customers', () => {
   // tenant's 100,001 rows to find a hundred, or one.
   test.each([100, 1])('resolving %i keys reads at most one row per key, by seeks', async (n) => {
     const keys = sizedResolveKeys(n)
-    const cost = await costOf(() => createSqlServerLookups(writer).resolve(config, keys.map((key) => tokenOf(key.tenantId, key.customerNo)), TENANT_1, NOT_ABORTED))
+    const cost = await costOf(() =>
+      createSqlServerLookups(writer).resolve(
+        config,
+        keys.map((key) => tokenOf(key.tenantId, key.customerNo)),
+        TENANT_1,
+        NOT_ABORTED,
+      ),
+    )
     expect(cost.answer).toHaveLength(n)
     expect(cost.read).toBeGreaterThan(0)
     expect(cost.read).toBeLessThanOrEqual(n * PER_KEY)

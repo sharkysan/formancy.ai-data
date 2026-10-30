@@ -62,7 +62,9 @@ function only(text, generator, { name } = {}) {
   const matching = blocks(text).filter((entry) => entry.generator === generator && entry.name === name)
   if (matching.length !== 1) {
     const what = name === undefined ? `the block ${generator} generates` : `the generated block "${name}"`
-    throw new Error(`must hold ${what} exactly once, opened by ${marker(generator, { name })} (with its source, if it has one); found ${String(matching.length)}`)
+    throw new Error(
+      `must hold ${what} exactly once, opened by ${marker(generator, { name })} (with its source, if it has one); found ${String(matching.length)}`,
+    )
   }
   return matching[0]
 }

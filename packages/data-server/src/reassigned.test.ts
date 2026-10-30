@@ -15,16 +15,36 @@ const WRITES = { create: true, update: true }
 const TEXT = { kind: 'text', maxLength: 40, lengthUnit: 'code-points', fixedLength: false } as const
 
 const columnBinding = (field: string, column: string): FieldBinding => ({ kind: 'column', field, column, type: TEXT, nullable: true, writes: WRITES })
-const lookupBinding = (field: string, foreignKey: string): FieldBinding => ({
-  kind: 'lookup', field, foreignKey, columns: [`${field}_id`], target: { table: { schema: 'sales', name: field }, columns: ['id'] }, display: ['name'], source: `erp-${foreignKey}`, nullable: true, writes: WRITES,
-} as FieldBinding)
+const lookupBinding = (field: string, foreignKey: string): FieldBinding =>
+  ({
+    kind: 'lookup',
+    field,
+    foreignKey,
+    columns: [`${field}_id`],
+    target: { table: { schema: 'sales', name: field }, columns: ['id'] },
+    display: ['name'],
+    source: `erp-${foreignKey}`,
+    nullable: true,
+    writes: WRITES,
+  }) as FieldBinding
 
 const bindings = (...fields: FieldBinding[]): FormBindings => ({
-  version: 2, root: { schema: 'sales', name: 'order' }, rootKind: 'table', identity: ['id'], concurrency: null, operations: { create: true, update: true }, fields, snapshotFingerprint: 'sha256:0',
+  version: 2,
+  root: { schema: 'sales', name: 'order' },
+  rootKind: 'table',
+  identity: ['id'],
+  concurrency: null,
+  operations: { create: true, update: true },
+  fields,
+  snapshotFingerprint: 'sha256:0',
 })
 
 const policy = (fields: FormPolicy['fields'], lookups: FormPolicy['lookups'] = {}): FormPolicy => ({
-  version: 1, operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] }, fields, rowFilters: [], lookups,
+  version: 1,
+  operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+  fields,
+  rowFilters: [],
+  lookups,
 })
 
 /** `policy` over `after`, as the route has it: the bundle validated, so a state the route never receives is never asserted on. */
@@ -45,11 +65,21 @@ describe('unconfirmedKeys', () => {
   test('a role on a re-pointed lookup needs confirming; its filter alone, which every lookup field has, does not', () => {
     const before = bindings(columnBinding('note', 'note'), lookupBinding('customer', 'fk_order_customer'))
     const after = bindings(columnBinding('note', 'note'), lookupBinding('customer', 'fk_order_buyer'))
-    const repointed = { field: 'customer', was: { kind: 'lookup', foreignKey: 'fk_order_customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_buyer' } } as const
+    const repointed = {
+      field: 'customer',
+      was: { kind: 'lookup', foreignKey: 'fk_order_customer' },
+      now: { kind: 'lookup', foreignKey: 'fk_order_buyer' },
+    } as const
     const granted = fitted(after, policy({ customer: { read: ['clerk'], write: [] } }, { customer: [] }))
     expect(unconfirmedKeys(before, granted, [])).toEqual([repointed])
     expect(unconfirmedKeys(before, granted, [repointed])).toEqual([])
-    expect(unconfirmedKeys(before, fitted(after, policy({ customer: { read: [], write: ['clerk'] } }, { customer: [{ column: 'tenant', attribute: 'tenant' }] })), [])).toEqual([repointed])
+    expect(
+      unconfirmedKeys(
+        before,
+        fitted(after, policy({ customer: { read: [], write: ['clerk'] } }, { customer: [{ column: 'tenant', attribute: 'tenant' }] })),
+        [],
+      ),
+    ).toEqual([repointed])
     expect(unconfirmedKeys(before, fitted(after, policy({}, { customer: [] })), [])).toEqual([])
     expect(unconfirmedKeys(before, fitted(after, policy({ customer: { read: [], write: [] } }, { customer: [] })), [])).toEqual([])
   })
@@ -62,11 +92,15 @@ describe('unconfirmedKeys', () => {
   // until confirmed, as a role is (watched failing: listed as nothing, and
   // published unasked).
   test('a through on a re-pointed lookup needs confirming, though nobody holds a role on its field', () => {
-    const toOrder = (field: string, foreignKey: string, column: string): FieldBinding => ({ ...lookupBinding(field, foreignKey), columns: [column], target: { table: { schema: 'sales', name: 'order' }, columns: ['id'] } } as FieldBinding)
+    const toOrder = (field: string, foreignKey: string, column: string): FieldBinding =>
+      ({ ...lookupBinding(field, foreignKey), columns: [column], target: { table: { schema: 'sales', name: 'order' }, columns: ['id'] } }) as FieldBinding
     const before = bindings(columnBinding('note', 'note'), toOrder('order', 'fk_line_order', 'order_id'))
     const after = bindings(columnBinding('note', 'note'), toOrder('order', 'fk_line_quote', 'quote_id'), toOrder('order_2', 'fk_line_order', 'order_id'))
     const repointed = { field: 'order', was: { kind: 'lookup', foreignKey: 'fk_line_order' }, now: { kind: 'lookup', foreignKey: 'fk_line_quote' } } as const
-    const scoped = fitted(after, { ...policy({ note: { read: ['clerk'], write: [] } }, { order: [{ column: 'tenant_id', attribute: 'tenant' }], order_2: [] }), through: ['order'] })
+    const scoped = fitted(after, {
+      ...policy({ note: { read: ['clerk'], write: [] } }, { order: [{ column: 'tenant_id', attribute: 'tenant' }], order_2: [] }),
+      through: ['order'],
+    })
     expect(unconfirmedKeys(before, scoped, [])).toEqual([repointed])
     expect(unconfirmedKeys(before, scoped, [repointed])).toEqual([])
     // Without the through, the same policy grants nothing on the key.
@@ -92,8 +126,10 @@ describe('readKeysConfirmed', () => {
   // Absent is the publish every client sent before 0039, and it confirms nothing.
   test('absent is none; each entry is rebuilt from the anchors it names', () => {
     expect(readKeysConfirmed(undefined)).toEqual([])
-    expect(readKeysConfirmed([{ field: 'note', was: { kind: 'column', column: 'note', extra: 1 }, now: { kind: 'lookup', foreignKey: 'fk', column: 'x' }, by: 'me' }])).toEqual([
-      { field: 'note', was: { kind: 'column', column: 'note' }, now: { kind: 'lookup', foreignKey: 'fk' } },
-    ])
+    expect(
+      readKeysConfirmed([
+        { field: 'note', was: { kind: 'column', column: 'note', extra: 1 }, now: { kind: 'lookup', foreignKey: 'fk', column: 'x' }, by: 'me' },
+      ]),
+    ).toEqual([{ field: 'note', was: { kind: 'column', column: 'note' }, now: { kind: 'lookup', foreignKey: 'fk' } }])
   })
 })

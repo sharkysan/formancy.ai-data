@@ -49,7 +49,10 @@ afterEach(() => {
 })
 
 const records = (): HTMLElement => within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-const headers = (): string[] => within(records()).getAllByRole('columnheader').map((header) => header.textContent?.trim() ?? '')
+const headers = (): string[] =>
+  within(records())
+    .getAllByRole('columnheader')
+    .map((header) => header.textContent?.trim() ?? '')
 
 /** The page with the form chosen, its grid answered, its first row opened by a click, and the keyboard on that row. */
 async function inTheGrid(formId: string): Promise<User> {
@@ -87,11 +90,21 @@ describe.each(ENGINES)('the record grid on $engine', ({ formId }) => {
   // opened).
   test('clears, sends and asks nothing on Delete or Backspace', async () => {
     const user = await inTheGrid(formId)
-    expect(within(records()).getAllByRole('columnheader').map((header) => header.textContent?.trim())).toContain('Delete')
-    const before = within(records()).getAllByRole('gridcell').map((cell) => cell.textContent)
+    expect(
+      within(records())
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent?.trim()),
+    ).toContain('Delete')
+    const before = within(records())
+      .getAllByRole('gridcell')
+      .map((cell) => cell.textContent)
     const sent = plane.sent.length
     await user.keyboard('{Delete}{Backspace}')
-    expect(within(records()).getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual(before)
+    expect(
+      within(records())
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent),
+    ).toEqual(before)
     expect(plane.sent.slice(sent).map((request) => `${request.method} ${request.path}`)).toEqual([])
     expect(screen.queryByRole('region', { name: /^Delete / })).toBeNull()
   })

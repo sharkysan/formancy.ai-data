@@ -9,7 +9,10 @@ describe('what the journey expects', () => {
   test("is each role's menu as ROLE_GRANTS grants it, with the master-detail chain", () => {
     for (const [role, { may }] of Object.entries(ROLE_GRANTS)) {
       const menu = expectedMenu(role)
-      expect(menu.map((form) => form.id), role).toEqual(['customer', 'delivery', 'order', 'order-line'])
+      expect(
+        menu.map((form) => form.id),
+        role,
+      ).toEqual(['customer', 'delivery', 'order', 'order-line'])
       for (const form of menu) expect(form.operations, `${role} ${form.id}`).toEqual(may[form.id])
     }
     expect(expectedMenu('clerk').find((form) => form.id === 'order').children).toEqual([
@@ -34,7 +37,12 @@ describe('the money', () => {
     expect(units('12.5')).toBe(125000n)
     expect(units('0.0001')).toBe(1n)
     expect(units('-3')).toBe(-30000n)
-    expect(lineTotal([{ quantity: 3, unit_price: '0.10' }, { quantity: 1, unit_price: '0.20' }])).toBe(units('0.5'))
+    expect(
+      lineTotal([
+        { quantity: 3, unit_price: '0.10' },
+        { quantity: 1, unit_price: '0.20' },
+      ]),
+    ).toBe(units('0.5'))
     expect(() => units('1.23456')).toThrow(/more than four decimals/)
     expect(() => units('1e3')).toThrow(/not a decimal/)
   })
@@ -68,7 +76,16 @@ describe('the routes the Worker keeps closed', () => {
     expect(server.length).toBeGreaterThan(10)
     for (const route of server) expect(worker, `${route.method} ${route.path}`).toContainEqual(route)
     expect(server.some((route) => route.path === '/health' || route.path === '/v1/whoami')).toBe(false)
-    const doors = { routes: [{ method: 'GET', path: '/v1/forms', sample: '/v1/forms', plane: 'runtime', runtimeDoor: 'forwarded' }, { method: 'GET', path: '/v1/whoami', sample: '/v1/whoami', plane: 'shared', runtimeDoor: 'not forwarded' }, { method: 'POST', path: '/v1/x', sample: '/v1/x', plane: 'administrator', runtimeDoor: 'not forwarded' }] }
-    expect(closedRoutes(doors)).toEqual({ worker: [doors.routes[1], doors.routes[2]].map(({ method, path, sample }) => ({ method, path, sample })), server: [{ method: 'POST', path: '/v1/x', sample: '/v1/x' }] })
+    const doors = {
+      routes: [
+        { method: 'GET', path: '/v1/forms', sample: '/v1/forms', plane: 'runtime', runtimeDoor: 'forwarded' },
+        { method: 'GET', path: '/v1/whoami', sample: '/v1/whoami', plane: 'shared', runtimeDoor: 'not forwarded' },
+        { method: 'POST', path: '/v1/x', sample: '/v1/x', plane: 'administrator', runtimeDoor: 'not forwarded' },
+      ],
+    }
+    expect(closedRoutes(doors)).toEqual({
+      worker: [doors.routes[1], doors.routes[2]].map(({ method, path, sample }) => ({ method, path, sample })),
+      server: [{ method: 'POST', path: '/v1/x', sample: '/v1/x' }],
+    })
   })
 })

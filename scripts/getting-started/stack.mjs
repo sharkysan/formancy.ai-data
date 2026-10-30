@@ -39,7 +39,8 @@ export function compose(env, args, { allowFailure = false, timeout = 120_000 } =
 /** `docker` itself, for what compose does not answer: inspect, image sizes, the engine's version. */
 export function docker(args) {
   const result = spawnSync('docker', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
-  if (result.error !== undefined || result.status !== 0) throw new Error(`docker ${args.join(' ')} failed: ${(result.stderr ?? result.error?.message ?? '').trim()}`)
+  if (result.error !== undefined || result.status !== 0)
+    throw new Error(`docker ${args.join(' ')} failed: ${(result.stderr ?? result.error?.message ?? '').trim()}`)
   return result.stdout
 }
 
@@ -69,7 +70,8 @@ export function configProblems(config) {
   for (const [name, service] of Object.entries(config.services ?? {})) {
     for (const port of service.ports ?? []) {
       if (name === 'server') problems.push(`server publishes port ${String(port.target)}; the browser's way in is web, on one origin`)
-      else if (port.host_ip !== '127.0.0.1') problems.push(`${name} publishes port ${String(port.target)} on ${port.host_ip ?? 'every interface'}, not on 127.0.0.1`)
+      else if (port.host_ip !== '127.0.0.1')
+        problems.push(`${name} publishes port ${String(port.target)} on ${port.host_ip ?? 'every interface'}, not on 127.0.0.1`)
     }
     for (const [setting, value] of Object.entries(service.environment ?? {})) {
       if (!SECRET_NAME.test(setting)) continue
@@ -118,7 +120,9 @@ export function bindMountProblems(config) {
       if (mount.type !== 'bind') continue
       const found = unreadableByOthers(mount.source)
       if (found !== undefined) {
-        problems.push(`${name} reads ${found}, which other users cannot read, as its image's user rather than root; the guide's section 0 asks for a checkout other users can read`)
+        problems.push(
+          `${name} reads ${found}, which other users cannot read, as its image's user rather than root; the guide's section 0 asks for a checkout other users can read`,
+        )
       }
     }
   }
@@ -187,8 +191,15 @@ export function auditEvents(logText) {
 
 /** The addresses a service's containers have on compose's networks, from `docker inspect`. */
 export function containerAddresses(env, service) {
-  const ids = compose(env, ['ps', '-q', service]).stdout.split('\n').map((line) => line.trim()).filter((line) => line !== '')
-  return ids.flatMap((id) => Object.values(JSON.parse(docker(['inspect', id]))[0]?.NetworkSettings?.Networks ?? {}).map((network) => network.IPAddress).filter((address) => typeof address === 'string' && address !== ''))
+  const ids = compose(env, ['ps', '-q', service])
+    .stdout.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+  return ids.flatMap((id) =>
+    Object.values(JSON.parse(docker(['inspect', id]))[0]?.NetworkSettings?.Networks ?? {})
+      .map((network) => network.IPAddress)
+      .filter((address) => typeof address === 'string' && address !== ''),
+  )
 }
 
 /**
@@ -199,7 +210,12 @@ export function containerAddresses(env, service) {
 export function servicesWithContainers(env) {
   const text = compose(env, ['ps', '-a', '--format', 'json']).stdout.trim()
   if (text === '') return []
-  const entries = text.startsWith('[') ? JSON.parse(text) : text.split('\n').filter((line) => line.trim() !== '').map((line) => JSON.parse(line))
+  const entries = text.startsWith('[')
+    ? JSON.parse(text)
+    : text
+        .split('\n')
+        .filter((line) => line.trim() !== '')
+        .map((line) => JSON.parse(line))
   return [...new Set(entries.map((entry) => entry.Service))]
 }
 
@@ -238,7 +254,10 @@ export function projectVolumes(env) {
 
 /** Every container of the gate's project, running or exited, as `docker inspect` describes it. */
 export function projectContainers(env) {
-  const ids = compose(env, ['ps', '-a', '-q']).stdout.split('\n').map((line) => line.trim()).filter((line) => line !== '')
+  const ids = compose(env, ['ps', '-a', '-q'])
+    .stdout.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
   return ids.length === 0 ? [] : JSON.parse(docker(['inspect', ...ids]))
 }
 
@@ -309,11 +328,15 @@ export function readSecrets(env, config) {
   const listed = through(['ls', 'secrets', '-1', store])
   if (listed.status !== 0) throw new Error('the secrets volume could not be listed')
   const secrets = new Map()
-  for (const name of listed.stdout.split('\n').map((line) => line.trim()).filter((line) => line !== '' && !line.endsWith('.new'))) {
+  for (const name of listed.stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.endsWith('.new'))) {
     const read = through(['cat', 'secrets', `${store}/${name}`])
     if (read.status !== 0) throw new Error(`the secret ${name} could not be read from the volume`)
     const value = read.stdout.trim()
-    if (value.length < SHORTEST_SECRET) throw new Error(`the secret ${name} is shorter than ${String(SHORTEST_SECRET)} characters, so a leak check for it would match by chance`)
+    if (value.length < SHORTEST_SECRET)
+      throw new Error(`the secret ${name} is shorter than ${String(SHORTEST_SECRET)} characters, so a leak check for it would match by chance`)
     secrets.set(name, value)
   }
   if (secrets.size === 0) throw new Error('the secrets volume holds no secret to check for')
@@ -327,7 +350,10 @@ export function haystacks(env, config, configText) {
     const logs = compose(env, ['logs', '--no-color', service], { allowFailure: true })
     found.push({ where: `the logs of ${service}`, text: `${logs.stdout ?? ''}${logs.stderr ?? ''}` })
   }
-  const ids = compose(env, ['ps', '-a', '-q']).stdout.split('\n').map((line) => line.trim()).filter((line) => line !== '')
+  const ids = compose(env, ['ps', '-a', '-q'])
+    .stdout.split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
   for (const id of ids) {
     const inspected = docker(['inspect', id])
     const name = JSON.parse(inspected)[0]?.Name?.replace(/^\//, '') ?? id
@@ -344,7 +370,13 @@ export function haystacks(env, config, configText) {
  * layers too -- and only the second compares across machines.
  */
 export function imageSizes(config) {
-  const images = [...new Set(Object.values(config.services ?? {}).map((service) => service.image).filter((image) => typeof image === 'string'))]
+  const images = [
+    ...new Set(
+      Object.values(config.services ?? {})
+        .map((service) => service.image)
+        .filter((image) => typeof image === 'string'),
+    ),
+  ]
   return images.map((image) => ({
     image,
     bytes: Number(docker(['image', 'inspect', '--format', '{{.Size}}', image]).trim()),
@@ -434,7 +466,10 @@ export async function pageProblems(base) {
     }
     const sent = page.headers.get('content-security-policy')
     const wanted = pagePolicy(path)
-    if (sent !== wanted) problems.push(`${path} was sent with ${sent === null ? 'no Content-Security-Policy' : `Content-Security-Policy "${sent}"`}, not scripts/web-policies.mjs's "${wanted}"`)
+    if (sent !== wanted)
+      problems.push(
+        `${path} was sent with ${sent === null ? 'no Content-Security-Policy' : `Content-Security-Policy "${sent}"`}, not scripts/web-policies.mjs's "${wanted}"`,
+      )
     for (const reference of pageReferences(page.text)) {
       if (reference.url.startsWith('data:')) continue
       const url = new URL(reference.url, pageUrl)

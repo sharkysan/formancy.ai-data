@@ -35,7 +35,15 @@ let plane: TestPlane
 const CUSTOMERS = [
   { tenant_id: '1', customer_no: '1001', name: 'Muster AG', country_code: 'CH', credit_limit: '5000.00', active: true, created_at: '2026-10-01T08:00:00Z' },
   { tenant_id: '1', customer_no: '1002', name: 'Beispiel GmbH', country_code: null, credit_limit: null, active: false, created_at: '2026-10-08T23:59:59Z' },
-  { tenant_id: '2', customer_no: '1001', name: 'Other Tenant GmbH', country_code: 'CH', credit_limit: '125.50', active: true, created_at: '2026-10-09T00:00:00Z' },
+  {
+    tenant_id: '2',
+    customer_no: '1001',
+    name: 'Other Tenant GmbH',
+    country_code: 'CH',
+    credit_limit: '125.50',
+    active: true,
+    created_at: '2026-10-09T00:00:00Z',
+  },
 ]
 
 beforeEach(async () => {
@@ -162,7 +170,19 @@ describe('the panel', () => {
 
   // A column that offers nothing -- a time held cut to the minute, NOT NULL -- would be a choice that can only be refused; one that offers only NULL or not, a float, has no box to type into; a timestamp in no zone counts its days as its values are written.
   test('leaves out a column that offers nothing, and offers NULL alone where that is all a column compares', async () => {
-    plane.rows.set('sales.shipment', [{ id: '1', tenant_id: '1', tracking_no: '0f8fad5b-d9cb-469f-a165-70867728950e', carrier_code: '7', reference: 'S-1', pickup_time: '08:30', dispatched_at: '2026-10-08T12:00:00.5', weight_kg: 12.5, temperature_c: null }])
+    plane.rows.set('sales.shipment', [
+      {
+        id: '1',
+        tenant_id: '1',
+        tracking_no: '0f8fad5b-d9cb-469f-a165-70867728950e',
+        carrier_code: '7',
+        reference: 'S-1',
+        pickup_time: '08:30',
+        dispatched_at: '2026-10-08T12:00:00.5',
+        weight_kg: 12.5,
+        temperature_c: null,
+      },
+    ])
     const user = await browsing()
     await show(user, 'sales.shipment')
     await openPanel(user)
@@ -241,7 +261,11 @@ describe('applying a condition', () => {
     await statusSays('Filtered by manager_id is not NULL, showing rows 51 to 51.')
     await user.click(screen.getByRole('button', { name: 'name, sort descending' }))
     await screen.findByRole('button', { name: 'name, sort ascending' })
-    expect(browses().slice(-2).map((request) => request.body)).toEqual([
+    expect(
+      browses()
+        .slice(-2)
+        .map((request) => request.body),
+    ).toEqual([
       body('sales.employee', [{ column: 'manager_id', op: 'not-null' }], { sort, offset: LIST_PAGE_SIZE }),
       body('sales.employee', [{ column: 'manager_id', op: 'not-null' }], { sort: [{ column: 'name', direction: 'desc' }] }),
     ])
@@ -427,7 +451,9 @@ describe('the trail of follows', () => {
     await openPanel(user)
     await addCondition(user, 'name', 'equals', { Value: 'Switzerland' })
     await statusSays('Where iso_code = CH, filtered by name = Switzerland, showing rows 1 to 1.')
-    expect(lastBody()).toEqual(body('sales.country', [{ column: 'name', op: 'equals', value: 'Switzerland' }], { equal: [{ column: 'iso_code', value: 'CH' }] }))
+    expect(lastBody()).toEqual(
+      body('sales.country', [{ column: 'name', op: 'equals', value: 'Switzerland' }], { equal: [{ column: 'iso_code', value: 'CH' }] }),
+    )
 
     await user.click(screen.getByRole('button', { name: 'Back to sales.customer' }))
     await statusSays('Filtered by name contains “gmbh”, showing rows 1 to 2.')
@@ -456,4 +482,3 @@ describe('the trail of follows', () => {
     expect(toggle().getAttribute('aria-expanded')).toBe('false')
   })
 })
-

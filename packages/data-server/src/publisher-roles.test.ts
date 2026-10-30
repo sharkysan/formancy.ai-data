@@ -40,7 +40,9 @@ describe('publisherRolesSetting', () => {
   test.each(['', ' ', ',', ' , ,'])('stops on %j, which names no role', (text) => {
     const read = publisherRolesSetting(text, ON)
     expect(read.ok).toBe(false)
-    expect(!read.ok && read.problem).toBe('FORMANCY_DATA_PUBLISHER_ROLES is set and names no role: a deployment under review that nobody can publish to is not one anybody meant. Name the roles that approve, or leave it unset for no review.')
+    expect(!read.ok && read.problem).toBe(
+      'FORMANCY_DATA_PUBLISHER_ROLES is set and names no role: a deployment under review that nobody can publish to is not one anybody meant. Name the roles that approve, or leave it unset for no review.',
+    )
   })
 
   // A publisher is an administrator who may also approve: a role the
@@ -49,7 +51,11 @@ describe('publisherRolesSetting', () => {
   // publisher it can reach. The role is named, so the fix is in the line.
   test('stops on a role that is not an administrator role, naming it', () => {
     const read = publisherRolesSetting('data-publisher,data-approver', ON)
-    expect(read).toEqual({ ok: false, problem: 'FORMANCY_DATA_PUBLISHER_ROLES names "data-approver", which is not in FORMANCY_DATA_ADMIN_ROLES: a publisher is an administrator who may also approve.' })
+    expect(read).toEqual({
+      ok: false,
+      problem:
+        'FORMANCY_DATA_PUBLISHER_ROLES names "data-approver", which is not in FORMANCY_DATA_ADMIN_ROLES: a publisher is an administrator who may also approve.',
+    })
   })
 
   // Without the administrator's plane there is nothing to review: the
@@ -57,7 +63,11 @@ describe('publisherRolesSetting', () => {
   // CORS list is stopped beside a server with no runtime plane.
   test('stops when the administrator plane is off', () => {
     const read = publisherRolesSetting('data-publisher', { adminRoles: ['data-publisher'], admin: false })
-    expect(read).toEqual({ ok: false, problem: "FORMANCY_DATA_PUBLISHER_ROLES names publishers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and FORMANCY_DATA_ADMIN_ROLES, or leave it unset." })
+    expect(read).toEqual({
+      ok: false,
+      problem:
+        "FORMANCY_DATA_PUBLISHER_ROLES names publishers, and the administrator's plane is off: set FORMANCY_DATA_STORE_DIR, FORMANCY_DATA_CONNECTIONS and FORMANCY_DATA_ADMIN_ROLES, or leave it unset.",
+    })
     expect(publisherRolesSetting('data-publisher', { adminRoles: [], admin: false }).ok).toBe(false)
   })
 })
@@ -67,10 +77,12 @@ describe('publisherRolesProblem', () => {
   // environment variable reads: an empty list, a role the plane does not
   // admit, and a value that is no list from a caller the type does not
   // reach -- a .mjs file -- each stop the server being built.
-  test('holds an embedder\'s list to the setting\'s rule', () => {
+  test("holds an embedder's list to the setting's rule", () => {
     expect(publisherRolesProblem(['data-publisher'], ['data-admin', 'data-publisher'])).toBeUndefined()
     expect(publisherRolesProblem([], ['data-admin'])).toMatch(/^admin\.publisherRoles is set and names no role/)
-    expect(publisherRolesProblem(['data-approver'], ['data-admin'])).toBe('admin.publisherRoles names "data-approver", which is not in admin.adminRoles: a publisher is an administrator who may also approve.')
+    expect(publisherRolesProblem(['data-approver'], ['data-admin'])).toBe(
+      'admin.publisherRoles names "data-approver", which is not in admin.adminRoles: a publisher is an administrator who may also approve.',
+    )
     expect(publisherRolesProblem('data-publisher' as never, ['data-publisher'])).toBe('admin.publisherRoles is not a list of roles.')
   })
 })
@@ -88,7 +100,10 @@ describe('createDataServer', () => {
   const built = (publisherRoles: readonly string[]) => {
     const registry: ConnectionRegistry = { ids: () => [], scope: () => undefined, open: async () => undefined, close: async () => {} }
     const store = createFileConfigurationStore(root)
-    return createDataServer({ verifyIdentity: async () => ({ ok: false, reason: 'bad' }), admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles, audit: { sink: () => {} } } }).then(async (app) => {
+    return createDataServer({
+      verifyIdentity: async () => ({ ok: false, reason: 'bad' }),
+      admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles, audit: { sink: () => {} } },
+    }).then(async (app) => {
       await app.close()
       return 'built'
     })

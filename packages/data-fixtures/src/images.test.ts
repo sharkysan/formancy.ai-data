@@ -62,7 +62,9 @@ describe('the major an image names', () => {
   // fail far from the cause; an image of the other engine names neither.
   test('refuses a tag that names no major of its engine', () => {
     expect(() => imageMajor('postgres', 'postgres:latest')).toThrow('postgres:latest names no postgres major in its tag')
-    expect(() => imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2030-latest')).toThrow('mcr.microsoft.com/mssql/server:2030-latest names no sqlserver major in its tag')
+    expect(() => imageMajor('sqlserver', 'mcr.microsoft.com/mssql/server:2030-latest')).toThrow(
+      'mcr.microsoft.com/mssql/server:2030-latest names no sqlserver major in its tag',
+    )
     expect(() => imageMajor('sqlserver', 'postgres:17-alpine')).toThrow(/names no sqlserver major/)
   })
 })
@@ -101,15 +103,21 @@ describe(`${IMAGES_VARIABLE}`, () => {
   // started to the order the list was written in.
   test('refuses two images for one engine, and one image twice', () => {
     const [first, second] = MATRIX_IMAGES.postgres
-    expect(() => selectedImages(env(`${String(first)},${String(second)}`))).toThrow(`${IMAGES_VARIABLE} names two postgres images, ${String(first)} and ${String(second)}: a run is one image per engine`)
-    expect(() => selectedImages(env(`${String(second)},${String(second)}`))).toThrow(`${IMAGES_VARIABLE} names two postgres images, ${String(second)} and ${String(second)}: a run is one image per engine`)
+    expect(() => selectedImages(env(`${String(first)},${String(second)}`))).toThrow(
+      `${IMAGES_VARIABLE} names two postgres images, ${String(first)} and ${String(second)}: a run is one image per engine`,
+    )
+    expect(() => selectedImages(env(`${String(second)},${String(second)}`))).toThrow(
+      `${IMAGES_VARIABLE} names two postgres images, ${String(second)} and ${String(second)}: a run is one image per engine`,
+    )
   })
 
   // Set and empty is a matrix value that did not arrive -- a CI leg whose
   // `${{ matrix.image }}` names a field the matrix lacks -- and would
   // otherwise run the defaults under that leg's name.
   test('refuses being set to no image', () => {
-    expect(() => selectedImages(env(''))).toThrow(`${IMAGES_VARIABLE} is set and names no image: unset it for the defaults, or name one image per engine from the matrix`)
+    expect(() => selectedImages(env(''))).toThrow(
+      `${IMAGES_VARIABLE} is set and names no image: unset it for the defaults, or name one image per engine from the matrix`,
+    )
     expect(() => selectedImages(env(' , '))).toThrow(/is set and names no image/)
   })
 })

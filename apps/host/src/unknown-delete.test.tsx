@@ -2,7 +2,20 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { NOT_FOUND } from './deletion.js'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { chooseForm, chooseRenderer, gridSection, gridStatus, mount, newRecord, rendered, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  chooseForm,
+  chooseRenderer,
+  gridSection,
+  gridStatus,
+  mount,
+  newRecord,
+  rendered,
+  searchRecords,
+  shows,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { losingWrites } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -48,7 +61,13 @@ async function freshOrder(engine: Engine, notes: string): Promise<string> {
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error(`the order was not created: ${created.ok ? 'no token' : created.message}`)
   return created.value.record
 }
@@ -67,7 +86,9 @@ async function deleteThrough(engine: Engine, fetch: typeof globalThis.fetch, not
   await chooseRenderer(user)
   await searchRecords(user, notes, [record.slice(3)])
   const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-  const row = within(grid).getAllByRole('row').find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === record.slice(3)) as HTMLElement
+  const row = within(grid)
+    .getAllByRole('row')
+    .find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === record.slice(3)) as HTMLElement
   await user.click(within(row).getAllByRole('gridcell')[0] as HTMLElement)
   await screen.findByRole('heading', { level: 3, name: `Order ${record}` }, ARRIVES)
   await rendered()
@@ -99,7 +120,11 @@ describe.each(ENGINES)('a deletion whose answer was lost, on $engine', (engine) 
 
     await newRecord(user)
     await waitFor(() => expect(unsavedNotice()).not.toBeNull())
-    expect(within(unsavedNotice() as HTMLElement).getAllByRole('listitem').map((item) => item.textContent)).toContain(`Order ${record}: a deletion that may have been done, not yet checked.`)
+    expect(
+      within(unsavedNotice() as HTMLElement)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toContain(`Order ${record}: a deletion that may have been done, not yet checked.`)
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
 
     const sent = plane.sent.length
@@ -151,7 +176,8 @@ describe.each(ENGINES)('a deletion whose answer was lost, on $engine', (engine) 
     const user = await deleteThrough(engine, losing.fetch, notes, record)
     const read = await plane.clerk.read(engine.formId, record)
     if (!read.ok || read.value.version === null) throw new Error('the order did not read')
-    if (!(await plane.clerk.update(engine.formId, { record, version: read.value.version, answers: { notes: `${notes} changed` } })).ok) throw new Error('the order did not change')
+    if (!(await plane.clerk.update(engine.formId, { record, version: read.value.version, answers: { notes: `${notes} changed` } })).ok)
+      throw new Error('the order did not change')
     await user.click(within(notice()).getByRole('button', { name: 'Check whether it was deleted' }))
     await waitFor(() => expect(within(notice()).getByRole('status').textContent).toBe('It is still stored, and has changed since you saw it.'), ARRIVES)
     await user.click(within(notice()).getByRole('button', { name: 'Load the saved record' }))

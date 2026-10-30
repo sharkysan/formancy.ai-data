@@ -48,7 +48,9 @@ describe('the personas', () => {
     expect(describeGrants('Clerk', may, 2)).toBe(
       "Clerk of tenant 2: reads tenant 2's customers, orders, order lines and deliveries, and nothing of tenant 1's; adds and changes customers and order lines; adds, changes and deletes orders.",
     )
-    expect(describeGrants('Reader', { ...ROLE_GRANTS.auditor.may, delivery: [] }, 1)).toBe("Reader of tenant 1: reads tenant 1's customers, orders and order lines, and nothing of tenant 2's; changes nothing.")
+    expect(describeGrants('Reader', { ...ROLE_GRANTS.auditor.may, delivery: [] }, 1)).toBe(
+      "Reader of tenant 1: reads tenant 1's customers, orders and order lines, and nothing of tenant 2's; changes nothing.",
+    )
   })
 
   // The menu names only forms a person may read, and a delete names the

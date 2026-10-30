@@ -1,6 +1,27 @@
 import { describe, expect, test } from 'vitest'
 import type { DeleteOutcome, UnknownWrite } from '@formancy/data-client'
-import { again, answer, CASCADES, checked, checkedText, checking, CLEARS, close, confirm, deletionWork, detailTarget, gone, heading, IDLE, lead, NOT_FOUND, REMOVED, RESTRICTED, rowTarget, send } from './deletion.js'
+import {
+  again,
+  answer,
+  CASCADES,
+  checked,
+  checkedText,
+  checking,
+  CLEARS,
+  close,
+  confirm,
+  deletionWork,
+  detailTarget,
+  gone,
+  heading,
+  IDLE,
+  lead,
+  NOT_FOUND,
+  REMOVED,
+  RESTRICTED,
+  rowTarget,
+  send,
+} from './deletion.js'
 import type { DeleteTarget, Deletion } from './deletion.js'
 import type { Said } from './leave.js'
 
@@ -17,7 +38,16 @@ const ORDER: DeleteTarget = { noun: 'Order', record: 'k1:1003', version: '7', fr
 /** `said` as text, a token in backticks: what a person reads. */
 const text = (said: Said): string => said.map((part) => (typeof part === 'string' ? part : `\`${part.code}\``)).join('')
 
-const LOST: UnknownWrite = { ok: false, status: 0, code: 'unknown-outcome', message: 'The answer to this deletion was lost between this page and the data server. It may have been deleted.', operation: 'delete', record: 'k1:1003', version: '7', origin: 'transport' }
+const LOST: UnknownWrite = {
+  ok: false,
+  status: 0,
+  code: 'unknown-outcome',
+  message: 'The answer to this deletion was lost between this page and the data server. It may have been deleted.',
+  operation: 'delete',
+  record: 'k1:1003',
+  version: '7',
+  origin: 'transport',
+}
 
 /** A deletion sent for ORDER, answered `outcome`. */
 function answered(outcome: DeleteOutcome): { next: Deletion; gone: boolean } {
@@ -83,12 +113,18 @@ describe('the states of one deletion', () => {
     expect(out).toMatchObject({ state: 'sending', target: ORDER, n: asked.state === 'idle' ? -1 : asked.n })
     expect(answered({ ok: true, value: { record: 'k1:1003', deleted: true } })).toEqual({ next: IDLE, gone: true })
     expect(answered({ ok: false, status: 404, code: 'not-found', message: 'No such record.' }).next).toMatchObject({ state: 'not-found', target: ORDER })
-    expect(answered({ ok: false, status: 409, code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' }).next).toMatchObject({
+    expect(
+      answered({ ok: false, status: 409, code: 'stale', message: 'The record changed since it was read. Reload it and review the changes before deleting it.' })
+        .next,
+    ).toMatchObject({
       state: 'refused',
       stale: true,
       message: 'The record changed since it was read. Reload it and review the changes before deleting it.',
     })
-    expect(answered({ ok: false, status: 422, code: 'referenced', message: 'Other records still refer to this one, so the database keeps it. Nothing was deleted.' }).next).toMatchObject({
+    expect(
+      answered({ ok: false, status: 422, code: 'referenced', message: 'Other records still refer to this one, so the database keeps it. Nothing was deleted.' })
+        .next,
+    ).toMatchObject({
       state: 'refused',
       stale: false,
       message: 'Other records still refer to this one, so the database keeps it. Nothing was deleted.',
@@ -108,7 +144,10 @@ describe('the states of one deletion', () => {
     expect(absent).toMatchObject({ state: 'checked', found: { kind: 'absent' } })
     const unchanged = checked(checking(lost), { ok: true, state: 'unchanged', current: { record: 'k1:1003', version: '7', answers: {} } })
     expect(unchanged).toMatchObject({ state: 'checked', found: { kind: 'unchanged' } })
-    expect(checked(lost, { ok: true, state: 'changed', current: { record: 'k1:1003', version: '8', answers: {} } })).toMatchObject({ state: 'checked', found: { kind: 'changed' } })
+    expect(checked(lost, { ok: true, state: 'changed', current: { record: 'k1:1003', version: '8', answers: {} } })).toMatchObject({
+      state: 'checked',
+      found: { kind: 'changed' },
+    })
     expect(checked(lost, { ok: false, status: 503, code: 'unavailable', message: 'The database cannot be reached. Nothing was saved.' })).toMatchObject({
       state: 'checked',
       found: { kind: 'unread', message: 'The database cannot be reached. Nothing was saved.' },
@@ -135,7 +174,9 @@ describe('the states of one deletion', () => {
     expect(NOT_FOUND).toBe('This form cannot find the record any more: it was deleted, or is no longer one you may see.')
     expect(checkedText({ kind: 'unchanged' })).toBe('It is still stored, at the version you saw.')
     expect(checkedText({ kind: 'changed' })).toBe('It is still stored, and has changed since you saw it.')
-    expect(checkedText({ kind: 'unread', message: 'The database cannot be reached. Nothing was saved.' })).toBe('The database cannot be reached. Nothing was saved. Whether it was deleted is still unknown.')
+    expect(checkedText({ kind: 'unread', message: 'The database cannot be reached. Nothing was saved.' })).toBe(
+      'The database cannot be reached. Nothing was saved. Whether it was deleted is still unknown.',
+    )
   })
 
   // A deletion out, or one that may have been done and is not yet checked,

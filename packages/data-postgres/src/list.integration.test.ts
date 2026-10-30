@@ -1,5 +1,36 @@
-import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { ApiValue, BrowseFilterTerm, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListFilterTerm, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import {
+  browsePage,
+  browseRelations,
+  driftRefusal,
+  exportColumns,
+  exportHeader,
+  exportRecord,
+  followTerms,
+  generateForm,
+  listTerms,
+  planBrowse,
+  planList,
+  planRead,
+  recordPage,
+  toFormAnswers,
+} from '@formancy/data-core'
+import type {
+  ApiValue,
+  BrowseFilterTerm,
+  BrowseQuery,
+  BrowseRelation,
+  FormBindings,
+  FormPolicy,
+  FormRecord,
+  ListFilterTerm,
+  ListOutcome,
+  MetadataSnapshot,
+  ObjectRef,
+  PolicyContext,
+  RecordAdapter,
+  RecordList,
+  RecordListQuery,
+} from '@formancy/data-core'
 import {
   BROWSE_PARITY,
   browseCase,
@@ -71,7 +102,17 @@ const LINE_POLICY: FormPolicy = {
 const SHIPMENT_POLICY: FormPolicy = {
   version: 1,
   operations: { read: ['clerk'], create: [], update: [] },
-  fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
+  fields: {
+    id: READ,
+    tenant_id: READ,
+    tracking_no: READ,
+    carrier_code: READ,
+    reference: READ,
+    pickup_time: READ,
+    dispatched_at: READ,
+    weight_kg: READ,
+    temperature_c: READ,
+  },
   rowFilters: TENANT,
   lookups: {},
 }
@@ -88,7 +129,10 @@ beforeAll(async () => {
     await owner.unsafe('insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, $1::int, $2, $3::numeric)', [number, name, credit])
   }
   for (const [id, tenant] of LIST_ROWS.orders) {
-    await owner.unsafe(`insert into sales."order" (id, tenant_id, customer_no, order_date, amount) overriding system value values ($1::bigint, $2::int, 1001, '2026-10-09', 1)`, [id, tenant])
+    await owner.unsafe(
+      `insert into sales."order" (id, tenant_id, customer_no, order_date, amount) overriding system value values ($1::bigint, $2::int, 1001, '2026-10-09', 1)`,
+      [id, tenant],
+    )
   }
   for (const [order, line] of LIST_ROWS.lines) {
     await owner.unsafe('insert into sales.order_line (order_id, line_no, quantity, unit_price) values ($1::bigint, $2::int, 1, 1.00)', [order, line])
@@ -97,7 +141,10 @@ beforeAll(async () => {
   // calls a timestamp through JavaScript's Date, in this machine's zone, and
   // the text 'true' to a boolean as false (sql/statement.ts).
   for (const [number, created, active] of COLUMN_FILTER_ROWS.customers) {
-    await owner.unsafe('update sales.customer set created_at = $2::text::timestamptz, active = $3::text::boolean where tenant_id = 1 and customer_no = $1::int', [number, created, String(active)])
+    await owner.unsafe(
+      'update sales.customer set created_at = $2::text::timestamptz, active = $3::text::boolean where tenant_id = 1 and customer_no = $1::int',
+      [number, created, String(active)],
+    )
   }
   for (const [reference, tracking, dispatched] of COLUMN_FILTER_ROWS.shipments) {
     await owner.unsafe(
@@ -122,7 +169,14 @@ beforeAll(async () => {
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
     versionColumn: 'row_version',
   }).bindings
-  shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
+  shipments = generateForm(snapshot, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'shipment' },
+    formId: 'shipments',
+    title: 'Shipments',
+    lookups: [],
+    pinned: ['tenant_id'],
+  })
   records = createPostgresRecords(owner)
 })
 
@@ -132,7 +186,13 @@ afterAll(async () => {
 })
 
 /** One page as the server answers it: planned for Clara, or `context`, listed by the adapter, and built by `recordPage`. */
-async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>, context = CLARA, adapter = records): Promise<RecordList & { outcome: ListOutcome }> {
+async function listed(
+  bindings: FormBindings,
+  policy: FormPolicy,
+  change: Partial<RecordListQuery>,
+  context = CLARA,
+  adapter = records,
+): Promise<RecordList & { outcome: ListOutcome }> {
   const query = { ...EVERY, ...change }
   const plan = planList(snapshot, bindings, policy, context, query)
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
@@ -253,7 +313,9 @@ describe('a parent over a text foreign key', covers('postgres', listCase('text-p
   test("narrows a customer list to a country, as the database's equality compares char(2)", async () => {
     const entry = LIST_PARITY['text-parent']
     expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.exact.record } }))).toEqual(entry.exact.keys)
-    expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.folded.record } }))).toEqual(entry.folded.keys.postgres)
+    expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.folded.record } }))).toEqual(
+      entry.folded.keys.postgres,
+    )
   })
 })
 
@@ -271,15 +333,32 @@ describe('a key the table no longer holds', covers('postgres', listCase('key')),
     await owner.unsafe('create table sales.list_key (code integer not null constraint uq_list_key unique, label varchar(20) not null)')
     for (const [code, label] of LIST_PARITY.key.rows) await owner.unsafe('insert into sales.list_key (code, label) values ($1::int, $2)', [code, label])
     const keyed = await discoverPostgres(owner, FIXTURE_SCOPE)
-    const bindings = generateForm(keyed, { connection: 'test', root: { schema: 'sales', name: 'list_key' }, formId: 'list-key', title: 'Key', lookups: [] }).bindings
+    const bindings = generateForm(keyed, {
+      connection: 'test',
+      root: { schema: 'sales', name: 'list_key' },
+      formId: 'list-key',
+      title: 'Key',
+      lookups: [],
+    }).bindings
     expect(bindings.identity).toEqual(['code'])
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { code: READ, label: READ }, rowFilters: [], lookups: {} }
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: { code: READ, label: READ },
+      rowFilters: [],
+      lookups: {},
+    }
     const page = async () => {
       const plan = planList(keyed, bindings, policy, CLARA, EVERY)
       if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
       const outcome = await records.list(plan.request)
       if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-      return { fields: plan.fields, outcome, list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'), read: driftRefusal(keyed, bindings, policy, outcome.described, 'read') }
+      return {
+        fields: plan.fields,
+        outcome,
+        list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'),
+        read: driftRefusal(keyed, bindings, policy, outcome.described, 'read'),
+      }
     }
     const held = await page()
     expect(held.list).toBeUndefined()
@@ -348,7 +427,11 @@ describe('a view browsed', covers('postgres', browseCase('view'), browseCase('so
       const { plan, page } = await browsed({ object, offset: expected.offset, limit: size })
       expect(plan.ordered).toBe('columns')
       expect(plan.columns.map((column) => column.name)).toEqual(columns)
-      expect({ offset: expected.offset, rows: valuesIn(columns, page.rows), hasMore: page.hasMore }).toEqual({ offset: expected.offset, rows: expected.rows, hasMore: expected.hasMore })
+      expect({ offset: expected.offset, rows: valuesIn(columns, page.rows), hasMore: page.hasMore }).toEqual({
+        offset: expected.offset,
+        rows: expected.rows,
+        hasMore: expected.hasMore,
+      })
     }
   })
 
@@ -389,7 +472,13 @@ describe('a table with columns that have no text', covers('postgres', browseCase
  * `filter` too. Neither is written here, so the key's columns are paired as
  * this engine's catalog reports them.
  */
-async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>, filter: BrowseFilterTerm[] = []) {
+async function followed(
+  from: ObjectRef,
+  direction: BrowseRelation['direction'],
+  key: string,
+  row: Readonly<Record<string, ApiValue>>,
+  filter: BrowseFilterTerm[] = [],
+) {
   const relation = browseRelations(snapshot, from).relations.find((entry) => entry.direction === direction && entry.key === key)
   if (relation === undefined) throw new Error(`${key} cannot be followed ${direction} from ${from.schema}.${from.name}`)
   const equal = followTerms(relation, row)
@@ -428,7 +517,8 @@ describe('a row followed through a foreign key', covers('postgres', browseCase('
  */
 
 /** Tenant 1's customers narrowed by `filter`, beside whatever else `change` asks. */
-const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) => listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
+const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) =>
+  listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
 /** Tenant 3's shipments narrowed by `filter`, listed by its clerk. */
 const shipmentsWhere = (filter: ListFilterTerm[], adapter = records) => listed(shipments.bindings, SHIPMENT_POLICY, { filter }, SHIPPER, adapter)
 /** The references of a page of shipments, in its order. */
@@ -443,7 +533,8 @@ describe('a filter that a text equals', covers('postgres', columnFilterCase('tex
   // `column filter: collation` below is where that half is held.
   test('finds the reference exactly as given: case and a trailing space count', async () => {
     const { field, entries } = COLUMN_FILTER_PARITY.text
-    for (const entry of entries) expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
+    for (const entry of entries)
+      expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
   })
 })
 
@@ -516,7 +607,8 @@ describe('a filter beside a search', covers('postgres', columnFilterCase('search
   // The search and the filter are both conditions of the one statement:
   // either alone would find more.
   test('finds the rows both hold for', async () => {
-    for (const entry of COLUMN_FILTER_PARITY.search) expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
+    for (const entry of COLUMN_FILTER_PARITY.search)
+      expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
   })
 })
 
@@ -539,7 +631,8 @@ describe('a filter beside a follow', covers('postgres', columnFilterCase('follow
     const { object, equal, key, entries } = COLUMN_FILTER_PARITY.follow
     const [customer] = (await browsed({ object, equal: [...equal] })).page.rows
     if (customer === undefined) throw new Error('the customer followed from was not browsed')
-    for (const entry of entries) expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
+    for (const entry of entries)
+      expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
   })
 })
 
@@ -627,7 +720,10 @@ describe('a timestamp or a date, in the session the composition root chose', () 
       for (const [session, adapter] of sessions()) {
         for (const entry of entries) {
           const { page } = await browsed({ object, filter: [{ column, ...entry.condition }] }, adapter)
-          expect(page.rows.map((row) => row['id']), `${session}: ${JSON.stringify(entry.condition)}`).toEqual(entry.ids)
+          expect(
+            page.rows.map((row) => row['id']),
+            `${session}: ${JSON.stringify(entry.condition)}`,
+          ).toEqual(entry.ids)
         }
       }
     })

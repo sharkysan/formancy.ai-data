@@ -3,7 +3,26 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { CASCADES, HELD, NOT_FOUND, REMOVED, RESTRICTED, SAVE_OUT } from './deletion.js'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, gridStatus, mount, newRecord, notice, paper, rendered, said, save, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  gridSection,
+  gridStatus,
+  mount,
+  newRecord,
+  notice,
+  paper,
+  rendered,
+  said,
+  save,
+  searchRecords,
+  shows,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { holdingRequests, holdingWrites } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -52,7 +71,13 @@ async function freshOrder(engine: Engine, notes: string): Promise<string> {
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error(`the order was not created: ${created.ok ? 'no token' : created.message}`)
   return created.value.record
 }
@@ -124,7 +149,11 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
     const record = await freshOrder(engine, notes)
     await plane.clerk.create(engine.lines, { order: record, line_no: '1', quantity: '1', unit_price: '1.00' })
     const user = await workspace(engine.formId)
-    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update', 'Delete'])
+    expect(
+      within(screen.getByRole('list', { name: 'Operations' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Read', 'Create', 'Update', 'Delete'])
     expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Delete record' })).toBeNull()
     await newRecord(user)
@@ -134,7 +163,9 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
     expect(screen.getByRole('button', { name: 'Delete record' })).toBeTruthy()
 
     await answeredOnce('Order line')
-    const lineHeaders = within(gridSection('Order line')).getAllByRole('columnheader').map((header) => header.textContent?.trim())
+    const lineHeaders = within(gridSection('Order line'))
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent?.trim())
     await openRow(user, 'Order line', '1', `Order line ${record},1`)
     if (engine.connection === 'pg') {
       expect(lineHeaders).not.toContain('Delete')
@@ -270,7 +301,9 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
     expect(computeAccessibleDescription(confirmation('Removable', record))).toBe(`${REMOVED} ${RESTRICTED}`)
     await user.click(within(confirmation('Removable', record)).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(focusedName()).toBe('Not deleted'), ARRIVES)
-    expect(paragraphs(screen.getByRole('region', { name: 'Not deleted' }))).toEqual(['Other records still refer to this one, so the database keeps it. Nothing was deleted.'])
+    expect(paragraphs(screen.getByRole('region', { name: 'Not deleted' }))).toEqual([
+      'Other records still refer to this one, so the database keeps it. Nothing was deleted.',
+    ])
     expect(within(screen.getByRole('region', { name: 'Not deleted' })).queryByRole('button', { name: 'Load the saved record' })).toBeNull()
     expect(await stored(engine.removable, record)).toBe(true)
     await user.click(within(screen.getByRole('region', { name: 'Not deleted' })).getByRole('button', { name: 'Close' }))
@@ -312,8 +345,14 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
     await answer(user, 'React', 'Notes', 'a draft deleted with it')
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
     const region = confirmation('Order', record)
-    expect(within(region).getAllByRole('listitem').map((item) => item.textContent)).toEqual([`Order ${record}, React: changes that are not saved.`])
-    expect(computeAccessibleDescription(region)).toBe(`${REMOVED} ${CASCADES} Unsaved changes in these forms are discarded with it: Order ${record}, React: changes that are not saved.`)
+    expect(
+      within(region)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([`Order ${record}, React: changes that are not saved.`])
+    expect(computeAccessibleDescription(region)).toBe(
+      `${REMOVED} ${CASCADES} Unsaved changes in these forms are discarded with it: Order ${record}, React: changes that are not saved.`,
+    )
     const sent = plane.sent.length
     await answer(user, 'Angular', 'Notes', 'a draft typed while it asked')
     await user.click(within(confirmation('Order', record)).getByRole('button', { name: 'Delete it' }))
@@ -355,7 +394,11 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
 
     await newRecord(user)
     await waitFor(() => expect(unsavedNotice()).not.toBeNull())
-    expect(within(unsavedNotice() as HTMLElement).getAllByRole('listitem').map((item) => item.textContent)).toContain(`Order ${record}: a deletion the server has not answered yet.`)
+    expect(
+      within(unsavedNotice() as HTMLElement)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toContain(`Order ${record}: a deletion the server has not answered yet.`)
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
     expect(within(confirmation('Order', record)).getByRole('status').textContent).toBe('Deleting…')
 
@@ -464,7 +507,7 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
   // failing with the question's Delete it unaware of the save: the delete
   // went out beside the update, with the version before it, and was refused
   // as stale).
-  test("a save pressed while it asks holds Delete it until the save is answered", async () => {
+  test('a save pressed while it asks holds Delete it until the save is answered', async () => {
     const notes = stamp('asksaving')
     const record = await freshOrder(engine, notes)
     const holding = holdingWrites(plane.fetch)
@@ -572,7 +615,8 @@ test("a child row's stale delete loads the saved row, and its Deletes wait for a
   const linePane = (): HTMLElement => screen.getByRole('region', { name: `Order line ${line} React` })
   await within(linePane()).findByRole('spinbutton', { name: /^Quantity/ }, ARRIVES)
 
-  if (!(await plane.clerk.update(engine.lines, { record: line, version: created.value.version, answers: { quantity: '4' } })).ok) throw new Error('the line did not move on')
+  if (!(await plane.clerk.update(engine.lines, { record: line, version: created.value.version, answers: { quantity: '4' } })).ok)
+    throw new Error('the line did not move on')
   await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
   await user.click(within(confirmation('Order line', line)).getByRole('button', { name: 'Delete it' }))
   await waitFor(() => expect(focusedName()).toBe('Not deleted'), ARRIVES)
@@ -616,7 +660,15 @@ test('a child row saved and then deleted from its detail deletes by the version 
   await user.clear(quantity)
   await user.type(quantity, '3')
   await user.click(within(linePane()).getByRole('button', { name: 'Save' }))
-  await waitFor(() => expect(within(linePane()).getAllByRole('status').map((status) => status.textContent)).toContainEqual(expect.stringMatching(/^Saved\./)), ARRIVES)
+  await waitFor(
+    () =>
+      expect(
+        within(linePane())
+          .getAllByRole('status')
+          .map((status) => status.textContent),
+      ).toContainEqual(expect.stringMatching(/^Saved\./)),
+    ARRIVES,
+  )
   await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
   await user.click(within(confirmation('Order line', line)).getByRole('button', { name: 'Delete it' }))
   await waitFor(() => expect(focusedName()).toBe('Order line'), ARRIVES)

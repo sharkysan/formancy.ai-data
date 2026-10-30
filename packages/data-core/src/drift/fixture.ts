@@ -2,7 +2,19 @@ import { expect } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import { generateForm } from '../generate/generate.js'
 import type { FormBindings, GenerationRequest } from '../generate/types.js'
-import type { ColumnMeta, CoverageAspect, CoverageGap, CoverageSubject, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import type {
+  ColumnMeta,
+  CoverageAspect,
+  CoverageGap,
+  CoverageSubject,
+  DiscoveryAccount,
+  ForeignKeyMeta,
+  MetadataSnapshot,
+  NormalizedType,
+  ObjectMeta,
+  ObjectRef,
+  TextLengthUnit,
+} from '../metadata.js'
 import { serverStanding } from '../server.js'
 import type { ServerFacts } from '../server.js'
 import { createSnapshot, findObject, recordsDeleteFacts } from '../snapshot.js'
@@ -25,7 +37,12 @@ export const INT16: NormalizedType = { kind: 'integer', min: '-32768', max: '327
 export const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 export const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
 // One length unit for every text: these suites test planning, not units, which codec.test.ts covers (0026).
-export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
+export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({
+  kind: 'text',
+  maxLength,
+  lengthUnit,
+  fixedLength,
+})
 export const decimal = (precision: number, scale: number): NormalizedType => ({ kind: 'decimal', precision, scale })
 
 export const ORDER_REF: ObjectRef = { schema: 'sales', name: 'order' }
@@ -35,7 +52,19 @@ export const EMPLOYEE_REF: ObjectRef = { schema: 'sales', name: 'employee' }
 export const SUMMARY_REF: ObjectRef = { schema: 'sales', name: 'customer_summary' }
 
 export function col(name: string, databaseType: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal: 0, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
+  return {
+    name,
+    ordinal: 0,
+    databaseType,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+    ...extra,
+  }
 }
 
 export function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
@@ -62,7 +91,12 @@ function model(kind: DatabaseKind): ObjectMeta[] {
   return [
     table(
       'customer',
-      [col('tenant_id', 'int', INT32), col('customer_no', 'int', INT32), col('name', 'nvarchar(200)', text(200)), col('active', 'bit', { kind: 'boolean' }, { hasDefault: true, defaultExpression: '((1))' })],
+      [
+        col('tenant_id', 'int', INT32),
+        col('customer_no', 'int', INT32),
+        col('name', 'nvarchar(200)', text(200)),
+        col('active', 'bit', { kind: 'boolean' }, { hasDefault: true, defaultExpression: '((1))' }),
+      ],
       { ref: CUSTOMER_REF, primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] } },
     ),
     table('employee', [col('id', 'int', INT32), col('name', 'nvarchar(200)', text(200))], { primaryKey: { name: 'pk_employee', columns: ['id'] } }),
@@ -140,7 +174,15 @@ function recordFacts(objects: ObjectMeta[]): void {
     const derived = objects.flatMap((referrer) =>
       referrer.foreignKeys
         .filter((key) => key.references !== null && key.references.table.schema === object.ref.schema && key.references.table.name === object.ref.name)
-        .map((key) => ({ table: { ...referrer.ref }, name: key.name, columns: [...key.columns], referencedColumns: [...(key.references?.columns ?? [])], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced })),
+        .map((key) => ({
+          table: { ...referrer.ref },
+          name: key.name,
+          columns: [...key.columns],
+          referencedColumns: [...(key.references?.columns ?? [])],
+          onDelete: key.onDelete,
+          onUpdate: key.onUpdate,
+          enforced: key.enforced,
+        })),
     )
     object.referencedBy = [...derived, ...(object.referencedBy ?? []).filter((key) => !within(key.table))].sort(order)
   }
@@ -292,17 +334,25 @@ function withoutDeleteFacts(snapshot: MetadataSnapshot): MetadataSnapshot {
  */
 export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const report = review(base, current, bindings, policy)
-  const allows = (operation: 'read' | 'create' | 'update' | 'delete', verdict: { readable: boolean; writable: { create: boolean; update: boolean; delete: boolean } }) =>
-    operation === 'read' ? verdict.readable : verdict.writable[operation]
+  const allows = (
+    operation: 'read' | 'create' | 'update' | 'delete',
+    verdict: { readable: boolean; writable: { create: boolean; update: boolean; delete: boolean } },
+  ) => (operation === 'read' ? verdict.readable : verdict.writable[operation])
   for (const operation of ['read', 'create', 'update', 'delete'] as const) {
-    expect(!allows(operation, report) || allows(operation, report.runtime), `review allows ${operation} and the runtime refuses it: ${JSON.stringify(report.changes.map((change) => change.kind))}`).toBe(true)
+    expect(
+      !allows(operation, report) || allows(operation, report.runtime),
+      `review allows ${operation} and the runtime refuses it: ${JSON.stringify(report.changes.map((change) => change.kind))}`,
+    ).toBe(true)
   }
   const targets = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.target.table] : []))
   if (onlyTheRootDefinition(base, current, bindings.root, targets)) {
     expect(diffRootDefinition(base, describedOf(current, bindings.root) as DescribedRoot, bindings, policy)).toEqual(report)
   }
   if (!recordsDeleteFacts(base) && recordsDeleteFacts(current)) {
-    expect(review(base, withoutDeleteFacts(current), bindings, policy), 'the facts recorded since 0049 changed a report against a base taken before them').toEqual(report)
+    expect(
+      review(base, withoutDeleteFacts(current), bindings, policy),
+      'the facts recorded since 0049 changed a report against a base taken before them',
+    ).toEqual(report)
   }
   return report
 }

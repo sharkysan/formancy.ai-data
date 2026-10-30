@@ -17,7 +17,11 @@ import { VersionsPanel } from './versions.js'
  * words are `DriftSeverity`'s own definitions, not new ones.
  */
 const SEVERITIES: ReadonlyArray<{ severity: DriftSeverity; heading: string; blocks: string }> = [
-  { severity: 'blocking', heading: 'Blocking', blocks: 'Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.' },
+  {
+    severity: 'blocking',
+    heading: 'Blocking',
+    blocks: 'Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.',
+  },
   { severity: 'review', heading: 'Review', blocks: 'Blocks nothing. A person has something to decide.' },
   { severity: 'info', heading: 'Info', blocks: 'Blocks nothing. Recorded so the review is complete.' },
 ]
@@ -152,8 +156,8 @@ export function DriftStep({
   return (
     <>
       <p className="lede">
-        Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its
-        lookups&rsquo; targets. Something this connection can no longer see is an access change, never a deletion.
+        Compare a published form with its database as it is now. Only what the form rests on is compared: its table and its lookups&rsquo; targets. Something
+        this connection can no longer see is an access change, never a deletion.
       </p>
       <form className="inline-form" onSubmit={(event) => void check(event)} noValidate>
         <div className="field">
@@ -245,9 +249,9 @@ function DriftReportView({ drift, published, formId }: { drift: Drift; published
         <li>{drift.blocking ? 'As a whole: not to be used as published until the blocking changes are reviewed.' : 'As a whole: usable as published.'}</li>
         {allowedByServer.length === 0 ? null : (
           <li>
-            The server still allows {spoken(allowedByServer)}: what blocks {allowedByServer.length === 1 ? 'it' : 'them'} is a change it does not compare when a request arrives (a
-            lookup&rsquo;s table, {comparedForDelete}privileges, row security or the account). The database still refuses what the account may not do{refusedForDelete}.
-            Review the form and publish it again.
+            The server still allows {spoken(allowedByServer)}: what blocks {allowedByServer.length === 1 ? 'it' : 'them'} is a change it does not compare when a
+            request arrives (a lookup&rsquo;s table, {comparedForDelete}privileges, row security or the account). The database still refuses what the account
+            may not do{refusedForDelete}. Review the form and publish it again.
           </li>
         )}
       </ul>

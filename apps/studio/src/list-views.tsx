@@ -30,7 +30,10 @@ const HEADING = 'views-heading'
 /** A view in words, its fields by the form's labels: `where Status = placed; sorted by Order date descending; opens the grid`. */
 export function sayView(view: ListView, label: (key: string) => string): string {
   const where = view.filter.length === 0 ? 'every record' : `where ${view.filter.map((term) => sayCondition(label(term.field), term)).join(' and ')}`
-  const sorted = view.sort.length === 0 ? [] : [`sorted by ${view.sort.map((term) => `${label(term.field)} ${term.direction === 'asc' ? 'ascending' : 'descending'}`).join(', then ')}`]
+  const sorted =
+    view.sort.length === 0
+      ? []
+      : [`sorted by ${view.sort.map((term) => `${label(term.field)} ${term.direction === 'asc' ? 'ascending' : 'descending'}`).join(', then ')}`]
   return [where, ...sorted, ...(view.default === true ? ['opens the grid'] : [])].join('; ')
 }
 
@@ -57,8 +60,26 @@ export function SavedView({ view, label }: { view: ListView; label: (key: string
  * shape and its fit to these bindings, and a refusal is said in their
  * words with everything typed kept.
  */
-export function ListViewsPanel({ bindings, document, views, onViews }: { bindings: FormBindings; document: FormSchema; views: readonly ListView[]; onViews: (views: ListView[]) => void }): ReactElement {
-  const columns = useMemo(() => listColumns(bindings, bindings.fields.map((binding) => binding.field), []), [bindings])
+export function ListViewsPanel({
+  bindings,
+  document,
+  views,
+  onViews,
+}: {
+  bindings: FormBindings
+  document: FormSchema
+  views: readonly ListView[]
+  onViews: (views: ListView[]) => void
+}): ReactElement {
+  const columns = useMemo(
+    () =>
+      listColumns(
+        bindings,
+        bindings.fields.map((binding) => binding.field),
+        [],
+      ),
+    [bindings],
+  )
   const label = (key: string) => labelOf(document, key)
   const [draft, setDraft] = useState<ViewDraft>(EMPTY_VIEW)
   // The view in the form, by the name it was saved under: the name typed may change, and a move changes its place.
@@ -133,8 +154,7 @@ export function ListViewsPanel({ bindings, document, views, onViews }: { binding
         List views
       </h3>
       <p className="hint">
-        Named filters and sort orders a person can pick above this form’s grid. A person is offered a view only if they may read every
-        field it names.
+        Named filters and sort orders a person can pick above this form’s grid. A person is offered a view only if they may read every field it names.
       </p>
       {views.length === 0 ? (
         <p className="none">No view yet.</p>
@@ -155,7 +175,13 @@ export function ListViewsPanel({ bindings, document, views, onViews }: { binding
                   <button type="button" id={`view-${String(index)}-up`} className="button" disabled={index === 0} onClick={() => move(index, -1)}>
                     Move view {number} up
                   </button>
-                  <button type="button" id={`view-${String(index)}-down`} className="button" disabled={index === views.length - 1} onClick={() => move(index, 1)}>
+                  <button
+                    type="button"
+                    id={`view-${String(index)}-down`}
+                    className="button"
+                    disabled={index === views.length - 1}
+                    onClick={() => move(index, 1)}
+                  >
                     Move view {number} down
                   </button>
                 </p>

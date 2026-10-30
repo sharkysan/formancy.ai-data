@@ -38,7 +38,17 @@ export interface SectionGrid {
   resetChoices(): void
 }
 
-export function useGridState({ formId, section, columns, list }: { formId: string; section: GridSection; columns: readonly GridColumn[]; list: PublishedForm['list'] }): SectionGrid {
+export function useGridState({
+  formId,
+  section,
+  columns,
+  list,
+}: {
+  formId: string
+  section: GridSection
+  columns: readonly GridColumn[]
+  list: PublishedForm['list']
+}): SectionGrid {
   const storage = useMemo(browserStorage, [])
   const key = gridKey(section, formId)
   const [state, setState] = useState<GridState>(() => openGrid(parseKept(readPreference(storage, key)), columns, list))

@@ -79,7 +79,10 @@ export function readLicence(text) {
   const body = source.slice(heading.index + heading[0].length).split(/^## /m)[0]
   const addresses = [...new Set(body.match(ADDRESS) ?? [])]
   if (addresses.length === 0) throw new Error(`${LICENCE}'s section ${String(section)} names no address a production licence is requested from`)
-  if (addresses.length > 1) throw new Error(`${LICENCE}'s section ${String(section)} names ${String(addresses.length)} addresses: ${addresses.join(', ')}; a document can name only one`)
+  if (addresses.length > 1)
+    throw new Error(
+      `${LICENCE}'s section ${String(section)} names ${String(addresses.length)} addresses: ${addresses.join(', ')}; a document can name only one`,
+    )
   return { version: match[1], date: match[2], section, address: addresses[0] }
 }
 

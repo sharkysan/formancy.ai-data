@@ -80,12 +80,20 @@ export function listable(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   if (!readable.ok) return readable
   if (!prepared.addressable) return unaddressable(prepared)
   // prepare holds the identity to a key of the snapshot's root, so only a key column that can be NULL refuses here.
-  if (keyOrderProblem(prepared.root, prepared.target.identity.map((column) => column.name)) !== null) {
+  if (
+    keyOrderProblem(
+      prepared.root,
+      prepared.target.identity.map((column) => column.name),
+    ) !== null
+  ) {
     return refuse('operation-unavailable', "This form's key can be NULL, so its records have no order a page can rely on.")
   }
   const unscoped = unscopedLookups(bindings, policy)
   if (unscoped.length > 0) {
-    return refuse('operation-unavailable', `Nothing scopes this form's records, though the options of ${unscoped.join(' and ')} are filtered, so they are not listed.`)
+    return refuse(
+      'operation-unavailable',
+      `Nothing scopes this form's records, though the options of ${unscoped.join(' and ')} are filtered, so they are not listed.`,
+    )
   }
   const seen = new Set(filters.filter.map((term) => term.column))
   const wanted = new Set(readable.fields)
@@ -140,7 +148,11 @@ export function listColumns(bindings: FormBindings, fields: readonly string[], v
  * is stored, and offered to those few.
  */
 export function viewProblems(views: readonly ListView[], bindings: FormBindings): string[] {
-  const all = listColumns(bindings, bindings.fields.map((binding) => binding.field), [])
+  const all = listColumns(
+    bindings,
+    bindings.fields.map((binding) => binding.field),
+    [],
+  )
   return views.flatMap((view, index) => {
     const why = viewFit(view, bindings, all)
     return why === null ? [] : [`/views/${String(index)} (“${view.name}”): ${why}`]
@@ -176,13 +188,23 @@ export function listOrder(prepared: Prepared, requested: ReadonlyArray<{ column:
  * those columns cannot hold, such as an int8 for an int4 foreign key, names
  * no row of theirs and is refused.
  */
-function parentEqual(prepared: Prepared, bindings: FormBindings, fields: readonly string[], parent: RecordListQuery['parent']): { ok: true; equal: RecordValue[] } | PlanRefusal {
+function parentEqual(
+  prepared: Prepared,
+  bindings: FormBindings,
+  fields: readonly string[],
+  parent: RecordListQuery['parent'],
+): { ok: true; equal: RecordValue[] } | PlanRefusal {
   if (parent === null) return { ok: true, equal: [] }
   const binding = bindings.fields.find((candidate) => candidate.field === parent.field)
   if (binding === undefined || binding.kind !== 'lookup' || !fields.includes(parent.field)) {
     return refuse('invalid-request', `${parent.field} is not a lookup field you may read, so it cannot name a parent.`)
   }
-  const decoded = lookupAnswer(binding, binding.columns.map((name) => prepared.columns.get(name) as ColumnMeta), parent.record, new Map())
+  const decoded = lookupAnswer(
+    binding,
+    binding.columns.map((name) => prepared.columns.get(name) as ColumnMeta),
+    parent.record,
+    new Map(),
+  )
   if (!decoded.ok) return refuse('invalid-record-token', `The parent's record is not a token of a row ${parent.field} can reference.`)
   return { ok: true, equal: decoded.values }
 }
@@ -209,7 +231,8 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   const requested: Array<{ column: string; direction: 'asc' | 'desc' }> = []
   for (const term of query.sort) {
     const binding = byField.get(term.field)
-    if (binding === undefined || !offered.sortable.includes(term.field)) return refuse('not-sortable', `${term.field} is not a field you may sort this list by.`)
+    if (binding === undefined || !offered.sortable.includes(term.field))
+      return refuse('not-sortable', `${term.field} is not a field you may sort this list by.`)
     requested.push({ column: binding.column, direction: term.direction })
   }
   const filter: RecordFilter[] = []

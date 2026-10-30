@@ -141,19 +141,33 @@ async function main() {
   let failure
   const startsOf = () =>
     [...(stand?.objects.entries() ?? [])].flatMap(([name, object], at) =>
-      object.state.container.starts.map((start, n) => ({ label: `visitor ${String(at + 1)}${n === 0 ? '' : `, start ${String(n + 1)}`} (${name.slice(0, 6)}…)`, healthy: start.healthyAt === undefined ? undefined : start.healthyAt - start.startedAt })),
+      object.state.container.starts.map((start, n) => ({
+        label: `visitor ${String(at + 1)}${n === 0 ? '' : `, start ${String(n + 1)}`} (${name.slice(0, 6)}…)`,
+        healthy: start.healthyAt === undefined ? undefined : start.healthyAt - start.startedAt,
+      })),
     )
   try {
     await timed('Host page, demo build (`build:demo`)', () => command('pnpm', ['--filter', '@formancy/data-host', 'build:demo']))
-    await timed('Image build (`docker build --platform linux/amd64`)', () => command('docker', ['build', '--platform', 'linux/amd64', '-f', 'deploy/demo/Dockerfile', '-t', image, '.']))
+    await timed('Image build (`docker build --platform linux/amd64`)', () =>
+      command('docker', ['build', '--platform', 'linux/amd64', '-f', 'deploy/demo/Dockerfile', '-t', image, '.']),
+    )
     built = true
     size = Number((await docker(['image', 'inspect', '--format', '{{.Size}}', image])).trim())
 
     const worker = await loadWorker(join(repo, 'apps', 'live-demo', 'dist', 'worker', 'cloudflare.mjs'))
     let made = 0
-    stand = durableObjects(worker.DemoServer, () => new DockerContainer({ image, name: `formancy-data-demo-gate-${run}-${String((made += 1))}`, quota, port: SERVER_PORT }))
+    stand = durableObjects(
+      worker.DemoServer,
+      () => new DockerContainer({ image, name: `formancy-data-demo-gate-${run}-${String((made += 1))}`, quota, port: SERVER_PORT }),
+    )
     const rules = parseHeadersFile(liveHeadersFile(`${PREFIX}/`))
-    ;({ server, origin: stand.origin } = await serveOrigin({ directory: join(repo, 'apps', 'host', 'dist-demo'), prefix: PREFIX, assets: config.assets, rules, worker: (request) => worker.default.fetch(request, stand.env) }))
+    ;({ server, origin: stand.origin } = await serveOrigin({
+      directory: join(repo, 'apps', 'host', 'dist-demo'),
+      prefix: PREFIX,
+      assets: config.assets,
+      rules,
+      worker: (request) => worker.default.fetch(request, stand.env),
+    }))
     console.log(`The demo on ${stand.origin}${PREFIX}/`)
 
     const journey = await apiJourney({ origin: stand.origin, stand, check, timed })
@@ -167,35 +181,75 @@ async function main() {
     const b = visitor(stand.origin)
     const signed = await timed('Sign-in, a second visitor: their own container', () => b.signIn('clara'))
     const theirs = journey.objectOf(b)
-    check('a second visitor gets a cookie, an instance and a container of their own', signed.status === 200 && b.cookie !== journey.a.cookie && theirs !== undefined && theirs !== first && theirs.state.container.starts.length === 1 ? null : `answered ${String(signed.status)}`)
+    check(
+      'a second visitor gets a cookie, an instance and a container of their own',
+      signed.status === 200 && b.cookie !== journey.a.cookie && theirs !== undefined && theirs !== first && theirs.state.container.starts.length === 1
+        ? null
+        : `answered ${String(signed.status)}`,
+    )
     const created = await b.api('POST', '/v1/forms/order/records/read', { token: signed.json?.token, body: { record: journey.record } })
     const touched = await b.api('POST', '/v1/forms/order/records/read', { token: signed.json?.token, body: { record: journey.touched.record } })
-    check("the second visitor sees neither the first one's new order nor their change", created.status === 404 && touched.status === 200 && (touched.json.answers.notes ?? null) === journey.touched.before ? null : `the new order answered ${String(created.status)}; the changed one says ${JSON.stringify(touched.json?.answers?.notes)}`)
+    check(
+      "the second visitor sees neither the first one's new order nor their change",
+      created.status === 404 && touched.status === 200 && (touched.json.answers.notes ?? null) === journey.touched.before
+        ? null
+        : `the new order answered ${String(created.status)}; the changed one says ${JSON.stringify(touched.json?.answers?.notes)}`,
+    )
 
     // What the container wrote holds neither of its secrets.
     const key = first.state.stored().get('key')
     const password = await container.serverVariable('FORMANCY_DEMO_DB_PASSWORD')
-    check('neither the identity key nor the database password is in what the container wrote', leaks([{ where: "the first visitor's container's output", text: container.log }], { 'the identity key': key, 'the database password': password }).join('; ') || null)
+    check(
+      'neither the identity key nor the database password is in what the container wrote',
+      leaks([{ where: "the first visitor's container's output", text: container.log }], { 'the identity key': key, 'the database password': password }).join(
+        '; ',
+      ) || null,
+    )
     check('the server cannot write its own code', (await container.writableCode()).slice(0, 3).join(', ') || null)
-    check('the key the container verifies with is the one the Durable Object stored', (await container.serverVariable(IDENTITY_SECRET_VARIABLE)) === key ? null : 'they differ')
+    check(
+      'the key the container verifies with is the one the Durable Object stored',
+      (await container.serverVariable(IDENTITY_SECRET_VARIABLE)) === key ? null : 'they differ',
+    )
 
     // The reset, as the idle timeout makes it.
     await container.destroy()
     const stopped = await journey.a.api('GET', '/v1/forms', { token: journey.tokens.clara })
-    check("once the container has stopped, the visitor's request is the Worker's not-running answer", stopped.status === 503 && stopped.json?.message === NOT_RUNNING ? null : `answered ${String(stopped.status)} ${stopped.text}`)
+    check(
+      "once the container has stopped, the visitor's request is the Worker's not-running answer",
+      stopped.status === 503 && stopped.json?.message === NOT_RUNNING ? null : `answered ${String(stopped.status)} ${stopped.text}`,
+    )
     await first.server.alarm()
-    check("the Durable Object's alarm forgets the key once no container runs", first.state.stored().size === 0 ? null : `it still stores ${[...first.state.stored().keys()].join(', ')}`)
+    check(
+      "the Durable Object's alarm forgets the key once no container runs",
+      first.state.stored().size === 0 ? null : `it still stores ${[...first.state.stored().keys()].join(', ')}`,
+    )
     const again = await timed('Sign-in after the reset: two at once, one start', () => Promise.all([journey.a.signIn('clara'), journey.a.signIn('clara')]))
-    check('two sign-ins at once start one container, and both are answered', again.every((answer) => answer.status === 200) && container.starts.length === 2 ? null : `answered ${again.map((answer) => answer.status).join(', ')} with ${String(container.starts.length)} starts`)
+    check(
+      'two sign-ins at once start one container, and both are answered',
+      again.every((answer) => answer.status === 200) && container.starts.length === 2
+        ? null
+        : `answered ${again.map((answer) => answer.status).join(', ')} with ${String(container.starts.length)} starts`,
+    )
     const fresh = again[0].json?.token
     const both = await Promise.all(again.map((answer) => journey.a.api('GET', '/v1/forms', { token: answer.json?.token })))
-    check('both tokens of the new start are accepted', both.every((answer) => answer.status === 200) ? null : `answered ${both.map((answer) => answer.status).join(', ')}`)
+    check(
+      'both tokens of the new start are accepted',
+      both.every((answer) => answer.status === 200) ? null : `answered ${both.map((answer) => answer.status).join(', ')}`,
+    )
     const old = await journey.a.api('GET', '/v1/forms', { token: journey.tokens.clara })
     check("the token of before the reset is refused by the new start's key", old.status === 401 ? null : `answered ${String(old.status)}`)
     const after = await journey.a.api('POST', '/v1/forms/order/records/read', { token: fresh, body: { record: journey.record } })
     const restored = await journey.a.api('POST', '/v1/forms/order/records/read', { token: fresh, body: { record: journey.touched.record } })
     const listed = await journey.a.api('POST', '/v1/forms/order/records/list', { token: fresh, body: { limit: 1, offset: PER_TENANT.orders - 1 } })
-    check('after the reset the created order is gone and the generated data is as generated', after.status === 404 && (restored.json?.answers?.notes ?? null) === journey.touched.before && listed.json?.rows?.length === 1 && listed.json?.hasMore === false ? null : `the created order answered ${String(after.status)}, the changed one says ${JSON.stringify(restored.json?.answers?.notes)}, the last page ${JSON.stringify(listed.json?.rows?.length)}`)
+    check(
+      'after the reset the created order is gone and the generated data is as generated',
+      after.status === 404 &&
+        (restored.json?.answers?.notes ?? null) === journey.touched.before &&
+        listed.json?.rows?.length === 1 &&
+        listed.json?.hasMore === false
+        ? null
+        : `the created order answered ${String(after.status)}, the changed one says ${JSON.stringify(restored.json?.answers?.notes)}, the last page ${JSON.stringify(listed.json?.rows?.length)}`,
+    )
 
     // The page, in Chromium, as a third visitor: their own container.
     await demoPass({ origin: stand.origin, prefix: PREFIX, check, timed })
@@ -204,7 +258,8 @@ async function main() {
   }
 
   if (failure !== undefined || checks.some((entry) => entry.problem !== null)) {
-    for (const [name, object] of stand?.objects ?? []) console.error(`\n--- the output of ${name.slice(0, 6)}…'s container, its last 40 lines\n${object.state.container.log.split('\n').slice(-40).join('\n')}`)
+    for (const [name, object] of stand?.objects ?? [])
+      console.error(`\n--- the output of ${name.slice(0, 6)}…'s container, its last 40 lines\n${object.state.container.log.split('\n').slice(-40).join('\n')}`)
   }
   for (const object of stand?.objects.values() ?? []) await object.state.container.destroy()
   const left = (await docker(['ps', '--all', '--quiet', '--filter', `name=formancy-data-demo-gate-${run}`]).catch(() => '')).trim()
@@ -218,7 +273,10 @@ async function main() {
   console.log(`\n${table}`)
   if (process.env.GITHUB_STEP_SUMMARY !== undefined) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${table}\n`)
   if (failure !== undefined) console.error(`\nThe live demo's gate could not finish: ${failure.stack ?? failure.message}`)
-  if (failed.length > 0) console.error(`\n${String(failed.length)} of ${String(checks.length)} checks failed:\n- ${failed.map((entry) => `${entry.name}: ${entry.problem}`).join('\n- ')}`)
+  if (failed.length > 0)
+    console.error(
+      `\n${String(failed.length)} of ${String(checks.length)} checks failed:\n- ${failed.map((entry) => `${entry.name}: ${entry.problem}`).join('\n- ')}`,
+    )
   if (failure !== undefined || failed.length > 0) process.exitCode = 1
 }
 

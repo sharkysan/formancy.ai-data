@@ -73,7 +73,9 @@ describe('the menu', () => {
     const source = definition.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
     const [customer] = expectOk(await plane.client().query(parentForm, source, { operation: 'create', search: 'Muster' })).rows
     if (customer === undefined) throw new Error('no customer to order for')
-    const made = expectOk(await plane.client().create(parentForm, { customer: customer.token, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1', notes: null }))
+    const made = expectOk(
+      await plane.client().create(parentForm, { customer: customer.token, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1', notes: null }),
+    )
 
     const orders = expectOk(await plane.client().list(parentForm))
     // Tenant 1's seeded order, 2^53 + 1, which has a line, as the order form spells its token, and the order just made.

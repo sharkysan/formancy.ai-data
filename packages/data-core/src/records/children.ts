@@ -80,7 +80,8 @@ export function childLookups(form: PublishedTable): ChildLookup[] {
     }))
 }
 
-const sameList = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((item, index) => item === right[index])
+const sameList = (left: readonly string[], right: readonly string[]): boolean =>
+  left.length === right.length && left.every((item, index) => item === right[index])
 
 /**
  * The fields of `lookups` through which their form's rows are children of

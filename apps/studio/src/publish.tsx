@@ -80,8 +80,10 @@ function describeBase(formId: string, base: Base, next: number, superseded: { cu
       : `Version ${String(superseded.current)} of ${formId} is published now, and it is somebody else's. ${words.gerund} waits until you rebase on it.`
   }
   if (base.state === 'reading') return `Reading which version of ${formId} is published…`
-  if (base.state === 'unknown') return `The published version of ${formId} could not be read: ${base.message} ${words.gerund} will find out which version is current.`
-  if (base.version === null) return `No version of ${formId} is published yet: ${words === SUBMITTING ? 'approved, your draft will be' : 'this will be'} version 1.`
+  if (base.state === 'unknown')
+    return `The published version of ${formId} could not be read: ${base.message} ${words.gerund} will find out which version is current.`
+  if (base.version === null)
+    return `No version of ${formId} is published yet: ${words === SUBMITTING ? 'approved, your draft will be' : 'this will be'} version 1.`
   if (base.regenerated === true) {
     return `Regenerated from version ${String(base.version)} of ${formId}. ${words.makes} version ${String(next)}; if somebody has published since, the server says so and replaces nothing.`
   }
@@ -192,11 +194,11 @@ export function PublishStep({
   // The Policy step's own check, so the two cannot disagree about whether the server will take the policy.
   const problems = policyCheck(policy, proposal.bindings, proposal.snapshot)
   const blockers = [
-    problems.length === 0 ? null : `The policy has ${String(problems.length)} ${problems.length === 1 ? 'problem' : 'problems'}: the Policy step lists ${problems.length === 1 ? 'it' : 'them'}.`,
-    stale ? 'The row filters changed since the form was generated: generate it again from the Policy step.' : null,
-    undecided.length === 0
+    problems.length === 0
       ? null
-      : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step.`,
+      : `The policy has ${String(problems.length)} ${problems.length === 1 ? 'problem' : 'problems'}: the Policy step lists ${problems.length === 1 ? 'it' : 'them'}.`,
+    stale ? 'The row filters changed since the form was generated: generate it again from the Policy step.' : null,
+    undecided.length === 0 ? null : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step.`,
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
     ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
   ].filter((blocker): blocker is string => blocker !== null)
@@ -260,9 +262,8 @@ export function PublishStep({
   return (
     <>
       <p className="lede">
-        One bundle: the form as the presentation step left it, its bindings to {describeRef(proposal.bindings.root)} on{' '}
-        <code>{connection}</code>, the policy, and the snapshot they were generated from. The server checks all of it again
-        before it writes anything, and keeps every version it has published.
+        One bundle: the form as the presentation step left it, its bindings to {describeRef(proposal.bindings.root)} on <code>{connection}</code>, the policy,
+        and the snapshot they were generated from. The server checks all of it again before it writes anything, and keeps every version it has published.
       </p>
       {review === null ? null : <p className="reviewed">{review}</p>}
       <p className="base">{describeBase(formId, base, next, superseded, words)}</p>
@@ -312,7 +313,9 @@ function PublishOutcome({
   if (result.kind === 'published') {
     return (
       <div role="status" className="done">
-        <p>Published version {result.version} of {formId}.</p>
+        <p>
+          Published version {result.version} of {formId}.
+        </p>
         <button type="button" className="button" onClick={onDrift}>
           Check its drift
         </button>
@@ -347,8 +350,8 @@ function PublishOutcome({
     return (
       <div role="alert" className="problem-box">
         <p>
-          Somebody published {result.current === null ? 'first' : `version ${String(result.current)}`} while you worked.
-          Yours was not {words.undone}, and theirs is untouched.
+          Somebody published {result.current === null ? 'first' : `version ${String(result.current)}`} while you worked. Yours was not {words.undone}, and
+          theirs is untouched.
         </p>
         {result.published === null ? null : <p>{describePublished(result.published)}</p>}
         <button type="button" id={REBASE} className="button" onClick={() => onRebase(result.current)}>

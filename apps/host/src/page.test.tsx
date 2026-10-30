@@ -4,7 +4,34 @@ import { computeAccessibleName } from 'dom-accessibility-api'
 import { createFormText } from '@formancy/core/words'
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answer, answerable, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, newRecord, notice, openForm, openWith, pane, paper, RENDERERS, said, save, shows, signIn, statuses, unknownNotice, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answerable,
+  chooseCustomer,
+  chooseForm,
+  chooseRenderer,
+  exportButton,
+  exportLine,
+  gridSection,
+  gridStatus,
+  keeping,
+  load,
+  mount,
+  newRecord,
+  notice,
+  openForm,
+  openWith,
+  pane,
+  paper,
+  RENDERERS,
+  said,
+  save,
+  shows,
+  signIn,
+  statuses,
+  unknownNotice,
+  unsavedNotice,
+} from './test-host.js'
 import { holdingRequests, holdingWrites, losingWrites } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -52,7 +79,13 @@ async function freshOrder(formId: string, notes?: string): Promise<string> {
   const name = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(formId, name, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', ...(notes === undefined ? {} : { notes }) })
+  const created = await plane.clerk.create(formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    ...(notes === undefined ? {} : { notes }),
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return created.value.record
 }
@@ -86,7 +119,11 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
       expect({ renderer, names }).toEqual({ renderer, names: labels })
     }
     // What the definition allows, said from the server's answer, as tags.
-    expect(within(screen.getByRole('list', { name: 'Operations' })).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Read', 'Create', 'Update', 'Delete'])
+    expect(
+      within(screen.getByRole('list', { name: 'Operations' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['Read', 'Create', 'Update', 'Delete'])
     // New record took the keyboard to the record's heading.
     expect(focusedName()).toBe('New record')
   })
@@ -156,7 +193,11 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     const lines = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
     await user.click(within(lines).getAllByRole('gridcell')[0] as HTMLElement)
     await waitFor(() => expect(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).toBeTruthy(), { timeout: 15_000 })
-    await within(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).findByRole('spinbutton', { name: /^Quantity/ }, { timeout: 15_000 })
+    await within(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).findByRole(
+      'spinbutton',
+      { name: /^Quantity/ },
+      { timeout: 15_000 },
+    )
     expect(await floor('a line open')).toEqual(CLEAN('a line open'))
 
     await answer(user, 'React', 'Notes', 'a draft on the floor')
@@ -204,7 +245,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
     await screen.findByRole('heading', { level: 3, name: `Order ${kept}` }, { timeout: 15_000 })
     await shows('Angular', 'Customer', 'Muster AG')
-    const keep = async (question: string): Promise<void> => user.click(within(screen.getByRole('region', { name: question })).getByRole('button', { name: 'Keep it' }))
+    const keep = async (question: string): Promise<void> =>
+      user.click(within(screen.getByRole('region', { name: question })).getByRole('button', { name: 'Keep it' }))
 
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
     expect(await floor('the record, confirming')).toEqual(CLEAN('the record, confirming'))
@@ -212,7 +254,13 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await answer(user, 'React', 'Notes', `${notes} saving`)
     await save(user, 'React')
     await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
-    await waitFor(() => expect(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }).getAttribute('aria-disabled')).toBe('true'))
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('region', { name: `Delete Order ${kept}?` }))
+          .getByRole('button', { name: 'Delete it' })
+          .getAttribute('aria-disabled'),
+      ).toBe('true'),
+    )
     expect(await floor('the record, confirming while a save is out')).toEqual(CLEAN('the record, confirming while a save is out'))
     holding.answer()
     hold = false
@@ -329,7 +377,15 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     const user = await openForm(plane, formId, TOKENS.thirdClerk)
     for (const renderer of RENDERERS) {
       await user.click(within(paper(renderer)).getByRole('combobox', { name: 'Customer' }))
-      await waitFor(() => expect({ renderer, statuses: statuses(renderer), searches: searches() }).toEqual({ renderer, statuses: expect.arrayContaining([more]) as unknown, searches: expect.anything() as unknown }), { timeout: 15_000 })
+      await waitFor(
+        () =>
+          expect({ renderer, statuses: statuses(renderer), searches: searches() }).toEqual({
+            renderer,
+            statuses: expect.arrayContaining([more]) as unknown,
+            searches: expect.anything() as unknown,
+          }),
+        { timeout: 15_000 },
+      )
       expect(await floor(`${renderer}'s customer list, saying there are more`)).toEqual(CLEAN(`${renderer}'s customer list, saying there are more`))
     }
   })

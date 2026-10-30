@@ -88,13 +88,17 @@ if (options.tenant !== undefined) {
 }
 
 if (process.env.FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE !== undefined) {
-  refuse('This minter signs with a shared secret (HS256) only. A server that verifies with a public key takes its tokens from the identity provider holding the private one.')
+  refuse(
+    'This minter signs with a shared secret (HS256) only. A server that verifies with a public key takes its tokens from the identity provider holding the private one.',
+  )
 }
 // A key set's server verifies whatever its file holds, which this minter
 // never reads (0059): a token signed with a secret beside it would be for a
 // key the server may not hold.
 if (process.env.FORMANCY_DATA_IDENTITY_KEYS_FILE !== undefined) {
-  refuse('This minter signs with FORMANCY_DATA_IDENTITY_SECRET only. A server that reads FORMANCY_DATA_IDENTITY_KEYS_FILE takes its tokens from whoever holds the keys in that set.')
+  refuse(
+    'This minter signs with FORMANCY_DATA_IDENTITY_SECRET only. A server that reads FORMANCY_DATA_IDENTITY_KEYS_FILE takes its tokens from whoever holds the keys in that set.',
+  )
 }
 const reference = setting('FORMANCY_DATA_IDENTITY_SECRET')
 const issuer = setting('FORMANCY_DATA_ISSUER')

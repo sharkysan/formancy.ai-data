@@ -124,7 +124,11 @@ function shownKey(object: ObjectMeta, shown: ReadonlySet<string>): string[] | nu
  * its column cannot hold would make `listTerms` throw for the whole page.
  * The refusal names the column, never the value.
  */
-function equalTerms(object: ObjectMeta, byName: ReadonlyMap<string, ColumnMeta>, equal: readonly BrowseEqualTerm[]): { ok: true; equal: RecordValue[] } | BrowseRefusal {
+function equalTerms(
+  object: ObjectMeta,
+  byName: ReadonlyMap<string, ColumnMeta>,
+  equal: readonly BrowseEqualTerm[],
+): { ok: true; equal: RecordValue[] } | BrowseRefusal {
   const terms: RecordValue[] = []
   for (const term of equal) {
     const column = byName.get(term.column)
@@ -132,7 +136,8 @@ function equalTerms(object: ObjectMeta, byName: ReadonlyMap<string, ColumnMeta>,
       return refuse('not-comparable', `${term.column} is not a column of ${nameOf(object.ref)} this page shows that rows can be found by.`)
     }
     if (terms.some((known) => known.name === column.name)) return refuse('not-comparable', `${term.column} is named twice.`)
-    if (!isKeyValue(column.type, term.value)) return refuse('not-comparable', `The value given for ${term.column} is not one ${nameOf(object.ref)}.${term.column} can hold.`)
+    if (!isKeyValue(column.type, term.value))
+      return refuse('not-comparable', `The value given for ${term.column} is not one ${nameOf(object.ref)}.${term.column} can hold.`)
     terms.push({ name: column.name, type: column.type, value: term.value })
   }
   return { ok: true, equal: terms }
@@ -198,7 +203,10 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     through: [],
     equal: equal.equal,
     filter,
-    search: query.search === '' ? null : { text: query.search, columns: searchable.map((column) => ({ name: column.name, type: column.type }) as LookupSearchColumn) },
+    search:
+      query.search === ''
+        ? null
+        : { text: query.search, columns: searchable.map((column) => ({ name: column.name, type: column.type }) as LookupSearchColumn) },
     sort,
     offset: query.offset,
     limit: query.limit,
@@ -211,7 +219,8 @@ export function browsePage(rows: ReadonlyArray<Omit<RecordRead, 'ok'>>, limit: n
   return { rows: rows.slice(0, limit).map((row) => row.values), hasMore: rows.length > limit }
 }
 
-export type BrowseQueryCheck = { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | 'not-filterable' | SearchErrorCode | PageErrorCode; message: string }
+export type BrowseQueryCheck =
+  { ok: true; query: BrowseQuery } | { ok: false; code: 'malformed' | 'not-filterable' | SearchErrorCode | PageErrorCode; message: string }
 
 const PROPERTIES = new Set(['object', 'equal', 'filter', 'search', 'sort', 'offset', 'limit'])
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -230,7 +239,8 @@ function sortOf(sort: unknown): { ok: true; sort: BrowseSortTerm[] } | { ok: fal
   const seen = new Set<string>()
   const terms: BrowseSortTerm[] = []
   for (const entry of sort as unknown[]) {
-    if (!isRecord(entry) || !hasExactly(entry, ['column', 'direction'])) return { ok: false, message: 'Each sort term is { column, direction } and nothing else.' }
+    if (!isRecord(entry) || !hasExactly(entry, ['column', 'direction']))
+      return { ok: false, message: 'Each sort term is { column, direction } and nothing else.' }
     const { column, direction } = entry
     if (!isName(column)) return { ok: false, message: 'A sort term names a column.' }
     if (direction !== 'asc' && direction !== 'desc') return { ok: false, message: `${column} sorts asc or desc.` }
@@ -273,7 +283,8 @@ function equalOf(equal: unknown): { ok: true; equal: BrowseEqualTerm[] } | { ok:
 export function validateBrowseQuery(body: unknown): BrowseQueryCheck {
   if (!isRecord(body)) return malformed('A browse query is an object.')
   const unknown = Object.keys(body).filter((key) => !PROPERTIES.has(key))
-  if (unknown.length > 0) return malformed(`A browse query has an object, an equal, a filter, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
+  if (unknown.length > 0)
+    return malformed(`A browse query has an object, an equal, a filter, a search, a sort, an offset and a limit, and not ${unknown.join(', ')}.`)
   const object = body['object']
   if (!isRecord(object) || !hasExactly(object, ['schema', 'name']) || !isName(object['schema']) || !isName(object['name'])) {
     return malformed('The object is { schema, name }, both named.')

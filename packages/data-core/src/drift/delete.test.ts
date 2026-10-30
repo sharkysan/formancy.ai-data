@@ -48,7 +48,13 @@ function uuidKey(kind: 'postgres' | 'sqlserver', expression: string | null, hasD
   return (objects) => {
     const order = object(objects, 'order')
     const id = order.columns.find((candidate) => candidate.name === 'id') as ObjectMeta['columns'][number]
-    Object.assign(id, { databaseType: kind === 'postgres' ? 'uuid' : 'uniqueidentifier', type: { kind: 'uuid' }, generated: 'none', hasDefault, defaultExpression: expression })
+    Object.assign(id, {
+      databaseType: kind === 'postgres' ? 'uuid' : 'uniqueidentifier',
+      type: { kind: 'uuid' },
+      generated: 'none',
+      hasDefault,
+      defaultExpression: expression,
+    })
     const version = order.columns.find((candidate) => candidate.name === 'row_version') as ObjectMeta['columns'][number]
     if (kind === 'sqlserver') Object.assign(version, { databaseType: 'bigint', type: INT64, generated: 'none', hasDefault: true, defaultExpression: '((0))' })
   }
@@ -57,13 +63,29 @@ function uuidKey(kind: 'postgres' | 'sqlserver', expression: string | null, hasD
 /** A foreign key of the order over `columns`, onto the employee's id, as one added since the form was published. */
 function referring(name: string, columns: string[]): (objects: ObjectMeta[]) => void {
   return (objects) => {
-    object(objects, 'order').foreignKeys.push({ name, columns, references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true })
+    object(objects, 'order').foreignKeys.push({
+      name,
+      columns,
+      references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] },
+      onUpdate: 'no-action',
+      onDelete: 'no-action',
+      enforced: true,
+      validated: true,
+    })
   }
 }
 
 /** A key from a table outside the snapshot that refers to the order, as discovery names one (0049). */
 function referrer(onDelete: InboundKey['onDelete'], name = 'fk_order_copy_order'): InboundKey {
-  return { table: { schema: 'audit', name: 'order_copy' }, name, columns: ['order_id'], referencedColumns: ['id'], onDelete, onUpdate: 'no-action', enforced: true }
+  return {
+    table: { schema: 'audit', name: 'order_copy' },
+    name,
+    columns: ['order_id'],
+    referencedColumns: ['id'],
+    onDelete,
+    onUpdate: 'no-action',
+    enforced: true,
+  }
 }
 
 function referredBy(objects: ObjectMeta[], key: InboundKey): void {
@@ -117,7 +139,12 @@ describe('diffSnapshots: delete', () => {
   // the form offered none is a note -- regenerating may offer it.
   test('DELETE revoked stops delete, and granted is a note', () => {
     const revoked = drift((objects) => void (object(objects, 'order').access = { delete: false }), { ...FACTS, policy: DELETING }, ORDER, published())
-    expect(only(revoked)).toMatchObject({ kind: 'privilege-narrowed', severity: 'blocking', subject: { kind: 'object', object: ORDER_REF }, message: expect.stringMatching(/may no longer DELETE from sales\.order/) })
+    expect(only(revoked)).toMatchObject({
+      kind: 'privilege-narrowed',
+      severity: 'blocking',
+      subject: { kind: 'object', object: ORDER_REF },
+      message: expect.stringMatching(/may no longer DELETE from sales\.order/),
+    })
     expect(revoked.writable).toEqual({ create: true, update: true, delete: false })
     // The runtime decides over the root's description, which holds no grant; the database refuses the delete itself (0041).
     expect(revoked.runtime.writable.delete).toBe(true)
@@ -140,7 +167,10 @@ describe('diffSnapshots: delete', () => {
     expect(generateForm(base, request).bindings.operations.delete).toBe(true)
     const typed = drift(numbering('none'), { kind: 'postgres', ...FACTS, policy: DELETING }, request, base)
     expect(typed.writable.delete).toBe(false)
-    expect(typed.changes.find((change) => change.kind === 'column-generation-changed')).toMatchObject({ severity: 'blocking', message: expect.stringMatching(/no longer numbers a column of the key/) })
+    expect(typed.changes.find((change) => change.kind === 'column-generation-changed')).toMatchObject({
+      severity: 'blocking',
+      message: expect.stringMatching(/no longer numbers a column of the key/),
+    })
     const byDefault = drift(numbering('identity-by-default'), { kind: 'postgres', ...FACTS, policy: DELETING }, request, base)
     expect(byDefault.writable.delete).toBe(true)
   })
@@ -178,7 +208,14 @@ describe('diffSnapshots: delete', () => {
       const reports = changes[kind].map(([name, expression, hasDefault]) => {
         const report = drift(uuidKey(kind, expression, hasDefault), { kind, ...FACTS, policy: DELETING }, request, base)
         const key = report.changes.find((change) => change.subject.kind === 'column' && change.subject.name === 'id')
-        return { kind, name, delete: report.writable.delete, runtime: report.runtime.writable.delete, severity: key?.severity, numbering: key?.message.includes('no longer numbers a column of the key') }
+        return {
+          kind,
+          name,
+          delete: report.writable.delete,
+          runtime: report.runtime.writable.delete,
+          severity: key?.severity,
+          numbering: key?.message.includes('no longer numbers a column of the key'),
+        }
       })
       expect(reports).toEqual(changes[kind].map(([name]) => ({ kind, name, delete: false, runtime: false, severity: 'blocking', numbering: true })))
       const same = drift(uuidKey(kind, NEVER_REPEATING[kind]), { kind, ...FACTS, policy: DELETING }, request, base)
@@ -220,14 +257,28 @@ describe('diffSnapshots: delete', () => {
           base,
         )
       const key = over(['id'])
-      expect({ kind, delete: key.writable.delete, runtime: key.runtime.writable.delete, change: key.changes.find((change) => change.kind === 'foreign-key-changed') }).toEqual({
+      expect({
+        kind,
+        delete: key.writable.delete,
+        runtime: key.runtime.writable.delete,
+        change: key.changes.find((change) => change.kind === 'foreign-key-changed'),
+      }).toEqual({
         kind,
         delete: false,
         runtime: false,
-        change: expect.objectContaining({ severity: 'blocking', subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_employee' }, message: expect.stringMatching(/a lookup over it writes the key/) }),
+        change: expect.objectContaining({
+          severity: 'blocking',
+          subject: { kind: 'foreign-key', object: ORDER_REF, name: 'fk_order_employee' },
+          message: expect.stringMatching(/a lookup over it writes the key/),
+        }),
       })
       const other = over(['created_by'])
-      expect({ kind, delete: other.writable.delete, runtime: other.runtime.writable.delete, severity: other.changes.find((change) => change.kind === 'foreign-key-changed')?.severity }).toEqual({ kind, delete: true, runtime: true, severity: 'info' })
+      expect({
+        kind,
+        delete: other.writable.delete,
+        runtime: other.runtime.writable.delete,
+        severity: other.changes.find((change) => change.kind === 'foreign-key-changed')?.severity,
+      }).toEqual({ kind, delete: true, runtime: true, severity: 'info' })
     }
   })
 
@@ -240,14 +291,20 @@ describe('diffSnapshots: delete', () => {
       kind: 'referrer-added',
       severity: 'blocking',
       subject: { kind: 'foreign-key', object: { schema: 'audit', name: 'order_copy' }, name: 'fk_order_copy_order' },
-      message: expect.stringMatching(/Deleting a record of sales\.order also deletes rows of audit\.order_copy \(fk_order_copy_order, ON DELETE CASCADE\), which this form does not offer/),
+      message: expect.stringMatching(
+        /Deleting a record of sales\.order also deletes rows of audit\.order_copy \(fk_order_copy_order, ON DELETE CASCADE\), which this form does not offer/,
+      ),
     })
     expect(cascading.writable.delete).toBe(false)
     // Review's alone: the request's description holds nothing that refers to the root, and the statement's guard refuses it there (0050).
     expect(cascading.runtime.writable.delete).toBe(true)
 
     const refusing = drift((objects) => referredBy(objects, referrer('no-action')), { ...FACTS, policy: DELETING }, ORDER, published())
-    expect(only(refusing)).toMatchObject({ kind: 'referrer-added', severity: 'review', message: expect.stringMatching(/refuses to delete a record of sales\.order while rows of audit\.order_copy refer to it/) })
+    expect(only(refusing)).toMatchObject({
+      kind: 'referrer-added',
+      severity: 'review',
+      message: expect.stringMatching(/refuses to delete a record of sales\.order while rows of audit\.order_copy refer to it/),
+    })
     expect(refusing.writable.delete).toBe(true)
   })
 
@@ -255,7 +312,12 @@ describe('diffSnapshots: delete', () => {
   // see every key that refers to the root (0049), so what a delete also
   // does cannot be told.
   test('a referenced-by gap that appeared stops delete', () => {
-    const report = drift(undefined, { ...FACTS, policy: DELETING, gaps: [gap(null, 'referenced-by', 'No VIEW DEFINITION on the database.')] }, ORDER, published())
+    const report = drift(
+      undefined,
+      { ...FACTS, policy: DELETING, gaps: [gap(null, 'referenced-by', 'No VIEW DEFINITION on the database.')] },
+      ORDER,
+      published(),
+    )
     expect(only(report)).toMatchObject({ kind: 'access-narrowed', severity: 'blocking', subject: { kind: 'scope' } })
     expect(report.writable).toEqual({ create: true, update: true, delete: false })
   })
@@ -268,7 +330,10 @@ describe('diffSnapshots: delete', () => {
     const cascade = (objects: ObjectMeta[]) => referredBy(objects, referrer('set-null'))
     expect(only(drift(cascade, { ...FACTS, policy: DELETING }, ORDER, published())).severity).toBe('blocking')
     const nobody = drift(cascade, { ...FACTS, policy: NO_FILTERS }, ORDER, published())
-    expect(only(nobody)).toMatchObject({ severity: 'review', message: expect.stringMatching(/also sets order_id of audit\.order_copy to NULL in the rows that refer to it/) })
+    expect(only(nobody)).toMatchObject({
+      severity: 'review',
+      message: expect.stringMatching(/also sets order_id of audit\.order_copy to NULL in the rows that refer to it/),
+    })
     expect(nobody).toMatchObject({ blocking: false, writable: { create: true, update: true, delete: false } })
   })
 

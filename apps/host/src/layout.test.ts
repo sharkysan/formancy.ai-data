@@ -23,8 +23,18 @@ describe('the fragment', () => {
   // A form id is one of the menu's, but the fragment is typed by anybody:
   // read back, it is the same id however it was spelled in the address.
   test('reads back what it wrote, and an id with characters a URL escapes', () => {
-    expect(readFragment(fragmentOf({ form: 'pg.order_2', layout: 'stacked', view: 'record' }))).toEqual({ form: 'pg.order_2', layout: 'stacked', view: 'record', level: null })
-    expect(readFragment('#form=pg%2Dorder&layout=side-by-side&view=records')).toEqual({ form: 'pg-order', layout: 'side-by-side', view: 'records', level: null })
+    expect(readFragment(fragmentOf({ form: 'pg.order_2', layout: 'stacked', view: 'record' }))).toEqual({
+      form: 'pg.order_2',
+      layout: 'stacked',
+      view: 'record',
+      level: null,
+    })
+    expect(readFragment('#form=pg%2Dorder&layout=side-by-side&view=records')).toEqual({
+      form: 'pg-order',
+      layout: 'side-by-side',
+      view: 'records',
+      level: null,
+    })
   })
 
   // What the page cannot read asks for nothing: an unknown key is left out
@@ -70,14 +80,17 @@ describe('the level Drill down shows', () => {
   // at a level it would have to invent.
   test('reads a whole number from one, and nothing else', () => {
     expect(readFragment('#layout=drill&view=record&level=2&level=5')).toEqual({ form: null, layout: 'drill', view: 'record', level: 2 })
-    for (const level of ['0', '-1', '2x', '', '1.5', '01'])
-      expect(readFragment(`#layout=drill&view=record&level=${level}`).level).toBeNull()
+    for (const level of ['0', '-1', '2x', '', '1.5', '01']) expect(readFragment(`#layout=drill&view=record&level=${level}`).level).toBeNull()
   })
 
   // The levels are in memory only: a reload, a shared link or a typed
   // address with a level arrives on the records, as every other layout does.
   test('is never where a person arrives', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=drill&view=record&level=3', menu: ['pg-order'], phone: false })).toEqual({ form: 'pg-order', layout: 'drill', view: 'records' })
+    expect(arrival({ hash: '#form=pg-order&layout=drill&view=record&level=3', menu: ['pg-order'], phone: false })).toEqual({
+      form: 'pg-order',
+      layout: 'drill',
+      view: 'records',
+    })
   })
 })
 
@@ -87,14 +100,22 @@ describe('arriving with an address', () => {
   // A fragment's form is opened only when the menu names it: a form outside
   // the menu is never asked for, and the address is then the page's own.
   test('opens the form the fragment names only when the menu names it', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=stacked&view=records', menu, phone: false })).toEqual({ form: 'pg-order', layout: 'stacked', view: 'records' })
+    expect(arrival({ hash: '#form=pg-order&layout=stacked&view=records', menu, phone: false })).toEqual({
+      form: 'pg-order',
+      layout: 'stacked',
+      view: 'records',
+    })
     expect(arrival({ hash: '#form=ms-secret&layout=stacked&view=records', menu, phone: false })).toEqual({ form: null, layout: 'stacked', view: 'records' })
   })
 
   // No record is open on arrival, so a record view has nothing to show and
   // the records view is what the page writes back.
   test('starts in the records view, whatever the fragment says', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=separate&view=record', menu, phone: false })).toEqual({ form: 'pg-order', layout: 'separate', view: 'records' })
+    expect(arrival({ hash: '#form=pg-order&layout=separate&view=record', menu, phone: false })).toEqual({
+      form: 'pg-order',
+      layout: 'separate',
+      view: 'records',
+    })
   })
 
   // The layout the fragment names wins; otherwise a phone starts in Separate

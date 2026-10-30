@@ -61,7 +61,8 @@ export function freshFields(before: FormBindings, after: FormBindings): string[]
   return after.fields.filter((binding) => !known.has(canonicalize(fieldAnchor(binding)))).map((binding) => binding.field)
 }
 
-export type CarriedDraft = { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[] } | { ok: false; message: string }
+export type CarriedDraft =
+  { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[] } | { ok: false; message: string }
 
 /**
  * A draft's presentation carried to a new proposal of the same form: derived
@@ -83,7 +84,13 @@ export function carryDraft(from: { proposal: Proposal; edited: FormSchema; views
   // The rebase throws only for a base the generator did not write, which a
   // proposal never is and the derivation above has already read.
   const rebased = rebasePresentation({ base: from.proposal.form, presentation, bindings: from.proposal.bindings }, { base: to.form, bindings: to.bindings })
-  return { ok: true, form: rebased.form, conflicts: rebased.conflicts, fresh: freshFields(from.proposal.bindings, to.bindings), views: rebased.presentation.views ?? [] }
+  return {
+    ok: true,
+    form: rebased.form,
+    conflicts: rebased.conflicts,
+    fresh: freshFields(from.proposal.bindings, to.bindings),
+    views: rebased.presentation.views ?? [],
+  }
 }
 
 /**
@@ -96,11 +103,27 @@ export function carryDraft(from: { proposal: Proposal; edited: FormSchema; views
  * dropped label may be given to are the earlier ones, followed to their
  * keys in the new proposal by what they stand for, and those new in it.
  */
-export function carriedAgain(earlier: Carried | null, before: FormBindings, draft: { conflicts: PresentationConflict[]; fresh: string[] }, after: FormBindings): Carried {
+export function carriedAgain(
+  earlier: Carried | null,
+  before: FormBindings,
+  draft: { conflicts: PresentationConflict[]; fresh: string[] },
+  after: FormBindings,
+): Carried {
   const lost = (earlier?.conflicts ?? []).filter((conflict) => conflict.resolution === 'dropped')
   const anchorOf = new Map(before.fields.map((binding) => [binding.field, canonicalize(fieldAnchor(binding))]))
   const followed = new Set((earlier?.fresh ?? []).flatMap((key) => anchorOf.get(key) ?? []))
-  const fresh = after.fields.filter((binding) => draft.fresh.includes(binding.field) || followed.has(canonicalize(fieldAnchor(binding)))).map((binding) => binding.field)
-  const from = earlier === null || earlier.from.endsWith('your earlier draft') ? (earlier?.from ?? 'your earlier draft') : `${earlier.from}, then your earlier draft`
-  return { from, version: earlier?.version ?? null, conflicts: [...lost, ...draft.conflicts], fresh, undecided: earlier?.undecided ?? [], kept: earlier?.kept ?? [], removed: earlier?.removed ?? [] }
+  const fresh = after.fields
+    .filter((binding) => draft.fresh.includes(binding.field) || followed.has(canonicalize(fieldAnchor(binding))))
+    .map((binding) => binding.field)
+  const from =
+    earlier === null || earlier.from.endsWith('your earlier draft') ? (earlier?.from ?? 'your earlier draft') : `${earlier.from}, then your earlier draft`
+  return {
+    from,
+    version: earlier?.version ?? null,
+    conflicts: [...lost, ...draft.conflicts],
+    fresh,
+    undecided: earlier?.undecided ?? [],
+    kept: earlier?.kept ?? [],
+    removed: earlier?.removed ?? [],
+  }
 }

@@ -69,7 +69,14 @@ beforeAll(async () => {
   pg = postgres.container
   ms = sqlserver.container
 
-  const owner = connectPostgres({ host: pg.getHost(), port: pg.getPort(), database: pg.getDatabase(), user: pg.getUsername(), password: pg.getPassword(), tls: { enabled: false, rejectUnauthorized: false } })
+  const owner = connectPostgres({
+    host: pg.getHost(),
+    port: pg.getPort(),
+    database: pg.getDatabase(),
+    user: pg.getUsername(),
+    password: pg.getPassword(),
+    tls: { enabled: false, rejectUnauthorized: false },
+  })
   try {
     for (const statement of ENTRY.postgres) await owner.unsafe(statement)
   } finally {
@@ -91,12 +98,38 @@ beforeAll(async () => {
   }
 
   const connections: ConnectionConfig[] = [
-    { id: 'pg-14', kind: 'postgres', host: pg.getHost(), port: pg.getPort(), database: pg.getDatabase(), user: pg.getUsername(), password: 'env:PG_PASSWORD', schemas: ['ledger'], tls: { enabled: false } },
-    { id: 'ms-140', kind: 'sqlserver', host: ms.getHost(), port: ms.getPort(), database: 'compat_140', user: ms.getUsername(), password: 'env:MS_PASSWORD', schemas: ['ledger'], tls: { enabled: false, trustServerCertificate: true } },
+    {
+      id: 'pg-14',
+      kind: 'postgres',
+      host: pg.getHost(),
+      port: pg.getPort(),
+      database: pg.getDatabase(),
+      user: pg.getUsername(),
+      password: 'env:PG_PASSWORD',
+      schemas: ['ledger'],
+      tls: { enabled: false },
+    },
+    {
+      id: 'ms-140',
+      kind: 'sqlserver',
+      host: ms.getHost(),
+      port: ms.getPort(),
+      database: 'compat_140',
+      user: ms.getUsername(),
+      password: 'env:MS_PASSWORD',
+      schemas: ['ledger'],
+      tls: { enabled: false, trustServerCertificate: true },
+    },
   ]
-  registry = createConnectionRegistry(connections, DRIVER_FACTORIES, { env: { PG_PASSWORD: pg.getPassword(), MS_PASSWORD: ms.getPassword() }, readFile: async () => '' })
+  registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
+    env: { PG_PASSWORD: pg.getPassword(), MS_PASSWORD: ms.getPassword() },
+    readFile: async () => '',
+  })
   root = await mkdtemp(join(tmpdir(), 'formancy-data-admin-untested-'))
-  app = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } },
+  })
 })
 
 afterAll(async () => {
@@ -112,7 +145,8 @@ const inject = async (method: 'GET' | 'POST', url: string, payload?: Record<stri
 }
 
 /** The facts a standing is decided from, out of a ping's answer or a snapshot's `server`. */
-const factsOf = ({ product, major, compatibility }: ServerFacts): ServerFacts => (compatibility === undefined ? { product, major } : { product, major, compatibility })
+const factsOf = ({ product, major, compatibility }: ServerFacts): ServerFacts =>
+  compatibility === undefined ? { product, major } : { product, major, compatibility }
 
 /** Whoever may read every field, and nobody may write: a policy every generated form of this table fits. */
 function readOnly(bindings: FormBindings): FormPolicy {
@@ -146,7 +180,10 @@ describe.each(CONNECTIONS)('a server this release was not tested on, $connection
   // a snapshot that recorded another server than the test answered would
   // be reviewed against facts nobody was shown.
   test('discovery reads it and records the server the connection test answered', async () => {
-    const [tested, discovered] = await Promise.all([inject('POST', `/v1/connections/${connection}/test`), inject('GET', `/v1/connections/${connection}/metadata`)])
+    const [tested, discovered] = await Promise.all([
+      inject('POST', `/v1/connections/${connection}/test`),
+      inject('GET', `/v1/connections/${connection}/metadata`),
+    ])
     expect(discovered.status, discovered.body).toBe(200)
     const snapshot = discovered.json as MetadataSnapshot
     expect(snapshot.server).toEqual(factsOf(tested.json as ServerFacts))
@@ -162,7 +199,17 @@ describe.each(CONNECTIONS)('a server this release was not tested on, $connection
     const proposed = await inject('POST', '/v1/form-proposals', { connection, root: { schema: 'ledger', name: 'entry' }, formId, title: 'Entry' })
     expect(proposed.status, proposed.body).toBe(200)
     const proposal = proposed.json as { form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: GenerationRequest }
-    const bundle = { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: readOnly(proposal.bindings), snapshot: proposal.snapshot }
+    const bundle = {
+      format: 2,
+      connection,
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: EMPTY_PRESENTATION,
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: readOnly(proposal.bindings),
+      snapshot: proposal.snapshot,
+    }
     const published = await inject('POST', `/v1/forms/${formId}/versions`, { expectedBase: null, bundle })
     expect(published.status, published.body).toBe(201)
 

@@ -60,7 +60,13 @@ export interface HealthWait {
  * for the line a failed start writes.
  */
 export async function waitUntilHealthy(probe: (remainingMs: number) => Promise<boolean>, options: WaitOptions): Promise<HealthWait> {
-  const { alive, deadlineMs = START_DEADLINE_MS, pollMs = POLL_MS, now = Date.now, sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)) } = options
+  const {
+    alive,
+    deadlineMs = START_DEADLINE_MS,
+    pollMs = POLL_MS,
+    now = Date.now,
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  } = options
   const started = now()
   let probes = 0
   let lastError: string | undefined

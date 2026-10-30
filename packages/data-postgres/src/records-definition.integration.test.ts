@@ -1,6 +1,18 @@
 import { createHash } from 'node:crypto'
 import { describedOf, findObject } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, DeleteRequest, Described, DescribedTable, MetadataSnapshot, ObjectRef, RecordOutcome, RecordTarget, RecordValue, UpdateRequest } from '@formancy/data-core'
+import type {
+  ApiValue,
+  ColumnMeta,
+  DeleteRequest,
+  Described,
+  DescribedTable,
+  MetadataSnapshot,
+  ObjectRef,
+  RecordOutcome,
+  RecordTarget,
+  RecordValue,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { covers, driftingCase, driftingOn, FIXTURE_SCOPE, MODEL_CASES, PARITY_SCOPE, sharedDrifting, startPostgresFixture } from '@formancy/data-fixtures'
 import type { DriftingCase, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
@@ -97,8 +109,20 @@ async function held(table: string): Promise<{ row: string | null; rows: number }
 
 /** A write of `memo`, a create of the case's answers and `memo`, and a delete of row 1 (0050), typed from `snapshot`, under `definition`. */
 function writes(entry: DriftingCase, snapshot: MetadataSnapshot, version: string, definition: string) {
-  const update = { target: target(entry.table), key: [{ ...ID, value: '1' }], set: [value(snapshot, entry.table, 'memo', 'written')], expectedVersion: version, filters: { kind: 'unrestricted' } as const, through: [], returning: [], definition }
-  const values = [...Object.entries(entry.insert).map(([name, held]) => value(snapshot, entry.table, name, held)), value(snapshot, entry.table, 'memo', 'created')]
+  const update = {
+    target: target(entry.table),
+    key: [{ ...ID, value: '1' }],
+    set: [value(snapshot, entry.table, 'memo', 'written')],
+    expectedVersion: version,
+    filters: { kind: 'unrestricted' } as const,
+    through: [],
+    returning: [],
+    definition,
+  }
+  const values = [
+    ...Object.entries(entry.insert).map(([name, held]) => value(snapshot, entry.table, name, held)),
+    value(snapshot, entry.table, 'memo', 'created'),
+  ]
   const insert = { target: target(entry.table), values, returning: [ID], definition }
   const removal: DeleteRequest = { ...update, reach: { removed: [ref(entry.table)], cleared: [], accepted: [] } }
   return { update, insert, removal }
@@ -112,60 +136,64 @@ describe('the definition, change by change', () => {
     // a definition that moved for a comment or an index would refuse every
     // write after harmless DDL; one that did not move for a key or a typmod
     // would let a write through the change it was decided before.
-    test(`${entry.name}: the definition moves exactly when the change is one a description reads, and a write decided before it is refused`, declared(entry), async () => {
-    const records = createPostgresRecords(owner)
-    const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
-    const before = described(await records.describe(ref(entry.table)))
-    // The read's description is the table as that statement found it, and the same as describe's.
-    const first = await records.read(read)
-    expect(first).toMatchObject({ ok: true, described: before, record: { version: '1' } })
-    // As the writer too: the catalog it reads is every account's, so its definition is the owner's.
-    const asRestricted = createPostgresRecords(restricted)
-    expect(described(await asRestricted.describe(ref(entry.table))).definition).toBe(before.definition)
+    test(
+      `${entry.name}: the definition moves exactly when the change is one a description reads, and a write decided before it is refused`,
+      declared(entry),
+      async () => {
+        const records = createPostgresRecords(owner)
+        const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
+        const before = described(await records.describe(ref(entry.table)))
+        // The read's description is the table as that statement found it, and the same as describe's.
+        const first = await records.read(read)
+        expect(first).toMatchObject({ ok: true, described: before, record: { version: '1' } })
+        // As the writer too: the catalog it reads is every account's, so its definition is the owner's.
+        const asRestricted = createPostgresRecords(restricted)
+        expect(described(await asRestricted.describe(ref(entry.table))).definition).toBe(before.definition)
 
-    // The guard passes on the table as it is: a write decided over this description is written.
-    const unchanged = writes(entry, published, '1', before.definition)
-    expect(succeeded(await records.update(unchanged.update)).version).toBe('2')
+        // The guard passes on the table as it is: a write decided over this description is written.
+        const unchanged = writes(entry, published, '1', before.definition)
+        expect(succeeded(await records.update(unchanged.update)).version).toBe('2')
 
-    for (const statement of entry.alter.postgres as readonly string[]) await owner.unsafe(statement)
-    const altered = await held(entry.table)
-    const now = await records.describe(ref(entry.table))
-    const stale = writes(entry, published, entry.name === 'readded-same-definition' ? '1' : '2', before.definition)
+        for (const statement of entry.alter.postgres as readonly string[]) await owner.unsafe(statement)
+        const altered = await held(entry.table)
+        const now = await records.describe(ref(entry.table))
+        const stale = writes(entry, published, entry.name === 'readded-same-definition' ? '1' : '2', before.definition)
 
-    if (!now.ok) {
-      // A relation discovery no longer describes is gone as a request sees it.
-      expect(now).toMatchObject({ code: 'schema-changed' })
-      expect((await records.read(read)) as { code?: string }).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await held(entry.table)).toEqual(altered)
-      return
-    }
-    expect(now.described.definition !== before.definition, 'the definition moved').toBe(entry.moves)
-    const second = await records.read(read)
-    expect(second).toMatchObject({ ok: true, described: now.described })
-    // A digest that read anything the account's privileges decide would move for one account and not another.
-    expect(described(await asRestricted.describe(ref(entry.table))).definition, 'the writer describes what the owner does').toBe(now.described.definition)
+        if (!now.ok) {
+          // A relation discovery no longer describes is gone as a request sees it.
+          expect(now).toMatchObject({ code: 'schema-changed' })
+          expect((await records.read(read)) as { code?: string }).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await held(entry.table)).toEqual(altered)
+          return
+        }
+        expect(now.described.definition !== before.definition, 'the definition moved').toBe(entry.moves)
+        const second = await records.read(read)
+        expect(second).toMatchObject({ ok: true, described: now.described })
+        // A digest that read anything the account's privileges decide would move for one account and not another.
+        expect(described(await asRestricted.describe(ref(entry.table))).definition, 'the writer describes what the owner does').toBe(now.described.definition)
 
-    if (entry.moves) {
-      // Decided over the old definition: refused, and the row is as the ALTER
-      // left it -- a delete at the row's version included (0050).
-      expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await asRestricted.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await held(entry.table)).toEqual(altered)
-    }
-    // Decided over the table as it is now, they are what the column now does.
-    const after = await discoverPostgres(owner, SCOPE)
-    const fresh = writes(entry, after, (second as { record: { version: string } }).record.version, now.described.definition)
-    expect(succeeded(await records.update(fresh.update)).values).toEqual({})
-    expect(succeeded(await records.insert(fresh.insert)).values).toEqual({ id: expect.any(String) })
-    if (entry.name === 'readded-same-definition') {
-      // The limitation, held: the version column started again at its default, which drift does not see.
-      expect(altered.row).toMatch(/"row_version":1\b/)
-    }
-    })
+        if (entry.moves) {
+          // Decided over the old definition: refused, and the row is as the ALTER
+          // left it -- a delete at the row's version included (0050).
+          expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await records.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await records.delete(stale.removal)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await asRestricted.insert(stale.insert)).toMatchObject({ ok: false, code: 'schema-changed' })
+          expect(await held(entry.table)).toEqual(altered)
+        }
+        // Decided over the table as it is now, they are what the column now does.
+        const after = await discoverPostgres(owner, SCOPE)
+        const fresh = writes(entry, after, (second as { record: { version: string } }).record.version, now.described.definition)
+        expect(succeeded(await records.update(fresh.update)).values).toEqual({})
+        expect(succeeded(await records.insert(fresh.insert)).values).toEqual({ id: expect.any(String) })
+        if (entry.name === 'readded-same-definition') {
+          // The limitation, held: the version column started again at its default, which drift does not see.
+          expect(altered.row).toMatch(/"row_version":1\b/)
+        }
+      },
+    )
   }
 })
 
@@ -199,8 +227,16 @@ describe('a statement that fails on a moved table', () => {
       const snapshot = await discoverPostgres(owner, SCOPE)
       const old = described(await records.describe(ref(entry.table))).definition
       await alter(entry)
-      const update = (definition: string, types: MetadataSnapshot) => ({ ...writes(entry, types, '1', definition).update, set: [value(types, entry.table, field, sent)] })
-      const insert = (definition: string, types: MetadataSnapshot) => ({ target: target(entry.table), values: [value(types, entry.table, field, sent)], returning: [], definition })
+      const update = (definition: string, types: MetadataSnapshot) => ({
+        ...writes(entry, types, '1', definition).update,
+        set: [value(types, entry.table, field, sent)],
+      })
+      const insert = (definition: string, types: MetadataSnapshot) => ({
+        target: target(entry.table),
+        values: [value(types, entry.table, field, sent)],
+        returning: [],
+        definition,
+      })
       expect(await records.update(update(old, snapshot)), name).toMatchObject({ ok: false, code: 'schema-changed' })
       expect(await records.insert(insert(old, snapshot)), name).toMatchObject({ ok: false, code: 'schema-changed' })
       const now = described(await records.describe(ref(entry.table))).definition
@@ -229,7 +265,10 @@ describe('what a refused write leaves behind', () => {
     await alter(entry)
     const stale = writes(entry, snapshot, '1', old)
     expect(await records.update(stale.update)).toMatchObject({ ok: false, code: 'schema-changed' })
-    expect(await records.insert({ ...stale.insert, values: stale.insert.values.filter((entry) => entry.name !== 'code') })).toMatchObject({ ok: false, code: 'schema-changed' })
+    expect(await records.insert({ ...stale.insert, values: stale.insert.values.filter((entry) => entry.name !== 'code') })).toMatchObject({
+      ok: false,
+      code: 'schema-changed',
+    })
     expect([...(await owner`select operation from drifting.statement_log order by at`)].map((row) => row.operation)).toEqual(['UPDATE', 'INSERT'])
     expect((await held(entry.table)).rows).toBe(1)
   })
@@ -265,7 +304,11 @@ describe('what a description costs the catalog', () => {
     const describing = describeStatement(table)
     expect(await attributeScans(describing.text, describing.params)).toBe(reference)
     const id = { name: 'id', type: { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } } as const
-    const reading = readStatement({ target: { table, identity: [id], concurrency: null }, key: [{ ...id, value: '1' }], columns: [id], filters: { kind: 'unrestricted' }, through: [] }, [], [])
+    const reading = readStatement(
+      { target: { table, identity: [id], concurrency: null }, key: [{ ...id, value: '1' }], columns: [id], filters: { kind: 'unrestricted' }, through: [] },
+      [],
+      [],
+    )
     expect(await attributeScans(reading.text, reading.params)).toBe(reference)
   })
 })
@@ -289,42 +332,46 @@ describe('the description and discovery', () => {
   // not the SHA-256 of the facts the description parsed would guard
   // something nobody read. As the owner, the reader and the writer, over
   // every table of the fixture and the parity schema.
-  test('describe reads every fixture table as discovery does, and its digest is the SHA-256 of the facts it parsed', covers('postgres', MODEL_CASES.described), async () => {
-    // Every kind of relation discovery describes, which the fixture's schemas
-    // do not all have: a materialized view and a partitioned table, and a
-    // partition beside it that is described through its parent. A
-    // description that mapped a kind otherwise than discovery would have the
-    // runtime see a view where review saw a table, and refuse by a rule
-    // review never ran.
-    await owner.unsafe(`
+  test(
+    'describe reads every fixture table as discovery does, and its digest is the SHA-256 of the facts it parsed',
+    covers('postgres', MODEL_CASES.described),
+    async () => {
+      // Every kind of relation discovery describes, which the fixture's schemas
+      // do not all have: a materialized view and a partitioned table, and a
+      // partition beside it that is described through its parent. A
+      // description that mapped a kind otherwise than discovery would have the
+      // runtime see a view where review saw a table, and refuse by a rule
+      // review never ran.
+      await owner.unsafe(`
       create schema drifting_kinds;
       create table drifting_kinds.ranged (id integer not null, label text, constraint pk_ranged primary key (id)) partition by range (id);
       create table drifting_kinds.ranged_low partition of drifting_kinds.ranged for values from (minvalue) to (1000);
       create materialized view drifting_kinds.summary as select id, label from drifting_kinds.ranged;
       create unique index ux_summary_id on drifting_kinds.summary (id);
       create view drifting_kinds.labels as select label from drifting_kinds.ranged;`)
-    const KINDS_SCOPE = { schemas: ['drifting_kinds'] }
-    for (const uri of [fixture.admin, fixture.reader, fixture.writer]) {
-      const sql = postgres(uri, { onnotice: () => {} })
-      try {
-        const records = createPostgresRecords(sql)
-        for (const scope of [FIXTURE_SCOPE, PARITY_SCOPE, KINDS_SCOPE]) {
-          const snapshot = await discoverPostgres(sql, scope)
-          for (const object of snapshot.objects) {
-            const where = `${new URL(uri).username}: ${object.ref.schema}.${object.ref.name}`
-            const { definition, ...description } = described(await records.describe(object.ref))
-            expect(description, where).toEqual(describedOf(snapshot, object.ref))
-            const statement = describeStatement(object.ref)
-            const [facts, digest] = (await run(sql, statement.text, statement.params)).rows[0] as [string, string]
-            expect(createHash('sha256').update(facts, 'utf8').digest('hex'), where).toBe(digest)
-            expect(definition, where).toBe(`${digest}@read committed`)
+      const KINDS_SCOPE = { schemas: ['drifting_kinds'] }
+      for (const uri of [fixture.admin, fixture.reader, fixture.writer]) {
+        const sql = postgres(uri, { onnotice: () => {} })
+        try {
+          const records = createPostgresRecords(sql)
+          for (const scope of [FIXTURE_SCOPE, PARITY_SCOPE, KINDS_SCOPE]) {
+            const snapshot = await discoverPostgres(sql, scope)
+            for (const object of snapshot.objects) {
+              const where = `${new URL(uri).username}: ${object.ref.schema}.${object.ref.name}`
+              const { definition, ...description } = described(await records.describe(object.ref))
+              expect(description, where).toEqual(describedOf(snapshot, object.ref))
+              const statement = describeStatement(object.ref)
+              const [facts, digest] = (await run(sql, statement.text, statement.params)).rows[0] as [string, string]
+              expect(createHash('sha256').update(facts, 'utf8').digest('hex'), where).toBe(digest)
+              expect(definition, where).toBe(`${digest}@read committed`)
+            }
           }
+        } finally {
+          await sql.end()
         }
-      } finally {
-        await sql.end()
       }
-    }
-  })
+    },
+  )
 
   // The guard must not depend on a session setting 0016 promises changes no
   // answer. A spelled default or a type qualified by search_path in the
@@ -404,9 +451,26 @@ describe('an ALTER that commits while a request waits for it', () => {
           const stale = writes(entry, snapshot, '1', old)
           const read = { target: target(entry.table), key: [{ ...ID, value: '1' }], columns: [ID], filters: { kind: 'unrestricted' } as const, through: [] }
           // A list is a read of a page, asked again after the lock as a read is (0044).
-          const list = { target: read.target, columns: read.columns, filters: read.filters, through: [], equal: [], filter: [], search: null, sort: [{ column: 'id', direction: 'asc', nulls: null }], offset: 0, limit: 50 } as const
+          const list = {
+            target: read.target,
+            columns: read.columns,
+            filters: read.filters,
+            through: [],
+            equal: [],
+            filter: [],
+            search: null,
+            sort: [{ column: 'id', direction: 'asc', nulls: null }],
+            offset: 0,
+            limit: 50,
+          } as const
           const altering = await holdAlter(entry)
-          const pending = [records.insert(stale.insert), records.update(stale.update), records.read(read), records.list(list), records.delete(stale.removal)] as const
+          const pending = [
+            records.insert(stale.insert),
+            records.update(stale.update),
+            records.read(read),
+            records.list(list),
+            records.delete(stale.removal),
+          ] as const
           await waiting(entry.table, 5)
           await altering.commit()
           const [inserted, updated, reread, relisted, deleted] = await Promise.all(pending)
@@ -438,9 +502,17 @@ describe('an ALTER that commits while a request waits for it', () => {
       const old = described(await createPostgresRecords(committed).describe(ref(entry.table))).definition
       const create = { target: target(entry.table), values: [value(snapshot, entry.table, 'amount', '1234.5678')], returning: [], definition: old }
       // With nothing changed, the isolation alone refuses it, and says so: an insert, and an update.
-      expect(await createPostgresRecords(repeatable).insert(create)).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringMatching(/isolation/) })
+      expect(await createPostgresRecords(repeatable).insert(create)).toMatchObject({
+        ok: false,
+        code: 'unavailable',
+        message: expect.stringMatching(/isolation/),
+      })
       const update = { ...writes(entry, snapshot, '1', old).update }
-      expect(await createPostgresRecords(repeatable).update(update)).toMatchObject({ ok: false, code: 'unavailable', message: expect.stringMatching(/isolation/) })
+      expect(await createPostgresRecords(repeatable).update(update)).toMatchObject({
+        ok: false,
+        code: 'unavailable',
+        message: expect.stringMatching(/isolation/),
+      })
       // Behind a narrowing that commits while it waits, the guard reads the
       // catalog from before the wait on this connection: only the isolation
       // refuses it. The table moved, which is the answer, and nothing is stored.
@@ -453,7 +525,9 @@ describe('an ALTER that commits while a request waits for it', () => {
 
       const here = described(await createPostgresRecords(repeatable).describe(ref(entry.table))).definition
       const after = await discoverPostgres(owner, SCOPE)
-      expect(await createPostgresRecords(repeatable).insert({ ...create, values: [value(after, entry.table, 'amount', '12.50')], definition: here })).toMatchObject({ ok: true })
+      expect(
+        await createPostgresRecords(repeatable).insert({ ...create, values: [value(after, entry.table, 'amount', '12.50')], definition: here }),
+      ).toMatchObject({ ok: true })
       expect((await held(entry.table)).rows).toBe(2)
     } finally {
       await Promise.all([committed.end(), repeatable.end()])
@@ -475,12 +549,17 @@ describe('an ALTER that commits while a request waits for it', () => {
         const records = createPostgresRecords(sql)
         const snapshot = await discoverPostgres(sql, FIXTURE_SCOPE)
         const object = findObject(snapshot, { schema: 'sales', name: table })
-        const key = (object?.primaryKey?.columns ?? []).map((name) => ({ name, type: object?.columns.find((candidate) => candidate.name === name)?.type as RecordValue['type'], value: '1' }))
+        const key = (object?.primaryKey?.columns ?? []).map((name) => ({
+          name,
+          type: object?.columns.find((candidate) => candidate.name === name)?.type as RecordValue['type'],
+          value: '1',
+        }))
         const read = await records.read({
           target: { table: { schema: 'sales', name: table }, identity: key.map(({ name, type }) => ({ name, type })), concurrency: null },
           key,
           columns: columns.map((name) => ({ name, type: object?.columns.find((candidate) => candidate.name === name)?.type as RecordValue['type'] })),
-          filters: { kind: 'unrestricted' }, through: [],
+          filters: { kind: 'unrestricted' },
+          through: [],
         })
         expect(read.ok ? undefined : read.code, `${new URL(uri).username} on ${table}`).toBe(code)
       } finally {

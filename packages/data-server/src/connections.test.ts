@@ -19,7 +19,14 @@ const ERP: ConnectionConfig = {
 
 /** A connection whose ports are inert: the registry is what is under test, not a database. */
 function fakeConnection(onClose: () => void = () => {}): OpenConnection {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: 'x', product: 'sqlserver', major: null }), discover: async () => { throw new Error('unused') }, close: async () => onClose() } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: 'x', product: 'sqlserver', major: null }),
+    discover: async () => {
+      throw new Error('unused')
+    },
+    close: async () => onClose(),
+  } as DatabaseAdapter
   return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
 }
 
@@ -33,7 +40,11 @@ const CLIENT_SECRET = 'Zq8~entra-client-secret-value-e81'
 const { user: _user, password: _password, ...ADDRESS } = ERP
 const MANAGED: ConnectionConfig = { ...ADDRESS, id: 'erp-mi', login: { type: 'entra-managed-identity', client: CLIENT } }
 const SYSTEM: ConnectionConfig = { ...ADDRESS, id: 'erp-system', login: { type: 'entra-managed-identity' } }
-const PRINCIPAL: ConnectionConfig = { ...ADDRESS, id: 'erp-sp', login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: 'file:/run/secrets/erp-client-secret' } }
+const PRINCIPAL: ConnectionConfig = {
+  ...ADDRESS,
+  id: 'erp-sp',
+  login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: 'file:/run/secrets/erp-client-secret' },
+}
 
 /** The problems parseConnections finds in `entries`, which must be some. */
 function problemsOf(entries: unknown[]): string[] {
@@ -142,7 +153,17 @@ describe('parseConnections, for an Entra principal', () => {
       { ...MANAGED, id: 'pg', kind: 'postgres' },
       { ...MANAGED, id: 'clear', tls: { enabled: false } },
       { ...PRINCIPAL, id: 'trusting', tls: { trustServerCertificate: true } },
-      { ...PRINCIPAL, id: 'elsewhere', login: { type: 'entra-service-principal', tenant: TENANT, client: CLIENT, secret: 'env:ERP_CLIENT_SECRET', authority: 'https://login.microsoftonline.us' } },
+      {
+        ...PRINCIPAL,
+        id: 'elsewhere',
+        login: {
+          type: 'entra-service-principal',
+          tenant: TENANT,
+          client: CLIENT,
+          secret: 'env:ERP_CLIENT_SECRET',
+          authority: 'https://login.microsoftonline.us',
+        },
+      },
       { ...ADDRESS, id: 'shapeless', login: 'entra' },
       { ...PRINCIPAL, id: 'unsaid', login: { type: 'entra-service-principal' } },
     ])
@@ -163,7 +184,8 @@ describe('parseConnections, for an Entra principal', () => {
       "connections[9].login.client must be the application's client id, a UUID",
       'connections[9].login.secret must be a secret reference, env:NAME or file:/path',
     ])
-    for (const value of ['contoso', 'my-app', CLIENT_SECRET, TENANT, CLIENT, 'ERP_CLIENT_SECRET', 'microsoftonline.us']) expect(problems.join(' ')).not.toContain(value)
+    for (const value of ['contoso', 'my-app', CLIENT_SECRET, TENANT, CLIENT, 'ERP_CLIENT_SECRET', 'microsoftonline.us'])
+      expect(problems.join(' ')).not.toContain(value)
   })
 
   // The startup line main.ts logs once per Entra connection: what the
@@ -237,13 +259,17 @@ describe('createConnectionRegistry', () => {
   // is forgotten, so the next request tries again.
   test('tries again after a failed open', async () => {
     let attempts = 0
-    const registry = createConnectionRegistry([ERP], {
-      sqlserver: async () => {
-        attempts += 1
-        if (attempts === 1) throw new Error('ECONNREFUSED')
-        return fakeConnection()
+    const registry = createConnectionRegistry(
+      [ERP],
+      {
+        sqlserver: async () => {
+          attempts += 1
+          if (attempts === 1) throw new Error('ECONNREFUSED')
+          return fakeConnection()
+        },
       },
-    }, secrets)
+      secrets,
+    )
     await expect(registry.open('erp')).rejects.toThrow('ECONNREFUSED')
     await expect(registry.open('erp')).resolves.toBeDefined()
     expect(attempts).toBe(2)
@@ -268,13 +294,17 @@ describe('createConnectionRegistry', () => {
       calls.push({ id: config.id, secret })
       return fakeConnection()
     }
-    const registry = createConnectionRegistry([MANAGED, PRINCIPAL], { sqlserver: factory }, {
-      env: {},
-      readFile: async (path) => {
-        read.push(path)
-        return `${CLIENT_SECRET}\n`
+    const registry = createConnectionRegistry(
+      [MANAGED, PRINCIPAL],
+      { sqlserver: factory },
+      {
+        env: {},
+        readFile: async (path) => {
+          read.push(path)
+          return `${CLIENT_SECRET}\n`
+        },
       },
-    })
+    )
     await registry.open('erp-mi')
     await registry.open('erp-sp')
     expect(calls).toEqual([

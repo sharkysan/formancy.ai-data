@@ -145,7 +145,10 @@ export function useAddressRequests({
       }
       if (asks.form !== null && asks.form !== now.form && ids.includes(asks.form)) {
         const target = asks.form
-        const request = number === null ? ({ kind: 'form', title: menuEntry(target)?.title ?? target } as const) : ({ kind: 'history', direction: number < entry.current ? 'back' : 'forward' } as const)
+        const request =
+          number === null
+            ? ({ kind: 'form', title: menuEntry(target)?.title ?? target } as const)
+            : ({ kind: 'history', direction: number < entry.current ? 'back' : 'forward' } as const)
         asked.current += 1
         const mine = asked.current
         const settled = (): void => {

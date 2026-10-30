@@ -60,7 +60,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
@@ -90,8 +92,28 @@ beforeAll(async () => {
   ;[pg, ms] = await Promise.all([startPostgresFixture(POSTGRES_IMAGE), startSqlServerFixture(SQLSERVER_IMAGE)])
   const pgUrl = new URL(pg.admin)
   const connections: ConnectionConfig[] = [
-    { id: 'pg', kind: 'postgres', host: pgUrl.hostname, port: Number(pgUrl.port), database: pgUrl.pathname.slice(1), user: decodeURIComponent(pgUrl.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
-    { id: 'ms', kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
+    {
+      id: 'pg',
+      kind: 'postgres',
+      host: pgUrl.hostname,
+      port: Number(pgUrl.port),
+      database: pgUrl.pathname.slice(1),
+      user: decodeURIComponent(pgUrl.username),
+      password: 'env:PG_PASSWORD',
+      schemas: ['sales'],
+      tls: { enabled: false },
+    },
+    {
+      id: 'ms',
+      kind: 'sqlserver',
+      host: String(ms.admin.server),
+      port: Number(ms.admin.port),
+      database: String(ms.admin.database),
+      user: String(ms.admin.user),
+      password: 'env:MS_PASSWORD',
+      schemas: ['sales'],
+      tls: { enabled: false, trustServerCertificate: true },
+    },
   ]
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
@@ -99,24 +121,54 @@ beforeAll(async () => {
   })
   root = await mkdtemp(join(tmpdir(), 'formancy-data-lookup-limits-'))
   const store = createFileConfigurationStore(root)
-  const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
+  const verifyIdentity = await createIdentityVerifier({
+    key: { kind: 'secret', secret: SECRET },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: 'tid' },
+  })
   const audit = { sink: (event: unknown) => void events.push(event as RuntimeAuditEvent) }
-  patient = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store, audit, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS } })
-  short = await createDataServer({ verifyIdentity, logger: { stream: { write: (line) => void logs.push(JSON.parse(line) as { msg?: string }) } }, runtime: { registry, store, audit, lookupDeadlineMs: SHORT_DEADLINE_MS } })
+  patient = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store, audit, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS },
+  })
+  short = await createDataServer({
+    verifyIdentity,
+    logger: { stream: { write: (line) => void logs.push(JSON.parse(line) as { msg?: string }) } },
+    runtime: { registry, store, audit, lookupDeadlineMs: SHORT_DEADLINE_MS },
+  })
   bases.patient = await listening(patient)
   bases.short = await listening(short)
   admin = await token('admin-1', { roles: ['data-admin'] })
   clerk = await token('clerk-1', { roles: ['clerk'], tid: 1 })
   for (const connection of ['pg', 'ms']) {
     const formId = `${connection}-order`
-    const proposed = await call('patient', `/v1/form-proposals`, { connection, root: ORDER, formId, title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...(connection === 'pg' ? { versionColumn: 'row_version' } : {}) }, admin)
+    const proposed = await call(
+      'patient',
+      `/v1/form-proposals`,
+      {
+        connection,
+        root: ORDER,
+        formId,
+        title: 'Order',
+        lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+        ...(connection === 'pg' ? { versionColumn: 'row_version' } : {}),
+      },
+      admin,
+    )
     const { form, bindings, snapshot, generation } = proposed.json as Record<string, unknown>
     const fields = (bindings as { fields: FieldBinding[] }).fields
     const policy = clerkPolicy(fields)
     const lookup = fields.find((binding) => binding.kind === 'lookup')
     if (lookup?.kind !== 'lookup') throw new Error(`${formId} has no lookup`)
     sources[connection] = lookup.source
-    const publishedAnswer = await call('patient', `/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } }, admin)
+    const publishedAnswer = await call(
+      'patient',
+      `/v1/forms/${formId}/versions`,
+      { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } },
+      admin,
+    )
     if (publishedAnswer.status >= 300) throw new Error(`publishing ${formId} answered ${String(publishedAnswer.status)}`)
   }
 })
@@ -130,7 +182,13 @@ afterAll(async () => {
 })
 
 /** One request to one of the servers, as a host's page sends it; bounded, so a request the server never answers fails here. */
-async function call(server: 'patient' | 'short', path: string, body: unknown, bearer = clerk, signal?: AbortSignal): Promise<{ status: number; json: unknown }> {
+async function call(
+  server: 'patient' | 'short',
+  path: string,
+  body: unknown,
+  bearer = clerk,
+  signal?: AbortSignal,
+): Promise<{ status: number; json: unknown }> {
   const response = await fetch(`${bases[server]}${path}`, {
     method: 'POST',
     headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' },
@@ -177,7 +235,14 @@ async function firstCustomer(connection: 'pg' | 'ms'): Promise<string> {
 /** The owner's own PostgreSQL connection, around the server, through the adapter package's driver. */
 function pgOwner(): ReturnType<typeof connectPostgres> {
   const url = new URL(pg.admin)
-  return connectPostgres({ host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false } })
+  return connectPostgres({
+    host: url.hostname,
+    port: Number(url.port),
+    database: url.pathname.slice(1),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    tls: { enabled: false, rejectUnauthorized: false },
+  })
 }
 
 /** How many orders the owner sees, asked around the server. */
@@ -190,7 +255,15 @@ async function orders(connection: 'pg' | 'ms'): Promise<number> {
       await sql.end({ timeout: 5 })
     }
   }
-  const pool = await connectSqlServer({ host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true })
+  const pool = await connectSqlServer({
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
+  })
   try {
     return (await pool.request().query<{ n: number }>('select count(*) as n from sales.[order]')).recordset[0]?.n ?? -1
   } finally {
@@ -235,15 +308,28 @@ describe.each(ENGINES)('lookup limits on $engine', ({ connection }) => {
     const blocked = await locked(connection, CUSTOMER)
     try {
       for (const [action, body, refusal] of [
-        ['query', { operation: 'create', search: 'Muster' }, { code: 'lookup-timeout', message: `The search took longer than this server allows (${String(SHORT_DEADLINE_MS)} ms), and the database was told to stop it. The same search will take as long again.` }],
+        [
+          'query',
+          { operation: 'create', search: 'Muster' },
+          {
+            code: 'lookup-timeout',
+            message: `The search took longer than this server allows (${String(SHORT_DEADLINE_MS)} ms), and the database was told to stop it. The same search will take as long again.`,
+          },
+        ],
         ['resolve', { operation: 'update', tokens: [customer] }, { code: 'unavailable', message: 'The selected options could not be loaded.' }],
       ] as const) {
         let seen = 0
         const answer = call('short', `/v1/forms/${form}/lookups/${source(connection)}/${action}`, body)
         const watching = (async () => {
-          for (let settled = false; !settled; ) {
+          for (let settled = false; !settled;) {
             seen = Math.max(seen, await blocked.waiting())
-            settled = await Promise.race([answer.then(() => true, () => true), new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 20))])
+            settled = await Promise.race([
+              answer.then(
+                () => true,
+                () => true,
+              ),
+              new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 20)),
+            ])
           }
         })()
         expect(await answer).toEqual({ status: 503, json: refusal })
@@ -269,7 +355,9 @@ describe.each(ENGINES)('lookup limits on $engine', ({ connection }) => {
     const blocked = await locked(connection, CUSTOMER)
     logs.length = 0
     try {
-      const answer = await call('short', `/v1/forms/${form}/records/create`, { answers: { customer, order_date: '2026-10-14', status: 'placed', amount: '5', notes: 'past the deadline' } })
+      const answer = await call('short', `/v1/forms/${form}/records/create`, {
+        answers: { customer, order_date: '2026-10-14', status: 'placed', amount: '5', notes: 'past the deadline' },
+      })
       expect(answer).toEqual({ status: 503, json: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } })
       expect(logs.filter((line) => line.msg?.includes('passed its deadline') === true)).toEqual([expect.objectContaining({ deadlineMs: SHORT_DEADLINE_MS })])
       await until(async () => (await blocked.waiting()) === 0, 'the membership check stopped waiting while the lock was held', 5_000)
@@ -290,7 +378,9 @@ describe('the PostgreSQL lookups client', () => {
   // does not.
   test('runs lookups on a client of its own, which pg_stat_activity names', async () => {
     const customer = await firstCustomer('pg')
-    const created = await call('patient', '/v1/forms/pg-order/records/create', { answers: { customer, order_date: '2026-10-14', status: 'placed', amount: '5', notes: 'read while locked' } })
+    const created = await call('patient', '/v1/forms/pg-order/records/create', {
+      answers: { customer, order_date: '2026-10-14', status: 'placed', amount: '5', notes: 'read while locked' },
+    })
     expect(created.status).toBe(201)
     const record = (created.json as { record: string }).record
     const customers = await locked('pg', CUSTOMER)

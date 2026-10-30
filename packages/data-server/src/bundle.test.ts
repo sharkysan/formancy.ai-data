@@ -19,7 +19,19 @@ function startsWith(text: string): RegExp {
 }
 
 function column(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
+  return {
+    name,
+    ordinal,
+    databaseType: type.kind,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+    ...extra,
+  }
 }
 
 /** The employee table as discovered; `edit` narrows it as a revoked grant would. */
@@ -54,7 +66,14 @@ function snapshot(edit: (columns: ColumnMeta[]) => void = () => {}): MetadataSna
 }
 
 /** The request the employee form is generated from, as the proposal route normalises it. */
-const REQUEST: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee', lookups: [], pinned: [] }
+const REQUEST: GenerationRequest = {
+  connection: 'erp',
+  root: { schema: 'sales', name: 'employee' },
+  formId: 'employee',
+  title: 'Employee',
+  lookups: [],
+  pinned: [],
+}
 
 /** A bundle that is right in every way; each test breaks one thing. */
 function good(taken: MetadataSnapshot = snapshot()): BundleV2 {
@@ -122,7 +141,13 @@ describe('validateBundle', () => {
   test('a bundle published before 0027 is refused with "republish", and its policy is not read against bindings it cannot fit', () => {
     const old = copy(good()) as unknown as {
       bindings: { version: number; fields: Array<Record<string, unknown>>; snapshotFingerprint: string }
-      snapshot: { account?: unknown; fingerprint: string; objects: Array<{ rowSecurity?: unknown; columns: Array<{ access?: unknown }> }>; kind: string; gaps: unknown[] }
+      snapshot: {
+        account?: unknown
+        fingerprint: string
+        objects: Array<{ rowSecurity?: unknown; columns: Array<{ access?: unknown }> }>
+        kind: string
+        gaps: unknown[]
+      }
     }
     old.bindings.version = 1
     for (const field of old.bindings.fields) {
@@ -146,7 +171,10 @@ describe('validateBundle', () => {
     // Bindings alone, from a current snapshot: the same remedy.
     const versionOne = copy(good())
     ;(versionOne.bindings as { version: number }).version = 1
-    expect(validateBundle(versionOne)).toEqual({ ok: false, problems: ['bindings version 1 were published before 0027 (per-operation writes); republish the form'] })
+    expect(validateBundle(versionOne)).toEqual({
+      ok: false,
+      problems: ['bindings version 1 were published before 0027 (per-operation writes); republish the form'],
+    })
   })
 
   // A tenant filter on a column the account may not read turns every request
@@ -179,7 +207,9 @@ describe('validateBundle', () => {
     const offered = good(uninsertable)
     expect(offered.bindings.operations.create).toBe(true)
     const outcome = validateBundle(offered)
-    expect(outcome.ok ? [] : outcome.problems).toEqual(["policy: rowFilters tenant_id is a column this connection's account may not insert, and every create writes it"])
+    expect(outcome.ok ? [] : outcome.problems).toEqual([
+      "policy: rowFilters tenant_id is a column this connection's account may not insert, and every create writes it",
+    ])
 
     const readOnly = copy(offered)
     readOnly.bindings.operations.create = false
@@ -195,43 +225,89 @@ describe('validateBundle', () => {
   test('a lookup or root filter on a column a filter cannot compare is refused at publish, naming it', () => {
     const text = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false } as const
     const taken = createSnapshot({
-      kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+      kind: 'sqlserver',
+      serverVersion: '16.0',
+      account: { user: 'dbo', login: 'sa' },
+      scope: { schemas: ['sales'] },
+      gaps: [],
       objects: [
         {
-          ref: { schema: 'sales', name: 'customer' }, kind: 'table', comment: null,
+          ref: { schema: 'sales', name: 'customer' },
+          kind: 'table',
+          comment: null,
           columns: [column('id', 1, INT32), column('name', 2, text), column('active', 3, { kind: 'boolean' }, { databaseType: 'bit' })],
-          primaryKey: { name: 'pk_customer', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+          primaryKey: { name: 'pk_customer', columns: ['id'] },
+          uniqueKeys: [],
+          foreignKeys: [],
+          checks: [],
+          rowSecurity: 'none',
         },
         {
-          ref: { schema: 'sales', name: 'order' }, kind: 'table', comment: null,
+          ref: { schema: 'sales', name: 'order' },
+          kind: 'table',
+          comment: null,
           columns: [
             column('id', 1, INT32),
             column('customer_id', 2, INT32),
             column('placed_at', 3, { kind: 'timestamp', withTimeZone: true, precision: 7 }, { databaseType: 'datetimeoffset' }),
             column('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
           ],
-          primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [],
-          foreignKeys: [{ name: 'fk_order_customer', columns: ['customer_id'], references: { table: { schema: 'sales', name: 'customer' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
-          checks: [], rowSecurity: 'none',
+          primaryKey: { name: 'pk_order', columns: ['id'] },
+          uniqueKeys: [],
+          foreignKeys: [
+            {
+              name: 'fk_order_customer',
+              columns: ['customer_id'],
+              references: { table: { schema: 'sales', name: 'customer' }, columns: ['id'] },
+              onUpdate: 'no-action',
+              onDelete: 'no-action',
+              enforced: true,
+              validated: true,
+            },
+          ],
+          checks: [],
+          rowSecurity: 'none',
         },
       ],
     })
-    const { form, bindings } = generateForm(taken, { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+    const { form, bindings } = generateForm(taken, {
+      connection: 'erp',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'order',
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+    })
     const lookup = bindings.fields.find((binding) => binding.kind === 'lookup')?.field ?? ''
     const fields = Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: ['clerk'] }]))
     const policy = (rowFilters: FormPolicy['rowFilters'], rules: FormPolicy['rowFilters']): FormPolicy => ({
-      version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters, lookups: { [lookup]: rules },
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields,
+      rowFilters,
+      lookups: { [lookup]: rules },
     })
     const bundle = (chosen: FormPolicy): BundleV1 => ({ format: 1, connection: 'erp', form, bindings, policy: chosen, snapshot: taken })
 
     expect(validateBundle(bundle(policy([], [{ column: 'id', attribute: 'tenant' }])))).toMatchObject({ ok: true })
-    const flagged = validateBundle(bundle(policy([], [{ column: 'active', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }])))
+    const flagged = validateBundle(
+      bundle(
+        policy(
+          [],
+          [
+            { column: 'active', attribute: 'tenant' },
+            { column: 'region', attribute: 'tenant' },
+          ],
+        ),
+      ),
+    )
     expect(flagged.ok ? [] : flagged.problems).toEqual([
       expect.stringMatching(startsWith(`policy: lookups.${lookup} active is bit, which a row filter cannot compare`)),
       `policy: lookups.${lookup} customer has no column region`,
     ])
     const stamped = validateBundle(bundle(policy([{ column: 'placed_at', attribute: 'tenant' }], [])))
-    expect(stamped.ok ? [] : stamped.problems).toContainEqual(expect.stringMatching(/^policy: rowFilters placed_at is datetimeoffset, which a row filter cannot compare/))
+    expect(stamped.ok ? [] : stamped.problems).toContainEqual(
+      expect.stringMatching(/^policy: rowFilters placed_at is datetimeoffset, which a row filter cannot compare/),
+    )
   })
 
   // A through scopes the form's own rows by a lookup's filter on its target
@@ -244,27 +320,64 @@ describe('validateBundle', () => {
     const text = { kind: 'text', maxLength: 20, lengthUnit: 'utf16-code-units', fixedLength: false } as const
     const taken = (key: NormalizedType) =>
       createSnapshot({
-        kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+        kind: 'sqlserver',
+        serverVersion: '16.0',
+        account: { user: 'dbo', login: 'sa' },
+        scope: { schemas: ['sales'] },
+        gaps: [],
         objects: [
           {
-            ref: { schema: 'sales', name: 'order' }, kind: 'table', comment: null,
+            ref: { schema: 'sales', name: 'order' },
+            kind: 'table',
+            comment: null,
             columns: [column('id', 1, key), column('tenant_id', 2, INT32), column('placed', 3, { kind: 'date' })],
-            primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+            primaryKey: { name: 'pk_order', columns: ['id'] },
+            uniqueKeys: [],
+            foreignKeys: [],
+            checks: [],
+            rowSecurity: 'none',
           },
           {
-            ref: { schema: 'sales', name: 'order_line' }, kind: 'table', comment: null,
+            ref: { schema: 'sales', name: 'order_line' },
+            kind: 'table',
+            comment: null,
             columns: [column('order_id', 1, key), column('line_no', 2, INT32), column('row_version', 3, { kind: 'rowversion' }, { generated: 'rowversion' })],
-            primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [],
-            foreignKeys: [{ name: 'fk_order_line_order', columns: ['order_id'], references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'cascade', enforced: true, validated: true }],
-            checks: [], rowSecurity: 'none',
+            primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] },
+            uniqueKeys: [],
+            foreignKeys: [
+              {
+                name: 'fk_order_line_order',
+                columns: ['order_id'],
+                references: { table: { schema: 'sales', name: 'order' }, columns: ['id'] },
+                onUpdate: 'no-action',
+                onDelete: 'cascade',
+                enforced: true,
+                validated: true,
+              },
+            ],
+            checks: [],
+            rowSecurity: 'none',
           },
         ],
       })
     const bundle = (key: NormalizedType, rules: FormPolicy['rowFilters']): BundleV1 => {
       const snapshotted = taken(key)
-      const { form, bindings } = generateForm(snapshotted, { connection: 'erp', root: { schema: 'sales', name: 'order_line' }, formId: 'order-line', title: 'Line', lookups: [{ foreignKey: 'fk_order_line_order', display: ['placed'] }] })
+      const { form, bindings } = generateForm(snapshotted, {
+        connection: 'erp',
+        root: { schema: 'sales', name: 'order_line' },
+        formId: 'order-line',
+        title: 'Line',
+        lookups: [{ foreignKey: 'fk_order_line_order', display: ['placed'] }],
+      })
       const fields = Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: ['clerk'] }]))
-      const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters: [], lookups: { order: rules }, through: ['order'] }
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: [] },
+        fields,
+        rowFilters: [],
+        lookups: { order: rules },
+        through: ['order'],
+      }
       return { format: 1, connection: 'erp', form, bindings, policy, snapshot: snapshotted }
     }
     const tenant = [{ column: 'tenant_id', attribute: 'tenant' }]
@@ -440,7 +553,10 @@ describe('a format-2 bundle (0030)', () => {
   test('list views are read by shape, and their fit is not asked on read', () => {
     const empty = { ...copy(good()), presentation: { ...EMPTY_PRESENTATION, views: [] } }
     expect(validateBundle(empty)).toEqual({ ok: false, problems: ['presentation: views: names none; leave it out'] })
-    const misfit = { ...copy(good()), presentation: { ...EMPTY_PRESENTATION, views: [{ name: 'Seventh', filter: [{ field: 'id', op: 'equals' as const, value: 'seven' }], sort: [] }] } }
+    const misfit = {
+      ...copy(good()),
+      presentation: { ...EMPTY_PRESENTATION, views: [{ name: 'Seventh', filter: [{ field: 'id', op: 'equals' as const, value: 'seven' }], sort: [] }] },
+    }
     expect(validateBundle(misfit).ok).toBe(true)
   })
 
@@ -454,11 +570,23 @@ describe('a format-2 bundle (0030)', () => {
   test('a field moved to another section is served where the presentation puts it, and only there', () => {
     const stamped = good(snapshot((columns) => columns.push(column('stamp', 5, INT32, { generated: 'computed' }))))
     expect(stamped.base.layouts?.[0]?.nodes.map((node) => (node as { label: string }).label)).toEqual(['Employee', 'Record'])
-    const grids = (form: FormSchema) => (form.layouts?.[0]?.nodes ?? []).map((node) => (node as unknown as { children: Array<{ children: Array<{ path: string }> }> }).children[0]?.children ?? [])
+    const grids = (form: FormSchema) =>
+      (form.layouts?.[0]?.nodes ?? []).map(
+        (node) => (node as unknown as { children: Array<{ children: Array<{ path: string }> }> }).children[0]?.children ?? [],
+      )
     const movedForm = copy(stamped).form
     const [main, record] = grids(movedForm)
-    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'name'), 1) ?? []))
-    const moving = (section: { label: string; occurrence: number }, field = 'name'): BundleV2['presentation'] => ({ version: 1, fields: [{ field, anchor: { kind: 'column', column: field }, section }], sections: [] })
+    record?.push(
+      ...(main?.splice(
+        main.findIndex((node) => node.path === 'name'),
+        1,
+      ) ?? []),
+    )
+    const moving = (section: { label: string; occurrence: number }, field = 'name'): BundleV2['presentation'] => ({
+      version: 1,
+      fields: [{ field, anchor: { kind: 'column', column: field }, section }],
+      sections: [],
+    })
     const RECORD = { label: 'Record', occurrence: 0 }
 
     const moved = { ...copy(stamped), presentation: moving(RECORD), form: movedForm }
@@ -488,7 +616,10 @@ describe('a format-2 bundle (0030)', () => {
     expect(validateBundle(another)).toEqual({ ok: false, problems: ['generation: names form staff, and the base is employee'] })
     const loose = copy(good()) as unknown as { generation: Record<string, unknown> }
     delete loose.generation['pinned']
-    expect(validateBundle(loose)).toEqual({ ok: false, problems: ['generation: is not in its normalised form (lookups and pinned as lists, versionColumn only when given, nothing else)'] })
+    expect(validateBundle(loose)).toEqual({
+      ok: false,
+      problems: ['generation: is not in its normalised form (lookups and pinned as lists, versionColumn only when given, nothing else)'],
+    })
     const extra = copy(good()) as unknown as { generation: Record<string, unknown> }
     extra.generation['note'] = 'hello'
     expect(validateBundle(extra)).toMatchObject({ ok: false })
@@ -496,7 +627,12 @@ describe('a format-2 bundle (0030)', () => {
     Object.assign(malformed.generation, { connection: 1, root: 'sales.employee', title: 7, versionColumn: 1 })
     expect(validateBundle(malformed)).toEqual({
       ok: false,
-      problems: ['generation: connection must name a connection', 'generation: root must be { schema, name }', 'generation: title must be text', 'generation: versionColumn must name a column'],
+      problems: [
+        'generation: connection must name a connection',
+        'generation: root must be { schema, name }',
+        'generation: title must be text',
+        'generation: versionColumn must name a column',
+      ],
     })
     const missing = copy(good()) as unknown as Record<string, unknown>
     delete missing['generation']
@@ -509,7 +645,15 @@ describe('a format-2 bundle (0030)', () => {
   // Nothing here asks the generator: each property is one the request alone
   // decides, so a later release cannot make a stored version fail it.
   describe('a generation request that does not say what its base and bindings say is refused', () => {
-    const ORDER_REQUEST: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title: 'Order', lookups: [{ foreignKey: 'fk_order_employee', display: ['name'] }], pinned: [], versionColumn: 'revision' }
+    const ORDER_REQUEST: GenerationRequest = {
+      connection: 'erp',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'order',
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_employee', display: ['name'] }],
+      pinned: [],
+      versionColumn: 'revision',
+    }
     /** An order table with a lookup to employee and an application-maintained version column. */
     function ordered(request: GenerationRequest = ORDER_REQUEST): BundleV2 {
       const { fingerprint: _fingerprint, ...employee } = snapshot()
@@ -524,7 +668,17 @@ describe('a format-2 bundle (0030)', () => {
             columns: [column('id', 1, INT32), column('employee_id', 2, INT32), column('tenant_id', 3, INT32), column('revision', 4, INT32)],
             primaryKey: { name: 'pk_order', columns: ['id'] },
             uniqueKeys: [],
-            foreignKeys: [{ name: 'fk_order_employee', columns: ['employee_id'], references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+            foreignKeys: [
+              {
+                name: 'fk_order_employee',
+                columns: ['employee_id'],
+                references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] },
+                onUpdate: 'no-action',
+                onDelete: 'no-action',
+                enforced: true,
+                validated: true,
+              },
+            ],
             checks: [],
             rowSecurity: 'none',
           },
@@ -580,7 +734,11 @@ describe('a format-2 bundle (0030)', () => {
       beside.generation = { ...beside.generation, versionColumn: 'tenant_id' }
       expect(refused(beside)).toEqual([])
       // An unreadable rowversion leaves none, and still sets the request's column aside.
-      const unreadable = good(snapshot((columns) => { (columns[3] as ColumnMeta).access = { select: false, insert: false, update: false } }))
+      const unreadable = good(
+        snapshot((columns) => {
+          ;(columns[3] as ColumnMeta).access = { select: false, insert: false, update: false }
+        }),
+      )
       unreadable.generation = { ...unreadable.generation, versionColumn: 'tenant_id' }
       unreadable.policy.operations.update = []
       expect(unreadable.bindings.concurrency).toBeNull()
@@ -640,7 +798,10 @@ describe('a format-2 bundle (0030)', () => {
   test('policyProblems is what validateBundle reports about a policy', () => {
     const loose = copy(good())
     loose.policy.fields['ghost'] = { read: ['clerk'], write: [] }
-    loose.policy.rowFilters = [{ column: 'tenant_id', attribute: 'tenant' }, { column: 'region', attribute: 'tenant' }]
+    loose.policy.rowFilters = [
+      { column: 'tenant_id', attribute: 'tenant' },
+      { column: 'region', attribute: 'tenant' },
+    ]
     const reported = validateBundle(loose)
     expect(reported.ok).toBe(false)
     expect(reported.ok ? [] : reported.problems).toEqual(policyProblems(loose.snapshot, loose.bindings, loose.policy))

@@ -14,7 +14,13 @@ export interface ListRouteSteps {
   connection(bundle: PublishedBundle, reply: FastifyReply): Promise<OpenConnection | undefined>
   context(request: FastifyRequest): PolicyContext
   /** A read the database refused, as the read route answers it: a table that moved is decided as drift, over a description asked once more -- for a page, as a list. */
-  unread(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, failure: RecordFailure, operation: 'list'): Promise<WriteAnswer>
+  unread(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    bundle: PublishedBundle,
+    open: OpenConnection,
+    failure: RecordFailure,
+    operation: 'list',
+  ): Promise<WriteAnswer>
   /** A read decided over the description its own statement carried, as the read route decides one -- for a page, as a list: a refusal when drift stops reading the form, or the table no longer holds its key to a total order. */
   undecided(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, described: DescribedTable, operation: 'list'): WriteAnswer | undefined
   /** A refusal, sent, with what the audit names. */

@@ -46,7 +46,11 @@ async function listed(answer: Promise<RemoteOptionsAnswer>): Promise<readonly Re
 
 /** `count` customers of tenant 1, numbered from 1, each named for its number. */
 function customersOf(count: number): CapturedRow[] {
-  return Array.from({ length: count }, (_, index) => ({ tenant_id: '1', customer_no: String(index + 1), name: `Customer ${String(index + 1).padStart(3, '0')}` }))
+  return Array.from({ length: count }, (_, index) => ({
+    tenant_id: '1',
+    customer_no: String(index + 1),
+    name: `Customer ${String(index + 1).padStart(3, '0')}`,
+  }))
 }
 
 const request = {
@@ -157,9 +161,7 @@ describe('the in-memory customer source', () => {
     const controller = new AbortController()
     controller.abort()
     const source = inMemorySource(customerLookup(), customerRows())
-    await expect(
-      source.resolve({ ...request, kind: 'search', query: '', values: [], signal: controller.signal }),
-    ).rejects.toThrow(/abandoned/)
+    await expect(source.resolve({ ...request, kind: 'search', query: '', values: [], signal: controller.signal })).rejects.toThrow(/abandoned/)
   })
 })
 
@@ -170,9 +172,7 @@ describe('the options map the page hands both renderers', () => {
   // name the document carries.
   test('has a source under the name every generated lookup carries', () => {
     const sources = lookupSources(EXAMPLES, CAPTURED)
-    const named = EXAMPLES.flatMap((example) =>
-      example.generated.bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.source] : [])),
-    )
+    const named = EXAMPLES.flatMap((example) => example.generated.bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.source] : [])))
     expect(named.length).toBeGreaterThan(0)
     expect(Object.keys(sources).sort()).toEqual([...named].sort())
   })

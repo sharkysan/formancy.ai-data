@@ -14,7 +14,12 @@ import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@fo
 import { createIdentityVerifier, KeySet, readKeySet } from '@formancy/data-identity'
 import type { HostIdentity, IdentityOutcome } from '@formancy/data-identity'
 import { connectPostgres, createPostgresAdapter } from '@formancy/data-postgres'
-import { createIdentityVerifier as serverIdentityVerifier, DRIVER_FACTORIES, KeySet as ServerKeySet, KeySetRefusal as ServerKeySetRefusal } from '@formancy/data-server'
+import {
+  createIdentityVerifier as serverIdentityVerifier,
+  DRIVER_FACTORIES,
+  KeySet as ServerKeySet,
+  KeySetRefusal as ServerKeySetRefusal,
+} from '@formancy/data-server'
 import type { AdminAuditEvent, AuditEvent, AuditSink, RuntimeAuditEvent } from '@formancy/data-server'
 import { connectSqlServer, createSqlServerAdapter } from '@formancy/data-sqlserver'
 import type { FormSchema } from '@formancy/spec'
@@ -70,11 +75,41 @@ const sink: AuditSink = (event: AuditEvent) => {
     heard.push(`admin ${admin.connection ?? 'no connection'}`)
   }
 }
-await sink({ at: 't', plane: 'runtime', actor: null, operation: 'read', form: 'order', formVersion: null, status: 401, outcome: 'unauthenticated', record: null, rows: null })
-await sink({ at: 't', plane: 'admin', actor: 'a', operation: 'publish', connection: 'erp', form: 'order', formVersion: 1, expectedBase: null, restoredFrom: null, draft: null, object: null, status: 201, outcome: 'ok' })
+await sink({
+  at: 't',
+  plane: 'runtime',
+  actor: null,
+  operation: 'read',
+  form: 'order',
+  formVersion: null,
+  status: 401,
+  outcome: 'unauthenticated',
+  record: null,
+  rows: null,
+})
+await sink({
+  at: 't',
+  plane: 'admin',
+  actor: 'a',
+  operation: 'publish',
+  connection: 'erp',
+  form: 'order',
+  formVersion: 1,
+  expectedBase: null,
+  restoredFrom: null,
+  draft: null,
+  object: null,
+  status: 201,
+  outcome: 'ok',
+})
 if (heard.join() !== 'runtime no record,admin erp') throw new Error('an audit sink did not tell the planes apart')
 
-const form: FormSchema = { specVersion: '3', id: 'order', title: 'Order', model: { fields: [{ key: 'customer', type: 'select', optionsSource: 'order.customer' }] } }
+const form: FormSchema = {
+  specVersion: '3',
+  id: 'order',
+  title: 'Order',
+  model: { fields: [{ key: 'customer', type: 'select', optionsSource: 'order.customer' }] },
+}
 if (sourceNames(form).join() !== 'order.customer') throw new Error('sourceNames did not name order.customer')
 
 // A name that cannot be one path segment is refused before a request, so the
@@ -96,7 +131,8 @@ if (Object.keys(lookupSources(client, 'order', form, 'create')).join() !== 'orde
 // bound it re-exports, through the published entry points -- a value the
 // client re-exports from the core, which a type-only re-export would lose.
 const page: Outcome<RecordList> = await client.list('..', { limit: LIST_PAGE_SIZE })
-if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeInteger(LIST_PAGE_SIZE)) throw new Error('list("..") was not refused before a request')
+if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeInteger(LIST_PAGE_SIZE))
+  throw new Error('list("..") was not refused before a request')
 
 // The menu (0045): the client's forms() and its answer's type through the
 // published entry points, read from a stub that answers as the server does --
@@ -104,7 +140,11 @@ if (page.ok || page.code !== 'invalid-name' || fetched !== 0 || !Number.isSafeIn
 const menuClient = createDataClient({
   token: () => 'unused',
   base: 'http://127.0.0.1:9',
-  fetch: async () => new Response(JSON.stringify({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order' }] }] }), { status: 200, headers: { 'content-type': 'application/json' } }),
+  fetch: async () =>
+    new Response(JSON.stringify({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order' }] }] }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    }),
 })
 const menu: Outcome<FormMenu> = await menuClient.forms()
 if (!menu.ok || menu.value.forms[0]?.children[0]?.field !== 'order') throw new Error('forms() did not read the menu')
@@ -134,15 +174,24 @@ const exportClient = createDataClient({
 })
 const file: Outcome<RecordFile> = await exportClient.exportRecords('order', { search: 'Muster' })
 const bytes = file.ok ? Buffer.from(await file.value.file.arrayBuffer()) : Buffer.alloc(0)
-if (!file.ok || file.value.name !== 'order.csv' || !bytes.equals(Buffer.from(csv, 'utf8')) || !Number.isSafeInteger(EXPORT_MAX_BYTES)) throw new Error('exportRecords() did not read the file')
+if (!file.ok || file.value.name !== 'order.csv' || !bytes.equals(Buffer.from(csv, 'utf8')) || !Number.isSafeInteger(EXPORT_MAX_BYTES))
+  throw new Error('exportRecords() did not read the file')
 if (exportFileName('order') !== file.value.name) throw new Error('exportFileName() is not the name exportRecords() saves under')
 
 // What a delete may act through (0051): a policy that names a key with its
 // action, typed by what the published core declares, and the core's own
 // reading of a reach that goes past its root.
 const lines: CascadeRule = { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' }
-const cascading: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {}, cascades: [lines] }
-if (!reachesPast({ removed: [{ schema: 'sales', name: 'order' }, lines.table], cleared: [] }) || cascading.cascades?.length !== 1) throw new Error('reachesPast() did not read a reach past its root')
+const cascading: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+  fields: {},
+  rowFilters: [],
+  lookups: {},
+  cascades: [lines],
+}
+if (!reachesPast({ removed: [{ schema: 'sales', name: 'order' }, lines.table], cleared: [] }) || cascading.cascades?.length !== 1)
+  throw new Error('reachesPast() did not read a reach past its root')
 
 // The host's identity (0091): a package of its own, which another product
 // verifies the server's tokens with, and which the server re-exports. A
@@ -157,10 +206,16 @@ const part = (value: object) => Buffer.from(JSON.stringify(value)).toString('bas
 const signed = `${part({ alg: 'HS256', typ: 'JWT', kid: 'host-1' })}.${part({ sub: 'clerk-7', iss: 'https://host.example', aud: 'formancy-data', exp: Math.floor(Date.now() / 1000) + 60, roles: ['clerk'], tid: 3 })}`
 const token = `${signed}.${createHmac('sha256', secret).update(signed).digest('base64url')}`
 for (const make of [createIdentityVerifier, serverIdentityVerifier]) {
-  const verify = await make({ key: { kind: 'key-set', keys: () => set }, issuer: 'https://host.example', audience: 'formancy-data', attributes: { tenant: 'tid' } })
+  const verify = await make({
+    key: { kind: 'key-set', keys: () => set },
+    issuer: 'https://host.example',
+    audience: 'formancy-data',
+    attributes: { tenant: 'tid' },
+  })
   const verified: IdentityOutcome = await verify(token)
   const identity: HostIdentity | undefined = verified.ok ? verified.identity : undefined
-  if (identity?.actor.id !== 'clerk-7' || identity.attributes['tenant'] !== '3') throw new Error(`a token was not verified under a set data-identity read: ${verified.ok ? 'another identity' : verified.reason}`)
+  if (identity?.actor.id !== 'clerk-7' || identity.attributes['tenant'] !== '3')
+    throw new Error(`a token was not verified under a set data-identity read: ${verified.ok ? 'another identity' : verified.reason}`)
 }
 let refused = false
 try {
@@ -168,6 +223,9 @@ try {
 } catch (error) {
   refused = error instanceof ServerKeySetRefusal
 }
-if (!refused || ServerKeySet !== KeySet || serverIdentityVerifier !== createIdentityVerifier) throw new Error('the server carries a copy of data-identity instead of re-exporting it')
+if (!refused || ServerKeySet !== KeySet || serverIdentityVerifier !== createIdentityVerifier)
+  throw new Error('the server carries a copy of data-identity instead of re-exporting it')
 
-console.log(`ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, exports, the menu, deletion and cascades included; audit events; a host token verified through data-identity and the server alike`)
+console.log(
+  `ok: ${DATABASE_KINDS.join(', ')}; data-client, lists, exports, the menu, deletion and cascades included; audit events; a host token verified through data-identity and the server alike`,
+)

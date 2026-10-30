@@ -130,7 +130,10 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
  * names what was addressed; here it is a bug, as for a read.
  */
 export function deleteFailure(failure: RecordFailure): HttpRefusal {
-  const refused: HttpRefusal = { status: 422, body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' } }
+  const refused: HttpRefusal = {
+    status: 422,
+    body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' },
+  }
   switch (failure.code) {
     case 'not-found':
       return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
@@ -170,18 +173,25 @@ export function deleteFailure(failure: RecordFailure): HttpRefusal {
  * whose key the insert named can be read by it. A create whose key the
  * database numbers cannot be found by anything here.
  */
-export function unknownOutcome(operation: 'create' | 'update' | 'delete', record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
+export function unknownOutcome(
+  operation: 'create' | 'update' | 'delete',
+  record: string | null,
+  version: string | null,
+): { status: 502; body: UnknownOutcome } {
   let message: string
   if (operation === 'delete') {
     // A delete is protected by its version as an update is, and a key a
     // version proves a record by is never another record's (0050).
-    message = 'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'
+    message =
+      'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'
   } else if (operation === 'update') {
-    message = 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
+    message =
+      'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
   } else if (record !== null) {
     message = 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.'
   } else {
-    message = 'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.'
+    message =
+      'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.'
   }
   return { status: 502, body: { code: 'unknown-outcome', message, operation, record, version } }
 }

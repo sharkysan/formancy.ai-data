@@ -40,7 +40,14 @@ export function runFactsOf(rounds: readonly Measured[], baselineMs: number): Run
   }
 }
 
-export function scenarioResult(engine: EngineKey, scenario: string, concurrency: number, roundTrips: number, rounds: readonly Measured[], baselineMs: number): ScenarioResult {
+export function scenarioResult(
+  engine: EngineKey,
+  scenario: string,
+  concurrency: number,
+  roundTrips: number,
+  rounds: readonly Measured[],
+  baselineMs: number,
+): ScenarioResult {
   const samples = rounds.flatMap((round) => round.block.samples)
   const seconds = rounds.reduce((sum, round) => sum + round.block.seconds, 0)
   const sum = (pick: (round: Measured) => number): number => rounds.reduce((total, round) => total + pick(round), 0)

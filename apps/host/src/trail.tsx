@@ -12,7 +12,15 @@ import { Words } from './words.js'
  * draws the rest, and the last two (crumbs.ts); pressed, the button is
  * gone, so the keyboard goes to the first crumb it drew.
  */
-export function Trail({ crumbs, compact, onUp }: { crumbs: readonly Crumb[]; compact: boolean; onUp: (level: number, button: HTMLButtonElement) => void }): ReactElement {
+export function Trail({
+  crumbs,
+  compact,
+  onUp,
+}: {
+  crumbs: readonly Crumb[]
+  compact: boolean
+  onUp: (level: number, button: HTMLButtonElement) => void
+}): ReactElement {
   const [expanded, setExpanded] = useState(false)
   const shownLevel = crumbs.at(-1)?.level ?? 0
   /** The first crumb the button drew, once it has drawn them. */
@@ -49,7 +57,12 @@ export function Trail({ crumbs, compact, onUp }: { crumbs: readonly Crumb[]; com
                   <Words said={crumb.said} />
                 </span>
               ) : (
-                <button type="button" className="crumb" ref={crumb.level === crumbs[1]?.level ? drawn : undefined} onClick={(event) => onUp(crumb.level, event.currentTarget)}>
+                <button
+                  type="button"
+                  className="crumb"
+                  ref={crumb.level === crumbs[1]?.level ? drawn : undefined}
+                  onClick={(event) => onUp(crumb.level, event.currentTarget)}
+                >
                   <Words said={crumb.said} />
                 </button>
               )}

@@ -13,7 +13,10 @@ import { expect, test } from 'vitest'
  */
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
-const manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')) as { dependencies: Record<string, string>; devDependencies: Record<string, string> }
+const manifest = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8')) as {
+  dependencies: Record<string, string>
+  devDependencies: Record<string, string>
+}
 
 // A range would let an install pick a release the gate never saw; two
 // versions apart would pair a wrapper with a grid it does not match.
@@ -24,7 +27,8 @@ test('both AG Grid packages are pinned exactly, to one release', () => {
   // What is installed is what is pinned, for the wrapper's own dependency
   // too. Read from the app's node_modules: neither package exports its
   // package.json.
-  const installed = (name: string) => JSON.parse(readFileSync(join(app, 'node_modules', name, 'package.json'), 'utf8')) as { version: string; dependencies?: Record<string, string> }
+  const installed = (name: string) =>
+    JSON.parse(readFileSync(join(app, 'node_modules', name, 'package.json'), 'utf8')) as { version: string; dependencies?: Record<string, string> }
   expect(installed('ag-grid-community').version).toBe(pinned.community)
   expect(installed('ag-grid-react').version).toBe(pinned.community)
   expect(installed('ag-grid-react').dependencies?.['ag-grid-community']).toBe(pinned.community)

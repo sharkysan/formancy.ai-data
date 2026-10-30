@@ -115,10 +115,26 @@ beforeAll(async () => {
   const pgUrl = new URL(pg.admin)
   const connections: ConnectionConfig[] = [
     {
-      id: 'pg-rekey', kind: 'postgres', host: pgUrl.hostname, port: Number(pgUrl.port), database: pgUrl.pathname.slice(1), user: decodeURIComponent(pgUrl.username), password: 'env:PG_PASSWORD', schemas: ['rekey'], tls: { enabled: false },
+      id: 'pg-rekey',
+      kind: 'postgres',
+      host: pgUrl.hostname,
+      port: Number(pgUrl.port),
+      database: pgUrl.pathname.slice(1),
+      user: decodeURIComponent(pgUrl.username),
+      password: 'env:PG_PASSWORD',
+      schemas: ['rekey'],
+      tls: { enabled: false },
     },
     {
-      id: 'ms-rekey', kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: 'env:MS_PASSWORD', schemas: ['rekey'], tls: { enabled: false, trustServerCertificate: true },
+      id: 'ms-rekey',
+      kind: 'sqlserver',
+      host: String(ms.admin.server),
+      port: Number(ms.admin.port),
+      database: String(ms.admin.database),
+      user: String(ms.admin.user),
+      password: 'env:MS_PASSWORD',
+      schemas: ['rekey'],
+      tls: { enabled: false, trustServerCertificate: true },
     },
   ]
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
@@ -128,7 +144,11 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), 'formancy-data-keys-reassigned-'))
   const store = createFileConfigurationStore(root)
   const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: {} })
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   // A real socket and a plain HTTP client: whatever the studio holds, this does not.
   await app.listen({ host: '127.0.0.1', port: 0 })
   base = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
@@ -160,19 +180,34 @@ async function owner(engine: Engine): Promise<{ run(statements: readonly string[
   if (engine === 'pg') {
     const url = new URL(pg.admin)
     const sql = connectPostgres({
-      host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false },
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      tls: { enabled: false, rejectUnauthorized: false },
     })
     return {
-      run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) },
+      run: async (statements) => {
+        for (const statement of statements) await sql.unsafe(statement)
+      },
       one: async (query) => ((await sql.unsafe(query)) as unknown as Row[])[0] as Row,
       close: () => sql.end({ timeout: 5 }),
     }
   }
   const pool = await connectSqlServer({
-    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
   })
   return {
-    run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) },
+    run: async (statements) => {
+      for (const statement of statements) await pool.request().batch(statement)
+    },
     one: async (query) => (await pool.request().query<Row>(query)).recordset[0] as Row,
     close: () => pool.close(),
   }
@@ -185,7 +220,8 @@ interface Proposal {
   generation: GenerationRequest
 }
 
-const anchors = (bindings: FormBindings) => Object.fromEntries(bindings.fields.map((binding) => [binding.field, binding.kind === 'column' ? binding.column : binding.foreignKey]))
+const anchors = (bindings: FormBindings) =>
+  Object.fromEntries(bindings.fields.map((binding) => [binding.field, binding.kind === 'column' ? binding.column : binding.foreignKey]))
 
 describe.each([
   { engine: 'PostgreSQL', kind: 'pg' as Engine },
@@ -200,21 +236,40 @@ describe.each([
       await ddl.run(TABLE[kind].create)
 
       const proposed = await call('POST', '/v1/form-proposals', admin, {
-        connection, root: { schema: 'rekey', name: 'note' }, formId, title: 'Note', lookups: [], ...(kind === 'pg' ? { versionColumn: 'row_version' } : {}),
+        connection,
+        root: { schema: 'rekey', name: 'note' },
+        formId,
+        title: 'Note',
+        lookups: [],
+        ...(kind === 'pg' ? { versionColumn: 'row_version' } : {}),
       })
       expect(proposed.status, JSON.stringify(proposed.json)).toBe(200)
       const proposal = proposed.json as Proposal
       expect(anchors(proposal.bindings)).toEqual({ id: 'id', customer_note: 'customer_note', customer_note_2: 'customer note' })
       const v1 = await call('POST', `/v1/forms/${formId}/versions`, admin, {
         expectedBase: null,
-        bundle: { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot },
+        bundle: {
+          format: 2,
+          connection,
+          generation: proposal.generation,
+          base: proposal.form,
+          presentation: EMPTY_PRESENTATION,
+          form: proposal.form,
+          bindings: proposal.bindings,
+          policy: POLICY,
+          snapshot: proposal.snapshot,
+        },
       })
       expect(v1.status, JSON.stringify(v1.json)).toBe(201)
 
       // The control, under version 1: the column "customer note" is read-only to a clerk.
       const read1 = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
       expect(read1.status).toBe(200)
-      const control = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record: 'k1:1', version: read1.json.version, answers: { customer_note_2: 'a clerk tries' } })
+      const control = await call('POST', `/v1/forms/${formId}/records/update`, clerk, {
+        record: 'k1:1',
+        version: read1.json.version,
+        answers: { customer_note_2: 'a clerk tries' },
+      })
       expect(control.status).toBe(403)
       expect((await ddl.one(TABLE[kind].observeV1))['customer note']).toBe(MANAGERS_NOTE)
 
@@ -222,7 +277,16 @@ describe.each([
       await ddl.run(TABLE[kind].alter)
       const regenerated = await call('POST', `/v1/forms/${formId}/regenerations`, admin)
       expect(regenerated.status, JSON.stringify(regenerated.json)).toBe(200)
-      const { version, drift: _drift, policyProblems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned, notes: _notes, ...parts } = regenerated.json
+      const {
+        version,
+        drift: _drift,
+        policyProblems,
+        conflicts: _conflicts,
+        lookupsDropped: _dropped,
+        keysReassigned,
+        notes: _notes,
+        ...parts
+      } = regenerated.json
       const reassigned = [
         { field: 'customer_note', was: { kind: 'column', column: 'customer_note' }, now: { kind: 'column', column: 'customer note' } },
         { field: 'customer_note_2', was: { kind: 'column', column: 'customer note' }, now: { kind: 'column', column: 'customer-note' } },
@@ -251,7 +315,11 @@ describe.each([
       // The clerk's write through customer_note -- the column "customer note" now -- is refused, and the column keeps its note.
       const read2 = await call('POST', `/v1/forms/${formId}/records/read`, clerk, { record: 'k1:1' })
       expect(read2.status, JSON.stringify(read2.json)).toBe(200)
-      const write = await call('POST', `/v1/forms/${formId}/records/update`, clerk, { record: 'k1:1', version: read2.json.version, answers: { customer_note: 'written by a clerk' } })
+      const write = await call('POST', `/v1/forms/${formId}/records/update`, clerk, {
+        record: 'k1:1',
+        version: read2.json.version,
+        answers: { customer_note: 'written by a clerk' },
+      })
       expect(write.status, JSON.stringify(write.json)).toBe(403)
       expect((await ddl.one(TABLE[kind].observe))['customer note']).toBe(MANAGERS_NOTE)
     } finally {

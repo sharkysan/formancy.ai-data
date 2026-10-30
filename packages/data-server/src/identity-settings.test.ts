@@ -23,19 +23,63 @@ describe('identityKeySource', () => {
   // a guess -- the secret when a key set was also named, HS256 over a PEM's
   // text -- would accept tokens nobody meant it to.
   const refused: Array<{ why: string; env: Record<string, string>; says: RegExp }> = [
-    { why: 'no key at all', env: {}, says: /^Set exactly one of FORMANCY_DATA_IDENTITY_SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE and FORMANCY_DATA_IDENTITY_KEYS_FILE\.$/ },
-    { why: 'a secret and a public key', env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' }, says: /^Set exactly one of/ },
-    { why: 'a secret and a key set', env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' }, says: /^Set exactly one of/ },
-    { why: 'all three', env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/k.pem', FORMANCY_DATA_IDENTITY_KEYS_FILE: '/k.json' }, says: /^Set exactly one of/ },
-    { why: 'a key set without its algorithm', env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json' }, says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE/ },
-    { why: 'a key set with an empty algorithm', env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: '' }, says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE/ },
-    { why: 'a key set with another algorithm', env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'PS256' }, says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256, EdDSA or HS256 for a key set\.$/ },
-    { why: 'a key set at a relative path', env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: 'identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'RS256' }, says: /^FORMANCY_DATA_IDENTITY_KEYS_FILE is an absolute path/ },
-    { why: 'a public key without its algorithm', env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' }, says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required\.$/ },
+    {
+      why: 'no key at all',
+      env: {},
+      says: /^Set exactly one of FORMANCY_DATA_IDENTITY_SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE and FORMANCY_DATA_IDENTITY_KEYS_FILE\.$/,
+    },
+    {
+      why: 'a secret and a public key',
+      env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' },
+      says: /^Set exactly one of/,
+    },
+    {
+      why: 'a secret and a key set',
+      env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' },
+      says: /^Set exactly one of/,
+    },
+    {
+      why: 'all three',
+      env: { FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/k.pem', FORMANCY_DATA_IDENTITY_KEYS_FILE: '/k.json' },
+      says: /^Set exactly one of/,
+    },
+    {
+      why: 'a key set without its algorithm',
+      env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json' },
+      says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE/,
+    },
+    {
+      why: 'a key set with an empty algorithm',
+      env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: '' },
+      says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE/,
+    },
+    {
+      why: 'a key set with another algorithm',
+      env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'PS256' },
+      says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256, EdDSA or HS256 for a key set\.$/,
+    },
+    {
+      why: 'a key set at a relative path',
+      env: { FORMANCY_DATA_IDENTITY_KEYS_FILE: 'identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: 'RS256' },
+      says: /^FORMANCY_DATA_IDENTITY_KEYS_FILE is an absolute path/,
+    },
+    {
+      why: 'a public key without its algorithm',
+      env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem' },
+      says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is required\.$/,
+    },
     // The key-confusion attack 0014 refuses: a PEM's text as an HMAC secret
     // verifies any token its reader signs with it.
-    { why: 'HS256 with a public key file', env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' }, says: /^HS256 is a shared secret: it is FORMANCY_DATA_IDENTITY_SECRET or a key set, never a public key file\.$/ },
-    { why: 'a public key with another algorithm', env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'PS256' }, says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256 or EdDSA\.$/ },
+    {
+      why: 'HS256 with a public key file',
+      env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'HS256' },
+      says: /^HS256 is a shared secret: it is FORMANCY_DATA_IDENTITY_SECRET or a key set, never a public key file\.$/,
+    },
+    {
+      why: 'a public key with another algorithm',
+      env: { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: '/run/keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'PS256' },
+      says: /^FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256 or EdDSA\.$/,
+    },
   ]
 
   test.each(refused)('refuses $why', ({ env, says }) => {
@@ -48,10 +92,19 @@ describe('identityKeySource', () => {
   // they did: the secret's algorithm is never read, so a stale
   // FORMANCY_DATA_IDENTITY_ALGORITHM beside it changes nothing.
   test('names each kind, and reads no algorithm beside the secret', () => {
-    expect(identityKeySource({ FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_ALGORITHM: 'nonsense' })).toEqual({ ok: true, source: { kind: 'secret', reference: SECRET } })
-    expect(identityKeySource({ FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: 'keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'EdDSA' })).toEqual({ ok: true, source: { kind: 'public-key', path: 'keys/host.pem', algorithm: 'EdDSA' } })
+    expect(identityKeySource({ FORMANCY_DATA_IDENTITY_SECRET: SECRET, FORMANCY_DATA_IDENTITY_ALGORITHM: 'nonsense' })).toEqual({
+      ok: true,
+      source: { kind: 'secret', reference: SECRET },
+    })
+    expect(identityKeySource({ FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: 'keys/host.pem', FORMANCY_DATA_IDENTITY_ALGORITHM: 'EdDSA' })).toEqual({
+      ok: true,
+      source: { kind: 'public-key', path: 'keys/host.pem', algorithm: 'EdDSA' },
+    })
     for (const algorithm of ['RS256', 'ES256', 'EdDSA', 'HS256']) {
-      expect(identityKeySource({ FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: algorithm })).toEqual({ ok: true, source: { kind: 'key-set', path: '/run/identity/keys.json', algorithm } })
+      expect(identityKeySource({ FORMANCY_DATA_IDENTITY_KEYS_FILE: '/run/identity/keys.json', FORMANCY_DATA_IDENTITY_ALGORITHM: algorithm })).toEqual({
+        ok: true,
+        source: { kind: 'key-set', path: '/run/identity/keys.json', algorithm },
+      })
     }
   })
 })
@@ -80,13 +133,42 @@ describe('openIdentity', () => {
     const keys = join(directory, 'keys.json')
     await writeFile(keys, JSON.stringify({ keys: [{ kty: 'oct', kid: 'a', k: 'c2hvcnQ' }] }))
     const cases: Array<{ why: string; source: IdentityKeySource; env?: Record<string, string>; says: string }> = [
-      { why: 'a secret file that cannot be read', source: { kind: 'secret', reference: `file:${join(directory, 'none')}` }, says: `the secret file ${join(directory, 'none')} cannot be read` },
-      { why: 'a secret under 32 bytes', source: { kind: 'secret', reference: 'env:SHORT' }, env: { SHORT: short }, says: 'the identity secret must be at least 32 bytes' },
-      { why: 'a public key file that cannot be read', source: { kind: 'public-key', path: join(directory, 'none.pem'), algorithm: 'ES256' }, says: `the identity public key file ${join(directory, 'none.pem')} cannot be read` },
-      { why: 'a public key that is not a PEM', source: { kind: 'public-key', path: notPem, algorithm: 'ES256' }, says: 'the identity public key is not an SPKI PEM public key for ES256' },
-      { why: 'a public key of another algorithm', source: { kind: 'public-key', path: rsaPem, algorithm: 'ES256' }, says: 'the identity public key is not an SPKI PEM public key for ES256' },
-      { why: 'a key set file that cannot be read', source: { kind: 'key-set', path: join(directory, 'none.json'), algorithm: 'HS256' }, says: `the identity key set file ${join(directory, 'none.json')} cannot be read` },
-      { why: 'a key set refused', source: { kind: 'key-set', path: keys, algorithm: 'HS256' }, says: 'key "a" is shorter than 32 bytes, which HS256 needs (0014)' },
+      {
+        why: 'a secret file that cannot be read',
+        source: { kind: 'secret', reference: `file:${join(directory, 'none')}` },
+        says: `the secret file ${join(directory, 'none')} cannot be read`,
+      },
+      {
+        why: 'a secret under 32 bytes',
+        source: { kind: 'secret', reference: 'env:SHORT' },
+        env: { SHORT: short },
+        says: 'the identity secret must be at least 32 bytes',
+      },
+      {
+        why: 'a public key file that cannot be read',
+        source: { kind: 'public-key', path: join(directory, 'none.pem'), algorithm: 'ES256' },
+        says: `the identity public key file ${join(directory, 'none.pem')} cannot be read`,
+      },
+      {
+        why: 'a public key that is not a PEM',
+        source: { kind: 'public-key', path: notPem, algorithm: 'ES256' },
+        says: 'the identity public key is not an SPKI PEM public key for ES256',
+      },
+      {
+        why: 'a public key of another algorithm',
+        source: { kind: 'public-key', path: rsaPem, algorithm: 'ES256' },
+        says: 'the identity public key is not an SPKI PEM public key for ES256',
+      },
+      {
+        why: 'a key set file that cannot be read',
+        source: { kind: 'key-set', path: join(directory, 'none.json'), algorithm: 'HS256' },
+        says: `the identity key set file ${join(directory, 'none.json')} cannot be read`,
+      },
+      {
+        why: 'a key set refused',
+        source: { kind: 'key-set', path: keys, algorithm: 'HS256' },
+        says: 'key "a" is shorter than 32 bytes, which HS256 needs (0014)',
+      },
     ]
     for (const { why, source, env, says } of cases) {
       const opened = await openIdentity(source, io(env), claims)
@@ -99,7 +181,12 @@ describe('openIdentity', () => {
   // the key set file to read again on SIGHUP only when the setting is one.
   test('opens each kind, with the key set file only for a key set', async () => {
     const secret = randomBytes(32).toString('base64url')
-    const token = await new SignJWT({ sub: 'u' }).setProtectedHeader({ alg: 'HS256', kid: 'a' }).setIssuer(claims.issuer).setAudience(claims.audience).setExpirationTime('5m').sign(new TextEncoder().encode(secret))
+    const token = await new SignJWT({ sub: 'u' })
+      .setProtectedHeader({ alg: 'HS256', kid: 'a' })
+      .setIssuer(claims.issuer)
+      .setAudience(claims.audience)
+      .setExpirationTime('5m')
+      .sign(new TextEncoder().encode(secret))
     const underSecret = await openIdentity({ kind: 'secret', reference: 'env:SECRET' }, io({ SECRET: secret }), claims)
     expect(underSecret).toMatchObject({ ok: true, file: undefined })
     expect(underSecret.ok && (await underSecret.verifyIdentity(token))).toMatchObject({ ok: true })
@@ -164,9 +251,17 @@ describe('readAgainOnSignal', () => {
     await settled(3)
 
     expect(lines).toEqual([
-      { level: 'info', message: 'identity keys read again', fields: { identityKeys: { kids: ['a', 'b'], added: ['b'], removed: [], replaced: [], leftOut: [] } } },
+      {
+        level: 'info',
+        message: 'identity keys read again',
+        fields: { identityKeys: { kids: ['a', 'b'], added: ['b'], removed: [], replaced: [], leftOut: [] } },
+      },
       { level: 'info', message: 'identity keys read again; nothing changed', fields: { identityKeys: { kids: ['a', 'b'], leftOut: [] } } },
-      { level: 'error', message: 'identity keys not read again; the set in force is unchanged', fields: { identityKeys: { kids: ['a', 'b'], problem: 'the identity key set file is not JSON' } } },
+      {
+        level: 'error',
+        message: 'identity keys not read again; the set in force is unchanged',
+        fields: { identityKeys: { kids: ['a', 'b'], problem: 'the identity key set file is not JSON' } },
+      },
     ])
     const written = JSON.stringify(lines)
     for (const material of [ka, kb]) for (let start = 0; start + 8 <= material.length; start++) expect(written).not.toContain(material.slice(start, start + 8))

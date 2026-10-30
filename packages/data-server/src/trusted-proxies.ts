@@ -33,7 +33,12 @@ const PREFIX = /^(0|[1-9][0-9]{0,2})$/
 function addressBytes(address: string, family: 4 | 6): number[] {
   if (family === 4) return address.split('.').map(Number)
   const last = address.lastIndexOf(':')
-  const dotted = address.includes('.') ? address.slice(last + 1).split('.').map(Number) : undefined
+  const dotted = address.includes('.')
+    ? address
+        .slice(last + 1)
+        .split('.')
+        .map(Number)
+    : undefined
   const hex = dotted === undefined ? address : `${address.slice(0, last + 1)}0:0`
   const groups = (part: string) => (part === '' ? [] : part.split(':').map((group) => Number.parseInt(group, 16)))
   const [head = '', tail] = hex.split('::')

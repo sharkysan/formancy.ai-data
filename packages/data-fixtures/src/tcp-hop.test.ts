@@ -82,7 +82,10 @@ async function until(condition: () => boolean, what: string): Promise<void> {
 }
 
 /** A hop in front of a target playing `kind`; PostgreSQL unless a case is about what crosses it. */
-async function setUp({ halfOpen = false, kind = 'postgres' }: { halfOpen?: boolean; kind?: HopKind } = {}): Promise<{ hop: TcpHop; connect: (options?: { halfOpen?: boolean }) => Promise<Ends> }> {
+async function setUp({ halfOpen = false, kind = 'postgres' }: { halfOpen?: boolean; kind?: HopKind } = {}): Promise<{
+  hop: TcpHop
+  connect: (options?: { halfOpen?: boolean }) => Promise<Ends>
+}> {
   const target = await startTarget(halfOpen)
   const hop = await startTcpHop({ kind, host: '127.0.0.1', port: target.port })
   closing.push(() => hop.close())
@@ -164,8 +167,14 @@ describe('a TCP hop', () => {
       await fromClient(ends, text('request'))
       await fromServer(ends, text('answer'))
       const off = calls.mock.contexts.filter((_, index) => calls.mock.calls[index]?.[0] !== false) as net.Socket[]
-      expect(off.filter((socket) => socket.localPort === hop.port), 'the side the driver connects to').toHaveLength(1)
-      expect(off.filter((socket) => socket.remotePort === ends.server.localPort), 'the side to the database').toHaveLength(1)
+      expect(
+        off.filter((socket) => socket.localPort === hop.port),
+        'the side the driver connects to',
+      ).toHaveLength(1)
+      expect(
+        off.filter((socket) => socket.remotePort === ends.server.localPort),
+        'the side to the database',
+      ).toHaveLength(1)
     } finally {
       calls.mockRestore()
     }
@@ -321,7 +330,10 @@ describe('a TCP hop', () => {
     await fromServer(ended, text('200 c'))
     const heard = new Promise((resolve) => ended.client.once('end', resolve))
     ended.server.end()
-    await bounded(heard.then(() => undefined), 'the server’s end never reached the client')
+    await bounded(
+      heard.then(() => undefined),
+      'the server’s end never reached the client',
+    )
     await connect()
     const late = await connect()
     await fromClient(late, text('GET /late'))

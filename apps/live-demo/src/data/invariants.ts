@@ -88,12 +88,14 @@ function levels(employees: readonly DemoEmployee[]): Map<number, number> {
 function employeeProblems(employees: readonly DemoEmployee[]): string[] {
   const problems: string[] = []
   const ids = new Set(employees.map((employee) => employee.id))
-  for (const [name, same] of groupBy(employees, (employee) => employee.name)) if (same.length > 1) problems.push(`"${name}" is the name of ${String(same.length)} employees`)
+  for (const [name, same] of groupBy(employees, (employee) => employee.name))
+    if (same.length > 1) problems.push(`"${name}" is the name of ${String(same.length)} employees`)
   const roots = employees.filter((employee) => employee.managerId === null)
   if (roots.length !== 1) problems.push(`${String(roots.length)} employees have no manager, where the managing director alone has none`)
   const level = levels(employees)
   for (const employee of employees) {
-    if (employee.managerId !== null && !ids.has(employee.managerId)) problems.push(`employee ${String(employee.id)} reports to ${String(employee.managerId)}, who is no employee`)
+    if (employee.managerId !== null && !ids.has(employee.managerId))
+      problems.push(`employee ${String(employee.id)} reports to ${String(employee.managerId)}, who is no employee`)
     const depth = level.get(employee.id)
     if (depth === undefined) problems.push(`employee ${String(employee.id)} does not reach the managing director`)
     else if (depth > 2) problems.push(`employee ${String(employee.id)} is ${String(depth)} levels below the managing director, where staff are 2`)
@@ -118,11 +120,13 @@ function customerProblems(data: DemoData): string[] {
     const own = data.customers.filter((customer) => customer.tenantId === tenant)
     if (own.length !== PER_TENANT.customers) problems.push(`tenant ${String(tenant)} has ${String(own.length)} customers, not ${String(PER_TENANT.customers)}`)
     const last = FIRST_CUSTOMER_NO + PER_TENANT.customers - 1
-    if (own.some((customer, i) => customer.customerNo !== FIRST_CUSTOMER_NO + i)) problems.push(`tenant ${String(tenant)}'s customers are not numbered ${String(FIRST_CUSTOMER_NO)} to ${String(last)} in order`)
+    if (own.some((customer, i) => customer.customerNo !== FIRST_CUSTOMER_NO + i))
+      problems.push(`tenant ${String(tenant)}'s customers are not numbered ${String(FIRST_CUSTOMER_NO)} to ${String(last)} in order`)
     const named = new Map<string, DemoCustomer>()
     for (const customer of own) {
       const earlier = named.get(customer.name.toLowerCase())
-      if (earlier !== undefined) problems.push(`customers ${customerKey(tenant, earlier.customerNo)} and ${customerKey(tenant, customer.customerNo)} are both named "${customer.name}"`)
+      if (earlier !== undefined)
+        problems.push(`customers ${customerKey(tenant, earlier.customerNo)} and ${customerKey(tenant, customer.customerNo)} are both named "${customer.name}"`)
       else named.set(customer.name.toLowerCase(), customer)
     }
     const counts = groupBy(own, (customer) => customer.countryCode)
@@ -140,7 +144,8 @@ function customerProblems(data: DemoData): string[] {
     const dates = (ordersOf.get(key) ?? []).map((order) => order.orderDate).sort()
     const created = dayOf(dayOfInstant(customer.createdAt))
     const first = dates[0]
-    if (first !== undefined && dayOfInstant(customer.createdAt) >= dayNumber(first)) problems.push(`customer ${key} was created on ${created}, not before its first order of ${first}`)
+    if (first !== undefined && dayOfInstant(customer.createdAt) >= dayNumber(first))
+      problems.push(`customer ${key} was created on ${created}, not before its first order of ${first}`)
     if (dayOfInstant(customer.createdAt) > anchor) problems.push(`customer ${key} was created on ${created}, after ${ANCHOR}`)
     const latest = dates.at(-1)
     if (!customer.active && latest !== undefined && anchor - dayNumber(latest) <= INACTIVE_DAYS) {
@@ -155,10 +160,12 @@ function customerCountryProblems(customer: DemoCustomer, key: string, known: Rea
   if (!known.has(customer.countryCode)) return [`customer ${key} is in ${customer.countryCode}, which is no country of the demo's`]
   const problems: string[] = []
   const tenantCountries = TENANT_COUNTRIES[customer.tenantId as 1 | 2] ?? []
-  if (!tenantCountries.some(([code]) => code === customer.countryCode)) problems.push(`customer ${key} is in ${customer.countryCode}, where tenant ${String(customer.tenantId)} has no customers`)
+  if (!tenantCountries.some(([code]) => code === customer.countryCode))
+    problems.push(`customer ${key} is in ${customer.countryCode}, where tenant ${String(customer.tenantId)} has no customers`)
   const country = COUNTRIES.find((each) => each.isoCode === customer.countryCode)
   const forms = country?.regions.flatMap((region) => region.forms) ?? []
-  if (!forms.some((form) => customer.name.endsWith(` ${form}`))) problems.push(`customer ${key} "${customer.name}" ends in no legal form of ${customer.countryCode}`)
+  if (!forms.some((form) => customer.name.endsWith(` ${form}`)))
+    problems.push(`customer ${key} "${customer.name}" ends in no legal form of ${customer.countryCode}`)
   for (const { town, country: other } of foreignTowns(customer.name, customer.countryCode)) {
     problems.push(`customer ${key} "${customer.name}" names ${town}, a town of ${other}, not of ${customer.countryCode}`)
   }
@@ -178,7 +185,10 @@ function orderProblems(data: DemoData): string[] {
   }
   const inOrder = data.orders.every((order, i) => {
     const before = data.orders[i - 1]
-    return order.id === i + 1 && (before === undefined || before.tenantId < order.tenantId || (before.tenantId === order.tenantId && before.orderDate <= order.orderDate))
+    return (
+      order.id === i + 1 &&
+      (before === undefined || before.tenantId < order.tenantId || (before.tenantId === order.tenantId && before.orderDate <= order.orderDate))
+    )
   })
   if (!inOrder) problems.push('the orders are not numbered from 1 in order of tenant and date')
   for (const order of data.orders) {
@@ -189,10 +199,12 @@ function orderProblems(data: DemoData): string[] {
     const day = dayNumber(order.orderDate)
     if (day < windowStart || day > anchor) problems.push(`order ${id} is dated ${order.orderDate}, outside ${dayOf(windowStart)} to ${ANCHOR}`)
     if (!isWeekday(day)) problems.push(`order ${id} is dated ${order.orderDate}, a weekend day`)
-    if (order.status === 'draft' && anchor - day > RECENT_DAYS) problems.push(`order ${id} is a draft of ${order.orderDate}, older than ${String(RECENT_DAYS)} days`)
+    if (order.status === 'draft' && anchor - day > RECENT_DAYS)
+      problems.push(`order ${id} is a draft of ${order.orderDate}, older than ${String(RECENT_DAYS)} days`)
     if (level.get(order.createdBy) !== 2) problems.push(`order ${id} was created by employee ${String(order.createdBy)}, who is not staff`)
     if (order.status === 'draft' && order.approvedBy !== null) problems.push(`order ${id} is a draft and approved by employee ${String(order.approvedBy)}`)
-    if (order.status !== 'draft' && (order.approvedBy === null || level.get(order.approvedBy) !== 1)) problems.push(`order ${id} is ${order.status} and not approved by a head`)
+    if (order.status !== 'draft' && (order.approvedBy === null || level.get(order.approvedBy) !== 1))
+      problems.push(`order ${id} is ${order.status} and not approved by a head`)
     const sum = (linesOf.get(order.id) ?? []).reduce((total, line) => total + line.quantity * line.unitPriceCents, 0)
     if (sum !== order.amountCents) problems.push(`order ${id}: amount ${money(order.amountCents)} is not its lines' sum ${money(sum)}`)
     if (order.notes !== null && !NOTES.includes(order.notes)) problems.push(`order ${id}'s note "${order.notes}" is none of the list`)
@@ -207,14 +219,17 @@ function lineProblems(data: DemoData): string[] {
   for (const line of data.lines) {
     const key = `${String(line.orderId)}/${String(line.lineNo)}`
     if (!orders.has(line.orderId)) problems.push(`line ${key} is of no order`)
-    if (!Number.isInteger(line.quantity) || line.quantity < QUANTITY.min || line.quantity > QUANTITY.max) problems.push(`line ${key} has quantity ${String(line.quantity)}, not ${range(QUANTITY)}`)
+    if (!Number.isInteger(line.quantity) || line.quantity < QUANTITY.min || line.quantity > QUANTITY.max)
+      problems.push(`line ${key} has quantity ${String(line.quantity)}, not ${range(QUANTITY)}`)
     if (!UNIT_PRICES_CENTS.includes(line.unitPriceCents)) problems.push(`line ${key} costs ${money(line.unitPriceCents)} each, which is no price of the list`)
   }
   for (const order of data.orders) {
     const own: readonly DemoLine[] = linesOf.get(order.id) ?? []
-    if (own.length < LINES_PER_ORDER.min || own.length > LINES_PER_ORDER.max) problems.push(`order ${String(order.id)} has ${String(own.length)} lines, not ${range(LINES_PER_ORDER)}`)
+    if (own.length < LINES_PER_ORDER.min || own.length > LINES_PER_ORDER.max)
+      problems.push(`order ${String(order.id)} has ${String(own.length)} lines, not ${range(LINES_PER_ORDER)}`)
     const numbers = own.map((line) => line.lineNo).sort((a, b) => a - b)
-    if (numbers.some((number, i) => number !== i + 1)) problems.push(`order ${String(order.id)}'s lines are numbered ${numbers.join(', ')}, not 1 to ${String(own.length)}`)
+    if (numbers.some((number, i) => number !== i + 1))
+      problems.push(`order ${String(order.id)}'s lines are numbered ${numbers.join(', ')}, not 1 to ${String(own.length)}`)
   }
   return problems
 }
@@ -238,8 +253,12 @@ function deliveryProblems(data: DemoData): string[] {
     const count = (deliveriesOf.get(order.id) ?? []).length
     if (order.status !== 'shipped' && count > 0) problems.push(`order ${String(order.id)} is ${order.status} and has a delivery`)
     if (order.status === 'shipped' && count === 0) problems.push(`order ${String(order.id)} is shipped and has no delivery`)
-    if (order.status === 'shipped' && count > DELIVERIES_PER_SHIPPED_ORDER.max) problems.push(`order ${String(order.id)} has ${String(count)} deliveries, not ${range(DELIVERIES_PER_SHIPPED_ORDER)}`)
-    if (order.notes === COLLECTS && count > 0) problems.push(`order ${String(order.id)} says "${COLLECTS}" and was shipped by ${(deliveriesOf.get(order.id) ?? []).map((delivery) => delivery.carrier).join(' and ')}`)
+    if (order.status === 'shipped' && count > DELIVERIES_PER_SHIPPED_ORDER.max)
+      problems.push(`order ${String(order.id)} has ${String(count)} deliveries, not ${range(DELIVERIES_PER_SHIPPED_ORDER)}`)
+    if (order.notes === COLLECTS && count > 0)
+      problems.push(
+        `order ${String(order.id)} says "${COLLECTS}" and was shipped by ${(deliveriesOf.get(order.id) ?? []).map((delivery) => delivery.carrier).join(' and ')}`,
+      )
   }
   return problems
 }
@@ -247,12 +266,15 @@ function deliveryProblems(data: DemoData): string[] {
 /** A delivery agrees with its order: the tenant, a carrier of the customer's country, shipped on a weekday days after the order and not after the anchor. */
 function deliveryOfOrderProblems(delivery: DemoDelivery, order: DemoOrder, customer: DemoCustomer | undefined, anchor: number): string[] {
   const problems: string[] = []
-  if (delivery.tenantId !== order.tenantId) problems.push(`delivery ${delivery.id} is of tenant ${String(delivery.tenantId)}, its order ${String(order.id)} of tenant ${String(order.tenantId)}`)
+  if (delivery.tenantId !== order.tenantId)
+    problems.push(`delivery ${delivery.id} is of tenant ${String(delivery.tenantId)}, its order ${String(order.id)} of tenant ${String(order.tenantId)}`)
   const carriers = COUNTRIES.find((country) => country.isoCode === customer?.countryCode)?.carriers ?? []
-  if (customer !== undefined && !carriers.includes(delivery.carrier)) problems.push(`delivery ${delivery.id} is carried by ${delivery.carrier}, who does not deliver to ${customer.countryCode}`)
+  if (customer !== undefined && !carriers.includes(delivery.carrier))
+    problems.push(`delivery ${delivery.id} is carried by ${delivery.carrier}, who does not deliver to ${customer.countryCode}`)
   const shipped = dayOfInstant(delivery.shippedAt)
   const after = shipped - dayNumber(order.orderDate)
-  if (after < DAYS_TO_SHIP.min || after > DAYS_TO_SHIP.max) problems.push(`delivery ${delivery.id} shipped ${String(after)} days after its order, not ${range(DAYS_TO_SHIP)}`)
+  if (after < DAYS_TO_SHIP.min || after > DAYS_TO_SHIP.max)
+    problems.push(`delivery ${delivery.id} shipped ${String(after)} days after its order, not ${range(DAYS_TO_SHIP)}`)
   if (shipped > anchor) problems.push(`delivery ${delivery.id} shipped on ${dayOf(shipped)}, after ${ANCHOR}`)
   if (!isWeekday(shipped)) problems.push(`delivery ${delivery.id} shipped on ${dayOf(shipped)}, a weekend day`)
   return problems
@@ -266,7 +288,8 @@ function parcelProblems(data: DemoData): string[] {
   for (const parcel of data.parcels) if (!deliveries.has(parcel.deliveryId)) problems.push(`parcel ${String(parcel.id)} is of no delivery`)
   for (const delivery of data.deliveries) {
     const own = [...(parcelsOf.get(delivery.id) ?? [])].sort((a, b) => a.id - b.id)
-    if (own.length < PARCELS_PER_DELIVERY.min || own.length > PARCELS_PER_DELIVERY.max) problems.push(`delivery ${delivery.id} has ${String(own.length)} parcels, not ${range(PARCELS_PER_DELIVERY)}`)
+    if (own.length < PARCELS_PER_DELIVERY.min || own.length > PARCELS_PER_DELIVERY.max)
+      problems.push(`delivery ${delivery.id} has ${String(own.length)} parcels, not ${range(PARCELS_PER_DELIVERY)}`)
     own.forEach((parcel, i) => {
       const label = `Parcel ${String(i + 1)} of ${String(own.length)}`
       if (parcel.label !== label) problems.push(`parcel ${String(parcel.id)} is labelled "${parcel.label}", not "${label}"`)

@@ -65,11 +65,16 @@ type Engine = 'pg' | 'ms'
 const DDL: Record<Engine, { drop: string[]; restore: string[] }> = {
   pg: {
     drop: ['alter table sales."order" drop column approved_by'],
-    restore: ['alter table sales."order" add column approved_by integer, add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)'],
+    restore: [
+      'alter table sales."order" add column approved_by integer, add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)',
+    ],
   },
   ms: {
     drop: ['alter table sales.[order] drop constraint fk_order_approved_by', 'alter table sales.[order] drop column approved_by'],
-    restore: ['alter table sales.[order] add approved_by int null', 'alter table sales.[order] add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)'],
+    restore: [
+      'alter table sales.[order] add approved_by int null',
+      'alter table sales.[order] add constraint fk_order_approved_by foreign key (approved_by) references sales.employee (id)',
+    ],
   },
 }
 
@@ -106,10 +111,30 @@ function erp(engine: Engine): { config: ConnectionConfig; password: string } {
   if (engine === 'pg') {
     const url = new URL(pg.admin)
     // The fixture's containers speak no TLS. A real allowlist leaves it on.
-    const config: ConnectionConfig = { id: 'erp', kind: 'postgres', host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: 'env:ERP_PASSWORD', schemas: ['sales'], tls: { enabled: false } }
+    const config: ConnectionConfig = {
+      id: 'erp',
+      kind: 'postgres',
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: 'env:ERP_PASSWORD',
+      schemas: ['sales'],
+      tls: { enabled: false },
+    }
     return { config, password: decodeURIComponent(url.password) }
   }
-  const config: ConnectionConfig = { id: 'erp', kind: 'sqlserver', host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: 'env:ERP_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } }
+  const config: ConnectionConfig = {
+    id: 'erp',
+    kind: 'sqlserver',
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: 'env:ERP_PASSWORD',
+    schemas: ['sales'],
+    tls: { enabled: false, trustServerCertificate: true },
+  }
   return { config, password: String(ms.admin.password) }
 }
 
@@ -132,11 +157,21 @@ async function deployment(engine: Engine): Promise<Deployment> {
   const sink = (event: AuditEvent) => {
     if (event.plane === 'admin') events.push(event)
   }
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink } }, runtime: { registry, store } })
+  const app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink } },
+    runtime: { registry, store },
+  })
   return {
     root,
     events,
-    call: (method, url, bearer, payload) => app.inject({ method, url, headers: { authorization: `Bearer ${bearer}` }, ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }) }),
+    call: (method, url, bearer, payload) =>
+      app.inject({
+        method,
+        url,
+        headers: { authorization: `Bearer ${bearer}` },
+        ...(payload === undefined ? {} : { payload: payload as Record<string, unknown> }),
+      }),
   }
 }
 
@@ -144,11 +179,36 @@ async function deployment(engine: Engine): Promise<Deployment> {
 async function owner(engine: Engine): Promise<{ run(statements: readonly string[]): Promise<void>; close(): Promise<void> }> {
   if (engine === 'pg') {
     const url = new URL(pg.admin)
-    const sql = connectPostgres({ host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: decodeURIComponent(url.username), password: decodeURIComponent(url.password), tls: { enabled: false, rejectUnauthorized: false } })
-    return { run: async (statements) => { for (const statement of statements) await sql.unsafe(statement) }, close: () => sql.end({ timeout: 5 }) }
+    const sql = connectPostgres({
+      host: url.hostname,
+      port: Number(url.port),
+      database: url.pathname.slice(1),
+      user: decodeURIComponent(url.username),
+      password: decodeURIComponent(url.password),
+      tls: { enabled: false, rejectUnauthorized: false },
+    })
+    return {
+      run: async (statements) => {
+        for (const statement of statements) await sql.unsafe(statement)
+      },
+      close: () => sql.end({ timeout: 5 }),
+    }
   }
-  const pool = await connectSqlServer({ host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true })
-  return { run: async (statements) => { for (const statement of statements) await pool.request().batch(statement) }, close: () => pool.close() }
+  const pool = await connectSqlServer({
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
+  })
+  return {
+    run: async (statements) => {
+      for (const statement of statements) await pool.request().batch(statement)
+    },
+    close: () => pool.close(),
+  }
 }
 
 /** A clerk does everything the form offers, on their own tenant's orders and customers, as the end-to-end journey's policy says. */
@@ -156,7 +216,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
@@ -181,11 +243,31 @@ describe.each([
   /** A bundle of the order form as the database is now, under `title`, as the studio would build it. */
   async function proposed(bearer: string, title: string): Promise<Record<string, unknown>> {
     const proposal = await deployed.call('POST', '/v1/form-proposals', bearer, {
-      connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'order', title, lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }], ...(versionColumn === undefined ? {} : { versionColumn }),
+      connection: 'erp',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'order',
+      title,
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     expect(proposal.statusCode, proposal.body).toBe(200)
-    const { form, bindings, snapshot, generation } = proposal.json() as { form: unknown; bindings: FormBindings; snapshot: MetadataSnapshot; generation: unknown }
-    return { format: 2, connection: 'erp', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: clerkPolicy(bindings.fields), snapshot }
+    const { form, bindings, snapshot, generation } = proposal.json() as {
+      form: unknown
+      bindings: FormBindings
+      snapshot: MetadataSnapshot
+      generation: unknown
+    }
+    return {
+      format: 2,
+      connection: 'erp',
+      generation,
+      base: form,
+      presentation: EMPTY_PRESENTATION,
+      form,
+      bindings,
+      policy: clerkPolicy(bindings.fields),
+      snapshot,
+    }
   }
 
   beforeAll(async () => {
@@ -227,7 +309,10 @@ describe.each([
     await ddl.run(DDL[connection].drop)
     const refused = await deployed.call('POST', '/v1/forms/order/drafts/1/approval', publisher)
     expect(refused.statusCode, refused.body).toBe(409)
-    expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
+    expect(refused.json()).toMatchObject({
+      code: 'incompatible',
+      changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }],
+    })
     expect(refused.json().changes).toHaveLength(1)
     expect((await deployed.call('GET', '/v1/forms/order/versions', author)).statusCode).toBe(404)
     expect((await deployed.call('GET', '/v1/forms/order/drafts/1', publisher)).json()).toMatchObject({ state: 'pending', current: null })
@@ -249,7 +334,11 @@ describe.each([
     expect(approved.statusCode, approved.body).toBe(201)
     expect(approved.json()).toMatchObject({ version: 1, drift: { blocking: false } })
     expect(await readFile(join(deployed.root, 'order', '1.json'), 'utf8')).toBe(spelled(first))
-    expect(deployed.events.filter((event) => event.operation === 'draft-approve').map(({ actor, outcome, form, draft, formVersion }) => ({ actor, outcome, form, draft, formVersion }))).toEqual([
+    expect(
+      deployed.events
+        .filter((event) => event.operation === 'draft-approve')
+        .map(({ actor, outcome, form, draft, formVersion }) => ({ actor, outcome, form, draft, formVersion })),
+    ).toEqual([
       { actor: 'publisher-1', outcome: 'incompatible', form: 'order', draft: 1, formVersion: null },
       { actor: 'author-1', outcome: 'publisher-required', form: 'order', draft: 1, formVersion: null },
       { actor: 'publisher-1', outcome: 'ok', form: 'order', draft: 1, formVersion: 1 },
@@ -259,7 +348,13 @@ describe.each([
     const source = definition.form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
     const options = (await deployed.call('POST', `/v1/forms/order/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json()
     expect(options.rows.map((row: { label: string }) => row.label)).toEqual(['Muster AG'])
-    const answers = { customer: options.rows[0].token as string, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: EDGE_VALUES.largestAmount, notes: 'approved by a publisher' }
+    const answers = {
+      customer: options.rows[0].token as string,
+      order_date: EDGE_VALUES.orderDate,
+      status: 'placed',
+      amount: EDGE_VALUES.largestAmount,
+      notes: 'approved by a publisher',
+    }
     const created = await deployed.call('POST', '/v1/forms/order/records/create', clerk, { answers })
     expect(created.statusCode, created.body).toBe(201)
     const read = await deployed.call('POST', '/v1/forms/order/records/read', clerk, { record: created.json().record })
@@ -281,7 +376,10 @@ describe.each([
     expect([own.statusCode, own.json().code]).toEqual([403, 'own-draft'])
     const queue = await deployed.call('GET', '/v1/drafts', other)
     expect(queue.statusCode, queue.body).toBe(200)
-    expect(queue.json()).toEqual({ drafts: [{ form: 'order', draft: 2, expectedBase: 1, submittedBy: 'publisher-1', title: 'Sales order', refuses: {} }], unreadable: [] })
+    expect(queue.json()).toEqual({
+      drafts: [{ form: 'order', draft: 2, expectedBase: 1, submittedBy: 'publisher-1', title: 'Sales order', refuses: {} }],
+      unreadable: [],
+    })
   })
 
   // The same drift under a draft over a version the runtime already
@@ -295,12 +393,22 @@ describe.each([
     await ddl.run(DDL[connection].drop)
     const refused = await deployed.call('POST', '/v1/forms/order/drafts/2/approval', other)
     expect(refused.statusCode, refused.body).toBe(409)
-    expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }] })
+    expect(refused.json()).toMatchObject({
+      code: 'incompatible',
+      changes: [{ kind: 'column-dropped', severity: 'blocking', subject: { name: 'approved_by' } }],
+    })
     expect(refused.json().changes).toHaveLength(1)
     expect((await deployed.call('GET', '/v1/forms/order/versions', author)).json()).toEqual({ versions: [1] })
     expect(await readdir(join(deployed.root, 'order'))).toEqual(['1.json'])
     expect((await deployed.call('GET', '/v1/forms/order/drafts/2', other)).json()).toMatchObject({ state: 'pending', current: 1 })
-    expect(deployed.events.filter((event) => event.operation === 'draft-approve').at(-1)).toMatchObject({ actor: 'publisher-2', outcome: 'incompatible', draft: 2, expectedBase: 1, connection: 'erp', formVersion: null })
+    expect(deployed.events.filter((event) => event.operation === 'draft-approve').at(-1)).toMatchObject({
+      actor: 'publisher-2',
+      outcome: 'incompatible',
+      draft: 2,
+      expectedBase: 1,
+      connection: 'erp',
+      formVersion: null,
+    })
   })
 
   // The column back, nothing the form rests on differs: the approval is
@@ -312,7 +420,13 @@ describe.each([
     expect(approved.statusCode, approved.body).toBe(201)
     expect(approved.json()).toMatchObject({ version: 2, drift: { blocking: false } })
     expect(await readFile(join(deployed.root, 'order', '2.json'), 'utf8')).toBe(spelled(second))
-    expect(deployed.events.filter((event) => event.operation === 'draft-approve').at(-1)).toMatchObject({ actor: 'publisher-2', outcome: 'ok', draft: 2, expectedBase: 1, formVersion: 2 })
+    expect(deployed.events.filter((event) => event.operation === 'draft-approve').at(-1)).toMatchObject({
+      actor: 'publisher-2',
+      outcome: 'ok',
+      draft: 2,
+      expectedBase: 1,
+      formVersion: 2,
+    })
 
     const definition = await deployed.call('GET', '/v1/forms/order', clerk)
     expect(definition.statusCode, definition.body).toBe(200)

@@ -89,7 +89,13 @@ export function listQuery({
 
 /** A page's records as grid rows, each with an id; labels are filled in afterwards. */
 export function rowsOf(records: readonly FormRecord[], start: number): GridRow[] {
-  return records.map((row, index) => ({ id: row.record ?? `row-${String(start + index)}`, record: row.record, version: row.version, answers: row.answers, labels: {} }))
+  return records.map((row, index) => ({
+    id: row.record ?? `row-${String(start + index)}`,
+    record: row.record,
+    version: row.version,
+    answers: row.answers,
+    labels: {},
+  }))
 }
 
 /** What a cell shows: a lookup's label where the server gave one, otherwise the answer as the form holds it. */
@@ -204,7 +210,11 @@ export function createDatasource({
   let current: AbortController | undefined
   const lookups = columns.filter((column) => column.source !== null)
 
-  async function rowsFor(params: IGetRowsParams, query: RecordListQuery, signal: AbortSignal): Promise<{ rows: GridRow[]; hasMore: boolean } | { refused: string; code: string }> {
+  async function rowsFor(
+    params: IGetRowsParams,
+    query: RecordListQuery,
+    signal: AbortSignal,
+  ): Promise<{ rows: GridRow[]; hasMore: boolean } | { refused: string; code: string }> {
     const page = await client.list(formId, query, signal)
     if (!page.ok) return { refused: page.message, code: page.code }
     const rows = rowsOf(page.value.rows, params.startRow)

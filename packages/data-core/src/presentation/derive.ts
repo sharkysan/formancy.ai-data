@@ -48,7 +48,8 @@ function fieldProblems(base: FormSchema, edited: Record<string, unknown>, edits:
   if (!same(before, after)) {
     const known = problems.length
     for (const key of before) if (!after.includes(key)) problems.push(`/model/fields: ${key} was removed`)
-    for (const [index, key] of after.entries()) if (!before.includes(key as string)) problems.push(`/model/fields/${String(index)}: ${String(key)} is not a field of the base`)
+    for (const [index, key] of after.entries())
+      if (!before.includes(key as string)) problems.push(`/model/fields/${String(index)}: ${String(key)} is not a field of the base`)
     if (problems.length === known) problems.push('/model/fields: the fields are in another order, and the model order is not presentation')
     return
   }
@@ -72,7 +73,15 @@ function fieldProblems(base: FormSchema, edited: Record<string, unknown>, edits:
  * another section is a move (0075), recorded by the caller once every
  * section is read; a span is compared with the key's own generated width.
  */
-function sectionKeys(sections: readonly GeneratedSection[], node: unknown, at: string, index: number, reading: Reading, edits: Edits, problems: string[]): string[] | undefined {
+function sectionKeys(
+  sections: readonly GeneratedSection[],
+  node: unknown,
+  at: string,
+  index: number,
+  reading: Reading,
+  edits: Edits,
+  problems: string[],
+): string[] | undefined {
   const generated = sections[index] as GeneratedSection
   if (!isRecord(node) || node['kind'] !== 'section' || !hasKeys(node, ['kind', 'label', 'children'])) {
     problems.push(`${at}: a section may change its label, and is otherwise the generated one`)
@@ -140,7 +149,11 @@ function layoutProblems(base: FormSchema, sections: readonly GeneratedSection[],
   if (problems.length > known) return
 
   for (const [index, keys] of placed.entries()) for (const key of keys ?? []) if (home.get(key) !== index) edits.moves.set(key, index)
-  const expected = placements(sections, edits.moves, base.model.fields.map((field) => field.key))
+  const expected = placements(
+    sections,
+    edits.moves,
+    base.model.fields.map((field) => field.key),
+  )
   for (const [index, keys] of placed.entries()) {
     if (keys === undefined || same(keys, expected[index])) continue
     edits.sections.set(index, { ...edits.sections.get(index), order: keys })

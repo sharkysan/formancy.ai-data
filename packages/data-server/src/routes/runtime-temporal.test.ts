@@ -2,7 +2,19 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm, WRITE_ID_HEADER } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, DescribedRoot, FormPolicy, InsertRequest, LookupAdapter, NormalizedType, RecordAdapter, RecordFailure, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  DescribedRoot,
+  FormPolicy,
+  InsertRequest,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+  RecordFailure,
+  RecordOutcome,
+  UpdateRequest,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -24,14 +36,30 @@ import type { ConnectionRegistry } from '../connections.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: { schema: 'sales', name: 'stamped' }, kind: 'table', comment: null,
+      ref: { schema: 'sales', name: 'stamped' },
+      kind: 'table',
+      comment: null,
       columns: [
         col('id', 1, INT32, { generated: 'identity-always' }),
         col('tenant_id', 2, INT32),
@@ -40,7 +68,11 @@ const SNAPSHOT = createSnapshot({
         col('at_time', 5, { kind: 'time', precision: 7 }),
         col('rv', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
       ],
-      primaryKey: { name: 'pk_stamped', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_stamped', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -123,11 +155,20 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('these routes never delete')
     },
-
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
-  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined), close: async () => {} }
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
+  return {
+    ids: () => ['erp'],
+    scope: () => ({ schemas: ['sales'] }),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    close: async () => {},
+  }
 }
 
 beforeEach(async () => {
@@ -136,7 +177,14 @@ beforeEach(async () => {
   readOutcome = undefined
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-temporal-'))
   const store = createFileConfigurationStore(root)
-  const { form, bindings } = generateForm(SNAPSHOT, { connection: 'erp', root: { schema: 'sales', name: 'stamped' }, formId: 'stamped', title: 'Stamped', lookups: [], pinned: ['tenant_id'] })
+  const { form, bindings } = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: { schema: 'sales', name: 'stamped' },
+    formId: 'stamped',
+    title: 'Stamped',
+    lookups: [],
+    pinned: ['tenant_id'],
+  })
   for (const [id, entry] of Object.entries(POLICIES)) {
     const bundle: PublishedBundle = { format: 1, connection: 'erp', form: { ...form, id }, bindings, policy: entry, snapshot: SNAPSHOT }
     await store.publish(id, null, bundle)
@@ -148,7 +196,8 @@ afterEach(async () => {
   await rm(root, { recursive: true, force: true })
 })
 
-const post = (url: string, payload: unknown) => app.inject({ method: 'POST', url, headers: { authorization: 'Bearer clerk' }, payload: payload as Record<string, unknown> })
+const post = (url: string, payload: unknown) =>
+  app.inject({ method: 'POST', url, headers: { authorization: 'Bearer clerk' }, payload: payload as Record<string, unknown> })
 const update = (form: string, answers: Record<string, unknown>) => post(`/v1/forms/${form}/records/update`, { record: RECORD, version: VERSION, answers })
 /** The columns the one update the adapter was asked for sets, by name, with the values it carries. */
 const setBy = (index = 0) => Object.fromEntries((calls.updates[index]?.set ?? []).map((entry) => [entry.name, entry.value]))

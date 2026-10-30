@@ -155,10 +155,12 @@ export function viewShapeProblems(value: unknown): string[] {
 export function viewFit(view: ListView, bindings: FormBindings, columns: Pick<ListColumns, 'filterable' | 'sortable'>): string | null {
   const read = readFilter(view.filter, 'field')
   if (!read.ok) return read.message
-  if (canonicalize(read.filter) !== canonicalize(view.filter)) return 'its filter is not as a request reads it: what a contains condition finds is stored trimmed.'
+  if (canonicalize(read.filter) !== canonicalize(view.filter))
+    return 'its filter is not as a request reads it: what a contains condition finds is stored trimmed.'
   for (const term of read.filter) {
     const binding = bindings.fields.find((candidate) => candidate.field === term.field)
-    if (binding?.kind !== 'column' || !columns.filterable.some((offered) => offered.field === term.field)) return `${term.field} is not a field this list is filtered by.`
+    if (binding?.kind !== 'column' || !columns.filterable.some((offered) => offered.field === term.field))
+      return `${term.field} is not a field this list is filtered by.`
     const planned = columnFilter({ name: binding.column, type: binding.type, nullable: binding.nullable }, term, term.field)
     if (!planned.ok) return planned.message
   }

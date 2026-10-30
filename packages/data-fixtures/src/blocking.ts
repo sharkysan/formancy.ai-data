@@ -46,7 +46,9 @@ async function blockPostgres(admin: string, table: ObjectRef): Promise<BlockedTa
   }
   return {
     async waiting() {
-      const [row] = await sql.unsafe<Array<{ n: number }>>('select count(*)::int as n from pg_catalog.pg_locks where not granted and relation = $1::regclass', [qualified])
+      const [row] = await sql.unsafe<Array<{ n: number }>>('select count(*)::int as n from pg_catalog.pg_locks where not granted and relation = $1::regclass', [
+        qualified,
+      ])
       return row?.n ?? 0
     },
     async release() {
@@ -68,14 +70,20 @@ async function blockSqlServer(admin: mssql.config, table: ObjectRef): Promise<Bl
     // row versioning it would read the last committed version and never wait,
     // and every "the statement is gone" assertion would pass for nothing.
     const versioned = await pool.request().query<{ on: boolean }>('select is_read_committed_snapshot_on as [on] from sys.databases where database_id = db_id()')
-    if (versioned.recordset[0]?.on !== false) throw new Error('blockTable needs locking read committed; this database reads row versions (is_read_committed_snapshot_on = 1)')
+    if (versioned.recordset[0]?.on !== false)
+      throw new Error('blockTable needs locking read committed; this database reads row versions (is_read_committed_snapshot_on = 1)')
     await transaction.begin()
-    const held = await new mssql.Request(transaction).query<{ spid: number }>(`select @@spid as spid; select top (0) 1 as locked from ${msName(table.schema)}.${msName(table.name)} with (tablockx, holdlock)`)
+    const held = await new mssql.Request(transaction).query<{ spid: number }>(
+      `select @@spid as spid; select top (0) 1 as locked from ${msName(table.schema)}.${msName(table.name)} with (tablockx, holdlock)`,
+    )
     const spid = held.recordset[0]?.spid
     if (spid === undefined) throw new Error('the lock holder did not say which session it is')
     return {
       async waiting() {
-        const result = await pool.request().input('spid', mssql.SmallInt, spid).query<{ n: number }>('select count(*) as n from sys.dm_exec_requests where blocking_session_id = @spid')
+        const result = await pool
+          .request()
+          .input('spid', mssql.SmallInt, spid)
+          .query<{ n: number }>('select count(*) as n from sys.dm_exec_requests where blocking_session_id = @spid')
         return result.recordset[0]?.n ?? 0
       },
       async release() {

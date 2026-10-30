@@ -47,7 +47,11 @@ describe('connecting', () => {
   test('lists exactly the connections the server allows, and tests one', async () => {
     const user = await signIn(plane)
     const connect = step('Connect')
-    expect(within(connect).getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent)).toEqual([...CONNECTIONS])
+    expect(
+      within(connect)
+        .getAllByRole('heading', { level: 3 })
+        .map((heading) => heading.textContent),
+    ).toEqual([...CONNECTIONS])
     const fixture = within(connect).getByRole('group', { name: 'fixture' })
     await user.click(within(fixture).getByRole('button', { name: 'Test fixture' }))
     expect((await within(fixture).findByRole('status')).textContent).toBe(`PostgreSQL ${OWNER_SNAPSHOT.serverVersion} answered.`)
@@ -60,7 +64,10 @@ describe('connecting', () => {
   // so a tested server's answer stays the one line the test above holds.
   test('says when this release was not tested on the server that answered', async () => {
     plane.databases.set('fixture', onServer(OWNER_SNAPSHOT, '14.24', { product: 'postgresql', major: 14 }))
-    plane.databases.set('fixture-sqlserver', onServer(SQLSERVER_SNAPSHOT, SQLSERVER_SNAPSHOT.serverVersion, { product: 'sqlserver', major: 16, compatibility: 140 }))
+    plane.databases.set(
+      'fixture-sqlserver',
+      onServer(SQLSERVER_SNAPSHOT, SQLSERVER_SNAPSHOT.serverVersion, { product: 'sqlserver', major: 16, compatibility: 140 }),
+    )
     const user = await signIn(plane)
     const fixture = within(step('Connect')).getByRole('group', { name: 'fixture' })
     await user.click(within(fixture).getByRole('button', { name: 'Test fixture' }))
@@ -85,7 +92,11 @@ describe('connecting', () => {
     const alert = await within(fixture).findByRole('alert')
     expect(alert.textContent).toBe('Connection fixture cannot be reached.')
     await user.click(within(fixture).getByRole('button', { name: 'Discover fixture' }))
-    expect(within(fixture).getAllByRole('alert').map((element) => element.textContent)).toEqual(['Connection fixture cannot be reached.', 'Connection fixture cannot be reached.'])
+    expect(
+      within(fixture)
+        .getAllByRole('alert')
+        .map((element) => element.textContent),
+    ).toEqual(['Connection fixture cannot be reached.', 'Connection fixture cannot be reached.'])
     expect(document.body.textContent).not.toContain('10.0.0.5')
   })
 
@@ -218,7 +229,9 @@ describe('connecting', () => {
     const choose = await goTo(user, 'Choose')
     const root = within(choose).getByLabelText('Root table or view')
     expect((root as HTMLSelectElement).value).toBe('')
-    expect(computeAccessibleDescription(root)).toBe('Choosing a root on fixture-reader replaces the form generated from sales.order on fixture, and its policy.')
+    expect(computeAccessibleDescription(root)).toBe(
+      'Choosing a root on fixture-reader replaces the form generated from sales.order on fixture, and its policy.',
+    )
     expect(await audit()).toEqual([])
 
     // Back on the first connection, its choice is as it was left.
@@ -257,7 +270,11 @@ describe('connecting', () => {
   // writes a gap for it (0007). The table must not then read as having none.
   test('tells a table with no foreign key from one whose foreign keys it cannot see', async () => {
     const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
-    contents.gaps.push({ subject: { kind: 'object', object: { schema: 'sales', name: 'country' } }, aspect: 'foreign-keys', detail: 'the account has no VIEW DEFINITION on sales.country' })
+    contents.gaps.push({
+      subject: { kind: 'object', object: { schema: 'sales', name: 'country' } },
+      aspect: 'foreign-keys',
+      detail: 'the account has no VIEW DEFINITION on sales.country',
+    })
     plane.databases.set('fixture', createSnapshot(contents))
     const user = await signIn(plane)
     await discover(user, 'fixture')

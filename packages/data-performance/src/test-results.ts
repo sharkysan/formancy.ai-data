@@ -11,8 +11,26 @@ import { ENGINE_KEYS, expectedBlocks } from './results.js'
  */
 
 const RUN: Record<EngineKey, RunFacts> = {
-  pg: { machineBusyPct: 6.25, steal: 'not reported', generatorLagP99Ms: 1.2, loadAvgAtStart: 0.12, calibrationRatio: 1.02, repeated: false, disturbances: { autovacuum: 0, autoanalyze: 0 }, reconnects: 0 },
-  ms: { machineBusyPct: 7.5, steal: 'not reported', generatorLagP99Ms: 1.4, loadAvgAtStart: 0.2, calibrationRatio: 1.03, repeated: false, disturbances: { recompiles: 0, statisticsUpdated: 0 }, reconnects: 0 },
+  pg: {
+    machineBusyPct: 6.25,
+    steal: 'not reported',
+    generatorLagP99Ms: 1.2,
+    loadAvgAtStart: 0.12,
+    calibrationRatio: 1.02,
+    repeated: false,
+    disturbances: { autovacuum: 0, autoanalyze: 0 },
+    reconnects: 0,
+  },
+  ms: {
+    machineBusyPct: 7.5,
+    steal: 'not reported',
+    generatorLagP99Ms: 1.4,
+    loadAvgAtStart: 0.2,
+    calibrationRatio: 1.03,
+    repeated: false,
+    disturbances: { recompiles: 0, statisticsUpdated: 0 },
+    reconnects: 0,
+  },
 }
 
 function sizes(orders: number): SizeFacts {
@@ -56,12 +74,34 @@ export function publishedResults(): Results {
       .map((scenario) => {
         const roundTrips = scenario.roundTrips[engine]
         const expectedMs = protocol.latency.delayMs * roundTrips
-        const rounds = [0, 1, 2].map((r) => ({ undelayed: { n: 200, p50: 2 + r / 100 }, delayed: { n: 200, p50: 2 + r / 100 + expectedMs + 0.1 }, differenceMs: expectedMs + 0.1 }))
-        return { engine, scenario: scenario.name, roundTrips, rounds, undelayedMs: 2.01, delayedMs: 2.11 + expectedMs, differenceMs: expectedMs + 0.1, spreadMs: 0, expectedMs, ratio: roundTrips === 0 ? null : (expectedMs + 0.1) / expectedMs, run: RUN[engine] }
+        const rounds = [0, 1, 2].map((r) => ({
+          undelayed: { n: 200, p50: 2 + r / 100 },
+          delayed: { n: 200, p50: 2 + r / 100 + expectedMs + 0.1 },
+          differenceMs: expectedMs + 0.1,
+        }))
+        return {
+          engine,
+          scenario: scenario.name,
+          roundTrips,
+          rounds,
+          undelayedMs: 2.01,
+          delayedMs: 2.11 + expectedMs,
+          differenceMs: expectedMs + 0.1,
+          spreadMs: 0,
+          expectedMs,
+          ratio: roundTrips === 0 ? null : (expectedMs + 0.1) / expectedMs,
+          run: RUN[engine],
+        }
       }),
   )
   const refusals: RefusalResult[] = ENGINE_KEYS.flatMap((engine) =>
-    CATALOGUE.refusals.map((refusal) => ({ engine, scenario: refusal.name, roundTrips: refusal.roundTrips[engine], status: refusal.answer.status, code: refusal.answer.code })),
+    CATALOGUE.refusals.map((refusal) => ({
+      engine,
+      scenario: refusal.name,
+      roundTrips: refusal.roundTrips[engine],
+      status: refusal.answer.status,
+      code: refusal.answer.code,
+    })),
   )
   const summary = { n: 2000, p50: 0.05, p90: 0.07, p99: 0.12, max: 0.9, mean: 0.06 }
   const tally = [
@@ -76,13 +116,24 @@ export function publishedResults(): Results {
     protocol,
     commit: '0123456789abcdef0123456789abcdef01234567',
     catalogue: CATALOGUE,
-    product: { files: { 'packages/data-server/src/main.ts': 'a'.repeat(64) }, packages: { postgres: '3.4.9' }, build: { 'tsconfig.base.json': 'b'.repeat(64) } },
+    product: {
+      files: { 'packages/data-server/src/main.ts': 'a'.repeat(64) },
+      packages: { postgres: '3.4.9' },
+      build: { 'tsconfig.base.json': 'b'.repeat(64) },
+    },
     machine: {
       cpu: { model: 'Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz', vcpus: 20, sockets: 1, coresPerSocket: 20, threadsPerCore: 1, hypervisor: 'Microsoft' },
       memoryBytes: 16_000_000_000,
       os: { prettyName: 'Ubuntu 26.04.1 LTS', kernel: '7.0.14', clkTck: 100 },
       cgroup: { path: '/docker/abc', cpuMax: 'max 100000' },
-      docker: { version: '29.8.1', os: 'Ubuntu 26.04.1 LTS (containerized)', storageDriver: 'overlayfs', cgroupDriver: 'cgroupfs', ncpu: 20, memTotalBytes: 16_000_000_000 },
+      docker: {
+        version: '29.8.1',
+        os: 'Ubuntu 26.04.1 LTS (containerized)',
+        storageDriver: 'overlayfs',
+        cgroupDriver: 'cgroupfs',
+        ncpu: 20,
+        memTotalBytes: 16_000_000_000,
+      },
       databaseLimits: { pg: { nanoCpus: 0, cpuQuota: 0, cpuPeriod: 0, memoryBytes: 0 }, ms: { nanoCpus: 0, cpuQuota: 0, cpuPeriod: 0, memoryBytes: 0 } },
       node: 'v22.22.1',
       quiet: { enforced: true, containersBefore: [], loadAverage: 0.08, busyVcpusMax: 0.21, stealReported: false, calibrationBaselineMs: 4.2, seconds: 10 },
@@ -106,20 +157,59 @@ export function publishedResults(): Results {
       logLinesPerRequest: 3,
     },
     engines: {
-      pg: { image: 'postgres:17-alpine', imageId: 'sha256:1', repoDigests: ['postgres@sha256:2'], version: 'PostgreSQL 17.11 on x86_64-pc-linux-musl', settings: { shared_buffers: '128MB' }, text: { codePointOrder: true, lowerFoldsUmlaut: false }, sizes: { before: sizes(2), after: sizes(30_002) }, memoryBytes: 300_000_000 },
-      ms: { image: 'mcr.microsoft.com/mssql/server:2022-latest', imageId: 'sha256:3', repoDigests: ['mcr.microsoft.com/mssql/server@sha256:4'], version: '16.0.4295.3 Developer Edition (64-bit) CU27', settings: { maxdop: '0' }, text: null, sizes: { before: sizes(2), after: sizes(30_002) }, memoryBytes: 900_000_000 },
+      pg: {
+        image: 'postgres:17-alpine',
+        imageId: 'sha256:1',
+        repoDigests: ['postgres@sha256:2'],
+        version: 'PostgreSQL 17.11 on x86_64-pc-linux-musl',
+        settings: { shared_buffers: '128MB' },
+        text: { codePointOrder: true, lowerFoldsUmlaut: false },
+        sizes: { before: sizes(2), after: sizes(30_002) },
+        memoryBytes: 300_000_000,
+      },
+      ms: {
+        image: 'mcr.microsoft.com/mssql/server:2022-latest',
+        imageId: 'sha256:3',
+        repoDigests: ['mcr.microsoft.com/mssql/server@sha256:4'],
+        version: '16.0.4295.3 Developer Edition (64-bit) CU27',
+        settings: { maxdop: '0' },
+        text: null,
+        sizes: { before: sizes(2), after: sizes(30_002) },
+        memoryBytes: 900_000_000,
+      },
     },
-    bundle: { 'pg-order': { versionBytes: 60_000, snapshotBytes: 40_000, snapshotObjects: 9 }, 'ms-order': { versionBytes: 61_000, snapshotBytes: 41_000, snapshotObjects: 9 } },
-    sizedTable: { generator: 'sales.customer sized 1', rows: 1_000_002, perTenant: { '1': 100_001, '2': 900_001 }, digest: 'c'.repeat(64), loadSeconds: { pg: 35.2, ms: 15.1 } },
+    bundle: {
+      'pg-order': { versionBytes: 60_000, snapshotBytes: 40_000, snapshotObjects: 9 },
+      'ms-order': { versionBytes: 61_000, snapshotBytes: 41_000, snapshotObjects: 9 },
+    },
+    sizedTable: {
+      generator: 'sales.customer sized 1',
+      rows: 1_000_002,
+      perTenant: { '1': 100_001, '2': 900_001 },
+      digest: 'c'.repeat(64),
+      loadSeconds: { pg: 35.2, ms: 15.1 },
+    },
     containers: [{ role: 'pg', id: 'd1', image: 'postgres:17-alpine', imageId: 'sha256:1', repoDigests: ['postgres@sha256:2'] }],
     components: {
       verifyToken: { label: 'Verify a host token', ...summary },
-      readBundle: { pg: { label: 'Read and check the published version', form: 'pg-order', ...summary }, ms: { label: 'Read and check the published version', form: 'ms-order', ...summary } },
+      readBundle: {
+        pg: { label: 'Read and check the published version', form: 'pg-order', ...summary },
+        ms: { label: 'Read and check the published version', form: 'ms-order', ...summary },
+      },
       floor: { pg: { ...summary, roundTrips: 2, perRoundTripMs: 0.025 }, ms: { ...summary, roundTrips: 2, perRoundTripMs: 0.025 } },
     },
     scenarios,
     latency,
     refusals,
-    checks: { requests: tally, runtimeEvents: tally.map((row) => ({ ...row })), adminRequests: 20, adminEvents: 20, unexpected: 0, errorLines: 0, writes: 30_000, createdCustomers: { pg: 100, ms: 100 } },
+    checks: {
+      requests: tally,
+      runtimeEvents: tally.map((row) => ({ ...row })),
+      adminRequests: 20,
+      adminEvents: 20,
+      unexpected: 0,
+      errorLines: 0,
+      writes: 30_000,
+      createdCustomers: { pg: 100, ms: 100 },
+    },
   }
 }

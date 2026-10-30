@@ -28,7 +28,13 @@ export interface SqlServerRead {
  * SQL Managed Instance. Anything else -- Synapse, SQL Edge, an edition named
  * later -- is `other`.
  */
-const EDITIONS: Readonly<Record<number, ServerProduct>> = { 2: 'sqlserver', 3: 'sqlserver', 4: 'sqlserver', 5: 'azure-sql-database', 8: 'azure-sql-managed-instance' }
+const EDITIONS: Readonly<Record<number, ServerProduct>> = {
+  2: 'sqlserver',
+  3: 'sqlserver',
+  4: 'sqlserver',
+  5: 'azure-sql-database',
+  8: 'azure-sql-managed-instance',
+}
 
 /**
  * The server's identity, translated from what it answered (0068): data-core

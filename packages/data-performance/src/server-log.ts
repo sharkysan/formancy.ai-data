@@ -36,7 +36,14 @@ export function routeOf(method: string, path: string): { plane: 'runtime'; opera
 }
 
 /** Runtime routes as Fastify names them in a request line. */
-const RUNTIME_ROUTES = new Set(['/v1/forms/:id', '/v1/forms/:id/records/read', '/v1/forms/:id/records/create', '/v1/forms/:id/records/update', '/v1/forms/:id/lookups/:source/query', '/v1/forms/:id/lookups/:source/resolve'])
+const RUNTIME_ROUTES = new Set([
+  '/v1/forms/:id',
+  '/v1/forms/:id/records/read',
+  '/v1/forms/:id/records/create',
+  '/v1/forms/:id/records/update',
+  '/v1/forms/:id/lookups/:source/query',
+  '/v1/forms/:id/lookups/:source/resolve',
+])
 
 export interface ServerLog {
   runtimeEvents: RequestTally[]
@@ -57,7 +64,12 @@ export function readServerLog(text: string): ServerLog {
   let errorLines = 0
   text.split('\n').forEach((raw, index) => {
     if (raw.trim() === '') return
-    let entry: { level?: number; reqId?: string; req?: { route?: string | null }; audit?: { plane?: string; operation?: string; form?: string | null; status?: number } }
+    let entry: {
+      level?: number
+      reqId?: string
+      req?: { route?: string | null }
+      audit?: { plane?: string; operation?: string; form?: string | null; status?: number }
+    }
     try {
       entry = JSON.parse(raw) as typeof entry
     } catch {
@@ -84,7 +96,12 @@ export function readServerLog(text: string): ServerLog {
  * names none. `before` and `after` are the run's counts of runtime requests
  * by audit operation, around that one request; undefined when it did.
  */
-export function addressedProblem(scenario: string, operation: string | null | undefined, before: ReadonlyMap<string, number>, after: ReadonlyMap<string, number>): string | undefined {
+export function addressedProblem(
+  scenario: string,
+  operation: string | null | undefined,
+  before: ReadonlyMap<string, number>,
+  after: ReadonlyMap<string, number>,
+): string | undefined {
   if (operation === undefined) return `${scenario} names no operation in the catalogue`
   const sent = [...after].flatMap(([name, count]) => {
     const more = count - (before.get(name) ?? 0)

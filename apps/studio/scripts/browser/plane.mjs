@@ -34,21 +34,40 @@ const IDENTITIES = new Map([
  * limit; what a database does with a sort, a search, a filter or another
  * spelling is the adapter and parity suites' to prove (0003).
  */
-const ORDER = { tenant_id: '1', customer_no: '1001', order_date: '2026-10-08', status: 'placed', amount: '99999999999999.9999', group: 'A', created_by: '1', approved_by: null, row_version: '1' }
+const ORDER = {
+  tenant_id: '1',
+  customer_no: '1001',
+  order_date: '2026-10-08',
+  status: 'placed',
+  amount: '99999999999999.9999',
+  group: 'A',
+  created_by: '1',
+  approved_by: null,
+  row_version: '1',
+}
 const ROWS = new Map([
-  ['sales.order', [
-    { id: '9007199254740993', ...ORDER, notes: 'Deliver to the loading dock at the back of the building, not the front desk.' },
-    { id: '9007199254740995', ...ORDER, notes: null, status: 'shipped' },
-  ]],
-  ['sales.customer', [
-    { tenant_id: '1', customer_no: '1001', name: 'Muster AG', country_code: 'CH' },
-    { tenant_id: '1', customer_no: '1002', name: 'Beispiel GmbH', country_code: 'DE' },
-  ]],
+  [
+    'sales.order',
+    [
+      { id: '9007199254740993', ...ORDER, notes: 'Deliver to the loading dock at the back of the building, not the front desk.' },
+      { id: '9007199254740995', ...ORDER, notes: null, status: 'shipped' },
+    ],
+  ],
+  [
+    'sales.customer',
+    [
+      { tenant_id: '1', customer_no: '1001', name: 'Muster AG', country_code: 'CH' },
+      { tenant_id: '1', customer_no: '1002', name: 'Beispiel GmbH', country_code: 'DE' },
+    ],
+  ],
   ['sales.employee', [{ id: '1', name: 'Ada Lovelace', manager_id: null }]],
-  ['sales.customer_summary', [
-    { tenant_id: '1', customer_no: '1001', name: 'Muster AG', order_count: '2' },
-    { tenant_id: '2', customer_no: '1001', name: 'Other Tenant GmbH', order_count: '1' },
-  ]],
+  [
+    'sales.customer_summary',
+    [
+      { tenant_id: '1', customer_no: '1001', name: 'Muster AG', order_count: '2' },
+      { tenant_id: '2', customer_no: '1001', name: 'Other Tenant GmbH', order_count: '1' },
+    ],
+  ],
 ])
 
 /**
@@ -97,7 +116,12 @@ export async function startPlane({ review = false } = {}) {
       const now = databases.get(id)
       if (now === undefined) return undefined
       // The ping answers the server the capture records (0068), as the adapters read it beside discovery.
-      const adapter = { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }), discover: async () => databases.get(id), close: async () => {} }
+      const adapter = {
+        kind: now.kind,
+        ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }),
+        discover: async () => databases.get(id),
+        close: async () => {},
+      }
       return { adapter, lookups: {}, records }
     },
     close: async () => {},

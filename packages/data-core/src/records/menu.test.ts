@@ -5,7 +5,23 @@ import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { formMenu, grantedOperations, menuForm } from './menu.js'
 import type { MenuBundle } from './menu.js'
-import { actor, AUDITOR, CLERK, CLERK_RW, fk, INTAKE, LINE_POLICY, lineForm, MS_FACTS, ORDER_POLICY, orderForm, PG, sales, snapshot, TENANT } from './test-support.js'
+import {
+  actor,
+  AUDITOR,
+  CLERK,
+  CLERK_RW,
+  fk,
+  INTAKE,
+  LINE_POLICY,
+  lineForm,
+  MS_FACTS,
+  ORDER_POLICY,
+  orderForm,
+  PG,
+  sales,
+  snapshot,
+  TENANT,
+} from './test-support.js'
 
 /*
  * The forms a person's menu names, and the children under each (0045): the
@@ -14,7 +30,14 @@ import { actor, AUDITOR, CLERK, CLERK_RW, fk, INTAKE, LINE_POLICY, lineForm, MS_
  * what is under test here is who is told of a form or a child.
  */
 
-const bundle = (id: string, title: string, source: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, connection = 'erp'): MenuBundle => ({ id, title, connection, snapshot: source, bindings, policy })
+const bundle = (id: string, title: string, source: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, connection = 'erp'): MenuBundle => ({
+  id,
+  title,
+  connection,
+  snapshot: source,
+  bindings,
+  policy,
+})
 /** The menu as the route makes it: each bundle read alone for this person, then compared. */
 const menuOf = (bundles: readonly MenuBundle[], context: PolicyContext) => formMenu(bundles.map((entry) => menuForm(entry, context)))
 
@@ -22,7 +45,13 @@ const menuOf = (bundles: readonly MenuBundle[], context: PolicyContext) => formM
 const MANAGED = snapshot('postgres', (objects) => {
   ;(objects.find((object) => object.ref.name === 'employee') as ObjectMeta).foreignKeys.push(fk('fk_employee_manager', ['manager_id'], 'employee', ['id']))
 })
-const EMPLOYEE = generateForm(MANAGED, { connection: 'erp', root: sales('employee'), formId: 'sales-employee', title: 'Employee', lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }] }).bindings
+const EMPLOYEE = generateForm(MANAGED, {
+  connection: 'erp',
+  root: sales('employee'),
+  formId: 'sales-employee',
+  title: 'Employee',
+  lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }],
+}).bindings
 const EMPLOYEE_POLICY: FormPolicy = {
   version: 1,
   operations: { read: ['clerk'], create: [], update: [] },
@@ -119,14 +148,20 @@ describe('formMenu over menuForm', () => {
     expect(menu.forms.map((entry) => entry.id)).toEqual(['order', 'order-line'])
     expect(menu.forms.find((entry) => entry.id === 'order')?.children).toEqual([])
 
-    const hidden = bundle('order', 'Order', PG, orderForm(PG).bindings, { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, employee: { read: [], write: ['clerk'] } } })
+    const hidden = bundle('order', 'Order', PG, orderForm(PG).bindings, {
+      ...ORDER_POLICY,
+      fields: { ...ORDER_POLICY.fields, employee: { read: [], write: ['clerk'] } },
+    })
     expect(menuOf([EMPLOYEES, hidden], CLERK).forms.find((entry) => entry.id === 'employee')?.children).toEqual([{ form: 'employee', field: 'employee' }])
   })
 
   // A child the person may not read is not named under anything: the menu
   // says nothing about a form the policy keeps from them.
   test('never names a child the person may not read', () => {
-    const managersOnly = bundle('order-line', 'Order line', PG, lineForm(PG).bindings, { ...LINE_POLICY, operations: { read: ['manager'], create: [], update: [] } })
+    const managersOnly = bundle('order-line', 'Order line', PG, lineForm(PG).bindings, {
+      ...LINE_POLICY,
+      operations: { read: ['manager'], create: [], update: [] },
+    })
     const menu = menuOf([ORDER, managersOnly], CLERK)
     expect(menu).toEqual({ forms: [{ id: 'order', title: 'Order', operations: ['read', 'create', 'update'], children: [] }] })
   })

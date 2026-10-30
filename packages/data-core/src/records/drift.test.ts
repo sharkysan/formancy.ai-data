@@ -3,7 +3,23 @@ import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import { DELETE_REFUSED, driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './drift.js'
 import { planCreate, planUpdate } from './plan.js'
 import type { DescribedTable } from './types.js'
-import { ANSWERS, AUDITOR, CLERK, DEFINITION, described, MS, MS_FACTS, MS_ORDER, ORDER_POLICY, ORDER_TOKEN, orderForm, PG, PG_ORDER, snapshot, text } from './test-support.js'
+import {
+  ANSWERS,
+  AUDITOR,
+  CLERK,
+  DEFINITION,
+  described,
+  MS,
+  MS_FACTS,
+  MS_ORDER,
+  ORDER_POLICY,
+  ORDER_TOKEN,
+  orderForm,
+  PG,
+  PG_ORDER,
+  snapshot,
+  text,
+} from './test-support.js'
 
 /*
  * What the planners decide about the database as a request described it
@@ -34,9 +50,17 @@ describe('driftRefusal and runtimeOperations', () => {
   // narrowing would close every form whose writes a narrowing stopped; a
   // write let through a narrowing is the reproduction's 1234.57.
   test('refuse a read only when what the form shows breaks, and a write when a change stops it', () => {
-    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', AMOUNT_AS_TEXT), 'read')).toMatchObject({ ok: false, code: 'drift', message: READ_REFUSED })
+    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', AMOUNT_AS_TEXT), 'read')).toMatchObject({
+      ok: false,
+      code: 'drift',
+      message: READ_REFUSED,
+    })
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', GROUP_NARROWED), 'read')).toBeUndefined()
-    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', GROUP_NARROWED), 'create')).toMatchObject({ ok: false, code: 'drift', message: WRITE_REFUSED })
+    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', GROUP_NARROWED), 'create')).toMatchObject({
+      ok: false,
+      code: 'drift',
+      message: WRITE_REFUSED,
+    })
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', KEY_DROPPED), 'update')).toMatchObject({ ok: false, code: 'drift' })
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', KEY_DROPPED), 'create')).toBeUndefined()
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, described(PG, PG_ORDER), 'update')).toBeUndefined()
@@ -83,16 +107,26 @@ describe('driftRefusal and runtimeOperations', () => {
       order.primaryKey = null
       order.uniqueKeys.push({ name: 'uq_order_id', columns: ['id'] })
     })
-    for (const [name, description, kind] of [['loosened', loosened, 'column-loosened'], ['dropped', after('postgres', KEY_DROPPED), 'identity-key-changed']] as const) {
+    for (const [name, description, kind] of [
+      ['loosened', loosened, 'column-loosened'],
+      ['dropped', after('postgres', KEY_DROPPED), 'identity-key-changed'],
+    ] as const) {
       expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, description, 'read'), name).toBeUndefined()
       const refused = driftRefusal(PG, PG_ORDER, ORDER_POLICY, description, 'list')
       expect(refused, name).toMatchObject({ ok: false, code: 'drift', message: LIST_REFUSED })
       // The log is told what moved the key, whatever review calls it.
-      expect(refused?.drift?.map((change) => [change.kind, change.affects]), name).toContainEqual([kind, ['id']])
+      expect(
+        refused?.drift?.map((change) => [change.kind, change.affects]),
+        name,
+      ).toContainEqual([kind, ['id']])
     }
     expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, described(PG, PG_ORDER), 'list')).toBeUndefined()
     // A page the read refuses is refused as a read is.
-    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', AMOUNT_AS_TEXT), 'list')).toMatchObject({ ok: false, code: 'drift', message: READ_REFUSED })
+    expect(driftRefusal(PG, PG_ORDER, ORDER_POLICY, after('postgres', AMOUNT_AS_TEXT), 'list')).toMatchObject({
+      ok: false,
+      code: 'drift',
+      message: READ_REFUSED,
+    })
     expect(LIST_REFUSED).not.toMatch(/\bid\b|key column|NULL/)
     // `GET` asks this of every form it opens: one with no identity has no
     // key to hold, offers no list by `listable`, and is not refused here for it.
@@ -102,8 +136,15 @@ describe('driftRefusal and runtimeOperations', () => {
 
   // What GET offers is the runtime's verdict, from the same report.
   test('runtimeOperations is the report’s runtime verdict', () => {
-    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, after('sqlserver', KEY_DROPPED))).toMatchObject({ ok: true, verdict: { readable: true, writable: { create: true, update: false, delete: false } } })
-    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, described(MS, MS_ORDER))).toEqual({ ok: true, verdict: { readable: true, writable: { create: true, update: true, delete: false } }, drift: [] })
+    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, after('sqlserver', KEY_DROPPED))).toMatchObject({
+      ok: true,
+      verdict: { readable: true, writable: { create: true, update: false, delete: false } },
+    })
+    expect(runtimeOperations(MS, MS_ORDER, ORDER_POLICY, described(MS, MS_ORDER))).toEqual({
+      ok: true,
+      verdict: { readable: true, writable: { create: true, update: true, delete: false } },
+      drift: [],
+    })
   })
 
   // Bindings that do not fit their own snapshot cannot be compared, and
@@ -119,11 +160,18 @@ describe('driftRefusal and runtimeOperations', () => {
 describe('planCreate over a description', () => {
   // Without the check the reproduction's create was planned and sent.
   test('refuses drift when the description stops create, after the policy and before the codecs', () => {
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, after('postgres', GROUP_NARROWED))).toMatchObject({ ok: false, code: 'drift', drift: [{ kind: 'column-tightened' }] })
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, ANSWERS, after('postgres', GROUP_NARROWED))).toMatchObject({
+      ok: false,
+      code: 'drift',
+      drift: [{ kind: 'column-tightened' }],
+    })
     // Who may act first: the auditor may not create, whatever the database says.
     expect(planCreate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ANSWERS, after('postgres', GROUP_NARROWED))).toMatchObject({ ok: false, code: 'operation-denied' })
     // And before what was sent: an answer the codec refuses is still drift on a form that cannot save.
-    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, amount: 'many' }, after('postgres', GROUP_NARROWED))).toMatchObject({ ok: false, code: 'drift' })
+    expect(planCreate(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...ANSWERS, amount: 'many' }, after('postgres', GROUP_NARROWED))).toMatchObject({
+      ok: false,
+      code: 'drift',
+    })
   })
 
   // A widening is information (0010); refusing it would stop every form
@@ -143,12 +191,28 @@ describe('planUpdate over a description', () => {
       code: 'drift',
       drift: [{ kind: 'identity-key-changed' }],
     })
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ORDER_TOKEN, '1', { notes: 'x' }, undefined, narrowed)).toMatchObject({ ok: false, code: 'operation-denied' })
-    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, 'k1:x', 'not a version', { amount: 'many' }, undefined, narrowed)).toMatchObject({ ok: false, code: 'drift' })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, AUDITOR, ORDER_TOKEN, '1', { notes: 'x' }, undefined, narrowed)).toMatchObject({
+      ok: false,
+      code: 'operation-denied',
+    })
+    expect(planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, 'k1:x', 'not a version', { amount: 'many' }, undefined, narrowed)).toMatchObject({
+      ok: false,
+      code: 'drift',
+    })
   })
 
   test('plans after a widening, and the update carries the description’s definition', () => {
-    const planned = planUpdate(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN, '1', { notes: 'x' }, undefined, after('postgres', GROUP_WIDENED, 'widened@repeatable read'))
+    const planned = planUpdate(
+      PG,
+      PG_ORDER,
+      ORDER_POLICY,
+      CLERK,
+      ORDER_TOKEN,
+      '1',
+      { notes: 'x' },
+      undefined,
+      after('postgres', GROUP_WIDENED, 'widened@repeatable read'),
+    )
     expect(planned).toMatchObject({ ok: true, request: { definition: 'widened@repeatable read' } })
   })
 })

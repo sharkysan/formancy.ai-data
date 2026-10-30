@@ -42,7 +42,15 @@ export function FormHead({
           ))}
         </ul>
       </div>
-      <Segmented legend="Layout" name="layout" className="layout" options={LAYOUTS.map((value) => ({ value, label: LAYOUT_LABELS[value] }))} value={layout} onChange={onLayout} describedBy={note ? 'layout-note' : undefined}>
+      <Segmented
+        legend="Layout"
+        name="layout"
+        className="layout"
+        options={LAYOUTS.map((value) => ({ value, label: LAYOUT_LABELS[value] }))}
+        value={layout}
+        onChange={onLayout}
+        describedBy={note ? 'layout-note' : undefined}
+      >
         {note ? (
           <p className="hint layout-note" id="layout-note">
             In a window this narrow, Side by side is drawn stacked.

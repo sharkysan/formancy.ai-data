@@ -47,7 +47,8 @@ export function evidenceKind(item) {
 function itemProblem({ kind, value }, { covered, browserApps, jobs, exists }) {
   if (kind === 'file') {
     const file = String(value)
-    if (!TEST_FILE.test(file) || !covered.some((path) => file.startsWith(`${path}/`)) || !exists(file)) return `${file} is not a test file of a package with a suite`
+    if (!TEST_FILE.test(file) || !covered.some((path) => file.startsWith(`${path}/`)) || !exists(file))
+      return `${file} is not a test file of a package with a suite`
   } else if (kind === 'browserGate') {
     if (!browserApps.includes(value)) return `${String(value)} is not an app with a test:browser script`
   } else if (kind === 'job') {
@@ -71,15 +72,19 @@ export function gatesProblems(register, context) {
   const gates = Array.isArray(register?.gates) ? register.gates : []
   const numbers = gates.map((entry) => entry?.gate)
   const wanted = Array.from({ length: GATE_COUNT }, (_, index) => index + 1)
-  if (numbers.join() !== wanted.join()) problems.push(`the gates are ${numbers.join(', ') || 'none'}, where the plan numbers 1 to ${String(GATE_COUNT)}, each once and in order`)
+  if (numbers.join() !== wanted.join())
+    problems.push(`the gates are ${numbers.join(', ') || 'none'}, where the plan numbers 1 to ${String(GATE_COUNT)}, each once and in order`)
   for (const entry of gates) {
     const at = `gate ${String(entry?.gate)}`
     for (const key of Object.keys(entry ?? {}).filter((name) => !KEYS.has(name))) {
-      problems.push(`${at} carries "${key}", and a gate carries only its number, its evidence or why it is open: the plan's wording stays out of the repository`)
+      problems.push(
+        `${at} carries "${key}", and a gate carries only its number, its evidence or why it is open: the plan's wording stays out of the repository`,
+      )
     }
     const evidence = Array.isArray(entry?.evidence) && entry.evidence.length > 0
     const open = typeof entry?.open === 'string' && entry.open.trim() !== ''
-    if (evidence === open) problems.push(`${at} has ${evidence ? 'both evidence and a reason it is open' : 'neither evidence nor a reason it is open'}; it needs exactly one`)
+    if (evidence === open)
+      problems.push(`${at} has ${evidence ? 'both evidence and a reason it is open' : 'neither evidence nor a reason it is open'}; it needs exactly one`)
     for (const item of evidence ? entry.evidence : []) {
       const known = evidenceKind(item)
       const problem = known === undefined ? `${JSON.stringify(item)} is not exactly one of ${KINDS.join(', ')}` : itemProblem(known, context)

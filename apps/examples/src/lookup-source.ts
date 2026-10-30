@@ -60,7 +60,13 @@ export function inMemorySource(binding: LookupBinding, rows: readonly CapturedRo
     const key = keyOf(binding, row)
     const token = encodeKeyToken(key)
     if (!token.ok) throw new Error(`${binding.foreignKey}: ${token.message}`)
-    return { value: token.token, label: formatLabel(binding.display.map((column) => row[column] ?? null), key) }
+    return {
+      value: token.token,
+      label: formatLabel(
+        binding.display.map((column) => row[column] ?? null),
+        key,
+      ),
+    }
   })
 
   return {

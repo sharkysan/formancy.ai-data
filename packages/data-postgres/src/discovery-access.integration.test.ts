@@ -1,7 +1,19 @@
 import { findObject } from '@formancy/data-core'
 import type { MetadataSnapshot, ObjectMeta, RecordColumn, RecordOutcome, RecordTarget, RowFilters } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, defined, FIXTURE_MODEL, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startPostgresFixture, versionFact, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import {
+  accessDisagreements,
+  covers,
+  defined,
+  FIXTURE_MODEL,
+  FIXTURE_SCOPE,
+  MODEL_CASES,
+  renamedColumn,
+  startPostgresFixture,
+  versionFact,
+  WRITER,
+  WRITER_ACCESS,
+} from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
@@ -152,7 +164,9 @@ describe('whether the account may delete (0049)', () => {
     expect(deletable(asWriter, 'sales')).toEqual(['delivery', 'order', 'order_line', 'parcel'])
     expect(described(asWriter, 'sales', 'customer').access).toEqual({ delete: false })
     expect(described(sealed, 'sealed', 'inside').access).toEqual({ delete: false })
-    expect(await answers(writer, ['delete from sealed.inside where false', 'delete from sales.customer where false', 'delete from sales.order_line where false'])).toEqual(['42501', '42501', 'ok'])
+    expect(
+      await answers(writer, ['delete from sealed.inside where false', 'delete from sales.customer where false', 'delete from sales.order_line where false']),
+    ).toEqual(['42501', '42501', 'ok'])
   })
 })
 
@@ -260,7 +274,10 @@ describe('every capability the snapshot reports is the answer the database gives
     const sql = account()
     const snapshot = await discoverPostgres(sql, { schemas: ['sales', 'probe', 'sealed'] })
     const asked = probes(snapshot)
-    const answered = await answers(sql, asked.map((probe) => probe.statement))
+    const answered = await answers(
+      sql,
+      asked.map((probe) => probe.statement),
+    )
     const disagreements = asked.flatMap(({ statement, claimed }, index) => {
       const answer = answered[index]
       const agrees = claimed ? answer === 'ok' : answer === '42501'
@@ -301,7 +318,10 @@ describe('privileges through roles', () => {
   // 16 takes is refused, so a 15 leg that answered 16's way is red.
   test('a WITH INHERIT FALSE membership reports no capability, and the read is refused; a server without the option refuses the grant, and a NOINHERIT member reports none', async () => {
     if (!perMembership) {
-      await expect(owner.unsafe('grant inh_target to inh_full with inherit false')).rejects.toMatchObject({ code: '42601', message: 'syntax error at or near "inherit"' })
+      await expect(owner.unsafe('grant inh_target to inh_full with inherit false')).rejects.toMatchObject({
+        code: '42601',
+        message: 'syntax error at or near "inherit"',
+      })
     }
     const none = connect(as('inh_none', 'inherit-false-password'))
     const full = connect(as('inh_full', 'inherit-true-password'))
@@ -334,12 +354,18 @@ describe('row-level security', () => {
   // row_security_active answers for the account (B1), so the snapshots say
   // exactly that, and the reads agree.
   test('applies to the writer and the reader on customer, and not to the superuser owner', async () => {
-    const [asOwner, asReader, asWriter] = await Promise.all([discoverPostgres(owner, FIXTURE_SCOPE), discoverPostgres(reader, FIXTURE_SCOPE), discoverPostgres(writer, FIXTURE_SCOPE)])
+    const [asOwner, asReader, asWriter] = await Promise.all([
+      discoverPostgres(owner, FIXTURE_SCOPE),
+      discoverPostgres(reader, FIXTURE_SCOPE),
+      discoverPostgres(writer, FIXTURE_SCOPE),
+    ])
     expect(described(asOwner, 'sales', 'customer').rowSecurity).toBe('none')
     expect(described(asReader, 'sales', 'customer').rowSecurity).toBe('applies')
     expect(described(asWriter, 'sales', 'customer').rowSecurity).toBe('applies')
     for (const snapshot of [asOwner, asReader, asWriter]) {
-      expect(snapshot.objects.filter((object) => object.ref.name !== 'customer').map((object) => object.rowSecurity)).toEqual(Array(FIXTURE_MODEL.length - 1).fill('none'))
+      expect(snapshot.objects.filter((object) => object.ref.name !== 'customer').map((object) => object.rowSecurity)).toEqual(
+        Array(FIXTURE_MODEL.length - 1).fill('none'),
+      )
     }
     expect(await writer`select tenant_id from sales.customer`).toEqual([{ tenant_id: 1 }])
     expect(await owner`select tenant_id from sales.customer order by tenant_id`).toEqual([{ tenant_id: 1 }, { tenant_id: 2 }])
@@ -446,14 +472,26 @@ describe('what the records operations do with what the snapshot reports', () => 
     expect(described(snapshot, 'probe', 'policed').rowSecurity).toBe('applies')
     const records = defined(createPostgresRecords(writer))
     const id: RecordColumn = { name: 'id', type: INT32 }
-    const target = { table: { schema: 'probe', name: 'policed' }, identity: [id], concurrency: { kind: 'version-column', column: 'version' } } as const satisfies RecordTarget
+    const target = {
+      table: { schema: 'probe', name: 'policed' },
+      identity: [id],
+      concurrency: { kind: 'version-column', column: 'version' },
+    } as const satisfies RecordTarget
     const everyRow: RowFilters = { kind: 'unrestricted' }
     const row = (key: string, tenant: string) => [
       { ...id, value: key },
       { name: 'tenant_id', type: INT32, value: tenant },
     ]
     const update = (key: string) =>
-      records.update({ target, key: [{ ...id, value: key }], set: [{ name: 'note', type: TEXT, value: 'changed' }], expectedVersion: '1', filters: everyRow, through: [], returning: [] })
+      records.update({
+        target,
+        key: [{ ...id, value: key }],
+        set: [{ name: 'note', type: TEXT, value: 'changed' }],
+        expectedVersion: '1',
+        filters: everyRow,
+        through: [],
+        returning: [],
+      })
 
     expect(failure(await records.insert({ target, values: row('3', '2'), returning: [] }))).toBe('permission-denied')
     expect(failure(await records.read({ target, key: [{ ...id, value: '2' }], columns: [id], filters: everyRow, through: [] }))).toBe('not-found')

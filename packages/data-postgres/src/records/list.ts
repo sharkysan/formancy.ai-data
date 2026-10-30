@@ -69,5 +69,8 @@ export function listStatement(request: ListRequest, terms: ListTerms): RecordSta
     .filter((part) => part !== '')
     .join('\n')
   const once = columns.map((expression) => `case when "page"."n" is null or "page"."n" ${op('=')} ${first} then ${expression} end`)
-  return { text: `select ${once.join(', ')}, "page".*\nfrom ${from}\nleft join lateral (${page}) as "page" on true\norder by "page"."n"`, params: statement.params }
+  return {
+    text: `select ${once.join(', ')}, "page".*\nfrom ${from}\nleft join lateral (${page}) as "page" on true\norder by "page"."n"`,
+    params: statement.params,
+  }
 }

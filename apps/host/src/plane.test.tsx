@@ -5,7 +5,30 @@ import { ROUTE_OPERATIONS } from '@formancy/data-server'
 import { demoSession } from './demo.js'
 import { demoDoor } from './test-demo.js'
 import { applyCondition, listsApplied, listsSent } from './test-filter.js'
-import { answer, answeredOnce, chooseCustomer, chooseForm, chooseRenderer, exportButton, exportLine, gridSection, gridStatus, keeping, load, loaded, mount, newRecord, rendered, said, save, searchRecords, shows, signIn, signInAs, stamp } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseCustomer,
+  chooseForm,
+  chooseRenderer,
+  exportButton,
+  exportLine,
+  gridSection,
+  gridStatus,
+  keeping,
+  load,
+  loaded,
+  mount,
+  newRecord,
+  rendered,
+  said,
+  save,
+  searchRecords,
+  shows,
+  signIn,
+  signInAs,
+  stamp,
+} from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane, Sent } from './test-plane.js'
 
@@ -172,7 +195,11 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
 
     // The tenant is the token's, never the form's or the page's: no body
     // names one, at any depth (0011, 0029).
-    const tenants = page.flatMap((request) => keys(JSON.parse(request.body ?? '{}')).filter((key) => /tenant/i.test(key)).map((key) => `${line(request)}: ${key}`))
+    const tenants = page.flatMap((request) =>
+      keys(JSON.parse(request.body ?? '{}'))
+        .filter((key) => /tenant/i.test(key))
+        .map((key) => `${line(request)}: ${key}`),
+    )
     expect(tenants).toEqual([])
 
     // The filter travels as the search does (0104): in the body of the list
@@ -181,7 +208,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // held the condition).
     const condition = { field: 'notes', op: 'contains', text: words }
     expect(listsSent(sent, formId).some(({ body }) => JSON.stringify(body.filter) === JSON.stringify([condition]))).toBe(true)
-    const files = sent.filter((request) => request.path === `/v1/forms/${formId}/records/export`).map((request) => JSON.parse(request.body ?? '{}') as { filter?: unknown })
+    const files = sent
+      .filter((request) => request.path === `/v1/forms/${formId}/records/export`)
+      .map((request) => JSON.parse(request.body ?? '{}') as { filter?: unknown })
     expect(files.map((body) => body.filter)).toEqual([[condition]])
     expect(page.filter((request) => request.url.includes(words)).map(line)).toEqual([])
   })

@@ -5,8 +5,12 @@
 // so the two say the same thing the same way.
 
 export const code = (text) => `\`${text}\``
-const cell = (text) => String(text ?? '').replaceAll('|', '\\|').replaceAll('\n', ' ')
-export const table = (head, rows) => [`| ${head.join(' | ')} |`, `| ${head.map(() => '---').join(' | ')} |`, ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`)].join('\n')
+const cell = (text) =>
+  String(text ?? '')
+    .replaceAll('|', '\\|')
+    .replaceAll('\n', ' ')
+export const table = (head, rows) =>
+  [`| ${head.join(' | ')} |`, `| ${head.map(() => '---').join(' | ')} |`, ...rows.map((row) => `| ${row.map(cell).join(' | ')} |`)].join('\n')
 export const prose = (items) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
 export const seconds = (ms) => (ms === null || ms === undefined || Number.isNaN(ms) ? '' : `${(ms / 1000).toFixed(1)} s`)
 

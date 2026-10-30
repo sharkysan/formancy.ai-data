@@ -48,7 +48,13 @@ async function freshOrder(engine: Engine, notes: string): Promise<string> {
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   return created.value.record
 }
@@ -62,7 +68,11 @@ async function lostLine(engine: Engine, when: 'after' | 'before'): Promise<{ use
   await chooseForm(user, engine.formId)
   await searchRecords(user, words, [order.slice(3)])
   const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-  await user.click(within(grid).getAllByRole('gridcell').find((cell) => cell.textContent === order.slice(3)) as HTMLElement)
+  await user.click(
+    within(grid)
+      .getAllByRole('gridcell')
+      .find((cell) => cell.textContent === order.slice(3)) as HTMLElement,
+  )
   await waitFor(() => gridSection('Order line'), ARRIVES)
   await answeredOnce('Order line')
   await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
@@ -91,7 +101,13 @@ describe.each(ENGINES)('a lost line on $engine (0031, 0047)', (engine) => {
     const notice = await waitFor(() => lost(pane), ARRIVES)
     await waitFor(() => expect(focusedName()).toBe('New Order line React It may have been saved'))
     await user.click(within(notice).getByRole('button', { name: 'Check whether it was saved' }))
-    await waitFor(() => expect(within(notice).getByRole('status').textContent).toBe(`A record with this key is stored, record k1:${order.slice(3)},5. Load it to see whether it holds what was entered here.`), ARRIVES)
+    await waitFor(
+      () =>
+        expect(within(notice).getByRole('status').textContent).toBe(
+          `A record with this key is stored, record k1:${order.slice(3)},5. Load it to see whether it holds what was entered here.`,
+        ),
+      ARRIVES,
+    )
     expect(within(notice).getByRole('button', { name: 'Load the saved record' })).toBeTruthy()
   })
 
@@ -101,8 +117,22 @@ describe.each(ENGINES)('a lost line on $engine (0031, 0047)', (engine) => {
     const { user, pane, order } = await lostLine(engine, 'before')
     const notice = await waitFor(() => lost(pane), ARRIVES)
     await user.click(within(notice).getByRole('button', { name: 'Check whether it was saved' }))
-    await waitFor(() => expect(within(notice).getByRole('status').textContent).toBe('This form cannot find a record with its key. Saving it again is safe: the key stops a second copy.'), ARRIVES)
+    await waitFor(
+      () =>
+        expect(within(notice).getByRole('status').textContent).toBe(
+          'This form cannot find a record with its key. Saving it again is safe: the key stops a second copy.',
+        ),
+      ARRIVES,
+    )
     await user.click(within(pane).getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(within(pane).getAllByRole('status').map((status) => status.textContent)).toContain(`Created record k1:${order.slice(3)},5.`), ARRIVES)
+    await waitFor(
+      () =>
+        expect(
+          within(pane)
+            .getAllByRole('status')
+            .map((status) => status.textContent),
+        ).toContain(`Created record k1:${order.slice(3)},5.`),
+      ARRIVES,
+    )
   })
 })

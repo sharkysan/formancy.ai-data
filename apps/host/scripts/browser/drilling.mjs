@@ -78,7 +78,10 @@ async function anOrderLine(page, at) {
   await heading(page, `Order line ${at.line}`).waitFor(WITHIN)
   const all = ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]
   at.compact = await phone(page)
-  check('Drill down: three levels down, the trail names every level, or on a phone its ends', same(await crumbs(page), at.compact ? ['Records', '…', `Order ${at.order}`, `Order line ${at.line}`] : all))
+  check(
+    'Drill down: three levels down, the trail names every level, or on a phone its ends',
+    same(await crumbs(page), at.compact ? ['Records', '…', `Order ${at.order}`, `Order line ${at.line}`] : all),
+  )
   // The separator between crumbs is drawn, never read: Playwright's
   // accessibility tree takes a pseudo-element's `content`, and its
   // alternative text when the rule gives one, as the browsers do.
@@ -89,9 +92,18 @@ async function anOrderLine(page, at) {
   const reached = []
   for (let step = 0; step < 3; step += 1) {
     await page.keyboard.press('Tab')
-    reached.push(await page.evaluate(() => (document.activeElement?.closest('nav') === null ? null : (document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim() ?? null))))
+    reached.push(
+      await page.evaluate(() =>
+        document.activeElement?.closest('nav') === null
+          ? null
+          : (document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.textContent?.trim() ?? null),
+      ),
+    )
   }
-  check('Drill down: Tab reaches each crumb above the level shown, in order', same(reached, at.compact ? ['Records', 'Show all 4 levels', `Order ${at.order}`] : ['Records', `Customer ${at.name}`, `Order ${at.order}`]))
+  check(
+    'Drill down: Tab reaches each crumb above the level shown, in order',
+    same(reached, at.compact ? ['Records', 'Show all 4 levels', `Order ${at.order}`] : ['Records', `Customer ${at.name}`, `Order ${at.order}`]),
+  )
 }
 
 async function upByTheTrail(page, at) {
@@ -99,11 +111,17 @@ async function upByTheTrail(page, at) {
   const customer = trail(page).getByRole('button', { name: `Customer ${at.name}`, exact: true })
   if (at.compact) {
     const more = trail(page).getByRole('button', { name: 'Show all 4 levels', exact: true })
-    check('Drill down, on a phone: the button that draws the rest says it is collapsed', (await more.getAttribute('aria-expanded')) === 'false' ? null : 'aria-expanded is not "false"')
+    check(
+      'Drill down, on a phone: the button that draws the rest says it is collapsed',
+      (await more.getAttribute('aria-expanded')) === 'false' ? null : 'aria-expanded is not "false"',
+    )
     await more.focus()
     await page.keyboard.press('Enter')
     await customer.waitFor(WITHIN)
-    check('Drill down, on a phone: drawn, the trail names every level', same(await crumbs(page), ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]))
+    check(
+      'Drill down, on a phone: drawn, the trail names every level',
+      same(await crumbs(page), ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]),
+    )
     check('Drill down, on a phone: the keyboard is on the first crumb it drew', await focusedOn(page, customer))
   }
   await customer.focus()
@@ -111,7 +129,10 @@ async function upByTheTrail(page, at) {
   const shown = heading(page, `Customer k1:1,${String(at.no)}`)
   await shown.waitFor(WITHIN)
   await until(async () => (await focusedOn(page, shown)) === null, `Enter on a crumb left the keyboard on ${await describeFocus(page)}`)
-  check('Drill down: a level above shown by its crumb keeps the levels below', (await page.getByRole('heading', { name: `Order line ${at.line}`, exact: true }).count()) === 0 ? null : 'the line is still shown')
+  check(
+    'Drill down: a level above shown by its crumb keeps the levels below',
+    (await page.getByRole('heading', { name: `Order line ${at.line}`, exact: true }).count()) === 0 ? null : 'the line is still shown',
+  )
 }
 
 async function back(page, at) {
@@ -121,7 +142,10 @@ async function back(page, at) {
   await line.waitFor(WITHIN)
   await until(async () => (await focusedOn(page, line)) === null, 'never').catch(() => null)
   check("Drill down: the browser's Back goes down to the level the crumb left, keyboard on its heading", await focusedOn(page, line))
-  check('Drill down: and the address says that level', (await page.evaluate(() => window.location.hash)).endsWith('&layout=drill&view=record&level=3') ? null : await page.evaluate(() => window.location.hash))
+  check(
+    'Drill down: and the address says that level',
+    (await page.evaluate(() => window.location.hash)).endsWith('&layout=drill&view=record&level=3') ? null : await page.evaluate(() => window.location.hash),
+  )
   // Back to the layout the later journeys start from: the address keeps a
   // layout across a sign-in, and Drill down's records show no renderer switch.
   await page.getByRole('radio', { name: 'Side by side', exact: true }).check()

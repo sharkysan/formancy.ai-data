@@ -19,7 +19,9 @@ export type OfferedOperation = 'create' | 'update' | 'delete'
  */
 export function offers(bindings: Pick<FormBindings, 'operations'>, operation: OfferedOperation): boolean {
   const operations: unknown = bindings.operations
-  return typeof operations === 'object' && operations !== null && Object.hasOwn(operations, operation) && (operations as Record<string, unknown>)[operation] === true
+  return (
+    typeof operations === 'object' && operations !== null && Object.hasOwn(operations, operation) && (operations as Record<string, unknown>)[operation] === true
+  )
 }
 
 /** How a column's value is numbered by the database, for a key no form writes (0026). */

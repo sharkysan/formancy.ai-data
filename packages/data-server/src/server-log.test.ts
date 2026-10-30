@@ -27,7 +27,12 @@ const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } } : { ok: false, reason: 'bad' }
 
 /** The allowlist knows `erp` and opens nothing: no request here gets as far as a database. */
-const registry = (): ConnectionRegistry => ({ ids: () => ['erp'], scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined), open: async () => undefined, close: async () => {} })
+const registry = (): ConnectionRegistry => ({
+  ids: () => ['erp'],
+  scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
+  open: async () => undefined,
+  close: async () => {},
+})
 
 let root: string
 let store: ConfigurationStore
@@ -46,9 +51,22 @@ afterEach(async () => {
 })
 
 /** The server as `main.ts` composes it -- both planes from `servedPlanes`, the audit sink its log, an origin listed, review when publisher roles are given -- writing to this suite. */
-async function runnable(adminRoles: readonly string[] = ['data-admin'], origins: readonly string[] = ['https://app.example'], publisherRoles?: readonly string[]): Promise<FastifyInstance> {
+async function runnable(
+  adminRoles: readonly string[] = ['data-admin'],
+  origins: readonly string[] = ['https://app.example'],
+  publisherRoles?: readonly string[],
+): Promise<FastifyInstance> {
   let app: FastifyInstance | undefined
-  const planes = servedPlanes({ registry: registry(), store, adminRoles, publisherRoles, auditKey: undefined, origins, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => (app as FastifyInstance).log })
+  const planes = servedPlanes({
+    registry: registry(),
+    store,
+    adminRoles,
+    publisherRoles,
+    auditKey: undefined,
+    origins,
+    lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+    log: () => (app as FastifyInstance).log,
+  })
   app = await createDataServer({
     verifyIdentity,
     logger: {
@@ -133,7 +151,7 @@ describe("the runnable server's log", () => {
   // trail out by `msg: 'audit'` and tells the planes apart by `audit.plane`.
   // A plane wired to another sink, or to none, leaves its line out here.
   // The administrator's plane is on only when roles administer it.
-  test('writes both planes\' events to the same log, told apart by plane', async () => {
+  test("writes both planes' events to the same log, told apart by plane", async () => {
     const server = await runnable()
     await server.inject({ method: 'GET', url: '/v1/forms/employee' })
     await server.inject({ method: 'GET', url: '/v1/forms/employee/versions' })
@@ -141,7 +159,17 @@ describe("the runnable server's log", () => {
       { plane: 'runtime', operation: 'form' },
       { plane: 'admin', operation: 'version-list' },
     ])
-    expect(servedPlanes({ registry: registry(), store, adminRoles: [], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => server.log }).admin).toBeUndefined()
+    expect(
+      servedPlanes({
+        registry: registry(),
+        store,
+        adminRoles: [],
+        auditKey: undefined,
+        origins: [],
+        lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        log: () => server.log,
+      }).admin,
+    ).toBeUndefined()
   })
   // Review is the operator's choice, read once by main.ts and handed to the
   // administrator's plane by servedPlanes (0065). Dropped on the way, the
@@ -152,16 +180,48 @@ describe("the runnable server's log", () => {
   // leaving publisherRoles out.
   test('puts the administrator plane under review when publisher roles are set, and not otherwise', async () => {
     const reviewed = await runnable(['data-admin', 'data-publisher'], [], ['data-publisher'])
-    expect((await reviewed.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toMatchObject({ review: true, publisher: false })
-    const refused = await reviewed.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: { authorization: 'Bearer admin' }, payload: { expectedBase: null } })
+    expect((await reviewed.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toMatchObject({
+      review: true,
+      publisher: false,
+    })
+    const refused = await reviewed.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: { authorization: 'Bearer admin' },
+      payload: { expectedBase: null },
+    })
     expect([refused.statusCode, (refused.json() as { code: string }).code]).toEqual([403, 'review-required'])
-    expect(lines.filter((line) => line.msg === 'audit').map((line) => ({ operation: line.audit?.operation, outcome: (line.audit as { outcome?: string } | undefined)?.outcome }))).toEqual([
+    expect(
+      lines
+        .filter((line) => line.msg === 'audit')
+        .map((line) => ({ operation: line.audit?.operation, outcome: (line.audit as { outcome?: string } | undefined)?.outcome })),
+    ).toEqual([
       { operation: 'administration', outcome: 'ok' },
       { operation: 'publish', outcome: 'review-required' },
     ])
     const plain = await runnable()
-    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toEqual({ review: false, publisher: true, refuses: { browse: { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." } } })
-    expect(servedPlanes({ registry: registry(), store, adminRoles: [], publisherRoles: ['data-publisher'], auditKey: undefined, origins: [], lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, log: () => plain.log }).admin).toBeUndefined()
+    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: { authorization: 'Bearer admin' } })).json()).toEqual({
+      review: false,
+      publisher: true,
+      refuses: {
+        browse: {
+          code: 'browse-role-required',
+          message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you.",
+        },
+      },
+    })
+    expect(
+      servedPlanes({
+        registry: registry(),
+        store,
+        adminRoles: [],
+        publisherRoles: ['data-publisher'],
+        auditKey: undefined,
+        origins: [],
+        lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        log: () => plain.log,
+      }).admin,
+    ).toBeUndefined()
   })
 
   // A refused preflight is a plain network error to the page that sent it,
@@ -178,11 +238,17 @@ describe("the runnable server's log", () => {
     const typed = [`https://user:${PASSWORD}@${HOST}`, `https://${HOST}/${PASSWORD}`, `https://${HOST}?password=${PASSWORD}`, `https://${HOST}:${PASSWORD}`]
     for (const origin of [...typed, 'https://other.example']) {
       const preflight = await server.inject({ method: 'OPTIONS', url: '/v1/forms/employee', headers: { origin, 'access-control-request-method': 'GET' } })
-      const riding = await server.inject({ method: 'GET', url: '/v1/forms/employee', headers: { origin, 'sec-fetch-site': 'cross-site', authorization: 'Bearer admin' } })
+      const riding = await server.inject({
+        method: 'GET',
+        url: '/v1/forms/employee',
+        headers: { origin, 'sec-fetch-site': 'cross-site', authorization: 'Bearer admin' },
+      })
       expect([preflight.statusCode, riding.statusCode]).toEqual([403, 403])
     }
     expect(written.filter((line) => line.includes(PASSWORD) || line.includes(HOST))).toEqual([])
-    const refusals = lines.filter((line) => line.msg === 'preflight refused' || line.msg === 'cross-origin request refused').map(({ msg, reason, origin }) => ({ msg, reason, origin }))
+    const refusals = lines
+      .filter((line) => line.msg === 'preflight refused' || line.msg === 'cross-origin request refused')
+      .map(({ msg, reason, origin }) => ({ msg, reason, origin }))
     expect(refusals).toEqual([
       ...typed.flatMap(() => [
         { msg: 'preflight refused', reason: 'origin not listed', origin: undefined },

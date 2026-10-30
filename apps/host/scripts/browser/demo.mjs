@@ -47,25 +47,31 @@ const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.mi
  */
 async function audit(page) {
   if (!(await page.evaluate(() => 'axe' in window))) await page.evaluate(`${AXE}\n;undefined`)
-  return page.evaluate(async (tags) => {
-    const results = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, preload: false })
-    const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
-    return {
-      violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
-      measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-      undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)),
-    }
-  }, [...ACCESSIBILITY_TAGS])
+  return page.evaluate(
+    async (tags) => {
+      const results = await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, preload: false })
+      const nodes = (list, id) => list.find((rule) => rule.id === id)?.nodes ?? []
+      return {
+        violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
+        measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
+        undecided: nodes(results.incomplete, 'color-contrast').map((node) => node.html.slice(0, 60)),
+      }
+    },
+    [...ACCESSIBILITY_TAGS],
+  )
 }
 
 /** Records every policy violation the page reports, from before its first script. */
 function hearViolations() {
   window.formancyViolations = []
-  document.addEventListener('securitypolicyviolation', (event) => window.formancyViolations.push(`${event.effectiveDirective} refused ${event.blockedURI || 'inline'}`))
+  document.addEventListener('securitypolicyviolation', (event) =>
+    window.formancyViolations.push(`${event.effectiveDirective} refused ${event.blockedURI || 'inline'}`),
+  )
 }
 
 const violationsOf = (page) => page.evaluate(() => window.formancyViolations.splice(0))
-const focusedName = (page) => page.evaluate(() => `${document.activeElement?.tagName.toLowerCase() ?? 'nothing'} "${(document.activeElement?.textContent ?? '').trim().slice(0, 40)}"`)
+const focusedName = (page) =>
+  page.evaluate(() => `${document.activeElement?.tagName.toLowerCase() ?? 'nothing'} "${(document.activeElement?.textContent ?? '').trim().slice(0, 40)}"`)
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const grid = (scope, name) => scope.getByRole('grid', { name, exact: true })
 /** The open record's region, named by its heading: `Order k1:1`, `New record`, or a pattern for a token not known yet. */
@@ -118,7 +124,12 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const address = `${origin}${prefix}/`
 
     const response = await page.goto(address)
-    check('the page is sent with the live policy', response?.headers()['content-security-policy'] === contentSecurityPolicy(LIVE_POLICY) ? null : `it said ${String(response?.headers()['content-security-policy'])}`)
+    check(
+      'the page is sent with the live policy',
+      response?.headers()['content-security-policy'] === contentSecurityPolicy(LIVE_POLICY)
+        ? null
+        : `it said ${String(response?.headers()['content-security-policy'])}`,
+    )
     await page.getByRole('button', { name: 'Sign in as Clara' }).waitFor(WITHIN)
 
     // The keyboard path a visitor starts on, and the sign-in as everyone reads it.
@@ -126,9 +137,15 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const skip = await focusedName(page)
     await page.keyboard.press('Tab')
     const next = await focusedName(page)
-    check('the first Tab is on the skip link and the next on the first person', skip === 'a "Skip to the workspace"' && next === 'button "Sign in as Clara"' ? null : `${skip}, then ${next}`)
+    check(
+      'the first Tab is on the skip link and the next on the first person',
+      skip === 'a "Skip to the workspace"' && next === 'button "Sign in as Clara"' ? null : `${skip}, then ${next}`,
+    )
     const signIn = await audit(page)
-    check('axe finds nothing on the sign-in, and measured contrast and target size there', signIn.violations.length === 0 && signIn.measured.length === 2 && signIn.undecided.length === 0 ? null : JSON.stringify(signIn))
+    check(
+      'axe finds nothing on the sign-in, and measured contrast and target size there',
+      signIn.violations.length === 0 && signIn.measured.length === 2 && signIn.undecided.length === 0 ? null : JSON.stringify(signIn),
+    )
     await page.setViewportSize({ width: 320, height: 800 })
     const sideways = await page.evaluate(() => document.scrollingElement.scrollWidth - document.scrollingElement.clientWidth)
     check('the sign-in does not scroll sideways at 320 pixels', sideways <= 0 ? null : `it scrolls ${String(sideways)} px`)
@@ -160,7 +177,7 @@ export async function demoPass({ origin, prefix, check, timed }) {
     await says(lines, /^Order line rows 1–\d+\.$/)
     await says(first.getByRole('region', { name: 'Delivery', exact: true }), /^Delivery rows 1–\d+\.$/)
     const lineRows = (await grid(lines, 'Order line').getByRole('row').count()) - 1
-    check("an order opens with its lines in the linked grid", lineRows > 0 ? null : 'its lines grid has no row')
+    check('an order opens with its lines in the linked grid', lineRows > 0 ? null : 'its lines grid has no row')
     const open = await audit(page)
     check('axe finds no violation with an order open', open.violations.length === 0 ? null : open.violations.join('; '))
     const note = `Changed in the browser at ${new Date().toISOString()}`
@@ -180,7 +197,10 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const option = page.getByRole('option').filter({ hasText: 'Kunz' }).first()
     await option.waitFor(WITHIN)
     const offered = await page.getByRole('option').allTextContents()
-    check('the customer typeahead offers what the visitor typed', offered.length > 0 && offered.every((text) => text.includes('Kunz')) ? null : `it offered ${JSON.stringify(offered.slice(0, 4))}`)
+    check(
+      'the customer typeahead offers what the visitor typed',
+      offered.length > 0 && offered.every((text) => text.includes('Kunz')) ? null : `it offered ${JSON.stringify(offered.slice(0, 4))}`,
+    )
     await option.click()
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Order date*' }).fill('2026-10-17')
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Status' }).fill('placed')
@@ -203,7 +223,9 @@ export async function demoPass({ origin, prefix, check, timed }) {
     check('a line is added to the new order, in its linked grid', null)
     await made.getByRole('button', { name: 'Delete record' }).click()
     await page.getByRole('button', { name: 'Delete it' }).click()
-    await grid(records(page), 'Records').getByRole('button', { name: `Delete Order ${token}` }).waitFor({ state: 'detached', ...WITHIN })
+    await grid(records(page), 'Records')
+      .getByRole('button', { name: `Delete Order ${token}` })
+      .waitFor({ state: 'detached', ...WITHIN })
     // That its line went with it is the API journey's to show, which reads
     // the line after the delete (scripts/live-demo-gate/journey.mjs): a
     // visitor's page has no way to ask for a line it no longer lists.
@@ -223,7 +245,10 @@ export async function demoPass({ origin, prefix, check, timed }) {
     await signInAsClara(page)
     await openOrders(page)
     const refused = await violationsOf(page)
-    check("under the examples page's policy, AG Grid's style elements are refused", refused.some((violation) => violation.startsWith('style-src-elem refused inline')) ? null : `the page reported ${JSON.stringify(refused)}`)
+    check(
+      "under the examples page's policy, AG Grid's style elements are refused",
+      refused.some((violation) => violation.startsWith('style-src-elem refused inline')) ? null : `the page reported ${JSON.stringify(refused)}`,
+    )
     errors.splice(0)
   } finally {
     await browser.close()

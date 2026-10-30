@@ -10,7 +10,8 @@ import type { SecretSource } from '@formancy/data-identity'
  * `tenant` and a `client`, both ids, and a `secret` that is a reference, as
  * a password is. No test of this release logs in as either.
  */
-export type ConnectionLogin = { type: 'entra-managed-identity'; client?: string } | { type: 'entra-service-principal'; tenant: string; client: string; secret: string }
+export type ConnectionLogin =
+  { type: 'entra-managed-identity'; client?: string } | { type: 'entra-service-principal'; tenant: string; client: string; secret: string }
 
 /**
  * One database the deployment allows forms to bind to, as the operator wrote
@@ -92,8 +93,10 @@ function tlsProblems(where: string, tls: unknown, entra: boolean): string[] {
   for (const key of Object.keys(tls)) {
     if (!(TLS_KEYS as readonly string[]).includes(key)) problems.push(`${where}.tls.${key} is not a setting this release reads`)
   }
-  if (entra && tls['enabled'] === false) problems.push(`${where}.tls.enabled cannot be false for an Entra login: its token would cross the network in the clear`)
-  if (entra && tls['trustServerCertificate'] === true) problems.push(`${where}.tls.trustServerCertificate cannot be true for an Entra login: its token would go to any server that answered`)
+  if (entra && tls['enabled'] === false)
+    problems.push(`${where}.tls.enabled cannot be false for an Entra login: its token would cross the network in the clear`)
+  if (entra && tls['trustServerCertificate'] === true)
+    problems.push(`${where}.tls.trustServerCertificate cannot be true for an Entra login: its token would go to any server that answered`)
   return problems
 }
 
@@ -186,7 +189,9 @@ export function parseConnections(document: unknown): { ok: true; connections: Co
  * test of this release logs in as one (0074).
  */
 export function untestedLogins(connections: readonly ConnectionConfig[]): string[] {
-  return connections.filter((connection) => connection.login !== undefined).map((connection) => `No test of this release logs in as an Entra principal; connection ${connection.id} logs in as one.`)
+  return connections
+    .filter((connection) => connection.login !== undefined)
+    .map((connection) => `No test of this release logs in as an Entra principal; connection ${connection.id} logs in as one.`)
 }
 
 /** The variable under which @azure/identity's managed identity logs in by workload identity's token exchange instead. */

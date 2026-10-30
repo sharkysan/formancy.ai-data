@@ -168,7 +168,8 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
     }
     if (entry.section !== undefined) {
       const target = layout.sections.findIndex((section) => same(section.anchor, entry.section))
-      if (target < 0) problems.push(`${at}/section: the base has no section labelled "${entry.section.label}" at occurrence ${String(entry.section.occurrence)}`)
+      if (target < 0)
+        problems.push(`${at}/section: the base has no section labelled "${entry.section.label}" at occurrence ${String(entry.section.occurrence)}`)
       else if (target === homeOf(layout.sections, entry.field)) problems.push(`${at}/section: equals the base's; leave it out`)
       else moves.set(entry.field, { to: target, at })
     }

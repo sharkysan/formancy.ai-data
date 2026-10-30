@@ -87,18 +87,41 @@ async function startPlane() {
     open: async (id) => {
       const now = databases.get(id)
       if (now === undefined) return undefined
-      return { adapter: { kind: now.kind, ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }), discover: async () => databases.get(id), close: async () => {} }, lookups: {}, records: {} }
+      return {
+        adapter: {
+          kind: now.kind,
+          ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }),
+          discover: async () => databases.get(id),
+          close: async () => {},
+        },
+        lookups: {},
+        records: {},
+      }
     },
     close: async () => {},
   }
   const verifyIdentity = async (token) => {
     const actor = Object.keys(TOKENS).find((name) => TOKENS[name] === token)
-    return actor === undefined ? { ok: false, reason: 'ERR_JWS_INVALID' } : { ok: true, identity: { actor: { id: actor, roles: ['data-admin'] }, attributes: {} } }
+    return actor === undefined
+      ? { ok: false, reason: 'ERR_JWS_INVALID' }
+      : { ok: true, identity: { actor: { id: actor, roles: ['data-admin'] }, attributes: {} } }
   }
   const root = mkdtempSync(join(tmpdir(), 'formancy-data-studio-pictures-'))
-  const server = await createDataServer({ verifyIdentity, admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } } })
-  const as = async (who, method, url, payload) => server.inject({ method, url, headers: { authorization: `Bearer ${TOKENS[who]}` }, ...(payload === undefined ? {} : { payload }) })
-  return { server, databases, as, close: async () => { await server.close(); rmSync(root, { recursive: true, force: true }) } }
+  const server = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store: createFileConfigurationStore(root), adminRoles: ['data-admin'], audit: { sink: () => {} } },
+  })
+  const as = async (who, method, url, payload) =>
+    server.inject({ method, url, headers: { authorization: `Bearer ${TOKENS[who]}` }, ...(payload === undefined ? {} : { payload }) })
+  return {
+    server,
+    databases,
+    as,
+    close: async () => {
+      await server.close()
+      rmSync(root, { recursive: true, force: true })
+    },
+  }
 }
 
 /**
@@ -133,7 +156,10 @@ async function signIn(page) {
 }
 
 const discover = async (here, connection) => {
-  await here.getByRole('group', { name: connection, exact: true }).getByRole('button', { name: `Discover ${connection}`, exact: true }).click()
+  await here
+    .getByRole('group', { name: connection, exact: true })
+    .getByRole('button', { name: `Discover ${connection}`, exact: true })
+    .click()
   const seen = here.getByRole('region', { name: `What ${connection} can see`, exact: true })
   await seen.waitFor()
   return seen
@@ -169,7 +195,8 @@ function actsOver(plane, scenes) {
       await here.getByRole('checkbox', { name: `Offer ${LOOKUP.foreignKey} as a lookup`, exact: true }).check()
       const columns = here.getByRole('group', { name: `Columns to show for ${LOOKUP.foreignKey}`, exact: true })
       for (const column of LOOKUP.display) {
-        if (!(await columns.getByRole('checkbox', { name: column, exact: true }).isChecked())) throw new Error(`${column} is not ticked to show for ${LOOKUP.foreignKey}, as the alt says it is`)
+        if (!(await columns.getByRole('checkbox', { name: column, exact: true }).isChecked()))
+          throw new Error(`${column} is not ticked to show for ${LOOKUP.foreignKey}, as the alt says it is`)
       }
       return { parts: { Lookups: here.getByRole('group', { name: 'Foreign keys to offer as lookups', exact: true }) } }
     },
@@ -190,10 +217,16 @@ function actsOver(plane, scenes) {
 
     'studio-policy': async (page, scene) => {
       const here = await at(page, scene.step)
-      for (const operation of ['read', 'create', 'update']) await here.getByRole('textbox', { name: `Roles that may ${operation}`, exact: true }).fill(journey.policy.operations[operation].join(', '))
+      for (const operation of ['read', 'create', 'update'])
+        await here.getByRole('textbox', { name: `Roles that may ${operation}`, exact: true }).fill(journey.policy.operations[operation].join(', '))
       await here.getByRole('button', { name: 'Fill every field from the operations', exact: true }).click()
       await here.getByText(STUDIO.fits, { exact: true }).waitFor()
-      return { parts: { Rows: here.getByRole('group', { name: `Row filters on ${ROOT}`, exact: true }), Lookup: here.getByRole('group', { name: 'Rows the Customer list may offer', exact: true }) } }
+      return {
+        parts: {
+          Rows: here.getByRole('group', { name: `Row filters on ${ROOT}`, exact: true }),
+          Lookup: here.getByRole('group', { name: 'Rows the Customer list may offer', exact: true }),
+        },
+      }
     },
 
     'studio-presentation': async (page, scene) => {
@@ -209,7 +242,12 @@ function actsOver(plane, scenes) {
       // The whole section, its rows framed by its own border, and the toolbar
       // above it: a run of rows alone had the rows around them in its margin,
       // and showed no move -- the order of two rows looks like any order.
-      const parts = { Undo: here.getByRole('button', { name: 'Undo', exact: true }), Redo: here.getByRole('button', { name: 'Redo', exact: true }), Said: said, Order: order }
+      const parts = {
+        Undo: here.getByRole('button', { name: 'Undo', exact: true }),
+        Redo: here.getByRole('button', { name: 'Redo', exact: true }),
+        Said: said,
+        Order: order,
+      }
       await untilSnapshot(order, /textbox "Label of order_date"[\s\S]*textbox "Label of customer"/, { within: WITHIN, what: 'Customer below Order date' })
       await untilSnapshot(order, /textbox "Label of status" \[invalid\]/, { within: WITHIN, what: 'the refusal of the emptied label' })
       const notes = await here.getByRole('textbox', { name: 'Label of notes', exact: true }).inputValue()
@@ -218,7 +256,10 @@ function actsOver(plane, scenes) {
     },
 
     'studio-preview': async (page, scene) => {
-      await page.getByRole('main', { name: stepTitle(stepOf('studio-presentation')), exact: true }).getByRole('textbox', { name: 'Label of status', exact: true }).fill('Status')
+      await page
+        .getByRole('main', { name: stepTitle(stepOf('studio-presentation')), exact: true })
+        .getByRole('textbox', { name: 'Label of status', exact: true })
+        .fill('Status')
       const here = await at(page, scene.step)
       await here.getByRole('button', { name: 'Validate', exact: true }).click()
       await untilSnapshot(here, /\[invalid\]/, { within: WITHIN, what: "the preview's refusal" })
@@ -232,7 +273,8 @@ function actsOver(plane, scenes) {
       // grace, from the same server: version 1 read and published again over it.
       const latest = await plane.as('grace', 'GET', `/v1/forms/${FORM.formId}/versions/latest`)
       const theirs = await plane.as('grace', 'POST', `/v1/forms/${FORM.formId}/versions`, { expectedBase: 1, bundle: latest.json().bundle })
-      if (latest.statusCode !== 200 || theirs.statusCode !== 201) throw new Error(`grace's publish answered ${String(latest.statusCode)} and ${String(theirs.statusCode)}, not 200 and 201`)
+      if (latest.statusCode !== 200 || theirs.statusCode !== 201)
+        throw new Error(`grace's publish answered ${String(latest.statusCode)} and ${String(theirs.statusCode)}, not 200 and 201`)
       await here.getByRole('button', { name: 'Publish version 2', exact: true }).click()
       await here.getByRole('button', { name: 'Rebase on version 2', exact: true }).waitFor()
       return { parts: { Publish: here } }
@@ -246,7 +288,8 @@ function actsOver(plane, scenes) {
       // The caption's "restoring version 1, which still binds notes": version 3 is ada's, with Remarks.
       const three = (await plane.as('ada', 'GET', `/v1/forms/${FORM.formId}/versions/latest`)).json()
       const label = three.bundle.presentation.fields.find((entry) => entry.field === 'notes')?.label
-      if (three.version !== 3 || !JSON.stringify(label ?? '').includes('Remarks')) throw new Error(`the latest version is ${String(three.version)} with notes labelled ${JSON.stringify(label)}, not version 3 with Remarks`)
+      if (three.version !== 3 || !JSON.stringify(label ?? '').includes('Remarks'))
+        throw new Error(`the latest version is ${String(three.version)} with notes labelled ${JSON.stringify(label)}, not version 3 with Remarks`)
       plane.databases.set(FORM.connection, renamedColumn(WRITER, FORM.root, 'notes', 'memo'))
       const here = await at(page, scene.step)
       await here.getByRole('button', { name: 'Check drift', exact: true }).click()
@@ -277,7 +320,10 @@ function actsOver(plane, scenes) {
       const here = await at(page, stepOf('studio-drift'))
       await here.getByRole('button', { name: 'Check drift', exact: true }).click()
       const versions = await restoreVersion1(here)
-      await versions.getByRole('status').filter({ hasText: /^Restored version 1 as version \d+/ }).waitFor()
+      await versions
+        .getByRole('status')
+        .filter({ hasText: /^Restored version 1 as version \d+/ })
+        .waitFor()
       return { parts: { Versions: versions } }
     },
 
@@ -292,7 +338,8 @@ function actsOver(plane, scenes) {
       await regenerated.waitFor()
       // The caption's one key: the regeneration reports order_date and nothing else.
       const reported = await regenerated.getByRole('list', { name: KEYS, exact: true }).getByRole('listitem').allTextContents()
-      if (JSON.stringify(reported) !== JSON.stringify([MOVED])) throw new Error(`the regeneration reports the keys ${JSON.stringify(reported)}, not ${JSON.stringify([MOVED])}`)
+      if (JSON.stringify(reported) !== JSON.stringify([MOVED]))
+        throw new Error(`the regeneration reports the keys ${JSON.stringify(reported)}, not ${JSON.stringify([MOVED])}`)
       await page.getByRole('button', { name: 'Continue to presentation', exact: true }).click()
       await at(page, stepOf('studio-presentation'), { go: false })
       // "Publishing waits until each is decided": the Publish step says why, with its button disabled.
@@ -317,7 +364,8 @@ function actsOver(plane, scenes) {
       await choose.getByRole('button', { name: 'Generate the form', exact: true }).click()
       await at(page, stepOf('studio-generate'), { go: false })
       const here = await at(page, stepOf('studio-policy'))
-      for (const operation of ['read', 'create', 'update']) await here.getByRole('textbox', { name: `Roles that may ${operation}`, exact: true }).fill(journey.policy.operations[operation].join(', '))
+      for (const operation of ['read', 'create', 'update'])
+        await here.getByRole('textbox', { name: `Roles that may ${operation}`, exact: true }).fill(journey.policy.operations[operation].join(', '))
       await here.getByRole('button', { name: 'Fill every field from the operations', exact: true }).click()
       const list = here.getByRole('group', { name: 'Rows the Order list may offer', exact: true })
       await list.getByRole('button', { name: 'Add a filter to the Order list', exact: true }).click()

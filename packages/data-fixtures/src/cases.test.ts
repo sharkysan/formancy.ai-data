@@ -102,14 +102,16 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   UUID_ROWS: "the rows the uuid suites insert; what the suites show of them is UUID_PARITY's",
   COLUMN_FILTER_ROWS: "what the list suites give the rows they filter; what a filter narrows them to is COLUMN_FILTER_PARITY's",
   COLUMN_FILTER_TENANT: "the tenant of COLUMN_FILTER_ROWS' shipments, whose clerk lists them",
-  EXPORT_ROWS: "the customers the server's export suite inserts, each with the cell a file writes for its name; a file's text is data-core's, the same on both engines once EXPORT_PARITY's values are",
+  EXPORT_ROWS:
+    "the customers the server's export suite inserts, each with the cell a file writes for its name; a file's text is data-core's, the same on both engines once EXPORT_PARITY's values are",
   DELIVERIES: "the fixture's delivery keys, which UUID_PARITY's cases name",
   PARITY_CASCADES: "the keys CASCADE_PARITY's policy names; what a delete does through them is CASCADE_PARITY's",
   REACH_PRIVILEGE_LOSSES: "the grants reach-privilege takes away, each on both engines; what a delete answers then is CASCADE_PARITY's",
   PRELOGIN_ENCRYPTION: "the ENCRYPTION values the PRELOGIN stand-in answers with (0081), [MS-TDS]'s and no engine's",
   TDS_PACKET: "the packet types the PRELOGIN stand-in tells apart in what a client sends (0081), [MS-TDS]'s and no engine's",
-  PAGED_TENANT: "the tenant the paged rows belong to (0085), which no shared case reads",
-  PAGED_LATER: "how many customers lie past the paged lookup's first page (0085); what a search answers over them is lookups.integration.test.ts's, on both engines",
+  PAGED_TENANT: 'the tenant the paged rows belong to (0085), which no shared case reads',
+  PAGED_LATER:
+    "how many customers lie past the paged lookup's first page (0085); what a search answers over them is lookups.integration.test.ts's, on both engines",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 
@@ -141,7 +143,10 @@ describe('the shared cases', () => {
     const universe = new Set(sharedCases())
     for (const [family, ids] of Object.entries(FAMILIES)) {
       expect(ids.length, family).toBeGreaterThan(0)
-      expect(ids.filter((id) => !universe.has(id)), family).toEqual([])
+      expect(
+        ids.filter((id) => !universe.has(id)),
+        family,
+      ).toEqual([])
       expect(Object.keys(fixtures), family).toContain(family)
     }
     expect([FIXTURE_MODEL, READER_ACCESS, WRITER_ACCESS, FIRST_SHIPMENT, SECOND_SHIPMENT]).not.toContain(undefined)

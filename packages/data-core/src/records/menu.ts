@@ -66,7 +66,14 @@ export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const operations = grantedOperations(bundle.bindings, bundle.policy, context)
   if (!operations.includes('read')) return { id: bundle.id, title: bundle.title, operations, listedBy: null, key: null, lookups: [] }
   const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, context)
-  return { id: bundle.id, title: bundle.title, operations, listedBy: listed.ok ? [...listed.fields] : null, key: parentKey(bundle), lookups: childLookups(bundle) }
+  return {
+    id: bundle.id,
+    title: bundle.title,
+    operations,
+    listedBy: listed.ok ? [...listed.fields] : null,
+    key: parentKey(bundle),
+    lookups: childLookups(bundle),
+  }
 }
 
 /**

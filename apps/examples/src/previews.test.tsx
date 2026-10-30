@@ -68,15 +68,12 @@ function labelsOf(subject: Example): string[] {
  */
 async function mounted(): Promise<void> {
   render(<App />)
-  await waitFor(
-    () => {
-      for (const subject of EXAMPLES) {
-        const first = labelsOf(subject)[0] ?? ''
-        expect(within(pane(subject, 'Angular')).queryByLabelText(first), `the Angular ${tableOf(subject)} never rendered`).not.toBeNull()
-      }
-    },
-    ANGULAR_ARRIVES,
-  )
+  await waitFor(() => {
+    for (const subject of EXAMPLES) {
+      const first = labelsOf(subject)[0] ?? ''
+      expect(within(pane(subject, 'Angular')).queryByLabelText(first), `the Angular ${tableOf(subject)} never rendered`).not.toBeNull()
+    }
+  }, ANGULAR_ARRIVES)
   for (const subject of EXAMPLES) expect(within(pane(subject, 'Angular')).queryByRole('alert')).toBeNull()
 }
 
@@ -168,10 +165,7 @@ describe.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('
     const options = {
       runOnly: { type: 'tag' as const, values: [...ACCESSIBILITY_TAGS] },
       rules: Object.fromEntries(
-        [...Object.keys(ACCESSIBILITY_EXCLUSIONS), ...Object.keys(ACCESSIBILITY_UNMEASURABLE_IN_JSDOM)].map((rule) => [
-          rule,
-          { enabled: false },
-        ]),
+        [...Object.keys(ACCESSIBILITY_EXCLUSIONS), ...Object.keys(ACCESSIBILITY_UNMEASURABLE_IN_JSDOM)].map((rule) => [rule, { enabled: false }]),
       ),
     }
     const violations = async (renderer: Renderer): Promise<string[]> => {
@@ -211,9 +205,7 @@ describe('sales.order, at the edges the fixture inserts', () => {
     await mounted()
     const user = userEvent.setup()
     const order = example('order')
-    const amount = FIXTURE_SNAPSHOT.objects
-      .find((object) => object.ref.name === 'order')
-      ?.columns.find((column) => column.name === 'amount')?.type
+    const amount = FIXTURE_SNAPSHOT.objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'amount')?.type
     if (amount?.kind !== 'decimal' || amount.precision === null || amount.scale === null) {
       throw new Error('sales.order.amount is not an exact decimal with a precision and scale')
     }
@@ -286,14 +278,11 @@ describe('a lookup with no rows on this page', () => {
     const order = example('order')
     const source = order.generated.bindings.fields.find((binding) => binding.kind === 'lookup')?.source
     if (source === undefined) throw new Error('the order has no lookup to leave without rows')
-    await waitFor(
-      () => {
-        for (const renderer of RENDERERS) {
-          expect(within(pane(order, renderer)).queryByLabelText('Order date'), `${renderer} never rendered`).not.toBeNull()
-        }
-      },
-      ANGULAR_ARRIVES,
-    )
+    await waitFor(() => {
+      for (const renderer of RENDERERS) {
+        expect(within(pane(order, renderer)).queryByLabelText('Order date'), `${renderer} never rendered`).not.toBeNull()
+      }
+    }, ANGULAR_ARRIVES)
 
     for (const renderer of RENDERERS) {
       const preview = pane(order, renderer)

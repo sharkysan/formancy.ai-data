@@ -165,14 +165,37 @@ function wellHeight(header: number, rows: number, cap: number): number {
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
-  const { client, formId, columns, choices, labelledBy, parent, search, filter, sort, openToken, quiet = false, toolbarStart, refit = 0, bench, after, onClearSearch } = props
+  const {
+    client,
+    formId,
+    columns,
+    choices,
+    labelledBy,
+    parent,
+    search,
+    filter,
+    sort,
+    openToken,
+    quiet = false,
+    toolbarStart,
+    refit = 0,
+    bench,
+    after,
+    onClearSearch,
+  } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
   const retryButton = useRef<HTMLButtonElement>(null)
   // What the grid's callbacks read when they run: its options are made once.
   const latest = useRef(props)
   latest.current = props
-  const [status, setStatus] = useState<Status>({ kind: 'loading', text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)], help: null, clear: false, retry: false })
+  const [status, setStatus] = useState<Status>({
+    kind: 'loading',
+    text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)],
+    help: null,
+    clear: false,
+    retry: false,
+  })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
   /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
@@ -248,7 +271,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     if (grid === null || grid.isDestroyed()) return
     const wanted = latest.current.sort
     if (sameSort(headerSort(grid), wanted)) return
-    grid.applyColumnState({ state: wanted.map((term, index) => ({ colId: term.field, sort: term.direction, sortIndex: index })), defaultState: { sort: null, sortIndex: null } })
+    grid.applyColumnState({
+      state: wanted.map((term, index) => ({ colId: term.field, sort: term.direction, sortIndex: index })),
+      defaultState: { sort: null, sortIndex: null },
+    })
   }, [])
   /**
    * The last sort the headers told the section of. AG Grid tells a press a
@@ -281,7 +307,16 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         const { noun, canCreate, columns: shownColumns } = latest.current
         // The fields the block's own filter is on, by the labels the grid's headers carry.
         const filtered = asked.map((term) => shownColumns.find((column) => column.key === term.field)?.label ?? term.field)
-        const said = answered({ start, count: rows.length, hasMore, search: latest.current.search, filtered, untokened: rows.filter((row) => row.record === null).length, canCreate, ...(noun === undefined ? {} : { noun }) })
+        const said = answered({
+          start,
+          count: rows.length,
+          hasMore,
+          search: latest.current.search,
+          filtered,
+          untokened: rows.filter((row) => row.record === null).length,
+          canCreate,
+          ...(noun === undefined ? {} : { noun }),
+        })
         setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false })
         setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()
@@ -317,7 +352,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   // A new search, another parent, another filter or another sort is a new
   // list, from its first page: a new datasource, which AG Grid starts again
   // from row 0, and asks once the headers show the sort.
-  const datasource = useMemo(() => createDatasource({ client, formId, columns, search, parent, filter, sort, hooks }), [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks])
+  const datasource = useMemo(
+    () => createDatasource({ client, formId, columns, search, parent, filter, sort, hooks }),
+    [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks],
+  )
   useEffect(() => () => datasource.abort(), [datasource])
   useEffect(() => {
     if (sort !== told.current) showSort()

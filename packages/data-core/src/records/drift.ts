@@ -21,14 +21,24 @@ import type { DescribedTable } from './types.js'
  * refusal's `drift` list is for the server's log.
  */
 
-export const READ_REFUSED = 'The database changed since this form was published, and the form can no longer show its records faithfully. An administrator must review it.'
-export const WRITE_REFUSED = 'The database changed since this form was published, in a way this form cannot save safely. Nothing was saved; an administrator must review the form.'
-export const NOTHING_LEFT = 'The database changed since this form was published, and nothing this form offers you can be done safely until an administrator reviews it.'
-export const LIST_REFUSED = 'The database changed since this form was published, and its records no longer have an order a page can rely on. An administrator must review it.'
-export const DELETE_REFUSED = 'The database changed since this form was published, in a way this form cannot delete safely. Nothing was deleted; an administrator must review the form.'
+export const READ_REFUSED =
+  'The database changed since this form was published, and the form can no longer show its records faithfully. An administrator must review it.'
+export const WRITE_REFUSED =
+  'The database changed since this form was published, in a way this form cannot save safely. Nothing was saved; an administrator must review the form.'
+export const NOTHING_LEFT =
+  'The database changed since this form was published, and nothing this form offers you can be done safely until an administrator reviews it.'
+export const LIST_REFUSED =
+  'The database changed since this form was published, and its records no longer have an order a page can rely on. An administrator must review it.'
+export const DELETE_REFUSED =
+  'The database changed since this form was published, in a way this form cannot delete safely. Nothing was deleted; an administrator must review the form.'
 
 /** The report a request decides by, or `invalid-bindings` when the bindings cannot be compared with their own snapshot. */
-function reportOf(snapshot: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy, described: DescribedTable): { ok: true; report: DriftReport } | PlanRefusal {
+function reportOf(
+  snapshot: MetadataSnapshot,
+  bindings: FormBindings,
+  policy: DriftPolicy,
+  described: DescribedTable,
+): { ok: true; report: DriftReport } | PlanRefusal {
   const { definition: _definition, ...root } = described
   try {
     return { ok: true, report: diffRootDefinition(snapshot, root, bindings, policy) }
@@ -78,7 +88,9 @@ export function driftRefusal(
     // A form with no identity offers no list, and its planner refuses one before any statement.
     if (identity.length === 0 || keyOrderProblem(described, identity) === null) return undefined
     const key = new Set(identity)
-    const moved = report.changes.filter((change) => change.kind === 'identity-key-changed' || (change.subject.kind === 'column' && key.has(change.subject.name)))
+    const moved = report.changes.filter(
+      (change) => change.kind === 'identity-key-changed' || (change.subject.kind === 'column' && key.has(change.subject.name)),
+    )
     return { ...refuse('drift', LIST_REFUSED), drift: moved }
   }
   return report.writable[operation] ? undefined : refused(operation === 'delete' ? DELETE_REFUSED : WRITE_REFUSED, report)

@@ -34,7 +34,17 @@ const Workspace = lazy(() => import('./workspace.js').then((module) => ({ defaul
  * browser's download unless the page is mounted with another, as the suites
  * mount it in jsdom, which has no object URLs.
  */
-export function Host({ fetch, base = '', session, save = saveFile }: { fetch: typeof globalThis.fetch; base?: string; session?: DemoSession | undefined; save?: SaveFile }): ReactElement {
+export function Host({
+  fetch,
+  base = '',
+  session,
+  save = saveFile,
+}: {
+  fetch: typeof globalThis.fetch
+  base?: string
+  session?: DemoSession | undefined
+  save?: SaveFile
+}): ReactElement {
   const [signedIn, setSignedIn] = useState<SignedIn | null>(null)
   // Signed out from the workspace, rather than arrived: the question takes
   // the keyboard then, and only then -- on arrival the skip link is first.
@@ -56,9 +66,9 @@ export function Host({ fetch, base = '', session, save = saveFile }: { fetch: ty
           <h1>Published forms, in both renderers</h1>
           {signedIn === null ? (
             <p className="lead">
-              What a host application&rsquo;s people see: the forms they may read, their records in a grid, and each record drawn
-              by <code>@formancy/react</code> and <code>@formancy/angular</code> through <code>@formancy/data-client</code>.
-              Every answer is the data server&rsquo;s.
+              What a host application&rsquo;s people see: the forms they may read, their records in a grid, and each record drawn by{' '}
+              <code>@formancy/react</code> and <code>@formancy/angular</code> through <code>@formancy/data-client</code>. Every answer is the data
+              server&rsquo;s.
             </p>
           ) : null}
         </header>
@@ -88,7 +98,9 @@ export function Host({ fetch, base = '', session, save = saveFile }: { fetch: ty
         )}
 
         <footer className="colophon">
-          <p><a href="https://formancy.ai/legal/">Legal notice</a> · <a href="https://formancy.ai/privacy/">Privacy</a></p>
+          <p>
+            <a href="https://formancy.ai/legal/">Legal notice</a> · <a href="https://formancy.ai/privacy/">Privacy</a>
+          </p>
           <p>Formancy Data is source-available, not open source. The formancy packages it renders with are Apache-2.0.</p>
         </footer>
       </div>

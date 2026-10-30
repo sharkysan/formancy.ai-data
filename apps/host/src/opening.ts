@@ -57,7 +57,13 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
   // answer for an earlier request is not the person's latest.
   const asked = useRef(0)
 
-  function read(request: LeaveRequest, token: string, discarded: boolean, then: ReadHandlers, as: (record: FormRecord) => FormRecord = (record) => record): void {
+  function read(
+    request: LeaveRequest,
+    token: string,
+    discarded: boolean,
+    then: ReadHandlers,
+    as: (record: FormRecord) => FormRecord = (record) => record,
+  ): void {
     asked.current += 1
     const mine = asked.current
     void client.read(formId, token).then((answer) => {

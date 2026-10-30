@@ -38,7 +38,11 @@ function snapshot(objects: ObjectMeta[], extra: Partial<Omit<MetadataSnapshot, '
   return createSnapshot({ kind: 'postgres', serverVersion: '17.6', account: OWNER, scope: { schemas: ['sales'] }, objects, gaps: [], ...extra })
 }
 
-const onObject = (name: string, aspect: CoverageGap['aspect'] = 'foreign-keys'): CoverageGap => ({ subject: { kind: 'object', object: { schema: 'sales', name } }, aspect, detail: 'hidden' })
+const onObject = (name: string, aspect: CoverageGap['aspect'] = 'foreign-keys'): CoverageGap => ({
+  subject: { kind: 'object', object: { schema: 'sales', name } },
+  aspect,
+  detail: 'hidden',
+})
 
 describe('createSnapshot', () => {
   // Two adapters, or one adapter on two days, may read the catalog in any order.
@@ -107,9 +111,7 @@ describe('createSnapshot', () => {
   // dropped. Its sides cannot be compared, so that check must not throw.
   test('accepts a foreign key with an unknown target', () => {
     const partial = table('a', [column('x', 1)], {
-      foreignKeys: [
-        { name: 'fk_a_hidden', columns: ['x'], references: null, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true },
-      ],
+      foreignKeys: [{ name: 'fk_a_hidden', columns: ['x'], references: null, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
     })
     expect(snapshot([partial]).objects[0]?.foreignKeys[0]?.references).toBeNull()
   })
@@ -145,13 +147,18 @@ describe('createSnapshot', () => {
   // a codec counting in no unit and a generator reading an identity it does
   // not know. Refused here, naming the column or check (0026).
   test("refuses a snapshot in the shape contract v1 wrote: a text with no length unit, a binary with no fixedLength, a check with no enforced flag, generated 'identity'", () => {
-    const old = (columns: unknown[], checks: unknown[] = []) => () => snapshot([table('a', columns as ColumnMeta[], { checks: checks as ObjectMeta['checks'] })])
+    const old =
+      (columns: unknown[], checks: unknown[] = []) =>
+      () =>
+        snapshot([table('a', columns as ColumnMeta[], { checks: checks as ObjectMeta['checks'] })])
     const typed = (type: unknown, extra: Record<string, unknown> = {}) => ({ ...column('name', 1), type, ...extra })
 
     expect(old([typed({ kind: 'text', maxLength: 20, fixedLength: false })])).toThrow(/sales\.a: column name has no text length unit/)
     expect(old([typed({ kind: 'text', maxLength: 20, lengthUnit: 'characters', fixedLength: false })])).toThrow(/sales\.a: column name has no text length unit/)
     expect(old([typed({ kind: 'binary', maxLength: 16 })])).toThrow(/sales\.a: column name is binary with no fixedLength flag/)
-    expect(old([typed({ kind: 'integer', min: '0', max: '1' }, { generated: 'identity' })])).toThrow(/sales\.a: column name has generation "identity", which is not one the contract names/)
+    expect(old([typed({ kind: 'integer', min: '0', max: '1' }, { generated: 'identity' })])).toThrow(
+      /sales\.a: column name has generation "identity", which is not one the contract names/,
+    )
     expect(old([column('x', 1)], [{ name: 'ck_a', expression: null, validated: true }])).toThrow(/sales\.a: check ck_a has no enforced flag/)
 
     // The shape contract v2 writes is accepted.
@@ -216,7 +223,9 @@ describe('createSnapshot', () => {
     const objects = [table('a', [column('x', 1)])]
     expect(() => snapshot(objects, { server: { product: 'mysql' as never, major: 8 } })).toThrow(/the server's product "mysql" is not one the contract names/)
     expect(() => snapshot(objects, { server: { product: 'postgresql', major: 16.5 } })).toThrow(/the server's major 16.5 is neither a whole number nor null/)
-    expect(() => snapshot(objects, { server: { product: 'sqlserver', major: 16, compatibility: '160' as never } })).toThrow(/the server's compatibility level 160 is not a whole number/)
+    expect(() => snapshot(objects, { server: { product: 'sqlserver', major: 16, compatibility: '160' as never } })).toThrow(
+      /the server's compatibility level 160 is not a whole number/,
+    )
   })
 
   // A revoked column grant is a change to what a form bound to the column can
@@ -251,7 +260,9 @@ describe('createSnapshot', () => {
   // Row security outside the three values is an adapter bug; an empty account
   // names nobody, and the fingerprint would hash a principal that does not exist.
   test('refuses a row security outside the three values, and an empty account user or login', () => {
-    expect(() => snapshot([table('a', [column('x', 1)], { rowSecurity: 'maybe' as never })])).toThrow(/sales\.a: row security "maybe" is not one the contract names/)
+    expect(() => snapshot([table('a', [column('x', 1)], { rowSecurity: 'maybe' as never })])).toThrow(
+      /sales\.a: row security "maybe" is not one the contract names/,
+    )
     expect(() => snapshot([table('a', [column('x', 1)])], { account: { user: '', login: 'owner' } })).toThrow(/the account names no user/)
     expect(() => snapshot([table('a', [column('x', 1)])], { account: { user: 'owner', login: '' } })).toThrow(/the account names no login/)
   })
@@ -278,9 +289,15 @@ describe('createSnapshot', () => {
     const objects = [table('a', [column('x', 1)])]
     const gapOf = (subject: unknown) => ({ subject, aspect: 'objects', detail: 'x' }) as CoverageGap
     expect(() => snapshot(objects, { gaps: [gapOf({ kind: 'schema', schema: '' })] })).toThrow(/a gap names an empty schema/)
-    expect(() => snapshot(objects, { gaps: [gapOf({ kind: 'table', object: { schema: 'sales', name: 'a' } })] })).toThrow(/a gap's subject is not one the contract names/)
-    expect(() => snapshot(objects, { gaps: [gapOf({ kind: 'object', object: { schema: 'sales', name: '' } })] })).toThrow(/a gap's subject is not one the contract names/)
-    expect(() => snapshot(objects, { gaps: [{ ...gapOf({ kind: 'scope' }), aspect: 'rows' as never }] })).toThrow(/a gap's aspect "rows" is not one the contract names/)
+    expect(() => snapshot(objects, { gaps: [gapOf({ kind: 'table', object: { schema: 'sales', name: 'a' } })] })).toThrow(
+      /a gap's subject is not one the contract names/,
+    )
+    expect(() => snapshot(objects, { gaps: [gapOf({ kind: 'object', object: { schema: 'sales', name: '' } })] })).toThrow(
+      /a gap's subject is not one the contract names/,
+    )
+    expect(() => snapshot(objects, { gaps: [{ ...gapOf({ kind: 'scope' }), aspect: 'rows' as never }] })).toThrow(
+      /a gap's aspect "rows" is not one the contract names/,
+    )
   })
 
   // The fingerprint hashes the gaps in order, so the order must not depend on
@@ -318,10 +335,22 @@ describe('what a snapshot says about deleting (0049)', () => {
     enforced: true,
     validated: true,
   }
-  const inboundToA = { table: { schema: 'sales', name: 'b' }, name: 'fk_b_a', columns: ['a_id'], referencedColumns: ['id'], onDelete: 'cascade' as const, onUpdate: 'no-action' as const, enforced: true }
+  const inboundToA = {
+    table: { schema: 'sales', name: 'b' },
+    name: 'fk_b_a',
+    columns: ['a_id'],
+    referencedColumns: ['id'],
+    onDelete: 'cascade' as const,
+    onUpdate: 'no-action' as const,
+    enforced: true,
+  }
   const a = (extra: Partial<ObjectMeta> = {}) => table('a', [column('id', 1)], { primaryKey: { name: 'pk_a', columns: ['id'] }, ...extra })
   const b = (extra: Partial<ObjectMeta> = {}) => table('b', [column('id', 1), column('a_id', 2)], { foreignKeys: [toA], ...extra })
-  const withFacts = (deletable: boolean, extra: Partial<ObjectMeta> = {}): Partial<ObjectMeta> => ({ access: { delete: deletable }, referencedBy: [], ...extra })
+  const withFacts = (deletable: boolean, extra: Partial<ObjectMeta> = {}): Partial<ObjectMeta> => ({
+    access: { delete: deletable },
+    referencedBy: [],
+    ...extra,
+  })
 
   // Every bundle published before this record carries a snapshot with
   // neither fact, and the server hashes it again on every read (0019). A
@@ -346,7 +375,9 @@ describe('what a snapshot says about deleting (0049)', () => {
   test('one fact without the other is refused, and so is an object without them among objects with them', () => {
     expect(() => snapshot([a({ access: { delete: true } })])).toThrow(/sales\.a: access without referencedBy/)
     expect(() => snapshot([a({ referencedBy: [] })])).toThrow(/sales\.a: referencedBy without access/)
-    expect(() => snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b()])).toThrow(/sales\.b: has neither access nor referencedBy, while sales\.a has both/)
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b()])).toThrow(
+      /sales\.b: has neither access nor referencedBy, while sales\.a has both/,
+    )
     expect(() => snapshot([a({ access: { delete: 'yes' } as never, referencedBy: [] })])).toThrow(/sales\.a: access delete is not a boolean/)
     expect(() => snapshot([a({ access: { delete: true }, referencedBy: {} as never })])).toThrow(/sales\.a: referencedBy is not a list/)
   })
@@ -363,7 +394,9 @@ describe('what a snapshot says about deleting (0049)', () => {
     expect(() => snapshot([a(withFacts(true, { referencedBy: [{ ...inboundToA, onDelete: 'set-null' }] })), b(withFacts(true))])).toThrow(
       /sales\.a: referencedBy says fk_b_a of sales\.b otherwise than its own foreign keys do/,
     )
-    expect(() => snapshot([a(withFacts(true, { referencedBy: [{ ...inboundToA, enforced: false }] })), b(withFacts(true))])).toThrow(/otherwise than its own foreign keys do/)
+    expect(() => snapshot([a(withFacts(true, { referencedBy: [{ ...inboundToA, enforced: false }] })), b(withFacts(true))])).toThrow(
+      /otherwise than its own foreign keys do/,
+    )
     const agreed = snapshot([a(withFacts(true, { referencedBy: [inboundToA] })), b(withFacts(false))])
     expect(agreed.objects.map((object) => [object.ref.name, object.access, object.referencedBy])).toEqual([
       ['a', { delete: true }, [inboundToA]],
@@ -378,7 +411,12 @@ describe('what a snapshot says about deleting (0049)', () => {
     const outside = (schema: string, name: string, key: string) => ({ ...inboundToA, table: { schema, name }, name: key })
     const listed = [outside('audit', 'copy', 'fk_z'), inboundToA, outside('Audit', 'copy', 'fk_a'), outside('audit', 'copy', 'fk_a')]
     const made = snapshot([a(withFacts(true, { referencedBy: listed })), b(withFacts(true))])
-    expect(made.objects[0]?.referencedBy?.map((key) => `${key.table.schema}.${key.table.name}.${key.name}`)).toEqual(['Audit.copy.fk_a', 'audit.copy.fk_a', 'audit.copy.fk_z', 'sales.b.fk_b_a'])
+    expect(made.objects[0]?.referencedBy?.map((key) => `${key.table.schema}.${key.table.name}.${key.name}`)).toEqual([
+      'Audit.copy.fk_a',
+      'audit.copy.fk_a',
+      'audit.copy.fk_z',
+      'sales.b.fk_b_a',
+    ])
     expect(snapshot([a(withFacts(true, { referencedBy: [...listed].reverse() })), b(withFacts(true))]).fingerprint).toBe(made.fingerprint)
     // A key whose target this connection cannot see (0007) refers to nothing it can name, and asks nothing of referencedBy.
     const hidden = { ...toA, name: 'fk_b_hidden', references: null }
@@ -395,7 +433,9 @@ describe('what a snapshot says about deleting (0049)', () => {
     expect(() => snapshot([a(withFacts(true, { referencedBy: [outside, outside] }))])).toThrow(/sales\.a: referencedBy names fk_b_a of audit\.copy twice/)
     expect(refused({ ...outside, columns: [], referencedColumns: [] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has no columns/)
     expect(refused({ ...outside, columns: ['x', 'y'] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy pairs 2 columns with 1/)
-    expect(refused({ ...outside, referencedColumns: ['nope'] })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy refers to nope, which the table does not have/)
+    expect(refused({ ...outside, referencedColumns: ['nope'] })).toThrow(
+      /sales\.a: inbound key fk_b_a of audit\.copy refers to nope, which the table does not have/,
+    )
     expect(refused({ ...outside, onDelete: 'erase' })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has an action that is not one the contract names/)
     expect(refused({ ...outside, onUpdate: undefined })).toThrow(/has an action that is not one the contract names/)
     expect(refused({ ...outside, enforced: 'yes' })).toThrow(/sales\.a: inbound key fk_b_a of audit\.copy has no enforced flag/)
@@ -422,9 +462,13 @@ describe('what a snapshot says about deleting (0049)', () => {
     expect(() => snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'y'], referencedColumns: ['id', 'id'] }] }) }])).toThrow(
       /sales\.a: inbound key fk_b_a of audit\.copy refers to id twice/,
     )
-    expect(() => snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'x'], referencedColumns: ['id', 'n'] }] }) }])).not.toThrow()
+    expect(() =>
+      snapshot([{ ...wide, ...withFacts(true, { referencedBy: [{ ...outside, columns: ['x', 'x'], referencedColumns: ['id', 'n'] }] }) }]),
+    ).not.toThrow()
     const view = table('a', [column('id', 1)], { kind: 'view' })
-    expect(() => snapshot([{ ...view, ...withFacts(true, { referencedBy: [outside] }) }])).toThrow(/sales\.a: a view, which no foreign key can refer to, has referencedBy/)
+    expect(() => snapshot([{ ...view, ...withFacts(true, { referencedBy: [outside] }) }])).toThrow(
+      /sales\.a: a view, which no foreign key can refer to, has referencedBy/,
+    )
     expect(() => snapshot([{ ...view, ...withFacts(true) }])).not.toThrow()
   })
 

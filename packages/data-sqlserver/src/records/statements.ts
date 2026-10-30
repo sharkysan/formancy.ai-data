@@ -1,4 +1,15 @@
-import type { InsertRequest, ObjectRef, ReadRequest, RecordColumn, RecordConcurrency, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import type {
+  InsertRequest,
+  ObjectRef,
+  ReadRequest,
+  RecordColumn,
+  RecordConcurrency,
+  RecordTarget,
+  RecordValue,
+  RowFilterTerm,
+  ThroughTerms,
+  UpdateRequest,
+} from '@formancy/data-core'
 import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
@@ -180,7 +191,12 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * update is, inside the filters and every through (0043), so a record outside
  * them is not found whatever version was sent.
  */
-export function existsStatement(request: Pick<UpdateRequest, 'target' | 'key'>, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Buffer): Statement {
+export function existsStatement(
+  request: Pick<UpdateRequest, 'target' | 'key'>,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  definition: Buffer,
+): Statement {
   const parameters = new Parameters()
   const table = request.target.table
   const same = `case when ${digestOf(factsOf(tableName(parameters, table)))} = ${parameters.add(mssql.VarBinary(32), definition)} then 1 else 0 end`
@@ -218,7 +234,12 @@ interface Refind {
  * a float, which do not travel as text — keeps the version the statement saw.
  */
 function versionAfterTriggers(target: RecordTarget): Refind {
-  const keys = target.identity.map((column, index) => ({ column: quoteName(column.name), type: column.type, variable: `@i${String(index)}`, name: `[i${String(index)}]` }))
+  const keys = target.identity.map((column, index) => ({
+    column: quoteName(column.name),
+    type: column.type,
+    variable: `@i${String(index)}`,
+    name: `[i${String(index)}]`,
+  }))
   const exact = (key: (typeof keys)[number]): key is (typeof keys)[number] & { type: ExactKey } => isExactKey(key.type)
   if (target.concurrency === null || keys.length === 0 || !keys.every(exact)) return { captured: [], declared: [], statements: [] }
   const where = keys.map((key) => `[stored].${key.column} = ${fromText(key.type, key.variable)}`)
@@ -394,7 +415,8 @@ export function insertStatement(request: InsertRequest, definition: Buffer): Sta
     target: request.target,
     definition,
     operation: 'INSERT',
-    statement: (output) => (assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`),
+    statement: (output) =>
+      assigned.length === 0 ? `insert into ${table} ${output} default values` : `insert into ${table} (${columns}) ${output} values (${values})`,
     assigned,
     returned: selection(request.returning, request.target.concurrency, 'inserted.'),
     afterWrite: [],
@@ -420,7 +442,13 @@ export function versionIs(parameters: Parameters, concurrency: RecordConcurrency
  * rolls back rather than change several. The table is aliased, `update [r]
  * … from <table> as [r]`, so that the through's EXISTS can name the row.
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], expected: ExpectedVersion, definition: Buffer): Statement {
+export function updateStatement(
+  request: UpdateRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  expected: ExpectedVersion,
+  definition: Buffer,
+): Statement {
   const parameters = new Parameters()
   const { target } = request
   const assigned = request.set.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))

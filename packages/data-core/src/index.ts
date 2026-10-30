@@ -175,7 +175,18 @@ export { exportColumns, exportHeader, exportRecord, exportText } from './records
 export type { ExportColumns, ExportField, ExportLabels } from './records/export.js'
 export type { CsvCell, CsvRefusal, CsvText } from './records/csv.js'
 export { browsePage, planBrowse, validateBrowseQuery } from './records/browse.js'
-export type { BrowseEqualTerm, BrowseFilterTerm, BrowsePage, BrowseQuery, BrowseQueryCheck, BrowseRefusal, BrowseRefusalCode, BrowseSortTerm, OmittedColumn, PlannedBrowse } from './records/browse.js'
+export type {
+  BrowseEqualTerm,
+  BrowseFilterTerm,
+  BrowsePage,
+  BrowseQuery,
+  BrowseQueryCheck,
+  BrowseRefusal,
+  BrowseRefusalCode,
+  BrowseSortTerm,
+  OmittedColumn,
+  PlannedBrowse,
+} from './records/browse.js'
 export { columnFilter, dayAfter, filterOffer, readFilter } from './records/filter.js'
 export type { FilterPlanning, FilterRead } from './records/filter.js'
 export { browseRelations, followTerms } from './records/follow.js'

@@ -95,7 +95,9 @@ describe.each(ENGINES)('a stale save on $engine', (engine) => {
     // element it is cannot be asked of the accessibility tree, which has no
     // notion of an element's identity; the status is found by role, and then
     // compared as an object with the ones found by role before the click.
-    const line = within(pane(second)).getAllByRole('status').find((status) => status.textContent === discarded)
+    const line = within(pane(second))
+      .getAllByRole('status')
+      .find((status) => status.textContent === discarded)
     expect(line !== undefined && before.has(line)).toBe(true)
     expect(notice(second)).toBeNull()
     await waitFor(() => expect(focusedName()).toBe(second))

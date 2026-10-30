@@ -62,7 +62,8 @@ const DECLINED_INSERT: RecordFailure = {
 const DECLINED_UPDATE: RecordFailure = {
   ok: false,
   code: 'refused',
-  message: 'PostgreSQL completed the update without writing the row, though it exists at the version sent: a trigger, a rule or a row security policy declined it.',
+  message:
+    'PostgreSQL completed the update without writing the row, though it exists at the version sent: a trigger, a rule or a row security policy declined it.',
 }
 
 /**
@@ -205,7 +206,11 @@ function untilLost<T>(statement: Promise<T>): Promise<T> {
  * statement had been sent when it failed, which decides between
  * `unavailable` and `unknown-outcome`.
  */
-async function lockedTransaction(sql: Sql, lock: RecordStatement, statement: RecordStatement): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
+async function lockedTransaction(
+  sql: Sql,
+  lock: RecordStatement,
+  statement: RecordStatement,
+): Promise<{ ok: true; result: TextResult } | { ok: false; error: unknown; sent: boolean }> {
   let sent = false
   try {
     const result = await sql.begin(async (tx) => {
@@ -240,7 +245,9 @@ function listAnswer(request: ListRequest, ran: Ran): { answer: ListOutcome; isol
   // Always a row: the description's, with the page's first record beside it or none.
   const { described, isolation } = describedBy(ran.result.rows[0] as TextRow)
   if (described === undefined) return { answer: NOT_DESCRIBED, isolation }
-  const rows = ran.result.rows.filter((row) => row[DESCRIBED_COLUMNS] !== null).map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 1)))
+  const rows = ran.result.rows
+    .filter((row) => row[DESCRIBED_COLUMNS] !== null)
+    .map((row) => recordOf(request.target, request.columns, row.slice(DESCRIBED_COLUMNS + 1)))
   return { answer: { ok: true, described, rows }, isolation }
 }
 
@@ -308,7 +315,14 @@ async function whyNothingChanged(
  * state of one record for good (0050) -- so the database declined the
  * delete itself.
  */
-async function whyNotDeleted(sql: Sql, request: DeleteRequest, terms: DeleteTerms, withVersion: boolean, definition: Definition, path: WritePath): Promise<RecordFailure> {
+async function whyNotDeleted(
+  sql: Sql,
+  request: DeleteRequest,
+  terms: DeleteTerms,
+  withVersion: boolean,
+  definition: Definition,
+  path: WritePath,
+): Promise<RecordFailure> {
   const asked = await attempt(sql, whyNotDeletedStatement(request, terms, withVersion, definition), 'read')
   if (!asked.ok) return asked.failure
   const [same, reach, deletable, rules, isolation, unchanged] = asked.result.rows[0] as TextRow
@@ -431,9 +445,12 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
       // (0006). Nothing was written either way, so it is answered the same
       // way — as a race, whatever the version reads now: under SERIALIZABLE
       // a conflict over other rows is 40001 too, with this one unchanged.
-      if (!ran.ok) return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
+      if (!ran.ok)
+        return ran.state === '40001' ? whyNothingChanged(sql, request, scope, false, definition, path) : failedWrite(sql, table, definition, path, ran.failure)
       const row = onlyRow(ran.result)
-      return row === undefined ? whyNothingChanged(sql, request, scope, true, definition, path) : { ok: true, ...recordOf(request.target, request.returning, row) }
+      return row === undefined
+        ? whyNothingChanged(sql, request, scope, true, definition, path)
+        : { ok: true, ...recordOf(request.target, request.returning, row) }
     },
 
     async delete(request): Promise<DeleteOutcome> {
@@ -462,7 +479,10 @@ export function createPostgresRecords(sql: Sql): RecordAdapter {
         // with nothing deleted -- an identity that is not a key, a
         // programming error (delete.ts). A trigger's own 21000 is reported
         // as the same, and nothing was deleted either.
-        if (ran.state === CARDINALITY) throw new Error('The identity matched more than one row, so the delete was refused inside its statement and nothing was deleted: the bindings do not name a key.')
+        if (ran.state === CARDINALITY)
+          throw new Error(
+            'The identity matched more than one row, so the delete was refused inside its statement and nothing was deleted: the bindings do not name a key.',
+          )
         return ran.state === '40001' ? whyNotDeleted(sql, request, terms, false, definition, path) : failedWrite(sql, terms.root, definition, path, ran.failure)
       }
       const row = ran.result.rows[0]

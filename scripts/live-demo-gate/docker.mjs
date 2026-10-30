@@ -49,7 +49,8 @@ export function lookupDeadlineFor(type, measured) {
  * the container, which is how the stand-in learns it stopped.
  */
 export function runArguments({ image, name, port, quota, variables }) {
-  for (const variable of variables) if (variable.includes('=')) throw new Error(`runArguments takes a variable's name, never its value: ${variable.slice(0, variable.indexOf('='))}`)
+  for (const variable of variables)
+    if (variable.includes('=')) throw new Error(`runArguments takes a variable's name, never its value: ${variable.slice(0, variable.indexOf('='))}`)
   return [
     'run',
     '--name',
@@ -103,5 +104,9 @@ export function leaks(places, secrets) {
     if (typeof value !== 'string') throw new Error(`${what} is not known, so the leak check cannot look for it`)
     if (value.length < LOOKED_FOR) throw new Error(`${what} is ${String(value.length)} characters: too short to be looked for`)
   }
-  return places.flatMap(({ where, text }) => Object.entries(secrets).filter(([, value]) => text.includes(value)).map(([what]) => `${what} is in ${where}`))
+  return places.flatMap(({ where, text }) =>
+    Object.entries(secrets)
+      .filter(([, value]) => text.includes(value))
+      .map(([what]) => `${what} is in ${where}`),
+  )
 }

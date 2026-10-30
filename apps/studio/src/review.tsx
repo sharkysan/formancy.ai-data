@@ -44,7 +44,10 @@ const who = (submittedBy: string, me: string) => (submittedBy === me ? `${submit
 
 /** What a draft that is no longer pending became, in one line. */
 function stateOf(draft: DraftRead): string | null {
-  if (draft.state === 'rejected') return draft.withdrawn === true ? `Withdrawn by ${draft.rejectedBy ?? 'its submitter'}, who submitted it.` : `Rejected by ${draft.rejectedBy ?? 'a publisher'}.`
+  if (draft.state === 'rejected')
+    return draft.withdrawn === true
+      ? `Withdrawn by ${draft.rejectedBy ?? 'its submitter'}, who submitted it.`
+      : `Rejected by ${draft.rejectedBy ?? 'a publisher'}.`
   if (draft.state === 'published') return `Published as version ${String((draft.expectedBase ?? 0) + 1)}.`
   if (draft.state === 'stale') {
     const now = draft.current === null ? 'no version is published now' : `version ${String(draft.current)} is the newest now`
@@ -54,7 +57,9 @@ function stateOf(draft: DraftRead): string | null {
 }
 
 function decidedBy(outcome: Failure): Decided {
-  return outcome.code === 'incompatible' ? { kind: 'incompatible', message: outcome.message, changes: outcome.changes ?? [] } : { kind: 'refused', message: outcome.message }
+  return outcome.code === 'incompatible'
+    ? { kind: 'incompatible', message: outcome.message, changes: outcome.changes ?? [] }
+    : { kind: 'refused', message: outcome.message }
 }
 
 /**
@@ -146,8 +151,8 @@ export function ReviewStep({ client, me }: { client: AdminClient; me: string }):
   return (
     <>
       <p className="lede">
-        Each draft is a version an administrator submitted for review. A publisher other than its submitter approves it, which
-        publishes it as the next version, or rejects it; its submitter may withdraw it. Nothing here changes a table.
+        Each draft is a version an administrator submitted for review. A publisher other than its submitter approves it, which publishes it as the next version,
+        or rejects it; its submitter may withdraw it. Nothing here changes a table.
       </p>
       <section className="review queue" aria-labelledby="queue-heading">
         <h3 id="queue-heading">Waiting for review</h3>
@@ -174,7 +179,13 @@ export function ReviewStep({ client, me }: { client: AdminClient; me: string }):
           ) : read.state === 'failed' ? (
             <p className="problem-box">{read.again ? `The draft could not be read again: ${read.message}` : read.message}</p>
           ) : (
-            <DraftView draft={read.draft} revision={read.revision} me={me} decided={decided?.answer ?? null} onDecide={(decision) => void decide(read.draft, decision)} />
+            <DraftView
+              draft={read.draft}
+              revision={read.revision}
+              me={me}
+              decided={decided?.answer ?? null}
+              onDecide={(decision) => void decide(read.draft, decision)}
+            />
           )}
           {decided === null ? null : <Decision decided={decided.answer} draft={decided.on} />}
         </section>

@@ -130,7 +130,10 @@ beforeAll(async () => {
   fixture = await startPostgresFixture()
   owner = postgres(fixture.admin, { onnotice: () => {} })
   for (const [id, tenant] of UUID_ROWS.orders) {
-    await owner.unsafe(`insert into sales."order" (id, tenant_id, customer_no, order_date, amount) overriding system value values ($1::bigint, $2::int, 1001, '2026-10-11', 1)`, [id, tenant])
+    await owner.unsafe(
+      `insert into sales."order" (id, tenant_id, customer_no, order_date, amount) overriding system value values ($1::bigint, $2::int, 1001, '2026-10-11', 1)`,
+      [id, tenant],
+    )
   }
   for (const [id, tenant, order, carrier] of UUID_ROWS.deliveries) {
     await owner.unsafe('insert into sales.delivery (id, tenant_id, order_id, carrier) values ($1::uuid, $2::int, $3::bigint, $4)', [id, tenant, order, carrier])
@@ -332,7 +335,11 @@ describe('a delete', covers('postgres', uuidCase('delete')), () => {
   // nothing (watched failing with the guard accepting no key, as 0050's
   // did: the delivery's delete was answered schema-changed).
   test("deletes a delivery with its parcels, and then its order with its line, its other delivery and that one's parcel, once the policy names each key", async () => {
-    const { cascades, removed: sent, left: { counts } } = UUID_PARITY.delete
+    const {
+      cascades,
+      removed: sent,
+      left: { counts },
+    } = UUID_PARITY.delete
     const orders = generateForm(snapshot, ORDER).bindings
     const named = { delivery: deleting(DELIVERY_POLICY, cascades.delivery), order: deleting(ORDER_POLICY, cascades.order) }
     expect([refused(deliveries, named.delivery), refused(orders, named.order)]).toEqual([[], []])
@@ -370,7 +377,9 @@ describe('a create', covers('postgres', uuidCase('create')), () => {
     expect(made.record).toMatch(/^k1:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(made.record).toBe(token(String(made.answers['id'])))
     expect(await read(deliveries, DELIVERY_POLICY, OTTO, made.record as string)).toEqual(made)
-    const [stored] = await owner<{ tenant_id: number; carrier: string }[]>`select tenant_id, carrier from sales.delivery where id = ${String(made.answers['id'])}::uuid`
+    const [stored] = await owner<
+      { tenant_id: number; carrier: string }[]
+    >`select tenant_id, carrier from sales.delivery where id = ${String(made.answers['id'])}::uuid`
     expect(stored).toEqual({ tenant_id: 2, carrier: UUID_PARITY.create.carrier })
     const sent = planCreate(snapshot, deliveries, DELIVERY_POLICY, OTTO, { ...answers, id: UUID_PARITY.parent.ours.keys[0] }, await described(deliveries))
     expect(sent).toEqual({ ok: false, ...UUID_PARITY.create.given })
@@ -387,7 +396,10 @@ describe('an update', covers('postgres', uuidCase('update')), () => {
     const written = await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: UUID_PARITY.update.carrier })
     expect(written).toMatchObject({ ok: true, values: { carrier: UUID_PARITY.update.carrier } })
     expect(written.ok && written.version).not.toBe(before.version)
-    expect(await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: 'never written' })).toMatchObject({ ok: false, code: UUID_PARITY.update.stale })
+    expect(await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: 'never written' })).toMatchObject({
+      ok: false,
+      code: UUID_PARITY.update.stale,
+    })
   })
 })
 
@@ -433,7 +445,11 @@ describe('a list ordered by the uuid key', covers('postgres', uuidCase('order'))
     for (let offset = 0; offset < keys.length; offset += size) {
       const query = { parent: { field: 'order', record: parent }, offset, limit: size }
       const page = await listed(OTTO, query)
-      expect({ offset, keys: keysOf(page), hasMore: page.hasMore }).toEqual({ offset, keys: expected.slice(offset, offset + size), hasMore: offset + size < keys.length })
+      expect({ offset, keys: keysOf(page), hasMore: page.hasMore }).toEqual({
+        offset,
+        keys: expected.slice(offset, offset + size),
+        hasMore: offset + size < keys.length,
+      })
       expect(keysOf(await listed(OTTO, query))).toEqual(keysOf(page))
       seen.push(...keysOf(page))
     }
@@ -487,7 +503,7 @@ describe("a lookup onto the delivery's uuid", covers('postgres', uuidCase('looku
   })
 })
 
-describe("the default that fills a uuid key", covers('postgres', uuidCase('defaults')), () => {
+describe('the default that fills a uuid key', covers('postgres', uuidCase('defaults')), () => {
   // Which default makes a key one a version column proves a record over
   // (0057): tables keyed by a uuid, created by the owner in a schema of
   // this suite's own and discovered as the order form's account, which may
@@ -539,7 +555,9 @@ describe("the default that fills a uuid key", covers('postgres', uuidCase('defau
 
   /** Each table's key default in `found`, and whether a form over each offers delete. */
   const defaultsIn = (found: MetadataSnapshot) => ({
-    spelled: Object.fromEntries(tables.map((name) => [name, findObject(found, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression])),
+    spelled: Object.fromEntries(
+      tables.map((name) => [name, findObject(found, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression]),
+    ),
     offered: Object.fromEntries(tables.map((name) => [name, generateForm(found, request(name)).bindings.operations.delete])),
   })
 
@@ -551,7 +569,9 @@ describe("the default that fills a uuid key", covers('postgres', uuidCase('defau
       const tenant = name === 'two_columns' ? 'tenant_id int not null, ' : ''
       const key = name === 'two_columns' ? 'tenant_id, id' : 'id'
       const refers = name === 'foreign_key' ? `, constraint fk_${name}_never_repeating foreign key (id) references ${schema}.never_repeating (id)` : ''
-      await owner.unsafe(`create table ${schema}.${name} (${tenant}id uuid not null default ${DEFAULTS[name]}, note varchar(50) null, version int not null default 1, constraint pk_${name} primary key (${key})${refers})`)
+      await owner.unsafe(
+        `create table ${schema}.${name} (${tenant}id uuid not null default ${DEFAULTS[name]}, note varchar(50) null, version int not null default 1, constraint pk_${name} primary key (${key})${refers})`,
+      )
       await owner.unsafe(`grant update (note, version) on ${schema}.${name} to formancy_forms`)
     }
     await owner.unsafe(`grant usage on schema ${schema} to formancy_forms`)

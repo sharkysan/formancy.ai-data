@@ -46,6 +46,8 @@ describe('an idle gap', () => {
   // A probe that never reports is not a quiet machine; the run stops rather
   // than wait for ever or judge the gap by nothing.
   test('gives up on a probe that never reports', async () => {
-    await expect(idleGap({ docker: docker() as DockerReader, containerId: 'c', calibration: calibration(Number.POSITIVE_INFINITY), gapMs: 5 }, 30)).rejects.toThrow(/has not reported/)
+    await expect(
+      idleGap({ docker: docker() as DockerReader, containerId: 'c', calibration: calibration(Number.POSITIVE_INFINITY), gapMs: 5 }, 30),
+    ).rejects.toThrow(/has not reported/)
   })
 })

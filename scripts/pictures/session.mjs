@@ -22,7 +22,21 @@ import { join } from 'node:path'
 import { declaredFamilies, fontPackages } from '../fonts.mjs'
 import { parse } from '../pictures.mjs'
 import * as camera from './camera.mjs'
-import { announce, checkProblems, entry, IMAGES, lineDiff, pairingProblems, pictureOf, readRecord, readScenes, REPO, stylesheetNotices, withEntry, writeRecord } from './record.mjs'
+import {
+  announce,
+  checkProblems,
+  entry,
+  IMAGES,
+  lineDiff,
+  pairingProblems,
+  pictureOf,
+  readRecord,
+  readScenes,
+  REPO,
+  stylesheetNotices,
+  withEntry,
+  writeRecord,
+} from './record.mjs'
 
 /** The root runner's arguments, for one app: no --app, and no scene of another app. */
 export function appOptions(argv, scenes, app) {
@@ -178,7 +192,8 @@ export async function pictures(config, argv = process.argv.slice(2)) {
   // own route, so it measures the clip with the faces the pictures were
   // taken in (0072).
   const families = declaredFamilies(dist)
-  if (families.length === 0) throw new Error(`apps/${app}/dist declares no font face, so there is nothing to wait for and a fallback face would be pictured unnoticed`)
+  if (families.length === 0)
+    throw new Error(`apps/${app}/dist declares no font face, so there is nothing to wait for and a fallback face would be pictured unnoticed`)
   const faces = camera.lookFonts(families, fontPackages(join(REPO, 'apps', app)))
 
   const browser = await chromium.launch()
@@ -225,9 +240,13 @@ export async function pictures(config, argv = process.argv.slice(2)) {
       if (JSON.stringify(shots[id].text) !== JSON.stringify(running[id])) {
         const changed = Object.keys(running[id]).filter((part) => shots[id].text[part] !== running[id][part])
         const diffs = changed.map((part) => `  ${part}:\n    ${lineDiff(running[id][part], shots[id].text[part]).join('\n    ')}`)
-        throw new Error(`${id}: ${changed.join(', ')} said something else after the picture was taken than before it, so the act does not wait for the state it pictures:\n${diffs.join('\n')}`)
+        throw new Error(
+          `${id}: ${changed.join(', ')} said something else after the picture was taken than before it, so the act does not wait for the state it pictures:\n${diffs.join('\n')}`,
+        )
       }
-      console.log(`  ${id}: shot (${reason}), ${String(shots[id].clip.width)}x${String(shots[id].clip.height)} CSS px, settled in ${String(shots[id].shots)} shots`)
+      console.log(
+        `  ${id}: shot (${reason}), ${String(shots[id].clip.width)}x${String(shots[id].clip.height)} CSS px, settled in ${String(shots[id].shots)} shots`,
+      )
     }
 
     if (options.check) {

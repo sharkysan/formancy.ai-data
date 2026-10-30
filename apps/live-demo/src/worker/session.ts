@@ -47,7 +47,10 @@ const CROSS_ORIGIN = {
   code: 'cross-origin-refused',
   message: "A demo server is started only from the demo's own page, and this request did not come from it, so nothing was started.",
 }
-const MALFORMED = { code: 'malformed', message: `A sign-in is a JSON object naming one persona, {"persona": "<id>"}, in at most ${String(SIGN_IN_BYTES)} bytes.` }
+const MALFORMED = {
+  code: 'malformed',
+  message: `A sign-in is a JSON object naming one persona, {"persona": "<id>"}, in at most ${String(SIGN_IN_BYTES)} bytes.`,
+}
 const UNKNOWN = {
   code: 'unknown-persona',
   // "Clara, Otto or Vera": British English lists a choice without a comma before "or", as the rest of the page does.

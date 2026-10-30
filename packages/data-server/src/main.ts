@@ -52,7 +52,10 @@ function required(name: string): string {
 
 function attributeMap(text: string | undefined): Record<string, string> {
   const map: Record<string, string> = {}
-  for (const pair of (text ?? '').split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')) {
+  for (const pair of (text ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '')) {
     const [attribute, claim, extra] = pair.split('=')
     if (attribute === undefined || claim === undefined || extra !== undefined || attribute === '' || claim === '') {
       console.error(`FORMANCY_DATA_ATTRIBUTES: "${pair}" is not attribute=claim.`)
@@ -108,7 +111,10 @@ if (!origins.ok) {
 // an allowlist and at least one administrator role.
 const storeDirectory = process.env['FORMANCY_DATA_STORE_DIR']
 const connectionsFile = process.env['FORMANCY_DATA_CONNECTIONS']
-const adminRoles = (process.env['FORMANCY_DATA_ADMIN_ROLES'] ?? '').split(',').map((role) => role.trim()).filter((role) => role !== '')
+const adminRoles = (process.env['FORMANCY_DATA_ADMIN_ROLES'] ?? '')
+  .split(',')
+  .map((role) => role.trim())
+  .filter((role) => role !== '')
 
 // Read before anything opens, as the limit is: review that names no
 // publisher, names a role the administrator's plane does not admit, or
@@ -198,12 +204,33 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
   const auditReference = process.env['FORMANCY_DATA_AUDIT_KEY']
   const auditKey = auditReference === undefined ? undefined : await resolveSecret(auditReference)
   // One trail for both planes, the server's own log (0033).
-  planes = servedPlanes({ registry, store, adminRoles, publisherRoles: review.publisherRoles, browseRoles: browse.browseRoles, auditKey, origins: origins.origins, lookupDeadlineMs: deadline.ms, log: () => app.log })
+  planes = servedPlanes({
+    registry,
+    store,
+    adminRoles,
+    publisherRoles: review.publisherRoles,
+    browseRoles: browse.browseRoles,
+    auditKey,
+    origins: origins.origins,
+    lookupDeadlineMs: deadline.ms,
+    log: () => app.log,
+  })
 }
 
 const app = await createDataServer({ verifyIdentity, logger: true, rateLimit: limit.rateLimit, trustedProxies: proxies.trustedProxies, ...planes })
 const identityKeys = keyFile === undefined ? {} : { identityKeys: { kids: keyFile.current().kids, leftOut: keyFile.current().leftOut } }
-app.log.info({ runtime: planes.runtime !== undefined, admin: planes.admin !== undefined, review: planes.admin?.publisherRoles !== undefined, browse: planes.admin?.browseRoles !== undefined, connections: registry?.ids() ?? [], trustedProxies: proxies.trustedProxies, ...identityKeys }, 'planes')
+app.log.info(
+  {
+    runtime: planes.runtime !== undefined,
+    admin: planes.admin !== undefined,
+    review: planes.admin?.publisherRoles !== undefined,
+    browse: planes.admin?.browseRoles !== undefined,
+    connections: registry?.ids() ?? [],
+    trustedProxies: proxies.trustedProxies,
+    ...identityKeys,
+  },
+  'planes',
+)
 // Once for each connection that logs in as an Entra principal, naming the
 // connection and nothing of the principal: no test of this release logs
 // in as one (0074).

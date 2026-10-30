@@ -40,7 +40,8 @@ export function readGeneration(value: unknown): GenerationReading {
   if (typeof title !== 'string') problems.push('title must be text')
   const lookups = lookupChoices(value['lookups'])
   if (lookups === undefined) problems.push('lookups must be a list of { foreignKey, display: [columns] }')
-  const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...(pinned as string[])] : undefined
+  const pinnedColumns =
+    pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...(pinned as string[])] : undefined
   if (pinnedColumns === undefined) problems.push('pinned must be a list of columns')
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')
   if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root)) return { ok: false, problems }

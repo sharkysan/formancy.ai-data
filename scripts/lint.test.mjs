@@ -230,7 +230,19 @@ describe('the linter', TYPED, () => {
     const { project } = (await eslint.calculateConfigForFile(join(root, SOURCE))).languageOptions.parserOptions
     const tsconfigs = project.flatMap((pattern) => {
       const parts = pattern.replace(/^\.\//, '').split('/')
-      return parts.reduce((dirs, part) => dirs.flatMap((dir) => (part === '*' ? readdirSync(join(root, dir), { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => join(dir, entry.name)) : [join(dir, part)])), ['.']).filter((path) => existsSync(join(root, path)))
+      return parts
+        .reduce(
+          (dirs, part) =>
+            dirs.flatMap((dir) =>
+              part === '*'
+                ? readdirSync(join(root, dir), { withFileTypes: true })
+                    .filter((entry) => entry.isDirectory())
+                    .map((entry) => join(dir, entry.name))
+                : [join(dir, part)],
+            ),
+          ['.'],
+        )
+        .filter((path) => existsSync(join(root, path)))
     })
     expect(tsconfigs.length, 'tsconfigs the configuration names').toBeGreaterThan(0)
     const placed = new Set(

@@ -64,7 +64,11 @@ export async function applyCondition(user: User, heading: string, asked: Asked):
 /** The conditions the grid's panel lists as applied, each as it reads with its Remove; none when it lists none. */
 export function applied(heading: string): string[] {
   const list = within(gridSection(heading)).queryByRole('list', { name: 'Filtered by' })
-  return list === null ? [] : within(list).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return list === null
+    ? []
+    : within(list)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent ?? '')
 }
 
 /** Wait until the grid's panel lists exactly these conditions, each followed by its Remove. */
@@ -74,5 +78,7 @@ export async function listsApplied(heading: string, summaries: readonly string[]
 
 /** What the page sent to a form's list route, each body read. */
 export function listsSent(sent: readonly Sent[], formId: string): Array<{ url: string; body: RecordListQuery }> {
-  return sent.filter((request) => request.method === 'POST' && request.path === `/v1/forms/${formId}/records/list`).map((request) => ({ url: request.url, body: JSON.parse(request.body ?? '{}') as RecordListQuery }))
+  return sent
+    .filter((request) => request.method === 'POST' && request.path === `/v1/forms/${formId}/records/list`)
+    .map((request) => ({ url: request.url, body: JSON.parse(request.body ?? '{}') as RecordListQuery }))
 }

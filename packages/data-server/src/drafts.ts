@@ -123,7 +123,16 @@ function entryOf(document: unknown, form: string, number: number, before: Readon
   if (!checked.ok) problems.push(...checked.problems.map((problem) => `bundle: ${problem}`))
   else if (checked.bundle.format !== 2 || checked.bundle.form.id !== form) problems.push(`bundle: is not a format-2 bundle of ${form}`)
   if (problems.length > 0 || !checked.ok || checked.bundle.format !== 2 || confirmed === undefined) return { ok: false, problems }
-  return { ok: true, entry: { entry: 'draft', expectedBase: base as number | null, bundle: checked.bundle, keysConfirmed: confirmed, submittedBy: document['submittedBy'] as string } }
+  return {
+    ok: true,
+    entry: {
+      entry: 'draft',
+      expectedBase: base as number | null,
+      bundle: checked.bundle,
+      keysConfirmed: confirmed,
+      submittedBy: document['submittedBy'] as string,
+    },
+  }
 }
 
 /** One JSON document's text, without the store's indentation: two documents the store wrote are the same bytes exactly when these are equal. */

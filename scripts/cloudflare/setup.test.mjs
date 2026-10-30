@@ -38,7 +38,10 @@ const next = () => join(dir, 'config.yml.new')
 /** What a successful run is answered, step by step, `change` replacing an answer by its first word. */
 function plan(given, change = {}) {
   const answers = {
-    login: { args: ['tunnel', 'login'], out: 'Please open the following URL and log in with your Cloudflare account:\n\nhttps://dash.cloudflare.com/argotunnel?aud=&callback=x\n' },
+    login: {
+      args: ['tunnel', 'login'],
+      out: 'Please open the following URL and log in with your Cloudflare account:\n\nhttps://dash.cloudflare.com/argotunnel?aud=&callback=x\n',
+    },
     create: {
       args: ['tunnel', 'create', '--credentials-file', credentials(), 'formancy-data'],
       // The stand-in prints the secret, so the redaction is what keeps it
@@ -57,12 +60,30 @@ function plan(given, change = {}) {
     validate: { args: ['tunnel', '--config', next(), 'ingress', 'validate'], out: 'OK\n' },
   }
   for (const [name, answer] of Object.entries(change)) answers[name] = { ...answers[name], ...answer }
-  cloudflared.plan([...Object.values(answers), ...probes(doors, given).map((probe) => ({ args: ['tunnel', '--config', next(), 'ingress', 'rule', probe.url], out: `Matched rule #${String(probe.rule)}\n` }))])
+  cloudflared.plan([
+    ...Object.values(answers),
+    ...probes(doors, given).map((probe) => ({
+      args: ['tunnel', '--config', next(), 'ingress', 'rule', probe.url],
+      out: `Matched rule #${String(probe.rule)}\n`,
+    })),
+  ])
 }
 
 const run = (args = argv) =>
-  setup({ argv: args, doors, dir, cloudflared: cloudflared.binary, owner: null, interactive: false, print: (line) => printed.push(line), report: (line) => printed.push(line) })
-const steps = () => cloudflared.asked().map((args) => (args[0] === '--version' ? 'version' : args[1] === '--config' ? args[4] === 'rule' ? 'rule' : 'validate' : args.slice(1, 3).join(' ')))
+  setup({
+    argv: args,
+    doors,
+    dir,
+    cloudflared: cloudflared.binary,
+    owner: null,
+    interactive: false,
+    print: (line) => printed.push(line),
+    report: (line) => printed.push(line),
+  })
+const steps = () =>
+  cloudflared
+    .asked()
+    .map((args) => (args[0] === '--version' ? 'version' : args[1] === '--config' ? (args[4] === 'rule' ? 'rule' : 'validate') : args.slice(1, 3).join(' ')))
 
 describe('setup', () => {
   // A wrong input caught after the login leaves a token to revoke and maybe
@@ -99,7 +120,9 @@ describe('setup', () => {
     expect(run()).toBe(1)
     expect(steps()).toEqual(['login'])
     expect(printed.at(-1)).toMatch(/could not log in/)
-    expect(printed.at(-1)).toMatch(/If your browser downloaded a cert\.pem, delete it and revoke its token .*: it can manage every tunnel of the account, and setup cannot use it\./)
+    expect(printed.at(-1)).toMatch(
+      /If your browser downloaded a cert\.pem, delete it and revoke its token .*: it can manage every tunnel of the account, and setup cannot use it\./,
+    )
   })
 
   // The login chooses one zone, and route dns creates the records in it: a
@@ -117,7 +140,15 @@ describe('setup', () => {
   // cloudflared turns that off (its CHANGES.md, 2023.9.0). Seen while the
   // login lasts, it stops setup before any hostname is routed to the tunnel.
   test('stops when a private network route sends traffic to the tunnel, before routing any hostname', () => {
-    const route = { id: 'b0e1c8a2-0000-4000-8000-000000000001', network: '10.0.0.0/8', tunnel_id: ID, comment: '', created_at: '2026-10-11T00:00:00Z', deleted_at: '0001-01-01T00:00:00Z', tunnel_name: 'formancy-data' }
+    const route = {
+      id: 'b0e1c8a2-0000-4000-8000-000000000001',
+      network: '10.0.0.0/8',
+      tunnel_id: ID,
+      comment: '',
+      created_at: '2026-10-11T00:00:00Z',
+      deleted_at: '0001-01-01T00:00:00Z',
+      tunnel_name: 'formancy-data',
+    }
     plan(inputs, { 'route ip': { out: `${JSON.stringify([route], null, 2)}\n` } })
     expect(run()).toBe(1)
     expect([...new Set(steps())]).toEqual(['login', 'create --credentials-file', 'route ip'])
@@ -167,7 +198,9 @@ describe('setup', () => {
     const both = { ...inputs, app: 'app.example.com' }
     plan(both)
     expect(run([...argv, '--app', 'app.example.com'])).toBe(0)
-    expect(cloudflared.asked().filter((args) => args[1] === 'create' || (args[1] === 'route' && args[2] === 'dns'))).toEqual([['tunnel', 'route', 'dns', ID, 'app.example.com']])
+    expect(cloudflared.asked().filter((args) => args[1] === 'create' || (args[1] === 'route' && args[2] === 'dns'))).toEqual([
+      ['tunnel', 'route', 'dns', ID, 'app.example.com'],
+    ])
     expect(routedHostnames(readFileSync(join(dir, 'config.yml'), 'utf8'))).toEqual(['formancy.example.com', 'app.example.com'])
   })
 
@@ -178,6 +211,8 @@ describe('setup', () => {
     expect(run([...argv, '--app', 'app.example.com'])).toBe(1)
     expect(cloudflared.asked().some((args) => args.includes('--overwrite-dns'))).toBe(false)
     expect(existsSync(join(dir, 'config.yml'))).toBe(false)
-    expect(printed.at(-1)).toMatch(/delete it or choose another hostname, then run setup again: setup never overwrites a record\. formancy\.example\.com was routed by this run and stays routed\./)
+    expect(printed.at(-1)).toMatch(
+      /delete it or choose another hostname, then run setup again: setup never overwrites a record\. formancy\.example\.com was routed by this run and stays routed\./,
+    )
   })
 })

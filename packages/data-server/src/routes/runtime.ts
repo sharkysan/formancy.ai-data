@@ -169,7 +169,13 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * log, with the adapter's sentence, which names no value; answered with what
    * was addressed; and never sent again -- each route asks the adapter once.
    */
-  function lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update' | 'delete', record: string | null, version: string | null, failure: string): WriteAnswer {
+  function lost(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: 'create' | 'update' | 'delete',
+    record: string | null,
+    version: string | null,
+    failure: string,
+  ): WriteAnswer {
     request.log.warn({ form: request.params.id, operation, failure }, 'a write was sent and its answer lost; it is not retried')
     return { ...unknownOutcome(operation, record, version), record: record ?? undefined }
   }
@@ -196,9 +202,19 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * and never the change's message, which names columns and types the person
    * is not told -- and answered with the planner's sentence.
    */
-  function driftAnswer(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'list' | 'form', changes: readonly DriftChange[] | undefined, message: string): WriteAnswer {
+  function driftAnswer(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: PolicyOperation | 'list' | 'form',
+    changes: readonly DriftChange[] | undefined,
+    message: string,
+  ): WriteAnswer {
     request.log.warn(
-      { form: request.params.id, version: request.auditTrail?.formVersion ?? null, operation, changes: (changes ?? []).map((change) => ({ kind: change.kind, affects: change.affects })) },
+      {
+        form: request.params.id,
+        version: request.auditTrail?.formVersion ?? null,
+        operation,
+        changes: (changes ?? []).map((change) => ({ kind: change.kind, affects: change.affects })),
+      },
       'refused: the database no longer fits this form as published',
     )
     return planRefusal('drift', message)
@@ -210,7 +226,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /** The root as the catalog describes it now, or the answer when it cannot be described: 503 when the database cannot say, 409 when the table is not one it describes. */
-  async function describedRoot(bundle: PublishedBundle, open: OpenConnection): Promise<{ ok: true; described: DescribedTable } | { ok: false; answer: WriteAnswer }> {
+  async function describedRoot(
+    bundle: PublishedBundle,
+    open: OpenConnection,
+  ): Promise<{ ok: true; described: DescribedTable } | { ok: false; answer: WriteAnswer }> {
     const found = await open.records.describe(bundle.bindings.root)
     return found.ok ? { ok: true, described: found.described } : { ok: false, answer: recordFailure(bundle.bindings, found) }
   }
@@ -231,7 +250,13 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * (0041). Any other failure is the database's. A page is decided as a
    * list (0044), and said in the log as one.
    */
-  async function unread(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, failure: RecordFailure, operation: 'read' | 'list'): Promise<WriteAnswer> {
+  async function unread(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    bundle: PublishedBundle,
+    open: OpenConnection,
+    failure: RecordFailure,
+    operation: 'read' | 'list',
+  ): Promise<WriteAnswer> {
     const root = failure.code === 'schema-changed' ? await describedRoot(bundle, open) : undefined
     const refused = root?.ok === true ? driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, operation) : undefined
     return refused === undefined ? recordFailure(bundle.bindings, failure) : refusal(request, operation, refused)
@@ -243,7 +268,12 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * the table no longer holds its key to a total order (0044) -- or
    * `undefined`.
    */
-  function undecided(request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, described: DescribedTable, operation: 'read' | 'list'): WriteAnswer | undefined {
+  function undecided(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    bundle: PublishedBundle,
+    described: DescribedTable,
+    operation: 'read' | 'list',
+  ): WriteAnswer | undefined {
     const refused = driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, described, operation)
     return refused === undefined ? undefined : refusal(request, operation, refused)
   }
@@ -283,7 +313,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
     // The views among them this person could have built (0105); a version published before 0030 has none.
     const views = bundle.format === 2 ? (bundle.presentation.views ?? []) : []
-    const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listColumns(bundle.bindings, listed.fields, views) : null
+    const list =
+      listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined
+        ? listColumns(bundle.bindings, listed.fields, views)
+        : null
     // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
     // What a copy of a record carries into a new one: only where a create is offered (0107).

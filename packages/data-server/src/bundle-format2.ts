@@ -40,8 +40,10 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
   else if (canonicalize(read.generation) !== canonicalize(document['generation'])) {
     problems.push('generation: is not in its normalised form (lookups and pinned as lists, versionColumn only when given, nothing else)')
   } else {
-    if (read.generation.connection !== document['connection']) problems.push(`generation: names connection ${read.generation.connection}, and the bundle is bound to ${String(document['connection'])}`)
-    if (base.valid && read.generation.formId !== base.schema.id) problems.push(`generation: names form ${read.generation.formId}, and the base is ${base.schema.id}`)
+    if (read.generation.connection !== document['connection'])
+      problems.push(`generation: names connection ${read.generation.connection}, and the bundle is bound to ${String(document['connection'])}`)
+    if (base.valid && read.generation.formId !== base.schema.id)
+      problems.push(`generation: names form ${read.generation.formId}, and the base is ${base.schema.id}`)
     if (base.valid) problems.push(...requestProblems(read.generation, base.schema, bindings, snapshot))
   }
   if (!base.valid) problems.push(...base.problems)
@@ -95,7 +97,8 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
 
   for (const column of generation.pinned ?? []) {
     const field = bindings.fields.find((binding) => binding.kind === 'column' && binding.column === column)
-    if (field !== undefined && (field.writes.create || field.writes.update)) problems.push(`generation: pins ${column}, and its field ${field.field} is written by the form`)
+    if (field !== undefined && (field.writes.create || field.writes.update))
+      problems.push(`generation: pins ${column}, and its field ${field.field} is written by the form`)
   }
 
   // Compared as foreign key and display columns, the whole of a lookup choice.
@@ -103,8 +106,10 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
   const same = (left: Choice) => (right: Choice) => left.foreignKey === right.foreignKey && canonicalize(left.display) === canonicalize(right.display)
   const shown = (lookup: Choice) => `${lookup.foreignKey} showing ${lookup.display.join(', ')}`
   const bound = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding] : []))
-  for (const lookup of generation.lookups) if (!bound.some(same(lookup))) problems.push(`generation: chooses a lookup over ${shown(lookup)}, which the bindings do not have`)
-  for (const lookup of bound) if (!generation.lookups.some(same(lookup))) problems.push(`generation: the bindings have a lookup over ${shown(lookup)}, which it does not choose`)
+  for (const lookup of generation.lookups)
+    if (!bound.some(same(lookup))) problems.push(`generation: chooses a lookup over ${shown(lookup)}, which the bindings do not have`)
+  for (const lookup of bound)
+    if (!generation.lookups.some(same(lookup))) problems.push(`generation: the bindings have a lookup over ${shown(lookup)}, which it does not choose`)
   return problems
 }
 
@@ -131,7 +136,9 @@ export function generatedProblems(bundle: BundleV2): string[] {
     return [`generation: ${(error as Error).message}`]
   }
   const problems: string[] = []
-  if (canonicalize(generated.form) !== canonicalize(bundle.base)) problems.push('base: is not what this server generates from the stored snapshot and generation request')
-  if (canonicalize(generated.bindings) !== canonicalize(bundle.bindings)) problems.push('bindings: are not what this server generates from the stored snapshot and generation request')
+  if (canonicalize(generated.form) !== canonicalize(bundle.base))
+    problems.push('base: is not what this server generates from the stored snapshot and generation request')
+  if (canonicalize(generated.bindings) !== canonicalize(bundle.bindings))
+    problems.push('bindings: are not what this server generates from the stored snapshot and generation request')
   return problems
 }

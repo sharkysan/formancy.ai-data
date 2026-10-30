@@ -22,7 +22,11 @@ export const viewForm = (): HTMLElement => within(viewsPanel()).getByRole('form'
 /** The saved views, each as its list says it in words. */
 export function savedViews(): string[] {
   const list = within(viewsPanel()).queryByRole('list', { name: 'List views' })
-  return list === null ? [] : within(list).getAllByRole('listitem').map((item) => within(item).getAllByRole('paragraph')[0]?.textContent ?? '')
+  return list === null
+    ? []
+    : within(list)
+        .getAllByRole('listitem')
+        .map((item) => within(item).getAllByRole('paragraph')[0]?.textContent ?? '')
 }
 
 /** The form's rows of one kind, "Condition" or "Sort", in order. */

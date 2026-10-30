@@ -36,8 +36,16 @@ function foreignImports(file, seen = new Set()) {
   if (seen.has(file)) return []
   seen.add(file)
   const text = readFileSync(file, 'utf8')
-  const specifiers = [...text.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/gm)].map((match) => match[1] ?? match[2] ?? match[3])
-  return specifiers.flatMap((specifier) => (specifier.startsWith('.') ? foreignImports(resolve(dirname(file), specifier), seen) : specifier.startsWith('node:') ? [] : [`${file.slice(repo.length + 1).replaceAll('\\', '/')} imports ${specifier}`]))
+  const specifiers = [
+    ...text.matchAll(/^\s*(?:import|export)\s[^'"]*?from\s+['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]|\bimport\(\s*['"]([^'"]+)['"]\s*\)/gm),
+  ].map((match) => match[1] ?? match[2] ?? match[3])
+  return specifiers.flatMap((specifier) =>
+    specifier.startsWith('.')
+      ? foreignImports(resolve(dirname(file), specifier), seen)
+      : specifier.startsWith('node:')
+        ? []
+        : [`${file.slice(repo.length + 1).replaceAll('\\', '/')} imports ${specifier}`],
+  )
 }
 
 describe('the jobs that install nothing', () => {
@@ -54,7 +62,14 @@ describe('the jobs that install nothing', () => {
         for (const step of job.steps) for (const [, script] of String(step.run ?? '').matchAll(/\bnode (scripts\/\S+\.mjs)/g)) scripts.push({ id, script })
       }
     }
-    expect(scripts.map(({ id, script }) => `${id}: ${script}`)).toEqual(expect.arrayContaining(['publish: scripts/release-report/verify-publish.mjs', 'publish: scripts/release-report/publish.mjs', 'container: scripts/release-report/collect.mjs', 'getting-started: scripts/getting-started.mjs']))
+    expect(scripts.map(({ id, script }) => `${id}: ${script}`)).toEqual(
+      expect.arrayContaining([
+        'publish: scripts/release-report/verify-publish.mjs',
+        'publish: scripts/release-report/publish.mjs',
+        'container: scripts/release-report/collect.mjs',
+        'getting-started: scripts/getting-started.mjs',
+      ]),
+    )
     expect(scripts.flatMap(({ script }) => foreignImports(join(repo, script)))).toEqual([])
   })
 })
@@ -95,7 +110,9 @@ describe('release.yml', () => {
   test('reads NPM_TOKEN only in the npm-token and publish jobs, each behind the one condition', () => {
     expect(release.jobs['npm-token'].if).toBe(ONLY_WHEN_PUBLISHING)
     expect(release.jobs.publish.if).toBe(ONLY_WHEN_PUBLISHING)
-    const reading = Object.entries(release.jobs).filter(([, job]) => JSON.stringify(job).includes('secrets.NPM_TOKEN')).map(([id]) => id)
+    const reading = Object.entries(release.jobs)
+      .filter(([, job]) => JSON.stringify(job).includes('secrets.NPM_TOKEN'))
+      .map(([id]) => id)
     expect(reading).toEqual(['npm-token', 'publish'])
   })
 
@@ -163,7 +180,11 @@ describe('release.yml', () => {
     expect(check.steps.find((step) => step.id === 'report-checked').run).toContain('--stage content')
     expect(check.steps.find((step) => step.id === 'sbom-checked').run).toContain('--stage sbom')
     const publish = release.jobs.publish
-    expect(publish.env).toMatchObject({ CHECKED: '${{ needs.check.outputs.checked }}', CHECKED_SBOM: '${{ needs.check.outputs.sbom }}', VERSION: '${{ needs.tag.outputs.version }}' })
+    expect(publish.env).toMatchObject({
+      CHECKED: '${{ needs.check.outputs.checked }}',
+      CHECKED_SBOM: '${{ needs.check.outputs.sbom }}',
+      VERSION: '${{ needs.tag.outputs.version }}',
+    })
     const downloads = publish.steps.findIndex((step) => step.id === 'downloads-checked')
     expect(publish.steps[downloads].run).toContain('--stage downloads')
     expect(publish.steps.slice(downloads + 1).filter((step) => String(step.uses).startsWith('actions/download-artifact'))).toEqual([])
@@ -175,7 +196,11 @@ describe('release.yml', () => {
   // admits only `v*` tags is not. The policy is a repository setting no test
   // here can see (REPO-METADATA.md); that the two jobs ask for it is held here.
   test('reads the npm token from the npm environment, in the two jobs that need it and no other', () => {
-    expect(Object.entries(release.jobs).filter(([, job]) => job.environment !== undefined).map(([id, job]) => `${id}: ${String(job.environment)}`)).toEqual(['npm-token: npm', 'publish: npm'])
+    expect(
+      Object.entries(release.jobs)
+        .filter(([, job]) => job.environment !== undefined)
+        .map(([id, job]) => `${id}: ${String(job.environment)}`),
+    ).toEqual(['npm-token: npm', 'publish: npm'])
   })
 
   // A file named from a ref is a path a dispatch from `feat/x` gives a `/`;
@@ -194,7 +219,10 @@ describe('release.yml', () => {
   // a file missing is a release without it, so a missing match fails.
   test('attaches the report and its signatures to the GitHub release', () => {
     const step = release.jobs.publish.steps.find((entry) => entry.id === 'github-release')
-    const files = step.with.files.split('\n').map((line) => line.trim()).filter(Boolean)
+    const files = step.with.files
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
     for (const kind of ['md', 'json']) {
       expect(files).toContain(`formancy-data-*-release-report.${kind}`)
       expect(files).toContain(`formancy-data-*-release-report.${kind}.sigstore`)
@@ -214,7 +242,14 @@ describe('gates.yml', () => {
   test('builds every package the report reads built', () => {
     const packages = workspace(repo)
     const dirOf = new Map(packages.map(({ dir, manifest }) => [manifest.name, dir]))
-    const dependsOn = new Map(packages.map(({ dir, manifest }) => [dir, Object.keys({ ...manifest.dependencies, ...manifest.devDependencies }).filter((name) => dirOf.has(name)).map((name) => dirOf.get(name))]))
+    const dependsOn = new Map(
+      packages.map(({ dir, manifest }) => [
+        dir,
+        Object.keys({ ...manifest.dependencies, ...manifest.devDependencies })
+          .filter((name) => dirOf.has(name))
+          .map((name) => dirOf.get(name)),
+      ]),
+    )
     const build = gates.jobs.report.steps.map((step) => String(step.run ?? '')).find((run) => run.startsWith('pnpm exec turbo run build'))
     const filtered = [...String(build).matchAll(/--filter=(\S+)/g)].map((found) => dirOf.get(found[1]))
     const built = new Set()
@@ -250,7 +285,12 @@ describe('gates.yml', () => {
       const upload = jobSteps[jobSteps.indexOf(collect) + 1]
       expect(upload.uses, id).toMatch(/^actions\/upload-artifact@/)
       expect(upload.if, id).toContain('!cancelled()')
-      expect(upload.with, id).toEqual({ name: 'release-results-${{ steps.collect.outputs.key }}', path: 'release-results/', 'if-no-files-found': 'error', overwrite: true })
+      expect(upload.with, id).toEqual({
+        name: 'release-results-${{ steps.collect.outputs.key }}',
+        path: 'release-results/',
+        'if-no-files-found': 'error',
+        overwrite: true,
+      })
     }
   })
 
@@ -264,13 +304,32 @@ describe('gates.yml', () => {
     const expected = expectedKeys(gates, namedPackages())
     const keys = expected.map((entry) => entry.key)
     expect(new Set(keys).size).toBe(keys.length)
-    expect(keys).toEqual(expect.arrayContaining(['verify', 'browser-chromium', 'browser-firefox', 'browser-webkit', 'pictures', 'install', 'container', 'getting-started-runner', 'getting-started-2.20.3', 'live-demo']))
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        'verify',
+        'browser-chromium',
+        'browser-firefox',
+        'browser-webkit',
+        'pictures',
+        'install',
+        'container',
+        'getting-started-runner',
+        'getting-started-2.20.3',
+        'live-demo',
+      ]),
+    )
     expect(keys).not.toContain('browser')
     const of = (job) => expected.filter((entry) => entry.job === job).map((entry) => entry.key)
-    expect(of('test').sort()).toEqual(namedPackages().map((entry) => `test-${entry.id}`).sort())
+    expect(of('test').sort()).toEqual(
+      namedPackages()
+        .map((entry) => `test-${entry.id}`)
+        .sort(),
+    )
     // Each leg's key names its package and its image, so the report expects
     // every pair the job lists and no two legs share one.
-    expect(of('test-images')).toEqual(expect.arrayContaining(['test-images-data-fixtures-postgres-16-alpine', 'test-images-data-sqlserver-mcr.microsoft.com-mssql-server-2019-latest']))
+    expect(of('test-images')).toEqual(
+      expect.arrayContaining(['test-images-data-fixtures-postgres-16-alpine', 'test-images-data-sqlserver-mcr.microsoft.com-mssql-server-2019-latest']),
+    )
     expect(of('test-images')).toHaveLength(imageMatrix(gates).length)
   })
 
@@ -282,13 +341,23 @@ describe('gates.yml', () => {
       jobs: {
         legs: {
           strategy: { matrix },
-          steps: [{ id: 'collect', run: 'node scripts/release-report/collect.mjs --job legs --package "$PACKAGE" --variant "$IMAGE"', env: { PACKAGE: '${{ matrix.package }}', IMAGE: '${{ matrix.image }}' } }],
+          steps: [
+            {
+              id: 'collect',
+              run: 'node scripts/release-report/collect.mjs --job legs --package "$PACKAGE" --variant "$IMAGE"',
+              env: { PACKAGE: '${{ matrix.package }}', IMAGE: '${{ matrix.image }}' },
+            },
+          ],
         },
       },
     })
     const named = namedPackages()
-    expect(expectedKeys(leg({ include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named)).toEqual([{ key: 'legs-data-postgres-postgres-16-alpine', job: 'legs' }])
-    expect(() => expectedKeys(leg({ package: ['@formancy/data-postgres'], include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named)).toThrow(/its matrix lists package beside include/)
+    expect(expectedKeys(leg({ include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named)).toEqual([
+      { key: 'legs-data-postgres-postgres-16-alpine', job: 'legs' },
+    ])
+    expect(() =>
+      expectedKeys(leg({ package: ['@formancy/data-postgres'], include: [{ package: '@formancy/data-postgres', image: 'postgres:16-alpine' }] }), named),
+    ).toThrow(/its matrix lists package beside include/)
     expect(() => expectedKeys(leg({ include: [{ package: '@formancy/data-postgres' }] }), named)).toThrow(/include entry 1 gives no image/)
   })
 
@@ -347,7 +416,9 @@ describe('gates.yml', () => {
     expect(gates.jobs.browser['runs-on']).toBe('ubuntu-24.04')
     expect(gates.jobs.pictures['runs-on']).toBe('ubuntu-24.04')
     const deps = gates.jobs.browser.steps.filter((step) => String(step.run).includes('install-deps') || String(step.run).includes('--with-deps'))
-    expect(deps.map((step) => ({ if: step.if, run: step.run }))).toEqual([{ if: "matrix.browser == 'webkit'", run: 'pnpm --filter @formancy/data-examples exec playwright install-deps webkit' }])
+    expect(deps.map((step) => ({ if: step.if, run: step.run }))).toEqual([
+      { if: "matrix.browser == 'webkit'", run: 'pnpm --filter @formancy/data-examples exec playwright install-deps webkit' },
+    ])
   })
 
   // The runner's Ubuntu mirror has crawled for whole runs -- ten packages in
@@ -386,7 +457,11 @@ describe('gates.yml', () => {
   // write shell into; through `env` it is only ever a value.
   test('puts no expression inside a script, here or in the release', () => {
     for (const workflow of [gates, release]) {
-      expect(steps(workflow).filter(({ step }) => String(step.run ?? '').includes('${{')).map(({ job, step }) => `${job}: ${step.name ?? step.run}`)).toEqual([])
+      expect(
+        steps(workflow)
+          .filter(({ step }) => String(step.run ?? '').includes('${{'))
+          .map(({ job, step }) => `${job}: ${step.name ?? step.run}`),
+      ).toEqual([])
     }
   })
 
@@ -412,9 +487,14 @@ describe('gates.yml', () => {
   test('restores no cache in a release or a rehearsal', () => {
     const caches = steps(gates).filter(({ step }) => String(step.uses).startsWith('actions/cache'))
     expect(caches.length).toBeGreaterThan(0)
-    const guarded = (condition) => condition === "inputs.release == ''" || (typeof condition === 'string' && condition.startsWith("inputs.release == '' && ") && !condition.includes('||'))
+    const guarded = (condition) =>
+      condition === "inputs.release == ''" || (typeof condition === 'string' && condition.startsWith("inputs.release == '' && ") && !condition.includes('||'))
     expect(caches.filter(({ step }) => !guarded(step.if)).map(({ job, step }) => `${job}: ${step.name ?? step.with?.path}`)).toEqual([])
-    expect(steps(release).filter(({ step }) => String(step.uses).startsWith('actions/cache')).map(({ job }) => job)).toEqual([])
+    expect(
+      steps(release)
+        .filter(({ step }) => String(step.uses).startsWith('actions/cache'))
+        .map(({ job }) => job),
+    ).toEqual([])
   })
 
   // Merged, two jobs that wrote one key would overwrite each other before
@@ -428,6 +508,11 @@ describe('gates.yml', () => {
   test('keeps the tarballs the install gate packed, installed and ran', () => {
     const install = gates.jobs.install.steps
     expect(install.map((step) => step.run).filter(Boolean)).toContain('node scripts/install-test.mjs --keep-tarballs release-tarballs')
-    expect(install.find((step) => step.with?.name === 'release-tarballs')?.with).toEqual({ name: 'release-tarballs', path: 'release-tarballs/', 'if-no-files-found': 'error', overwrite: true })
+    expect(install.find((step) => step.with?.name === 'release-tarballs')?.with).toEqual({
+      name: 'release-tarballs',
+      path: 'release-tarballs/',
+      'if-no-files-found': 'error',
+      overwrite: true,
+    })
   })
 })

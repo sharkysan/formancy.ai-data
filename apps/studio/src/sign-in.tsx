@@ -65,7 +65,10 @@ export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; 
     const administration = await client.administration()
     setChecking(false)
     if (!administration.ok) {
-      setRefusal({ message: `The server did not say what this token may do here, so the studio cannot tell which steps are yours: ${administration.message}`, identity: who.value })
+      setRefusal({
+        message: `The server did not say what this token may do here, so the studio cannot tell which steps are yours: ${administration.message}`,
+        identity: who.value,
+      })
       return
     }
     setToken('')
@@ -78,20 +81,12 @@ export function SignIn({ fetch, onSignedIn }: { fetch: typeof globalThis.fetch; 
         <p className="eyebrow">Formancy Data &middot; studio</p>
         <h1 id="signin-heading">Sign in to the studio</h1>
         <p className="lede">
-          Paste a token your host application issued for you. The server checks it, says whom it names, and lets you in if
-          one of its roles administers this deployment.
+          Paste a token your host application issued for you. The server checks it, says whom it names, and lets you in if one of its roles administers this
+          deployment.
         </p>
         <form onSubmit={(event) => void submit(event)}>
           <label htmlFor="token">Host token</label>
-          <input
-            id="token"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            required
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-          />
+          <input id="token" type="password" autoComplete="off" spellCheck={false} required value={token} onChange={(event) => setToken(event.target.value)} />
           <p className="hint">{TOKEN_KEPT}</p>
           <button type="submit" className="primary">
             Sign in

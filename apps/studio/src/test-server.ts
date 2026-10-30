@@ -2,7 +2,20 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf } from '@formancy/data-core'
-import type { ApiValue, ColumnMeta, CoverageGap, DatabaseAdapter, DescribedTable, ListRequest, LookupAdapter, MetadataSnapshot, RecordAdapter, RecordFilter, ReferentialAction, ServerFacts } from '@formancy/data-core'
+import type {
+  ApiValue,
+  ColumnMeta,
+  CoverageGap,
+  DatabaseAdapter,
+  DescribedTable,
+  ListRequest,
+  LookupAdapter,
+  MetadataSnapshot,
+  RecordAdapter,
+  RecordFilter,
+  ReferentialAction,
+  ServerFacts,
+} from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@formancy/data-server'
 import owner from './fixtures/postgres-owner.json'
@@ -45,7 +58,9 @@ export function readSnapshot(raw: unknown): MetadataSnapshot {
   const { fingerprint, ...contents } = raw as MetadataSnapshot
   const recomputed = createSnapshot(contents)
   if (recomputed.fingerprint !== fingerprint) {
-    throw new Error(`a captured snapshot hashes to ${recomputed.fingerprint}, not ${String(fingerprint)}: it was edited. Run scripts/capture-snapshots.mjs again.`)
+    throw new Error(
+      `a captured snapshot hashes to ${recomputed.fingerprint}, not ${String(fingerprint)}: it was edited. Run scripts/capture-snapshots.mjs again.`,
+    )
   }
   return recomputed
 }
@@ -63,7 +78,13 @@ export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
  * also lets in; `both` holds both, and still never approves what it
  * submitted. `browser` administers and holds the browse role (0099).
  */
-export const TOKENS = { admin: 'studio-test-administrator', clerk: 'studio-test-clerk', publisher: 'studio-test-publisher', both: 'studio-test-both', browser: 'studio-test-browser' } as const
+export const TOKENS = {
+  admin: 'studio-test-administrator',
+  clerk: 'studio-test-clerk',
+  publisher: 'studio-test-publisher',
+  both: 'studio-test-both',
+  browser: 'studio-test-browser',
+} as const
 export const ADMIN_ROLE = 'data-admin'
 export const PUBLISHER_ROLE = 'data-publisher'
 export const BROWSE_ROLE = 'data-browser'
@@ -161,7 +182,11 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
     case 'range': {
       if (value === null) return false
       const order = (bound: string) => rangeOrder(condition.type, String(value), bound)
-      return (condition.from === null || order(condition.from) >= 0) && (condition.to === null || order(condition.to) <= 0) && (condition.before === null || order(condition.before) < 0)
+      return (
+        (condition.from === null || order(condition.from) >= 0) &&
+        (condition.to === null || order(condition.to) <= 0) &&
+        (condition.before === null || order(condition.before) < 0)
+      )
     }
   }
 }
@@ -223,7 +248,8 @@ export async function startPlane(options: { administrator?: boolean; review?: bo
           const page = narrowed.slice(request.offset, request.offset + request.limit + 1)
           const described = describedOf(databases.get(id) ?? now, request.target.table) as DescribedTable
           // Only the columns the request names, as an adapter reads them: a fake that answered every value it holds would show a page what the server's discovery left out.
-          const read = (values: Record<string, ApiValue>) => Object.fromEntries(request.columns.filter((column) => Object.hasOwn(values, column.name)).map((column) => [column.name, values[column.name]]))
+          const read = (values: Record<string, ApiValue>) =>
+            Object.fromEntries(request.columns.filter((column) => Object.hasOwn(values, column.name)).map((column) => [column.name, values[column.name]]))
           return { ok: true, described, rows: page.map((values) => ({ values: read(values), version: null })) }
         },
       } as unknown as RecordAdapter
@@ -347,11 +373,27 @@ export function withForeignKey(
   const onto = find(key.onto)
   from.foreignKeys = [
     ...from.foreignKeys.filter((candidate) => candidate.name !== key.name),
-    { name: key.name, columns: key.columns, references: { table: onto.ref, columns: key.referencedColumns }, onUpdate: 'no-action', onDelete: key.onDelete, enforced: true, validated: true },
+    {
+      name: key.name,
+      columns: key.columns,
+      references: { table: onto.ref, columns: key.referencedColumns },
+      onUpdate: 'no-action',
+      onDelete: key.onDelete,
+      enforced: true,
+      validated: true,
+    },
   ]
   onto.referencedBy = [
     ...(onto.referencedBy ?? []).filter((candidate) => candidate.name !== key.name || candidate.table.name !== key.from),
-    { table: from.ref, name: key.name, columns: key.columns, referencedColumns: key.referencedColumns, onDelete: key.onDelete, onUpdate: 'no-action', enforced: true },
+    {
+      table: from.ref,
+      name: key.name,
+      columns: key.columns,
+      referencedColumns: key.referencedColumns,
+      onDelete: key.onDelete,
+      onUpdate: 'no-action',
+      enforced: true,
+    },
   ]
   return createSnapshot(contents)
 }

@@ -14,7 +14,25 @@ import type { Catalogue, Results, ScenarioResult } from './results.js'
 
 /** A scenario result with only what the derivation reads set apart from zero. */
 function result(engine: 'pg' | 'ms', scenario: string, concurrency: number, max: number): ScenarioResult {
-  return { engine, scenario, concurrency, max, n: 3000, p50: 1, p90: 1, p99: 1, mean: 1, rounds: [1], throughput: 1, roundTrips: 2, rowsAnswered: 1, serverCpuMsPerRequest: 0, databaseCpuMsPerRequest: 0, databaseIdleCpuMsPerSecond: 0, run: {} as ScenarioResult['run'] }
+  return {
+    engine,
+    scenario,
+    concurrency,
+    max,
+    n: 3000,
+    p50: 1,
+    p90: 1,
+    p99: 1,
+    mean: 1,
+    rounds: [1],
+    throughput: 1,
+    roundTrips: 2,
+    rowsAnswered: 1,
+    serverCpuMsPerRequest: 0,
+    databaseCpuMsPerRequest: 0,
+    databaseIdleCpuMsPerSecond: 0,
+    run: {} as ScenarioResult['run'],
+  }
 }
 
 const scenario = (name: string, operation: string | null | undefined): Catalogue['scenarios'][number] => ({
@@ -28,7 +46,11 @@ const scenario = (name: string, operation: string | null | undefined): Catalogue
   ...(operation === undefined ? {} : { operation }),
 })
 
-const catalogue = (entries: Catalogue['scenarios']): Catalogue => ({ scenarios: entries, refusals: [], floor: { label: 'floor', roundTrips: { pg: 2, ms: 2 } } })
+const catalogue = (entries: Catalogue['scenarios']): Catalogue => ({
+  scenarios: entries,
+  refusals: [],
+  floor: { label: 'floor', roundTrips: { pg: 2, ms: 2 } },
+})
 
 describe('lookupDeadlineFrom', () => {
   // Only what a lookup route answers sets the deadline: a create is slower
@@ -38,7 +60,12 @@ describe('lookupDeadlineFrom', () => {
   // would refuse what the figures say this machine serves. A fraction rounds
   // up, never down, for the same reason.
   test('is the slowest lookup or resolve answer, on either engine at any level, rounded up', () => {
-    const entries = catalogue([scenario('lookup-absent', 'lookup-query'), scenario('resolve-100', 'lookup-resolve'), scenario('create', 'create'), scenario('health', null)])
+    const entries = catalogue([
+      scenario('lookup-absent', 'lookup-query'),
+      scenario('resolve-100', 'lookup-resolve'),
+      scenario('create', 'create'),
+      scenario('health', null),
+    ])
     const scenarios = [
       result('pg', 'lookup-absent', 1, 190.2),
       result('ms', 'lookup-absent', 8, 535.0001),
@@ -47,14 +74,21 @@ describe('lookupDeadlineFrom', () => {
       result('ms', 'health', 8, 700),
     ]
     expect(lookupDeadlineFrom(scenarios, entries)).toEqual({ ms: 536, engine: 'ms', scenario: 'lookup-absent', concurrency: 8 })
-    expect(lookupDeadlineFrom([...scenarios, result('pg', 'resolve-100', 8, 600)], entries)).toEqual({ ms: 600, engine: 'pg', scenario: 'resolve-100', concurrency: 8 })
+    expect(lookupDeadlineFrom([...scenarios, result('pg', 'resolve-100', 8, 600)], entries)).toEqual({
+      ms: 600,
+      engine: 'pg',
+      scenario: 'resolve-100',
+      concurrency: 8,
+    })
   })
 
   // A catalogue measured before 0061 names no operation, and a derivation
   // that guessed one from a scenario's name would rest on wording, which the
   // repository does not let a guard rest on. It refuses, naming the entry.
   test('refuses a catalogue that names no operation for a scenario the results hold', () => {
-    expect(() => lookupDeadlineFrom([result('pg', 'lookup-absent', 1, 190)], catalogue([scenario('lookup-absent', undefined)]))).toThrow(/lookup-absent names no operation/)
+    expect(() => lookupDeadlineFrom([result('pg', 'lookup-absent', 1, 190)], catalogue([scenario('lookup-absent', undefined)]))).toThrow(
+      /lookup-absent names no operation/,
+    )
   })
 
   // A results set with no lookup in it has no slowest lookup; a deadline of

@@ -189,7 +189,14 @@ function runner(env, docker) {
   } catch {
     // No Docker here: the container and getting-started jobs have it; a verify job need not.
   }
-  return { node: process.version, platform: process.platform, arch: process.arch, image: env.ImageOS ?? null, imageVersion: env.ImageVersion ?? null, docker: server }
+  return {
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    image: env.ImageOS ?? null,
+    imageVersion: env.ImageVersion ?? null,
+    docker: server,
+  }
 }
 
 /** Digest and image id of each distinct image the records name, from the machine that ran them. */
@@ -214,7 +221,20 @@ function withDigests(records, docker, missing) {
  * under `root`, the `docker` and `git` it is given, and `browsers`, the
  * browsers the gates run in.
  */
-export function collect({ root = repo, job, pkg, variant, image, local = false, since, browsers = BROWSERS, env = process.env, docker = defaultDocker, git = defaultGit, now = () => new Date() }) {
+export function collect({
+  root = repo,
+  job,
+  pkg,
+  variant,
+  image,
+  local = false,
+  since,
+  browsers = BROWSERS,
+  env = process.env,
+  docker = defaultDocker,
+  git = defaultGit,
+  now = () => new Date(),
+}) {
   if (!local && job === 'browser') {
     if (variant === undefined) throw new Error(`--job browser needs --variant <browser>, the browser its leg ran: one of ${browsers.join(', ')}`)
     if (!browsers.includes(variant)) throw new Error(`--job browser --variant ${variant}: ${variant} is no browser the gates run in (${browsers.join(', ')})`)
@@ -223,7 +243,8 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
   const key = local ? 'local' : keyFor({ job, pkg, variant }, packages)
   const missing = []
   const after = local ? time(since) : Number.NEGATIVE_INFINITY
-  if (local && Number.isNaN(after)) throw new Error('--local needs --since <ISO instant>: results older than it are refused as stale, and nothing else can say from when')
+  if (local && Number.isNaN(after))
+    throw new Error('--local needs --since <ISO instant>: results older than it are refused as stale, and nothing else can say from when')
   const collectedAt = now()
   const fresh = (path, started, verb = 'started') => {
     if (time(started) >= after) return true
@@ -247,7 +268,8 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
     if (task?.startTime != null && !fresh(`turbo's run summary for ${name}#test:coverage`, task.startTime)) task = undefined
     if (task?.cache === 'HIT') missing.push(`a fresh run of ${name}#test:coverage: turbo replayed it from its cache`)
     let coverage = null
-    if (existsSync(join(root, summary)) && fresh(slash(summary), statSync(join(root, summary)).mtimeMs, 'written')) coverage = readJson(join(root, summary)).total
+    if (existsSync(join(root, summary)) && fresh(slash(summary), statSync(join(root, summary)).mtimeMs, 'written'))
+      coverage = readJson(join(root, summary)).total
     suites.push({ package: name, path, ...normaliseSuite(json, root), task: task ?? null, coverage })
     servers.push(...within(serverRecords(root, path), SUITE_SCRIPTS, json.startTime, collectedAt.getTime(), name, root))
   }
@@ -262,8 +284,10 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
     // A file another browser's run wrote -- its launch failed, so no browser
     // names itself in it -- would be that browser's failure under this one's
     // name; one that launched another browser would be that browser's checks.
-    if (result.asked !== browser) return void missing.push(`${path}’s gate asked for ${result.asked === undefined ? 'no browser' : String(result.asked)} in the ${browser} job: ${shown}`)
-    if (result.browser != null && result.browser.name !== browser) return void missing.push(`${path}’s gate launched ${String(result.browser.name)} in the ${browser} job: ${shown}`)
+    if (result.asked !== browser)
+      return void missing.push(`${path}’s gate asked for ${result.asked === undefined ? 'no browser' : String(result.asked)} in the ${browser} job: ${shown}`)
+    if (result.browser != null && result.browser.name !== browser)
+      return void missing.push(`${path}’s gate launched ${String(result.browser.name)} in the ${browser} job: ${shown}`)
     browserGates.push(result)
     servers.push(...within(serverRecords(root, path), GATE_SCRIPTS, time(result.startedAt), time(result.finishedAt), result.gate, root))
   }
@@ -316,11 +340,14 @@ export function collect({ root = repo, job, pkg, variant, image, local = false, 
   // root. In its own job, one per connection the journey runs on, or the
   // report fails: a journey that recorded none would leave it silent on
   // what the guide ran, with the job green.
-  if (local || job === 'getting-started') servers.push(...within(serverRecords(root, '.'), new Set(['getting-started']), after, collectedAt.getTime(), null, root))
+  if (local || job === 'getting-started')
+    servers.push(...within(serverRecords(root, '.'), new Set(['getting-started']), after, collectedAt.getTime(), null, root))
   if (job === 'getting-started') {
     for (const { connection, kind } of journeyConnections(root)) {
       if (!servers.some((server) => server.script === 'getting-started' && server.engine === kind)) {
-        missing.push(`a record of the composed ${kind} database behind the journey’s connection ${connection}, which scripts/getting-started.mjs writes after the journey`)
+        missing.push(
+          `a record of the composed ${kind} database behind the journey’s connection ${connection}, which scripts/getting-started.mjs writes after the journey`,
+        )
       }
     }
   }
@@ -372,12 +399,22 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/coll
   const argv = process.argv.slice(2)
   const local = argv.includes('--local')
   const job = option(argv, '--job')
-  if (!local && job === undefined) throw new Error('usage: collect.mjs --job <job> [--package <name>] [--variant <value>] [--image <image>], or --local --since <ISO instant>')
-  const result = collect({ job, pkg: option(argv, '--package'), variant: option(argv, '--variant'), image: option(argv, '--image'), local, since: option(argv, '--since') })
+  if (!local && job === undefined)
+    throw new Error('usage: collect.mjs --job <job> [--package <name>] [--variant <value>] [--image <image>], or --local --since <ISO instant>')
+  const result = collect({
+    job,
+    pkg: option(argv, '--package'),
+    variant: option(argv, '--variant'),
+    image: option(argv, '--image'),
+    local,
+    since: option(argv, '--since'),
+  })
   const out = resolve(repo, option(argv, '--out') ?? 'release-results')
   const written = join(out, `${result.key}.json`)
   mkdirSync(out, { recursive: true })
   writeFileSync(written, `${JSON.stringify(result, null, 2)}\n`, 'utf8')
   if (process.env.GITHUB_OUTPUT !== undefined) appendFileSync(process.env.GITHUB_OUTPUT, `key=${result.key}\n`)
-  console.log(`${slash(relative(repo, written))}: ${String(result.suites.length)} suite(s), ${String(result.servers.length)} server(s), ${String(result.browserGates.length)} browser gate(s)${result.missing.length === 0 ? '' : `; missing: ${result.missing.join('; ')}`}`)
+  console.log(
+    `${slash(relative(repo, written))}: ${String(result.suites.length)} suite(s), ${String(result.servers.length)} server(s), ${String(result.browserGates.length)} browser gate(s)${result.missing.length === 0 ? '' : `; missing: ${result.missing.join('; ')}`}`,
+  )
 }

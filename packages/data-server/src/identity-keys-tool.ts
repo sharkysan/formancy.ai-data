@@ -56,7 +56,9 @@ async function convert(kid: string, env: Readonly<Record<string, string | undefi
   }
   const { source } = setting
   if (source.kind === 'key-set') {
-    io.stderr('This environment already names a key set file (FORMANCY_DATA_IDENTITY_KEYS_FILE); convert writes one from FORMANCY_DATA_IDENTITY_SECRET or FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE.\n')
+    io.stderr(
+      'This environment already names a key set file (FORMANCY_DATA_IDENTITY_KEYS_FILE); convert writes one from FORMANCY_DATA_IDENTITY_SECRET or FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE.\n',
+    )
     return 1
   }
   try {

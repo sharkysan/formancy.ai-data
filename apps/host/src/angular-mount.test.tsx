@@ -19,7 +19,12 @@ import { AngularForm } from './angular-mount.js'
  */
 afterEach(cleanup)
 
-const DOCUMENT: FormSchema = { specVersion: '3', id: 'mount-test', title: 'Mount', model: { fields: [{ key: 'name', label: 'Name', type: 'text' }] } } as FormSchema
+const DOCUMENT: FormSchema = {
+  specVersion: '3',
+  id: 'mount-test',
+  title: 'Mount',
+  model: { fields: [{ key: 'name', label: 'Name', type: 'text' }] },
+} as FormSchema
 
 function engine(): FormEngine {
   return createFormEngine({ schema: DOCUMENT, formId: 'mount-test-angular' })

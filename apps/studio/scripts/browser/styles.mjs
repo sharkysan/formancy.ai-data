@@ -81,5 +81,8 @@ export async function checkThePaper(page, check, what) {
   const paper = await rulesOnThePaper(page)
   check(`${what}: no rule of studio.css selects anything on the paper`, paper.reached.length === 0 ? null : paper.reached.slice(0, 6).join('; '))
   const missing = ['label', 'input', 'button'].filter((tag) => !paper.tags.includes(tag))
-  check('which matched studio.css against a whole form', paper.rules > 0 && missing.length === 0 ? null : `${String(paper.rules)} rules, and no ${missing.join(', ')} on the paper`)
+  check(
+    'which matched studio.css against a whole form',
+    paper.rules > 0 && missing.length === 0 ? null : `${String(paper.rules)} rules, and no ${missing.join(', ')} on the paper`,
+  )
 }

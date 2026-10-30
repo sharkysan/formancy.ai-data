@@ -132,7 +132,11 @@ beforeAll(async () => {
   owner = await new mssql.ConnectionPool(fixture.admin).connect()
   // IDENTITY_INSERT is the session's, so the orders go in one batch; every value is a constant of UUID_ROWS's digits.
   const orders = UUID_ROWS.orders.map(([id, tenant]) => `(${id}, ${tenant}, 1001, '2026-10-11', 1)`).join(', ')
-  await owner.request().batch(`set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orders}; set identity_insert sales.[order] off;`)
+  await owner
+    .request()
+    .batch(
+      `set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orders}; set identity_insert sales.[order] off;`,
+    )
   for (const [id, tenant, order, carrier] of UUID_ROWS.deliveries) {
     await owner
       .request()
@@ -143,10 +147,18 @@ beforeAll(async () => {
       .query('insert into sales.delivery (id, tenant_id, order_id, carrier) values (@id, @tenant, @order, @carrier)')
   }
   for (const [order, line] of UUID_ROWS.lines) {
-    await owner.request().input('order', mssql.BigInt, order).input('line', mssql.Int, Number(line)).query('insert into sales.order_line (order_id, line_no, quantity, unit_price) values (@order, @line, 1, 1.00)')
+    await owner
+      .request()
+      .input('order', mssql.BigInt, order)
+      .input('line', mssql.Int, Number(line))
+      .query('insert into sales.order_line (order_id, line_no, quantity, unit_price) values (@order, @line, 1, 1.00)')
   }
   for (const [delivery, label] of UUID_ROWS.parcels) {
-    await owner.request().input('delivery', mssql.UniqueIdentifier, delivery).input('label', mssql.NVarChar(40), label).query('insert into sales.parcel (delivery_id, label) values (@delivery, @label)')
+    await owner
+      .request()
+      .input('delivery', mssql.UniqueIdentifier, delivery)
+      .input('label', mssql.NVarChar(40), label)
+      .query('insert into sales.parcel (delivery_id, label) values (@delivery, @label)')
   }
   writer = await new mssql.ConnectionPool(fixture.writer).connect()
   snapshot = await discoverSqlServer(writer, FIXTURE_SCOPE)
@@ -342,7 +354,11 @@ describe('a delete', covers('sqlserver', uuidCase('delete')), () => {
   // check that asked of the parcels anything the account lacks, would roll
   // it back.
   test("deletes a delivery with its parcels, and then its order with its line, its other delivery and that one's parcel, once the policy names each key", async () => {
-    const { cascades, removed: sent, left: { counts } } = UUID_PARITY.delete
+    const {
+      cascades,
+      removed: sent,
+      left: { counts },
+    } = UUID_PARITY.delete
     const orders = generateForm(snapshot, ORDER).bindings
     const named = { delivery: deleting(DELIVERY_POLICY, cascades.delivery), order: deleting(ORDER_POLICY, cascades.order) }
     expect([refused(deliveries, named.delivery), refused(orders, named.order)]).toEqual([[], []])
@@ -402,7 +418,10 @@ describe('an update', covers('sqlserver', uuidCase('update')), () => {
     const written = await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: UUID_PARITY.update.carrier })
     expect(written).toMatchObject({ ok: true, values: { carrier: UUID_PARITY.update.carrier } })
     expect(written.ok && written.version).not.toBe(before.version)
-    expect(await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: 'never written' })).toMatchObject({ ok: false, code: UUID_PARITY.update.stale })
+    expect(await update(OTTO, UUID_PARITY.update.record, before.version, { carrier: 'never written' })).toMatchObject({
+      ok: false,
+      code: UUID_PARITY.update.stale,
+    })
   })
 })
 
@@ -450,7 +469,11 @@ describe('a list ordered by the uuid key', covers('sqlserver', uuidCase('order')
     for (let offset = 0; offset < keys.length; offset += size) {
       const query = { parent: { field: 'order', record: parent }, offset, limit: size }
       const page = await listed(OTTO, query)
-      expect({ offset, keys: keysOf(page), hasMore: page.hasMore }).toEqual({ offset, keys: expected.slice(offset, offset + size), hasMore: offset + size < keys.length })
+      expect({ offset, keys: keysOf(page), hasMore: page.hasMore }).toEqual({
+        offset,
+        keys: expected.slice(offset, offset + size),
+        hasMore: offset + size < keys.length,
+      })
       expect(keysOf(await listed(OTTO, query))).toEqual(keysOf(page))
       seen.push(...keysOf(page))
     }
@@ -513,18 +536,30 @@ describe('uniqueidentifier, as SQL Server stores and orders it', () => {
   // described the order by the text's bytes taken in those stored positions,
   // without the swap, would describe another order, and this fails on it.
   test('stores the first three groups little-endian and orders by its stored bytes, group by group from the last', async () => {
-    const { recordset } = await owner.request().query<{ text: string; stored: Buffer }>(
-      'select lower(convert(nchar(36), d.id)) as text, convert(binary(16), d.id) as stored from sales.delivery as d order by d.id',
-    )
+    const { recordset } = await owner
+      .request()
+      .query<{ text: string; stored: Buffer }>(
+        'select lower(convert(nchar(36), d.id)) as text, convert(binary(16), d.id) as stored from sales.delivery as d order by d.id',
+      )
     const hex = (text: string): string[] => text.replaceAll('-', '').match(/../g) ?? []
-    const littleEndian = (bytes: string[]): string[] => [...bytes.slice(0, 4).reverse(), ...bytes.slice(4, 6).reverse(), ...bytes.slice(6, 8).reverse(), ...bytes.slice(8)]
+    const littleEndian = (bytes: string[]): string[] => [
+      ...bytes.slice(0, 4).reverse(),
+      ...bytes.slice(4, 6).reverse(),
+      ...bytes.slice(6, 8).reverse(),
+      ...bytes.slice(8),
+    ]
     expect(recordset.map((row) => row.stored.toString('hex'))).toEqual(recordset.map((row) => littleEndian(hex(row.text)).join('')))
     const GROUPS = [10, 11, 12, 13, 14, 15, 8, 9, 6, 7, 4, 5, 0, 1, 2, 3]
     const byStored = (row: { stored: Buffer }): string => GROUPS.map((at) => row.stored.toString('hex', at, at + 1)).join('')
     const sorted = [...recordset].sort((left, right) => (byStored(left) < byStored(right) ? -1 : byStored(left) > byStored(right) ? 1 : 0))
     expect(recordset.length).toBeGreaterThanOrEqual(UUID_PARITY.order.keys.length)
     expect(recordset.map((row) => row.text)).toEqual(sorted.map((row) => row.text))
-    expect(recordset.map((row) => row.text)).toEqual(uuidOrder('sqlserver', recordset.map((row) => row.text)))
+    expect(recordset.map((row) => row.text)).toEqual(
+      uuidOrder(
+        'sqlserver',
+        recordset.map((row) => row.text),
+      ),
+    )
   })
 
   // Where the engines differ in what a key tells (0056). newsequentialid()
@@ -540,7 +575,9 @@ describe('uniqueidentifier, as SQL Server stores and orders it', () => {
     const other = await owner
       .request()
       .input('order', mssql.BigInt, UUID_ROWS.orders[0][0])
-      .query<{ id: string }>("insert into sales.delivery (tenant_id, order_id, carrier) output lower(convert(nchar(36), inserted.id)) as id values (3, @order, N'Another tenant')")
+      .query<{ id: string }>(
+        "insert into sales.delivery (tenant_id, order_id, carrier) output lower(convert(nchar(36), inserted.id)) as id values (3, @order, N'Another tenant')",
+      )
     const between = String(other.recordset[0]?.id)
     const last = String((await create(deliveries, DELIVERY_POLICY, OTTO, answers)).answers['id'])
     expect(uuidOrder('sqlserver', [last, between, first])).toEqual([first, between, last])
@@ -548,7 +585,7 @@ describe('uniqueidentifier, as SQL Server stores and orders it', () => {
   })
 })
 
-describe("the default that fills a uuid key", covers('sqlserver', uuidCase('defaults')), () => {
+describe('the default that fills a uuid key', covers('sqlserver', uuidCase('defaults')), () => {
   // Which default makes a key one a version column proves a record over
   // (0057): tables keyed by a uniqueidentifier, each guarded by an int
   // version column the module maintains -- not a rowversion, which proves a
@@ -602,7 +639,9 @@ describe("the default that fills a uuid key", covers('sqlserver', uuidCase('defa
 
   beforeAll(async () => {
     await owner.request().batch(`create schema ${schema}`)
-    await owner.request().batch(`create function ${schema}.newsequentialid() returns uniqueidentifier as begin return cast('${constant}' as uniqueidentifier) end`)
+    await owner
+      .request()
+      .batch(`create function ${schema}.newsequentialid() returns uniqueidentifier as begin return cast('${constant}' as uniqueidentifier) end`)
     for (const name of tables) {
       const tenant = name === 'two_columns' ? 'tenant_id int not null, ' : ''
       const key = name === 'two_columns' ? 'tenant_id, id' : 'id'
@@ -619,7 +658,9 @@ describe("the default that fills a uuid key", covers('sqlserver', uuidCase('defa
   })
 
   test("reports each key's default as SQL Server spells it, and offers delete over newsequentialid() on a key of its own alone", () => {
-    const found = Object.fromEntries(tables.map((name) => [name, findObject(minted, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression]))
+    const found = Object.fromEntries(
+      tables.map((name) => [name, findObject(minted, { schema, name })?.columns.find((column) => column.name === 'id')?.defaultExpression]),
+    )
     expect(found).toEqual(spelled.sqlserver)
     expect(Object.fromEntries(tables.map((name) => [name, generateForm(minted, request(name)).bindings.operations.delete]))).toEqual(offered)
   })
@@ -631,7 +672,9 @@ describe("the default that fills a uuid key", covers('sqlserver', uuidCase('defa
   // SQL Server prints it in upper case, and the answer spells it as the
   // token does (0056).
   test('deletes a row of the table whose key never repeats by its token at the version read, and the same delete again is not found', async () => {
-    const inserted = await owner.request().query<{ id: string }>(`insert into ${schema}.never_repeating (note) output lower(convert(nchar(36), inserted.id)) as id values (N'deleted')`)
+    const inserted = await owner
+      .request()
+      .query<{ id: string }>(`insert into ${schema}.never_repeating (note) output lower(convert(nchar(36), inserted.id)) as id values (N'deleted')`)
     const id = String(inserted.recordset[0]?.id)
     const bindings = generateForm(minted, request('never_repeating')).bindings
     const reading = planRead(minted, bindings, REMOVING, CLARA, token(id))

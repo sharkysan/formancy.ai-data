@@ -64,7 +64,11 @@ export function configure({ inputs, doors, dir = CONFIG_DIR, cloudflared = 'clou
     return { ok: false, lines: [error.message] }
   }
   protect(credentials, owner)
-  const dropped = existsSync(config) ? droppedDoors(readFileSync(config, 'utf8'), doors, inputs) : inputs.drop === undefined ? [] : [`--drop ${inputs.drop} removes no door: there is no configuration in use yet.`]
+  const dropped = existsSync(config)
+    ? droppedDoors(readFileSync(config, 'utf8'), doors, inputs)
+    : inputs.drop === undefined
+      ? []
+      : [`--drop ${inputs.drop} removes no door: there is no configuration in use yet.`]
   if (dropped.length > 0) return { ok: false, lines: [...dropped, `${config} was left as it was.`] }
 
   rmSync(next, { force: true })
@@ -81,13 +85,20 @@ export function configure({ inputs, doors, dir = CONFIG_DIR, cloudflared = 'clou
     return refuse([`cloudflared refused the configuration it would run: ${`${validate.stdout ?? ''}${validate.stderr ?? ''}`.trim()}`])
   }
   const expected = probes(doors, inputs)
-  const answers = matchAll(cloudflared, next, expected.map((probe) => probe.url))
+  const answers = matchAll(
+    cloudflared,
+    next,
+    expected.map((probe) => probe.url),
+  )
   const wrong = expected.flatMap((probe, index) => {
     const { rule, said } = answers[index]
     if (rule === probe.rule) return []
-    return [`${probe.url} matched ${rule === undefined ? `no rule (${String(said)})` : `rule #${String(rule)}`} under cloudflared, where it must match rule #${String(probe.rule)}: ${probe.why}.`]
+    return [
+      `${probe.url} matched ${rule === undefined ? `no rule (${String(said)})` : `rule #${String(rule)}`} under cloudflared, where it must match rule #${String(probe.rule)}: ${probe.why}.`,
+    ]
   })
-  if (wrong.length > 0) return refuse(['cloudflared reads the configuration differently from what deploy/cloudflare/doors.json says, so it was not used:', ...wrong])
+  if (wrong.length > 0)
+    return refuse(['cloudflared reads the configuration differently from what deploy/cloudflare/doors.json says, so it was not used:', ...wrong])
 
   renameSync(next, config)
   const order = rules(inputs)

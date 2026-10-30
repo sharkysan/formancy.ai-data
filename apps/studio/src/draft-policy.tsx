@@ -51,7 +51,11 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
         {bindings.fields.map((binding) => {
           const entry = policy.fields[binding.field]
           const written = binding.writes.create || binding.writes.update
-          return <li key={binding.field}>{`${labelOf(document, binding.field)} (${binding.field}): read roles ${roles(entry?.read)}; ${written ? `write roles ${roles(entry?.write)}` : 'never written by this form'}.`}</li>
+          return (
+            <li
+              key={binding.field}
+            >{`${labelOf(document, binding.field)} (${binding.field}): read roles ${roles(entry?.read)}; ${written ? `write roles ${roles(entry?.write)}` : 'never written by this form'}.`}</li>
+          )
         })}
       </ul>
       <h5 id="draft-rows">Rows</h5>
@@ -70,7 +74,9 @@ export function DraftPolicy({ policy, bindings, document }: { policy: FormPolicy
           <h5 id="draft-delete">What a delete also does</h5>
           <ul aria-labelledby="draft-delete">
             {cascades.map((rule) => (
-              <li key={`${describeRef(rule.table)}/${rule.foreignKey}`}>{`${rule.foreignKey} of ${describeRef(rule.table)}, as ON DELETE ${SPELLED[rule.onDelete]}.`}</li>
+              <li
+                key={`${describeRef(rule.table)}/${rule.foreignKey}`}
+              >{`${rule.foreignKey} of ${describeRef(rule.table)}, as ON DELETE ${SPELLED[rule.onDelete]}.`}</li>
             ))}
           </ul>
         </>

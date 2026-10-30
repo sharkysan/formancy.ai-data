@@ -4,7 +4,18 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { stylesheetLinks } from './addresses.mjs'
 import { contentSecurityPolicy, policyProblems, POLICY } from './demo-headers.mjs'
-import { HOST_ALLOWED, mapValue, NGINX_CONF, nginxPolicyProblems, pagePolicy, parseNginx, policyMap, STUDIO_ALLOWED, WEB_PAGES, withPolicyMap } from './web-policies.mjs'
+import {
+  HOST_ALLOWED,
+  mapValue,
+  NGINX_CONF,
+  nginxPolicyProblems,
+  pagePolicy,
+  parseNginx,
+  policyMap,
+  STUDIO_ALLOWED,
+  WEB_PAGES,
+  withPolicyMap,
+} from './web-policies.mjs'
 
 /**
  * The composed stack's pages under their Content-Security-Policy (0083):
@@ -40,19 +51,24 @@ describe("the pages' policies (0083)", () => {
   // own -- allows data: images exactly because the page and its theme use
   // them, and refuses anything inline in index.html. Read from dist, so
   // `pnpm build` first, as for scripts/mint-token.test.mjs.
-  test.each(Object.values(WEB_PAGES))('$location holds exactly what its built page loads, with its named allowances and no other', ({ location, app, policy, allowed }) => {
-    const dist = join(repo, app, 'dist')
-    if (!existsSync(join(dist, 'index.html'))) throw new Error(`no built page at ${app}/dist: run \`pnpm build\` first`)
-    const html = readFileSync(join(dist, 'index.html'), 'utf8')
-    const stylesheets = stylesheetLinks(html).map((href) => readFileSync(join(dist, ...href.replace(/^\.?\//, '').split('/')), 'utf8'))
-    expect(stylesheets.length).toBeGreaterThan(0)
-    const built = { html, stylesheets, address: `http://localhost:8080${location}` }
-    expect(policyProblems(policy, built, { allowed })).toEqual([])
-    // An allowance is one source in one directive, and no licence for the
-    // page itself to carry what it allows a script to inject.
-    if (Object.keys(allowed).length > 0) expect(policyProblems(policy, built)).toEqual(["style-src allows 'unsafe-inline'"])
-    expect(policyProblems(policy, { ...built, html: html.replace('<div id="root">', '<div id="root"><script>1</script>') }, { allowed })).toContain('index.html has an inline script, which script-src refuses')
-  })
+  test.each(Object.values(WEB_PAGES))(
+    '$location holds exactly what its built page loads, with its named allowances and no other',
+    ({ location, app, policy, allowed }) => {
+      const dist = join(repo, app, 'dist')
+      if (!existsSync(join(dist, 'index.html'))) throw new Error(`no built page at ${app}/dist: run \`pnpm build\` first`)
+      const html = readFileSync(join(dist, 'index.html'), 'utf8')
+      const stylesheets = stylesheetLinks(html).map((href) => readFileSync(join(dist, ...href.replace(/^\.?\//, '').split('/')), 'utf8'))
+      expect(stylesheets.length).toBeGreaterThan(0)
+      const built = { html, stylesheets, address: `http://localhost:8080${location}` }
+      expect(policyProblems(policy, built, { allowed })).toEqual([])
+      // An allowance is one source in one directive, and no licence for the
+      // page itself to carry what it allows a script to inject.
+      if (Object.keys(allowed).length > 0) expect(policyProblems(policy, built)).toEqual(["style-src allows 'unsafe-inline'"])
+      expect(policyProblems(policy, { ...built, html: html.replace('<div id="root">', '<div id="root"><script>1</script>') }, { allowed })).toContain(
+        'index.html has an inline script, which script-src refuses',
+      )
+    },
+  )
 
   // Every file of a page is sent with its policy, and the files Vite names
   // with a hash are in assets/: what the map is tested on below.
@@ -106,7 +122,11 @@ describe('nginx.conf sends each page its policy (0083)', () => {
   test('fails an add_header inside a location that serves a page, which drops the server-level policy there', () => {
     const own = conf.replace('    location /host/ {\n', '    location /host/ {\n        add_header X-Robots-Tag noindex;\n')
     expect(own).not.toBe(conf)
-    expect(nginxPolicyProblems(own)).toEqual([expect.stringMatching(/^location \/host\/ has an add_header of its own \(line \d+\), which drops every add_header of its server there, the policy among them$/)])
+    expect(nginxPolicyProblems(own)).toEqual([
+      expect.stringMatching(
+        /^location \/host\/ has an add_header of its own \(line \d+\), which drops every add_header of its server there, the policy among them$/,
+      ),
+    ])
   })
 
   // nginx chooses the header's value by the path the response is sent
@@ -119,7 +139,11 @@ describe('nginx.conf sends each page its policy (0083)', () => {
   test('fails a directive that moves a request under a page to a path outside it', () => {
     const inHost = (line) => conf.replace('    location /host/ {\n', `    location /host/ {\n        ${line}\n`)
     const moves = (name, target, prefix = '/host/') =>
-      expect.stringMatching(new RegExp(`^${name} \\(line \\d+\\) moves a request under ${prefix} to ${target.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}, outside the page, where nginx sends the header that path is given, not the page's policy$`))
+      expect.stringMatching(
+        new RegExp(
+          `^${name} \\(line \\d+\\) moves a request under ${prefix} to ${target.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}, outside the page, where nginx sends the header that path is given, not the page's policy$`,
+        ),
+      )
     expect(nginxPolicyProblems(inHost('error_page 404 /missing.html;'))).toEqual([moves('error_page', '/missing.html')])
     expect(nginxPolicyProblems(inHost('error_page 404 =200 /index.html;'))).toEqual([moves('error_page', '/index.html')])
     expect(nginxPolicyProblems(inHost('try_files $uri /index.html;'))).toEqual([moves('try_files', '/index.html')])
@@ -135,7 +159,14 @@ describe('nginx.conf sends each page its policy (0083)', () => {
     // What keeps a request under the page is no problem: a target under
     // it, the path tried as it is, a status, a named location, which
     // keeps the path, and a redirect, which sends the browser elsewhere.
-    for (const line of ['error_page 404 /host/404.html;', 'error_page 404 @gone;', 'try_files $uri $uri/ =404;', 'rewrite ^/host/old$ /studio/ permanent;', 'rewrite ^/host/a$ /host/b break;', 'index index.html;']) {
+    for (const line of [
+      'error_page 404 /host/404.html;',
+      'error_page 404 @gone;',
+      'try_files $uri $uri/ =404;',
+      'rewrite ^/host/old$ /studio/ permanent;',
+      'rewrite ^/host/a$ /host/b break;',
+      'index index.html;',
+    ]) {
       expect(nginxPolicyProblems(inHost(line)), line).toEqual([])
     }
   })
@@ -151,9 +182,15 @@ describe('nginx.conf sends each page its policy (0083)', () => {
     const unknown = (prefix) =>
       `location ${prefix} answers neither with a page's files, nor from the data server, nor with a redirect or an error, so what it sends could be a page that scripts/web-policies.mjs gives no policy`
     expect(nginxPolicyProblems(add('    location /docs/ {\n        proxy_pass http://docs:8000;\n    }'))).toEqual([unknown('/docs/')])
-    expect(nginxPolicyProblems(add('    location = /hello {\n        default_type text/html;\n        return 200 "<p>hello</p>";\n    }'))).toEqual([unknown('/hello')])
+    expect(nginxPolicyProblems(add('    location = /hello {\n        default_type text/html;\n        return 200 "<p>hello</p>";\n    }'))).toEqual([
+      unknown('/hello'),
+    ])
     expect(nginxPolicyProblems(add('    location /bare/ {\n    }'))).toEqual([unknown('/bare/')])
-    for (const block of ['    location = /old {\n        return 301 /studio/;\n    }', '    location = /gone {\n        return 410;\n    }', '    location = /elsewhere {\n        return https://example.com/;\n    }']) {
+    for (const block of [
+      '    location = /old {\n        return 301 /studio/;\n    }',
+      '    location = /gone {\n        return 410;\n    }',
+      '    location = /elsewhere {\n        return https://example.com/;\n    }',
+    ]) {
       expect(nginxPolicyProblems(add(block)), block).toEqual([])
     }
   })
@@ -165,7 +202,9 @@ describe('nginx.conf sends each page its policy (0083)', () => {
     const line = `    add_header Content-Security-Policy $formancy_content_security_policy always;\n`
     expect(conf).toContain(line)
     for (const changed of [conf.replace(line, ''), conf.replace(line, line.replace(' always;', ';'))]) {
-      expect(nginxPolicyProblems(changed)).toEqual(['the server on 8080 serves /studio/ and /host/ and has no "add_header Content-Security-Policy $formancy_content_security_policy always;" of its own'])
+      expect(nginxPolicyProblems(changed)).toEqual([
+        'the server on 8080 serves /studio/ and /host/ and has no "add_header Content-Security-Policy $formancy_content_security_policy always;" of its own',
+      ])
     }
   })
 
@@ -186,7 +225,15 @@ describe('parseNginx and mapValue', () => {
   test('reads quoted arguments, comments and nested blocks', () => {
     const tree = parseNginx('# a comment\nmap $uri $x {\n    ~^/a/  "a; b \'c\' # d";\n    default "";\n}\nserver { location /a/ { alias /x/; } }\n')
     expect(tree).toEqual([
-      { name: 'map', args: ['$uri', '$x'], line: 2, block: [{ name: '~^/a/', args: ["a; b 'c' # d"], line: 3 }, { name: 'default', args: [''], line: 4 }] },
+      {
+        name: 'map',
+        args: ['$uri', '$x'],
+        line: 2,
+        block: [
+          { name: '~^/a/', args: ["a; b 'c' # d"], line: 3 },
+          { name: 'default', args: [''], line: 4 },
+        ],
+      },
       { name: 'server', args: [], line: 6, block: [{ name: 'location', args: ['/a/'], line: 6, block: [{ name: 'alias', args: ['/x/'], line: 6 }] }] },
     ])
     expect(() => parseNginx('server {')).toThrow('ends inside')
@@ -196,7 +243,12 @@ describe('parseNginx and mapValue', () => {
   // nginx chooses an exact key before any expression, the expressions in
   // their order, and the default last.
   test('chooses as nginx does', () => {
-    const entries = [['~^/a/', 'first'], ['~*^/A/B', 'second'], ['/a/exact', 'exact'], ['default', 'none']]
+    const entries = [
+      ['~^/a/', 'first'],
+      ['~*^/A/B', 'second'],
+      ['/a/exact', 'exact'],
+      ['default', 'none'],
+    ]
     expect(mapValue(entries, '/a/b')).toBe('first')
     expect(mapValue(entries, '/a/exact')).toBe('exact')
     expect(mapValue(entries, '/z')).toBe('none')

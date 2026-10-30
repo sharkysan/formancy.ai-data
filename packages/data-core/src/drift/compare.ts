@@ -48,9 +48,7 @@ export function compareTypes(before: NormalizedType, after: NormalizedType): Typ
     // char pads with spaces and varchar does not: not a wider or narrower text.
     // Nor is a length in another unit (0026) — 20 bytes of UTF-8 against 20
     // characters of code page 1252 is neither more nor less.
-    return before.fixedLength === after.fixedLength && before.lengthUnit === after.lengthUnit
-      ? verdict([limit(before.maxLength, after.maxLength)])
-      : 'changed'
+    return before.fixedLength === after.fixedLength && before.lengthUnit === after.lengthUnit ? verdict([limit(before.maxLength, after.maxLength)]) : 'changed'
   }
   if (before.kind === 'integer' && after.kind === 'integer') return verdict(range(before, after))
   if (before.kind === 'decimal' && after.kind === 'decimal') {
@@ -74,11 +72,22 @@ export function compareTypes(before: NormalizedType, after: NormalizedType): Typ
 export type ColumnChangeKind = 'column-type-changed' | 'column-generation-changed' | 'column-tightened' | 'column-loosened' | 'column-default-changed'
 
 /** Most serious first. A column whose type changed and that became nullable is a changed type that also accepts null. */
-const SERIOUSNESS: readonly ColumnChangeKind[] = ['column-type-changed', 'column-generation-changed', 'column-tightened', 'column-loosened', 'column-default-changed']
+const SERIOUSNESS: readonly ColumnChangeKind[] = [
+  'column-type-changed',
+  'column-generation-changed',
+  'column-tightened',
+  'column-loosened',
+  'column-default-changed',
+]
 
 /** Why a type is a different one. A text whose unit moved under one spelling — a collation change — says so, rather than "from varchar(20) to varchar(20)". */
 function typeChange(before: ColumnMeta, after: ColumnMeta): string {
-  if (before.type.kind === 'text' && after.type.kind === 'text' && before.type.lengthUnit !== after.type.lengthUnit && before.databaseType === after.databaseType) {
+  if (
+    before.type.kind === 'text' &&
+    after.type.kind === 'text' &&
+    before.type.lengthUnit !== after.type.lengthUnit &&
+    before.databaseType === after.databaseType
+  ) {
     return `its length now counts ${after.type.lengthUnit} where it counted ${before.type.lengthUnit}, though the database still spells it ${after.databaseType}`
   }
   return `its type changed from ${before.databaseType} to ${after.databaseType}`

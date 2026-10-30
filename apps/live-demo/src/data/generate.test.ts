@@ -78,16 +78,41 @@ describe('the demo data', () => {
       )
 
       expect(new Set(recent.map((order) => order.status)), `tenant ${String(tenant)}'s last three weeks`).toEqual(new Set(['draft', 'placed', 'shipped']))
-      expect(old.some((order) => order.status === 'placed'), `tenant ${String(tenant)}: an old order still placed`).toBe(true)
-      expect([...perOrder.values()].some((list) => list.length === 2), `tenant ${String(tenant)}: a split delivery`).toBe(true)
-      expect(new Set([...linesPerOrder.values()].map((lines) => lines.length)), `tenant ${String(tenant)}: one to six lines`).toEqual(new Set([1, 2, 3, 4, 5, 6]))
-      expect(orders.some((order) => order.notes !== null), `tenant ${String(tenant)}: a note`).toBe(true)
-      expect(customers.some((customer) => customer.creditLimitCents === null), `tenant ${String(tenant)}: no credit limit`).toBe(true)
-      expect(customers.some((customer) => !customer.active), `tenant ${String(tenant)}: an inactive customer`).toBe(true)
-      expect(new Set(customers.map((customer) => customer.countryCode)), `tenant ${String(tenant)}'s countries`).toEqual(new Set(TENANT_COUNTRIES[tenant].map(([code]) => code)))
+      expect(
+        old.some((order) => order.status === 'placed'),
+        `tenant ${String(tenant)}: an old order still placed`,
+      ).toBe(true)
+      expect(
+        [...perOrder.values()].some((list) => list.length === 2),
+        `tenant ${String(tenant)}: a split delivery`,
+      ).toBe(true)
+      expect(new Set([...linesPerOrder.values()].map((lines) => lines.length)), `tenant ${String(tenant)}: one to six lines`).toEqual(
+        new Set([1, 2, 3, 4, 5, 6]),
+      )
+      expect(
+        orders.some((order) => order.notes !== null),
+        `tenant ${String(tenant)}: a note`,
+      ).toBe(true)
+      expect(
+        customers.some((customer) => customer.creditLimitCents === null),
+        `tenant ${String(tenant)}: no credit limit`,
+      ).toBe(true)
+      expect(
+        customers.some((customer) => !customer.active),
+        `tenant ${String(tenant)}: an inactive customer`,
+      ).toBe(true)
+      expect(new Set(customers.map((customer) => customer.countryCode)), `tenant ${String(tenant)}'s countries`).toEqual(
+        new Set(TENANT_COUNTRIES[tenant].map(([code]) => code)),
+      )
       const towns = COUNTRIES.flatMap((country) => country.regions.flatMap((region) => region.towns))
-      expect(customers.some((customer) => towns.some((town) => ` ${customer.name} `.includes(` ${town} `))), `tenant ${String(tenant)}: a name with a town`).toBe(true)
-      expect(customers.some((customer) => !towns.some((town) => ` ${customer.name} `.includes(` ${town} `))), `tenant ${String(tenant)}: a name without one`).toBe(true)
+      expect(
+        customers.some((customer) => towns.some((town) => ` ${customer.name} `.includes(` ${town} `))),
+        `tenant ${String(tenant)}: a name with a town`,
+      ).toBe(true)
+      expect(
+        customers.some((customer) => !towns.some((town) => ` ${customer.name} `.includes(` ${town} `))),
+        `tenant ${String(tenant)}: a name without one`,
+      ).toBe(true)
     }
   })
 
@@ -132,7 +157,12 @@ describe('the seeded numbers', () => {
     expect(() => seeded(1).int(3, 2)).toThrow('int(3, 2) is no range of whole numbers')
     expect(() => seeded(1).pick([])).toThrow('pick from an empty list')
     expect(() => seeded(1).weighted([['a', 0]])).toThrow('weighted needs a positive weight')
-    expect(() => seeded(1).weighted([['a', 1], ['b', -1]])).toThrow('a weight is zero or more')
+    expect(() =>
+      seeded(1).weighted([
+        ['a', 1],
+        ['b', -1],
+      ]),
+    ).toThrow('a weight is zero or more')
   })
 
   // A weight is a share: a value with three times the weight comes up about
@@ -140,7 +170,14 @@ describe('the seeded numbers', () => {
   test('draw a weighted value as often as its weight', () => {
     const random = seeded(DEMO_SEED)
     const counts = { a: 0, b: 0, never: 0 }
-    for (let i = 0; i < 4000; i += 1) counts[random.weighted([['a', 1], ['never', 0], ['b', 3]] as const)] += 1
+    for (let i = 0; i < 4000; i += 1)
+      counts[
+        random.weighted([
+          ['a', 1],
+          ['never', 0],
+          ['b', 3],
+        ] as const)
+      ] += 1
     expect(counts.never).toBe(0)
     expect(counts.b / counts.a).toBeGreaterThan(2.5)
     expect(counts.b / counts.a).toBeLessThan(3.5)

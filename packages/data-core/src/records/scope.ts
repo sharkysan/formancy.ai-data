@@ -19,7 +19,12 @@ import type { RecordColumn, Through } from './types.js'
  */
 
 /** The root's filter for an operation, each term typed from its column and spelled as the column holds it (0028). */
-export function filtersFor(prepared: Prepared, policy: FormPolicy, context: PolicyContext, operation: 'read' | 'update' | 'delete'): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
+export function filtersFor(
+  prepared: Prepared,
+  policy: FormPolicy,
+  context: PolicyContext,
+  operation: 'read' | 'update' | 'delete',
+): { ok: true; filter: RowFilter; filters: RowFilters } | PlanRefusal {
   const filter = rowFilter(policy, context, operation)
   if (!filter.ok) return filter
   const scoped = scopeRowFilters(prepared.root, filter.filter, 'rowFilters')
@@ -88,7 +93,12 @@ export function throughFor(
  * authorised here as everywhere; an actor who may not create gets the
  * policy's refusal.
  */
-export function throughFields(bindings: FormBindings, policy: FormPolicy, context: PolicyContext, operation: 'create' | 'update'): { ok: true; fields: ReadonlySet<string> } | PlanRefusal {
+export function throughFields(
+  bindings: FormBindings,
+  policy: FormPolicy,
+  context: PolicyContext,
+  operation: 'create' | 'update',
+): { ok: true; fields: ReadonlySet<string> } | PlanRefusal {
   const resolved = throughFilters(policy, context, bindings, operation)
   return resolved.ok ? { ok: true, fields: new Set(resolved.through.map((entry) => entry.field)) } : resolved
 }

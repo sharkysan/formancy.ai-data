@@ -324,15 +324,22 @@ export function nginxPolicyProblems(text) {
     const pages = locations.filter(servesFiles)
     if (pages.length === 0) continue
     const sends = server.block.filter((each) => each.name === 'add_header' && each.args[0]?.toLowerCase() === 'content-security-policy')
-    const listens = below(server.block, 'listen').map((each) => each.args[0]).join(', ')
+    const listens = below(server.block, 'listen')
+      .map((each) => each.args[0])
+      .join(', ')
     if (!sends.some((each) => each.args[1] === POLICY_VARIABLE && each.args[2] === 'always')) {
-      problems.push(`the server on ${listens} serves ${pages.map(prefixOf).join(' and ')} and has no "add_header Content-Security-Policy ${POLICY_VARIABLE} always;" of its own`)
+      problems.push(
+        `the server on ${listens} serves ${pages.map(prefixOf).join(' and ')} and has no "add_header Content-Security-Policy ${POLICY_VARIABLE} always;" of its own`,
+      )
     }
     for (const location of pages) {
       const prefix = prefixOf(location)
       served.add(prefix)
       const own = below(location.block, 'add_header')
-      if (own.length > 0) problems.push(`location ${prefix} has an add_header of its own (line ${String(own[0].line)}), which drops every add_header of its server there, the policy among them`)
+      if (own.length > 0)
+        problems.push(
+          `location ${prefix} has an add_header of its own (line ${String(own[0].line)}), which drops every add_header of its server there, the policy among them`,
+        )
       const known = WEB_PAGES[prefix]
       if (known === undefined) {
         problems.push(`location ${prefix} serves files, and ${GENERATOR} has no policy for a page there`)
@@ -346,7 +353,8 @@ export function nginxPolicyProblems(text) {
       }
     }
   }
-  for (const location of Object.keys(WEB_PAGES)) if (!served.has(location)) problems.push(`${GENERATOR} has a policy for ${location}, and no location of ${NGINX_CONF} serves files there`)
+  for (const location of Object.keys(WEB_PAGES))
+    if (!served.has(location)) problems.push(`${GENERATOR} has a policy for ${location}, and no location of ${NGINX_CONF} serves files there`)
   return problems
 }
 

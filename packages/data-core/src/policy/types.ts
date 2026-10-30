@@ -131,13 +131,7 @@ export type RowFilter = ReadonlyArray<{ column: string; value: string }>
  * `unknown-lookup` — the policy says nothing about which rows a lookup offers.
  */
 export type PolicyRefusalCode =
-  | 'invalid-context'
-  | 'invalid-policy'
-  | 'operation-denied'
-  | 'missing-attribute'
-  | 'over-posting'
-  | 'field-denied'
-  | 'unknown-lookup'
+  'invalid-context' | 'invalid-policy' | 'operation-denied' | 'missing-attribute' | 'over-posting' | 'field-denied' | 'unknown-lookup'
 
 export interface PolicyRefusal {
   ok: false

@@ -149,7 +149,10 @@ describe('presentation', () => {
     await generateOrder(user)
     const presentation = await goTo(user, 'Presentation')
     const views = within(presentation).getByRole('region', { name: 'List views' })
-    const outside = (role: string) => within(presentation).queryAllByRole(role).filter((element) => !views.contains(element))
+    const outside = (role: string) =>
+      within(presentation)
+        .queryAllByRole(role)
+        .filter((element) => !views.contains(element))
     const named = (role: string) => outside(role).map((element) => computeAccessibleName(element))
     expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+)$/.test(name))).toEqual([])
     const regions = outside('region').map((region) => computeAccessibleName(region))
@@ -159,8 +162,14 @@ describe('presentation', () => {
         .getAllByRole('textbox')
         .filter((box) => computeAccessibleName(box).startsWith('Label of '))
         .map((box) => (box as HTMLInputElement).value)
-    const offered = regions.flatMap((region) => labelled(region).flatMap((label) => regions.filter((other) => other !== region).map((other) => `Move to ${other} ${label}`)))
-    expect(named('button').filter((name) => name.startsWith('Move to ')).sort()).toEqual(offered.sort())
+    const offered = regions.flatMap((region) =>
+      labelled(region).flatMap((label) => regions.filter((other) => other !== region).map((other) => `Move to ${other} ${label}`)),
+    )
+    expect(
+      named('button')
+        .filter((name) => name.startsWith('Move to '))
+        .sort(),
+    ).toEqual(offered.sort())
     expect(named('textbox').filter((name) => !/^(Section label|Label) of .+$/.test(name))).toEqual([])
     expect(named('checkbox').filter((name) => !/^Full width for .+$/.test(name))).toEqual([])
     for (const role of ['combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
@@ -185,13 +194,19 @@ describe('presentation', () => {
     // Every bound field is in the form and placed in the arrangement both renderers draw.
     const placedPaths = new Set<string>()
     const walk = (nodes: ReturnType<typeof nodesOfLayout>, path: number[]) =>
-      nodes?.forEach((node, index) => (node.kind === 'field' ? placedPaths.add(node.path) : walk(layoutChildrenAt(form, 'default', [...path, index]), [...path, index])))
+      nodes?.forEach((node, index) =>
+        node.kind === 'field' ? placedPaths.add(node.path) : walk(layoutChildrenAt(form, 'default', [...path, index]), [...path, index]),
+      )
     walk(nodesOfLayout(form, 'default'), [])
     expect(bindings.fields.map((binding) => binding.field).filter((key) => !placedPaths.has(key))).toEqual([])
     const main = layoutChildrenAt(form, 'default', [0, 0])?.map((node) => (node.kind === 'field' ? node.path : node.kind))
     expect(main?.indexOf('amount')).toBe((main?.indexOf('status') ?? 0) - 1)
     expect(main).not.toContain('customer')
-    expect(layoutChildrenAt(form, 'default', [1, 0])?.map((node) => (node.kind === 'field' ? node.path : node.kind)).at(-1)).toBe('customer')
+    expect(
+      layoutChildrenAt(form, 'default', [1, 0])
+        ?.map((node) => (node.kind === 'field' ? node.path : node.kind))
+        .at(-1),
+    ).toBe('customer')
     // Since 0030 the edits are kept as what they are -- a label, a width, an
     // order, and since 0075 a section -- beside the generated base, so a
     // regeneration can carry them. A studio that published the edited form

@@ -1,4 +1,15 @@
-import type { InsertRequest, ObjectRef, ReachTerms, ReadRequest, RecordColumn, RecordTarget, RecordValue, RowFilterTerm, ThroughTerms, UpdateRequest } from '@formancy/data-core'
+import type {
+  InsertRequest,
+  ObjectRef,
+  ReachTerms,
+  ReadRequest,
+  RecordColumn,
+  RecordTarget,
+  RecordValue,
+  RowFilterTerm,
+  ThroughTerms,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
@@ -169,13 +180,22 @@ export function readStatement(request: ReadRequest, terms: readonly RowFilterTer
  * `false`, or NULL for no such record. The digest depends on no session
  * (definition.ts), so any connection answers it as the write's would.
  */
-export function nothingChangedStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], withVersion: boolean, definition: Definition): RecordStatement {
+export function nothingChangedStatement(
+  request: UpdateRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  withVersion: boolean,
+  definition: Definition,
+): RecordStatement {
   const statement = new Statement()
   const same = `(${digestOf(factsOf(statement, request.target.table))} ${op('=')} ${statement.text(definition.digest)})::pg_catalog.text`
   const where = located(statement, request.key, terms, through)
   const unchanged = withVersion ? `(${versionIs(statement, request)})::pg_catalog.text` : `'false'`
   const found = `${selectFrom(request.target.table, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
-  return { text: `select ${same}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+  return {
+    text: `select ${same}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`,
+    params: statement.params,
+  }
 }
 
 /** Whether the table's definition is still `definition`, and this connection's isolation: after a write that wrote nothing or failed. */
@@ -213,7 +233,13 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
  * The same WHERE holds the table to the definition the update was decided
  * over (0041).
  */
-export function updateStatement(request: UpdateRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Definition, path: WritePath): RecordStatement {
+export function updateStatement(
+  request: UpdateRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  definition: Definition,
+  path: WritePath,
+): RecordStatement {
   const statement = new Statement()
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)

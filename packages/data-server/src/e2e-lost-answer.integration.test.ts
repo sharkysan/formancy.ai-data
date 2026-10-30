@@ -82,14 +82,33 @@ beforeAll(async () => {
   // The registry reaches each database through its hop, by the address an operator would write.
   const connections: ConnectionConfig[] = [
     {
-      id: 'pg', kind: 'postgres', host: '127.0.0.1', port: hops.pg.port, database: pgUrl.pathname.slice(1), user: decodeURIComponent(pgUrl.username), password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false },
+      id: 'pg',
+      kind: 'postgres',
+      host: '127.0.0.1',
+      port: hops.pg.port,
+      database: pgUrl.pathname.slice(1),
+      user: decodeURIComponent(pgUrl.username),
+      password: 'env:PG_PASSWORD',
+      schemas: ['sales'],
+      tls: { enabled: false },
     },
     {
-      id: 'ms', kind: 'sqlserver', host: '127.0.0.1', port: hops.ms.port, database: String(ms.admin.database), user: String(ms.admin.user), password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true },
+      id: 'ms',
+      kind: 'sqlserver',
+      host: '127.0.0.1',
+      port: hops.ms.port,
+      database: String(ms.admin.database),
+      user: String(ms.admin.user),
+      password: 'env:MS_PASSWORD',
+      schemas: ['sales'],
+      tls: { enabled: false, trustServerCertificate: true },
     },
   ]
   // A table whose key holds a text a delete's answer echoes (0050), in a schema of its own: `lost`.
-  connections.push({ ...(connections[0] as ConnectionConfig), id: 'pg-lost', schemas: ['lost'] }, { ...(connections[1] as ConnectionConfig), id: 'ms-lost', schemas: ['lost'] })
+  connections.push(
+    { ...(connections[0] as ConnectionConfig), id: 'pg-lost', schemas: ['lost'] },
+    { ...(connections[1] as ConnectionConfig), id: 'ms-lost', schemas: ['lost'] },
+  )
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
     readFile: async () => '',
@@ -97,17 +116,38 @@ beforeAll(async () => {
 
   // The owners' own connections, straight to the databases.
   const pgOwner = connectPostgres({
-    host: pgUrl.hostname, port: Number(pgUrl.port), database: pgUrl.pathname.slice(1), user: decodeURIComponent(pgUrl.username), password: decodeURIComponent(pgUrl.password), tls: { enabled: false, rejectUnauthorized: false },
+    host: pgUrl.hostname,
+    port: Number(pgUrl.port),
+    database: pgUrl.pathname.slice(1),
+    user: decodeURIComponent(pgUrl.username),
+    password: decodeURIComponent(pgUrl.password),
+    tls: { enabled: false, rejectUnauthorized: false },
   })
   const msOwner = await connectSqlServer({
-    host: String(ms.admin.server), port: Number(ms.admin.port), database: String(ms.admin.database), user: String(ms.admin.user), password: String(ms.admin.password), encrypt: false, trustServerCertificate: true,
+    host: String(ms.admin.server),
+    port: Number(ms.admin.port),
+    database: String(ms.admin.database),
+    user: String(ms.admin.user),
+    password: String(ms.admin.password),
+    encrypt: false,
+    trustServerCertificate: true,
   })
-  await pgOwner.unsafe('create schema lost; create table lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))')
+  await pgOwner.unsafe(
+    'create schema lost; create table lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))',
+  )
   await msOwner.request().batch('create schema lost')
-  await msOwner.request().batch('create table lost.removable (id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1, constraint pk_lost_removable primary key (id, code))')
+  await msOwner
+    .request()
+    .batch(
+      'create table lost.removable (id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1, constraint pk_lost_removable primary key (id, code))',
+    )
   insertRemovable = async (connection, code) => {
-    if (connection === 'pg') return (await pgOwner.unsafe<Array<{ id: string }>>('insert into lost.removable (code) values ($1) returning id::text as id', [code]))[0]?.id ?? ''
-    return String((await msOwner.request().input('code', code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]?.id)
+    if (connection === 'pg')
+      return (await pgOwner.unsafe<Array<{ id: string }>>('insert into lost.removable (code) values ($1) returning id::text as id', [code]))[0]?.id ?? ''
+    return String(
+      (await msOwner.request().input('code', code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]
+        ?.id,
+    )
   }
   count = async (connection, statement, text) => {
     if (connection === 'pg') return (await pgOwner.unsafe<Array<{ n: number }>>(statement.pg, [text]))[0]?.n ?? 0
@@ -120,7 +160,12 @@ beforeAll(async () => {
 
   root = await mkdtemp(join(tmpdir(), 'formancy-data-lost-answer-'))
   const store = createFileConfigurationStore(root)
-  const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
+  const verifyIdentity = await createIdentityVerifier({
+    key: { kind: 'secret', secret: SECRET },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: 'tid' },
+  })
   app = await createDataServer({
     verifyIdentity,
     // One sink for both planes, as main.ts wires it; the trail below narrows on `plane`.
@@ -147,7 +192,8 @@ afterAll(async () => {
   await rm(root, { recursive: true, force: true })
 }, 60_000)
 
-const call = (url: string, bearer: string, payload: unknown) => app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${bearer}` }, payload: payload as Record<string, unknown> })
+const call = (url: string, bearer: string, payload: unknown) =>
+  app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${bearer}` }, payload: payload as Record<string, unknown> })
 
 interface Proposal {
   form: FormSchema
@@ -167,9 +213,13 @@ function clerkPolicy(bindings: FormBindings): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: bindings.operations.update ? ['clerk'] : [] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
-    lookups: Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, [{ column: 'tenant_id', attribute: 'tenant' }]])),
+    lookups: Object.fromEntries(
+      fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, [{ column: 'tenant_id', attribute: 'tenant' }]]),
+    ),
   }
 }
 
@@ -177,7 +227,10 @@ async function publish(connection: string, formId: string, generation: Record<st
   const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
   expect(proposal.statusCode, proposal.body).toBe(200)
   const proposed = proposal.json() as Proposal
-  const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposed, clerkPolicy(proposed.bindings)) })
+  const published = await call(`/v1/forms/${formId}/versions`, admin, {
+    expectedBase: null,
+    bundle: asProposed(connection, proposed, clerkPolicy(proposed.bindings)),
+  })
   expect(published.statusCode, published.body).toBe(201)
 }
 
@@ -223,9 +276,18 @@ async function eventually(check: () => Promise<void>): Promise<void> {
   }
 }
 
-const REMOVABLE_CODED = { pg: 'select count(*)::int as n from lost.removable where code = $1', ms: 'select count(*) as n from lost.removable where code = @text' }
-const ORDERS_WITH_NOTES = { pg: 'select count(*)::int as n from sales."order" where notes = $1', ms: 'select count(*) as n from sales.[order] where notes = @text' }
-const CUSTOMERS_NAMED = { pg: 'select count(*)::int as n from sales.customer where name = $1', ms: 'select count(*) as n from sales.customer where name = @text' }
+const REMOVABLE_CODED = {
+  pg: 'select count(*)::int as n from lost.removable where code = $1',
+  ms: 'select count(*) as n from lost.removable where code = @text',
+}
+const ORDERS_WITH_NOTES = {
+  pg: 'select count(*)::int as n from sales."order" where notes = $1',
+  ms: 'select count(*) as n from sales.[order] where notes = @text',
+}
+const CUSTOMERS_NAMED = {
+  pg: 'select count(*)::int as n from sales.customer where name = $1',
+  ms: 'select count(*) as n from sales.customer where name = @text',
+}
 
 describe.each([
   { engine: 'PostgreSQL', connection: 'pg' as const, kind: 'postgres' as DatabaseKind, versionColumn: 'row_version' as string | undefined, customerNo: 5101 },
@@ -245,8 +307,11 @@ describe.each([
     })
     // A customer is named by its tenant, pinned from the token, and a number the clerk types.
     await publish(connection, customerForm, { root: { schema: 'sales', name: 'customer' }, title: 'Customer', lookups: [], pinned: ['tenant_id'] })
-    source = (await app.inject({ method: 'GET', url: `/v1/forms/${orderForm}`, headers: { authorization: `Bearer ${clerk}` } })).json().form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
-    customerToken = (await call(`/v1/forms/${orderForm}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0].token as string
+    source = (await app.inject({ method: 'GET', url: `/v1/forms/${orderForm}`, headers: { authorization: `Bearer ${clerk}` } }))
+      .json()
+      .form.model.fields.find((field: { key: string }) => field.key === 'customer').optionsSource as string
+    customerToken = (await call(`/v1/forms/${orderForm}/lookups/${source}/query`, clerk, { operation: 'create', search: 'Muster' })).json().rows[0]
+      .token as string
   })
 
   /**
@@ -280,7 +345,10 @@ describe.each([
     const { response, sent } = await sentAndLost(
       notes,
       async () => expect(await count(connection, ORDERS_WITH_NOTES, notes)).toBe(1),
-      () => call(`/v1/forms/${orderForm}/records/create`, clerk, { answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1', notes } }),
+      () =>
+        call(`/v1/forms/${orderForm}/records/create`, clerk, {
+          answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1', notes },
+        }),
     )
     expect(response.statusCode, response.body).toBe(502)
     expect(response.json()).toMatchObject({ code: 'unknown-outcome', operation: 'create', record: null, version: null })
@@ -296,7 +364,9 @@ describe.each([
   // again with that version is refused as stale -- stored at most once,
   // which is what makes "Saving again is safe" a true sentence.
   test('an order update is 502 with its record and version, is stored once, and a resend is stale', async () => {
-    const created = await call(`/v1/forms/${orderForm}/records/create`, clerk, { answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '2', notes: 'before' } })
+    const created = await call(`/v1/forms/${orderForm}/records/create`, clerk, {
+      answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '2', notes: 'before' },
+    })
     expect(created.statusCode, created.body).toBe(201)
     const { record, version, answers } = created.json() as { record: string; version: string; answers: Record<string, unknown> }
     const notes = `lost update ${connection} ${String(Date.now())}`
@@ -317,7 +387,9 @@ describe.each([
     expect(again.statusCode, again.body).toBe(409)
     expect(again.json()).toMatchObject({ code: 'stale' })
 
-    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === orderForm && event.record === recordReference(AUDIT_KEY, record))
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === orderForm && event.record === recordReference(AUDIT_KEY, record),
+    )
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'create', status: 201, outcome: 'ok' },
       { operation: 'update', status: 502, outcome: 'unknown-outcome' },
@@ -353,7 +425,9 @@ describe.each([
     // The trail names the lost create's record as the read that settles it
     // does. The refused second create names none: a create is named by what
     // it made, or by what it would have made when that is unknown.
-    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === customerForm && event.record === recordReference(AUDIT_KEY, record))
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === customerForm && event.record === recordReference(AUDIT_KEY, record),
+    )
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'create', status: 502, outcome: 'unknown-outcome' },
       { operation: 'read', status: 200, outcome: 'ok' },
@@ -371,7 +445,12 @@ describe.each([
   // was told 404 about a record the first one had deleted).
   test('a delete is 502 with its record and version, sent once, the row gone, and a resend is not found', async () => {
     const formId = `${connection}-removable-lost`
-    await publishDeleting(`${connection}-lost`, formId, { root: { schema: 'lost', name: 'removable' }, title: 'Removable', lookups: [], versionColumn: 'version' })
+    await publishDeleting(`${connection}-lost`, formId, {
+      root: { schema: 'lost', name: 'removable' },
+      title: 'Removable',
+      lookups: [],
+      versionColumn: 'version',
+    })
     const code = randomUUID()
     const id = await insertRemovable(connection, code)
     const token = recordToken(['id', 'code'], { id, code })
@@ -389,7 +468,9 @@ describe.each([
     const again = await call(`/v1/forms/${formId}/records/delete`, clerk, { record, version: '1' })
     expect([again.statusCode, again.json()]).toEqual([404, { code: 'not-found', message: 'No such record.' }])
     expect(await count(connection, REMOVABLE_CODED, code)).toBe(0)
-    const trail = events.filter((event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId && event.record === recordReference(AUDIT_KEY, record))
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId && event.record === recordReference(AUDIT_KEY, record),
+    )
     expect(trail.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
       { operation: 'delete', status: 502, outcome: 'unknown-outcome' },
       { operation: 'delete', status: 404, outcome: 'not-found' },

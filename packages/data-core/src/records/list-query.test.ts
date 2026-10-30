@@ -13,11 +13,25 @@ describe('validateListQuery', () => {
   // page in key order, of the largest page the server serves.
   test('fills what a body leaves out, and returns a fresh query', () => {
     expect(validateListQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [], offset: 0, limit: LIST_PAGE_SIZE } })
-    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: ' AG ' }], offset: 50, limit: 25 }
+    const body = {
+      search: ' Muster ',
+      sort: [{ field: 'name', direction: 'desc' }],
+      parent: { field: 'order', record: 'k1:7' },
+      filter: [{ field: 'name', op: 'contains', text: ' AG ' }],
+      offset: 50,
+      limit: 25,
+    }
     const checked = validateListQuery(body)
     expect(checked).toEqual({
       ok: true,
-      query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'name', op: 'contains', text: 'AG' }], offset: 50, limit: 25 },
+      query: {
+        search: 'Muster',
+        sort: [{ field: 'name', direction: 'desc' }],
+        parent: { field: 'order', record: 'k1:7' },
+        filter: [{ field: 'name', op: 'contains', text: 'AG' }],
+        offset: 50,
+        limit: 25,
+      },
     })
     if (checked.ok) {
       expect(checked.query.sort[0]).not.toBe(body.sort[0])
@@ -48,7 +62,10 @@ describe('validateListQuery', () => {
       [{ field: '', direction: 'asc' }],
       [{ field: 7, direction: 'asc' }],
       [{ field: 'name', direction: 'asc', nulls: 'first' }],
-      [{ field: 'name', direction: 'asc' }, { field: 'name', direction: 'desc' }],
+      [
+        { field: 'name', direction: 'asc' },
+        { field: 'name', direction: 'desc' },
+      ],
       null,
     ]
     for (const sort of sorts) expect(validateListQuery({ sort }), JSON.stringify(sort)).toMatchObject({ ok: false, code: 'malformed' })
@@ -57,7 +74,14 @@ describe('validateListQuery', () => {
   // The parent is a field key and a token, both text, and nothing else: a
   // parent carrying columns or values of its own would be SQL's to read.
   test('refuses a parent that is not exactly a field and a record token', () => {
-    for (const parent of ['k1:7', { field: 'order' }, { field: 'order', record: 7 }, { field: '', record: 'k1:7' }, { field: 'order', record: 'k1:7', column: 'order_id' }, []]) {
+    for (const parent of [
+      'k1:7',
+      { field: 'order' },
+      { field: 'order', record: 7 },
+      { field: '', record: 'k1:7' },
+      { field: 'order', record: 'k1:7', column: 'order_id' },
+      [],
+    ]) {
       expect(validateListQuery({ parent }), JSON.stringify(parent)).toMatchObject({ ok: false, code: 'malformed' })
     }
   })
@@ -76,9 +100,22 @@ describe('validateExportQuery', () => {
   // check passed.
   test('fills what a body leaves out, and returns a fresh query', () => {
     expect(validateExportQuery({})).toEqual({ ok: true, query: { search: '', sort: [], parent: null, filter: [] } })
-    const body = { search: ' Muster ', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'paid', op: 'null' }] }
+    const body = {
+      search: ' Muster ',
+      sort: [{ field: 'name', direction: 'desc' }],
+      parent: { field: 'order', record: 'k1:7' },
+      filter: [{ field: 'paid', op: 'null' }],
+    }
     const checked = validateExportQuery(body)
-    expect(checked).toEqual({ ok: true, query: { search: 'Muster', sort: [{ field: 'name', direction: 'desc' }], parent: { field: 'order', record: 'k1:7' }, filter: [{ field: 'paid', op: 'null' }] } })
+    expect(checked).toEqual({
+      ok: true,
+      query: {
+        search: 'Muster',
+        sort: [{ field: 'name', direction: 'desc' }],
+        parent: { field: 'order', record: 'k1:7' },
+        filter: [{ field: 'paid', op: 'null' }],
+      },
+    })
     if (checked.ok) {
       expect(checked.query.sort[0]).not.toBe(body.sort[0])
       expect(checked.query.parent).not.toBe(body.parent)

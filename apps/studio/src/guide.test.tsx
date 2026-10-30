@@ -92,7 +92,8 @@ async function perform(user: User, { step, control, action }: WalkRow): Promise<
       expect(box.checked).toBe(true)
       if (action.keep !== undefined) {
         const group = within(here()).getByRole('group', { name: action.keep.group })
-        for (const name of action.keep.ticked) expect((within(group).getByRole('checkbox', { name }) as HTMLInputElement).checked, `${name} under ${action.keep.group}`).toBe(true)
+        for (const name of action.keep.ticked)
+          expect((within(group).getByRole('checkbox', { name }) as HTMLInputElement).checked, `${name} under ${action.keep.group}`).toBe(true)
       }
       if (action.holds !== undefined) expect((within(here()).getByLabelText(action.holds.name) as HTMLInputElement).value).toBe(action.holds.value)
       return
@@ -130,13 +131,16 @@ describe("the guide's section 4", () => {
         try {
           await perform(user, row)
         } catch (error) {
-          throw new Error(`${form.connection}: the guide's row "${row.control}" (${row.action.kind}): ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`, { cause: error })
+          throw new Error(
+            `${form.connection}: the guide's row "${row.control}" (${row.action.kind}): ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`,
+            { cause: error },
+          )
         }
       }
     }
     // Not vacuous: both forms reached the server, published.
-    expect(plane.requests.filter((request) => request.method === 'POST' && /^\/v1\/forms\/[^/]+\/versions$/.test(request.path)).map((request) => request.path)).toEqual(
-      GUIDE.forms.map((form) => `/v1/forms/${form.formId}/versions`),
-    )
+    expect(
+      plane.requests.filter((request) => request.method === 'POST' && /^\/v1\/forms\/[^/]+\/versions$/.test(request.path)).map((request) => request.path),
+    ).toEqual(GUIDE.forms.map((form) => `/v1/forms/${form.formId}/versions`))
   })
 })

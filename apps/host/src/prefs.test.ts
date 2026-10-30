@@ -1,5 +1,18 @@
 import { describe, expect, test } from 'vitest'
-import { gridKey, PREFERENCES, readPreference, readRenderer, readSplit, removePreference, SPLIT, splitLimits, stepSplit, writePreference, writeRenderer, writeSplit } from './prefs.js'
+import {
+  gridKey,
+  PREFERENCES,
+  readPreference,
+  readRenderer,
+  readSplit,
+  removePreference,
+  SPLIT,
+  splitLimits,
+  stepSplit,
+  writePreference,
+  writeRenderer,
+  writeSplit,
+} from './prefs.js'
 
 /*
  * What one viewer's browser keeps of the workspace (0047): which renderer

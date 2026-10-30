@@ -36,7 +36,7 @@ export interface UnreadyInspection {
  */
 export function logLines(frames: Buffer): string[] {
   const payloads: Buffer[] = []
-  for (let offset = 0; offset + 8 <= frames.length; ) {
+  for (let offset = 0; offset + 8 <= frames.length;) {
     const end = offset + 8 + frames.readUInt32BE(offset + 4)
     payloads.push(frames.subarray(offset + 8, end))
     offset = end

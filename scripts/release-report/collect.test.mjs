@@ -47,7 +47,11 @@ function workspace() {
   roots.push(root)
   put(root, 'packages/data-core/package.json', { name: '@formancy/data-core', scripts: { 'test:coverage': 'vitest run --coverage' } })
   put(root, 'packages/data-core/dist/index.mjs', 'export {}\n')
-  put(root, 'apps/host/package.json', { name: '@formancy/data-host', private: true, scripts: { 'test:coverage': 'vitest run --coverage', 'test:browser': 'node scripts/browser-test.mjs' } })
+  put(root, 'apps/host/package.json', {
+    name: '@formancy/data-host',
+    private: true,
+    scripts: { 'test:coverage': 'vitest run --coverage', 'test:browser': 'node scripts/browser-test.mjs' },
+  })
   put(root, 'apps/host/test-results/vitest.json', {
     success: true,
     numTotalTests: 1,
@@ -69,12 +73,26 @@ function workspace() {
     coverageMap: { 'apps/host/src/page.tsx': { s: { 0: 1 } } },
   })
   put(root, 'apps/host/coverage/coverage-summary.json', { total: { lines: { pct: 90 } }, 'src/page.tsx': {} })
-  put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'chromium', startedAt: at(30), finishedAt: at(40), browser: { name: 'chromium', version: '153.0.8010.12' }, checks: { ok: 1, failed: [] } })
+  put(root, 'apps/host/test-results/browser-chromium.json', {
+    gate: 'apps/host',
+    asked: 'chromium',
+    startedAt: at(30),
+    finishedAt: at(40),
+    browser: { name: 'chromium', version: '153.0.8010.12' },
+    checks: { ok: 1, failed: [] },
+  })
   put(root, 'apps/host/test-results/servers/test-coverage-postgres-1-1.json', record({ caller: join(root, 'apps/host/src/test-databases.ts') }))
-  put(root, 'apps/host/test-results/servers/test-browser-postgres-2-1.json', record({ script: 'test-browser', at: at(31), caller: join(root, 'apps/host/scripts/browser-test.mjs') }))
+  put(
+    root,
+    'apps/host/test-results/servers/test-browser-postgres-2-1.json',
+    record({ script: 'test-browser', at: at(31), caller: join(root, 'apps/host/scripts/browser-test.mjs') }),
+  )
   put(root, 'apps/host/test-results/servers/snapshot-postgres-3-1.json', record({ script: 'snapshot', at: at(2) }))
   put(root, 'apps/host/test-results/servers/test-coverage-postgres-4-1.json', record({ at: at(-60) }))
-  put(root, '.turbo/runs/one.json', { execution: { startTime: T0 - 5000 }, tasks: [{ taskId: '@formancy/data-host#test:coverage', execution: { startTime: T0 - 4000, endTime: T0 + 9000 }, cache: { status: 'MISS' } }] })
+  put(root, '.turbo/runs/one.json', {
+    execution: { startTime: T0 - 5000 },
+    tasks: [{ taskId: '@formancy/data-host#test:coverage', execution: { startTime: T0 - 4000, endTime: T0 + 9000 }, cache: { status: 'MISS' } }],
+  })
   return root
 }
 
@@ -103,8 +121,12 @@ describe('a job’s key', () => {
   // one image would.
   test('names both the package and the image of an image leg', () => {
     const covered = [{ path: 'packages/data-postgres', id: 'data-postgres', name: '@formancy/data-postgres' }]
-    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'postgres:16-alpine' }, covered)).toBe('test-images-data-postgres-postgres-16-alpine')
-    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'mcr.microsoft.com/mssql/server:2019-latest' }, covered)).toBe('test-images-data-postgres-mcr.microsoft.com-mssql-server-2019-latest')
+    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'postgres:16-alpine' }, covered)).toBe(
+      'test-images-data-postgres-postgres-16-alpine',
+    )
+    expect(keyFor({ job: 'test-images', pkg: '@formancy/data-postgres', variant: 'mcr.microsoft.com/mssql/server:2019-latest' }, covered)).toBe(
+      'test-images-data-postgres-mcr.microsoft.com-mssql-server-2019-latest',
+    )
     expect(() => keyFor({ job: 'test-images', pkg: '@formancy/nothing', variant: 'postgres:16-alpine' }, covered)).toThrow(/no workspace package/)
   })
 })
@@ -120,11 +142,26 @@ describe('a test job’s results', () => {
     expect(result).toMatchObject({ schema: 1, key: 'test-app-host', commit: 'abc123', run: { id: '42', attempt: '1' }, missing: [] })
     const [suite] = result.suites
     expect(suite).not.toHaveProperty('coverageMap')
-    expect(suite.files).toEqual([{ file: 'apps/host/src/page.test.tsx', status: 'passed', startTime: T0 + 1000, endTime: T0 + 2000, tests: [{ name: 'the page loads', status: 'passed', durationMs: 1000, meta: {} }] }])
+    expect(suite.files).toEqual([
+      {
+        file: 'apps/host/src/page.test.tsx',
+        status: 'passed',
+        startTime: T0 + 1000,
+        endTime: T0 + 2000,
+        tests: [{ name: 'the page loads', status: 'passed', durationMs: 1000, meta: {} }],
+      },
+    ])
     expect(suite.task).toEqual({ startTime: T0 - 4000, endTime: T0 + 9000, cache: 'MISS' })
     expect(suite.coverage).toEqual({ lines: { pct: 90 } })
     expect(result.servers).toEqual([
-      expect.objectContaining({ script: 'test-coverage', at: at(1), package: '@formancy/data-host', caller: 'apps/host/src/test-databases.ts', digest: 'postgres@sha256:b0f9', imageId: 'sha256:b0f9' }),
+      expect.objectContaining({
+        script: 'test-coverage',
+        at: at(1),
+        package: '@formancy/data-host',
+        caller: 'apps/host/src/test-databases.ts',
+        digest: 'postgres@sha256:b0f9',
+        imageId: 'sha256:b0f9',
+      }),
     ])
     expect(result.dist).toEqual([{ package: '@formancy/data-core', distHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/) }])
   })
@@ -133,9 +170,19 @@ describe('a test job’s results', () => {
   // the leg's key, with the image it was given.
   test('keep an image leg’s suite and servers under its key and its image', () => {
     const root = workspace()
-    put(root, 'apps/host/test-results/servers/test-coverage-postgres-1-1.json', record({ image: 'postgres:16-alpine', version: '16.15', caller: join(root, 'apps/host/src/test-databases.ts') }))
+    put(
+      root,
+      'apps/host/test-results/servers/test-coverage-postgres-1-1.json',
+      record({ image: 'postgres:16-alpine', version: '16.15', caller: join(root, 'apps/host/src/test-databases.ts') }),
+    )
     const result = collect({ root, job: 'test-images', pkg: '@formancy/data-host', variant: 'postgres:16-alpine', ...machine })
-    expect(result).toMatchObject({ key: 'test-images-app-host-postgres-16-alpine', job: 'test-images', package: '@formancy/data-host', variant: 'postgres:16-alpine', missing: [] })
+    expect(result).toMatchObject({
+      key: 'test-images-app-host-postgres-16-alpine',
+      job: 'test-images',
+      package: '@formancy/data-host',
+      variant: 'postgres:16-alpine',
+      missing: [],
+    })
     expect(result.suites.map((suite) => suite.package)).toEqual(['@formancy/data-host'])
     expect(result.servers.map((server) => [server.image, server.caller])).toEqual([['postgres:16-alpine', 'apps/host/src/test-databases.ts']])
   })
@@ -153,8 +200,14 @@ describe('a test job’s results', () => {
   // journey. If they ever disagree, this is where anybody finds out.
   test('refuse a malformed server record, naming its file', () => {
     const root = workspace()
-    put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', { engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: 16 })
-    expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine })).toThrow(/apps\/host\/test-results\/servers\/test-coverage-sqlserver-9-1\.json is not a server record: version is not a string/)
+    put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', {
+      engine: 'sqlserver',
+      image: 'mcr.microsoft.com/mssql/server:2022-latest',
+      version: 16,
+    })
+    expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine })).toThrow(
+      /apps\/host\/test-results\/servers\/test-coverage-sqlserver-9-1\.json is not a server record: version is not a string/,
+    )
   })
 
   // data-core's compatibility floor is held to the level each SQL Server
@@ -166,10 +219,16 @@ describe('a test job’s results', () => {
       const root = workspace()
       const { compatibility: _, ...without } = record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3' })
       put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', compatibility === undefined ? without : { ...without, compatibility })
-      expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }), String(compatibility)).toThrow(/test-coverage-sqlserver-9-1\.json is not a server record: compatibility is neither a whole number nor null/)
+      expect(() => collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }), String(compatibility)).toThrow(
+        /test-coverage-sqlserver-9-1\.json is not a server record: compatibility is neither a whole number nor null/,
+      )
     }
     const root = workspace()
-    put(root, 'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json', record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3', compatibility: 160 }))
+    put(
+      root,
+      'apps/host/test-results/servers/test-coverage-sqlserver-9-1.json',
+      record({ engine: 'sqlserver', image: 'mcr.microsoft.com/mssql/server:2022-latest', version: '16.0.4295.3', compatibility: 160 }),
+    )
     expect(collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine }).servers.map((server) => server.compatibility)).toContain(160)
   })
 })
@@ -183,7 +242,9 @@ describe('the browser job’s results', () => {
     const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
     expect(result).toMatchObject({ key: 'browser-chromium', variant: 'chromium', missing: [] })
     expect(result.browserGates.map((gate) => [gate.gate, gate.asked])).toEqual([['apps/host', 'chromium']])
-    expect(result.servers.map((server) => [server.script, server.package, server.caller])).toEqual([['test-browser', 'apps/host', 'apps/host/scripts/browser-test.mjs']])
+    expect(result.servers.map((server) => [server.script, server.package, server.caller])).toEqual([
+      ['test-browser', 'apps/host', 'apps/host/scripts/browser-test.mjs'],
+    ])
   })
 
   // A leg whose gate wrote nothing for its browser -- FORMANCY_BROWSERS
@@ -192,7 +253,14 @@ describe('the browser job’s results', () => {
   test('list an app whose gate left no file for the leg’s browser', () => {
     const root = workspace()
     rmSync(join(root, 'apps/host/test-results/browser-chromium.json'))
-    put(root, 'apps/host/test-results/browser-firefox.json', { gate: 'apps/host', asked: 'firefox', startedAt: at(30), finishedAt: at(40), browser: { name: 'firefox', version: '155.0' }, checks: { ok: 1, failed: [] } })
+    put(root, 'apps/host/test-results/browser-firefox.json', {
+      gate: 'apps/host',
+      asked: 'firefox',
+      startedAt: at(30),
+      finishedAt: at(40),
+      browser: { name: 'firefox', version: '155.0' },
+      checks: { ok: 1, failed: [] },
+    })
     const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
     expect(result.browserGates).toEqual([])
     expect(result.missing).toEqual(['apps/host/test-results/browser-chromium.json'])
@@ -202,7 +270,14 @@ describe('the browser job’s results', () => {
   // checks reported as Chromium's, held to Chromium's pin.
   test('list a file whose gate launched another browser than the leg’s', () => {
     const root = workspace()
-    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'chromium', startedAt: at(30), finishedAt: at(40), browser: { name: 'firefox', version: '155.0' }, checks: { ok: 1, failed: [] } })
+    put(root, 'apps/host/test-results/browser-chromium.json', {
+      gate: 'apps/host',
+      asked: 'chromium',
+      startedAt: at(30),
+      finishedAt: at(40),
+      browser: { name: 'firefox', version: '155.0' },
+      checks: { ok: 1, failed: [] },
+    })
     const result = collect({ root, job: 'browser', variant: 'chromium', ...machine })
     expect(result.browserGates).toEqual([])
     expect(result.missing).toEqual(['apps/host’s gate launched firefox in the chromium job: apps/host/test-results/browser-chromium.json'])
@@ -215,18 +290,42 @@ describe('the browser job’s results', () => {
   // is no recorder's of this repository's.
   test('list a file whose gate asked for another browser than the leg’s', () => {
     const root = workspace()
-    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', asked: 'firefox', startedAt: at(30), finishedAt: at(40), browser: null, error: 'could not launch Firefox', checks: { ok: 0, failed: [] } })
-    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({ browserGates: [], missing: ['apps/host’s gate asked for firefox in the chromium job: apps/host/test-results/browser-chromium.json'] })
-    put(root, 'apps/host/test-results/browser-chromium.json', { gate: 'apps/host', startedAt: at(30), finishedAt: at(40), browser: { name: 'chromium', version: '153.0.8010.12' }, checks: { ok: 1, failed: [] } })
-    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({ browserGates: [], missing: ['apps/host’s gate asked for no browser in the chromium job: apps/host/test-results/browser-chromium.json'] })
+    put(root, 'apps/host/test-results/browser-chromium.json', {
+      gate: 'apps/host',
+      asked: 'firefox',
+      startedAt: at(30),
+      finishedAt: at(40),
+      browser: null,
+      error: 'could not launch Firefox',
+      checks: { ok: 0, failed: [] },
+    })
+    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({
+      browserGates: [],
+      missing: ['apps/host’s gate asked for firefox in the chromium job: apps/host/test-results/browser-chromium.json'],
+    })
+    put(root, 'apps/host/test-results/browser-chromium.json', {
+      gate: 'apps/host',
+      startedAt: at(30),
+      finishedAt: at(40),
+      browser: { name: 'chromium', version: '153.0.8010.12' },
+      checks: { ok: 1, failed: [] },
+    })
+    expect(collect({ root, job: 'browser', variant: 'chromium', ...machine })).toMatchObject({
+      browserGates: [],
+      missing: ['apps/host’s gate asked for no browser in the chromium job: apps/host/test-results/browser-chromium.json'],
+    })
   })
 
   // Without its browser a leg's key would be every leg's, and the legs'
   // uploads would overwrite one another; a browser the gates do not run in
   // is a leg no pin holds.
   test('refuse --job browser without a browser the gates run in', () => {
-    expect(() => collect({ root: workspace(), job: 'browser', ...machine })).toThrow('--job browser needs --variant <browser>, the browser its leg ran: one of chromium, firefox, webkit')
-    expect(() => collect({ root: workspace(), job: 'browser', variant: 'opera', ...machine })).toThrow('--job browser --variant opera: opera is no browser the gates run in (chromium, firefox, webkit)')
+    expect(() => collect({ root: workspace(), job: 'browser', ...machine })).toThrow(
+      '--job browser needs --variant <browser>, the browser its leg ran: one of chromium, firefox, webkit',
+    )
+    expect(() => collect({ root: workspace(), job: 'browser', variant: 'opera', ...machine })).toThrow(
+      '--job browser --variant opera: opera is no browser the gates run in (chromium, firefox, webkit)',
+    )
   })
 })
 
@@ -237,15 +336,24 @@ describe('the getting-started job’s results', () => {
   test('keep each composed database’s record, and name every connection of the journey without one', () => {
     const root = workspace()
     put(root, 'scripts/getting-started/journey.json', { forms: [{ connection: 'pg' }, { connection: 'ms' }] })
-    put(root, 'deploy/connections.json', [{ id: 'pg', kind: 'postgres' }, { id: 'ms', kind: 'sqlserver' }])
+    put(root, 'deploy/connections.json', [
+      { id: 'pg', kind: 'postgres' },
+      { id: 'ms', kind: 'sqlserver' },
+    ])
     expect(collect({ root, job: 'getting-started', variant: 'runner', ...machine }).missing).toEqual([
       'a record of the composed postgres database behind the journey’s connection pg, which scripts/getting-started.mjs writes after the journey',
       'a record of the composed sqlserver database behind the journey’s connection ms, which scripts/getting-started.mjs writes after the journey',
     ])
-    put(root, 'test-results/servers/getting-started-postgres-7-1.json', record({ script: 'getting-started', caller: 'scripts/getting-started.mjs', at: at(45) }))
+    put(
+      root,
+      'test-results/servers/getting-started-postgres-7-1.json',
+      record({ script: 'getting-started', caller: 'scripts/getting-started.mjs', at: at(45) }),
+    )
     const result = collect({ root, job: 'getting-started', variant: 'runner', ...machine })
     expect(result.servers.map((server) => [server.engine, server.script])).toEqual([['postgres', 'getting-started']])
-    expect(result.missing).toEqual(['a record of the composed sqlserver database behind the journey’s connection ms, which scripts/getting-started.mjs writes after the journey'])
+    expect(result.missing).toEqual([
+      'a record of the composed sqlserver database behind the journey’s connection ms, which scripts/getting-started.mjs writes after the journey',
+    ])
   })
 })
 
@@ -278,7 +386,10 @@ describe('local results', () => {
   test('refuse a turbo summary or a coverage summary from before --since, and say so', () => {
     const root = workspace()
     const yesterday = T0 - 86_400_000
-    put(root, '.turbo/runs/one.json', { execution: { startTime: yesterday }, tasks: [{ taskId: '@formancy/data-host#test:coverage', execution: { startTime: yesterday, endTime: yesterday + 600_000 }, cache: { status: 'MISS' } }] })
+    put(root, '.turbo/runs/one.json', {
+      execution: { startTime: yesterday },
+      tasks: [{ taskId: '@formancy/data-host#test:coverage', execution: { startTime: yesterday, endTime: yesterday + 600_000 }, cache: { status: 'MISS' } }],
+    })
     utimesSync(join(root, 'apps/host/coverage/coverage-summary.json'), new Date(yesterday), new Date(yesterday))
     const result = collect({ root, local: true, since: at(-1), ...machine, env: {} })
     expect(result.suites.map((suite) => [suite.path, suite.task, suite.coverage])).toEqual([['apps/host', null, null]])
@@ -318,7 +429,11 @@ describe('the command line', () => {
     roots.push(out)
     // A step's outputs are the workflow's; this run is not a step of one.
     const { GITHUB_OUTPUT: _, ...env } = process.env
-    const printed = execFileSync(process.execPath, [join(repo, 'scripts', 'release-report', 'collect.mjs'), '--job', 'install', '--out', out], { cwd: repo, encoding: 'utf8', env })
+    const printed = execFileSync(process.execPath, [join(repo, 'scripts', 'release-report', 'collect.mjs'), '--job', 'install', '--out', out], {
+      cwd: repo,
+      encoding: 'utf8',
+      env,
+    })
     expect(existsSync(join(out, 'install.json'))).toBe(true)
     expect(existsSync(join(repo, out))).toBe(false)
     expect(printed.startsWith(`${relative(repo, join(out, 'install.json')).replaceAll('\\', '/')}: `)).toBe(true)

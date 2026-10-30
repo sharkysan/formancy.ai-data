@@ -153,7 +153,7 @@ function report({ when, on, timings, sizes, outcome }) {
   if (sizes.length > 0) {
     lines.push(
       '',
-      'Image sizes in bytes: `.Size` from `docker image inspect`, as this machine\'s image store counts it, and the layers unpacked, summed from `docker history`:',
+      "Image sizes in bytes: `.Size` from `docker image inspect`, as this machine's image store counts it, and the layers unpacked, summed from `docker history`:",
       '',
       '| Image | `.Size` | Unpacked |',
       '| --- | ---: | ---: |',
@@ -246,7 +246,11 @@ async function main() {
       for (const [secret, value] of readSecrets(env, config)) known.secrets.set(secret, value)
       const places = [
         ...haystacks(env, config, JSON.stringify(config)),
-        ...outputs.map((output) => ({ where: `the output of the guide's step on line ${String(output.step.line)}`, text: `${output.stdout}${output.stderr}`, mints: output.mints })),
+        ...outputs.map((output) => ({
+          where: `the output of the guide's step on line ${String(output.step.line)}`,
+          text: `${output.stdout}${output.stderr}`,
+          mints: output.mints,
+        })),
       ]
       fail('a secret or a token reached somewhere it must not', leaks({ ...known, haystacks: places }))
     })
@@ -259,14 +263,21 @@ async function main() {
     on = machine()
     config = JSON.parse(compose(env, ['config', '--format', 'json']).stdout)
     await timed('Gate: compose configuration', async () => {
-      fail('the composed configuration is not what 0032, 0071 and the guide say', [...configProblems(config), ...bindMountProblems(config), ...trustProblems(config)])
+      fail('the composed configuration is not what 0032, 0071 and the guide say', [
+        ...configProblems(config),
+        ...bindMountProblems(config),
+        ...trustProblems(config),
+      ])
     })
 
     for (const entry of before) await step(entry, entry === start ? 'Start' : 'Step')
     await timed('Gate: PostgreSQL logs every statement from here on', async () => logEveryStatement(env))
     await step(start, 'Start again')
     await timed('Gate: no volume the configuration does not name', async () => {
-      fail("a container mounts a volume compose.yaml does not name, and the guide's stop and start would leave one behind each time", anonymousMountProblems(projectContainers(env), config))
+      fail(
+        "a container mounts a volume compose.yaml does not name, and the guide's stop and start would leave one behind each time",
+        anonymousMountProblems(projectContainers(env), config),
+      )
     })
 
     // The tokens are what the guide's commands printed, and nothing the gate made.
@@ -276,7 +287,8 @@ async function main() {
       const printed = output.stdout.trim()
       if (!JWT.test(printed)) continue
       const who = await call(base, 'GET', '/v1/whoami', { token: printed })
-      if (who.status !== 200) throw new Error(`the token printed by line ${String(output.step.line)} is refused (${String(who.status)}) by the stack it was minted for`)
+      if (who.status !== 200)
+        throw new Error(`the token printed by line ${String(output.step.line)} is refused (${String(who.status)}) by the stack it was minted for`)
       const name = classify(who.json, { adminRoles, clerkRole: journey.policy.operations.read[0] })
       if (name !== undefined && tokens[name] === undefined) {
         tokens[name] = printed
@@ -288,7 +300,10 @@ async function main() {
 
     await timed('Gate: the secrets each service can read', async () => {
       const problems = []
-      for (const [name, running] of [['server', true], ['token', false]]) {
+      for (const [name, running] of [
+        ['server', true],
+        ['token', false],
+      ]) {
         const named = namedSecretFiles(config.services[name], readHostFile)
         problems.push(...exposureProblems(name, named, readableSecretFiles(env, name, named, { running })))
       }
@@ -298,7 +313,10 @@ async function main() {
     const records = new Map()
     for (const form of journey.forms) records.set(form, await timed(`Gate: journey on ${form.engine}`, () => journeyFor(base, tokens, form, journey)))
     await timed('Gate: what a proxy in front sees, through the web front', async () => {
-      fail('a proxy in front of the stack could keep an answer, or forward a path the server routes', await proxyProblems(base, tokens.clerk1, journey.forms[0].formId))
+      fail(
+        'a proxy in front of the stack could keep an answer, or forward a path the server routes',
+        await proxyProblems(base, tokens.clerk1, journey.forms[0].formId),
+      )
     })
     // What each composed database answered, through the product's own
     // adapter, kept for the release report beside every suite's (0035).
@@ -324,15 +342,24 @@ async function main() {
         // directly, past nginx. Should that stop being so, the sentence goes.
         const port = serverPort()
         const answers = await Promise.all(containerAddresses(env, 'server').map((address) => directStatus(address, port, '/health')))
-        if (!answers.includes(200)) throw new Error(`the server did not answer at its container address (${answers.join(', ') || 'none'}), which the guide's section 8 says a local process on a Linux host reaches`)
+        if (!answers.includes(200))
+          throw new Error(
+            `the server did not answer at its container address (${answers.join(', ') || 'none'}), which the guide's section 8 says a local process on a Linux host reaches`,
+          )
       })
     }
     await leakCheck('Gate: leak check')
     await timed('Gate: the audit trail in the server log', async () => {
-      fail("the server's log holds no audit event for the journey's create, which the guide's section 8 says is where the trail is", journey.forms.filter((form) => createdIn(form) === 0).map((form) => form.formId))
+      fail(
+        "the server's log holds no audit event for the journey's create, which the guide's section 8 says is where the trail is",
+        journey.forms.filter((form) => createdIn(form) === 0).map((form) => form.formId),
+      )
     })
     await timed('Gate: the server believes the web front', async () => {
-      fail("the server did not believe the web front's X-Forwarded-For, so every client shares one bucket, which compose.yaml's FORMANCY_DATA_TRUSTED_PROXIES is there to prevent (0071)", believedProblems(compose(env, ['logs', '--no-color', '--no-log-prefix', 'server']).stdout, config))
+      fail(
+        "the server did not believe the web front's X-Forwarded-For, so every client shares one bucket, which compose.yaml's FORMANCY_DATA_TRUSTED_PROXIES is there to prevent (0071)",
+        believedProblems(compose(env, ['logs', '--no-color', '--no-log-prefix', 'server']).stdout, config),
+      )
     })
 
     for (const entry of keep) {
@@ -342,11 +369,16 @@ async function main() {
         for (const [name, token] of Object.entries(tokens)) {
           const who = await call(base, 'GET', '/v1/whoami', { token })
           if (who.status !== 200) {
-            throw new Error(`the ${name} token is refused (${String(who.status)}) after \`${entry.command}\` and a start: the guide says the secrets are kept, and the key that signed it was not`)
+            throw new Error(
+              `the ${name} token is refused (${String(who.status)}) after \`${entry.command}\` and a start: the guide says the secrets are kept, and the key that signed it was not`,
+            )
           }
         }
         for (const [form, record] of records) await stillThere(base, tokens, form, record, journey)
-        fail(`the server's log still holds the audit events of before \`${entry.command}\`, which the guide's section 8 says it removes`, journey.forms.filter((form) => createdIn(form) > 0).map((form) => form.formId))
+        fail(
+          `the server's log still holds the audit events of before \`${entry.command}\`, which the guide's section 8 says it removes`,
+          journey.forms.filter((form) => createdIn(form) > 0).map((form) => form.formId),
+        )
       })
       await leakCheck('Gate: leak check after the start')
     }

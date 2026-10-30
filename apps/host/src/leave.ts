@@ -161,7 +161,9 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'created': {
       // The record's own: its children are the record's, and go with it.
       const keeps = { owner: request.owner, renderer: request.by }
-      return request.owner === 'master' ? { owners: 'all', spares: RECORDS_GRID, renderers: 'all', keeps } : { owners: [request.owner], renderers: 'all', keeps }
+      return request.owner === 'master'
+        ? { owners: 'all', spares: RECORDS_GRID, renderers: 'all', keeps }
+        : { owners: [request.owner], renderers: 'all', keeps }
     }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }

@@ -36,7 +36,8 @@ export const PREFLIGHT_MAX_AGE_SECONDS = 600
 /** The answer to a refused preflight, and to a token-bearing request refused across origins: a code and a sentence, and nothing of the request. */
 export const CROSS_ORIGIN_REFUSED = {
   code: 'cross-origin-refused',
-  message: 'Across origins this server answers only the runtime plane’s routes, from an origin its operator lists, and this request is not one of those, so it was refused before any work.',
+  message:
+    'Across origins this server answers only the runtime plane’s routes, from an origin its operator lists, and this request is not one of those, so it was refused before any work.',
 } as const
 
 const SETTING = 'FORMANCY_DATA_CORS_ORIGINS'
@@ -65,10 +66,12 @@ function originProblem(entry: unknown): string | undefined {
     return 'is not an origin: a scheme, a host and, where it is not the default, a port'
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return 'is not an https: origin'
-  if (url.origin !== entry) return 'is not written as a browser sends Origin: lower case, a punycode name, no path or trailing slash, no default port and no user information'
+  if (url.origin !== entry)
+    return 'is not written as a browser sends Origin: lower case, a punycode name, no path or trailing slash, no default port and no user information'
   const host = url.hostname
   if (!(host.startsWith('[') || host.split('.').every((label) => LABEL.test(label)))) return 'names a pattern or a host that is no DNS name or IP address'
-  if (url.protocol === 'http:' && !LOOPBACK.has(host)) return 'is plain HTTP on a host other than localhost, 127.0.0.1 or [::1]: anything else is listed as https:'
+  if (url.protocol === 'http:' && !LOOPBACK.has(host))
+    return 'is plain HTTP on a host other than localhost, 127.0.0.1 or [::1]: anything else is listed as https:'
   return undefined
 }
 
@@ -83,13 +86,19 @@ export type CorsOriginsSetting = { ok: true; origins: readonly string[] } | { ok
  * it grants.
  */
 export function corsOriginsSetting(text: string | undefined, plane: { runtime: boolean }): CorsOriginsSetting {
-  const entries = (text ?? '').split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')
+  const entries = (text ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '')
   for (const [index, entry] of entries.entries()) {
     const problem = originProblem(entry)
     if (problem !== undefined) return { ok: false, problem: `${SETTING}: entry ${String(index + 1)} ${problem}.` }
   }
   if (entries.length > 0 && !plane.runtime) {
-    return { ok: false, problem: `${SETTING} lists origins, and the runtime plane is off: set FORMANCY_DATA_STORE_DIR and FORMANCY_DATA_CONNECTIONS, or leave it empty.` }
+    return {
+      ok: false,
+      problem: `${SETTING} lists origins, and the runtime plane is off: set FORMANCY_DATA_STORE_DIR and FORMANCY_DATA_CONNECTIONS, or leave it empty.`,
+    }
   }
   return { ok: true, origins: [...new Set(entries)] }
 }
@@ -106,7 +115,11 @@ export function originsProblem(origins: unknown): string | undefined {
 
 /** `existing` Vary with `name` added once, by its token case-insensitively; `*` stays `*`. */
 export function varyWith(existing: number | string | readonly string[] | undefined, name: string): string {
-  const tokens = [existing ?? []].flat().flatMap((value) => String(value).split(',')).map((token) => token.trim()).filter((token) => token !== '')
+  const tokens = [existing ?? []]
+    .flat()
+    .flatMap((value) => String(value).split(','))
+    .map((token) => token.trim())
+    .filter((token) => token !== '')
   if (tokens.includes('*')) return '*'
   return tokens.some((token) => token.toLowerCase() === name.toLowerCase()) ? tokens.join(', ') : [...tokens, name].join(', ')
 }
@@ -148,7 +161,10 @@ function segmentKind(segment: string): 'parameter' | 'static' | 'unmodelled' {
 
 /** Whether a path exists that both patterns, each of plain segments, match: the same number of segments, each equal static text or a parameter on either side. */
 function overlap(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((segment, index) => segment === b[index] || segmentKind(segment) === 'parameter' || segmentKind(String(b[index])) === 'parameter')
+  return (
+    a.length === b.length &&
+    a.every((segment, index) => segment === b[index] || segmentKind(segment) === 'parameter' || segmentKind(String(b[index])) === 'parameter')
+  )
 }
 
 /**
@@ -247,7 +263,10 @@ export function crossOrigin(app: FastifyInstance, options: CrossOriginOptions): 
   })
   app.addHook('onReady', async () => {
     const problems = routeProblems(routes)
-    if (problems.length > 0) throw new Error(`With origins listed, the server does not start beside a route another plane could answer at a runtime path (0060): ${problems.join('; ')}.`)
+    if (problems.length > 0)
+      throw new Error(
+        `With origins listed, the server does not start beside a route another plane could answer at a runtime path (0060): ${problems.join('; ')}.`,
+      )
   })
 
   // Every answer of a runtime route, refusals included -- path-not-plain,
@@ -281,8 +300,12 @@ export function crossOrigin(app: FastifyInstance, options: CrossOriginOptions): 
     // it, which createDataServer has none of; and it asks for the method
     // asked alone: another riding the grant is the check at ready's.
     const reached = app.findRoute({ method: method as 'GET', url: request.url })
-    if (reached === null || !sameParameters(reached.params, request.params as Record<string, unknown>)) return { granted: false, reason: 'method reaches another route' }
-    const asked = String(request.headers['access-control-request-headers'] ?? '').split(',').map((name) => name.trim().toLowerCase()).filter((name) => name !== '')
+    if (reached === null || !sameParameters(reached.params, request.params as Record<string, unknown>))
+      return { granted: false, reason: 'method reaches another route' }
+    const asked = String(request.headers['access-control-request-headers'] ?? '')
+      .split(',')
+      .map((name) => name.trim().toLowerCase())
+      .filter((name) => name !== '')
     if (!asked.every((name) => (CROSS_ORIGIN_REQUEST_HEADERS as readonly string[]).includes(name))) return { granted: false, reason: 'header not allowed' }
     return { granted: true, origin, method }
   }

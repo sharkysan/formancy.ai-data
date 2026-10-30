@@ -161,18 +161,32 @@ export function serverStanding(kind: DatabaseKind, facts: ServerFacts | undefine
   if (facts === undefined) return { tested: false, says: NOT_RECORDED }
   const tested: TestedServer = TESTED_SERVERS[kind]
   const name = serverName(kind, facts)
-  if (facts.product !== tested.product) return { tested: false, says: `This release of Formancy Data was not tested on ${name}: it was tested on ${testedList(kind)}.` }
+  if (facts.product !== tested.product)
+    return { tested: false, says: `This release of Formancy Data was not tested on ${name}: it was tested on ${testedList(kind)}.` }
   if (facts.major === null) {
-    return { tested: false, says: `${name} did not say its major version, so this release of Formancy Data cannot be said to have been tested on it: it was tested on ${testedList(kind)}.` }
+    return {
+      tested: false,
+      says: `${name} did not say its major version, so this release of Formancy Data cannot be said to have been tested on it: it was tested on ${testedList(kind)}.`,
+    }
   }
-  if (!tested.majors.includes(facts.major)) return { tested: false, says: `This release of Formancy Data was not tested on ${name}: it was tested on ${testedList(kind)}.` }
+  if (!tested.majors.includes(facts.major))
+    return { tested: false, says: `This release of Formancy Data was not tested on ${name}: it was tested on ${testedList(kind)}.` }
   const floor = tested.compatibilityFloor
   if (floor === undefined) return { tested: true, says: `This release of Formancy Data was tested on ${name}.` }
   if (facts.compatibility === undefined) {
-    return { tested: false, says: `${name} did not say the database’s compatibility level, so this release of Formancy Data cannot be said to have been tested at it.` }
+    return {
+      tested: false,
+      says: `${name} did not say the database’s compatibility level, so this release of Formancy Data cannot be said to have been tested at it.`,
+    }
   }
   const level = String(facts.compatibility)
   return facts.compatibility < floor
-    ? { tested: false, says: `This release of Formancy Data was tested on ${name}, and the database’s compatibility level, ${level}, is below the lowest it was tested at, ${String(floor)}.` }
-    : { tested: true, says: `This release of Formancy Data was tested on ${name}, and the database’s compatibility level, ${level}, is not below the lowest it was tested at, ${String(floor)}.` }
+    ? {
+        tested: false,
+        says: `This release of Formancy Data was tested on ${name}, and the database’s compatibility level, ${level}, is below the lowest it was tested at, ${String(floor)}.`,
+      }
+    : {
+        tested: true,
+        says: `This release of Formancy Data was tested on ${name}, and the database’s compatibility level, ${level}, is not below the lowest it was tested at, ${String(floor)}.`,
+      }
 }

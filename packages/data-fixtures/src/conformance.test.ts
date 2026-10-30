@@ -66,7 +66,17 @@ function inbound(objects: readonly ObjectMeta[], target: ObjectMeta): InboundKey
   return objects.flatMap((referrer) =>
     referrer.foreignKeys.flatMap((key) =>
       key.references !== null && key.references.table.schema === target.ref.schema && key.references.table.name === target.ref.name
-        ? [{ table: { ...referrer.ref }, name: key.name, columns: [...key.columns], referencedColumns: [...key.references.columns], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced }]
+        ? [
+            {
+              table: { ...referrer.ref },
+              name: key.name,
+              columns: [...key.columns],
+              referencedColumns: [...key.references.columns],
+              onDelete: key.onDelete,
+              onUpdate: key.onUpdate,
+              enforced: key.enforced,
+            },
+          ]
         : [],
     ),
   )
@@ -78,7 +88,12 @@ function inbound(objects: readonly ObjectMeta[], target: ObjectMeta): InboundKey
  * may delete from it -- the owner may, unless the edit said otherwise -- and
  * what refers to it.
  */
-function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, gaps: MetadataSnapshot['gaps'] = [], before0049 = false): MetadataSnapshot {
+function snapshot(
+  kind: DatabaseKind,
+  edit: (objects: ObjectMeta[]) => void = () => {},
+  gaps: MetadataSnapshot['gaps'] = [],
+  before0049 = false,
+): MetadataSnapshot {
   const objects = perfect(kind)
   edit(objects)
   if (!before0049) {
@@ -145,7 +160,9 @@ describe('snapshotDisagreements', () => {
   test("holds order_line to its version column, each engine's edition, and refuses a snapshot without it", () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const version = columnOf(perfect(kind), 'order_line', 'row_version')
-      expect(version, kind).toMatchObject(kind === 'postgres' ? { type: { kind: 'integer' }, generated: 'none', hasDefault: true } : { type: { kind: 'rowversion' }, generated: 'rowversion' })
+      expect(version, kind).toMatchObject(
+        kind === 'postgres' ? { type: { kind: 'integer' }, generated: 'none', hasDefault: true } : { type: { kind: 'rowversion' }, generated: 'rowversion' },
+      )
       const before = snapshot(kind, (objects) => {
         const line = object(objects, 'order_line')
         line.columns = line.columns.filter((column) => column.name !== 'row_version')
@@ -183,12 +200,16 @@ describe('snapshotDisagreements', () => {
     const wrong = snapshot('sqlserver', (objects) => {
       columnOf(objects, 'shipment', 'reference').type = { kind: 'text', maxLength: 20, lengthUnit: 'code-page-bytes', fixedLength: false }
     })
-    expect(snapshotDisagreements(wrong)).toEqual([expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "code-page-bytes", expected "utf8-bytes"/)])
+    expect(snapshotDisagreements(wrong)).toEqual([
+      expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "code-page-bytes", expected "utf8-bytes"/),
+    ])
     // The same column is characters on PostgreSQL, and nothing else.
     const postgres = snapshot('postgres', (objects) => {
       columnOf(objects, 'shipment', 'reference').type = { kind: 'text', maxLength: 20, lengthUnit: 'utf8-bytes', fixedLength: false }
     })
-    expect(snapshotDisagreements(postgres)).toEqual([expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "utf8-bytes", expected "code-points"/)])
+    expect(snapshotDisagreements(postgres)).toEqual([
+      expect.stringMatching(/sales\.shipment\.reference type lengthUnit is "utf8-bytes", expected "code-points"/),
+    ])
   })
 
   // ALWAYS refuses a value and BY DEFAULT accepts one. An adapter that read
@@ -365,7 +386,9 @@ describe('snapshotDisagreements', () => {
     const missing = readBack(made, (copy) => {
       described(copy, 'order').referencedBy = []
     })
-    expect(snapshotDisagreements(missing)).toEqual(['sales.order is referred to by [], expected [sales.delivery fk_delivery_order, sales.order_line fk_order_line_order]'])
+    expect(snapshotDisagreements(missing)).toEqual([
+      'sales.order is referred to by [], expected [sales.delivery fk_delivery_order, sales.order_line fk_order_line_order]',
+    ])
     const extra = snapshot('postgres', (objects) => {
       object(objects, 'order').referencedBy = [FROM_OUTSIDE, ...inbound(objects, object(objects, 'order'))]
     })
@@ -482,14 +505,16 @@ describe('accessDisagreements', () => {
     }
     expect(accessDisagreements(asAccount('sqlserver', without('order')), READER_ACCESS)).toEqual(['sales.order is missing, though the account may use it'])
     expect(accessDisagreements(asAccount('sqlserver', without('employee')), READER_ACCESS)).toEqual(['sales.employee is missing and no objects gap says why'])
-    const behind = asAccount('sqlserver', without('employee'), [{ subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION' }])
+    const behind = asAccount('sqlserver', without('employee'), [
+      { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION' },
+    ])
     expect(accessDisagreements(behind, READER_ACCESS)).toEqual([])
     const scoped = asAccount('sqlserver', without('employee'), [{ subject: { kind: 'scope' }, aspect: 'objects', detail: '1 object denied' }])
     expect(accessDisagreements(scoped, READER_ACCESS)).toEqual([])
     // A usable object is never excused by a gap.
-    expect(accessDisagreements(asAccount('sqlserver', without('order'), [{ subject: { kind: 'scope' }, aspect: 'objects', detail: 'x' }]), READER_ACCESS)).toEqual([
-      'sales.order is missing, though the account may use it',
-    ])
+    expect(
+      accessDisagreements(asAccount('sqlserver', without('order'), [{ subject: { kind: 'scope' }, aspect: 'objects', detail: 'x' }]), READER_ACCESS),
+    ).toEqual(['sales.order is missing, though the account may use it'])
   })
 
   // The failure 0027 exists to remove: an adapter that reads a
@@ -544,12 +569,37 @@ describe('accessDisagreements', () => {
         grantsOf(WRITER_ACCESS, 'postgres')(objects)
         edit(objects)
       })
-    expect(accessDisagreements(writer(() => {}), WRITER_ACCESS)).toEqual([])
-    expect(described(writer(() => {}), 'order_line').access).toEqual({ delete: true })
-    expect(accessDisagreements(writer((objects) => (object(objects, 'order_line').access = { delete: false })), WRITER_ACCESS)).toEqual(['sales.order_line delete is false, expected true'])
-    expect(accessDisagreements(writer((objects) => (object(objects, 'customer').access = { delete: true })), WRITER_ACCESS)).toEqual(['sales.customer delete is true, expected false'])
+    expect(
+      accessDisagreements(
+        writer(() => {}),
+        WRITER_ACCESS,
+      ),
+    ).toEqual([])
+    expect(
+      described(
+        writer(() => {}),
+        'order_line',
+      ).access,
+    ).toEqual({ delete: true })
+    expect(
+      accessDisagreements(
+        writer((objects) => (object(objects, 'order_line').access = { delete: false })),
+        WRITER_ACCESS,
+      ),
+    ).toEqual(['sales.order_line delete is false, expected true'])
+    expect(
+      accessDisagreements(
+        writer((objects) => (object(objects, 'customer').access = { delete: true })),
+        WRITER_ACCESS,
+      ),
+    ).toEqual(['sales.customer delete is true, expected false'])
     const reader = asAccount('sqlserver', grantsOf(READER_ACCESS, 'sqlserver'))
-    expect(accessDisagreements(readBack(reader, (copy) => delete described(copy, 'order').access), READER_ACCESS)).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
+    expect(
+      accessDisagreements(
+        readBack(reader, (copy) => delete described(copy, 'order').access),
+        READER_ACCESS,
+      ),
+    ).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
   })
 })
 
@@ -569,7 +619,9 @@ describe('restrictedDisagreements', () => {
 
   // "I cannot tell" is an acceptable answer, in either of its two shapes.
   test('a missing key or an unknown target is fine when a gap says so', () => {
-    const gap = [{ subject: { kind: 'object' as const, object: { schema: 'sales', name: 'order' } }, aspect: 'foreign-keys' as const, detail: 'target not visible' }]
+    const gap = [
+      { subject: { kind: 'object' as const, object: { schema: 'sales', name: 'order' } }, aspect: 'foreign-keys' as const, detail: 'target not visible' },
+    ]
     expect(restrictedDisagreements(snapshot('sqlserver', withoutCustomerKey, gap))).toEqual([])
     const unknownTarget = (objects: ObjectMeta[]): void => {
       const foreignKey = object(objects, 'order').foreignKeys.find((entry) => entry.name === 'fk_order_customer')
@@ -615,8 +667,14 @@ describe('restrictedDisagreements', () => {
       'fk_delivery_order of sales.delivery refers to sales.order, and is missing with no gap that says the reader cannot see it',
       'fk_order_line_order of sales.order_line refers to sales.order, and is missing with no gap that says the reader cannot see it',
     ])
-    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION on the database' }]))).toEqual([])
-    expect(restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }]))).toHaveLength(2)
+    expect(
+      restrictedDisagreements(
+        snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'no VIEW DEFINITION on the database' }]),
+      ),
+    ).toEqual([])
+    expect(
+      restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }])),
+    ).toHaveLength(2)
     expect(restrictedDisagreements(snapshot('postgres', () => {}, [], true))).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
   })
 })

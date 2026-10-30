@@ -25,7 +25,8 @@ type Child = { kind: 'field'; path: string; span?: number | 'all' }
 type Grid = { kind: 'table'; columns: number; children: Child[] }
 const section = (form: FormSchema, at: number) => form.layouts?.[0]?.nodes[at] as { kind: 'section'; label: string; children: LayoutNode[] }
 const grid = (form: FormSchema, at: number) => section(form, at).children[0] as Grid
-const node = (form: FormSchema, path: string) => (grid(form, 0).children.find((entry) => entry.path === path) ?? grid(form, 1).children.find((entry) => entry.path === path)) as Child
+const node = (form: FormSchema, path: string) =>
+  (grid(form, 0).children.find((entry) => entry.path === path) ?? grid(form, 1).children.find((entry) => entry.path === path)) as Child
 const field = (form: FormSchema, key: string) => form.model.fields.find((entry) => entry.key === key) as unknown as Record<string, unknown>
 const index = (key: string) => String(base.model.fields.findIndex((entry) => entry.key === key))
 
@@ -80,7 +81,13 @@ describe('presentationOf', () => {
           { field: 'status', anchor: { kind: 'column', column: 'status' }, span: 'all' },
           { field: 'notes', anchor: { kind: 'column', column: 'notes' }, span: 'one' },
         ],
-        sections: [{ anchor: { label: 'Order', occurrence: 0 }, label: 'Order details', order: ['customer', 'order_date', 'status', 'notes', 'amount', 'created_by', 'paid'] }],
+        sections: [
+          {
+            anchor: { label: 'Order', occurrence: 0 },
+            label: 'Order details',
+            order: ['customer', 'order_date', 'status', 'notes', 'amount', 'created_by', 'paid'],
+          },
+        ],
       },
     })
     // Derive then apply is the edited form: the patch loses nothing.
@@ -133,7 +140,11 @@ describe('presentationOf', () => {
     const outcome = presentationOf(base, moved, bindings)
     expect(outcome).toEqual({
       ok: true,
-      presentation: { version: 1, fields: [{ field: 'paid', anchor: { kind: 'column', column: 'paid' }, section: { label: 'Record', occurrence: 0 } }], sections: [] },
+      presentation: {
+        version: 1,
+        fields: [{ field: 'paid', anchor: { kind: 'column', column: 'paid' }, section: { label: 'Record', occurrence: 0 } }],
+        sections: [],
+      },
     })
     const applied = outcome.ok ? applyPresentation(base, outcome.presentation, bindings) : outcome
     expect(applied.ok && canonicalize(applied.form)).toBe(canonicalize(moved))
@@ -158,12 +169,21 @@ describe('presentationOf', () => {
 
     const wide = copy(base)
     const children = grid(wide, 0).children
-    grid(wide, 1).children.push(children.splice(children.findIndex((entry) => entry.path === 'notes'), 1)[0] as Child)
+    grid(wide, 1).children.push(
+      children.splice(
+        children.findIndex((entry) => entry.path === 'notes'),
+        1,
+      )[0] as Child,
+    )
     expect(node(wide, 'notes').span).toBe('all')
     const outcome = presentationOf(base, wide, bindings)
     expect(outcome).toEqual({
       ok: true,
-      presentation: { version: 1, fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, section: { label: 'Record', occurrence: 0 } }], sections: [] },
+      presentation: {
+        version: 1,
+        fields: [{ field: 'notes', anchor: { kind: 'column', column: 'notes' }, section: { label: 'Record', occurrence: 0 } }],
+        sections: [],
+      },
     })
     const applied = outcome.ok ? applyPresentation(base, outcome.presentation, bindings) : outcome
     expect(applied.ok && canonicalize(applied.form)).toBe(canonicalize(wide))
@@ -227,13 +247,48 @@ describe('presentationOf', () => {
     // Each other way a document can differ from what layoutFor writes, by the path it is refused at.
     const bases: Array<[string, (form: FormSchema) => void]> = [
       ['/layouts', (form) => form.layouts?.push({ name: 'print', nodes: [] })],
-      ['/layouts/0', (form) => { (form.layouts?.[0] as { name: string }).name = 'web' }],
-      ['/layouts/0/nodes/1', (form) => { (section(form, 1) as { kind: string }).kind = 'row' }],
-      ['/layouts/0/nodes/0/children/0', (form) => { grid(form, 0).columns = 3 }],
-      ['/layouts/0/nodes/0/children/0/children/2', (form) => { node(form, 'status').span = 2 }],
-      ['/layouts/0/nodes/1/children/0/children/1', (form) => { grid(form, 1).children.push({ kind: 'field', path: 'paid' }) }],
-      ['/layouts/0/nodes/0/children/0/children/0', (form) => { (grid(form, 0).children[0] as unknown as Record<string, unknown>)['help'] = 'x' }],
-      ['/layouts/0/nodes', (form) => { grid(form, 0).children.pop() }],
+      [
+        '/layouts/0',
+        (form) => {
+          ;(form.layouts?.[0] as { name: string }).name = 'web'
+        },
+      ],
+      [
+        '/layouts/0/nodes/1',
+        (form) => {
+          ;(section(form, 1) as { kind: string }).kind = 'row'
+        },
+      ],
+      [
+        '/layouts/0/nodes/0/children/0',
+        (form) => {
+          grid(form, 0).columns = 3
+        },
+      ],
+      [
+        '/layouts/0/nodes/0/children/0/children/2',
+        (form) => {
+          node(form, 'status').span = 2
+        },
+      ],
+      [
+        '/layouts/0/nodes/1/children/0/children/1',
+        (form) => {
+          grid(form, 1).children.push({ kind: 'field', path: 'paid' })
+        },
+      ],
+      [
+        '/layouts/0/nodes/0/children/0/children/0',
+        (form) => {
+          ;(grid(form, 0).children[0] as unknown as Record<string, unknown>)['help'] = 'x'
+        },
+      ],
+      [
+        '/layouts/0/nodes',
+        (form) => {
+          grid(form, 0).children.pop()
+        },
+      ],
     ]
     for (const [path, change] of bases) {
       const other = copy(base)
@@ -250,25 +305,99 @@ describe('presentationOf', () => {
     const at = (key: string) => `/model/fields/${index(key)}`
     const grid0 = '/layouts/0/nodes/0/children/0'
     const cases: Array<[string[], (form: FormSchema) => void]> = [
-      [['/model: the edited form has no fields'], (form) => { (form as unknown as { model: unknown }).model = {} }],
-      [["/model/extra: changed, and only labels, order, a field's section and full width are presentation"], (form) => { (form.model as unknown as Record<string, unknown>)['extra'] = 1 }],
-      [['/model/fields: the fields are in another order, and the model order is not presentation'], (form) => { form.model.fields.reverse() }],
-      [[`${at('notes')}/label: a label may change, not be removed`], (form) => { delete field(form, 'notes')['label'] }],
-      [[`${at('notes')}/label: not text`], (form) => { field(form, 'notes')['label'] = 7 }],
-      [['/layouts: the form keeps the one layout it was generated with'], (form) => { delete form.layouts }],
-      [["/layouts/0: changed, and only labels, order, a field's section and full width are presentation", "/layouts/0/name: changed, and only labels, order, a field's section and full width are presentation"], (form) => {
-        (form.layouts as unknown as Array<Record<string, unknown>>)[0] = { name: 'web', nodes: form.layouts?.[0]?.nodes, label: 'x' }
-      }],
-      [['/layouts/0/nodes/0: a section may change its label, and is otherwise the generated one'], (form) => { (section(form, 0) as { kind: string }).kind = 'row' }],
-      [['/layouts/0/nodes/0/label: not text'], (form) => { (section(form, 0) as unknown as { label: unknown }).label = 7 }],
-      [['/layouts/0/nodes/0/children: a section holds the one grid it was generated with'], (form) => { section(form, 0).children.push(section(form, 0).children[0] as LayoutNode) }],
-      [[`${grid0}/columns: changed, and only labels, order, a field's section and full width are presentation`], (form) => { grid(form, 0).columns = 3 }],
-      [[`${grid0}/children/0: a grid holds the fields it was generated with, and nothing else`, `${grid0}/children: customer is missing`], (form) => {
-        (grid(form, 0).children as unknown[])[0] = { kind: 'static', path: 'customer' }
-      }],
-      [[`${grid0}/children/2/span: full width is 'all'`], (form) => { (node(form, 'status') as unknown as { span: string }).span = 'half' }],
-      [[`${grid0}/children/1/path: customer is placed twice`, `${grid0}/children: order_date is missing`], (form) => { node(form, 'order_date').path = 'customer' }],
-      [[`${grid0}/children/1/path: ghost is not a field of the base`, `${grid0}/children: order_date is missing`], (form) => { node(form, 'order_date').path = 'ghost' }],
+      [
+        ['/model: the edited form has no fields'],
+        (form) => {
+          ;(form as unknown as { model: unknown }).model = {}
+        },
+      ],
+      [
+        ["/model/extra: changed, and only labels, order, a field's section and full width are presentation"],
+        (form) => {
+          ;(form.model as unknown as Record<string, unknown>)['extra'] = 1
+        },
+      ],
+      [
+        ['/model/fields: the fields are in another order, and the model order is not presentation'],
+        (form) => {
+          form.model.fields.reverse()
+        },
+      ],
+      [
+        [`${at('notes')}/label: a label may change, not be removed`],
+        (form) => {
+          delete field(form, 'notes')['label']
+        },
+      ],
+      [
+        [`${at('notes')}/label: not text`],
+        (form) => {
+          field(form, 'notes')['label'] = 7
+        },
+      ],
+      [
+        ['/layouts: the form keeps the one layout it was generated with'],
+        (form) => {
+          delete form.layouts
+        },
+      ],
+      [
+        [
+          "/layouts/0: changed, and only labels, order, a field's section and full width are presentation",
+          "/layouts/0/name: changed, and only labels, order, a field's section and full width are presentation",
+        ],
+        (form) => {
+          ;(form.layouts as unknown as Array<Record<string, unknown>>)[0] = { name: 'web', nodes: form.layouts?.[0]?.nodes, label: 'x' }
+        },
+      ],
+      [
+        ['/layouts/0/nodes/0: a section may change its label, and is otherwise the generated one'],
+        (form) => {
+          ;(section(form, 0) as { kind: string }).kind = 'row'
+        },
+      ],
+      [
+        ['/layouts/0/nodes/0/label: not text'],
+        (form) => {
+          ;(section(form, 0) as unknown as { label: unknown }).label = 7
+        },
+      ],
+      [
+        ['/layouts/0/nodes/0/children: a section holds the one grid it was generated with'],
+        (form) => {
+          section(form, 0).children.push(section(form, 0).children[0] as LayoutNode)
+        },
+      ],
+      [
+        [`${grid0}/columns: changed, and only labels, order, a field's section and full width are presentation`],
+        (form) => {
+          grid(form, 0).columns = 3
+        },
+      ],
+      [
+        [`${grid0}/children/0: a grid holds the fields it was generated with, and nothing else`, `${grid0}/children: customer is missing`],
+        (form) => {
+          ;(grid(form, 0).children as unknown[])[0] = { kind: 'static', path: 'customer' }
+        },
+      ],
+      [
+        [`${grid0}/children/2/span: full width is 'all'`],
+        (form) => {
+          ;(node(form, 'status') as unknown as { span: string }).span = 'half'
+        },
+      ],
+      [
+        [`${grid0}/children/1/path: customer is placed twice`, `${grid0}/children: order_date is missing`],
+        (form) => {
+          node(form, 'order_date').path = 'customer'
+        },
+      ],
+      [
+        [`${grid0}/children/1/path: ghost is not a field of the base`, `${grid0}/children: order_date is missing`],
+        (form) => {
+          node(form, 'order_date').path = 'ghost'
+        },
+      ],
     ]
     for (const [expected, change] of cases) {
       const edited = copy(base)
@@ -284,7 +413,10 @@ describe('presentationOf', () => {
     const edited = copy(base)
     field(edited, 'paid')['label'] = 'Settled'
     const unbound = { ...bindings, fields: bindings.fields.filter((entry) => entry.field !== 'paid') }
-    expect(presentationOf(base, edited, unbound)).toEqual({ ok: false, problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`] })
+    expect(presentationOf(base, edited, unbound)).toEqual({
+      ok: false,
+      problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`],
+    })
   })
 
   // A move is presentation on the field's own entry (0075) and needs the
@@ -296,6 +428,9 @@ describe('presentationOf', () => {
     const moved = copy(base)
     grid(moved, 1).children.push(grid(moved, 0).children.pop() as Child)
     const unbound = { ...bindings, fields: bindings.fields.filter((entry) => entry.field !== 'paid') }
-    expect(presentationOf(base, moved, unbound)).toEqual({ ok: false, problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`] })
+    expect(presentationOf(base, moved, unbound)).toEqual({
+      ok: false,
+      problems: [`/model/fields/${index('paid')}: paid has no binding, so nothing anchors its presentation`],
+    })
   })
 })

@@ -88,7 +88,13 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     notice = await asking()
     await discard(user, notice)
     await shows('Angular', 'Customer', 'Muster AG')
-    await waitFor(() => expect(within(screen.getByRole('region', { name: `Order ${EDGES.seededOrder}` })).getAllByRole('status')[0]?.textContent).toBe(`Discarded the unsaved changes. Loaded record ${EDGES.seededOrder} into both forms.`), ARRIVES)
+    await waitFor(
+      () =>
+        expect(within(screen.getByRole('region', { name: `Order ${EDGES.seededOrder}` })).getAllByRole('status')[0]?.textContent).toBe(
+          `Discarded the unsaved changes. Loaded record ${EDGES.seededOrder} into both forms.`,
+        ),
+      ARRIVES,
+    )
   })
 
   // Another form from the menu: watched failing without the guard, when the
@@ -168,7 +174,10 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     let again = await asking()
     expect(within(again).getAllByRole('paragraph')[0]?.textContent).toBe('Starting a new Order line closes these forms:')
     await discard(user, again)
-    await waitFor(() => expect((within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe(''), ARRIVES)
+    await waitFor(
+      () => expect((within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe(''),
+      ARRIVES,
+    )
 
     // And Discard on another row opens it: the line's own form, its record named.
     await user.type(within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText(/^Quantity\b/), '5')
@@ -190,7 +199,11 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     await answer(user, 'React', 'Amount', '8')
     await discard(user, notice)
     const again = await asking()
-    expect(within(again).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['New record, React: changes that are not saved.', 'New record, Angular: changes that are not saved.'])
+    expect(
+      within(again)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual(['New record, React: changes that are not saved.', 'New record, Angular: changes that are not saved.'])
     await shows('React', 'Amount', '8')
     await discard(user, again)
     await shows('React', 'Amount', '')

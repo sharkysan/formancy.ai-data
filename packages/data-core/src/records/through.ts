@@ -34,9 +34,11 @@ function keyColumns(value: unknown): string[] | undefined {
 
 function read(entry: unknown): ThroughTerms {
   const refuse = (why: string) => new Error(`A through ${why}; refusing rather than scoping less than the policy said.`)
-  if (!isRecord(entry) || !hasExactly(entry, ['columns', 'target', 'targetColumns', 'filters'])) throw refuse('is columns, a target, its key columns and filters, and nothing else')
+  if (!isRecord(entry) || !hasExactly(entry, ['columns', 'target', 'targetColumns', 'filters']))
+    throw refuse('is columns, a target, its key columns and filters, and nothing else')
   const target = entry['target']
-  if (!isRecord(target) || !hasExactly(target, ['schema', 'name']) || !isName(target['schema']) || !isName(target['name'])) throw refuse('names its target table by schema and name')
+  if (!isRecord(target) || !hasExactly(target, ['schema', 'name']) || !isName(target['schema']) || !isName(target['name']))
+    throw refuse('names its target table by schema and name')
   const columns = keyColumns(entry['columns'])
   const references = keyColumns(entry['targetColumns'])
   if (columns === undefined || references === undefined || columns.length !== references.length) {
@@ -44,7 +46,11 @@ function read(entry: unknown): ThroughTerms {
   }
   const terms = rowFilterTerms(entry['filters'] as Through['filters'])
   if (terms.length === 0) throw refuse("scopes nothing without its target's filter")
-  return { target: { schema: target['schema'], name: target['name'] }, pairs: columns.map((column, index) => ({ column, references: references[index] as string })), terms }
+  return {
+    target: { schema: target['schema'], name: target['name'] },
+    pairs: columns.map((column, index) => ({ column, references: references[index] as string })),
+    terms,
+  }
 }
 
 /**

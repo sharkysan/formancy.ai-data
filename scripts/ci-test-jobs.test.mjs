@@ -62,7 +62,9 @@ describe('the image legs', () => {
   test('run data-fixtures and each engine’s adapter on every image of the matrix but the default, and nothing else', () => {
     const { DEFAULT_IMAGES, MATRIX_IMAGES } = fixtures
     const needed = Object.entries(MATRIX_IMAGES).flatMap(([engine, images]) =>
-      images.filter((image) => image !== DEFAULT_IMAGES[engine]).flatMap((image) => ['@formancy/data-fixtures', `@formancy/data-${engine}`].map((name) => `${name} on ${image}`)),
+      images
+        .filter((image) => image !== DEFAULT_IMAGES[engine])
+        .flatMap((image) => ['@formancy/data-fixtures', `@formancy/data-${engine}`].map((name) => `${name} on ${image}`)),
     )
     const legs = imageMatrix(readWorkflow(root)).map((leg) => `${leg.package} on ${leg.image}`)
     expect([...legs].sort()).toEqual([...needed].sort())
@@ -97,7 +99,10 @@ describe('the image legs', () => {
       for (const file of sourceFiles(join(root, entry.path))) {
         const text = readFileSync(file, 'utf8')
         for (const match of text.matchAll(/\bstart(?:Postgres|SqlServer)(?:Fixture|Container)\((\s*\))?/g)) {
-          starts.push({ at: `${relative(root, file).replaceAll('\\', '/')}:${String(text.slice(0, match.index).split('\n').length)}`, bare: match[1] !== undefined })
+          starts.push({
+            at: `${relative(root, file).replaceAll('\\', '/')}:${String(text.slice(0, match.index).split('\n').length)}`,
+            bare: match[1] !== undefined,
+          })
         }
       }
     }

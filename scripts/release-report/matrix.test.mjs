@@ -95,7 +95,10 @@ describe('a run with an image leg', () => {
   test('counts a file that started two images for both', () => {
     const report = withLeg((inputs) => {
       inputs.results = inputs.results.filter((result) => result.key !== LEG)
-      for (const file of ['parity', 'records']) job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: `packages/data-postgres/src/${file}.integration.test.ts` }))
+      for (const file of ['parity', 'records'])
+        job(inputs, 'test-data-postgres').servers.push(
+          server({ image: SIXTEEN, version: '16.15', caller: `packages/data-postgres/src/${file}.integration.test.ts` }),
+        )
     })
     expect(report.sharedCases.rows.map((row) => [row.cells['postgres:17-alpine'].state, row.cells[SIXTEEN].state])).toEqual([
       ['passed', 'passed'],
@@ -112,11 +115,17 @@ describe('a run with an image leg', () => {
   test('fails when an image of the matrix was started only by a file in another leg', () => {
     const report = withLeg((inputs) => {
       inputs.results = inputs.results.filter((result) => result.key !== LEG)
-      job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }))
+      job(inputs, 'test-data-postgres').servers.push(
+        server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }),
+      )
     })
     expect(report.problems).toContain(`PostgreSQL's matrix image ${SIXTEEN} never answered a test in a leg of its own in this run`)
     // And the same file beside a leg that ran: the leg answers, and nothing fails.
-    const green = withLeg((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' })))
+    const green = withLeg((inputs) =>
+      job(inputs, 'test-data-postgres').servers.push(
+        server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }),
+      ),
+    )
     expect(green.problems).toEqual([])
   })
 })
@@ -159,7 +168,9 @@ describe('the report’s words for the matrix', () => {
   // is named, beside the problem that fails the run.
   test('say an image of the matrix nothing ran on', () => {
     const markdown = renderContent(withLeg((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== LEG))))
-    expect(markdown).toContain('Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run; no test ran on `postgres:16-alpine`, an image of the matrix. No other version')
+    expect(markdown).toContain(
+      'Every PostgreSQL test ran on `postgres:17-alpine`, which answered 17.11 in this run; no test ran on `postgres:16-alpine`, an image of the matrix. No other version',
+    )
   })
 
   // A file that names an image of the matrix in another leg ran its own
@@ -167,7 +178,10 @@ describe('the report’s words for the matrix', () => {
   // ran that never did, and "no test ran on it" would leave out the file
   // that did. Its suites are said from its own legs.
   test('say an image of the matrix that no leg of its own ran on, and the files that did', () => {
-    const pg16 = (inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }))
+    const pg16 = (inputs) =>
+      job(inputs, 'test-data-postgres').servers.push(
+        server({ image: SIXTEEN, version: '16.15', caller: 'packages/data-postgres/src/discovery-pg16.integration.test.ts' }),
+      )
     const markdown = renderContent(
       withLeg((inputs) => {
         inputs.results = inputs.results.filter((result) => result.key !== LEG)

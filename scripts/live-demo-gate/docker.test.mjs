@@ -54,7 +54,13 @@ describe("the image's lookup deadline", () => {
 })
 
 describe('the docker run of a visitor’s container', () => {
-  const arguments_ = runArguments({ image: 'formancy/data-demo:gate', name: 'formancy-data-demo-gate-1', port: 4390, quota: quotaOf('basic'), variables: ['FORMANCY_DATA_DEMO_IDENTITY_SECRET'] })
+  const arguments_ = runArguments({
+    image: 'formancy/data-demo:gate',
+    name: 'formancy-data-demo-gate-1',
+    port: 4390,
+    quota: quotaOf('basic'),
+    variables: ['FORMANCY_DATA_DEMO_IDENTITY_SECRET'],
+  })
 
   // The key is the instance's whole credential: on a command line it is in
   // every process listing and in `docker inspect`'s Args. Named alone, the
@@ -63,7 +69,9 @@ describe('the docker run of a visitor’s container', () => {
     const at = arguments_.indexOf('--env')
     expect(arguments_[at + 1]).toBe('FORMANCY_DATA_DEMO_IDENTITY_SECRET')
     expect(arguments_.filter((argument) => argument.includes('='))).toEqual([])
-    expect(() => runArguments({ image: 'i', name: 'n', port: 1, quota: quotaOf('basic'), variables: ['FORMANCY_DATA_DEMO_IDENTITY_SECRET=k'] })).toThrow(/a variable's name, never its value/)
+    expect(() => runArguments({ image: 'i', name: 'n', port: 1, quota: quotaOf('basic'), variables: ['FORMANCY_DATA_DEMO_IDENTITY_SECRET=k'] })).toThrow(
+      /a variable's name, never its value/,
+    )
   })
 
   // Cloudflare's VM starts the container with an empty /run, where
@@ -79,7 +87,13 @@ describe('the docker run of a visitor’s container', () => {
   // loopback would put a visitor's server on this machine's network.
   test('runs linux/amd64 under the quota, its port on loopback only, the image last', () => {
     expect(arguments_.slice(0, 3)).toEqual(['run', '--name', 'formancy-data-demo-gate-1'])
-    for (const [flag, value] of [['--platform', 'linux/amd64'], ['--cpus', '0.25'], ['--memory', '1024m'], ['--memory-swap', '1024m'], ['--publish', '127.0.0.1::4390']]) {
+    for (const [flag, value] of [
+      ['--platform', 'linux/amd64'],
+      ['--cpus', '0.25'],
+      ['--memory', '1024m'],
+      ['--memory-swap', '1024m'],
+      ['--publish', '127.0.0.1::4390'],
+    ]) {
       expect(arguments_[arguments_.indexOf(flag) + 1], flag).toBe(value)
     }
     expect(arguments_.at(-1)).toBe('formancy/data-demo:gate')
@@ -112,7 +126,9 @@ describe('the leak check', () => {
   test('names each secret a text holds, and says nothing of one it does not', () => {
     const key = 'k'.repeat(43)
     const password = 'p'.repeat(43)
-    expect(leaks([{ where: 'the container’s log', text: `listening; key ${key}` }], { 'the identity key': key, 'the database password': password })).toEqual(['the identity key is in the container’s log'])
+    expect(leaks([{ where: 'the container’s log', text: `listening; key ${key}` }], { 'the identity key': key, 'the database password': password })).toEqual([
+      'the identity key is in the container’s log',
+    ])
     expect(leaks([{ where: 'the container’s log', text: 'listening' }], { 'the identity key': key })).toEqual([])
   })
 

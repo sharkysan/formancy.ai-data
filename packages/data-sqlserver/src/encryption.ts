@@ -85,7 +85,7 @@ export function readPreloginAnswer(bytes: Uint8Array): PreloginRead {
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const payload: Buffer[] = []
   let size = 0
-  for (let at = 0; ; ) {
+  for (let at = 0; ;) {
     if (at >= buffer.length) return INCOMPLETE
     if (buffer[at] !== RESPONSE) return unreadable
     if (buffer.length - at < HEADER) return INCOMPLETE

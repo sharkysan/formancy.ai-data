@@ -167,7 +167,8 @@ export function paper(renderer: RendererName): HTMLElement {
 /** Wait until both renderers have drawn the form: the customer chooser, by role and name, in each paper. */
 export async function rendered(): Promise<void> {
   await waitFor(() => {
-    for (const renderer of RENDERERS) expect(within(paper(renderer)).queryByRole('combobox', { name: 'Customer' }), `${renderer} never drew the form`).not.toBeNull()
+    for (const renderer of RENDERERS)
+      expect(within(paper(renderer)).queryByRole('combobox', { name: 'Customer' }), `${renderer} never drew the form`).not.toBeNull()
   }, ARRIVES_WITHIN)
 }
 
@@ -256,7 +257,13 @@ export async function load(user: User, record: string): Promise<void> {
  * about when it does.
  */
 export async function loaded(record: string, title = 'Order'): Promise<void> {
-  await waitFor(() => expect(within(screen.getByRole('region', { name: `${title} ${record}` })).getAllByRole('status')[0]?.textContent).toMatch(new RegExp(`^Loaded record ${escaped(record)} into `)), ARRIVES_WITHIN)
+  await waitFor(
+    () =>
+      expect(within(screen.getByRole('region', { name: `${title} ${record}` })).getAllByRole('status')[0]?.textContent).toMatch(
+        new RegExp(`^Loaded record ${escaped(record)} into `),
+      ),
+    ARRIVES_WITHIN,
+  )
 }
 
 /**

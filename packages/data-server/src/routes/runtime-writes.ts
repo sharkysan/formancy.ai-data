@@ -1,4 +1,13 @@
-import { authorizeOperation, checkSubmittedFields, intendedRecord, planCreate, planRead, planUpdate, rejectedSelection, toFormAnswers } from '@formancy/data-core'
+import {
+  authorizeOperation,
+  checkSubmittedFields,
+  intendedRecord,
+  planCreate,
+  planRead,
+  planUpdate,
+  rejectedSelection,
+  toFormAnswers,
+} from '@formancy/data-core'
 import type { DescribedTable, FieldError, FormRecord, MembershipCheck, PlanRefusal, PolicyContext, RecordFailure } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FastifyBaseLogger, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -17,9 +26,20 @@ export interface WriteRouteSteps {
   connection(bundle: PublishedBundle, reply: FastifyReply): Promise<OpenConnection | undefined>
   context(request: FastifyRequest): PolicyContext
   /** Runs `perform` once per sending of a write id, and answers a later sending with its answer (0031). */
-  sendOnce(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update', id: string | undefined, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated?: boolean }>
+  sendOnce(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: 'create' | 'update',
+    id: string | undefined,
+    perform: () => Promise<WriteAnswer>,
+  ): Promise<WriteAnswer & { repeated?: boolean }>
   /** A write sent whose answer was lost: said in the log, answered 502 with what was addressed, never sent again. */
-  lost(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update', record: string | null, version: string | null, failure: string): WriteAnswer
+  lost(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: 'create' | 'update',
+    record: string | null,
+    version: string | null,
+    failure: string,
+  ): WriteAnswer
   /** A planner's refusal as the answer, its drift said in the log first. */
   refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: 'create' | 'update', plan: PlanRefusal): WriteAnswer
   /** The root as the catalog describes it now, or the answer when it cannot be described. */
@@ -67,9 +87,11 @@ function withoutEchoes(
     if (!Object.hasOwn(kept, binding.field)) continue
     if (checkSubmittedFields(bundle.policy, actor, bundle.bindings, operation, [binding.field]).ok) continue
     const value = kept[binding.field]
-    const echo = behind || (current === undefined
-      ? value === null || value === undefined || value === ''
-      : Object.hasOwn(current, binding.field) && canonicalize(value ?? null) === canonicalize(current[binding.field] ?? null))
+    const echo =
+      behind ||
+      (current === undefined
+        ? value === null || value === undefined || value === ''
+        : Object.hasOwn(current, binding.field) && canonicalize(value ?? null) === canonicalize(current[binding.field] ?? null))
     if (echo) delete kept[binding.field]
   }
   return kept
@@ -86,7 +108,12 @@ function withoutEchoes(
  * past its deadline keeps the answer every failed check has, nothing
  * saved, and the log says the deadline passed.
  */
-async function memberships(open: OpenConnection, checks: readonly MembershipCheck[], log: FastifyBaseLogger, lookupDeadlineMs: number): Promise<WriteAnswer | undefined> {
+async function memberships(
+  open: OpenConnection,
+  checks: readonly MembershipCheck[],
+  log: FastifyBaseLogger,
+  lookupDeadlineMs: number,
+): Promise<WriteAnswer | undefined> {
   const errors: FieldError[] = []
   for (const check of checks) {
     const deadline = lookupDeadline(lookupDeadlineMs)
@@ -95,14 +122,20 @@ async function memberships(open: OpenConnection, checks: readonly MembershipChec
       if (rejected.length > 0) errors.push(rejectedSelection(check.field))
     } catch (error) {
       // Fails closed, as formancy's own membership port does (formancy.ai 0077).
-      if (deadline.signal.aborted && error === deadline.signal.reason) log.warn({ field: check.field, deadlineMs: lookupDeadlineMs }, 'a lookup could not vouch for a selection: it passed its deadline, and the database was told to stop it')
+      if (deadline.signal.aborted && error === deadline.signal.reason)
+        log.warn(
+          { field: check.field, deadlineMs: lookupDeadlineMs },
+          'a lookup could not vouch for a selection: it passed its deadline, and the database was told to stop it',
+        )
       else log.warn({ field: check.field, error: (error as Error).message }, 'a lookup could not vouch for a selection')
       return { status: 503, body: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } }
     } finally {
       deadline.clear()
     }
   }
-  return errors.length === 0 ? undefined : { status: 422, body: { code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: errors } }
+  return errors.length === 0
+    ? undefined
+    : { status: 422, body: { code: 'invalid-values', message: 'A selection is not one of the options.', fieldErrors: errors } }
 }
 
 /**
@@ -117,7 +150,13 @@ async function memberships(open: OpenConnection, checks: readonly MembershipChec
  * membership check and no insert sent, and the insert carries the
  * definition it was decided over.
  */
-async function created(steps: WriteRouteSteps, request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, answers: Record<string, unknown>): Promise<WriteAnswer> {
+async function created(
+  steps: WriteRouteSteps,
+  request: FastifyRequest<{ Params: { id: string } }>,
+  bundle: PublishedBundle,
+  open: OpenConnection,
+  answers: Record<string, unknown>,
+): Promise<WriteAnswer> {
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'create')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
@@ -155,7 +194,15 @@ async function created(steps: WriteRouteSteps, request: FastifyRequest<{ Params:
  * anyway, a read that failed and a write that did not would store the cut
  * value.
  */
-async function updated(steps: WriteRouteSteps, request: FastifyRequest<{ Params: { id: string } }>, bundle: PublishedBundle, open: OpenConnection, record: string, version: string, answers: Record<string, unknown>): Promise<WriteAnswer> {
+async function updated(
+  steps: WriteRouteSteps,
+  request: FastifyRequest<{ Params: { id: string } }>,
+  bundle: PublishedBundle,
+  open: OpenConnection,
+  record: string,
+  version: string,
+  answers: Record<string, unknown>,
+): Promise<WriteAnswer> {
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'update')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
@@ -180,7 +227,17 @@ async function updated(steps: WriteRouteSteps, request: FastifyRequest<{ Params:
   // The record as read now is newer than the one the person saved over: the
   // database will answer stale, and an echo the change moved is not theirs.
   const behind = current !== undefined && current.version !== null && current.version !== version
-  const plan = planUpdate(bundle.snapshot, bundle.bindings, bundle.policy, actor, record, version, withoutEchoes(bundle, actor, 'update', answers, current?.answers, behind), current, described)
+  const plan = planUpdate(
+    bundle.snapshot,
+    bundle.bindings,
+    bundle.policy,
+    actor,
+    record,
+    version,
+    withoutEchoes(bundle, actor, 'update', answers, current?.answers, behind),
+    current,
+    described,
+  )
   if (!plan.ok) {
     if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
     if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)

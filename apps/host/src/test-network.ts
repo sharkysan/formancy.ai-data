@@ -118,7 +118,10 @@ export interface Losing {
  * exactly what it would see in a page. Once, unless `times` says more: what
  * the page does next is what is under test, and it must reach the server.
  */
-export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, writes = /\/records\/(create|update)$/ }: { when: 'after' | 'before'; times?: number; writes?: RegExp }): Losing {
+export function losingWrites(
+  fetch: typeof globalThis.fetch,
+  { when, times = 1, writes = /\/records\/(create|update)$/ }: { when: 'after' | 'before'; times?: number; writes?: RegExp },
+): Losing {
   const lost: string[] = []
   return {
     lost,

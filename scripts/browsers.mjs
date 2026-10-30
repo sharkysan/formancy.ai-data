@@ -87,7 +87,9 @@ export function launchedBuild({ name, options = {}, pwdebug = null }) {
  * shell, not the full Chromium the `chromium` entry names. Derived, so the
  * pin the report holds a browser to is the build its gates launch.
  */
-export const PINNED_AS = Object.freeze(Object.fromEntries(BROWSERS.map((browser) => [browser, launchedBuild({ name: browser, options: LAUNCH_OPTIONS }).build])))
+export const PINNED_AS = Object.freeze(
+  Object.fromEntries(BROWSERS.map((browser) => [browser, launchedBuild({ name: browser, options: LAUNCH_OPTIONS }).build])),
+)
 
 /** The platforms each browser's gates run on; one not named runs on any. */
 const ONLY_ON = Object.freeze({ webkit: 'linux' })
@@ -103,14 +105,18 @@ export function gateBrowsers({ env = process.env, browsers = BROWSERS, platform 
   const value = env[VARIABLE]
   if (value === undefined) {
     const chosen = UNSET.filter((browser) => browsers.includes(browser))
-    if (chosen.length === 0) throw new Error(`${VARIABLE} is unset, which runs ${prose(UNSET.map(browserName))} alone, and ${prose(UNSET.map(browserName))} is no browser the gates run in: name one of ${browsers.join(', ')}`)
+    if (chosen.length === 0)
+      throw new Error(
+        `${VARIABLE} is unset, which runs ${prose(UNSET.map(browserName))} alone, and ${prose(UNSET.map(browserName))} is no browser the gates run in: name one of ${browsers.join(', ')}`,
+      )
     return onThisPlatform(chosen, browsers, platform)
   }
   const named = value
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '')
-  if (named.length === 0) throw new Error(`${VARIABLE} is set and names no browser: unset it for Chromium alone, or name the browsers (${browsers.join(', ')}), or all`)
+  if (named.length === 0)
+    throw new Error(`${VARIABLE} is set and names no browser: unset it for Chromium alone, or name the browsers (${browsers.join(', ')}), or all`)
   if (named.includes('all')) {
     if (named.length > 1) throw new Error(`${VARIABLE} names all beside a browser: all stands alone`)
     if (browsers.length === 0) throw new Error(`${VARIABLE}=all names no browser: the gates run in none`)
@@ -139,7 +145,8 @@ export function ranIn(chosen, { env = process.env, browsers = BROWSERS, platform
   if (env[VARIABLE] !== undefined) return `In ${names}, as ${VARIABLE}=${env[VARIABLE]} asks.`
   const here = browsers.filter((browser) => ONLY_ON[browser] === undefined || ONLY_ON[browser] === platform)
   const elsewhere = browsers.filter((browser) => !here.includes(browser))
-  if (elsewhere.length === 0) return `In ${names}: ${VARIABLE} is unset, which on a machine runs Chromium alone; ${VARIABLE}=all runs ${prose(browsers.map(browserName))}, as CI does.`
+  if (elsewhere.length === 0)
+    return `In ${names}: ${VARIABLE} is unset, which on a machine runs Chromium alone; ${VARIABLE}=all runs ${prose(browsers.map(browserName))}, as CI does.`
   return `In ${names}: ${VARIABLE} is unset, which on a machine runs Chromium alone; ${VARIABLE}=${here.join(',')} runs ${prose(here.map(browserName))}, and ${prose(elsewhere.map(browserName))} runs on Linux only.`
 }
 
@@ -152,7 +159,8 @@ export function ranIn(chosen, { env = process.env, browsers = BROWSERS, platform
  * libraries, and `install-deps firefox webkit` installed 262 packages
  * through sudo.
  */
-export const installCommand = (browser) => `pnpm --filter @formancy/data-examples exec playwright install ${browser === 'chromium' ? '' : '--with-deps '}${browser}`
+export const installCommand = (browser) =>
+  `pnpm --filter @formancy/data-examples exec playwright install ${browser === 'chromium' ? '' : '--with-deps '}${browser}`
 
 /**
  * The system packages, by Debian name, that a browser's gates take from the
@@ -203,7 +211,10 @@ const FOCUS_PROBE = Object.freeze({
 export const FACTS = Object.freeze({
   clickThenTab: Object.freeze({
     says: 'after a click on the page’s corner, the first Tab reaches the page’s first tab stop, an off-screen skip link',
-    heldBy: Object.freeze({ gate: 'apps/studio', checks: Object.freeze(['a click on the workbench’s corner, then Tab: as 0058’s table says of this browser']) }),
+    heldBy: Object.freeze({
+      gate: 'apps/studio',
+      checks: Object.freeze(['a click on the workbench’s corner, then Tab: as 0058’s table says of this browser']),
+    }),
     values: Object.freeze({ chromium: true, firefox: false, webkit: true }),
     source: Object.freeze({
       chromium: `${NOT_READ}; Chromium starts sequential navigation from the node clicked`,
@@ -229,7 +240,10 @@ export const FACTS = Object.freeze({
     says: 'a browser sends a POST again on its own when, over HTTP/1.1, the connection closes after the server read it and before any byte of an answer',
     heldBy: Object.freeze({
       gate: 'apps/host',
-      checks: Object.freeze(['the browser sent the lost create as often as 0058’s table says for that connection', 'the run measured 0058’s row for the connection this browser takes when it can choose']),
+      checks: Object.freeze([
+        'the browser sent the lost create as often as 0058’s table says for that connection',
+        'the run measured 0058’s row for the connection this browser takes when it can choose',
+      ]),
     }),
     connections: Object.freeze(['reused', 'fresh']),
     values: Object.freeze({
@@ -245,9 +259,18 @@ export const FACTS = Object.freeze({
         'libsoup 3.4.4 and 3.6.6, libsoup/http1/soup-client-message-io-http1.c:693-711: a request is restarted only when its connection was used before and its method is idempotent (soup-misc.h:59-65: GET, HEAD, OPTIONS, PROPFIND, TRACE, PUT, DELETE); a POST is neither, and is sent on a new connection (postConnection)',
     }),
     measured: Object.freeze({
-      chromium: Object.freeze({ reused: SANDBOX, fresh: Object.freeze({ on: '2026-10-09', by: '0031’s P7, a page’s fetch through a server answering Connection: close, in Playwright’s Chromium' }) }),
-      firefox: Object.freeze({ reused: SANDBOX, fresh: unmeasured('by source; no run has reached it: the host page’s create travels on a connection its earlier requests used') }),
-      webkit: Object.freeze({ reused: unmeasured('by source; no run can reach it: WebKit sends no POST on a reused connection (postConnection)'), fresh: SANDBOX }),
+      chromium: Object.freeze({
+        reused: SANDBOX,
+        fresh: Object.freeze({ on: '2026-10-09', by: '0031’s P7, a page’s fetch through a server answering Connection: close, in Playwright’s Chromium' }),
+      }),
+      firefox: Object.freeze({
+        reused: SANDBOX,
+        fresh: unmeasured('by source; no run has reached it: the host page’s create travels on a connection its earlier requests used'),
+      }),
+      webkit: Object.freeze({
+        reused: unmeasured('by source; no run can reach it: WebKit sends no POST on a reused connection (postConnection)'),
+        fresh: SANDBOX,
+      }),
     }),
     restsOn: Object.freeze({ webkit: Object.freeze(['libsoup-3.0-0']) }),
   }),
@@ -260,7 +283,8 @@ export const FACTS = Object.freeze({
     values: Object.freeze({ chromium: false, firefox: false, webkit: true }),
     source: Object.freeze({
       chromium: 'ag-stack 36.2.0, dist/package/main.esm.mjs:2652-2675, tests navigator.userAgent; Chromium’s names Chrome',
-      firefox: 'ag-stack 36.2.0, dist/package/main.esm.mjs:2652-2675; Firefox’s names Firefox, which turns on ag-grid-community 36.2.0’s Firefox branches (dist/package/main.esm.mjs:41450, 51417, 52925)',
+      firefox:
+        'ag-stack 36.2.0, dist/package/main.esm.mjs:2652-2675; Firefox’s names Firefox, which turns on ag-grid-community 36.2.0’s Firefox branches (dist/package/main.esm.mjs:41450, 51417, 52925)',
       webkit:
         'ag-stack 36.2.0, dist/package/main.esm.mjs:2652-2675; Playwright’s Linux WebKit names itself Safari on a Mac, which turns on ag-grid-community 36.2.0’s Safari branches (dist/package/main.esm.mjs:29439 and 31565, forced browser focus, and 41380, 41565, 42263, 43272, 53390); its platform is claimsMacOs’s',
     }),
@@ -292,7 +316,10 @@ export const FACTS = Object.freeze({
   }),
   reportsFocusScroll: Object.freeze({
     says: 'after `focus()` scrolls the window or an element’s scroller to show an element, the page says the new scroll -- `scrollY`, `scrollLeft`, every box -- in the task that focused; where it says it only at its next rendering update, a script that reads the scroll before then reads the one from before, as AG Grid’s keeping its scrollbar in step with its grid did',
-    heldBy: Object.freeze({ gate: 'apps/host', checks: Object.freeze(['a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser']) }),
+    heldBy: Object.freeze({
+      gate: 'apps/host',
+      checks: Object.freeze(['a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser']),
+    }),
     values: Object.freeze({ chromium: true, firefox: true, webkit: false }),
     source: Object.freeze({ chromium: NOT_READ, firefox: NOT_READ, webkit: NOT_READ }),
     measured: Object.freeze({ chromium: FOCUS_PROBE, firefox: FOCUS_PROBE, webkit: FOCUS_PROBE }),

@@ -227,7 +227,14 @@ export const COLUMN_FILTER_PARITY = {
   ],
   parent: [
     { order: SECOND, filter: [{ field: 'line_no', op: 'equals', value: '2' }], lines: [[SECOND, '2']] },
-    { order: null, filter: [{ field: 'line_no', op: 'equals', value: '1' }], lines: [[OURS, '1'], [SECOND, '1']] },
+    {
+      order: null,
+      filter: [{ field: 'line_no', op: 'equals', value: '1' }],
+      lines: [
+        [OURS, '1'],
+        [SECOND, '1'],
+      ],
+    },
     { order: THEIRS, filter: [{ field: 'line_no', op: 'equals', value: '1' }], lines: [] },
   ],
   follow: {

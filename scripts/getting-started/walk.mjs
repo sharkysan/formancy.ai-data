@@ -88,7 +88,10 @@ export function studioWalk(journey, form) {
       control: `Offer ${lookup.foreignKey} as a lookup`,
       action: { kind: 'tick', keep: { group: `Columns to show for ${lookup.foreignKey}`, ticked: lookup.display } },
     })),
-    ...form.pinned.map((column) => ({ control: `Pin ${column}`, action: { kind: 'tick', holds: { name: `Attribute ${column} is pinned to`, value: attribute(column) } } })),
+    ...form.pinned.map((column) => ({
+      control: `Pin ${column}`,
+      action: { kind: 'tick', holds: { name: `Attribute ${column} is pinned to`, value: attribute(column) } },
+    })),
     {
       control: 'Version column',
       action: form.versionColumn === undefined ? { kind: 'none', reads: 'has a rowversion column' } : { kind: 'select', value: form.versionColumn },

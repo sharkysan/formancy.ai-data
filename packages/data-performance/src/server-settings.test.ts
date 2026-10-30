@@ -17,6 +17,11 @@ describe('the server a measurement runs', () => {
   // allowlist, the rate limit and the port are the run's own.
   test('is configured with what the run gives it', () => {
     const settings = serverSettings({ storeDir: '/store', connectionsFile: '/connections.json', rateLimit: 1_000_000, port: 4390 })
-    expect(settings).toMatchObject({ FORMANCY_DATA_STORE_DIR: '/store', FORMANCY_DATA_CONNECTIONS: '/connections.json', FORMANCY_DATA_RATE_LIMIT: '1000000', PORT: '4390' })
+    expect(settings).toMatchObject({
+      FORMANCY_DATA_STORE_DIR: '/store',
+      FORMANCY_DATA_CONNECTIONS: '/connections.json',
+      FORMANCY_DATA_RATE_LIMIT: '1000000',
+      PORT: '4390',
+    })
   })
 })

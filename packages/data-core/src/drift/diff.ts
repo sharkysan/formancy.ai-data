@@ -8,7 +8,21 @@ import type { DescribedTable } from '../records/types.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
-import { allFields, byCodepoint, type Comparison, describe, type Draft, type DriftPolicy, foreignKeyIn, identityKeyIn, objectIn, type Operation, refKey, stopped, WRITES } from './context.js'
+import {
+  allFields,
+  byCodepoint,
+  type Comparison,
+  describe,
+  type Draft,
+  type DriftPolicy,
+  foreignKeyIn,
+  identityKeyIn,
+  objectIn,
+  type Operation,
+  refKey,
+  stopped,
+  WRITES,
+} from './context.js'
 import { accountChanges, privilegeChanges } from './privileges.js'
 import { referrerChanges } from './referrers.js'
 import { checkChanges, lookupTargetChanges, rootRelationshipChanges } from './relationships.js'
@@ -89,7 +103,8 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   // The runtime takes the same shortcut, before anything is described: equal
   // fingerprints are one database, whatever the objects passed in say. Not
   // one server: an in-place upgrade keeps the fingerprint (0068).
-  if (current.fingerprint === base.fingerprint) return { ...finish(serverChanges(current), offered, policy), runtime: { readable: true, writable: { ...offered } } }
+  if (current.fingerprint === base.fingerprint)
+    return { ...finish(serverChanges(current), offered, policy), runtime: { readable: true, writable: { ...offered } } }
   if (current.kind !== base.kind) {
     throw new Error(`a ${base.kind} snapshot cannot be compared with a ${current.kind} one: a form's bindings belong to one engine`)
   }
@@ -97,7 +112,10 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   const after = findObject(current, bindings.root)
   // The account is said beside a missing root: under another principal it may be missing for that principal only.
   if (after === undefined) {
-    return { ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings), ...serverChanges(current)], offered, policy), runtime: NOTHING_LEFT }
+    return {
+      ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings), ...serverChanges(current)], offered, policy),
+      runtime: NOTHING_LEFT,
+    }
   }
 
   const comparison: Comparison = { base, current, bindings, policy, before, after, cited: new Set() }
@@ -171,13 +189,21 @@ function rootDefinition(
   const after: ObjectMeta = {
     ...before,
     kind: described.kind,
-    columns: described.columns.map((column) => ({ ...column, comment: known.get(column.name)?.comment ?? null, access: { ...(known.get(column.name)?.access ?? NOTHING_PERMITTED) } })),
+    columns: described.columns.map((column) => ({
+      ...column,
+      comment: known.get(column.name)?.comment ?? null,
+      access: { ...(known.get(column.name)?.access ?? NOTHING_PERMITTED) },
+    })),
     primaryKey: described.primaryKey,
     uniqueKeys: described.uniqueKeys,
     foreignKeys: described.foreignKeys,
   }
   const comparison: Comparison = { base, current: base, bindings, policy, before, after, cited: new Set() }
-  return finish(ROOT_DEFINITION.flatMap((family) => family(comparison)), offered, policy)
+  return finish(
+    ROOT_DEFINITION.flatMap((family) => family(comparison)),
+    offered,
+    policy,
+  )
 }
 
 function verdictOf(report: DriftVerdict): DriftVerdict {
@@ -213,7 +239,13 @@ function assertBindingsMatch(base: MetadataSnapshot, bindings: FormBindings): Ob
 /** The root is not in the current snapshot: blocked whatever the reason, and the reason named. */
 function rootMissing(current: MetadataSnapshot, bindings: FormBindings): Draft {
   const ref = bindings.root
-  const missing = { subject: { kind: 'object', object: ref } as const, affects: allFields(bindings), stops: [], breaksReads: true, otherwise: 'review' as const }
+  const missing = {
+    subject: { kind: 'object', object: ref } as const,
+    affects: allFields(bindings),
+    stops: [],
+    breaksReads: true,
+    otherwise: 'review' as const,
+  }
   const absent = absence(current, ref)
   if (absent.why === 'scope') {
     return {
@@ -287,6 +319,10 @@ function finish(drafts: readonly Draft[], offered: Offered, policy: Pick<FormPol
     changes,
     blocking: changes.some((change) => change.severity === 'blocking'),
     readable: !drafts.some((draft) => draft.breaksReads),
-    writable: { create: offered.create && !stops.has('create'), update: offered.update && !stops.has('update'), delete: offered.delete && !stops.has('delete') },
+    writable: {
+      create: offered.create && !stops.has('create'),
+      update: offered.update && !stops.has('update'),
+      delete: offered.delete && !stops.has('delete'),
+    },
   }
 }

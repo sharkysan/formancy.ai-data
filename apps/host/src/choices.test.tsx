@@ -44,7 +44,7 @@ async function workspace(formId: string): Promise<User> {
   return user
 }
 
-describe.each(ENGINES)('the viewer\'s choices on $engine', ({ formId }) => {
+describe.each(ENGINES)("the viewer's choices on $engine", ({ formId }) => {
   // One form drawn by default, React's; Both draws the two, Angular alone
   // draws Angular's -- each renderer mounted only while chosen -- and the
   // choice is there the next time the page is opened in this browser.
@@ -76,7 +76,12 @@ describe.each(ENGINES)('the viewer\'s choices on $engine', ({ formId }) => {
   test('splits the records and the record at 55, moves by its keys, and keeps where it was left', async () => {
     const user = await workspace(formId)
     const split = screen.getByRole('separator', { name: 'Records' })
-    expect({ now: split.getAttribute('aria-valuenow'), min: split.getAttribute('aria-valuemin'), max: split.getAttribute('aria-valuemax'), orientation: split.getAttribute('aria-orientation') }).toEqual({ now: '55', min: '25', max: '75', orientation: 'vertical' })
+    expect({
+      now: split.getAttribute('aria-valuenow'),
+      min: split.getAttribute('aria-valuemin'),
+      max: split.getAttribute('aria-valuemax'),
+      orientation: split.getAttribute('aria-orientation'),
+    }).toEqual({ now: '55', min: '25', max: '75', orientation: 'vertical' })
     split.focus()
     await user.keyboard('{ArrowRight}')
     expect(split.getAttribute('aria-valuenow')).toBe('60')

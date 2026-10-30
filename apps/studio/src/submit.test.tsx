@@ -72,9 +72,13 @@ describe('submitting under review', () => {
     plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
     await pressEnter(user, within(submit).getByRole('button', { name: 'Submit version 1 for review' }))
     const alert = await within(submit).findByRole('alert')
-    expect(paragraphs(alert)[0]).toBe('This draft cannot be submitted: the database differs from the one this version was generated from in a way it cannot serve.')
+    expect(paragraphs(alert)[0]).toBe(
+      'This draft cannot be submitted: the database differs from the one this version was generated from in a way it cannot serve.',
+    )
     const blocking = within(within(alert).getByRole('list', { name: 'What blocks it' })).getAllByRole('listitem')
-    expect(blocking.map((item) => item.textContent)).toEqual([expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/)])
+    expect(blocking.map((item) => item.textContent)).toEqual([
+      expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/),
+    ])
     const queued = await client(plane, TOKENS.publisher).drafts()
     expect(queued.ok && queued.value.drafts).toEqual([])
     expect(focusedName()).toBe('Submit version 1 for review')
@@ -86,12 +90,27 @@ describe('submitting under review', () => {
   test('lists what differs from the database now and blocks nothing', async () => {
     const user = await signIn(plane)
     const submit = await toSubmit(user)
-    const discount = { name: 'discount', ordinal: 99, databaseType: 'integer', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, nullable: true, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true } } as const
+    const discount = {
+      name: 'discount',
+      ordinal: 99,
+      databaseType: 'integer',
+      type: { kind: 'integer', min: '-2147483648', max: '2147483647' },
+      nullable: true,
+      hasDefault: false,
+      defaultExpression: null,
+      generated: 'none',
+      comment: null,
+      access: { select: true, insert: true, update: true },
+    } as const
     plane.databases.set('fixture', withColumn(OWNER_SNAPSHOT, 'order', discount))
     await user.click(within(submit).getByRole('button', { name: 'Submit version 1 for review' }))
     await within(submit).findByRole('status')
     const differs = within(submit).getByRole('list', { name: 'What differs from the database now, and blocks nothing' })
-    expect(within(differs).getAllByRole('listitem').map((item) => item.textContent)).toEqual([expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/)])
+    expect(
+      within(differs)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/)])
     expect(await audit()).toEqual([])
   })
 
@@ -107,7 +126,9 @@ describe('submitting under review', () => {
     await user.click(within(submit).getByRole('button', { name: 'Submit version 1 for review' }))
     const alert = await within(submit).findByRole('alert')
     expect(paragraphs(alert)[0]).toBe('Somebody published version 1 while you worked. Yours was not submitted, and theirs is untouched.')
-    expect(within(submit).getByText(/is published now/).textContent).toBe("Version 1 of sales-order is published now, and it is somebody else's. Submitting waits until you rebase on it.")
+    expect(within(submit).getByText(/is published now/).textContent).toBe(
+      "Version 1 of sales-order is published now, and it is somebody else's. Submitting waits until you rebase on it.",
+    )
     expect(within(submit).getByRole('button', { name: 'Submit for review' })).toHaveProperty('disabled', true)
     expect(focusedName()).toBe('Rebase on version 1')
     await pressEnter(user, within(alert).getByRole('button', { name: 'Rebase on version 1' }))

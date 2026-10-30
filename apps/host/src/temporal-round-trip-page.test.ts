@@ -133,13 +133,28 @@ beforeAll(async () => {
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: [SCHEMA], tls: { enabled: false } },
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: [SCHEMA], tls: { enabled: false, trustServerCertificate: true } },
     { id: 'pgw', kind: 'postgres', ...pg, user: WRITER, password: 'env:WRITER_PASSWORD', schemas: [SCHEMA], tls: { enabled: false } },
-    { id: 'msw', kind: 'sqlserver', ...ms, user: WRITER, password: 'env:WRITER_PASSWORD', schemas: [SCHEMA], tls: { enabled: false, trustServerCertificate: true } },
+    {
+      id: 'msw',
+      kind: 'sqlserver',
+      ...ms,
+      user: WRITER,
+      password: 'env:WRITER_PASSWORD',
+      schemas: [SCHEMA],
+      tls: { enabled: false, trustServerCertificate: true },
+    },
   ]
-  const registry = createConnectionRegistry(connections, DRIVER_FACTORIES, { env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password, WRITER_PASSWORD }, readFile: async () => '' })
+  const registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
+    env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password, WRITER_PASSWORD },
+    readFile: async () => '',
+  })
   registryClose = () => registry.close()
   root = await mkdtemp(join(tmpdir(), 'formancy-data-temporal-page-'))
   const store = createFileConfigurationStore(root)
-  app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   fetchThroughServer = fetchThrough(app, sent)
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
@@ -148,7 +163,13 @@ beforeAll(async () => {
     return reply.json<Record<string, unknown>>()
   }
   const forms = (['pg', 'ms'] as const).flatMap((engine) => [
-    ...(Object.keys(WITHHELD) as Account[]).map((account) => ({ engine, id: formId(engine, account), table: 'stamped', connection: account === 'writer' ? `${engine}w` : engine, withhold: WITHHELD[account] })),
+    ...(Object.keys(WITHHELD) as Account[]).map((account) => ({
+      engine,
+      id: formId(engine, account),
+      table: 'stamped',
+      connection: account === 'writer' ? `${engine}w` : engine,
+      withhold: WITHHELD[account],
+    })),
     { engine, id: localFormId(engine), table: 'local_stamped', connection: engine, withhold: [] as readonly string[] },
   ])
   for (const { engine, id, table, connection, withhold } of forms) {
@@ -164,7 +185,17 @@ beforeAll(async () => {
     })) as { form: unknown; bindings: { fields: FieldBinding[]; operations: { create?: unknown; update?: unknown } }; snapshot: unknown; generation: unknown }
     await admin(`/v1/forms/${id}/versions`, {
       expectedBase: null,
-      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: clerkPolicy(bindings.fields, bindings.operations, withhold), snapshot },
+      bundle: {
+        format: 2,
+        connection,
+        generation,
+        base: form,
+        presentation: EMPTY_PRESENTATION,
+        form,
+        bindings,
+        policy: clerkPolicy(bindings.fields, bindings.operations, withhold),
+        snapshot,
+      },
     })
   }
 })
@@ -233,13 +264,21 @@ function refusal(renderer: RendererName): HTMLElement | null {
 async function pressSave(user: User, renderer: RendererName) {
   const mark = sent.length
   // A refused submit's only trace is aria-invalid, read off the DOM because the accessibility tree has no query for it.
-  const invalid = () => Array.from(paper(renderer).querySelectorAll('input')).filter((element) => element.getAttribute('aria-invalid') === 'true').map((element) => element.labels?.[0]?.textContent ?? element.name)
+  const invalid = () =>
+    Array.from(paper(renderer).querySelectorAll('input'))
+      .filter((element) => element.getAttribute('aria-invalid') === 'true')
+      .map((element) => element.labels?.[0]?.textContent ?? element.name)
   await user.click(within(paper(renderer)).getByRole('button', { name: 'Save' }))
   await waitFor(() => {
     const line = statuses(renderer).filter((text) => text !== '' && text !== 'Saving…')
     expect(line.length > 0 || invalid().length > 0 || refusal(renderer) !== null, 'the page settled').toBe(true)
   }, ARRIVES)
-  return { statuses: statuses(renderer).filter((text) => text !== ''), invalid: invalid(), notice: refusal(renderer)?.textContent ?? null, updates: updatesIn(sent, mark) }
+  return {
+    statuses: statuses(renderer).filter((text) => text !== ''),
+    invalid: invalid(),
+    notice: refusal(renderer)?.textContent ?? null,
+    updates: updatesIn(sent, mark),
+  }
 }
 
 const temporal = (held: Held) => ({ created_at: held.created_at, at_time: held.at_time })
@@ -303,7 +342,10 @@ describe.each(['pg', 'ms'] as const)('%s, only the temporal columns writable, th
       const user = await openRecord(formId(engine, 'temporal'), record)
       const result = await pressSave(user, renderer)
       const after = await heldStamped(owners, SCHEMA, engine, record)
-      expect({ invalid: result.invalid, notice: result.notice }, JSON.stringify(result)).toEqual({ invalid: [], notice: expect.stringContaining('These answers change no column.') as unknown })
+      expect({ invalid: result.invalid, notice: result.notice }, JSON.stringify(result)).toEqual({
+        invalid: [],
+        notice: expect.stringContaining('These answers change no column.') as unknown,
+      })
       expect(result.statuses).not.toContain('Saved.')
       expect(after).toEqual(before)
     })
@@ -348,7 +390,9 @@ async function heldLocal(engine: Engine, record: string): Promise<{ note: string
   const result = await owners.ms
     .request()
     .input('id', mssql.Int, id)
-    .query<{ note: string; t: string; b: Buffer }>(`select note, cast(local_at as nvarchar(40)) as t, cast(local_at as varbinary(16)) as b from ${SCHEMA}.local_stamped where id = @id`)
+    .query<{ note: string; t: string; b: Buffer }>(
+      `select note, cast(local_at as nvarchar(40)) as t, cast(local_at as varbinary(16)) as b from ${SCHEMA}.local_stamped where id = @id`,
+    )
   const row = result.recordset[0]
   if (row === undefined) throw new Error(`no row ${String(id)}`)
   return { note: row.note, text: row.t, bytes: Buffer.from(row.b).toString('hex') }
@@ -365,7 +409,11 @@ describe.each(['pg', 'ms'] as const)('%s, a zoneless timestamp, through the page
     const id =
       engine === 'pg'
         ? (await owners.pg.unsafe<Array<{ id: number }>>(`insert into ${SCHEMA}.local_stamped (tenant_id, note) values (1, 'as inserted') returning id`))[0]?.id
-        : (await owners.ms.request().query<{ id: number }>(`insert into ${SCHEMA}.local_stamped (tenant_id, note) output inserted.id values (1, N'as inserted')`)).recordset[0]?.id
+        : (
+            await owners.ms
+              .request()
+              .query<{ id: number }>(`insert into ${SCHEMA}.local_stamped (tenant_id, note) output inserted.id values (1, N'as inserted')`)
+          ).recordset[0]?.id
     const record = `k1:${String(id)}`
     const before = await heldLocal(engine, record)
     expect(before.text, 'the default wrote a fraction').toMatch(/\.\d*[1-9]/)

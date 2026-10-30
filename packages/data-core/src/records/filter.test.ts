@@ -128,8 +128,14 @@ describe('columnFilter', () => {
   // A number's and a date's bounds are values of the column, both ends
   // inclusive; a bound left out is no bound.
   test('plans a range of numbers or dates, inclusive', () => {
-    expect(planned(AMOUNT, { op: 'range', from: '10', to: null })).toEqual({ ok: true, filter: { op: 'range', column: 'c', type: AMOUNT, from: '10.0000', to: null, before: null } })
-    expect(planned(DATE, { op: 'range', from: '2026-01-01', to: '2026-01-31' })).toMatchObject({ ok: true, filter: { from: '2026-01-01', to: '2026-01-31', before: null } })
+    expect(planned(AMOUNT, { op: 'range', from: '10', to: null })).toEqual({
+      ok: true,
+      filter: { op: 'range', column: 'c', type: AMOUNT, from: '10.0000', to: null, before: null },
+    })
+    expect(planned(DATE, { op: 'range', from: '2026-01-01', to: '2026-01-31' })).toMatchObject({
+      ok: true,
+      filter: { from: '2026-01-01', to: '2026-01-31', before: null },
+    })
     expect(planned(INT32, { op: 'range', from: 'x', to: '7' })).toEqual({ ok: false, message: 'A value given for c is not one it can hold.' })
     expect(planned(INT32, { op: 'range', from: null, to: null })).toEqual({ ok: false, message: 'A range on c has a from, a to or both.' })
   })
@@ -143,14 +149,23 @@ describe('columnFilter', () => {
       ok: true,
       filter: { op: 'range', column: 'c', type: INSTANT, from: '2026-10-01T00:00:00Z', to: null, before: '2026-11-01T00:00:00Z' },
     })
-    expect(planned(WALL_CLOCK, { op: 'range', from: null, to: '2024-02-28' })).toMatchObject({ ok: true, filter: { from: null, to: null, before: '2024-02-29T00:00:00' } })
-    expect(planned(WALL_CLOCK, { op: 'range', from: '2026-10-01T12:00:00', to: null })).toEqual({ ok: false, message: 'A value given for c is not one it can hold.' })
+    expect(planned(WALL_CLOCK, { op: 'range', from: null, to: '2024-02-28' })).toMatchObject({
+      ok: true,
+      filter: { from: null, to: null, before: '2024-02-29T00:00:00' },
+    })
+    expect(planned(WALL_CLOCK, { op: 'range', from: '2026-10-01T12:00:00', to: null })).toEqual({
+      ok: false,
+      message: 'A value given for c is not one it can hold.',
+    })
   })
 
   // 9999-12-31 has no next midnight SQL Server stores, so a range to it has
   // no upper end; with no lower end either it holds every value there is.
   test('leaves a range to the last day open above', () => {
-    expect(planned(INSTANT, { op: 'range', from: '2026-10-01', to: '9999-12-31' })).toMatchObject({ ok: true, filter: { from: '2026-10-01T00:00:00Z', to: null, before: null } })
+    expect(planned(INSTANT, { op: 'range', from: '2026-10-01', to: '9999-12-31' })).toMatchObject({
+      ok: true,
+      filter: { from: '2026-10-01T00:00:00Z', to: null, before: null },
+    })
     expect(planned(INSTANT, { op: 'range', from: null, to: '9999-12-31' })).toEqual({ ok: true, filter: { op: 'not-null', column: 'c' } })
   })
 })
@@ -214,7 +229,10 @@ describe('readFilter', () => {
       [{ field: 'name', op: 'contains', text: '   ' }],
       [{ field: 'name', op: 'contains', text: 7 }],
       [{ field: 'name', op: 'sql', where: '1=1' }],
-      [{ field: 'name', op: 'null' }, { field: 'name', op: 'not-null' }],
+      [
+        { field: 'name', op: 'null' },
+        { field: 'name', op: 'not-null' },
+      ],
     ]) {
       expect(readFilter(filter, 'field'), JSON.stringify(filter)).toMatchObject({ ok: false, code: 'malformed' })
     }
@@ -229,8 +247,16 @@ describe('readFilter', () => {
       code: 'not-filterable',
       message: 'What a contains condition on name finds is at most 200 characters, and this has 201.',
     })
-    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\u0007b' }], 'field')).toEqual({ ok: false, code: 'not-filterable', message: 'What a contains condition on name finds cannot contain a control character.' })
-    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\ud800b' }], 'field')).toEqual({ ok: false, code: 'not-filterable', message: 'What a contains condition on name finds cannot contain an unpaired UTF-16 surrogate.' })
+    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\u0007b' }], 'field')).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'What a contains condition on name finds cannot contain a control character.',
+    })
+    expect(readFilter([{ field: 'name', op: 'contains', text: 'a\ud800b' }], 'field')).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'What a contains condition on name finds cannot contain an unpaired UTF-16 surrogate.',
+    })
     expect(readFilter([{ field: 'name', op: 'contains', text: 7 }], 'field')).toMatchObject({ ok: false, code: 'malformed' })
   })
 })

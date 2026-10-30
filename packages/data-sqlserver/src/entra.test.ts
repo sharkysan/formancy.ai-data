@@ -6,7 +6,17 @@ import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/ident
 import mssql from 'mssql'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { connectSqlServer, sqlServerConfig } from './connect.js'
-import { AZURE_SQL_SCOPE, ENTRA_NO_TOKEN, ENTRA_REFUSED, ENTRA_SCOPE_REFUSED, ENTRA_UNCHECKED, ENTRA_UNENCRYPTED, entraCredential, entraLoginFailure, scopedToAzureSql } from './entra.js'
+import {
+  AZURE_SQL_SCOPE,
+  ENTRA_NO_TOKEN,
+  ENTRA_REFUSED,
+  ENTRA_SCOPE_REFUSED,
+  ENTRA_UNCHECKED,
+  ENTRA_UNENCRYPTED,
+  entraCredential,
+  entraLoginFailure,
+  scopedToAzureSql,
+} from './entra.js'
 
 /*
  * An Entra login's credential and its failures, without a server and
@@ -144,7 +154,13 @@ describe('scopedToAzureSql', () => {
     const guarded = scopedToAzureSql(inner)
     expect(await guarded.getToken(AZURE_SQL_SCOPE)).toBe(TOKEN)
     expect(await guarded.getToken([AZURE_SQL_SCOPE])).toBe(TOKEN)
-    for (const other of ['https://management.azure.com/.default', 'https://graph.microsoft.com/.default', 'https://database.windows.net.example/.default', [AZURE_SQL_SCOPE, 'https://graph.microsoft.com/.default'], []]) {
+    for (const other of [
+      'https://management.azure.com/.default',
+      'https://graph.microsoft.com/.default',
+      'https://database.windows.net.example/.default',
+      [AZURE_SQL_SCOPE, 'https://graph.microsoft.com/.default'],
+      [],
+    ]) {
       await expect(guarded.getToken(other), JSON.stringify(other)).rejects.toThrow(ENTRA_SCOPE_REFUSED)
     }
     expect(inner.asked).toEqual([AZURE_SQL_SCOPE, AZURE_SQL_SCOPE])
@@ -157,7 +173,10 @@ describe('scopedToAzureSql', () => {
   // Watched failing with the inner error rethrown.
   test('rejects a refused token with the sentence and the AADSTS code alone', async () => {
     const guarded = scopedToAzureSql(counting(async () => Promise.reject(unknownClient())))
-    const error = await guarded.getToken(AZURE_SQL_SCOPE).then(() => undefined, (rejected: unknown) => rejected)
+    const error = await guarded.getToken(AZURE_SQL_SCOPE).then(
+      () => undefined,
+      (rejected: unknown) => rejected,
+    )
     expect((error as Error).message).toBe(`${ENTRA_NO_TOKEN} Entra ID answered AADSTS700016.`)
     expect((error as Error).cause).toBeUndefined()
     expectNothingOf(everywhere(error))
@@ -189,7 +208,9 @@ describe('entraLoginFailure', () => {
   // sentence and the AADSTS code, with nothing kept. Watched failing with
   // mssql's error returned as it came.
   test('says a token failure in a sentence with the AADSTS code, and keeps nothing of what Entra answered', () => {
-    const failure = entraLoginFailure(asMssql(new AggregateError([tediousError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), unknownClient()])))
+    const failure = entraLoginFailure(
+      asMssql(new AggregateError([tediousError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), unknownClient()])),
+    )
     expect(failure.message).toBe(`${ENTRA_NO_TOKEN} Entra ID answered AADSTS700016.`)
     expectNothingOf(everywhere(failure))
     expect(everywhere(failure)).not.toContain('AggregateError')
@@ -205,8 +226,13 @@ describe('entraLoginFailure', () => {
   test('says a refused scope in its own sentence', async () => {
     const refused = await scopedToAzureSql(counting(async () => TOKEN))
       .getToken('https://management.azure.com/.default')
-      .then(() => undefined, (rejected: unknown) => rejected)
-    const failure = entraLoginFailure(asMssql(new AggregateError([tediousError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), refused as Error])))
+      .then(
+        () => undefined,
+        (rejected: unknown) => rejected,
+      )
+    const failure = entraLoginFailure(
+      asMssql(new AggregateError([tediousError('Security token could not be authenticated or authorized.', 'EFEDAUTH'), refused as Error])),
+    )
     expect(failure.message).toBe(ENTRA_SCOPE_REFUSED)
   })
 
@@ -253,7 +279,9 @@ describe('connectSqlServer, for an Entra principal', () => {
   // otherwise be refused by the operating system, which is a different
   // sentence. Watched failing with the check removed.
   test('refuses to log in without TLS, before it connects', async () => {
-    await expect(connectSqlServer({ ...NOWHERE, encrypt: false, trustServerCertificate: false, entra: { type: 'managed-identity' } })).rejects.toThrow(ENTRA_UNENCRYPTED)
+    await expect(connectSqlServer({ ...NOWHERE, encrypt: false, trustServerCertificate: false, entra: { type: 'managed-identity' } })).rejects.toThrow(
+      ENTRA_UNENCRYPTED,
+    )
   })
 
   // A trusted certificate is a token handed to whichever server answered.
@@ -263,7 +291,9 @@ describe('connectSqlServer, for an Entra principal', () => {
   // silence. Watched failing with the check removed: the operating
   // system's refusal of port 1 came back instead.
   test('refuses to log in with the server’s certificate trusted, before it connects', async () => {
-    await expect(connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: true, entra: { type: 'managed-identity' } })).rejects.toThrow(ENTRA_UNCHECKED)
+    await expect(connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: true, entra: { type: 'managed-identity' } })).rejects.toThrow(
+      ENTRA_UNCHECKED,
+    )
   })
 
   // `encrypt: true` is TDS 7's: TLS is started only if the server's
@@ -293,11 +323,16 @@ describe('connectSqlServer, for an Entra principal', () => {
   // (two constructed for one object).
   test('opens a pool again with the credential the last one had, for the same login, and a new one for another', async () => {
     const login = { type: 'managed-identity', clientId: CLIENT } as const
-    const open = (entra: typeof login) => connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).then(() => undefined, (rejected: unknown) => rejected)
+    const open = (entra: typeof login) =>
+      connectSqlServer({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).then(
+        () => undefined,
+        (rejected: unknown) => rejected,
+      )
     expect(await open(login)).toMatchObject({ code: 'ESOCKET' })
     expect(await open(login)).toMatchObject({ code: 'ESOCKET' })
     expect(constructed).toHaveLength(1)
-    const credentialOf = (entra: typeof login) => (sqlServerConfig({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).authentication?.options as { credential: unknown }).credential
+    const credentialOf = (entra: typeof login) =>
+      (sqlServerConfig({ ...NOWHERE, encrypt: true, trustServerCertificate: false, entra }).authentication?.options as { credential: unknown }).credential
     expect(credentialOf(login)).toBe(credentialOf(login))
     expect(credentialOf({ ...login })).not.toBe(credentialOf(login))
     expect(constructed).toHaveLength(2)
@@ -314,7 +349,14 @@ describe('connectSqlServer, for an Entra principal', () => {
     const asked = vi.spyOn(ManagedIdentityCredential.prototype, 'getToken').mockRejectedValue(new Error('not here'))
     const listener = await firstBytes()
     try {
-      const error = await connectSqlServer({ host: '127.0.0.1', port: listener.port, database: 'erp', encrypt: true, trustServerCertificate: false, entra: { type: 'managed-identity' } }).then(
+      const error = await connectSqlServer({
+        host: '127.0.0.1',
+        port: listener.port,
+        database: 'erp',
+        encrypt: true,
+        trustServerCertificate: false,
+        entra: { type: 'managed-identity' },
+      }).then(
         () => undefined,
         (rejected: unknown) => rejected,
       )

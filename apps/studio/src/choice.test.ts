@@ -36,7 +36,9 @@ describe('which lookups can be offered', () => {
   // and the studio says why before anybody asks.
   test('refuses a key whose target is unknown, and says so', () => {
     const key = { ...customerKey(OWNER_SNAPSHOT), references: null }
-    expect(lookupBlocker(OWNER_SNAPSHOT, rootOf(OWNER_SNAPSHOT), key)).toBe('This connection can see that the key exists but not what it references, so it cannot be offered.')
+    expect(lookupBlocker(OWNER_SNAPSHOT, rootOf(OWNER_SNAPSHOT), key)).toBe(
+      'This connection can see that the key exists but not what it references, so it cannot be offered.',
+    )
   })
 
   // A target in a schema discovery is not approved for is outside the scope,
@@ -45,7 +47,9 @@ describe('which lookups can be offered', () => {
     const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
     contents.objects = contents.objects.filter((object) => object.ref.name !== 'customer')
     const outside = createSnapshot(contents)
-    expect(lookupBlocker(outside, rootOf(outside), customerKey(outside))).toBe('sales.customer is outside the schemas this connection discovers, so its rows cannot be offered.')
+    expect(lookupBlocker(outside, rootOf(outside), customerKey(outside))).toBe(
+      'sales.customer is outside the schemas this connection discovers, so its rows cannot be offered.',
+    )
   })
 
   // In scope but hidden is a third answer: a gap on the target's schema says
@@ -56,14 +60,16 @@ describe('which lookups can be offered', () => {
     contents.objects = contents.objects.filter((object) => object.ref.name !== 'customer')
     contents.gaps = [{ subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION on schema sales' }]
     const hidden = createSnapshot(contents)
-    expect(lookupBlocker(hidden, rootOf(hidden), customerKey(hidden))).toBe('sales.customer is not visible to this connection: no VIEW DEFINITION on schema sales.')
+    expect(lookupBlocker(hidden, rootOf(hidden), customerKey(hidden))).toBe(
+      'sales.customer is not visible to this connection: no VIEW DEFINITION on schema sales.',
+    )
   })
 
   // The generator reads a lookup's own columns on the root as well as its
   // target's key (0027): the writer may read customer's country_code on
   // neither side. The reason names the root's column, which is the one the
   // form would have bound.
-  test("refuses a key whose own columns on the root this connection may not read, naming the column", () => {
+  test('refuses a key whose own columns on the root this connection may not read, naming the column', () => {
     const customer = rootOf(WRITER_SNAPSHOT, 'customer')
     expect(lookupBlocker(WRITER_SNAPSHOT, customer, keyOf(WRITER_SNAPSHOT, 'customer', 'fk_customer_country'))).toBe(
       'country_code of sales.customer cannot be read by this connection, so the lookup cannot be offered.',
@@ -105,7 +111,13 @@ describe('which lookups a form can be reached through (0043)', () => {
   // server's own words, because it asks the same function.
   test('offers a lookup over an integer key, and says why one over a text key is not', () => {
     const generated = (root: string, foreignKey: string, display: string) =>
-      generateForm(OWNER_SNAPSHOT, { connection: 'fixture', root: { schema: 'sales', name: root }, formId: root, title: root, lookups: [{ foreignKey, display: [display] }] }).bindings
+      generateForm(OWNER_SNAPSHOT, {
+        connection: 'fixture',
+        root: { schema: 'sales', name: root },
+        formId: root,
+        title: root,
+        lookups: [{ foreignKey, display: [display] }],
+      }).bindings
     expect(throughBlocker(OWNER_SNAPSHOT, generated('order_line', 'fk_order_line_order', 'order_date'), 'order')).toBeNull()
     expect(throughBlocker(OWNER_SNAPSHOT, generated('customer', 'fk_customer_country', 'name'), 'country')).toBe(
       'it joins sales.customer.country_code and sales.country.iso_code, which a through cannot compare: only integer, decimal, uuid and date keys are compared without a collation, and the snapshot records none',

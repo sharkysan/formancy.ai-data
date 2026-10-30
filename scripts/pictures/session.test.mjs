@@ -22,12 +22,24 @@ describe("an app script's arguments", () => {
   // The root runner passes an app only its own scenes; a person running the
   // app script by hand must get the same refusals, or a scene of another app
   // would be walked by nobody and the run would say it succeeded.
-  test('are the runner\'s, for this app only', () => {
-    expect(appOptions(['--scene', 'studio-drift', '--review', OUTSIDE], SCENES, 'studio')).toEqual({ apps: [], scenes: ['studio-drift'], all: false, check: false, review: OUTSIDE })
+  test("are the runner's, for this app only", () => {
+    expect(appOptions(['--scene', 'studio-drift', '--review', OUTSIDE], SCENES, 'studio')).toEqual({
+      apps: [],
+      scenes: ['studio-drift'],
+      all: false,
+      check: false,
+      review: OUTSIDE,
+    })
     expect(appOptions(['--check'], SCENES, 'studio')).toMatchObject({ check: true })
-    expect(() => appOptions(['--scene', 'host-loaded'], SCENES, 'studio')).toThrow('--scene host-loaded is a host scene, and this is apps/studio/scripts/pictures.mjs')
-    expect(() => appOptions(['--app', 'studio'], SCENES, 'studio')).toThrow("--app is the root runner's option: apps/studio/scripts/pictures.mjs takes its own scenes only")
-    expect(() => appOptions(['--all', '--scene', 'studio-drift'], SCENES, 'studio')).toThrow('--all retakes every scene of an app, so it is not given with --scene')
+    expect(() => appOptions(['--scene', 'host-loaded'], SCENES, 'studio')).toThrow(
+      '--scene host-loaded is a host scene, and this is apps/studio/scripts/pictures.mjs',
+    )
+    expect(() => appOptions(['--app', 'studio'], SCENES, 'studio')).toThrow(
+      "--app is the root runner's option: apps/studio/scripts/pictures.mjs takes its own scenes only",
+    )
+    expect(() => appOptions(['--all', '--scene', 'studio-drift'], SCENES, 'studio')).toThrow(
+      '--all retakes every scene of an app, so it is not given with --scene',
+    )
     expect(() => appOptions(['--review', join(REPO, 'x')], SCENES, 'studio')).toThrow(/is inside the repository/)
   })
 })
@@ -38,7 +50,9 @@ describe('what an app script prints when it fails', () => {
   // either would reach a CI log that anybody with access to the run reads.
   test('has every secret of the plane taken out', () => {
     const error = new Error('locator.fill("pictures-host-clara"): postgres://formancy_writer:writer-fixture-password@localhost:5432/x refused')
-    expect(said(error, ['pictures-host-clara', 'writer-fixture-password', ''])).toBe('locator.fill("[a secret]"): postgres://formancy_writer:[a secret]@localhost:5432/x refused')
+    expect(said(error, ['pictures-host-clara', 'writer-fixture-password', ''])).toBe(
+      'locator.fill("[a secret]"): postgres://formancy_writer:[a secret]@localhost:5432/x refused',
+    )
     expect(said('a string thrown', [])).toBe('a string thrown')
   })
 })
@@ -63,12 +77,18 @@ describe('which scene is shot', () => {
   // `file` is read with `in`, because a default would stand in for the `undefined` that means "no picture".
   const shoot = (argv, changes = {}) => {
     const { record = { 'studio-connect': recorded }, now = text } = changes
-    return reasonToShoot({ options: appOptions(argv, SCENES, 'studio'), id: 'studio-connect', record, text: now, picture: 'file' in changes ? changes.file : picture })
+    return reasonToShoot({
+      options: appOptions(argv, SCENES, 'studio'),
+      id: 'studio-connect',
+      record,
+      text: now,
+      picture: 'file' in changes ? changes.file : picture,
+    })
   }
 
   // The default is "retake what is stale": a picture whose text is the
   // record's is left as it is, and every other one is retaken, saying why.
-  test('by default, only one whose text changed, or that has no record or no picture, or a picture that is not its record\'s', () => {
+  test("by default, only one whose text changed, or that has no record or no picture, or a picture that is not its record's", () => {
     expect(shoot([])).toBeUndefined()
     expect(shoot([], { now: { Seen: '- region "What ms-reader can see":\n  - list' } })).toBe('its text changed')
     expect(shoot([], { record: {} })).toBe('it has no record')
@@ -88,14 +108,17 @@ describe('which scene is shot', () => {
 
 describe('what a scene that is not shot is said to be', () => {
   const text = { Seen: '- region "What ms-reader can see"' }
-  const line = (argv, now = text) => notShot({ options: appOptions(argv, SCENES, 'studio'), id: 'studio-connect', record: { 'studio-connect': { text } }, text: now })
+  const line = (argv, now = text) =>
+    notShot({ options: appOptions(argv, SCENES, 'studio'), id: 'studio-connect', record: { 'studio-connect': { text } }, text: now })
 
   // Under --scene a scene not named is walked and its text read, but it was
   // said to be "the record's" without being compared: a scene whose text had
   // changed was reported unchanged. Watched failing with that line.
   test('under --scene, compared with its record and said either way, and never retaken', () => {
     expect(line(['--scene', 'studio-drift'])).toBe("not named by --scene; its text is the record's")
-    expect(line(['--scene', 'studio-drift'], { Seen: '- region "What ms-reader can see":\n  - list' })).toBe("not named by --scene, and its text is not the record's: `pnpm pictures --scene studio-connect` retakes it")
+    expect(line(['--scene', 'studio-drift'], { Seen: '- region "What ms-reader can see":\n  - list' })).toBe(
+      "not named by --scene, and its text is not the record's: `pnpm pictures --scene studio-connect` retakes it",
+    )
   })
 
   // By default a scene is left only when its text is the record's; under

@@ -2,12 +2,7 @@ import { readFileSync } from 'node:fs'
 
 /** The fixture files this package ships, by name. */
 export type FixtureFile =
-  | 'postgres.sql'
-  | 'postgres.restricted.sql'
-  | 'postgres.parity.sql'
-  | 'sqlserver.sql'
-  | 'sqlserver.restricted.sql'
-  | 'sqlserver.parity.sql'
+  'postgres.sql' | 'postgres.restricted.sql' | 'postgres.parity.sql' | 'sqlserver.sql' | 'sqlserver.restricted.sql' | 'sqlserver.parity.sql'
 
 /**
  * A fixture's text.

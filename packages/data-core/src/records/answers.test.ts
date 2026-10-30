@@ -190,7 +190,10 @@ const ANSWERS = { ...CLERK_ANSWERS, paid: 'false' }
  */
 function stored(request: InsertRequest, generated: Record<string, ApiValue>, version: string): RecordRead {
   const written = new Map(request.values.map((entry) => [entry.name, entry.value]))
-  const values = request.returning.map((column): [string, ApiValue] => [column.name, Object.hasOwn(generated, column.name) ? (generated[column.name] as ApiValue) : (written.get(column.name) ?? null)])
+  const values = request.returning.map((column): [string, ApiValue] => [
+    column.name,
+    Object.hasOwn(generated, column.name) ? (generated[column.name] as ApiValue) : (written.get(column.name) ?? null),
+  ])
   return { ok: true, values: Object.fromEntries(values), version }
 }
 
@@ -225,7 +228,9 @@ describe('a round trip', () => {
     const again = planRead(source, bindings, POLICY, CLERK, back.record ?? '')
     expect(again).toMatchObject({ ok: true, request: { key: [{ name: 'id', value: ORDER_ID }] } })
     const { id: _id, ...writable } = back.answers
-    expect(planUpdate(source, bindings, POLICY, CLERK, back.record ?? '', back.version ?? '', writable, undefined, described(source, bindings))).toMatchObject({ ok: true })
+    expect(planUpdate(source, bindings, POLICY, CLERK, back.record ?? '', back.version ?? '', writable, undefined, described(source, bindings))).toMatchObject({
+      ok: true,
+    })
   })
 
   // A decimal is stored at its column's scale, so it comes back padded: the

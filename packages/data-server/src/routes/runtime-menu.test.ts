@@ -26,24 +26,68 @@ import type { ConnectionRegistry } from '../connections.js'
  */
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 const ref = (name: string): ObjectRef => ({ schema: 'sales', name })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: ref('order'), kind: 'table', comment: null,
-      columns: [col('id', 1, INT32), col('tenant_id', 2, INT32), col('placed', 3, { kind: 'date' }), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
-      primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      ref: ref('order'),
+      kind: 'table',
+      comment: null,
+      columns: [
+        col('id', 1, INT32),
+        col('tenant_id', 2, INT32),
+        col('placed', 3, { kind: 'date' }),
+        col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+      ],
+      primaryKey: { name: 'pk_order', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('line'), kind: 'table', comment: null,
-      columns: [col('order_id', 1, INT32), col('line_no', 2, INT32), col('quantity', 3, INT32), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
-      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [],
-      foreignKeys: [{ name: 'fk_line_order', columns: ['order_id'], references: { table: ref('order'), columns: ['id'] }, onUpdate: 'no-action', onDelete: 'cascade', enforced: true, validated: true }],
-      checks: [], rowSecurity: 'none',
+      ref: ref('line'),
+      kind: 'table',
+      comment: null,
+      columns: [
+        col('order_id', 1, INT32),
+        col('line_no', 2, INT32),
+        col('quantity', 3, INT32),
+        col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+      ],
+      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] },
+      uniqueKeys: [],
+      foreignKeys: [
+        {
+          name: 'fk_line_order',
+          columns: ['order_id'],
+          references: { table: ref('order'), columns: ['id'] },
+          onUpdate: 'no-action',
+          onDelete: 'cascade',
+          enforced: true,
+          validated: true,
+        },
+      ],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -71,10 +115,13 @@ const LINE_POLICY: FormPolicy = {
 const SECRET_POLICY: FormPolicy = { ...ORDER_POLICY, operations: { read: ['manager'], create: ['clerk'], update: [] } }
 
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
-    : token === 'buyer' ? { ok: true, identity: { actor: { id: 'b', roles: ['buyer'] }, attributes: { tenant: '1' } } }
-    : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
-      : { ok: false, reason: 'bad' }
+  token === 'clerk'
+    ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+    : token === 'buyer'
+      ? { ok: true, identity: { actor: { id: 'b', roles: ['buyer'] }, attributes: { tenant: '1' } } }
+      : token === 'stranger'
+        ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
+        : { ok: false, reason: 'bad' }
 
 let root: string
 let store: ConfigurationStore
@@ -106,7 +153,13 @@ beforeEach(async () => {
   const generated = generateForm(SNAPSHOT, { connection: 'erp', root: ref('order'), formId: 'order', title: 'Order', lookups: [], pinned: ['tenant_id'] })
   order = { format: 1, connection: 'erp', form: generated.form, bindings: generated.bindings, policy: ORDER_POLICY, snapshot: SNAPSHOT }
   await store.publish('order', null, order)
-  const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'order-line', title: 'Order line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
+  const line = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('line'),
+    formId: 'order-line',
+    title: 'Order line',
+    lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }],
+  })
   await store.publish('order-line', null, { ...order, form: line.form, bindings: line.bindings, policy: LINE_POLICY })
   const sink: AuditSink = (event) => {
     if (event.plane === 'runtime') events.push(event)
@@ -174,7 +227,13 @@ describe('the menu route', () => {
     expect(answer.statusCode, answer.body).toBe(200)
     expect(answer.json().forms.map((entry: { id: string }) => entry.id)).toEqual(['order', 'order-line'])
     expect(lines).toContainEqual(expect.objectContaining({ form: 'edited', version: 1, msg: 'a published bundle failed validation' }))
-    expect(lines).toContainEqual(expect.objectContaining({ form: 'mangled', error: expect.stringMatching(/1\.json is not valid JSON/), msg: 'a published form cannot be read, and is not served' }))
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        form: 'mangled',
+        error: expect.stringMatching(/1\.json is not valid JSON/),
+        msg: 'a published form cannot be read, and is not served',
+      }),
+    )
   })
 
   // A hand edit that is valid JSON can leave a part where the check, or
@@ -204,7 +263,13 @@ describe('the menu route', () => {
   test('leaves out a form bound to a connection the allowlist does not have', async () => {
     await store.publish('archived', null, { ...order, connection: 'archive' })
     expect((await menu('clerk')).json().forms.map((entry: { id: string }) => entry.id)).toEqual(['order', 'order-line'])
-    expect(lines).toContainEqual(expect.objectContaining({ form: 'archived', connection: 'archive', msg: 'a published form names a connection the allowlist does not have, and is not served' }))
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        form: 'archived',
+        connection: 'archive',
+        msg: 'a published form names a connection the allowlist does not have, and is not served',
+      }),
+    )
     expect(opened).toEqual([])
   })
 
@@ -238,10 +303,21 @@ describe('the menu route', () => {
 
   // One event per request, under its own name; it addresses no form, so it
   // names none, no version and no record (0023).
-  test("is audited as form-list, naming no form, version or record", async () => {
+  test('is audited as form-list, naming no form, version or record', async () => {
     await menu('clerk')
     expect(events).toEqual([
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'form-list', form: null, formVersion: null, status: 200, outcome: 'ok', record: null, rows: null },
+      {
+        at: '2026-10-11T12:00:00.000Z',
+        plane: 'runtime',
+        actor: 'c',
+        operation: 'form-list',
+        form: null,
+        formVersion: null,
+        status: 200,
+        outcome: 'ok',
+        record: null,
+        rows: null,
+      },
     ])
   })
 })

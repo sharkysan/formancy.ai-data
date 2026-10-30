@@ -54,7 +54,7 @@ describe("the grid's theme parameters", () => {
   // The focused cell is drawn by the range-selection border, which defaults
   // to the accent: violet, the room's colour for what a person acts on. The
   // room's focus is teal, and the gate measures it against both rows.
-  test('draw the focus in the room\'s teal', () => {
+  test("draw the focus in the room's teal", () => {
     expect(ROOM_GRID.rangeSelectionBorderColor).toBe('var(--server)')
     expect(ROOM_GRID.focusShadow).toEqual({ spread: 2, color: 'var(--server)' })
   })

@@ -18,12 +18,22 @@ import { decimal } from './model.js'
 const text = (value: string): string => `'${value.replaceAll("'", "''")}'`
 const orNull = <T>(value: T | null, write: (value: T) => string): string => (value === null ? 'null' : write(value))
 /** An instant in UTC, to the second: `2026-09-30 08:14:00+00`. */
-const instant = (time: number): string => text(new Date(time).toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '+00'))
+const instant = (time: number): string =>
+  text(
+    new Date(time)
+      .toISOString()
+      .replace('T', ' ')
+      .replace(/\.\d{3}Z$/, '+00'),
+  )
 
 /** One insert of every row, a row a line, or nothing for no rows: `values ;` is a syntax error. */
 function insert(table: string, columns: readonly string[], rows: ReadonlyArray<readonly string[]>, overriding = false): string[] {
   if (rows.length === 0) return []
-  return [`insert into ${table} (${columns.join(', ')})${overriding ? ' overriding system value' : ''} values`, `${rows.map((row) => `  (${row.join(', ')})`).join(',\n')};`, '']
+  return [
+    `insert into ${table} (${columns.join(', ')})${overriding ? ' overriding system value' : ''} values`,
+    `${rows.map((row) => `  (${row.join(', ')})`).join(',\n')};`,
+    '',
+  ]
 }
 
 /** The SQL that replaces the fixture's rows with `data`. */
@@ -95,7 +105,13 @@ export function renderDemoSql(data: DemoData): string {
     ...insert(
       'sales.delivery',
       ['id', 'tenant_id', 'order_id', 'carrier', 'shipped_at'],
-      data.deliveries.map((delivery) => [text(delivery.id), String(delivery.tenantId), String(delivery.orderId), text(delivery.carrier), instant(delivery.shippedAt)]),
+      data.deliveries.map((delivery) => [
+        text(delivery.id),
+        String(delivery.tenantId),
+        String(delivery.orderId),
+        text(delivery.carrier),
+        instant(delivery.shippedAt),
+      ]),
     ),
     ...insert(
       'sales.parcel',

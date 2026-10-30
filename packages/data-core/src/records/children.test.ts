@@ -25,7 +25,13 @@ const MANAGED = snapshot('postgres', (objects) => {
   employee.foreignKeys.push(fk('fk_employee_manager', ['manager_id'], 'employee', ['id']))
 })
 const employeeForm = (source: MetadataSnapshot) =>
-  generateForm(source, { connection: 'erp', root: sales('employee'), formId: 'sales-employee', title: 'Employee', lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }] }).bindings
+  generateForm(source, {
+    connection: 'erp',
+    root: sales('employee'),
+    formId: 'sales-employee',
+    title: 'Employee',
+    lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }],
+  }).bindings
 /** An order form showing who created and who approved it: two lookups onto one employee. */
 const staffForm = (source: MetadataSnapshot) =>
   generateForm(source, {
@@ -43,7 +49,9 @@ const staffForm = (source: MetadataSnapshot) =>
 function priced(quoted: NormalizedType): MetadataSnapshot {
   return snapshot('postgres', (objects) => {
     objects.push(
-      table('price', [col('code', 1, { kind: 'decimal', precision: 12, scale: 2 }), col('label', 2, text(50))], { primaryKey: { name: 'pk_price', columns: ['code'] } }),
+      table('price', [col('code', 1, { kind: 'decimal', precision: 12, scale: 2 }), col('label', 2, text(50))], {
+        primaryKey: { name: 'pk_price', columns: ['code'] },
+      }),
       table('quote', [col('id', 1, INT32), col('price_code', 2, quoted)], {
         primaryKey: { name: 'pk_quote', columns: ['id'] },
         foreignKeys: [fk('fk_quote_price', ['price_code'], 'price', ['code'])],
@@ -51,9 +59,16 @@ function priced(quoted: NormalizedType): MetadataSnapshot {
     )
   })
 }
-const priceForm = (source: MetadataSnapshot) => generateForm(source, { connection: 'erp', root: sales('price'), formId: 'price', title: 'Price', lookups: [] }).bindings
+const priceForm = (source: MetadataSnapshot) =>
+  generateForm(source, { connection: 'erp', root: sales('price'), formId: 'price', title: 'Price', lookups: [] }).bindings
 const quoteForm = (source: MetadataSnapshot) =>
-  generateForm(source, { connection: 'erp', root: sales('quote'), formId: 'quote', title: 'Quote', lookups: [{ foreignKey: 'fk_quote_price', display: ['label'] }] }).bindings
+  generateForm(source, {
+    connection: 'erp',
+    root: sales('quote'),
+    formId: 'quote',
+    title: 'Quote',
+    lookups: [{ foreignKey: 'fk_quote_price', display: ['label'] }],
+  }).bindings
 
 describe('childFields', () => {
   // An order's lines reference the order's key, its only identity column,
@@ -103,9 +118,18 @@ describe('childFields', () => {
     const source = snapshot('sqlserver', (objects) => {
       const order = objects.find((object) => object.ref.name === 'order') as ObjectMeta
       order.foreignKeys = [fk('fk_order_customer', ['customer_no', 'tenant_id'], 'customer', ['customer_no', 'tenant_id'])]
-      ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).uniqueKeys.push({ name: 'uq_customer_reversed', columns: ['customer_no', 'tenant_id'] })
+      ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).uniqueKeys.push({
+        name: 'uq_customer_reversed',
+        columns: ['customer_no', 'tenant_id'],
+      })
     })
-    const order = generateForm(source, { connection: 'erp', root: sales('order'), formId: 'o', title: 'Order', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] }).bindings
+    const order = generateForm(source, {
+      connection: 'erp',
+      root: sales('order'),
+      formId: 'o',
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+    }).bindings
     expect(childFields(on(source, customerForm(source).bindings), on(source, order))).toEqual([])
   })
 
@@ -173,7 +197,13 @@ describe('childFields', () => {
       )
     })
     const region = generateForm(regions, { connection: 'erp', root: sales('region'), formId: 'region', title: 'Region', lookups: [] }).bindings
-    const depot = generateForm(regions, { connection: 'erp', root: sales('depot'), formId: 'depot', title: 'Depot', lookups: [{ foreignKey: 'fk_depot_region', display: ['name'] }] }).bindings
+    const depot = generateForm(regions, {
+      connection: 'erp',
+      root: sales('depot'),
+      formId: 'depot',
+      title: 'Depot',
+      lookups: [{ foreignKey: 'fk_depot_region', display: ['name'] }],
+    }).bindings
     expect(childFields(on(regions, region), on(regions, depot))).toEqual(['region'])
   })
 

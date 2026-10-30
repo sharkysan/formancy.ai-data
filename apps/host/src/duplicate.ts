@@ -22,7 +22,9 @@ function held(answer: unknown): boolean {
  * not hold is left absent, as on a new form.
  */
 export function copyOf(record: FormRecord, copied: readonly string[]): FormRecord {
-  const answers: FormRecord['answers'] = Object.fromEntries(copied.filter((field) => Object.hasOwn(record.answers, field)).map((field) => [field, record.answers[field] ?? null]))
+  const answers: FormRecord['answers'] = Object.fromEntries(
+    copied.filter((field) => Object.hasOwn(record.answers, field)).map((field) => [field, record.answers[field] ?? null]),
+  )
   return { record: null, version: null, answers }
 }
 

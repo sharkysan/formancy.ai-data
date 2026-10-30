@@ -1,7 +1,25 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answer, answeredOnce, chooseCustomer, chooseForm, formLink, gridSection, load, mount, newRecord, openForm, said, save, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseCustomer,
+  chooseForm,
+  formLink,
+  gridSection,
+  load,
+  mount,
+  newRecord,
+  openForm,
+  said,
+  save,
+  searchRecords,
+  shows,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 
@@ -118,7 +136,12 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     const again = mount(plane.fetch)
     await signIn(again, TOKENS.clerk)
     await screen.findByRole('heading', { level: 2, name: 'No form open' }, ARRIVES)
-    expect(plane.sent.slice(sent).map((request) => request.path).filter((path) => path.includes('-secret'))).toEqual([])
+    expect(
+      plane.sent
+        .slice(sent)
+        .map((request) => request.path)
+        .filter((path) => path.includes('-secret')),
+    ).toEqual([])
     await waitFor(() => expect(window.location.hash).toBe('#layout=stacked&view=records'))
   })
 

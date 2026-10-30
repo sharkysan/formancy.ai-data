@@ -42,7 +42,10 @@ export function parseProcStat(text: string): { total: CpuTicks; cpus: number } {
 const allTicks = (t: CpuTicks): number => t.user + t.nice + t.system + t.idle + t.iowait + t.irq + t.softirq + t.steal
 
 /** Busy between two reads: every tick neither idle nor waiting on I/O, as a share and in vCPUs; steal as a share. */
-export function busyBetween(before: { total: CpuTicks; cpus: number }, after: { total: CpuTicks; cpus: number }): { busyPct: number; busyVcpus: number; stealPct: number } {
+export function busyBetween(
+  before: { total: CpuTicks; cpus: number },
+  after: { total: CpuTicks; cpus: number },
+): { busyPct: number; busyVcpus: number; stealPct: number } {
   const all = allTicks(after.total) - allTicks(before.total)
   if (all <= 0) return { busyPct: 0, busyVcpus: 0, stealPct: 0 }
   const resting = after.total.idle + after.total.iowait - (before.total.idle + before.total.iowait)
@@ -60,13 +63,17 @@ export function parsePidStat(text: string): { utime: number; stime: number } {
   const close = text.lastIndexOf(')')
   if (close === -1) throw new Error('a /proc/<pid>/stat line has its name in parentheses')
   // After the name: state is field 3, utime field 14 and stime field 15.
-  const fields = text.slice(close + 2).trim().split(/\s+/)
+  const fields = text
+    .slice(close + 2)
+    .trim()
+    .split(/\s+/)
   return { utime: Number(fields[11]), stime: Number(fields[12]) }
 }
 
 export function parseLoadAverage(text: string): { one: number; five: number; fifteen: number } {
   const [one, five, fifteen] = text.trim().split(/\s+/).map(Number)
-  if (one === undefined || five === undefined || fifteen === undefined || [one, five, fifteen].some(Number.isNaN)) throw new Error('/proc/loadavg has three averages first')
+  if (one === undefined || five === undefined || fifteen === undefined || [one, five, fifteen].some(Number.isNaN))
+    throw new Error('/proc/loadavg has three averages first')
   return { one, five, fifteen }
 }
 
@@ -131,7 +138,12 @@ export async function clockTicks(): Promise<number> {
 }
 
 /** The machine as presented: CPU, memory, OS, kernel, and this process's cgroup with its CPU limit. */
-export async function describeMachine(): Promise<{ cpu: PresentedCpu; memoryBytes: number; os: { prettyName: string; kernel: string; clkTck: number }; cgroup: { path: string; cpuMax: string } }> {
+export async function describeMachine(): Promise<{
+  cpu: PresentedCpu
+  memoryBytes: number
+  os: { prettyName: string; kernel: string; clkTck: number }
+  cgroup: { path: string; cpuMax: string }
+}> {
   const cpu = parseLscpu((await run('lscpu', [], { env: { ...process.env, LC_ALL: 'C' } })).stdout)
   const path = parseCgroupPath(await readFile('/proc/self/cgroup', 'utf8'))
   // Without a cgroup namespace of its own the hierarchy is mounted from its

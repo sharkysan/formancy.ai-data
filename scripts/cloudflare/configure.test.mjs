@@ -38,7 +38,10 @@ function plan({ validate = { out: 'Validating rules from x\nOK\n' }, wrong = {} 
   cloudflared.plan([
     { args: ['--version'], out: 'cloudflared version 2026.10.0 (stand-in)\n' },
     { args: ['tunnel', '--config', next(), 'ingress', 'validate'], ...validate },
-    ...probes(doors, inputs).map((probe) => ({ args: ['tunnel', '--config', next(), 'ingress', 'rule', probe.url], out: `Using rules from x\nMatched rule #${String(wrong[probe.url] ?? probe.rule)}\n` })),
+    ...probes(doors, inputs).map((probe) => ({
+      args: ['tunnel', '--config', next(), 'ingress', 'rule', probe.url],
+      out: `Using rules from x\nMatched rule #${String(wrong[probe.url] ?? probe.rule)}\n`,
+    })),
   ])
 }
 const run = () => configure({ inputs, doors, dir, cloudflared: cloudflared.binary, owner: null })

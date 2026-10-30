@@ -51,7 +51,16 @@ describe('listTerms', () => {
   test('refuses an order that does not end every tie with the key', () => {
     expect(() => listTerms(altered({ sort: [{ column: 'notes', direction: 'desc', nulls: 'last' }] }))).toThrow(/every identity column/)
     expect(() => listTerms(altered({ sort: [] }))).toThrow(/at least one column/)
-    expect(() => listTerms(altered({ sort: [{ column: 'id', direction: 'asc', nulls: null }, { column: 'id', direction: 'desc', nulls: null }] }))).toThrow(/twice/)
+    expect(() =>
+      listTerms(
+        altered({
+          sort: [
+            { column: 'id', direction: 'asc', nulls: null },
+            { column: 'id', direction: 'desc', nulls: null },
+          ],
+        }),
+      ),
+    ).toThrow(/twice/)
   })
 
   // The direction is spliced into SQL on SQL Server, which takes no
@@ -99,7 +108,10 @@ describe('listTerms', () => {
       [{ name: 'customer_no', type: INT32, value: '007' }],
       [{ name: 'customer_no', type: INT32, value: 1001 }],
       [{ name: 'notes', type: { kind: 'boolean' }, value: 'true' }],
-      [{ name: 'customer_no', type: INT32, value: '1' }, { name: 'customer_no', type: INT32, value: '2' }],
+      [
+        { name: 'customer_no', type: INT32, value: '1' },
+        { name: 'customer_no', type: INT32, value: '2' },
+      ],
       'customer_no',
     ]) {
       expect(() => listTerms(altered({ equal })), JSON.stringify(equal)).toThrow(/A list request/)
@@ -124,7 +136,16 @@ describe('listTerms', () => {
     expect(read.filter).toEqual(filter)
     expect(read.filter[0]).not.toBe(filter[0])
     expect((read.filter[0] as { type: unknown }).type).not.toBe(filter[0]?.type)
-    expect(listTerms(altered({ filter: [{ op: 'null', column: 'notes' }, { op: 'not-null', column: 'notes' }] })).filter).toHaveLength(2)
+    expect(
+      listTerms(
+        altered({
+          filter: [
+            { op: 'null', column: 'notes' },
+            { op: 'not-null', column: 'notes' },
+          ],
+        }),
+      ).filter,
+    ).toHaveLength(2)
   })
 
   // Each is what columnFilter never writes: an operator outside the set, a

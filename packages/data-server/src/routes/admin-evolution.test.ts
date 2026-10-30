@@ -2,7 +2,18 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FormBindings, ListView, LookupAdapter, MetadataSnapshot, NormalizedType, ObjectMeta, PresentationOverrides, RecordAdapter } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  DatabaseAdapter,
+  FormBindings,
+  ListView,
+  LookupAdapter,
+  MetadataSnapshot,
+  NormalizedType,
+  ObjectMeta,
+  PresentationOverrides,
+  RecordAdapter,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
@@ -26,7 +37,17 @@ import type { ConnectionRegistry } from '../connections.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind === 'binary' ? 'varbinary(200)' : type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind === 'binary' ? 'varbinary(200)' : type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** The employee table as it is "now"; each test changes it to make drift. */
@@ -38,23 +59,55 @@ let reachable: boolean
 let engine: 'sqlserver' | 'postgres'
 
 function snapshot(): MetadataSnapshot {
-  const dept: ObjectMeta[] = department === null ? [] : [{
-    ref: { schema: 'sales', name: 'dept' }, kind: 'table', comment: null,
-    columns: [col('id', 1, INT32), col('name', 2, department.name)],
-    primaryKey: { name: 'pk_dept', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-  }]
+  const dept: ObjectMeta[] =
+    department === null
+      ? []
+      : [
+          {
+            ref: { schema: 'sales', name: 'dept' },
+            kind: 'table',
+            comment: null,
+            columns: [col('id', 1, INT32), col('name', 2, department.name)],
+            primaryKey: { name: 'pk_dept', columns: ['id'] },
+            uniqueKeys: [],
+            foreignKeys: [],
+            checks: [],
+            rowSecurity: 'none',
+          },
+        ]
   return createSnapshot({
-    kind: engine, serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null,
-      columns: department === null ? columns : [...columns, col('dept_id', 9, INT32, { nullable: true })],
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [],
-      foreignKeys: department?.foreignKey === true ? [{
-        name: 'fk_employee_dept', columns: ['dept_id'], references: { table: { schema: 'sales', name: 'dept' }, columns: ['id'] },
-        onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true,
-      }] : [],
-      checks: [], rowSecurity: 'none',
-    }, ...dept],
+    kind: engine,
+    serverVersion: '16.0',
+    account: { user: 'dbo', login: 'sa' },
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns: department === null ? columns : [...columns, col('dept_id', 9, INT32, { nullable: true })],
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys:
+          department?.foreignKey === true
+            ? [
+                {
+                  name: 'fk_employee_dept',
+                  columns: ['dept_id'],
+                  references: { table: { schema: 'sales', name: 'dept' }, columns: ['id'] },
+                  onUpdate: 'no-action',
+                  onDelete: 'no-action',
+                  enforced: true,
+                  validated: true,
+                },
+              ]
+            : [],
+        checks: [],
+        rowSecurity: 'none',
+      },
+      ...dept,
+    ],
   })
 }
 
@@ -66,7 +119,12 @@ let store: ConfigurationStore
 let app: FastifyInstance
 
 function registry(): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => snapshot(),
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
@@ -80,7 +138,12 @@ function registry(): ConnectionRegistry {
 }
 
 beforeEach(async () => {
-  columns = [col('id', 1, INT32), col('name', 2, TEXT), col('title', 3, TEXT, { nullable: true }), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })]
+  columns = [
+    col('id', 1, INT32),
+    col('name', 2, TEXT),
+    col('title', 3, TEXT, { nullable: true }),
+    col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+  ]
   department = null
   reachable = true
   engine = 'sqlserver'
@@ -97,12 +160,19 @@ afterEach(async () => {
 const ADMIN = { authorization: 'Bearer admin' }
 const PROPOSAL = { connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee' }
 
-interface Proposal { form: FormSchema; bindings: FormBindings; snapshot: MetadataSnapshot; generation: Record<string, unknown> }
+interface Proposal {
+  form: FormSchema
+  bindings: FormBindings
+  snapshot: MetadataSnapshot
+  generation: Record<string, unknown>
+}
 
 const policyFor = (bindings: FormBindings) => ({
   version: 1,
   operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-  fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+  fields: Object.fromEntries(
+    bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+  ),
   rowFilters: [],
   lookups: Object.fromEntries(bindings.fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []])),
 })
@@ -123,18 +193,34 @@ async function publish(expectedBase: number | null = null, extra: Record<string,
   const name = edited.model.fields.find((field) => field.key === 'name')
   if (name !== undefined) name.label = label
   const nodes = grid(edited)
-  nodes.unshift(...nodes.splice(nodes.findIndex((node) => node.path === 'name'), 1))
+  nodes.unshift(
+    ...nodes.splice(
+      nodes.findIndex((node) => node.path === 'name'),
+      1,
+    ),
+  )
   const derived = presentationOf(proposal.form, edited, proposal.bindings)
   if (!derived.ok) throw new Error(derived.problems.join('; '))
   const presentation: PresentationOverrides = views.length === 0 ? derived.presentation : { ...derived.presentation, views }
-  const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+  const bundle = {
+    format: 2,
+    connection: 'erp',
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation,
+    form: edited,
+    bindings: proposal.bindings,
+    policy: policyFor(proposal.bindings),
+    snapshot: proposal.snapshot,
+  }
   const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle } })
   expect(response.statusCode, response.body).toBe(201)
   return { bundle, presentation }
 }
 
 const regenerate = () => app.inject({ method: 'POST', url: '/v1/forms/employee/regenerations', headers: ADMIN })
-const restore = (payload: unknown) => app.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: ADMIN, payload: payload as Record<string, unknown> })
+const restore = (payload: unknown) =>
+  app.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: ADMIN, payload: payload as Record<string, unknown> })
 const file = (version: number) => readFile(join(root, 'employee', `${String(version)}.json`), 'utf8')
 
 describe('regeneration', () => {
@@ -146,7 +232,14 @@ describe('regeneration', () => {
     const response = await regenerate()
     expect(response.statusCode, response.body).toBe(200)
     const regeneration = response.json()
-    expect(regeneration).toMatchObject({ version: 1, conflicts: [], lookupsDropped: [], keysReassigned: [], policyProblems: [], drift: { changes: [], blocking: false } })
+    expect(regeneration).toMatchObject({
+      version: 1,
+      conflicts: [],
+      lookupsDropped: [],
+      keysReassigned: [],
+      policyProblems: [],
+      drift: { changes: [], blocking: false },
+    })
     expect(canonicalize(regeneration.presentation)).toBe(canonicalize(presentation))
     expect(regeneration.generation).toEqual({ ...PROPOSAL, lookups: [], pinned: [] })
     expect(keys(regeneration.form)).toEqual(['name', 'id', 'title'])
@@ -161,12 +254,29 @@ describe('regeneration', () => {
     columns.push(col('stamp', 5, INT32, { generated: 'computed' }))
     const proposal = await propose()
     const edited = JSON.parse(JSON.stringify(proposal.form)) as FormSchema
-    const [main, record] = (edited.layouts?.[0]?.nodes ?? []).map((node) => ((node as { children: LayoutNode[] }).children[0] as { children: Array<{ path: string }> }).children)
-    record?.push(...(main?.splice(main.findIndex((node) => node.path === 'title'), 1) ?? []))
+    const [main, record] = (edited.layouts?.[0]?.nodes ?? []).map(
+      (node) => ((node as { children: LayoutNode[] }).children[0] as { children: Array<{ path: string }> }).children,
+    )
+    record?.push(
+      ...(main?.splice(
+        main.findIndex((node) => node.path === 'title'),
+        1,
+      ) ?? []),
+    )
     const derived = presentationOf(proposal.form, edited, proposal.bindings)
     if (!derived.ok) throw new Error(derived.problems.join('; '))
     expect(derived.presentation.fields).toEqual([{ field: 'title', anchor: { kind: 'column', column: 'title' }, section: { label: 'Record', occurrence: 0 } }])
-    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: derived.presentation, form: edited, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const bundle = {
+      format: 2,
+      connection: 'erp',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: derived.presentation,
+      form: edited,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    }
     const published = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: null, bundle } })
     expect(published.statusCode, published.body).toBe(201)
 
@@ -211,7 +321,12 @@ describe('regeneration', () => {
     await publish(null, {}, 'Full name', [ada, byId])
     columns = columns.filter((entry) => entry.name !== 'name')
     const regeneration = (await regenerate()).json()
-    expect(regeneration.conflicts).toContainEqual({ kind: 'view-dropped', view: 'Ada', resolution: 'dropped', message: 'View “Ada” names name, which is not in the regenerated form, so it was dropped.' })
+    expect(regeneration.conflicts).toContainEqual({
+      kind: 'view-dropped',
+      view: 'Ada',
+      resolution: 'dropped',
+      message: 'View “Ada” names name, which is not in the regenerated form, so it was dropped.',
+    })
     expect(regeneration.presentation.views).toEqual([byId])
   })
 
@@ -230,7 +345,9 @@ describe('regeneration', () => {
 
     department = { name: { kind: 'binary', maxLength: 200, fixedLength: false }, foreignKey: true }
     const binary = (await regenerate()).json()
-    expect(binary.lookupsDropped).toEqual([{ foreignKey: 'fk_employee_dept', message: expect.stringMatching(/display column name is varbinary\(200\), which has no text form for a label/) }])
+    expect(binary.lookupsDropped).toEqual([
+      { foreignKey: 'fk_employee_dept', message: expect.stringMatching(/display column name is varbinary\(200\), which has no text form for a label/) },
+    ])
     expect(binary.policyProblems).toContainEqual('policy: lookups.dept: dept is not a lookup field of this form')
   })
 
@@ -265,10 +382,20 @@ describe('regeneration', () => {
   // is nothing to regenerate from and nothing to rebase onto.
   test('latest published in format 1 is 409 published-before-0030', async () => {
     const proposal = await propose()
-    await store.publish('employee', null, { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot })
+    await store.publish('employee', null, {
+      format: 1,
+      connection: 'erp',
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    })
     const response = await regenerate()
     expect(response.statusCode).toBe(409)
-    expect(response.json()).toEqual({ code: 'published-before-0030', message: 'Version 1 was published before 0030 and kept no generation request: propose the form again.' })
+    expect(response.json()).toEqual({
+      code: 'published-before-0030',
+      message: 'Version 1 was published before 0030 and kept no generation request: propose the form again.',
+    })
   })
 
   // An operator who points the connection at a database of another engine
@@ -316,7 +443,7 @@ describe('restoration', () => {
   // on the volume still validates and is restored in the store's own
   // spelling. A claim of the old file's bytes would be true only for files
   // this store wrote, and this case is the one where it is not.
-  test('a version reformatted on the volume is restored as the same document, in the store\'s spelling', async () => {
+  test("a version reformatted on the volume is restored as the same document, in the store's spelling", async () => {
     await publish()
     await publish(1, {}, 'Name in full')
     const document = JSON.parse(await file(1)) as unknown
@@ -354,7 +481,11 @@ describe('restoration', () => {
     engine = 'postgres'
     const refused = await restore({ version: 1, expectedBase: 1 })
     expect(refused.statusCode).toBe(422)
-    expect(refused.json()).toEqual({ code: 'other-engine', message: "Version 1 cannot be restored: connection erp is a postgres database now, and the version is bound to sqlserver. A form's bindings belong to one engine." })
+    expect(refused.json()).toEqual({
+      code: 'other-engine',
+      message:
+        "Version 1 cannot be restored: connection erp is a postgres database now, and the version is bound to sqlserver. A form's bindings belong to one engine.",
+    })
     expect(await store.latest('employee')).toBe(1)
   })
 
@@ -365,7 +496,9 @@ describe('restoration', () => {
     await publish(1)
     expect((await restore({ version: 1, expectedBase: 1 })).json()).toEqual({ code: 'conflict', message: expect.any(String), current: 2 })
     expect((await restore({ version: 7, expectedBase: 2 })).json()).toMatchObject({ code: 'unknown-version' })
-    expect((await app.inject({ method: 'POST', url: '/v1/forms/nope/restorations', headers: ADMIN, payload: { version: 1, expectedBase: 1 } })).json()).toMatchObject({ code: 'unknown-form' })
+    expect(
+      (await app.inject({ method: 'POST', url: '/v1/forms/nope/restorations', headers: ADMIN, payload: { version: 1, expectedBase: 1 } })).json(),
+    ).toMatchObject({ code: 'unknown-form' })
     reachable = false
     const down = await restore({ version: 1, expectedBase: 2 })
     expect(down.statusCode).toBe(503)
@@ -380,7 +513,14 @@ describe('restoration', () => {
   // restored, though not regenerated.
   test('a format-1 version may be restored', async () => {
     const proposal = await propose()
-    await store.publish('employee', null, { format: 1, connection: 'erp', form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot })
+    await store.publish('employee', null, {
+      format: 1,
+      connection: 'erp',
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    })
     await publish(1)
     expect((await restore({ version: 1, expectedBase: 2 })).statusCode).toBe(201)
     expect(await file(3)).toBe(await file(1))
@@ -412,8 +552,22 @@ async function regenerated(): Promise<Record<string, unknown> & { version: numbe
 }
 
 /** A regeneration published as it came, `policy` in place of the published one, `extra` beside the bundle in the body. */
-function publishRegenerated(regeneration: Record<string, unknown>, extra: Record<string, unknown> = {}, policy?: unknown, expectedBase = regeneration['version']) {
-  const { version: _version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
+function publishRegenerated(
+  regeneration: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+  policy?: unknown,
+  expectedBase = regeneration['version'],
+) {
+  const {
+    version: _version,
+    drift: _drift,
+    policyProblems: _problems,
+    conflicts: _conflicts,
+    lookupsDropped: _dropped,
+    keysReassigned: _keys,
+    notes: _notes,
+    ...parts
+  } = regeneration
   const bundle = { format: 2, connection: 'erp', ...parts, ...(policy === undefined ? {} : { policy }) }
   return app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle, ...extra } })
 }
@@ -435,7 +589,8 @@ describe('publishing over keys that now name other columns (0039)', () => {
     expect(undecided.statusCode).toBe(422)
     expect(undecided.json()).toEqual({
       code: 'keys-reassigned',
-      message: "Version 1 bound job_title, job_title_2 to other columns or lookups: confirm the grants on each for what it stands for now, or remove them. A grant is a role on the key's field, or a through that scopes this form's rows by it.",
+      message:
+        "Version 1 bound job_title, job_title_2 to other columns or lookups: confirm the grants on each for what it stands for now, or remove them. A grant is a role on the key's field, or a through that scopes this form's rows by it.",
       keys: REASSIGNED,
       problems: [
         'Grants for job_title were written for column job_title; it now stands for column job title.',
@@ -497,7 +652,14 @@ describe('publishing over keys that now name other columns (0039)', () => {
     renumber()
     const regeneration = await regenerated()
     const was = column('job_title')
-    for (const keysConfirmed of [null, 'job_title', [{ field: 'job_title' }], [{ field: 'job_title', was, now: { kind: 'table', name: 'job' } }], [{ field: 7, was, now: was }], [{ field: 'job_title', was, now: { kind: 'lookup', foreignKey: 3 } }]]) {
+    for (const keysConfirmed of [
+      null,
+      'job_title',
+      [{ field: 'job_title' }],
+      [{ field: 'job_title', was, now: { kind: 'table', name: 'job' } }],
+      [{ field: 7, was, now: was }],
+      [{ field: 'job_title', was, now: { kind: 'lookup', foreignKey: 3 } }],
+    ]) {
       const response = await publishRegenerated(regeneration, { keysConfirmed })
       expect(response.statusCode, JSON.stringify(keysConfirmed)).toBe(400)
       expect(response.json()).toMatchObject({ code: 'invalid-request' })
@@ -531,7 +693,17 @@ describe('publishing over keys that now name other columns (0039)', () => {
     await writeFile(join(root, 'employee', '1.json'), JSON.stringify(damaged, null, 2))
     renumber()
     const proposal = await propose()
-    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const bundle = {
+      format: 2,
+      connection: 'erp',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: EMPTY_PRESENTATION,
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    }
     const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
     expect(response.statusCode, response.body).toBe(201)
   })
@@ -547,7 +719,17 @@ describe('publishing over keys that now name other columns (0039)', () => {
     await writeFile(join(root, 'employee', '1.json'), text.slice(0, Math.floor(text.length / 2)))
     renumber()
     const proposal = await propose()
-    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const bundle = {
+      format: 2,
+      connection: 'erp',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: EMPTY_PRESENTATION,
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    }
     const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
     expect(response.statusCode, response.body).toBe(201)
     expect(response.json()).toEqual({ version: 2 })
@@ -570,9 +752,26 @@ describe('publishing over keys that now name other columns (0039)', () => {
         return store.read(id, version)
       },
     }
-    const other = await createDataServer({ verifyIdentity, admin: { registry: registry(), store: failing, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
-    const { version: _version, drift: _drift, policyProblems: _problems, conflicts: _conflicts, lookupsDropped: _dropped, keysReassigned: _keys, notes: _notes, ...parts } = regeneration
-    const response = await other.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle: { format: 2, connection: 'erp', ...parts } } })
+    const other = await createDataServer({
+      verifyIdentity,
+      admin: { registry: registry(), store: failing, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    })
+    const {
+      version: _version,
+      drift: _drift,
+      policyProblems: _problems,
+      conflicts: _conflicts,
+      lookupsDropped: _dropped,
+      keysReassigned: _keys,
+      notes: _notes,
+      ...parts
+    } = regeneration
+    const response = await other.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: ADMIN,
+      payload: { expectedBase: 1, bundle: { format: 2, connection: 'erp', ...parts } },
+    })
     expect(response.statusCode).toBe(500)
     expect(await store.versions('employee')).toEqual([1])
     await other.close()
@@ -585,7 +784,17 @@ describe('publishing over keys that now name other columns (0039)', () => {
   test('a base below 1 over a published form is the conflict, as any base that is not the newest', async () => {
     await publish()
     const proposal = await propose()
-    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings), snapshot: proposal.snapshot }
+    const bundle = {
+      format: 2,
+      connection: 'erp',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: EMPTY_PRESENTATION,
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy: policyFor(proposal.bindings),
+      snapshot: proposal.snapshot,
+    }
     for (const expectedBase of [0, -1]) {
       const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase, bundle } })
       expect(response.statusCode, `${String(expectedBase)}: ${response.body}`).toBe(409)
@@ -625,8 +834,25 @@ describe('publishing over keys that now name other columns (0039)', () => {
     await publish()
     const proposal = await propose({ root: { schema: 'sales', name: 'dept' } })
     expect(proposal.bindings.root).toEqual({ schema: 'sales', name: 'dept' })
-    const policy = { ...policyFor(proposal.bindings), operations: { read: ['clerk'], create: proposal.bindings.operations.create ? ['clerk'] : [], update: proposal.bindings.operations.update ? ['clerk'] : [] } }
-    const bundle = { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy, snapshot: proposal.snapshot }
+    const policy = {
+      ...policyFor(proposal.bindings),
+      operations: {
+        read: ['clerk'],
+        create: proposal.bindings.operations.create ? ['clerk'] : [],
+        update: proposal.bindings.operations.update ? ['clerk'] : [],
+      },
+    }
+    const bundle = {
+      format: 2,
+      connection: 'erp',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation: EMPTY_PRESENTATION,
+      form: proposal.form,
+      bindings: proposal.bindings,
+      policy,
+      snapshot: proposal.snapshot,
+    }
     const response = await app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: ADMIN, payload: { expectedBase: 1, bundle } })
     expect(response.statusCode, response.body).toBe(201)
   })
@@ -706,7 +932,12 @@ describe('versions', () => {
 
   // The routes are on the administrator plane, behind its role check.
   test('every evolution route needs an administrator', async () => {
-    for (const [method, url] of [['GET', '/v1/forms/employee/versions'], ['GET', '/v1/forms/employee/versions/1'], ['POST', '/v1/forms/employee/regenerations'], ['POST', '/v1/forms/employee/restorations']] as const) {
+    for (const [method, url] of [
+      ['GET', '/v1/forms/employee/versions'],
+      ['GET', '/v1/forms/employee/versions/1'],
+      ['POST', '/v1/forms/employee/regenerations'],
+      ['POST', '/v1/forms/employee/restorations'],
+    ] as const) {
       expect((await app.inject({ method, url })).statusCode, url).toBe(401)
     }
   })

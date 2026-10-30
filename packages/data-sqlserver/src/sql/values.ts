@@ -116,9 +116,7 @@ export function canonicalText(type: NormalizedType, expression: string): string 
     case 'time':
       return `convert(nchar(5), ${expression}, 108)`
     case 'timestamp':
-      return type.withTimeZone
-        ? `convert(nchar(19), switchoffset(${expression}, '+00:00'), 126) + N'Z'`
-        : zonelessText(expression)
+      return type.withTimeZone ? `convert(nchar(19), switchoffset(${expression}, '+00:00'), 126) + N'Z'` : zonelessText(expression)
     case 'uuid':
       return `lower(convert(nchar(36), ${expression}))`
     case 'binary':

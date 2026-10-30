@@ -23,7 +23,17 @@ import type { BrowseAnswer } from './admin-browse.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** Planted where an event must never look: a search, a filter's value, and a value a row holds. */
@@ -32,26 +42,45 @@ const FILTERED = 'filter-marker-9a64'
 const VALUE = 'value-marker-c4d2'
 
 const SNAPSHOT = createSnapshot({
-  kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'postgres',
+  serverVersion: '17.6',
+  account: { user: 'owner', login: 'owner' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null,
+      ref: { schema: 'sales', name: 'employee' },
+      kind: 'table',
+      comment: null,
       columns: [col('id', 1, INT32), col('name', 2, TEXT), col('photo', 3, { kind: 'binary', maxLength: null, fixedLength: false }, { nullable: true })],
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_employee', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: { schema: 'sales', name: 'headcount' }, kind: 'view', comment: null,
+      ref: { schema: 'sales', name: 'headcount' },
+      kind: 'view',
+      comment: null,
       columns: [col('team', 1, TEXT), col('people', 2, INT32)],
-      primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: null,
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
 
 /** Tokens by name: an administrator, a browser who administers too, and a publisher who administers and does not browse. */
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
-    : token === 'browser' ? { ok: true, identity: { actor: { id: 'b', roles: ['data-admin', 'data-browser'] }, attributes: {} } }
-      : token === 'publisher' ? { ok: true, identity: { actor: { id: 'p', roles: ['data-admin', 'data-publisher'] }, attributes: {} } }
+  token === 'admin'
+    ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
+    : token === 'browser'
+      ? { ok: true, identity: { actor: { id: 'b', roles: ['data-admin', 'data-browser'] }, attributes: {} } }
+      : token === 'publisher'
+        ? { ok: true, identity: { actor: { id: 'p', roles: ['data-admin', 'data-publisher'] }, attributes: {} } }
         : { ok: false, reason: 'bad' }
 
 let requests: ListRequest[]
@@ -83,7 +112,9 @@ function serve(roles: { browse?: string[]; publish?: string[] } = { browse: ['da
   return createDataServer({
     verifyIdentity,
     admin: {
-      registry: registry(), store, adminRoles: ['data-admin', 'data-browser', 'data-publisher'],
+      registry: registry(),
+      store,
+      adminRoles: ['data-admin', 'data-browser', 'data-publisher'],
       ...(roles.browse === undefined ? {} : { browseRoles: roles.browse }),
       ...(roles.publish === undefined ? {} : { publisherRoles: roles.publish }),
       audit: { sink, now: () => 't' },
@@ -137,9 +168,9 @@ describe('who may browse', () => {
 
   // An embedder's list is held to the setting's rule: a role the plane refuses at its door could browse nothing.
   test('a browse role that is not an administrator role stops the plane', async () => {
-    await expect(createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], browseRoles: ['data-browser'], audit: { sink } } })).rejects.toThrow(
-      'admin.browseRoles names "data-browser", which is not in admin.adminRoles',
-    )
+    await expect(
+      createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], browseRoles: ['data-browser'], audit: { sink } } }),
+    ).rejects.toThrow('admin.browseRoles names "data-browser", which is not in admin.adminRoles')
   })
 })
 
@@ -154,14 +185,20 @@ describe('a page', () => {
       target: { table: { schema: 'sales', name: 'employee' }, identity: [{ name: 'id', type: INT32 }], concurrency: null },
       filters: { kind: 'unrestricted' },
       through: [],
-      sort: [{ column: 'name', direction: 'desc', nulls: null }, { column: 'id', direction: 'asc', nulls: null }],
+      sort: [
+        { column: 'name', direction: 'desc', nulls: null },
+        { column: 'id', direction: 'asc', nulls: null },
+      ],
       offset: 0,
       limit: 1,
     })
     expect(response.json()).toEqual({
       object: { schema: 'sales', name: 'employee' },
       kind: 'table',
-      columns: [{ name: 'id', type: INT32 }, { name: 'name', type: TEXT }],
+      columns: [
+        { name: 'id', type: INT32 },
+        { name: 'name', type: TEXT },
+      ],
       omitted: [{ column: 'photo', reason: 'no-text' }],
       ordered: 'key',
       rows: [{ id: '1', name: 'Ada' }],
@@ -241,7 +278,12 @@ describe('a page', () => {
 
   // A filter of another shape is the body's fault, refused with it before the discovery: a column named twice, an operator outside the closed set, a property its operator has not got.
   test.each([
-    [[{ column: 'name', op: 'equals', value: 'a' }, { column: 'name', op: 'contains', text: 'b' }]],
+    [
+      [
+        { column: 'name', op: 'equals', value: 'a' },
+        { column: 'name', op: 'contains', text: 'b' },
+      ],
+    ],
     [[{ column: 'name', op: 'like', value: 'A%' }]],
     [[{ column: 'id', op: 'null', value: '1' }]],
     [{ column: 'name', op: 'null' }],
@@ -282,8 +324,36 @@ describe('the trail', () => {
     await browse(server, 'browser', { ...EMPLOYEE, search: SEARCH, filter: [{ column: 'name', op: 'equals', value: FILTERED }] })
     await browse(server, 'browser', { ...EMPLOYEE, filter: [{ column: 'id', op: 'equals', value: FILTERED }] })
     expect(events).toEqual([
-      { at: 't', plane: 'admin', actor: 'b', operation: 'browse', connection: 'erp', form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: 'sales.employee', status: 200, outcome: 'ok' },
-      { at: 't', plane: 'admin', actor: 'b', operation: 'browse', connection: 'erp', form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: 'sales.employee', status: 400, outcome: 'not-filterable' },
+      {
+        at: 't',
+        plane: 'admin',
+        actor: 'b',
+        operation: 'browse',
+        connection: 'erp',
+        form: null,
+        formVersion: null,
+        expectedBase: null,
+        restoredFrom: null,
+        draft: null,
+        object: 'sales.employee',
+        status: 200,
+        outcome: 'ok',
+      },
+      {
+        at: 't',
+        plane: 'admin',
+        actor: 'b',
+        operation: 'browse',
+        connection: 'erp',
+        form: null,
+        formVersion: null,
+        expectedBase: null,
+        restoredFrom: null,
+        draft: null,
+        object: 'sales.employee',
+        status: 400,
+        outcome: 'not-filterable',
+      },
     ])
     expect(JSON.stringify(events)).not.toContain(SEARCH)
     expect(JSON.stringify(events)).not.toContain(FILTERED)

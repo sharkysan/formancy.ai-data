@@ -3,7 +3,17 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { ColumnAccess, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
-import { accessDisagreements, covers, FIXTURE_SCOPE, MODEL_CASES, renamedColumn, startSqlServerFixture, versionFact, WRITER, WRITER_ACCESS } from '@formancy/data-fixtures'
+import {
+  accessDisagreements,
+  covers,
+  FIXTURE_SCOPE,
+  MODEL_CASES,
+  renamedColumn,
+  startSqlServerFixture,
+  versionFact,
+  WRITER,
+  WRITER_ACCESS,
+} from '@formancy/data-fixtures'
 import { discoverSqlServer } from './index.js'
 
 /**
@@ -237,7 +247,10 @@ describe('what a snapshot says an account may do', () => {
   // only, marks every column. With no SELECT, the UPDATE the snapshot allows
   // succeeds -- with a NULL cast; `set c = c` would read c (B12).
   test('column UPDATE grants mark exactly those columns, INSERT marks every one, and odd names are answered', async () => {
-    await asOwner('create schema quoting', "create table quoting.[it's [odd]]] (id int not null constraint pk_odd primary key, [group] int null, [it's [odd]]] int null, amount int null)")
+    await asOwner(
+      'create schema quoting',
+      "create table quoting.[it's [odd]]] (id int not null constraint pk_odd primary key, [group] int null, [it's [odd]]] int null, amount int null)",
+    )
     const pool = await connectAs('probe_quoting', [
       "grant insert on quoting.[it's [odd]]] to probe_quoting",
       "grant update ([group], [it's [odd]]]) on quoting.[it's [odd]]] to probe_quoting",
@@ -257,9 +270,24 @@ describe('what a snapshot says an account may do', () => {
   // is a yes, a column DENY under a table GRANT a no, and a table GRANT made
   // after a column DENY removes the DENY. Each is confirmed with a real read.
   test.each([
-    ['a table DENY with a column GRANT', 'probe_b8a', ['deny select on precedence.t to probe_b8a', 'grant select on precedence.t (c) to probe_b8a'], { c: true, d: false }],
-    ['a table GRANT with a column DENY', 'probe_b8b', ['grant select on precedence.t to probe_b8b', 'deny select on precedence.t (d) to probe_b8b'], { c: true, d: false }],
-    ['a column DENY, then a table GRANT', 'probe_b8c', ['deny select on precedence.t (d) to probe_b8c', 'grant select on precedence.t to probe_b8c'], { c: true, d: true }],
+    [
+      'a table DENY with a column GRANT',
+      'probe_b8a',
+      ['deny select on precedence.t to probe_b8a', 'grant select on precedence.t (c) to probe_b8a'],
+      { c: true, d: false },
+    ],
+    [
+      'a table GRANT with a column DENY',
+      'probe_b8b',
+      ['grant select on precedence.t to probe_b8b', 'deny select on precedence.t (d) to probe_b8b'],
+      { c: true, d: false },
+    ],
+    [
+      'a column DENY, then a table GRANT',
+      'probe_b8c',
+      ['deny select on precedence.t (d) to probe_b8c', 'grant select on precedence.t to probe_b8c'],
+      { c: true, d: true },
+    ],
   ] as const)('%s: the snapshot reports what a read then does', async (_title, login, grants, expected) => {
     await asOwner("if schema_id('precedence') is null exec ('create schema precedence')")
     await asOwner("if object_id('precedence.t') is null create table precedence.t (c int null, d int null)")
@@ -318,7 +346,9 @@ describe('what a snapshot says an account may do', () => {
     try {
       await pool
         .request()
-        .batch("insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time) values (9, 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 1, 'B15', '08:00')")
+        .batch(
+          "insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time) values (9, 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 1, 'B15', '08:00')",
+        )
       const stored = await owner.request().query<{ numbered: number }>('select count(*) as numbered from sales.shipment where tenant_id = 9 and id is not null')
       expect(stored.recordset).toEqual([{ numbered: 1 }])
     } finally {
@@ -363,7 +393,10 @@ describe('whether a security policy filters what the account sees', () => {
     await withGuard('on', async () => {
       const bySchema = await discoverSqlServer(schemaViewer, FIXTURE_SCOPE)
       expect(rowSecurityOf(bySchema, 'employee')).toBe('unknown')
-      expect(bySchema.gaps).toEqual([referrersGap(/lacks VIEW DEFINITION on the database, which is what lists every foreign key/), scopeGap(/lacks VIEW DEFINITION on the database/)])
+      expect(bySchema.gaps).toEqual([
+        referrersGap(/lacks VIEW DEFINITION on the database, which is what lists every foreign key/),
+        scopeGap(/lacks VIEW DEFINITION on the database/),
+      ])
       const byDatabase = await discoverSqlServer(databaseViewer, FIXTURE_SCOPE)
       expect(rowSecurityOf(byDatabase, 'employee')).toBe('applies')
       expect(byDatabase.gaps).toEqual([])
@@ -387,11 +420,18 @@ describe('whether a security policy filters what the account sees', () => {
   // nothing, and that refusal is what is asserted.
   test('VIEW SECURITY DEFINITION alone does not settle row security', async () => {
     if (!versionFact('viewSecurityDefinition', fixture.server)) {
-      await expect(connectAs('probe_security_viewer', ['grant view security definition to probe_security_viewer'])).rejects.toThrow("Incorrect syntax near 'view'.")
+      await expect(connectAs('probe_security_viewer', ['grant view security definition to probe_security_viewer'])).rejects.toThrow(
+        "Incorrect syntax near 'view'.",
+      )
       return
     }
-    const pool = await connectAs('probe_security_viewer', ['grant view security definition to probe_security_viewer', 'grant select on sales.customer to probe_security_viewer'])
-    const held = await pool.request().query<{ held: number }>("select has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW SECURITY DEFINITION') as held")
+    const pool = await connectAs('probe_security_viewer', [
+      'grant view security definition to probe_security_viewer',
+      'grant select on sales.customer to probe_security_viewer',
+    ])
+    const held = await pool
+      .request()
+      .query<{ held: number }>("select has_perms_by_name(quotename(db_name()), N'DATABASE', N'VIEW SECURITY DEFINITION') as held")
     expect(held.recordset).toEqual([{ held: 1 }])
     const snapshot = await discoverSqlServer(pool, FIXTURE_SCOPE)
     expect(rowSecurityOf(snapshot, 'customer')).toBe('unknown')
@@ -404,8 +444,20 @@ describe('whether a security policy filters what the account sees', () => {
   // object count reads 0: without counting schema denies, employee would be
   // reported "none" under a policy that filters it.
   test.each([
-    ['its schema', 'probe_deny_schema', 'deny view definition on schema::guard to probe_deny_schema', 'employee', /denied VIEW DEFINITION or CONTROL on 1 schema/],
-    ['the policy', 'probe_deny_policy', 'deny view definition on object::guard.employee_guard to probe_deny_policy', 'employee', /denied VIEW DEFINITION or CONTROL on 1 object/],
+    [
+      'its schema',
+      'probe_deny_schema',
+      'deny view definition on schema::guard to probe_deny_schema',
+      'employee',
+      /denied VIEW DEFINITION or CONTROL on 1 schema/,
+    ],
+    [
+      'the policy',
+      'probe_deny_policy',
+      'deny view definition on object::guard.employee_guard to probe_deny_policy',
+      'employee',
+      /denied VIEW DEFINITION or CONTROL on 1 object/,
+    ],
   ] as const)('a deny on %s under a database grant leaves row security unknown, and says why', async (_title, login, deny, name, reason) => {
     const pool = await connectAs(login, [`grant view definition to ${login}`])
     await withGuard('on', async () => {
@@ -444,7 +496,7 @@ describe('whether a security policy filters what the account sees', () => {
   // `it's [odd] db` the raw DB_NAME() answers NULL and QUOTENAME's answers 1
   // (B9). Unquoted, every account there would carry a row-security gap that
   // its grant should have settled.
-  test("a database whose name needs quoting is checked by its quoted name", async () => {
+  test('a database whose name needs quoting is checked by its quoted name', async () => {
     await inMaster("create database [it's [odd]] db]")
     await new mssql.ConnectionPool({ ...fixture.admin, database: "it's [odd] db" }).connect().then(async (pool) => {
       try {

@@ -114,7 +114,12 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   if (unbrowsable !== undefined) throw new Error(unbrowsable)
   const browsers = browsing === undefined ? undefined : new Set(browsing)
   const review = publishers !== undefined
-  auditRequests(app, { names: ADMIN_OPERATIONS, sink: options.audit.sink, now: options.audit.now, describe: describeAdmin((id) => registry.scope(id) !== undefined) })
+  auditRequests(app, {
+    names: ADMIN_OPERATIONS,
+    sink: options.audit.sink,
+    now: options.audit.now,
+    describe: describeAdmin((id) => registry.scope(id) !== undefined),
+  })
 
   app.addHook('preHandler', async (request, reply) => {
     const identity = await options.authenticate(request)
@@ -190,7 +195,12 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     if (!isRecord(body)) return refuse(reply, 400, 'invalid-request', 'Expected a JSON object.')
     const read = readGeneration(body)
     if (!read.ok) {
-      return refuse(reply, 400, 'invalid-request', 'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups, versionColumn and pinned columns.')
+      return refuse(
+        reply,
+        400,
+        'invalid-request',
+        'Expected connection, root { schema, name }, a lower-case formId, title, and optional lookups, versionColumn and pinned columns.',
+      )
     }
     const trail = adminTrail(request)
     trail.form = read.generation.formId
@@ -218,7 +228,12 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     trail.expectedBase = expectedBase
     const confirmed = readKeysConfirmed(body['keysConfirmed'])
     if (confirmed === undefined) {
-      return refuse(reply, 400, 'invalid-request', 'Expected keysConfirmed, when sent, to list { field, was, now } as a regeneration reports them in keysReassigned.')
+      return refuse(
+        reply,
+        400,
+        'invalid-request',
+        'Expected keysConfirmed, when sent, to list { field, was, now } as a regeneration reports them in keysReassigned.',
+      )
     }
     const checked = storable(body['bundle'], id, (name) => registry.scope(name) !== undefined)
     if (!checked.ok) {

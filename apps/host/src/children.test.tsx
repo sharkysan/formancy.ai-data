@@ -70,7 +70,11 @@ function rows(heading: string): string[][] {
   return within(grid)
     .getAllByRole('row')
     .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) => within(row).getAllByRole('gridcell').map((cell) => cell.textContent ?? ''))
+    .map((row) =>
+      within(row)
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent ?? ''),
+    )
 }
 
 /** Click the row of the grid `heading` names whose first cell says `first`. */
@@ -114,7 +118,11 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     await waitFor(() => expect(screen.getByRole('region', { name: 'Order line' })).toBeTruthy(), ARRIVES)
     expect(await answeredOnce('Order line')).toBe('Order line rows 1–2.')
     expect(rows('Order line').map((cells) => cells[0])).toEqual(['1', '2'])
-    expect(within(gridSection('Order line')).getAllByRole('columnheader').map((header) => header.textContent?.trim())).not.toContain('Order')
+    expect(
+      within(gridSection('Order line'))
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent?.trim()),
+    ).not.toContain('Order')
     expect(paragraphs(gridSection('Order line'))).toContain(`For Order ${mine.order}`)
   })
 
@@ -152,7 +160,10 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     await user.type(field(/^Unit price\b/), '1.25')
     await user.click(within(pane).getByRole('button', { name: 'Save' }))
     const created = await waitFor(() => {
-      const text = within(pane).getAllByRole('status').map((status) => status.textContent ?? '').find((said) => /^Created record /.test(said))
+      const text = within(pane)
+        .getAllByRole('status')
+        .map((status) => status.textContent ?? '')
+        .find((said) => /^Created record /.test(said))
       expect(text, 'the line was created').toBeDefined()
       return String(text)
     }, ARRIVES)
@@ -168,7 +179,15 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     await user.clear(quantity)
     await user.type(quantity, '9')
     await user.click(within(opened).getByRole('button', { name: 'Save' }))
-    await waitFor(() => expect(within(opened).getAllByRole('status').map((status) => status.textContent)).toContain('Saved.'), ARRIVES)
+    await waitFor(
+      () =>
+        expect(
+          within(opened)
+            .getAllByRole('status')
+            .map((status) => status.textContent),
+        ).toContain('Saved.'),
+      ARRIVES,
+    )
     const edited = await plane.clerk.read(engine.lines, mine.lines[0] ?? '')
     expect(edited.ok && String(edited.value.answers['quantity'])).toBe('9')
   })

@@ -92,7 +92,9 @@ function onTarget(bindings: FormBindings, target: ObjectRef, column: ColumnMeta,
   into.stops.add('create')
   into.stops.add('update')
   for (const lookup of users) into.affects.add(lookup.field)
-  into.reasons.push(`${list(users.map((lookup) => lookup.field))} ${users.length === 1 ? 'reads' : 'read'} it on every search, so a selection can be neither offered nor rechecked, and writes are blocked.`)
+  into.reasons.push(
+    `${list(users.map((lookup) => lookup.field))} ${users.length === 1 ? 'reads' : 'read'} it on every search, so a selection can be neither offered nor rechecked, and writes are blocked.`,
+  )
 }
 
 /** The root, then each lookup's target once, as they were and as they are; a target no longer there is the relationship suites' business. */
@@ -155,7 +157,11 @@ function rowSecurityDraft(comparison: Comparison, before: ObjectMeta, after: Obj
   if (before.rowSecurity === after.rowSecurity) return []
   const { bindings } = comparison
   const isRoot = sameRef(after.ref, bindings.root)
-  const fields = isRoot ? allFields(bindings) : lookups(bindings).filter((lookup) => sameRef(lookup.target.table, after.ref)).map((lookup) => lookup.field)
+  const fields = isRoot
+    ? allFields(bindings)
+    : lookups(bindings)
+        .filter((lookup) => sameRef(lookup.target.table, after.ref))
+        .map((lookup) => lookup.field)
   return [
     {
       kind: 'row-security-changed',

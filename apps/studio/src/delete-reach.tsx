@@ -51,7 +51,14 @@ const strayRemove = (index: number) => `stray-cascade-${String(index)}-remove`
  * next one's, else the one before's, and when the note closes to `check`,
  * the policy check whose verdict the removal changes.
  */
-function Strays({ id, lead, entries, policy, onPolicy, check }: {
+function Strays({
+  id,
+  lead,
+  entries,
+  policy,
+  onPolicy,
+  check,
+}: {
   id: string
   lead: string
   entries: ReadonlyArray<{ index: number; rule: CascadeRule }>
@@ -77,7 +84,7 @@ function Strays({ id, lead, entries, policy, onPolicy, check }: {
             <li key={`${String(index)}-${named}`}>
               <code>{rule.foreignKey}</code> of {describeRef(rule.table)}, as ON DELETE {SPELLED[rule.onDelete]}{' '}
               <button type="button" id={strayRemove(index)} className="button" onClick={() => remove(at, index)}>
-                Remove{' '}<span className="visually-hidden">the acceptance of {named}</span>
+                Remove <span className="visually-hidden">the acceptance of {named}</span>
               </button>
             </li>
           )
@@ -105,7 +112,13 @@ function Strays({ id, lead, entries, policy, onPolicy, check }: {
  * Shown only where the form offers delete. A form that offers none, with
  * acceptances left from one that did, lists them to be removed.
  */
-export function DeleteReach({ bindings, snapshot, policy, onPolicy, check }: {
+export function DeleteReach({
+  bindings,
+  snapshot,
+  policy,
+  onPolicy,
+  check,
+}: {
   bindings: FormBindings
   snapshot: MetadataSnapshot
   policy: FormPolicy
@@ -116,7 +129,16 @@ export function DeleteReach({ bindings, snapshot, policy, onPolicy, check }: {
   const root = describeRef(bindings.root)
   if (!offers(bindings, 'delete')) {
     const left = (policy.cascades ?? []).map((rule, index) => ({ index, rule }))
-    return <Strays id="cascades-unoffered" lead="The policy accepts what a delete does, and this form offers no delete" entries={left} policy={policy} onPolicy={onPolicy} check={check} />
+    return (
+      <Strays
+        id="cascades-unoffered"
+        lead="The policy accepts what a delete does, and this form offers no delete"
+        entries={left}
+        policy={policy}
+        onPolicy={onPolicy}
+        check={check}
+      />
+    )
   }
   const review = deleteReview(snapshot, bindings.root, policy)
   // A key that sets NULL or a default keeps the rows it reaches: of the keys
@@ -143,8 +165,8 @@ export function DeleteReach({ bindings, snapshot, policy, onPolicy, check }: {
       ) : (
         <>
           <p className="hint" id="reach-acting">
-            Each key below deletes or changes other rows when a record is deleted, and those rows are asked of no form&rsquo;s
-            policy. Tick each one you accept: a grant of delete is refused while one is not.
+            Each key below deletes or changes other rows when a record is deleted, and those rows are asked of no form&rsquo;s policy. Tick each one you accept:
+            a grant of delete is refused while one is not.
           </p>
           {review.acting.map((reached, index) => {
             const id = `cascade-${String(index)}`
@@ -189,7 +211,14 @@ export function DeleteReach({ bindings, snapshot, policy, onPolicy, check }: {
           </ul>
         </div>
       )}
-      <Strays id="cascades-stray" lead={`The policy accepts what a delete of ${root} does not do`} entries={review.stray} policy={policy} onPolicy={onPolicy} check={check} />
+      <Strays
+        id="cascades-stray"
+        lead={`The policy accepts what a delete of ${root} does not do`}
+        entries={review.stray}
+        policy={policy}
+        onPolicy={onPolicy}
+        check={check}
+      />
     </fieldset>
   )
 }

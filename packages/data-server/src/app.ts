@@ -67,7 +67,14 @@ export interface DataServerOptions {
    * Absent, nobody browses; the runnable server reads
    * `FORMANCY_DATA_BROWSE_ROLES` for it.
    */
-  admin?: { registry: ConnectionRegistry; store: ConfigurationStore; adminRoles: readonly string[]; publisherRoles?: readonly string[]; browseRoles?: readonly string[]; audit: AdminOptions['audit'] }
+  admin?: {
+    registry: ConnectionRegistry
+    store: ConfigurationStore
+    adminRoles: readonly string[]
+    publisherRoles?: readonly string[]
+    browseRoles?: readonly string[]
+    audit: AdminOptions['audit']
+  }
   /**
    * The runtime plane: published forms, their records and their lookups, for
    * the host application's people. Absent, none of those routes exist.
@@ -89,7 +96,13 @@ export interface DataServerOptions {
    * performance figures; the runnable server reads
    * `FORMANCY_DATA_LOOKUP_DEADLINE_MS` for it (main.ts).
    */
-  runtime?: { registry: ConnectionRegistry; store: ConfigurationStore; audit?: NonNullable<RuntimeOptions['audit']>; origins?: readonly string[]; lookupDeadlineMs?: number }
+  runtime?: {
+    registry: ConnectionRegistry
+    store: ConfigurationStore
+    audit?: NonNullable<RuntimeOptions['audit']>
+    origins?: readonly string[]
+    lookupDeadlineMs?: number
+  }
 }
 
 /**
@@ -209,7 +222,12 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   // Counted by the address the log names (trusted-proxies.ts), masked as the
   // limiter's own default key is: an IPv6 client by its /64.
   const limit = options.rateLimit ?? DEFAULT_RATE_LIMIT
-  await app.register(rateLimit, { global: true, max: limit.max, timeWindow: limit.timeWindowMs, keyGenerator: (request) => normalizeIP(clientAddress(request)) })
+  await app.register(rateLimit, {
+    global: true,
+    max: limit.max,
+    timeWindow: limit.timeWindowMs,
+    keyGenerator: (request) => normalizeIP(clientAddress(request)),
+  })
 
   // A path a proxy could read differently from the router is answered here,
   // before any route's work (paths.ts, 0037): before a plane's hooks, before

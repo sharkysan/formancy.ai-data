@@ -81,7 +81,11 @@ export function readVersionFile(name: string, text: string): { ok: true; file: V
   const table = describeRef({ schema: root['schema'], name: root['name'] })
   return {
     ok: true,
-    file: { formId, bundle: parsed, described: `${formId} version file: “${title}”, ${String(fields)} ${fields === 1 ? 'field' : 'fields'}, bound to ${table} on ${connection}.` },
+    file: {
+      formId,
+      bundle: parsed,
+      described: `${formId} version file: “${title}”, ${String(fields)} ${fields === 1 ? 'field' : 'fields'}, bound to ${table} on ${connection}.`,
+    },
   }
 }
 
@@ -193,7 +197,13 @@ export function ImportPanel({
     // Validated by the server before it answered anything but a refusal of the file itself.
     const published: Published = { version: newest ?? 0, bundle: file.bundle as PublishedBundle }
     if (outcome.ok && 'version' in outcome) {
-      setImported({ kind: 'imported', formId: file.formId, version: outcome.version, drift: outcome.drift, published: { ...published, version: outcome.version } })
+      setImported({
+        kind: 'imported',
+        formId: file.formId,
+        version: outcome.version,
+        drift: outcome.drift,
+        published: { ...published, version: outcome.version },
+      })
       await readNewest(file, asked)
       onImported(file.formId)
     } else if (outcome.ok) {
@@ -217,9 +227,9 @@ export function ImportPanel({
     <section className="versions import" aria-labelledby="import-heading">
       <h3 id="import-heading">Import a version</h3>
       <p className="hint">
-        A version file is one version as a studio downloads it, from this deployment or another. It keeps its form id and its
-        connection&rsquo;s name, which this deployment&rsquo;s allowlist resolves to its own database. The server checks it as it
-        checks a publish, and against this database as it checks a restore.
+        A version file is one version as a studio downloads it, from this deployment or another. It keeps its form id and its connection&rsquo;s name, which
+        this deployment&rsquo;s allowlist resolves to its own database. The server checks it as it checks a publish, and against this database as it checks a
+        restore.
       </p>
       {review === null ? null : <p className="reviewed">{review}</p>}
       <div className="field">
@@ -261,13 +271,21 @@ function Differs({ imported }: { imported: Extract<Imported, { drift: DriftRepor
 }
 
 /** What the server answered an import, each answer as the step shows its kind elsewhere. */
-function ImportOutcome({ imported, reviewed, onConfirm }: { imported: Imported; reviewed: boolean; onConfirm: (keys: readonly ReassignedKey[]) => void }): ReactElement {
+function ImportOutcome({
+  imported,
+  reviewed,
+  onConfirm,
+}: {
+  imported: Imported
+  reviewed: boolean
+  onConfirm: (keys: readonly ReassignedKey[]) => void
+}): ReactElement {
   if (imported.kind === 'imported') {
     return (
       <>
         <p role="status" className="done">
-          Imported as version {imported.version} of {imported.formId}: the runtime here serves it from now on, with the policy and the
-          snapshot it was published with. The database was not changed.
+          Imported as version {imported.version} of {imported.formId}: the runtime here serves it from now on, with the policy and the snapshot it was published
+          with. The database was not changed.
         </p>
         <Differs imported={imported} />
       </>
@@ -317,9 +335,10 @@ function ImportOutcome({ imported, reviewed, onConfirm }: { imported: Imported; 
     const next = (current ?? 0) + 1
     return (
       <p role="alert" className="problem-box">
-        Somebody published {current === null ? 'a version' : `version ${String(current)}`} of {imported.formId} here since its versions
-        were read.{' '}
-        {reviewed ? `Nothing was submitted; a draft submitted now, once approved, makes version ${String(next)}.` : `Nothing was imported; importing now makes version ${String(next)}.`}
+        Somebody published {current === null ? 'a version' : `version ${String(current)}`} of {imported.formId} here since its versions were read.{' '}
+        {reviewed
+          ? `Nothing was submitted; a draft submitted now, once approved, makes version ${String(next)}.`
+          : `Nothing was imported; importing now makes version ${String(next)}.`}
       </p>
     )
   }

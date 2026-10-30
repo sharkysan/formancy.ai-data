@@ -35,7 +35,10 @@ function instances(options: { signIn?: () => Promise<SignInResult>; fetch?: (req
       },
       fetch: async (request) => {
         asked.forwarded.push(request)
-        return (options.fetch ?? (async () => new Response('{"forms":[]}', { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } })))(request)
+        return (
+          options.fetch ??
+          (async () => new Response('{"forms":[]}', { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } }))
+        )(request)
       },
     }
   }
@@ -43,9 +46,14 @@ function instances(options: { signIn?: () => Promise<SignInResult>; fetch?: (req
 }
 
 const signIn = (persona: string, headers: Record<string, string> = {}): Request =>
-  new Request(`${PAGE}/data/demo/session`, { method: 'POST', body: JSON.stringify({ persona }), headers: { origin: PAGE, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...headers } })
+  new Request(`${PAGE}/data/demo/session`, {
+    method: 'POST',
+    body: JSON.stringify({ persona }),
+    headers: { origin: PAGE, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...headers },
+  })
 
-const api = (path: string, headers: Record<string, string> = {}, init: RequestInit = {}): Request => new Request(`${PAGE}/data/demo${path}`, { ...init, headers })
+const api = (path: string, headers: Record<string, string> = {}, init: RequestInit = {}): Request =>
+  new Request(`${PAGE}/data/demo${path}`, { ...init, headers })
 
 describe('the Worker', () => {
   // Listing the personas is a constant: no Durable Object is created and
@@ -93,7 +101,10 @@ describe('the Worker', () => {
   // Durable Object itself failed: the start failure, and no cookie naming
   // an instance that holds nothing.
   test('answers a start that failed, or an instance that threw, with the start failure and no cookie', async () => {
-    for (const signInOf of [async (): Promise<SignInResult> => ({ ok: false }), async (): Promise<SignInResult> => Promise.reject(new Error('Durable Object reset'))]) {
+    for (const signInOf of [
+      async (): Promise<SignInResult> => ({ ok: false }),
+      async (): Promise<SignInResult> => Promise.reject(new Error('Durable Object reset')),
+    ]) {
       const { named } = instances({ signIn: signInOf })
       const answer = await handle(signIn('otto'), named)
       expect([answer.status, await answer.json()]).toEqual([503, { code: 'unavailable', message: START_FAILED }])
@@ -110,7 +121,13 @@ describe('the Worker', () => {
     const answer = await handle(
       api(
         '/v1/forms/order/records/create',
-        { cookie: `${COOKIE_NAME}=${name}`, authorization: 'Bearer t', 'content-type': 'application/json', [WRITE_ID_HEADER]: 'w-1', 'x-forwarded-for': '203.0.113.7' },
+        {
+          cookie: `${COOKIE_NAME}=${name}`,
+          authorization: 'Bearer t',
+          'content-type': 'application/json',
+          [WRITE_ID_HEADER]: 'w-1',
+          'x-forwarded-for': '203.0.113.7',
+        },
         { method: 'POST', body: '{"values":{}}' },
       ),
       named,

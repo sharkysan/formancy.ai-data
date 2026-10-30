@@ -1,5 +1,15 @@
 import { describe, expect, test } from 'vitest'
-import { busyBetween, parseCgroupPath, parseLoadAverage, parseLscpu, parseMemTotal, parseOsRelease, parsePidStat, parseProcStat, stealSinceBoot } from './machine.js'
+import {
+  busyBetween,
+  parseCgroupPath,
+  parseLoadAverage,
+  parseLscpu,
+  parseMemTotal,
+  parseOsRelease,
+  parsePidStat,
+  parseProcStat,
+  stealSinceBoot,
+} from './machine.js'
 
 // In the shape of the Docker Sandbox VM's /proc/stat (2026-10-09), cut to three
 // CPUs, with counts made up so the arithmetic is easy to follow.
@@ -80,7 +90,14 @@ Hypervisor vendor:                       Microsoft
 Virtualization type:                     full
 `
   test('reads lscpu into vCPUs, topology and hypervisor', () => {
-    expect(parseLscpu(LSCPU)).toEqual({ model: 'Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz', vcpus: 20, sockets: 1, coresPerSocket: 20, threadsPerCore: 1, hypervisor: 'Microsoft' })
+    expect(parseLscpu(LSCPU)).toEqual({
+      model: 'Intel(R) Core(TM) i9-10900K CPU @ 3.70GHz',
+      vcpus: 20,
+      sockets: 1,
+      coresPerSocket: 20,
+      threadsPerCore: 1,
+      hypervisor: 'Microsoft',
+    })
   })
 
   // Bare metal has no hypervisor line; the page then prints CPUs, not vCPUs.

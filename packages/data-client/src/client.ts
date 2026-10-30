@@ -1,5 +1,16 @@
 import { exportFileName, WRITE_ID_HEADER } from '@formancy/data-core'
-import type { FieldError, FormMenu, FormRecord, LookupResult, LookupRow, PublishedForm, RecordDeleted, RecordExportQuery, RecordList, RecordListQuery } from '@formancy/data-core'
+import type {
+  FieldError,
+  FormMenu,
+  FormRecord,
+  LookupResult,
+  LookupRow,
+  PublishedForm,
+  RecordDeleted,
+  RecordExportQuery,
+  RecordList,
+  RecordListQuery,
+} from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
 import { isFormMenu, isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
@@ -233,9 +244,29 @@ export function createDataClient(options: DataClientOptions) {
   }
 
   const read = (formId: string, record: string): Promise<Outcome<FormRecord>> =>
-    call({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/read`, body: { record }, read: (body) => (isFormRecord(body) ? body : undefined) })
-  const lookups = <T>(formId: string, source: string, action: 'query' | 'resolve', body: Record<string, unknown>, read: (body: unknown) => T | undefined, signal?: AbortSignal) =>
-    call({ method: 'POST', names: [formId, source], route: ([form, name]) => `/v1/forms/${String(form)}/lookups/${String(name)}/${action}`, body, read, signal })
+    call({
+      method: 'POST',
+      names: [formId],
+      route: ([form]) => `/v1/forms/${String(form)}/records/read`,
+      body: { record },
+      read: (body) => (isFormRecord(body) ? body : undefined),
+    })
+  const lookups = <T>(
+    formId: string,
+    source: string,
+    action: 'query' | 'resolve',
+    body: Record<string, unknown>,
+    read: (body: unknown) => T | undefined,
+    signal?: AbortSignal,
+  ) =>
+    call({
+      method: 'POST',
+      names: [formId, source],
+      route: ([form, name]) => `/v1/forms/${String(form)}/lookups/${String(name)}/${action}`,
+      body,
+      read,
+      signal,
+    })
 
   return {
     /**
@@ -288,7 +319,13 @@ export function createDataClient(options: DataClientOptions) {
      * whole is `incomplete`, never a file.
      */
     exportRecords: async (formId: string, query: Partial<RecordExportQuery> = {}, signal?: AbortSignal): Promise<Outcome<RecordFile>> => {
-      const file = await download({ method: 'POST', names: [formId], route: ([form]) => `/v1/forms/${String(form)}/records/export`, body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter }, signal })
+      const file = await download({
+        method: 'POST',
+        names: [formId],
+        route: ([form]) => `/v1/forms/${String(form)}/records/export`,
+        body: { search: query.search, sort: query.sort, parent: query.parent, filter: query.filter },
+        signal,
+      })
       return file.ok ? { ok: true, value: { file: file.value, name: exportFileName(formId) } } : file
     },
 
@@ -307,7 +344,11 @@ export function createDataClient(options: DataClientOptions) {
      * passed carries.
      */
     update: (formId: string, change: { record: string; version: string; answers: Readonly<Record<string, unknown>> }): Promise<WriteOutcome> =>
-      write(formId, { operation: 'update', record: change.record, version: change.version }, { record: change.record, version: change.version, answers: change.answers }),
+      write(
+        formId,
+        { operation: 'update', record: change.record, version: change.version },
+        { record: change.record, version: change.version, answers: change.answers },
+      ),
 
     /**
      * `POST …/records/delete` (0050): the record, only if it is still at
@@ -333,10 +374,22 @@ export function createDataClient(options: DataClientOptions) {
       q: { operation: LookupOperation; search: string; offset?: number; limit?: number },
       signal?: AbortSignal,
     ): Promise<Outcome<LookupResult>> =>
-      lookups(formId, source, 'query', { operation: q.operation, search: q.search, offset: q.offset, limit: q.limit }, (body) => (isLookupResult(body) ? body : undefined), signal),
+      lookups(
+        formId,
+        source,
+        'query',
+        { operation: q.operation, search: q.search, offset: q.offset, limit: q.limit },
+        (body) => (isLookupResult(body) ? body : undefined),
+        signal,
+      ),
 
     /** `POST …/lookups/:source/resolve`: the labels of the tokens this person may see; any other is absent, not an error. */
-    resolve: (formId: string, source: string, r: { operation: LookupOperation; tokens: readonly string[] }, signal?: AbortSignal): Promise<Outcome<LookupRow[]>> =>
+    resolve: (
+      formId: string,
+      source: string,
+      r: { operation: LookupOperation; tokens: readonly string[] },
+      signal?: AbortSignal,
+    ): Promise<Outcome<LookupRow[]>> =>
       lookups(formId, source, 'resolve', { operation: r.operation, tokens: r.tokens }, (body) => (isResolved(body) ? body.rows : undefined), signal),
   }
 }

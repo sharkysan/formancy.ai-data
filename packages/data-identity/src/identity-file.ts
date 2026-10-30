@@ -9,7 +9,15 @@ import type { KeySet, KeySetAlgorithm, LeftOutKey } from './identity-keys.js'
  * so it holds no text of the file.
  */
 export type KeySetReadAgain =
-  | { read: true; changed: true; kids: readonly string[]; added: readonly string[]; removed: readonly string[]; replaced: readonly string[]; leftOut: readonly LeftOutKey[] }
+  | {
+      read: true
+      changed: true
+      kids: readonly string[]
+      added: readonly string[]
+      removed: readonly string[]
+      replaced: readonly string[]
+      leftOut: readonly LeftOutKey[]
+    }
   | { read: true; changed: false; kids: readonly string[]; leftOut: readonly LeftOutKey[] }
   | { read: false; kids: readonly string[]; problem: string }
 
@@ -74,7 +82,11 @@ export async function openKeySetFile(path: string, algorithm: KeySetAlgorithm, r
     try {
       next = await readSet(path, algorithm, read)
     } catch (error) {
-      return { read: false, kids: current.kids, problem: error instanceof KeySetRefusal ? error.message : 'the identity key set file could not be read as a key set' }
+      return {
+        read: false,
+        kids: current.kids,
+        problem: error instanceof KeySetRefusal ? error.message : 'the identity key set file could not be read as a key set',
+      }
     }
     const { added, removed, replaced } = current.compare(next)
     current = next

@@ -47,6 +47,7 @@ export function checkUpdate(request: UpdateRequest, terms: readonly RowFilterTer
   once(request.set, 'the values to set')
   for (const value of request.set) {
     if (value.name === concurrency.column) throw new Error(`${value.name} is the version column; an update moves it, and never sets it.`)
-    if (terms.some((term) => term.column === value.name)) throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
+    if (terms.some((term) => term.column === value.name))
+      throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
   }
 }

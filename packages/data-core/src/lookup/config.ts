@@ -155,7 +155,9 @@ function searchFor(display: readonly LookupDisplayColumn[], where: string, reque
     if (shown === undefined) throw new Error(`${where}: ${name} is not displayed, and a search matches only what the person can see`)
     const column = readableOf(target, where, name, '')
     if (!searchable(shown)) {
-      throw new Error(`${where}: ${name} is ${column.databaseType}; only text and integer columns are searched, because the engines spell other types differently`)
+      throw new Error(
+        `${where}: ${name} is ${column.databaseType}; only text and integer columns are searched, because the engines spell other types differently`,
+      )
     }
     return { name, type: shown.type }
   })

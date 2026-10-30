@@ -61,7 +61,9 @@ describe('the demo’s SQL', () => {
     expect(sql).toContain(
       `  (${String(order.id)}, ${String(order.tenantId)}, ${String(order.customerNo)}, '${order.orderDate}', '${order.status}', ${decimal(order.amountCents, 4)}, ${order.notes === null ? 'null' : `'${order.notes}'`}, null, ${String(order.createdBy)}, ${order.approvedBy === null ? 'null' : String(order.approvedBy)})`,
     )
-    expect(sql).toContain(`  (${String(customer.tenantId)}, ${String(customer.customerNo)}, '${customer.name}', '${customer.countryCode}', null, ${String(customer.active)}, '${instant}')`)
+    expect(sql).toContain(
+      `  (${String(customer.tenantId)}, ${String(customer.customerNo)}, '${customer.name}', '${customer.countryCode}', null, ${String(customer.active)}, '${instant}')`,
+    )
     expect(instant).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:00\+00$/)
   })
 
@@ -89,7 +91,9 @@ describe('the demo’s SQL', () => {
     expect(demoSql()).toBe(sql)
     const broken: DemoData = structuredClone(data)
     broken.orders[0]!.amountCents += 1
-    expect(() => demoSql(broken)).toThrow(`The demo data breaks its invariants:\n  - order 1: amount ${decimal(data.orders[0]!.amountCents + 1, 2)} is not its lines' sum`)
+    expect(() => demoSql(broken)).toThrow(
+      `The demo data breaks its invariants:\n  - order 1: amount ${decimal(data.orders[0]!.amountCents + 1, 2)} is not its lines' sum`,
+    )
   })
 })
 

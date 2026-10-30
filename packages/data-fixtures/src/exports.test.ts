@@ -34,7 +34,10 @@ describe('EXPORT_ROWS', () => {
   // LIST_ROWS'; a number twice in tenant 1 is a primary-key violation
   // before anything is exported.
   test('number customers no other rows of tenant 1 use', () => {
-    const taken = new Set([...FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).map((row) => String(row.customerNo)), ...LIST_ROWS.customers.map(([number]) => number)])
+    const taken = new Set([
+      ...FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).map((row) => String(row.customerNo)),
+      ...LIST_ROWS.customers.map(([number]) => number),
+    ])
     const numbers = EXPORT_ROWS.customers.map((row) => row.number)
     expect(numbers.filter((number) => taken.has(number))).toEqual([])
     expect(new Set(numbers).size).toBe(numbers.length)

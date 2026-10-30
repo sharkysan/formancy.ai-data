@@ -101,7 +101,17 @@ export function Records({
           }}
         >
           <label htmlFor="search">Search</label>
-          <input id="search" type="text" autoComplete="off" spellCheck={false} enterKeyHint="search" aria-describedby="search-hint" ref={searchRef} value={typed} onChange={(event) => setTyped(event.target.value)} />
+          <input
+            id="search"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            enterKeyHint="search"
+            aria-describedby="search-hint"
+            ref={searchRef}
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+          />
           <button type="submit" className="button">
             Search
           </button>
@@ -123,7 +133,9 @@ export function Records({
             New record
           </button>
         ) : null}
-        {definition.list === null ? null : <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />}
+        {definition.list === null ? null : (
+          <DownloadCsv client={client} formId={formId} idBase="records-export" query={() => ({ search, sort, parent: null, filter })} />
+        )}
       </div>
       <RecordGrid
         ref={grid}

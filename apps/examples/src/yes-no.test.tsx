@@ -69,7 +69,11 @@ describe.each([
     const user = userEvent.setup()
 
     const vip = await screen.findByRole('combobox', { name: 'Vip' }, ANGULAR_ARRIVES)
-    expect(within(vip).getAllByRole('option').map((option) => option.textContent)).toEqual(['', 'Yes', 'No'])
+    expect(
+      within(vip)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['', 'Yes', 'No'])
     await user.selectOptions(vip, 'Yes')
     expect((engine.value() as Record<string, unknown>)['vip']).toBe('true')
     await user.selectOptions(vip, '')

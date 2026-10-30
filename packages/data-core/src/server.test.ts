@@ -23,7 +23,10 @@ describe('serverStanding on PostgreSQL', () => {
   // not read as tested because the product is right.
   test('calls each major the release was tested on tested, and another major not tested, naming the ones that were', () => {
     for (const major of TESTED_SERVERS.postgres.majors) {
-      expect(serverStanding('postgres', postgres(major))).toEqual({ tested: true, says: `This release of Formancy Data was tested on PostgreSQL ${String(major)}.` })
+      expect(serverStanding('postgres', postgres(major))).toEqual({
+        tested: true,
+        says: `This release of Formancy Data was tested on PostgreSQL ${String(major)}.`,
+      })
     }
     expect(serverStanding('postgres', postgres(14))).toEqual({
       tested: false,
@@ -143,7 +146,9 @@ describe('serverName', () => {
     expect(serverName('sqlserver', sqlserver(null))).toBe('SQL Server')
     expect(serverName('sqlserver', sqlserver(12, 160, 'azure-sql-database'))).toBe('Azure SQL Database')
     expect(serverName('sqlserver', sqlserver(16, 160, 'azure-sql-managed-instance'))).toBe('Azure SQL Managed Instance')
-    expect(serverName('sqlserver', sqlserver(16, 160, 'other'))).toBe('a server that speaks SQL Server’s protocol and is no SQL Server product Formancy Data knows')
+    expect(serverName('sqlserver', sqlserver(16, 160, 'other'))).toBe(
+      'a server that speaks SQL Server’s protocol and is no SQL Server product Formancy Data knows',
+    )
   })
 })
 
@@ -194,6 +199,7 @@ describe('TESTED_SERVERS', () => {
   // and a list out of order or twice over would be printed so.
   test('names, for each tested SQL Server major, a release year, and lists each engine’s majors once and ascending', () => {
     for (const major of TESTED_SERVERS.sqlserver.majors) expect(SQLSERVER_RELEASES[major], String(major)).toEqual(expect.any(Number))
-    for (const tested of [TESTED_SERVERS.postgres, TESTED_SERVERS.sqlserver]) expect([...tested.majors]).toEqual([...new Set(tested.majors)].sort((a, b) => a - b))
+    for (const tested of [TESTED_SERVERS.postgres, TESTED_SERVERS.sqlserver])
+      expect([...tested.majors]).toEqual([...new Set(tested.majors)].sort((a, b) => a - b))
   })
 })

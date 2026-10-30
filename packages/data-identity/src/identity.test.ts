@@ -17,7 +17,10 @@ const BASE: IdentityOptions = {
   attributes: { tenant: 'tid' },
 }
 
-async function token(claims: Record<string, unknown>, options: { secret?: string; issuer?: string; audience?: string; expires?: string } = {}): Promise<string> {
+async function token(
+  claims: Record<string, unknown>,
+  options: { secret?: string; issuer?: string; audience?: string; expires?: string } = {},
+): Promise<string> {
   let jwt = new SignJWT(claims)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuer(options.issuer ?? BASE.issuer)
@@ -86,7 +89,14 @@ describe('createIdentityVerifier', () => {
     const signed = await token({ sub: 'u' })
     expect(await verify(signed)).toMatchObject({ ok: true })
     const [header = '', body = '', signature = ''] = signed.split('.')
-    for (const spelling of [`${header}.${body}.${signature}=`, `${header}=.${body}.${signature}`, `${header}.${body}=.${signature}`, ` ${signed}`, `${signed}\n`, `${header}.${body}.${signature.replaceAll('-', '+').replaceAll('_', '/')}+`]) {
+    for (const spelling of [
+      `${header}.${body}.${signature}=`,
+      `${header}=.${body}.${signature}`,
+      `${header}.${body}=.${signature}`,
+      ` ${signed}`,
+      `${signed}\n`,
+      `${header}.${body}.${signature.replaceAll('-', '+').replaceAll('_', '/')}+`,
+    ]) {
       expect(await verify(spelling), JSON.stringify(spelling.slice(-3))).toEqual({ ok: false, reason: 'ERR_JWS_INVALID' })
     }
   })
@@ -130,10 +140,16 @@ describe('createIdentityVerifier with a key set', () => {
     return { kid, secret: createSecretKey(bytes), jwk: { kty: 'oct', kid, k: bytes.toString('base64url') } }
   }
   const [a, b, c] = [hs('a'), hs('b'), hs('c')]
-  const verifierOf = (...held: Held[]) => createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: held.map((key) => key.jwk) }), 'HS256') } })
+  const verifierOf = (...held: Held[]) =>
+    createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: held.map((key) => key.jwk) }), 'HS256') } })
 
   async function signed(key: KeyObject, header: Partial<JWTHeaderParameters> = {}, expires = '5m', alg = 'HS256'): Promise<string> {
-    return new SignJWT({ sub: 'u', tid: 't' }).setProtectedHeader({ alg, ...header }).setIssuer(BASE.issuer).setAudience(BASE.audience).setExpirationTime(expires).sign(key)
+    return new SignJWT({ sub: 'u', tid: 't' })
+      .setProtectedHeader({ alg, ...header })
+      .setIssuer(BASE.issuer)
+      .setAudience(BASE.audience)
+      .setExpirationTime(expires)
+      .sign(key)
   }
 
   // A kid is the token saying which key it was signed with. Selecting that
@@ -183,7 +199,10 @@ describe('createIdentityVerifier with a key set', () => {
   // one, so a token cannot choose PS256 over an RS256 key.
   test('a PS256 token over an RSA key without alg is refused', async () => {
     const pair = generateKeyPairSync('rsa', { modulusLength: 2048 })
-    const verify = await createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: [{ ...pair.publicKey.export({ format: 'jwk' }), kid: 'r' }] }), 'RS256') } })
+    const verify = await createIdentityVerifier({
+      ...BASE,
+      key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: [{ ...pair.publicKey.export({ format: 'jwk' }), kid: 'r' }] }), 'RS256') },
+    })
     expect(await verify(await signed(pair.privateKey, { kid: 'r' }, '5m', 'RS256'))).toMatchObject({ ok: true })
     expect(await verify(await signed(pair.privateKey, { kid: 'r' }, '5m', 'PS256'))).toEqual({ ok: false, reason: 'ERR_JOSE_ALG_NOT_ALLOWED' })
   })
@@ -220,7 +239,10 @@ describe('createIdentityVerifier with a key set', () => {
     test('verifies only against the set, and nothing is fetched', async () => {
       const pair = generateKeyPairSync('ec', { namedCurve: 'P-256' })
       const ours = generateKeyPairSync('ec', { namedCurve: 'P-256' })
-      const verify = await createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: [{ ...ours.publicKey.export({ format: 'jwk' }), kid: 'a' }] }), 'ES256') } })
+      const verify = await createIdentityVerifier({
+        ...BASE,
+        key: { kind: 'key-set', keys: () => readKeySet(JSON.stringify({ keys: [{ ...ours.publicKey.export({ format: 'jwk' }), kid: 'a' }] }), 'ES256') },
+      })
       const jwk = pair.publicKey.export({ format: 'jwk' })
       const jku = `http://127.0.0.1:${String((server.address() as AddressInfo).port)}/jwks`
       const forged = [
@@ -241,9 +263,17 @@ describe('createIdentityVerifier with a key set', () => {
   // so it verifies nothing: refused at construction, and refused per token
   // when a later call hands one over.
   test('a hand-built set verifies nothing', async () => {
-    const lookalike = { kids: ['a'], leftOut: [], algorithm: 'HS256', keyTypes: ['secret'], verify: async () => ({ payload: { sub: 'u', exp: 9_999_999_999 } }) } as unknown as KeySet
+    const lookalike = {
+      kids: ['a'],
+      leftOut: [],
+      algorithm: 'HS256',
+      keyTypes: ['secret'],
+      verify: async () => ({ payload: { sub: 'u', exp: 9_999_999_999 } }),
+    } as unknown as KeySet
     await expect(createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => lookalike } })).rejects.toThrow(/not one readKeySet made/)
-    await expect(createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => Object.create(KeySet.prototype) as KeySet } })).rejects.toThrow(/not one readKeySet made/)
+    await expect(createIdentityVerifier({ ...BASE, key: { kind: 'key-set', keys: () => Object.create(KeySet.prototype) as KeySet } })).rejects.toThrow(
+      /not one readKeySet made/,
+    )
 
     const real = readKeySet(JSON.stringify({ keys: [a.jwk] }), 'HS256')
     let handed: () => KeySet = () => real

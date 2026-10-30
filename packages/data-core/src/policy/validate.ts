@@ -115,7 +115,10 @@ function deleteGrantProblems(policy: ParsedPolicy, bindings: FormBindings): stri
   const problems = [...deleting]
     .filter((role) => !policy.operations.read.has(role))
     .sort(byCodepoint)
-    .map((role) => `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`)
+    .map(
+      (role) =>
+        `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`,
+    )
   const unscoped = unscopedLookups(bindings, {
     rowFilters: [...policy.rowFilters],
     through: [...policy.through],

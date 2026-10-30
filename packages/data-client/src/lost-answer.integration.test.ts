@@ -95,7 +95,15 @@ describe.each(ENGINES)('an answer lost after the commit, through the client, on 
   // reads the record and finds it moved on, with the change in it.
   test('an update is unknown from the database, sent once, and reconciles to changed', async () => {
     const client = plane.client()
-    const created = expectOk(await client.create(formId, { customer: await customer(client, formId), order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '1', notes: 'before' }))
+    const created = expectOk(
+      await client.create(formId, {
+        customer: await customer(client, formId),
+        order_date: EDGE_VALUES.orderDate,
+        status: 'placed',
+        amount: '1',
+        notes: 'before',
+      }),
+    )
     const record = created.record ?? ''
     const version = created.version ?? ''
     const notes = `lost through the client ${connection} ${String(Date.now())}`
@@ -171,7 +179,9 @@ describe.each(ENGINES)('an answer lost after the commit, through the client, on 
     }
     const client = createDataClient({ token: () => plane.tokens.clerk, base: plane.base, fetch: twice })
     const notes = `sent twice by the browser ${connection} ${String(Date.now())}`
-    const created = expectOk(await client.create(formId, { customer: await customer(client, formId), order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '3', notes }))
+    const created = expectOk(
+      await client.create(formId, { customer: await customer(client, formId), order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '3', notes }),
+    )
     expect(created.answers['notes']).toBe(notes)
     expect(await lossy.ordersWithNotes(connection, notes)).toBe(1)
   })

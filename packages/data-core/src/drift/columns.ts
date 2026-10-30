@@ -76,7 +76,15 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
   if (fields.length === 0 && !token) {
     // Nothing here binds it. Out of sight, the gap reports itself; gone, it is a note.
     if (gaps.length > 0) return null
-    return { kind: 'column-dropped', subject, affects: [], stops: [], breaksReads: false, otherwise: 'info', message: `${was.name} is gone. No field of this form binds it.` }
+    return {
+      kind: 'column-dropped',
+      subject,
+      affects: [],
+      stops: [],
+      breaksReads: false,
+      otherwise: 'info',
+      message: `${was.name} is gone. No field of this form binds it.`,
+    }
   }
 
   // A delete names the version as an update does (0050).
@@ -155,25 +163,56 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
   switch (kind) {
     case 'column-type-changed':
       if (fields.length > 0) {
-        return { kind, stops: [], breaksReads: true, otherwise: 'review', consequence: `The form binds it to ${list(fields)} and reads it with the codec it was published with, so the form is blocked until it is reviewed.` }
+        return {
+          kind,
+          stops: [],
+          breaksReads: true,
+          otherwise: 'review',
+          consequence: `The form binds it to ${list(fields)} and reads it with the codec it was published with, so the form is blocked until it is reviewed.`,
+        }
       }
       // A key column the form cannot show still addresses the record an update changes, or a delete removes.
       if (bindings.identity?.includes(is.name) === true) {
-        return { kind, stops: ['update', 'delete'], breaksReads: false, otherwise: 'info', consequence: 'It identifies a record, so update and delete are blocked until the form is reviewed.' }
+        return {
+          kind,
+          stops: ['update', 'delete'],
+          breaksReads: false,
+          otherwise: 'info',
+          consequence: 'It identifies a record, so update and delete are blocked until the form is reviewed.',
+        }
       }
       return note(unbound)
     case 'column-generation-changed':
       // A by-default identity would take the value, which is worse: a number its sequence later hands out again (0026).
       if (writable && is.generated === 'identity-by-default') {
-        return { kind, stops: on, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.' }
+        return {
+          kind,
+          stops: on,
+          breaksReads: false,
+          otherwise: 'review',
+          consequence:
+            'The form writes it, and the database now numbers it when a create leaves it out; a value written by hand would not advance that numbering, so writes are blocked until the form is reviewed.',
+        }
       }
       if (writable && is.generated !== 'none') {
-        return { kind, stops: on, breaksReads: false, otherwise: 'review', consequence: 'The form writes it, and the database refuses a value for a column it generates, so writes are blocked until the form is reviewed.' }
+        return {
+          kind,
+          stops: on,
+          breaksReads: false,
+          otherwise: 'review',
+          consequence: 'The form writes it, and the database refuses a value for a column it generates, so writes are blocked until the form is reviewed.',
+        }
       }
       return { ...note(unbound), otherwise: fields.length > 0 ? 'review' : 'info' }
     case 'column-tightened':
       if (writable) {
-        return { kind, stops: on, breaksReads: false, otherwise: 'info', consequence: `The form would accept values the database now refuses, so writes of ${list(fields)} are blocked until its validation is reviewed.` }
+        return {
+          kind,
+          stops: on,
+          breaksReads: false,
+          otherwise: 'info',
+          consequence: `The form would accept values the database now refuses, so writes of ${list(fields)} are blocked until its validation is reviewed.`,
+        }
       }
       return note(fields.length > 0 ? 'The form only shows it, and every value it shows still fits.' : unbound)
     case 'column-loosened': {
@@ -188,7 +227,13 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
           consequence: `The published ${control} field cannot hold every value it now can, and a save would write back what the field made of it, so writes of ${list(fields)} are blocked until the form is reviewed.`,
         }
       }
-      return { kind: 'column-outgrew-field', stops: [], breaksReads: false, otherwise: 'review', consequence: `The published ${control} field cannot show every value it now can; it never writes one back.` }
+      return {
+        kind: 'column-outgrew-field',
+        stops: [],
+        breaksReads: false,
+        otherwise: 'review',
+        consequence: `The published ${control} field cannot show every value it now can; it never writes one back.`,
+      }
     }
     case 'column-default-changed':
       return note('What a create that leaves it out stores is different; nothing is refused.')
@@ -222,7 +267,8 @@ function numberingLost(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
   )
 }
 
-const NUMBERING_LOST = 'The database no longer numbers a column of the key, so a record created again under a deleted one\'s key would start its version where the deleted one did: delete is blocked until the form is reviewed.'
+const NUMBERING_LOST =
+  "The database no longer numbers a column of the key, so a record created again under a deleted one's key would start its version where the deleted one did: delete is blocked until the form is reviewed."
 
 function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta): Draft | null {
   const found = classify(was, is)
@@ -232,7 +278,11 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
   // The generator's create rule, now: a change that leaves this column needing a value nobody gives stops create.
   const createLost = blocksCreate(bindings, is) && !blocksCreate(bindings, was)
   const numbering = numberingLost(comparison, was, is)
-  const stops: Operation[] = [...effect.stops, ...(createLost ? ['create' as const] : []), ...(numbering && !effect.stops.includes('delete') ? ['delete' as const] : [])]
+  const stops: Operation[] = [
+    ...effect.stops,
+    ...(createLost ? ['create' as const] : []),
+    ...(numbering && !effect.stops.includes('delete') ? ['delete' as const] : []),
+  ]
   return {
     kind: effect.kind,
     subject: { kind: 'column', object: comparison.after.ref, name: is.name },
@@ -247,10 +297,31 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
 function addedColumn(comparison: Comparison, is: ColumnMeta): Draft {
   const subject = { kind: 'column', object: comparison.after.ref, name: is.name } as const
   if (blocksCreate(comparison.bindings, is)) {
-    return { kind: 'column-added', subject, affects: [], stops: ['create'], breaksReads: false, otherwise: 'review', message: `${is.name} is new (${is.databaseType}), NOT NULL, with no default and no generator. ${CREATE_LOST}` }
+    return {
+      kind: 'column-added',
+      subject,
+      affects: [],
+      stops: ['create'],
+      breaksReads: false,
+      otherwise: 'review',
+      message: `${is.name} is new (${is.databaseType}), NOT NULL, with no default and no generator. ${CREATE_LOST}`,
+    }
   }
-  const traits = [is.databaseType, ...(is.nullable ? ['nullable'] : []), ...(is.hasDefault ? ['with a default'] : []), ...(is.generated === 'none' ? [] : [`generated (${is.generated})`])]
-  return { kind: 'column-added', subject, affects: [], stops: [], breaksReads: false, otherwise: 'review', message: `${is.name} is new (${list(traits)}). It can be added to the form; the published form is unchanged.` }
+  const traits = [
+    is.databaseType,
+    ...(is.nullable ? ['nullable'] : []),
+    ...(is.hasDefault ? ['with a default'] : []),
+    ...(is.generated === 'none' ? [] : [`generated (${is.generated})`]),
+  ]
+  return {
+    kind: 'column-added',
+    subject,
+    affects: [],
+    stops: [],
+    breaksReads: false,
+    otherwise: 'review',
+    message: `${is.name} is new (${list(traits)}). It can be added to the form; the published form is unchanged.`,
+  }
 }
 
 /**

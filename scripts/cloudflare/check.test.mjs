@@ -61,7 +61,11 @@ const EDGE = {
   access: { status: 302, headers: { location: ACCESS_LOGIN }, body: '' },
   // A WAF block as Cloudflare's structured error (error-responses.mdx's
   // fields, error_code 1020), not a captured answer.
-  waf: { status: 403, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Error 1020: Access denied', status: 403, error_code: 1020, cloudflare_error: true }) },
+  waf: {
+    status: 403,
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ title: 'Error 1020: Access denied', status: 403, error_code: 1020, cloudflare_error: true }),
+  },
   // cloudflared's catch-all, `http_status:404`: a 404 without the web
   // front's headers. Its body is not measured and not read.
   catchAll: { status: 404, headers: {}, body: '' },
@@ -96,7 +100,8 @@ describe('redirected to HTTPS', () => {
   // Always Use HTTPS sends plain HTTP to the same place over TLS; a
   // redirect elsewhere, or an answer over plain HTTP, is not that.
   test('is a 301 or 308 to exactly the same host and path over HTTPS', () => {
-    for (const status of [301, 308]) expect(verdict(expectation, { status, headers: { location: 'https://formancy.example.com/studio/' }, body: '' }, inputs).pass).toBe(true)
+    for (const status of [301, 308])
+      expect(verdict(expectation, { status, headers: { location: 'https://formancy.example.com/studio/' }, body: '' }, inputs).pass).toBe(true)
     for (const response of [
       { status: 302, headers: { location: 'https://formancy.example.com/studio/' } },
       { status: 301, headers: { location: 'https://formancy.example.com/' } },
@@ -121,7 +126,14 @@ describe('reached the data server', () => {
     expect(answer.status).toBe(401)
     expect(verdict(expectation, answer, inputs).pass).toBe(true)
     const bare = await app.inject({ method: route.method, url: route.sample })
-    for (const response of [EDGE.catchAll, EDGE.spa, EDGE.waf, EDGE.access, { status: bare.statusCode, headers: bare.headers, body: bare.body }, await throughWebFront('GET', '/health')]) {
+    for (const response of [
+      EDGE.catchAll,
+      EDGE.spa,
+      EDGE.waf,
+      EDGE.access,
+      { status: bare.statusCode, headers: bare.headers, body: bare.body },
+      await throughWebFront('GET', '/health'),
+    ]) {
       expect(verdict(expectation, response, inputs).pass, String(response.status)).toBe(false)
     }
   })
@@ -142,8 +154,13 @@ describe('did not reach the web front', () => {
     const refused = await throughWebFront(hostile.method, hostile.path)
     expect([refused.status, JSON.parse(refused.body).code]).toEqual([400, 'path-not-plain'])
     const nginx404 = { status: 404, headers: { ...webFrontHeaders(), 'content-type': 'text/html' }, body: fixture('nginx-404.html') }
-    for (const response of [EDGE.catchAll, EDGE.spa, EDGE.waf, refused, nginx404]) expect(verdict(expectation, response, inputs).pass, String(response.status)).toBe(true)
-    for (const response of [await throughWebFront(route.method, route.sample), { status: 200, headers: { ...webFrontHeaders(), 'cache-control': 'no-cache' }, body: '<!doctype html>' }, await throughWebFront('GET', '/v1/nothing')]) {
+    for (const response of [EDGE.catchAll, EDGE.spa, EDGE.waf, refused, nginx404])
+      expect(verdict(expectation, response, inputs).pass, String(response.status)).toBe(true)
+    for (const response of [
+      await throughWebFront(route.method, route.sample),
+      { status: 200, headers: { ...webFrontHeaders(), 'cache-control': 'no-cache' }, body: '<!doctype html>' },
+      await throughWebFront('GET', '/v1/nothing'),
+    ]) {
       expect(verdict(expectation, response, inputs), String(response.status)).toEqual({ pass: false, saw: expect.stringMatching(/^reached the web front/) })
     }
   })
@@ -183,9 +200,18 @@ describe('no answer at all', () => {
   test('fails every verdict, and says why the request ended', () => {
     const route = doors.routes.find((entry) => entry.plane === 'runtime')
     for (const kind of ['access', 'https', 'server', 'outside']) {
-      const expectation = { kind, method: 'GET', scheme: kind === 'https' ? 'http' : 'https', host: kind === 'access' || kind === 'https' ? inputs.admin : inputs.app, path: route.sample }
+      const expectation = {
+        kind,
+        method: 'GET',
+        scheme: kind === 'https' ? 'http' : 'https',
+        host: kind === 'access' || kind === 'https' ? inputs.admin : inputs.app,
+        path: route.sample,
+      }
       for (const reason of ['ENOTFOUND', 'timeout']) {
-        expect(verdict(expectation, { status: 0, headers: {}, body: '', error: reason }, inputs), `${kind} ${reason}`).toEqual({ pass: false, saw: `no answer (${reason})` })
+        expect(verdict(expectation, { status: 0, headers: {}, body: '', error: reason }, inputs), `${kind} ${reason}`).toEqual({
+          pass: false,
+          saw: `no answer (${reason})`,
+        })
       }
     }
   })
@@ -221,7 +247,13 @@ describe('the requests', () => {
   // what it saw, so an operator knows which setting to look at.
   test('are printed one line each, a failure with what it saw, then the count', () => {
     const [first, second] = expectations(doors, inputs)
-    const text = render([{ expectation: first, pass: true }, { expectation: second, pass: false, saw: 'answered 200 without Access' }], inputs)
+    const text = render(
+      [
+        { expectation: first, pass: true },
+        { expectation: second, pass: false, saw: 'answered 200 without Access' },
+      ],
+      inputs,
+    )
     expect(text.split('\n')).toEqual([
       'doors-check: formancy.example.com (administrator), app.example.com (runtime), team example-team',
       'pass  GET https://formancy.example.com/studio/  Access answered first',

@@ -325,7 +325,8 @@ export function useHeard(sessions: readonly Session[]): (record: string) => stri
     }
   }, [sessions])
   return useCallback(
-    (record: string) => (last.current?.record === record ? last.current.version : (sessions.find((session) => session.state().record === record)?.state().version ?? null)),
+    (record: string) =>
+      last.current?.record === record ? last.current.version : (sessions.find((session) => session.state().record === record)?.state().version ?? null),
     [sessions],
   )
 }

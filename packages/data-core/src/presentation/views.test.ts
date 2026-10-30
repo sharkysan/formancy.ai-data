@@ -28,7 +28,9 @@ describe('viewShapeProblems', () => {
   // The views a studio writes must read back: a filter and a sort exactly as
   // a list request carries them, and one default.
   test('reads views a list request could carry', () => {
-    expect(viewShapeProblems([OPEN, { name: 'Unpaid, newest', filter: [{ field: 'paid', op: 'equals', value: 'false' }], sort: [], default: true }])).toEqual([])
+    expect(viewShapeProblems([OPEN, { name: 'Unpaid, newest', filter: [{ field: 'paid', op: 'equals', value: 'false' }], sort: [], default: true }])).toEqual(
+      [],
+    )
     expect(presentationShapeProblems({ ...EMPTY_PRESENTATION, views: [OPEN] })).toEqual([])
   })
 
@@ -45,8 +47,19 @@ describe('viewShapeProblems', () => {
     expect(viewShapeProblems([view({ colour: 'red' })])).toEqual(['/views/0/colour is not a property of a list view'])
     expect(viewShapeProblems([{ name: 'Placed', sort: [] }])).toEqual(['/views/0/filter must be a list of conditions, [] for none'])
     expect(viewShapeProblems([{ name: 'Placed', filter: [] }])).toEqual(['/views/0/sort must be a list of { field, direction }, [] for none'])
-    expect(viewShapeProblems([view({ filter: [{ field: 'status', op: 'like', value: 'p%' }] })])).toEqual(['/views/0/filter/0: status is filtered by equals, range, contains, null or not-null.'])
-    expect(viewShapeProblems([view({ filter: [{ field: 'notes', op: 'null' }, { field: 'notes', op: 'not-null' }] })])).toEqual(['/views/0/filter: notes is named twice in the filter.'])
+    expect(viewShapeProblems([view({ filter: [{ field: 'status', op: 'like', value: 'p%' }] })])).toEqual([
+      '/views/0/filter/0: status is filtered by equals, range, contains, null or not-null.',
+    ])
+    expect(
+      viewShapeProblems([
+        view({
+          filter: [
+            { field: 'notes', op: 'null' },
+            { field: 'notes', op: 'not-null' },
+          ],
+        }),
+      ]),
+    ).toEqual(['/views/0/filter: notes is named twice in the filter.'])
     expect(viewShapeProblems([view({ sort: [{ field: 'status', direction: 'up' }] })])).toEqual(['/views/0/sort: status sorts asc or desc.'])
     expect(viewShapeProblems([view({ default: false })])).toEqual(['/views/0/default must be true, or left out'])
     expect(viewShapeProblems([view({ filter: [], sort: [] })])).toEqual(['/views/0: says nothing; leave the view out'])
@@ -73,7 +86,14 @@ describe('viewShapeProblems', () => {
   // compared whatever their order, since every one must hold. Watched
   // failing with the check left out.
   test('refuses two views that ask the same, whatever the order of their conditions', () => {
-    const both: ListView = { name: 'Both', filter: [{ field: 'status', op: 'equals', value: 'placed' }, { field: 'notes', op: 'null' }], sort: [] }
+    const both: ListView = {
+      name: 'Both',
+      filter: [
+        { field: 'status', op: 'equals', value: 'placed' },
+        { field: 'notes', op: 'null' },
+      ],
+      sort: [],
+    }
     const turned = { ...both, name: 'Turned', filter: [...both.filter].reverse() }
     expect(viewShapeProblems([both, turned])).toEqual(['/views/1: asks what “Both” asks, so a picker could not tell them apart'])
     expect(viewShapeProblems([OPEN, view({ name: 'Other' })])).toEqual(['/views/1: asks what “Placed” asks, so a picker could not tell them apart'])
@@ -83,7 +103,9 @@ describe('viewShapeProblems', () => {
   // Two defaults would leave the grid to pick one, and each page might pick
   // another.
   test('refuses more than one default', () => {
-    expect(viewShapeProblems([view({ default: true }), view({ name: 'Other', sort: [], default: true })])).toEqual(['/views: more than one view is the default'])
+    expect(viewShapeProblems([view({ default: true }), view({ name: 'Other', sort: [], default: true })])).toEqual([
+      '/views: more than one view is the default',
+    ])
   })
 
   // Shape is read on every read of a version, and what a contains may find
@@ -93,7 +115,9 @@ describe('viewShapeProblems', () => {
   test('leaves to the fit what a contains could not find', () => {
     const long = view({ filter: [{ field: 'notes', op: 'contains', text: 'x'.repeat(201) }] })
     expect(viewShapeProblems([long])).toEqual([])
-    expect(viewProblems([long as unknown as ListView], PG_ORDER)).toEqual(['/views/0 (“Placed”): What a contains condition on notes finds is at most 200 characters, and this has 201.'])
+    expect(viewProblems([long as unknown as ListView], PG_ORDER)).toEqual([
+      '/views/0 (“Placed”): What a contains condition on notes finds is at most 200 characters, and this has 201.',
+    ])
   })
 
   // Read whole, readFilter stops at its first refusal, so a contains it
@@ -163,10 +187,16 @@ describe('listColumns offers views', () => {
   // What a page is offered is what the server accepts: a view the planner
   // refused would be a choice that always fails.
   test('offers only views the planner accepts as a request', () => {
-    const offered = listColumns(PG_ORDER, CLERK_FIELDS, [OPEN, ON_AMOUNT, { name: 'Unnoted', filter: [{ field: 'notes', op: 'null' }], sort: [{ field: 'amount', direction: 'asc' }] }]).views
+    const offered = listColumns(PG_ORDER, CLERK_FIELDS, [
+      OPEN,
+      ON_AMOUNT,
+      { name: 'Unnoted', filter: [{ field: 'notes', op: 'null' }], sort: [{ field: 'amount', direction: 'asc' }] },
+    ]).views
     expect(offered).toHaveLength(3)
-    for (const offer of offered) expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...FIRST, filter: offer.filter, sort: offer.sort }).ok, offer.name).toBe(true)
-    for (const offer of auditor([OPEN, ON_AMOUNT])) expect(planList(PG, PG_ORDER, ORDER_POLICY, AUDITOR, { ...FIRST, filter: offer.filter, sort: offer.sort }).ok, offer.name).toBe(true)
+    for (const offer of offered)
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, { ...FIRST, filter: offer.filter, sort: offer.sort }).ok, offer.name).toBe(true)
+    for (const offer of auditor([OPEN, ON_AMOUNT]))
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, AUDITOR, { ...FIRST, filter: offer.filter, sort: offer.sort }).ok, offer.name).toBe(true)
   })
 })
 
@@ -181,7 +211,12 @@ describe('rebasePresentation carries views', () => {
     const next = generateForm(snapshot(after), ORDER)
     return rebasePresentation(published, { base: next.form, bindings: next.bindings })
   }
-  const DATED: ListView = { name: 'This year', filter: [{ field: 'order_date', op: 'range', from: '2026-01-01', to: null }], sort: [{ field: 'amount', direction: 'desc' }], default: true }
+  const DATED: ListView = {
+    name: 'This year',
+    filter: [{ field: 'order_date', op: 'range', from: '2026-01-01', to: null }],
+    sort: [{ field: 'amount', direction: 'desc' }],
+    default: true,
+  }
   const UNPAID: ListView = { name: 'Unpaid', filter: [{ field: 'paid', op: 'equals', value: 'false' }], sort: [] }
 
   // The fast path of every regeneration of an unchanged database.
@@ -197,14 +232,20 @@ describe('rebasePresentation carries views', () => {
   test('a view follows its column to a renumbered key', () => {
     const second = (objects: ObjectMeta[]) => {
       const order = objects.find((object) => object.ref.name === 'order') as ObjectMeta
-      order.columns.push({ ...(order.columns.find((column) => column.name === 'order_date') as ObjectMeta['columns'][number]), name: 'order date', nullable: true })
+      order.columns.push({
+        ...(order.columns.find((column) => column.name === 'order_date') as ObjectMeta['columns'][number]),
+        name: 'order date',
+        nullable: true,
+      })
     }
     const shipped: ListView = { name: 'Shipped', filter: [{ field: 'order_date_2', op: 'not-null' }], sort: [{ field: 'order_date_2', direction: 'asc' }] }
     const rebased = regenerate(publish([shipped], second), (objects) => {
       second(objects)
       dropColumn(objects, 'order', 'order_date')
     })
-    expect(rebased.presentation.views).toEqual([{ ...shipped, filter: [{ field: 'order_date', op: 'not-null' }], sort: [{ field: 'order_date', direction: 'asc' }] }])
+    expect(rebased.presentation.views).toEqual([
+      { ...shipped, filter: [{ field: 'order_date', op: 'not-null' }], sort: [{ field: 'order_date', direction: 'asc' }] },
+    ])
     expect(rebased.conflicts.filter((conflict) => conflict.kind === 'view-dropped')).toEqual([])
   })
 
@@ -214,7 +255,14 @@ describe('rebasePresentation carries views', () => {
   test('a view naming a dropped column is dropped whole and said', () => {
     const rebased = regenerate(publish([DATED, UNPAID]), (objects) => dropColumn(objects, 'order', 'paid'))
     expect(rebased.presentation.views).toEqual([DATED])
-    expect(rebased.conflicts).toEqual([{ kind: 'view-dropped', view: 'Unpaid', resolution: 'dropped', message: 'View “Unpaid” names paid, which is not in the regenerated form, so it was dropped.' }])
+    expect(rebased.conflicts).toEqual([
+      {
+        kind: 'view-dropped',
+        view: 'Unpaid',
+        resolution: 'dropped',
+        message: 'View “Unpaid” names paid, which is not in the regenerated form, so it was dropped.',
+      },
+    ])
     expect(regenerate(publish([UNPAID]), (objects) => dropColumn(objects, 'order', 'paid')).presentation).toEqual(EMPTY_PRESENTATION)
   })
 
@@ -222,9 +270,13 @@ describe('rebasePresentation carries views', () => {
   // equality (0104): the view's question no longer has an answer.
   test('a view its column no longer answers is dropped, its default with it', () => {
     const today: ListView = { name: 'Today', filter: [{ field: 'order_date', op: 'equals', value: '2026-10-28' }], sort: [], default: true }
-    const rebased = regenerate(publish([today, UNPAID]), (objects) => retype(objects, 'order', 'order_date', 'datetime2(3)', { kind: 'timestamp', withTimeZone: false, precision: 3 }))
+    const rebased = regenerate(publish([today, UNPAID]), (objects) =>
+      retype(objects, 'order', 'order_date', 'datetime2(3)', { kind: 'timestamp', withTimeZone: false, precision: 3 }),
+    )
     expect(rebased.presentation.views).toEqual([UNPAID])
-    expect(rebased.conflicts).toEqual([{ kind: 'view-dropped', view: 'Today', resolution: 'dropped', message: 'View “Today” was dropped: order_date offers no equals condition.' }])
+    expect(rebased.conflicts).toEqual([
+      { kind: 'view-dropped', view: 'Today', resolution: 'dropped', message: 'View “Today” was dropped: order_date offers no equals condition.' },
+    ])
   })
 
   // Conflicts are said field by field, then section by section; a view is
@@ -252,6 +304,13 @@ describe('rebasePresentation carries views', () => {
   // Watched failing as a 500's "Cannot canonicalize undefined".
   test('a view naming a field the published bindings never held is dropped, not thrown on', () => {
     const rebased = regenerate(publish([{ name: 'Edited', filter: [{ field: 'nothing', op: 'null' }], sort: [] }]))
-    expect(rebased.conflicts).toEqual([{ kind: 'view-dropped', view: 'Edited', resolution: 'dropped', message: 'View “Edited” names nothing, which is not in the regenerated form, so it was dropped.' }])
+    expect(rebased.conflicts).toEqual([
+      {
+        kind: 'view-dropped',
+        view: 'Edited',
+        resolution: 'dropped',
+        message: 'View “Edited” names nothing, which is not in the regenerated form, so it was dropped.',
+      },
+    ])
   })
 })

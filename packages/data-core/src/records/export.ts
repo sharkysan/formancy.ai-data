@@ -119,7 +119,8 @@ export function exportRecord(columns: ExportColumns, record: FormRecord, labels:
   const cells: CsvCell[] = []
   for (const field of columns.fields) {
     const written = cellsOf(field, record.answers, labels)
-    if (written === null) return { ok: false, code: 'unencodable', message: `${field.header} names a row whose key is too long for a token, so a file cannot say which.` }
+    if (written === null)
+      return { ok: false, code: 'unencodable', message: `${field.header} names a row whose key is too long for a token, so a file cannot say which.` }
     cells.push(...written)
   }
   return csvRecord(columns.headers, cells)

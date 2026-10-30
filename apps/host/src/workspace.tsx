@@ -29,7 +29,10 @@ function useMedia(query: string): boolean {
 }
 
 /** The form open in main: asked for, refused, or open with its children. */
-type Opened = { entry: FormMenuEntry; state: 'asking' } | { entry: FormMenuEntry; state: 'refused'; message: string } | { entry: FormMenuEntry; state: 'open'; definition: PublishedForm; children: ChildForm[] }
+type Opened =
+  | { entry: FormMenuEntry; state: 'asking' }
+  | { entry: FormMenuEntry; state: 'refused'; message: string }
+  | { entry: FormMenuEntry; state: 'open'; definition: PublishedForm; children: ChildForm[] }
 
 /**
  * The host page's workspace (0047), the chunk loaded after sign-in, AG Grid
@@ -51,7 +54,9 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   const ids = useMemo(() => menu.forms.map((form) => form.id), [menu])
   const narrow = useMedia('(max-width: 56rem)')
   const phone = useMedia('(max-width: 40rem)')
-  const [first] = useState(() => arrival({ hash: window.location.hash, menu: ids, phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches }))
+  const [first] = useState(() =>
+    arrival({ hash: window.location.hash, menu: ids, phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches }),
+  )
   const [place, setPlaceState] = useState<Place>({ form: null, layout: first.layout, view: 'records' })
   const placeRef = useRef(place)
   const [opened, setOpened] = useState<Opened | null>(null)
@@ -123,7 +128,11 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       return
     }
     const chosen = menuEntry(id)
-    guard.ask({ kind: 'form', title: chosen?.title ?? id }, () => void openForm(id, { focus: true, push: true }), () => link.focus())
+    guard.ask(
+      { kind: 'form', title: chosen?.title ?? id },
+      () => void openForm(id, { focus: true, push: true }),
+      () => link.focus(),
+    )
   }
 
   // Back, Forward, and a fragment typed into the address bar.
@@ -152,7 +161,15 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
 
   return (
     <div className="workspace">
-      <FormsNav menu={menu} current={place.form} layout={place.layout} headingRef={formsHeading} signOutRef={signOutRef} onChoose={choose} onSignOut={signOut} />
+      <FormsNav
+        menu={menu}
+        current={place.form}
+        layout={place.layout}
+        headingRef={formsHeading}
+        signOutRef={signOutRef}
+        onChoose={choose}
+        onSignOut={signOut}
+      />
       <main id="host-main" className="workspace-main" tabIndex={-1} aria-labelledby={opened === null ? undefined : 'form-heading'}>
         {opened === null ? (
           <section className="panel nothing" aria-labelledby="no-form-heading">

@@ -22,7 +22,9 @@ describe("a start's key", () => {
     }
     expect(Buffer.from(keys[0] ?? '', 'base64url').byteLength).toBe(32)
     expect(new Set(keys).size).toBe(keys.length)
-    await expect(createIdentityVerifier({ key: { kind: 'secret', secret: newKey() }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } })).resolves.toBeTypeOf('function')
+    await expect(
+      createIdentityVerifier({ key: { kind: 'secret', secret: newKey() }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } }),
+    ).resolves.toBeTypeOf('function')
   })
 })
 
@@ -155,7 +157,13 @@ describe('waiting for a started server', () => {
       },
       { alive: () => true, now: time.now, sleep: time.sleep },
     )
-    expect(deadline).toEqual({ healthy: false, ended: 'deadline', probes: START_DEADLINE_MS / POLL_MS, elapsedMs: START_DEADLINE_MS, lastError: 'TypeError: Container is not listening to port 4390' })
+    expect(deadline).toEqual({
+      healthy: false,
+      ended: 'deadline',
+      probes: START_DEADLINE_MS / POLL_MS,
+      elapsedMs: START_DEADLINE_MS,
+      lastError: 'TypeError: Container is not listening to port 4390',
+    })
     let checks = 0
     const stopped = await waitUntilHealthy(async () => false, { alive: () => (checks += 1) < 3, now: time.now, sleep: time.sleep })
     expect(stopped).toMatchObject({ healthy: false, ended: 'stopped', probes: 2, lastError: undefined })
@@ -169,15 +177,27 @@ describe("a failed start's log line (0086)", () => {
   // setInactivityTimeout() throw on Cloudflare, and the line is all the
   // live log shows of it.
   test("names the step that threw and the platform's error", () => {
-    expect(failedStartLine({ step: 'start', error: new Error('the start was refused') }, key)).toBe('live demo: a start failed: start threw Error: the start was refused')
-    expect(failedStartLine({ step: 'inactivity-timeout', error: new RangeError('no') }, key)).toBe('live demo: a start failed: inactivity-timeout threw RangeError: no')
+    expect(failedStartLine({ step: 'start', error: new Error('the start was refused') }, key)).toBe(
+      'live demo: a start failed: start threw Error: the start was refused',
+    )
+    expect(failedStartLine({ step: 'inactivity-timeout', error: new RangeError('no') }, key)).toBe(
+      'live demo: a start failed: inactivity-timeout threw RangeError: no',
+    )
     expect(failedStartLine({ step: 'other', error: 'a string' }, key)).toBe('live demo: a start failed: other threw a string')
   })
 
   // A wait for /health that gave up says why, how long and how often it
   // asked, and what it was last refused with.
   test('says how the wait for /health ended', () => {
-    expect(failedStartLine({ step: 'health', wait: { healthy: false, ended: 'deadline', probes: 60, elapsedMs: 30_000, lastError: 'TypeError: Container is not listening to port 4390' } }, key)).toBe(
+    expect(
+      failedStartLine(
+        {
+          step: 'health',
+          wait: { healthy: false, ended: 'deadline', probes: 60, elapsedMs: 30_000, lastError: 'TypeError: Container is not listening to port 4390' },
+        },
+        key,
+      ),
+    ).toBe(
       'live demo: a start failed: /health did not answer within 30000 ms, after 60 probes; the last threw TypeError: Container is not listening to port 4390',
     )
     expect(failedStartLine({ step: 'health', wait: { healthy: false, ended: 'stopped', probes: 3, elapsedMs: 1_000, lastError: undefined } }, key)).toBe(
@@ -219,7 +239,16 @@ describe('a start Cloudflare has no instance for (0087)', () => {
 
   // A start that still failed says how often it was started again.
   test('a failed wait says how often it was started again', () => {
-    expect(failedStartLine({ step: 'health', wait: { healthy: false, ended: 'deadline', probes: 240, elapsedMs: 60_000, lastError: 'Error: Cloudflare had no container instance; started again' }, restarts: 3 }, newKey())).toBe(
+    expect(
+      failedStartLine(
+        {
+          step: 'health',
+          wait: { healthy: false, ended: 'deadline', probes: 240, elapsedMs: 60_000, lastError: 'Error: Cloudflare had no container instance; started again' },
+          restarts: 3,
+        },
+        newKey(),
+      ),
+    ).toBe(
       'live demo: a start failed: /health did not answer within 60000 ms, after 240 probes; the last threw Error: Cloudflare had no container instance; started again; started again 3 times after Cloudflare had no instance',
     )
   })

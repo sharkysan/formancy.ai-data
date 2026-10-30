@@ -44,7 +44,9 @@ describe('applyPresentation', () => {
   // A key the base lacks is a presentation for another form; applied, it
   // would be silently ignored and the person's edit lost without a word.
   test('refuses an unknown key', () => {
-    expect(problems(presentation([{ field: 'ghost', anchor: { kind: 'column', column: 'ghost' }, label: 'Ghost' }]))).toEqual(['/fields/0/field: the base has no field ghost'])
+    expect(problems(presentation([{ field: 'ghost', anchor: { kind: 'column', column: 'ghost' }, label: 'Ghost' }]))).toEqual([
+      '/fields/0/field: the base has no field ghost',
+    ])
   })
 
   // The anchor is what a regeneration carries the override by. One naming
@@ -77,7 +79,14 @@ describe('applyPresentation', () => {
       ['id', 'notes*'],
     ])
     // Two moved into one section land in the base's field order.
-    expect(placed(presentation([{ field: 'notes', anchor: NOTES, section: RECORD }, { field: 'paid', anchor: PAID, section: RECORD }]))).toEqual([
+    expect(
+      placed(
+        presentation([
+          { field: 'notes', anchor: NOTES, section: RECORD },
+          { field: 'paid', anchor: PAID, section: RECORD },
+        ]),
+      ),
+    ).toEqual([
       ['customer', 'order_date', 'status', 'amount', 'created_by'],
       ['id', 'notes*', 'paid'],
     ])
@@ -105,7 +114,9 @@ describe('applyPresentation', () => {
     expect(problems(presentation([{ field: 'paid', anchor: PAID, section: { label: 'Record', occurrence: 1 } }]))).toEqual([
       '/fields/0/section: the base has no section labelled "Record" at occurrence 1',
     ])
-    expect(problems(presentation([{ field: 'id', anchor: { kind: 'column', column: 'id' }, section: MAIN }]))).toEqual(['/fields/0/section: moving id leaves section "Record" with no field'])
+    expect(problems(presentation([{ field: 'id', anchor: { kind: 'column', column: 'id' }, section: MAIN }]))).toEqual([
+      '/fields/0/section: moving id leaves section "Record" with no field',
+    ])
     expect(presentationShapeProblems(presentation([{ field: 'paid', anchor: PAID, section: { label: 'Record' } }]))).toEqual([
       '/fields/0/section must be { label, occurrence } with a whole occurrence of at least 0',
     ])
@@ -113,7 +124,9 @@ describe('applyPresentation', () => {
 
   // A section the base does not have is an override with nowhere to go.
   test('refuses an unmatched section', () => {
-    expect(problems(presentation([], [{ anchor: { label: 'Order', occurrence: 1 }, label: 'Again' }]))).toEqual(['/sections/0/anchor: the base has no section labelled "Order" at occurrence 1'])
+    expect(problems(presentation([], [{ anchor: { label: 'Order', occurrence: 1 }, label: 'Again' }]))).toEqual([
+      '/sections/0/anchor: the base has no section labelled "Order" at occurrence 1',
+    ])
   })
 
   // One presentation, one spelling: an entry equal to the base, or empty,
@@ -125,11 +138,20 @@ describe('applyPresentation', () => {
     expect(problems(presentation([{ field: 'notes', anchor: NOTES }]))).toEqual(['/fields/0: says nothing; leave the field out'])
     const anchor = { label: 'Order', occurrence: 0 }
     expect(problems(presentation([], [{ anchor, label: 'Order' }]))).toEqual(["/sections/0/label: equals the base's; leave it out"])
-    expect(problems(presentation([], [{ anchor, order: ['customer', 'order_date', 'status', 'amount', 'notes', 'created_by', 'paid'] }]))).toEqual(["/sections/0/order: equals the base's; leave it out"])
+    expect(problems(presentation([], [{ anchor, order: ['customer', 'order_date', 'status', 'amount', 'notes', 'created_by', 'paid'] }]))).toEqual([
+      "/sections/0/order: equals the base's; leave it out",
+    ])
     expect(problems(presentation([], [{ anchor }]))).toEqual(['/sections/0: says nothing; leave the section out'])
     // And entries out of the base's order are a second spelling of the same patch.
     const STATUS = { kind: 'column', column: 'status' }
-    expect(problems(presentation([{ field: 'notes', anchor: NOTES, label: 'N' }, { field: 'status', anchor: STATUS, label: 'S' }]))).toEqual(["/fields: not in the base's field order"])
+    expect(
+      problems(
+        presentation([
+          { field: 'notes', anchor: NOTES, label: 'N' },
+          { field: 'status', anchor: STATUS, label: 'S' },
+        ]),
+      ),
+    ).toEqual(["/fields: not in the base's field order"])
   })
 
   // What a hand edit of the file could put there, each named: a version
@@ -163,7 +185,9 @@ describe('applyPresentation', () => {
       '/sections/0/label must be text',
     ])
     // A lookup's anchor and a translated label are both well formed.
-    expect(presentationShapeProblems(presentation([{ field: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, label: { $t: 'buyer' } }]))).toEqual([])
+    expect(
+      presentationShapeProblems(presentation([{ field: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, label: { $t: 'buyer' } }])),
+    ).toEqual([])
   })
 
   // What the presentation is applied to must be a base this release
@@ -173,7 +197,10 @@ describe('applyPresentation', () => {
     const odd = { ...base, layouts: [] }
     expect(applyPresentation(odd, EMPTY_PRESENTATION, bindings)).toEqual({ ok: false, problems: ['a base this release did not generate (/layouts)'] })
     const unbound = { ...bindings, fields: bindings.fields.filter((entry) => entry.field !== 'notes') }
-    expect(applyPresentation(base, presentation([{ field: 'notes', anchor: NOTES, label: 'N' }]), unbound)).toEqual({ ok: false, problems: ['/fields/0/field: notes has no binding'] })
+    expect(applyPresentation(base, presentation([{ field: 'notes', anchor: NOTES, label: 'N' }]), unbound)).toEqual({
+      ok: false,
+      problems: ['/fields/0/field: notes has no binding'],
+    })
   })
 
   // Sections out of the base's order are a second spelling of one patch, as fields are.
@@ -187,9 +214,26 @@ describe('applyPresentation', () => {
   // Two entries for one field, or one section, would leave which applies to
   // the order they happen to be read in.
   test('refuses duplicates', () => {
-    expect(presentationShapeProblems(presentation([{ field: 'notes', anchor: NOTES, label: 'A' }, { field: 'notes', anchor: NOTES, span: 'one' }]))).toEqual(['/fields/1: notes appears twice'])
+    expect(
+      presentationShapeProblems(
+        presentation([
+          { field: 'notes', anchor: NOTES, label: 'A' },
+          { field: 'notes', anchor: NOTES, span: 'one' },
+        ]),
+      ),
+    ).toEqual(['/fields/1: notes appears twice'])
     const anchor = { label: 'Order', occurrence: 0 }
-    expect(presentationShapeProblems(presentation([], [{ anchor, label: 'A' }, { anchor, label: 'B' }]))).toEqual(['/sections/1: section "Order" (0) appears twice'])
+    expect(
+      presentationShapeProblems(
+        presentation(
+          [],
+          [
+            { anchor, label: 'A' },
+            { anchor, label: 'B' },
+          ],
+        ),
+      ),
+    ).toEqual(['/sections/1: section "Order" (0) appears twice'])
     expect(presentationShapeProblems(presentation([], [{ anchor, order: ['notes', 'notes'] }]))).toEqual(['/sections/0/order: notes appears twice'])
   })
 })

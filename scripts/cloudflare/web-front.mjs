@@ -123,20 +123,53 @@ export async function startWebFront({ name, toolsImage, nginxImage, repo, conf, 
   }
   try {
     docker(['network', 'create', network])
-    docker(['run', '-d', '--name', server, '--network', network, '--network-alias', 'server', '-v', `${repo}:/repo:ro`, '--entrypoint', 'node', toolsImage, '--input-type=module', '-e', SERVER])
+    docker([
+      'run',
+      '-d',
+      '--name',
+      server,
+      '--network',
+      network,
+      '--network-alias',
+      'server',
+      '-v',
+      `${repo}:/repo:ro`,
+      '--entrypoint',
+      'node',
+      toolsImage,
+      '--input-type=module',
+      '-e',
+      SERVER,
+    ])
     for (let waited = 0; !jsonLines(server).some((line) => line.listening === 4390); waited += 1) {
       if (waited === 60) throw new Error(`the data server did not listen within 30 seconds: ${docker(['logs', server], { allowFailure: true }).stderr.trim()}`)
       await wait(500)
     }
     const mounts = statics.flatMap((location) => ['-v', `${join(files, location)}:${SHARE}${location.replace(/\/$/, '')}:ro`])
-    docker(['run', '-d', '--name', web, '--network', network, '-p', '127.0.0.1::8080', '-p', '127.0.0.1::8081', '-v', `${conf}:/etc/nginx/conf.d/default.conf:ro`, ...mounts, nginxImage])
+    docker([
+      'run',
+      '-d',
+      '--name',
+      web,
+      '--network',
+      network,
+      '-p',
+      '127.0.0.1::8080',
+      '-p',
+      '127.0.0.1::8081',
+      '-v',
+      `${conf}:/etc/nginx/conf.d/default.conf:ro`,
+      ...mounts,
+      nginxImage,
+    ])
     const port = (target) => {
       const published = /:(\d+)\s*$/m.exec(docker(['port', web, String(target)]).stdout)?.[1]
       if (published === undefined) throw new Error(`the web front publishes no port for ${String(target)}`)
       return Number(published)
     }
     for (let waited = 0; (await status(port(8080), '/health')) !== 200; waited += 1) {
-      if (waited === 60) throw new Error(`/health through the web front did not answer 200 within 30 seconds: ${docker(['logs', web], { allowFailure: true }).stderr.trim()}`)
+      if (waited === 60)
+        throw new Error(`/health through the web front did not answer 200 within 30 seconds: ${docker(['logs', web], { allowFailure: true }).stderr.trim()}`)
       await wait(500)
     }
     return { port, lines: () => jsonLines(server), close }

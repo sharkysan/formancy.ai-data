@@ -88,7 +88,11 @@ export function detailTarget(noun: string, record: string, heard: string | null)
  * record's row, the newest the detail heard, which a save may have moved
  * past the row. Nothing for a row no token addresses.
  */
-export function rowTarget(noun: string, row: { record: string | null; version: string | null }, open: { record: string; heard: string | null } | null): DeleteTarget | null {
+export function rowTarget(
+  noun: string,
+  row: { record: string | null; version: string | null },
+  open: { record: string; heard: string | null } | null,
+): DeleteTarget | null {
   if (row.record === null) return null
   const isOpen = open !== null && open.record === row.record
   const version = isOpen ? (open.heard ?? row.version) : row.version
@@ -147,7 +151,8 @@ export function answer(now: Deletion, outcome: DeleteOutcome): { next: Deletion;
   const { target } = now
   const n = numbered(now)
   if (outcome.ok) return { next: IDLE, gone: true }
-  if (outcome.code === 'unknown-outcome' && 'operation' in outcome) return { next: { state: 'unknown', target, unknown: outcome, checking: false, n }, gone: false }
+  if (outcome.code === 'unknown-outcome' && 'operation' in outcome)
+    return { next: { state: 'unknown', target, unknown: outcome, checking: false, n }, gone: false }
   if (outcome.status === 404 && outcome.code === 'not-found') return { next: { state: 'not-found', target, n }, gone: false }
   return { next: { state: 'refused', target, message: outcome.message, stale: outcome.status === 409 && outcome.code === 'stale', n }, gone: false }
 }

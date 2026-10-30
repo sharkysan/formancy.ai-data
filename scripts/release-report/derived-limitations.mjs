@@ -26,16 +26,20 @@ function filesOf(images) {
 function matrixClauses(images) {
   const groups = new Map()
   for (const image of images.filter((entry) => entry.tested.length > 0)) {
-    const who = image.suites.length === 0 ? `the tests in ${ran(image)}` : `the ${image.suites.length === 1 ? 'suite' : 'suites'} of ${prose(image.suites.map(code))}`
+    const who =
+      image.suites.length === 0 ? `the tests in ${ran(image)}` : `the ${image.suites.length === 1 ? 'suite' : 'suites'} of ${prose(image.suites.map(code))}`
     groups.set(who, [...(groups.get(who) ?? []), image])
   }
   const clauses = [...groups].map(([who, ranOn]) => `; ${who} also ran on ${prose(ranOn.map(answered))}`)
   const none = images.filter((entry) => entry.tested.length === 0)
   for (const image of none.filter((entry) => (entry.aside?.tested ?? []).length > 0)) {
-    clauses.push(`; no leg of the matrix ran on ${code(image.image)}, though the tests in ${prose(image.aside.callers.map(code))} did (${prose(image.aside.tested.map(answer))})`)
+    clauses.push(
+      `; no leg of the matrix ran on ${code(image.image)}, though the tests in ${prose(image.aside.callers.map(code))} did (${prose(image.aside.tested.map(answer))})`,
+    )
   }
   const nothing = none.filter((entry) => (entry.aside?.tested ?? []).length === 0)
-  if (nothing.length > 0) clauses.push(`; no test ran on ${prose(nothing.map((entry) => code(entry.image)))}, ${nothing.length === 1 ? 'an image' : 'images'} of the matrix`)
+  if (nothing.length > 0)
+    clauses.push(`; no test ran on ${prose(nothing.map((entry) => code(entry.image)))}, ${nothing.length === 1 ? 'an image' : 'images'} of the matrix`)
   return clauses.join('')
 }
 
@@ -124,7 +128,10 @@ function systemSentences(gates) {
     const packages = [...seen.values()]
     const gives = prose([...new Set(packages.map((entry) => entry.gives))])
     const resting = Object.entries(FACTS).filter(([, fact]) => (fact.restsOn?.[browser] ?? []).length > 0)
-    const rests = resting.length === 0 ? '' : `; 0058's ${prose(resting.map(([id]) => id))} rest on ${prose([...new Set(resting.flatMap(([, fact]) => fact.restsOn[browser]))])}`
+    const rests =
+      resting.length === 0
+        ? ''
+        : `; 0058's ${prose(resting.map(([id]) => id))} rest on ${prose([...new Set(resting.flatMap(([, fact]) => fact.restsOn[browser]))])}`
     sentences.push(`${browserName(browser)}'s ${gives} were the runner's, not Playwright's: ${prose(packages.map(recorded))}${rests}.`)
   }
   return sentences
@@ -164,14 +171,19 @@ export function derivedLimitations(report) {
       ? 'Every runtime dependency is published as a range; the suites ran the versions *Tested on* names.'
       : `${prose(ranged.map((entry) => code(entry.name)))} are published as ranges; the suites ran the versions *Tested on* names.`,
   )
-  const moved = [...testedOn.runtime, ...testedOn.upstream].filter((entry) => entry.fresh !== null && entry.fresh !== undefined && entry.fresh !== (entry.loaded ?? entry.version))
+  const moved = [...testedOn.runtime, ...testedOn.upstream].filter(
+    (entry) => entry.fresh !== null && entry.fresh !== undefined && entry.fresh !== (entry.loaded ?? entry.version),
+  )
   if (moved.length > 0) {
     sentences.push(
       `A clean npm install on ${String(testedOn.installedAt).slice(0, 10)} resolved ${prose(moved.map((entry) => `${code(entry.name)} ${entry.fresh} (the suites ran ${entry.loaded ?? entry.version})`))}, which no suite ran.`,
     )
   }
 
-  const declared = testedOn.node.declared.length === 0 ? 'no published package declares the Node versions it supports' : prose(testedOn.node.declared.map((entry) => `${code(entry.package)} declares Node ${code(entry.node)}`))
+  const declared =
+    testedOn.node.declared.length === 0
+      ? 'no published package declares the Node versions it supports'
+      : prose(testedOn.node.declared.map((entry) => `${code(entry.package)} declares Node ${code(entry.node)}`))
   const image = testedOn.node.image === null ? "the server image's Node was not recorded in this run" : `the server image runs ${testedOn.node.image}`
   sentences.push(`The suites ran on Node ${prose(testedOn.node.ran)}; ${image}; ${declared}.`)
 
@@ -181,12 +193,17 @@ export function derivedLimitations(report) {
     // Only the jobs that built every published package are named: a job
     // that built one, as an adapter's test job builds data-core, did not
     // build the others, and the table says which built what.
-    const everywhere = identity.map((entry) => new Set(entry.builds.map((build) => build.job))).reduce((all, jobs) => new Set([...all].filter((job) => jobs.has(job))))
+    const everywhere = identity
+      .map((entry) => new Set(entry.builds.map((build) => build.job)))
+      .reduce((all, jobs) => new Set([...all].filter((job) => jobs.has(job))))
     const named = [...everywhere].sort()
     sentences.push(
       `Each package's own suites ran its source; the published dist/ was run by the install gate, and each package's is byte-identical to ${named.length === 0 ? 'the dist/ every job that built it built' : `its dist/ built in ${prose(named)}, and in every other job that built it`} (*Build identity* names them).`,
     )
-  } else sentences.push("Each package's own suites ran its source; the published dist/ was run by the install gate, and is not shown byte-identical to every job's build (see *Build identity*).")
+  } else
+    sentences.push(
+      "Each package's own suites ran its source; the published dist/ was run by the install gate, and is not shown byte-identical to every job's build (see *Build identity*).",
+    )
 
   sentences.push(
     results.container === null

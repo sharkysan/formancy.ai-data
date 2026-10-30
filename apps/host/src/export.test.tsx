@@ -3,7 +3,23 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import type { PublishedForm, RecordExportQuery } from '@formancy/data-client'
 import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, exportButton, exportLine, formLink, gridSection, gridStatus, keeping, load, loaded, mount, newRecord, searchRecords, signIn, stamp } from './test-host.js'
+import {
+  answeredOnce,
+  chooseForm,
+  exportButton,
+  exportLine,
+  formLink,
+  gridSection,
+  gridStatus,
+  keeping,
+  load,
+  loaded,
+  mount,
+  newRecord,
+  searchRecords,
+  signIn,
+  stamp,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -76,7 +92,8 @@ async function bytesOf(file: Blob): Promise<number[]> {
 }
 
 /** What the page sent to the export route, in order. */
-const exportsSent = (sent: readonly Sent[], formId: string): Sent[] => sent.filter((request) => request.method === 'POST' && request.path === `/v1/forms/${formId}/records/export`)
+const exportsSent = (sent: readonly Sent[], formId: string): Sent[] =>
+  sent.filter((request) => request.method === 'POST' && request.path === `/v1/forms/${formId}/records/export`)
 
 /** The file the server makes for `query`, asked by tenant 1's clerk beside the page. */
 async function serversFile(formId: string, query: Partial<RecordExportQuery>): Promise<{ bytes: number[]; name: string }> {
@@ -98,7 +115,11 @@ async function definitionOf(formId: string): Promise<PublishedForm> {
  * two cannot drift apart unseen.
  */
 function headerFor(gridHeaders: readonly string[], definition: PublishedForm): string[] {
-  const lookups = new Set(definition.form.model.fields.filter((field) => typeof (field as { optionsSource?: unknown }).optionsSource === 'string').map((field) => String(field.label ?? field.key)))
+  const lookups = new Set(
+    definition.form.model.fields
+      .filter((field) => typeof (field as { optionsSource?: unknown }).optionsSource === 'string')
+      .map((field) => String(field.label ?? field.key)),
+  )
   return gridHeaders.flatMap((header) => (lookups.has(header) ? [header, `${header} (key)`] : [header]))
 }
 
@@ -125,7 +146,13 @@ async function freshOrder(engine: Engine, notes: string, lines: readonly number[
   const source = definition.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   for (const no of lines) {
     const line = await plane.clerk.create(engine.lines, { order: created.value.record, line_no: String(no), quantity: String(no), unit_price: '2.50' })
@@ -181,7 +208,9 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     expect(focusedName()).toBe('Download CSV')
     const sent = exportsSent(plane.sent, engine.formId)
     // No condition applied, so an empty filter: filter.test.tsx holds a filtered file (0104).
-    expect(sent.map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: notes, sort: [{ field: 'id', direction: 'desc' }], parent: null, filter: [] }])
+    expect(sent.map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([
+      { search: notes, sort: [{ field: 'id', direction: 'desc' }], parent: null, filter: [] },
+    ])
     expect(kept.saved).toHaveLength(1)
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
@@ -263,7 +292,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const signals: AbortSignal[] = []
     const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith('/records/export'))
     const fetch: typeof globalThis.fetch = (input, init) => {
-      if (init?.signal != null && new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname.endsWith('/records/export')) signals.push(init.signal)
+      if (init?.signal != null && new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname.endsWith('/records/export'))
+        signals.push(init.signal)
       return held.fetch(input, init)
     }
     const kept = keeping()
@@ -308,17 +338,30 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const grid = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
     await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
     await user.keyboard('{ArrowUp}{Enter}{Enter}')
-    await waitFor(() => expect(within(grid).getByRole('columnheader', { name: /^Line no/ }).getAttribute('aria-sort')).toBe('descending'), ARRIVES)
+    await waitFor(
+      () =>
+        expect(
+          within(grid)
+            .getByRole('columnheader', { name: /^Line no/ })
+            .getAttribute('aria-sort'),
+        ).toBe('descending'),
+      ARRIVES,
+    )
     await waitFor(() => expect(firstCells('Order line')).toEqual(['3', '2', '1']), ARRIVES)
     plane.sent.length = 0
     await pressFromKeyboard(user, 'Order line')
     await waitFor(() => expect(exportLine('Order line').textContent).toBe(made(engine.lines)), ARRIVES)
     const parent = { field: 'order', record: order }
     const sort = [{ field: 'line_no', direction: 'desc' as const }]
-    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([{ search: '', sort, parent, filter: [] }])
+    expect(exportsSent(plane.sent, engine.lines).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([
+      { search: '', sort, parent, filter: [] },
+    ])
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
-    expect({ name: saved.name, bytes: await bytesOf(saved.file) }).toEqual({ name: `${engine.lines}.csv`, bytes: (await serversFile(engine.lines, { parent, sort })).bytes })
+    expect({ name: saved.name, bytes: await bytesOf(saved.file) }).toEqual({
+      name: `${engine.lines}.csv`,
+      bytes: (await serversFile(engine.lines, { parent, sort })).bytes,
+    })
     const definition = await definitionOf(engine.lines)
     const [header, ...rows] = records(await saved.file.text())
     const label = String(definition.form.model.fields.find((field) => field.key === 'order')?.label)
@@ -340,7 +383,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const signals: AbortSignal[] = []
     const held = holdingRequests(plane.fetch, ({ path }) => path.endsWith('/records/export'))
     const fetch: typeof globalThis.fetch = (input, init) => {
-      if (init?.signal != null && new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname.endsWith('/records/export')) signals.push(init.signal)
+      if (init?.signal != null && new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname.endsWith('/records/export'))
+        signals.push(init.signal)
       return held.fetch(input, init)
     }
     const kept = keeping()

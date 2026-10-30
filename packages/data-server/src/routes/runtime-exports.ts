@@ -1,4 +1,14 @@
-import { EXPORT_MAX_BYTES, exportColumns, exportFileName, exportHeader, exportRecord, LIST_PAGE_SIZE, planList, recordPage, validateExportQuery } from '@formancy/data-core'
+import {
+  EXPORT_MAX_BYTES,
+  exportColumns,
+  exportFileName,
+  exportHeader,
+  exportRecord,
+  LIST_PAGE_SIZE,
+  planList,
+  recordPage,
+  validateExportQuery,
+} from '@formancy/data-core'
 import type { ExportColumns, ExportLabels, FormRecord, ListRequest, RuntimeRefusal } from '@formancy/data-core'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
@@ -23,8 +33,16 @@ type ExportRequest = FastifyRequest<{ Params: { id: string } }>
 /** A refusal this route makes itself: a stable code and a sentence a person can be shown, naming no value (0011). */
 const refused = (status: number, code: string, message: string): WriteAnswer => ({ status, body: { code, message } satisfies RuntimeRefusal })
 
-const TOO_LARGE = refused(422, 'export-too-large', `The file would be larger than ${String(EXPORT_MAX_BYTES / (1024 * 1024))} MB. Search for fewer records and try again.`)
-const TIMED_OUT = refused(503, 'export-timeout', `The file could not be made within ${String(EXPORT_DEADLINE_MS / 1000)} seconds. Search for fewer records and try again.`)
+const TOO_LARGE = refused(
+  422,
+  'export-too-large',
+  `The file would be larger than ${String(EXPORT_MAX_BYTES / (1024 * 1024))} MB. Search for fewer records and try again.`,
+)
+const TIMED_OUT = refused(
+  503,
+  'export-timeout',
+  `The file could not be made within ${String(EXPORT_DEADLINE_MS / 1000)} seconds. Search for fewer records and try again.`,
+)
 const BUSY = refused(503, 'export-busy', "Another file is being made from this form's database. Try again in a moment.")
 const MOVED = refused(409, 'moved', 'The records changed while the file was made. Try again.')
 const ABANDONED = refused(499, 'abandoned', 'The client closed the connection before the file was made; no further statement was sent.')
@@ -58,7 +76,10 @@ function stopped(making: Making): { ok: false; answer: WriteAnswer } | undefined
     return stop(ABANDONED)
   }
   if (Date.now() < making.deadline) return undefined
-  request.log.warn({ form: request.params.id, rows: request.auditTrail?.rows ?? 0, deadlineMs: EXPORT_DEADLINE_MS }, 'an export passed its deadline; no further statement was sent')
+  request.log.warn(
+    { form: request.params.id, rows: request.auditTrail?.rows ?? 0, deadlineMs: EXPORT_DEADLINE_MS },
+    'an export passed its deadline; no further statement was sent',
+  )
   return stop(TIMED_OUT)
 }
 
@@ -97,7 +118,11 @@ async function labelsOf(steps: ExportRouteSteps, making: Making, rows: readonly 
       const ours = signal.aborted && error === signal.reason
       const halted = ours ? stopped(making) : undefined
       if (halted !== undefined) return halted
-      if (ours) making.request.log.warn({ field, deadlineMs: steps.lookupDeadlineMs }, "an export's labels passed the lookup deadline; the database was told to stop it")
+      if (ours)
+        making.request.log.warn(
+          { field, deadlineMs: steps.lookupDeadlineMs },
+          "an export's labels passed the lookup deadline; the database was told to stop it",
+        )
       else making.request.log.warn({ field, error: (error as Error).message }, "an export's labels could not be resolved")
       return stop(UNLABELLED)
     } finally {

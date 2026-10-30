@@ -1,5 +1,36 @@
-import { browsePage, browseRelations, driftRefusal, exportColumns, exportHeader, exportRecord, followTerms, generateForm, listTerms, planBrowse, planList, planRead, recordPage, toFormAnswers } from '@formancy/data-core'
-import type { ApiValue, BrowseFilterTerm, BrowseQuery, BrowseRelation, FormBindings, FormPolicy, FormRecord, ListFilterTerm, ListOutcome, MetadataSnapshot, ObjectRef, PolicyContext, RecordAdapter, RecordList, RecordListQuery } from '@formancy/data-core'
+import {
+  browsePage,
+  browseRelations,
+  driftRefusal,
+  exportColumns,
+  exportHeader,
+  exportRecord,
+  followTerms,
+  generateForm,
+  listTerms,
+  planBrowse,
+  planList,
+  planRead,
+  recordPage,
+  toFormAnswers,
+} from '@formancy/data-core'
+import type {
+  ApiValue,
+  BrowseFilterTerm,
+  BrowseQuery,
+  BrowseRelation,
+  FormBindings,
+  FormPolicy,
+  FormRecord,
+  ListFilterTerm,
+  ListOutcome,
+  MetadataSnapshot,
+  ObjectRef,
+  PolicyContext,
+  RecordAdapter,
+  RecordList,
+  RecordListQuery,
+} from '@formancy/data-core'
 import {
   BROWSE_PARITY,
   browseCase,
@@ -70,7 +101,17 @@ const LINE_POLICY: FormPolicy = {
 const SHIPMENT_POLICY: FormPolicy = {
   version: 1,
   operations: { read: ['clerk'], create: [], update: [] },
-  fields: { id: READ, tenant_id: READ, tracking_no: READ, carrier_code: READ, reference: READ, pickup_time: READ, dispatched_at: READ, weight_kg: READ, temperature_c: READ },
+  fields: {
+    id: READ,
+    tenant_id: READ,
+    tracking_no: READ,
+    carrier_code: READ,
+    reference: READ,
+    pickup_time: READ,
+    dispatched_at: READ,
+    weight_kg: READ,
+    temperature_c: READ,
+  },
   rowFilters: TENANT,
   lookups: {},
 }
@@ -93,9 +134,17 @@ beforeAll(async () => {
   }
   // IDENTITY_INSERT is the session's, so the orders go in one batch; every value is a constant of LIST_ROWS's digits.
   const orders = LIST_ROWS.orders.map(([id, tenant]) => `(${id}, ${tenant}, 1001, '2026-10-09', 1)`).join(', ')
-  await owner.request().batch(`set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orders}; set identity_insert sales.[order] off;`)
+  await owner
+    .request()
+    .batch(
+      `set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orders}; set identity_insert sales.[order] off;`,
+    )
   for (const [order, line] of LIST_ROWS.lines) {
-    await owner.request().input('order', mssql.BigInt, order).input('line', mssql.Int, Number(line)).query('insert into sales.order_line (order_id, line_no, quantity, unit_price) values (@order, @line, 1, 1.00)')
+    await owner
+      .request()
+      .input('order', mssql.BigInt, order)
+      .input('line', mssql.Int, Number(line))
+      .query('insert into sales.order_line (order_id, line_no, quantity, unit_price) values (@order, @line, 1, 1.00)')
   }
   // Each timestamp as text, converted by the server through an ISO 8601
   // style, never through a JavaScript Date in this machine's zone.
@@ -114,7 +163,9 @@ beforeAll(async () => {
       .input('tracking', mssql.NVarChar(36), tracking)
       .input('reference', mssql.NVarChar(20), reference)
       .input('dispatched', mssql.NVarChar(40), dispatched)
-      .query(`insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at) values (@tenant, convert(uniqueidentifier, @tracking), 1, @reference, '08:00', convert(datetime2(3), @dispatched, 126))`)
+      .query(
+        `insert into sales.shipment (tenant_id, tracking_no, carrier_code, reference, pickup_time, dispatched_at) values (@tenant, convert(uniqueidentifier, @tracking), 1, @reference, '08:00', convert(datetime2(3), @dispatched, 126))`,
+      )
   }
   snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
   customers = generateForm(snapshot, {
@@ -132,7 +183,14 @@ beforeAll(async () => {
     title: 'Order line',
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
   }).bindings
-  shipments = generateForm(snapshot, { connection: 'test', root: { schema: 'sales', name: 'shipment' }, formId: 'shipments', title: 'Shipments', lookups: [], pinned: ['tenant_id'] })
+  shipments = generateForm(snapshot, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'shipment' },
+    formId: 'shipments',
+    title: 'Shipments',
+    lookups: [],
+    pinned: ['tenant_id'],
+  })
   records = createSqlServerRecords(owner)
 })
 
@@ -142,7 +200,13 @@ afterAll(async () => {
 })
 
 /** One page as the server answers it: planned for Clara, or `context`, listed by the adapter, and built by `recordPage`. */
-async function listed(bindings: FormBindings, policy: FormPolicy, change: Partial<RecordListQuery>, context = CLARA, adapter = records): Promise<RecordList & { outcome: ListOutcome }> {
+async function listed(
+  bindings: FormBindings,
+  policy: FormPolicy,
+  change: Partial<RecordListQuery>,
+  context = CLARA,
+  adapter = records,
+): Promise<RecordList & { outcome: ListOutcome }> {
   const query = { ...EVERY, ...change }
   const plan = planList(snapshot, bindings, policy, context, query)
   if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
@@ -204,7 +268,9 @@ describe('a NOT NULL sort', covers('sqlserver', listCase('order')), () => {
     expect(listStatement(plan.request, listTerms(plan.request)).sql).not.toMatch(/case when \[r\]/)
     const nullable = planList(snapshot, customers, CUSTOMER_POLICY, CLARA, { ...EVERY, sort: [{ field: 'credit_limit', direction: 'desc' }] })
     if (!nullable.ok) throw new Error(nullable.message)
-    expect(listStatement(nullable.request, listTerms(nullable.request)).sql).toMatch(/case when \[r\]\.\[credit_limit\] is null then 1 else 0 end, \[r\]\.\[credit_limit\] desc/)
+    expect(listStatement(nullable.request, listTerms(nullable.request)).sql).toMatch(
+      /case when \[r\]\.\[credit_limit\] is null then 1 else 0 end, \[r\]\.\[credit_limit\] desc/,
+    )
   })
 })
 
@@ -264,7 +330,9 @@ describe('a parent over a text foreign key', covers('sqlserver', listCase('text-
   test("narrows a customer list to a country, as the database's equality compares char(2)", async () => {
     const entry = LIST_PARITY['text-parent']
     expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.exact.record } }))).toEqual(entry.exact.keys)
-    expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.folded.record } }))).toEqual(entry.folded.keys.sqlserver)
+    expect(numbers(await listed(customers, CUSTOMER_POLICY, { parent: { field: entry.field, record: entry.folded.record } }))).toEqual(
+      entry.folded.keys.sqlserver,
+    )
   })
 })
 
@@ -280,25 +348,50 @@ describe('a key the table no longer holds', covers('sqlserver', listCase('key'))
   test('refuses a page once its own description says the key can be NULL, or is not unique', async () => {
     await owner.request().batch('create table sales.list_key (code int not null constraint uq_list_key unique, label nvarchar(20) not null)')
     for (const [code, label] of LIST_PARITY.key.rows) {
-      await owner.request().input('code', mssql.Int, Number(code)).input('label', mssql.NVarChar(20), label).query('insert into sales.list_key (code, label) values (@code, @label)')
+      await owner
+        .request()
+        .input('code', mssql.Int, Number(code))
+        .input('label', mssql.NVarChar(20), label)
+        .query('insert into sales.list_key (code, label) values (@code, @label)')
     }
     const keyed = await discoverSqlServer(owner, FIXTURE_SCOPE)
-    const bindings = generateForm(keyed, { connection: 'test', root: { schema: 'sales', name: 'list_key' }, formId: 'list-key', title: 'Key', lookups: [] }).bindings
+    const bindings = generateForm(keyed, {
+      connection: 'test',
+      root: { schema: 'sales', name: 'list_key' },
+      formId: 'list-key',
+      title: 'Key',
+      lookups: [],
+    }).bindings
     expect(bindings.identity).toEqual(['code'])
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { code: READ, label: READ }, rowFilters: [], lookups: {} }
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: { code: READ, label: READ },
+      rowFilters: [],
+      lookups: {},
+    }
     const page = async () => {
       const plan = planList(keyed, bindings, policy, CLARA, EVERY)
       if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
       const outcome = await records.list(plan.request)
       if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-      return { fields: plan.fields, outcome, list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'), read: driftRefusal(keyed, bindings, policy, outcome.described, 'read') }
+      return {
+        fields: plan.fields,
+        outcome,
+        list: driftRefusal(keyed, bindings, policy, outcome.described, 'list'),
+        read: driftRefusal(keyed, bindings, policy, outcome.described, 'read'),
+      }
     }
     const held = await page()
     expect(held.list).toBeUndefined()
     expect(recordPage(bindings, held.fields, held.outcome.rows, EVERY.limit).rows.map((row) => String(row.answers['code']))).toEqual(LIST_PARITY.key.listed)
 
     // SQL Server alters no column a constraint covers, so the key is dropped and added again around it.
-    await owner.request().batch('alter table sales.list_key drop constraint uq_list_key; alter table sales.list_key alter column code int null; alter table sales.list_key add constraint uq_list_key unique (code)')
+    await owner
+      .request()
+      .batch(
+        'alter table sales.list_key drop constraint uq_list_key; alter table sales.list_key alter column code int null; alter table sales.list_key add constraint uq_list_key unique (code)',
+      )
     await owner.request().batch(`insert into sales.list_key (code, label) values (null, N'none')`)
     const loosened = await page()
     expect({ list: loosened.list?.code, read: loosened.read }).toEqual({ list: LIST_PARITY.key.refused, read: undefined })
@@ -361,7 +454,11 @@ describe('a view browsed', covers('sqlserver', browseCase('view'), browseCase('s
       const { plan, page } = await browsed({ object, offset: expected.offset, limit: size })
       expect(plan.ordered).toBe('columns')
       expect(plan.columns.map((column) => column.name)).toEqual(columns)
-      expect({ offset: expected.offset, rows: valuesIn(columns, page.rows), hasMore: page.hasMore }).toEqual({ offset: expected.offset, rows: expected.rows, hasMore: expected.hasMore })
+      expect({ offset: expected.offset, rows: valuesIn(columns, page.rows), hasMore: page.hasMore }).toEqual({
+        offset: expected.offset,
+        rows: expected.rows,
+        hasMore: expected.hasMore,
+      })
     }
   })
 
@@ -402,7 +499,13 @@ describe('a table with columns that have no text', covers('sqlserver', browseCas
  * `filter` too. Neither is written here, so the key's columns are paired as
  * this engine's catalog reports them.
  */
-async function followed(from: ObjectRef, direction: BrowseRelation['direction'], key: string, row: Readonly<Record<string, ApiValue>>, filter: BrowseFilterTerm[] = []) {
+async function followed(
+  from: ObjectRef,
+  direction: BrowseRelation['direction'],
+  key: string,
+  row: Readonly<Record<string, ApiValue>>,
+  filter: BrowseFilterTerm[] = [],
+) {
   const relation = browseRelations(snapshot, from).relations.find((entry) => entry.direction === direction && entry.key === key)
   if (relation === undefined) throw new Error(`${key} cannot be followed ${direction} from ${from.schema}.${from.name}`)
   const equal = followTerms(relation, row)
@@ -441,7 +544,8 @@ describe('a row followed through a foreign key', covers('sqlserver', browseCase(
  */
 
 /** Tenant 1's customers narrowed by `filter`, beside whatever else `change` asks. */
-const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) => listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
+const customersWhere = (filter: ListFilterTerm[], change: Partial<RecordListQuery> = {}, adapter = records) =>
+  listed(customers, CUSTOMER_POLICY, { ...change, filter }, CLARA, adapter)
 /** Tenant 3's shipments narrowed by `filter`, listed by its clerk. */
 const shipmentsWhere = (filter: ListFilterTerm[], adapter = records) => listed(shipments.bindings, SHIPMENT_POLICY, { filter }, SHIPPER, adapter)
 /** The references of a page of shipments, in its order. */
@@ -455,7 +559,8 @@ describe('a filter that a text equals', covers('sqlserver', columnFilterCase('te
   // counts both (0028). Watched failing with `=` alone.
   test('finds the reference exactly as given: case and a trailing space count', async () => {
     const { field, entries } = COLUMN_FILTER_PARITY.text
-    for (const entry of entries) expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
+    for (const entry of entries)
+      expect(references(await shipmentsWhere([{ field, op: 'equals', value: entry.value }])), JSON.stringify(entry.value)).toEqual(entry.references)
   })
 })
 
@@ -529,7 +634,8 @@ describe('a filter beside a search', covers('sqlserver', columnFilterCase('searc
   // The search and the filter are both predicates of the one statement:
   // either alone would find more.
   test('finds the rows both hold for', async () => {
-    for (const entry of COLUMN_FILTER_PARITY.search) expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
+    for (const entry of COLUMN_FILTER_PARITY.search)
+      expect(numbers(await customersWhere([...entry.filter], { search: entry.search })), entry.search).toEqual(entry.keys)
   })
 })
 
@@ -552,7 +658,8 @@ describe('a filter beside a follow', covers('sqlserver', columnFilterCase('follo
     const { object, equal, key, entries } = COLUMN_FILTER_PARITY.follow
     const [customer] = (await browsed({ object, equal: [...equal] })).page.rows
     if (customer === undefined) throw new Error('the customer followed from was not browsed')
-    for (const entry of entries) expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
+    for (const entry of entries)
+      expect((await followed(object, 'referred-by', key, customer, [...entry.filter])).page.rows.map((row) => row['id'])).toEqual(entry.ids)
   })
 })
 
@@ -589,7 +696,11 @@ describe('a timestamp or a date, in the language the composition root chose', ()
   // read as datetime without its `T`.
   beforeAll(async () => {
     german = await new mssql.ConnectionPool({ ...fixture.admin, options: { ...fixture.admin.options, language: 'Deutsch', dateFormat: 'dmy' } }).connect()
-    const settings = await german.request().query<{ language: string; format: string }>('select @@language as language, (select date_format from sys.dm_exec_sessions where session_id = @@spid) as format')
+    const settings = await german
+      .request()
+      .query<{ language: string; format: string }>(
+        'select @@language as language, (select date_format from sys.dm_exec_sessions where session_id = @@spid) as format',
+      )
     expect(settings.recordset[0]).toEqual({ language: 'Deutsch', format: 'dmy' })
     zoned = createSqlServerRecords(german)
   })
@@ -641,7 +752,10 @@ describe('a timestamp or a date, in the language the composition root chose', ()
       for (const [session, adapter] of sessions()) {
         for (const entry of entries) {
           const { page } = await browsed({ object, filter: [{ column, ...entry.condition }] }, adapter)
-          expect(page.rows.map((row) => row['id']), `${session}: ${JSON.stringify(entry.condition)}`).toEqual(entry.ids)
+          expect(
+            page.rows.map((row) => row['id']),
+            `${session}: ${JSON.stringify(entry.condition)}`,
+          ).toEqual(entry.ids)
         }
       }
     })
@@ -660,7 +774,11 @@ describe("a day range on each of SQL Server's zoneless clocks", () => {
   // statement: watched failing with the bound read as datetime.
   test('holds the days of a datetime, a smalldatetime and a datetime2 of either scale, at midnight exactly', async () => {
     const object = { schema: 'sales', name: 'filter_clock' }
-    await owner.request().batch('create table sales.filter_clock (id int not null constraint pk_filter_clock primary key, legacy datetime null, minute smalldatetime null, precise datetime2(7) null, whole datetime2(0) null)')
+    await owner
+      .request()
+      .batch(
+        'create table sales.filter_clock (id int not null constraint pk_filter_clock primary key, legacy datetime null, minute smalldatetime null, precise datetime2(7) null, whole datetime2(0) null)',
+      )
     await owner.request().batch(`insert into sales.filter_clock (id, legacy, minute, precise, whole) values
       (1, '2026-02-28T23:59:59.997', '2026-02-28T23:59:00', '2026-02-28T23:59:59.9999999', '2026-02-28T23:59:59'),
       (2, '2026-03-01T00:00:00', '2026-03-01T00:00:00', '2026-03-01T00:00:00', '2026-03-01T00:00:00'),
@@ -670,9 +788,15 @@ describe("a day range on each of SQL Server's zoneless clocks", () => {
     const clocked = await discoverSqlServer(owner, FIXTURE_SCOPE)
     for (const column of ['legacy', 'minute', 'precise', 'whole']) {
       const days = await browsed({ object, filter: [{ column, op: 'range', from: '2026-03-01', to: '2026-03-02' }] }, records, clocked)
-      expect(days.page.rows.map((row) => row['id']), column).toEqual(['2', '3'])
+      expect(
+        days.page.rows.map((row) => row['id']),
+        column,
+      ).toEqual(['2', '3'])
       const wide = await browsed({ object, filter: [{ column, op: 'range', from: '0001-01-01', to: '9999-12-30' }] }, records, clocked)
-      expect(wide.page.rows.map((row) => row['id']), column).toEqual(['1', '2', '3', '4'])
+      expect(
+        wide.page.rows.map((row) => row['id']),
+        column,
+      ).toEqual(['1', '2', '3', '4'])
     }
   })
 })

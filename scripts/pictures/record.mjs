@@ -58,7 +58,8 @@ export function misquotes(scene, text) {
   }
   const quotes = scene.quotes ?? {}
   for (const quote of new Set(written)) {
-    if (!Object.hasOwn(quotes, quote)) problems.push(`${scene.id}: “${quote}” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture`)
+    if (!Object.hasOwn(quotes, quote))
+      problems.push(`${scene.id}: “${quote}” is quoted in its caption or alt and is not a key of its quotes, so nothing holds it to the picture`)
   }
   for (const [quote, parts] of Object.entries(quotes)) {
     if (!written.includes(quote)) problems.push(`${scene.id}: “${quote}” is a key of its quotes and is quoted in neither its caption nor its alt`)
@@ -79,7 +80,10 @@ export function misquotes(scene, text) {
         problems.push(`${scene.id}, part ${part}: ${error.message}`)
         continue
       }
-      if (!found) problems.push(`${scene.id}: “${quote}” is not inside one name or value of what the part ${part} says, so the caption quotes what its picture does not show`)
+      if (!found)
+        problems.push(
+          `${scene.id}: “${quote}” is not inside one name or value of what the part ${part} says, so the caption quotes what its picture does not show`,
+        )
     }
   }
   return problems
@@ -145,7 +149,9 @@ export function dated(previous, next) {
 export function ordered(record, scenes) {
   const ids = scenes.map((scene) => scene.id)
   const known = ids.filter((id) => Object.hasOwn(record, id)).map((id) => [id, record[id]])
-  const unknown = Object.keys(record).filter((id) => !ids.includes(id)).map((id) => [id, record[id]])
+  const unknown = Object.keys(record)
+    .filter((id) => !ids.includes(id))
+    .map((id) => [id, record[id]])
   return Object.fromEntries([...known, ...unknown])
 }
 
@@ -165,7 +171,9 @@ export function withEntry(record, scenes, id, next) {
   if (problems.length > 0) throw new Error(`${id} was not written, because its caption or alt would not be true of it:\n  ${problems.join('\n  ')}`)
   const other = Object.values(record).find((existing) => !sameLook(existing.look, next.look))
   if (other !== undefined) {
-    throw new Error(`the pictures were taken on ${describeLook(other.look)}; this machine has ${describeLook(next.look)}; \`pnpm pictures --all\` retakes every picture`)
+    throw new Error(
+      `the pictures were taken on ${describeLook(other.look)}; this machine has ${describeLook(next.look)}; \`pnpm pictures --all\` retakes every picture`,
+    )
   }
   return ordered({ ...record, [id]: dated(record[id], next) }, scenes)
 }
@@ -187,7 +195,9 @@ export function outsideRepository(dir, cwd = process.cwd()) {
   const absolute = resolve(cwd, dir)
   const inside = relative(REPO, absolute)
   if (inside === '' || (inside !== '..' && !inside.startsWith(`..${sep}`) && !isAbsolute(inside))) {
-    throw new Error(`--review ${dir} is inside the repository (${inside === '' ? '.' : inside.split(sep).join('/')}); give a directory outside it, so the decoded pictures are never committed`)
+    throw new Error(
+      `--review ${dir} is inside the repository (${inside === '' ? '.' : inside.split(sep).join('/')}); give a directory outside it, so the decoded pictures are never committed`,
+    )
   }
   return absolute
 }
@@ -197,7 +207,8 @@ export function lineDiff(before, after) {
   const [a, b] = [before.split('\n'), after.split('\n')]
   // Longest common subsequence, by table: a snapshot is at most a few hundred lines.
   const lengths = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
-  for (let i = a.length - 1; i >= 0; i -= 1) for (let j = b.length - 1; j >= 0; j -= 1) lengths[i][j] = a[i] === b[j] ? lengths[i + 1][j + 1] + 1 : Math.max(lengths[i + 1][j], lengths[i][j + 1])
+  for (let i = a.length - 1; i >= 0; i -= 1)
+    for (let j = b.length - 1; j >= 0; j -= 1) lengths[i][j] = a[i] === b[j] ? lengths[i + 1][j + 1] + 1 : Math.max(lengths[i + 1][j], lengths[i][j + 1])
   const out = []
   let [i, j] = [0, 0]
   while (i < a.length || j < b.length) {
@@ -263,9 +274,13 @@ export function checkProblems({ app, scenes, record, actIds, running, playwright
  * can say whether they still look like the page.
  */
 export function stylesheetNotices({ app, scenes, record, stylesheet }) {
-  const stale = scenes.filter((scene) => scene.app === app && record[scene.id] !== undefined && record[scene.id].stylesheet !== stylesheet).map((scene) => scene.id)
+  const stale = scenes
+    .filter((scene) => scene.app === app && record[scene.id] !== undefined && record[scene.id].stylesheet !== stylesheet)
+    .map((scene) => scene.id)
   if (stale.length === 0) return []
-  return [`${app}'s stylesheet changed since ${stale.join(', ')} ${stale.length === 1 ? 'was' : 'were'} taken; the text check cannot see what that did to the pictures, so look at them, and \`pnpm pictures --scene <id>\` retakes one`]
+  return [
+    `${app}'s stylesheet changed since ${stale.join(', ')} ${stale.length === 1 ? 'was' : 'were'} taken; the text check cannot see what that did to the pictures, so look at them, and \`pnpm pictures --scene <id>\` retakes one`,
+  ]
 }
 
 /**
