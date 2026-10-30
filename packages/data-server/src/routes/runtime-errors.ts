@@ -20,6 +20,7 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
     case 'over-posting':
     case 'unknown-lookup':
     case 'operation-unavailable':
+    case 'transition-denied':
       return { status: 403, body: { code, message } }
     case 'drift':
       // The bundle's snapshot no longer matches what it was published with, or

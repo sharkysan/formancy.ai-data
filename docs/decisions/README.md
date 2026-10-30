@@ -65,7 +65,7 @@ only enforcement is "we remember" says so plainly.
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028; extended by 0079 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109 |
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068, 0111 |
-| [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050 |
+| [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050, 0112 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted; extended by 0059; narrowed by 0101 |
@@ -76,8 +76,8 @@ only enforcement is "we remember" says so plainly.
 | [0019](0019-a-published-form-is-checked-every-time-it-is-read.md) | A published form is one bundle, checked every time it is read; a form reaches only allowlisted databases | accepted; extended by 0030, 0041, 0042, 0045, 0062, 0074 |
 | [0020](0020-administration-is-a-separate-plane.md) | Administration is a separate plane, held by a role in the host's token | accepted; extended by 0033, 0065, 0099 |
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029; extended by 0058, 0069 |
-| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040, 0098; extended by 0041, 0044, 0045, 0050 |
-| [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050, 0079 |
+| [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040, 0098; extended by 0041, 0044, 0045, 0050, 0112 |
+| [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050, 0079, 0112 |
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075; palette copy reversed by 0096 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061, 0074 |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
@@ -166,3 +166,4 @@ only enforcement is "we remember" says so plainly.
 | [0109](0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md) | A form whose key is its foreign key onto its parent's is shown under the parent's record as one section, while the record holds the value its generation names | accepted |
 | [0110](0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md) | A form that is its own child is shown as a tree of its records: its roots, and under each record those naming it | accepted |
 | [0111](0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md) | A deploy pipeline checks drift with a command the image ships, which fails on a blocking change and never passes a form it could not check | accepted |
+| [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md) | A policy holds a state field to the moves it lists, each for named roles, checked from the record as read | accepted |

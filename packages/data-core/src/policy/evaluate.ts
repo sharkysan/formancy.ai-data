@@ -291,3 +291,27 @@ export function forcedValues(policy: FormPolicy, context: PolicyContext): Forced
   const filter = rowFilter(policy, context, 'create')
   return filter.ok ? { ok: true, values: filter.filter } : filter
 }
+
+/** The field a policy holds to its moves (0112), or null when it names none. */
+export function stateField(policy: FormPolicy): string | null {
+  const read = readPolicy(policy)
+  return read.parsed?.transitions?.field ?? null
+}
+
+/**
+ * Whether changing the state field from `from` -- `null` on create -- to
+ * `to`, both spelled as its column holds them, is a move this actor's
+ * roles may make (0112). Asked only where the value changes: a record
+ * submitted with the state it already holds moves nothing. Without a rule
+ * every change is the field's write grant alone. The refusal names the
+ * field, never a state, as every policy sentence names no value.
+ */
+export function checkTransition(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, from: string | null, to: string): PolicyDecision {
+  const prepared = prepare(policy, context, bindings)
+  if (!prepared.ok) return prepared
+  const rule = prepared.policy.transitions
+  if (rule === null) return { ok: true }
+  const move = rule.moves.find((candidate) => candidate.from === from && candidate.to === to)
+  if (move !== undefined && holds(move.roles, prepared.actor)) return { ok: true }
+  return refuse('transition-denied', from === null ? `${rule.field} may not start where this create puts it, for your roles.` : `${rule.field} may not move from where it is to where this update puts it, for your roles.`)
+}

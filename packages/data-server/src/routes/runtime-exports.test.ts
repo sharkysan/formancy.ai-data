@@ -705,9 +705,9 @@ describe('the export route', () => {
     await exported('customer', {}, 'stranger')
     await exported('customer', { filter: [{ field: 'customer_no', op: 'equals', value: '98765x' }] })
     expect(events).toEqual([
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: 2 },
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'export', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: 0 },
-      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: 0 },
+      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: 2, moved: null },
+      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'export', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: 0, moved: null },
+      { at: '2026-10-17T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'export', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: 0, moved: null },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|k1:|"name"|filter-marker|98765|notes/)
   })

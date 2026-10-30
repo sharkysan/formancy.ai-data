@@ -129,6 +129,8 @@ export type PlannedInsert =
       fields: string[]
       /** Every lookup selection to recheck under the actor's filters before the insert runs. */
       memberships: MembershipCheck[]
+      /** Whether the insert starts the policy's state field by a move (0112), `null` when the policy names none. */
+      moved: boolean | null
     }
   | InvalidValues
   | PlanRefusal
@@ -139,6 +141,8 @@ export type PlannedUpdate =
       request: UpdateRequest
       fields: string[]
       memberships: MembershipCheck[]
+      /** Whether the update moves the policy's state field (0112), `null` when the policy names none. */
+      moved: boolean | null
     }
   | InvalidValues
   | PlanRefusal

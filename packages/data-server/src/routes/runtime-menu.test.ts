@@ -241,7 +241,7 @@ describe('the menu route', () => {
   test("is audited as form-list, naming no form, version or record", async () => {
     await menu('clerk')
     expect(events).toEqual([
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'form-list', form: null, formVersion: null, status: 200, outcome: 'ok', record: null, rows: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'form-list', form: null, formVersion: null, status: 200, outcome: 'ok', record: null, rows: null, moved: null },
     ])
   })
 })

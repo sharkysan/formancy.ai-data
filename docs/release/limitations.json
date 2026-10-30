@@ -150,7 +150,7 @@
       ]
     },
     "0011": {
-      "reviewed": "sha256:aff815ad433330e5d428c6453198c0a50d321b84b5aac43a3d74284f323e33cc",
+      "reviewed": "sha256:a3ce1e73fdfc7e7ea5f071fa379ecd510dca4e14f674c7b2280a3213e5340594",
       "limitations": [
         {
           "area": "access",
@@ -404,7 +404,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:71727ef0ff96dd0c98f8e65d6497c3c5e56c7752c57846e197b7626de433efe1",
+      "reviewed": "sha256:045c191eb13859c5212013bef5d627eeb8c25c441e473f7ae936898eaba9202a",
       "limitations": [
         {
           "area": "writes",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:6009d8b76335f87e34d4b3f9a286c371aa0f9676fc69395da68de64f57657163",
+      "reviewed": "sha256:dfafcf138921ffba38db957dbc885da649a0717496199611c6bb9270e4e51b6d",
       "limitations": [
         {
           "area": "operations",
@@ -3336,6 +3336,44 @@
           "area": "operations",
           "says": "The drift check is a command in the server image, or in an installed @formancy/data-server, and prints lines for a log; a program reads the drift route's JSON instead.",
           "heldBy": "packages/data-server/src/drift-check.test.ts"
+        }
+      ]
+    },
+    "0112": {
+      "reviewed": "sha256:a553eb6be2b4f3c88ddbea42d6b45b6b06332b3d2e1e35295f7a6e39a5314224",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A policy holds one field of a form to its moves, each a pair of values for named roles: no condition on another field, on time or on the person, and no move from any state.",
+          "heldBy": "packages/data-core/src/records/transition.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A form offers every value its state field accepts; a move the person may not make is refused after Save with the policy's sentence, not withheld from the field's choices.",
+          "heldBy": "packages/data-server/src/routes/runtime-transitions.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A create that leaves the state field to the column's default is not checked against the moves, and a write that reaches the table other than through the runtime plane is not checked at all.",
+          "heldBy": "packages/data-core/src/records/transition.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "An update whose record was read at a newer version than it names is answered stale, even where its move would be allowed from where the record is now.",
+          "heldBy": "packages/data-server/src/routes/runtime-transitions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "The audit trail says that a create or an update moved the state field, never from where or to where; a deployment that needs the history keeps it in the database.",
+          "heldBy": "packages/data-server/src/routes/runtime-transitions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Moves are not a process engine: no task, assignment, deadline or notification follows a move."
+        },
+        {
+          "area": "server",
+          "says": "A server older than this release refuses a policy that names moves, so a version holding them is not imported into an older deployment."
         }
       ]
     }

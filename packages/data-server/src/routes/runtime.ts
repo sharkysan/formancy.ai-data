@@ -70,9 +70,10 @@ declare module 'fastify' {
     /**
      * `repeated`: answered with an earlier sending's answer, and nothing
      * asked of the database (0031). `rows`: the records an export wrote
-     * into its file so far (0079).
+     * into its file so far (0079). `moved`: whether a planned create or
+     * update moves its policy's state field (0112).
      */
-    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number }
+    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null }
   }
 }
 
@@ -185,6 +186,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
         rows: base.operation === 'export' ? (trail.rows ?? 0) : null,
+        moved: trail.repeated === true ? null : (trail.moved ?? null),
       }
     },
   })
@@ -338,6 +340,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
       return refusal(request, 'create', plan)
     }
+    if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
     const refused = await memberships(open, plan.memberships, request.log)
     if (refused !== undefined) return refused
     const outcome = await open.records.insert(plan.request)
@@ -396,6 +399,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       if (plan.code === 'record-not-read' && unread !== undefined) return recordFailure(bundle.bindings, unread)
       return refusal(request, 'update', plan)
     }
+    if (request.auditTrail !== undefined) request.auditTrail.moved = plan.moved
     const refused = await memberships(open, plan.memberships, request.log)
     if (refused !== undefined) return refused
     const outcome = await open.records.update(plan.request)

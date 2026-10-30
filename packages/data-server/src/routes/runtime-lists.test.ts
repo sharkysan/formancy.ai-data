@@ -548,10 +548,10 @@ describe('the list route', () => {
     await list('customer', { filter: [{ field: 'name', op: 'contains', text: FILTERED }] })
     await list('customer', { filter: [{ field: 'credit_limit', op: 'equals', value: '98765.4321' }] })
     expect(events).toEqual([
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'line', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null },
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'list', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: null },
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null },
-      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'line', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null, moved: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 's', operation: 'list', form: 'customer', formVersion: 1, status: 403, outcome: 'operation-denied', record: null, rows: null, moved: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 200, outcome: 'ok', record: null, rows: null, moved: null },
+      { at: '2026-10-11T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'list', form: 'customer', formVersion: 1, status: 400, outcome: 'not-filterable', record: null, rows: null, moved: null },
     ])
     expect(JSON.stringify(events)).not.toMatch(/Muster|quantity|k1:|31337|98765|filter-marker/)
   })

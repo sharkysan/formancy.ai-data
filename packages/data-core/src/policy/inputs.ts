@@ -89,6 +89,8 @@ export interface ParsedPolicy {
   through: readonly string[]
   /** The foreign keys a delete may act through, with their actions (0051), each once, in the policy's order; empty when the policy names none. */
   cascades: readonly CascadeRule[]
+  /** The state field and its moves (0112), each `from`-`to` pair once, its roles a set; null when the policy names none. */
+  transitions: { field: string; moves: ReadonlyArray<{ from: string | null; to: string; roles: ReadonlySet<string> }> } | null
 }
 
 /**
@@ -227,6 +229,49 @@ function readCascades(value: unknown, problems: string[]): CascadeRule[] {
 }
 
 /**
+ * The state field and its moves (0112); an absent property is none. Each
+ * move once by its `from` and its `to`, which differ: a move to where the
+ * record already is moves nothing, and two entries for one move would say
+ * two things about who may make it.
+ */
+function readTransitions(value: unknown, problems: string[]): ParsedPolicy['transitions'] {
+  if (value === undefined) return null
+  if (!isRecord(value)) {
+    problems.push('transitions is not { field, moves }')
+    return null
+  }
+  const before = problems.length
+  unread(value, ['field', 'moves'], 'transitions.', problems)
+  const field = nameOrNull(value['field'])
+  if (field === null) problems.push('transitions names no field')
+  const rawMoves = value['moves']
+  if (!Array.isArray(rawMoves) || rawMoves.length === 0) {
+    problems.push('transitions.moves is not a list of at least one { from, to, roles }')
+    return null
+  }
+  const moves: Array<{ from: string | null; to: string; roles: ReadonlySet<string> }> = []
+  for (const [index, entry] of (rawMoves as unknown[]).entries()) {
+    const at = `transitions.moves[${String(index)}]`
+    if (!isRecord(entry)) {
+      problems.push(`${at} is not { from, to, roles }`)
+      continue
+    }
+    const start = problems.length
+    unread(entry, ['from', 'to', 'roles'], `${at}.`, problems)
+    const from = entry['from']
+    const to = entry['to']
+    if (from !== null && typeof from !== 'string') problems.push(`${at}.from is not a value of the field, or null for a create`)
+    if (typeof to !== 'string') problems.push(`${at}.to is not a value of the field`)
+    const roles = readRoles(entry['roles'], `${at}.roles`, problems)
+    if (problems.length > start || typeof to !== 'string' || (from !== null && typeof from !== 'string')) continue
+    if (from === to) problems.push(`${at} moves the field to the value it already holds`)
+    else if (moves.some((move) => move.from === from && move.to === to)) problems.push(`${at} names a move a second time`)
+    else moves.push({ from, to, roles })
+  }
+  return problems.length > before || field === null ? null : { field, moves }
+}
+
+/**
  * The policy as the rest of this module uses it, or every reason it cannot be.
  *
  * Every problem rather than the first, because a person fixes a policy from
@@ -236,7 +281,7 @@ function readCascades(value: unknown, problems: string[]): CascadeRule[] {
 export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [] } | { parsed: null; problems: string[] } {
   if (!isRecord(policy)) return { parsed: null, problems: ['the policy is not an object'] }
   const problems: string[] = []
-  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades'], '', problems)
+  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades', 'transitions'], '', problems)
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
@@ -266,7 +311,8 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
 
   const through = readThrough(policy['through'], problems)
   const cascades = readCascades(policy['cascades'], problems)
+  const transitions = readTransitions(policy['transitions'], problems)
 
   if (problems.length > 0) return { parsed: null, problems }
-  return { parsed: { operations, fields, rowFilters, lookups, through, cascades }, problems: [] }
+  return { parsed: { operations, fields, rowFilters, lookups, through, cascades, transitions }, problems: [] }
 }

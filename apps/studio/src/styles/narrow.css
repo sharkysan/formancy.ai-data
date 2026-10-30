@@ -55,6 +55,7 @@
   .pair,
   .field-roles li,
   .rule,
+  .move,
   .placed {
     grid-template-columns: minmax(0, 1fr);
   }
