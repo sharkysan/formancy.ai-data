@@ -27,6 +27,7 @@ import { Words } from './words.js'
 import type { HeldLevels, SectionDrill } from './use-drill.js'
 import { useGridState } from './use-grid-state.js'
 import { ViewPicker } from './view-picker.js'
+import { childTitle } from './child-title.js'
 
 /** What the record above a child section is: a saved record, or a new one not saved yet. */
 export type ParentOpen = { kind: 'new' } | { kind: 'record'; token: string }
@@ -138,14 +139,16 @@ export function ChildSection({
   openRef.current = open
 
   const title = menu.title
-  const fieldLabel = String(definition.form.model.fields.find((field) => field.key === child.field)?.label ?? child.field)
   const headingId = `${idBase}-${String(index)}-heading`
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
   const waiting = parent.kind === 'new'
   const waitingText = `${title} rows are listed once this ${parentNoun} is saved.`
 
   const sessions = useMemo(
-    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] })),
+    () =>
+      (['react', 'angular'] as const).map((which) =>
+        createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] }),
+      ),
     [client, child.form, child.field, definition, owner],
   )
   const entries = useMemo<PaneEntry[]>(
@@ -194,14 +197,23 @@ export function ChildSection({
   const listing = parent.kind === 'record' ? parent.token : null
   useEffect(() => {
     if (register === undefined || listing === null) return undefined
-    register(owner, { parent: listing, removed: (said) => grid.current?.removed(said), focusHeading: () => sectionHeading.current?.focus(), reload: () => grid.current?.reload() })
+    register(owner, {
+      parent: listing,
+      removed: (said) => grid.current?.removed(said),
+      focusHeading: () => sectionHeading.current?.focus(),
+      reload: () => grid.current?.reload(),
+    })
     return () => register(owner, null)
   }, [register, owner, listing])
 
   function askRow(token: string, how: OpenHow, at: RowAt): void {
     // In Drill down every open goes down a level: a click, Space and Enter alike.
     if (drill !== undefined) {
-      drill.descend({ kind: 'record', token }, () => grid.current?.focusAt(at), (message) => grid.current?.say([message]))
+      drill.descend(
+        { kind: 'record', token },
+        () => grid.current?.focusAt(at),
+        (message) => grid.current?.say([message]),
+      )
       return
     }
     if (open?.kind === 'record' && open.token === token) {
@@ -275,7 +287,11 @@ export function ChildSection({
     }
     const parentToken = parent.token
     if (drill !== undefined) {
-      drill.descend({ kind: 'new' }, () => newButton.current?.focus(), (message) => grid.current?.say([message]))
+      drill.descend(
+        { kind: 'new' },
+        () => newButton.current?.focus(),
+        (message) => grid.current?.say([message]),
+      )
       return
     }
     ask(
@@ -304,7 +320,7 @@ export function ChildSection({
     <section className="child" aria-labelledby={headingId}>
       <div className="section-head">
         <h4 id={headingId} className="child-heading" tabIndex={-1} ref={sectionHeading}>
-          {twice ? `${title}, ${fieldLabel}` : title}
+          {childTitle(title, twice, definition, child.field)}
         </h4>
         {canCreate ? (
           <button
@@ -318,7 +334,14 @@ export function ChildSection({
             New {title}
           </button>
         ) : null}
-        {parent.kind === 'record' ? <DownloadCsv client={client} formId={child.form} idBase={`${headingId}-export`} query={() => ({ search: '', sort, parent: { field: child.field, record: parent.token }, filter })} /> : null}
+        {parent.kind === 'record' ? (
+          <DownloadCsv
+            client={client}
+            formId={child.form}
+            idBase={`${headingId}-export`}
+            query={() => ({ search: '', sort, parent: { field: child.field, record: parent.token }, filter })}
+          />
+        ) : null}
       </div>
       {waiting ? (
         <p role="status" id={`${headingId}-waiting`} className="status" data-kind="loading">
@@ -348,14 +371,24 @@ export function ChildSection({
             toolbarStart={
               <>
                 <ViewPicker idBase={headingId} views={views} filter={filter} sort={sort} onPick={state.pick} />
-                <ColumnsPanel idBase={`${headingId}-columns`} columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+                <ColumnsPanel
+                  idBase={`${headingId}-columns`}
+                  columns={columns}
+                  choices={state.choices}
+                  onChoices={state.setChoices}
+                  onReset={state.resetChoices}
+                />
                 {filterable.length === 0 ? null : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={state.setFilter} />}
               </>
             }
             refit={refit}
             bench="child-bench"
             {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
-            after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} /> : null}
+            after={
+              removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
+                <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} />
+              ) : null
+            }
             drilling={drill !== undefined}
             onOpen={askRow}
             onSort={state.setSort}
@@ -369,7 +402,14 @@ export function ChildSection({
               <Words said={open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]} />
             </h5>
             {canDelete && open.kind === 'record' ? (
-              <button type="button" className="button danger" ref={deleteButton} aria-disabled={saving ? 'true' : undefined} aria-describedby={saving ? `${headingId}-delete-waits` : undefined} onClick={deleteOpen}>
+              <button
+                type="button"
+                className="button danger"
+                ref={deleteButton}
+                aria-disabled={saving ? 'true' : undefined}
+                aria-describedby={saving ? `${headingId}-delete-waits` : undefined}
+                onClick={deleteOpen}
+              >
                 Delete {title}
               </button>
             ) : null}
@@ -379,7 +419,9 @@ export function ChildSection({
               </span>
             ) : null}
           </div>
-          {removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={6} idBase={`${headingId}-delete`} /> : null}
+          {removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? (
+            <DeleteRegion flow={removal} deleting={definition.deleting} level={6} idBase={`${headingId}-delete`} />
+          ) : null}
           <p role="status" className="status quiet-line">
             <Words said={line} />
           </p>
@@ -388,7 +430,15 @@ export function ChildSection({
               .filter((session) => renderersOf(renderer).includes(session.renderer))
               .map((session) => (
                 // The paper is named for the child row, so it differs from the record's own form of the same title.
-                <Pane key={session.renderer} session={session} title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`} level={6} idBase={owner} namedBy={`${headingId}-detail`} onAnswer={(result) => answered(result, session)} />
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
+                  level={6}
+                  idBase={owner}
+                  namedBy={`${headingId}-detail`}
+                  onAnswer={(result) => answered(result, session)}
+                />
               ))}
           </div>
         </div>

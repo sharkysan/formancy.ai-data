@@ -36,7 +36,10 @@ function expectOk<T>(outcome: { ok: true; value: T } | Refusal): T {
 }
 
 /** A request as a renderer makes one: the fields the source reads, and a live signal. */
-function request(kind: LookupRequest['kind'], options: { query?: string; values?: readonly string[]; limit?: number; signal?: AbortSignal } = {}): LookupRequest {
+function request(
+  kind: LookupRequest['kind'],
+  options: { query?: string; values?: readonly string[]; limit?: number; signal?: AbortSignal } = {},
+): LookupRequest {
   return { kind, query: options.query ?? '', values: options.values ?? [], limit: options.limit ?? 50, signal: options.signal ?? new AbortController().signal }
 }
 
@@ -57,7 +60,20 @@ function countriesLocked(connection: string): Promise<BlockedTable> {
     const admin = `postgres://${encodeURIComponent(pg.user)}:${encodeURIComponent(pg.password)}@${pg.host}:${String(pg.port)}/${encodeURIComponent(pg.database)}`
     return blockTable({ kind: 'postgres', admin }, table)
   }
-  return blockTable({ kind: 'sqlserver', admin: { server: ms.host, port: ms.port, database: ms.database, user: ms.user, password: ms.password, options: { encrypt: false, trustServerCertificate: true } } }, table)
+  return blockTable(
+    {
+      kind: 'sqlserver',
+      admin: {
+        server: ms.host,
+        port: ms.port,
+        database: ms.database,
+        user: ms.user,
+        password: ms.password,
+        options: { encrypt: false, trustServerCertificate: true },
+      },
+    },
+    table,
+  )
 }
 
 /** Polls until `condition` holds, or fails naming what never happened. */
@@ -113,7 +129,9 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
     const sources = lookupSources(plane.client(), formId, form, 'create')
     const answer = await sources[source]?.resolve(request('search', { query: 'Muster', limit: 20 }))
     expect(answer).toEqual({ options: [{ value: expect.stringMatching(/^k1:/) as unknown, label: 'Muster AG' }], more: false, withheld: 0 })
-    expect(plane.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([`POST ${plane.base}/v1/forms/${formId}/lookups/${encodeURIComponent(source)}/query`])
+    expect(plane.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
+      `POST ${plane.base}/v1/forms/${formId}/lookups/${encodeURIComponent(source)}/query`,
+    ])
     expect(body(0)).toEqual({ operation: 'create', search: 'Muster', limit: 20 })
     expect(plane.sent[0]?.headers['authorization']).toBe(`Bearer ${plane.tokens.clerk}`)
   })
@@ -142,7 +160,9 @@ describe.each(ENGINES)('lookups on $engine', ({ connection }) => {
     const lookup = sources[source]
     if (lookup === undefined) throw new Error('no source for the customer')
     expect(lookup.maxRows).toBe(DEFAULT_MAX_PAGE_SIZE)
-    const first = pagedCustomers().slice(0, DEFAULT_MAX_PAGE_SIZE).map((customer) => customer.name)
+    const first = pagedCustomers()
+      .slice(0, DEFAULT_MAX_PAGE_SIZE)
+      .map((customer) => customer.name)
     const empty = await lookup.resolve(request('search', { limit: lookup.maxRows }))
     expect({ labels: labelsOf(empty), more: pageOf(empty).more, withheld: pageOf(empty).withheld }).toEqual({ labels: first, more: true, withheld: 0 })
     expect(body(0)).toEqual({ operation: 'create', search: '', limit: DEFAULT_MAX_PAGE_SIZE })

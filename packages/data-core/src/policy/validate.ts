@@ -111,7 +111,10 @@ function transitionFitProblems(policy: ParsedPolicy, byField: ReadonlyMap<string
   const problems: string[] = []
   for (const [index, move] of rule.moves.entries()) {
     const at = `transitions.moves[${String(index)}]`
-    for (const [which, value] of [['from', move.from], ['to', move.to]] as const) {
+    for (const [which, value] of [
+      ['from', move.from],
+      ['to', move.to],
+    ] as const) {
       if (value !== null && !isKeyValue(type, value)) problems.push(`${at}.${which} is not spelled as ${binding.column} holds its values`)
     }
     const operation = move.from === null ? 'create' : 'update'
@@ -150,7 +153,10 @@ function deleteGrantProblems(policy: ParsedPolicy, bindings: FormBindings): stri
   const problems = [...deleting]
     .filter((role) => !policy.operations.read.has(role))
     .sort(byCodepoint)
-    .map((role) => `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`)
+    .map(
+      (role) =>
+        `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`,
+    )
   const unscoped = unscopedLookups(bindings, {
     rowFilters: [...policy.rowFilters],
     through: [...policy.through],

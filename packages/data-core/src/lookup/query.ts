@@ -4,10 +4,7 @@ import type { LookupConfig, LookupQuery } from './types.js'
 
 const PROPERTIES = new Set(['search', 'offset', 'limit'])
 
-export type LookupQueryErrorCode =
-  | SearchErrorCode
-  | 'not-searchable'
-  | PageErrorCode
+export type LookupQueryErrorCode = SearchErrorCode | 'not-searchable' | PageErrorCode
 
 export type LookupQueryCheck = { ok: true; query: LookupQuery } | { ok: false; code: LookupQueryErrorCode; message: string }
 

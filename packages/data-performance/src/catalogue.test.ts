@@ -15,7 +15,10 @@ describe('the catalogue', () => {
     }
     expect(CATALOGUE.scenarios.find((entry) => entry.name === 'resolve-100')?.rowsRead).toEqual({ atMost: read.perKey * sizedResolveKeys(100).length })
     expect(CATALOGUE.scenarios.find((entry) => entry.name === 'resolve-1')?.rowsRead).toEqual({ atMost: read.perKey })
-    expect(read).toMatchObject({ tenant: (SIZED_CUSTOMERS.tenants.find((entry) => entry.tenantId === 1)?.rows ?? 0) + FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).length, table: SIZED_CUSTOMERS.rows + FIXTURE_CUSTOMERS.length })
+    expect(read).toMatchObject({
+      tenant: (SIZED_CUSTOMERS.tenants.find((entry) => entry.tenantId === 1)?.rows ?? 0) + FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).length,
+      table: SIZED_CUSTOMERS.rows + FIXTURE_CUSTOMERS.length,
+    })
   })
 
   // The unfiltered form reads the whole table per search: at eight in

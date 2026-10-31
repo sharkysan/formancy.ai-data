@@ -79,7 +79,8 @@ export function entraLogin(login: ConnectionLogin, secret: string | undefined): 
   const kept = entraLogins.get(login)
   if (kept !== undefined && (kept.type === 'managed-identity' || kept.clientSecret === secret)) return kept
   let made: EntraLogin
-  if (login.type === 'entra-managed-identity') made = login.client === undefined ? { type: 'managed-identity' } : { type: 'managed-identity', clientId: login.client }
+  if (login.type === 'entra-managed-identity')
+    made = login.client === undefined ? { type: 'managed-identity' } : { type: 'managed-identity', clientId: login.client }
   else if (secret === undefined) throw new Error('a service principal logs in with its client secret, and none was resolved')
   else made = { type: 'service-principal', tenantId: login.tenant, clientId: login.client, clientSecret: secret }
   entraLogins.set(login, made)
@@ -90,7 +91,9 @@ export function entraLogin(login: ConnectionLogin, secret: string | undefined): 
 const openSqlServer: ConnectionFactory = async (config, secret) => {
   const { enabled, trust } = tls(config)
   const address = { host: config.host, port: config.port, database: config.database, encrypt: enabled, trustServerCertificate: trust }
-  const pool = await connectSqlServer(config.login === undefined ? { ...address, ...sqlLogin(config, secret) } : { ...address, entra: entraLogin(config.login, secret) })
+  const pool = await connectSqlServer(
+    config.login === undefined ? { ...address, ...sqlLogin(config, secret) } : { ...address, entra: entraLogin(config.login, secret) },
+  )
   return { adapter: createSqlServerAdapter(pool), lookups: createSqlServerLookups(pool), records: createSqlServerRecords(pool) }
 }
 

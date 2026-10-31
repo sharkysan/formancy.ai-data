@@ -313,5 +313,10 @@ export function checkTransition(policy: FormPolicy, context: PolicyContext, bind
   if (rule === null) return { ok: true }
   const move = rule.moves.find((candidate) => candidate.from === from && candidate.to === to)
   if (move !== undefined && holds(move.roles, prepared.actor)) return { ok: true }
-  return refuse('transition-denied', from === null ? `${rule.field} may not start where this create puts it, for your roles.` : `${rule.field} may not move from where it is to where this update puts it, for your roles.`)
+  return refuse(
+    'transition-denied',
+    from === null
+      ? `${rule.field} may not start where this create puts it, for your roles.`
+      : `${rule.field} may not move from where it is to where this update puts it, for your roles.`,
+  )
 }

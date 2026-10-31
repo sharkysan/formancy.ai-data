@@ -149,7 +149,7 @@ describe('intendedRecord', () => {
   test('is null when the database supplies the key, a value is NULL or not text, or the key has no settled spelling', () => {
     expect(intendedRecord(insert(ORDER, [tenant, { name: 'notes', type: text(null), value: 'x' }]))).toBeNull()
     expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: null }]))).toBeNull()
-    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: 8 as unknown as string }]))).toBeNull()
+    expect(intendedRecord(insert(CUSTOMER, [tenant, { ...number, value: 8 }]))).toBeNull()
     const at: NormalizedType = { kind: 'timestamp', withTimeZone: true, precision: 6 }
     expect(intendedRecord(insert([{ name: 'at', type: at }], [{ name: 'at', type: at, value: '2026-10-09T12:00:00Z' }]))).toBeNull()
     const code = text(null)
@@ -167,7 +167,11 @@ describe('intendedRecord', () => {
     const customer = generateForm(customers, { connection: 'erp', root: sales('customer'), formId: 'c', title: 'Customer', lookups: [], pinned: ['tenant_id'] })
     const { country: _country, ...fields } = CUSTOMER_POLICY.fields
     const customerPolicy: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...fields, country_code: CLERK_RW }, lookups: {} }
-    expectSameToken(planCreate(customers, customer.bindings, customerPolicy, CLERK, { customer_no: 8, name: 'Neu GmbH' }, described(customers, customer.bindings)), customer.bindings, 'k1:1,8')
+    expectSameToken(
+      planCreate(customers, customer.bindings, customerPolicy, CLERK, { customer_no: 8, name: 'Neu GmbH' }, described(customers, customer.bindings)),
+      customer.bindings,
+      'k1:1,8',
+    )
 
     const coded = snapshot('postgres', (objects) => {
       const country = objects.find((object) => object.ref.name === 'country')
@@ -184,7 +188,11 @@ describe('intendedRecord', () => {
       lookups: {},
     }
     // One letter in a char(2): stored padded, read back without the pad on both engines.
-    expectSameToken(planCreate(coded, country.bindings, countryPolicy, CLERK, { iso_code: 'C', name: 'Cee' }, described(coded, country.bindings)), country.bindings, 'k1:C')
+    expectSameToken(
+      planCreate(coded, country.bindings, countryPolicy, CLERK, { iso_code: 'C', name: 'Cee' }, described(coded, country.bindings)),
+      country.bindings,
+      'k1:C',
+    )
   })
 })
 

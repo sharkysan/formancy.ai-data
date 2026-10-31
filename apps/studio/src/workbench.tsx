@@ -207,7 +207,15 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       proposal: { form: base, bindings, notes, snapshot, generation },
       session: createBuilderSession(form),
       views: regeneration.presentation.views ?? [],
-      carried: { from: `version ${String(version)}`, version, conflicts: regeneration.conflicts, fresh, undecided: regeneration.keysReassigned, kept: [], removed: [] },
+      carried: {
+        from: `version ${String(version)}`,
+        version,
+        conflicts: regeneration.conflicts,
+        fresh,
+        undecided: regeneration.keysReassigned,
+        kept: [],
+        removed: [],
+      },
     })
     setPublishedId(formId)
     setCurrent('presentation')
@@ -251,7 +259,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         return <ReviewStep client={client} me={identity.actor.id} />
       case 'browse':
         // Keyed by the connection, so a page of another database's rows never stays on screen once it is discovered.
-        return discovered === null ? null : <BrowseStep key={discovered.connection} client={client} connection={discovered.connection} snapshot={discovered.snapshot} />
+        return discovered === null ? null : (
+          <BrowseStep key={discovered.connection} client={client} connection={discovered.connection} snapshot={discovered.snapshot} />
+        )
       case 'choose':
         return discovered === null ? null : (
           <ChooseStep

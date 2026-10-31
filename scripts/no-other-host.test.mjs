@@ -39,7 +39,10 @@ const PAGE = 'http://page.invalid/'
 /** The http(s) addresses among `values`, resolved against `base` as a browser would, on an origin other than base's. */
 function elsewhere(values, base) {
   const own = new URL(base).origin
-  return values.map((value) => resolved(value, base)).filter((url) => url !== null && /^https?:$/.test(url.protocol) && url.origin !== own).map((url) => url.href)
+  return values
+    .map((value) => resolved(value, base))
+    .filter((url) => url !== null && /^https?:$/.test(url.protocol) && url.origin !== own)
+    .map((url) => url.href)
 }
 
 /** apps/<app>/dist, or a failure that says to build first. */
@@ -90,7 +93,8 @@ const WIDTH = /^(?:ultra-|extra-|semi-)?(?:condensed|expanded)$/i
 const PERCENTAGE = /^(?:\d+\.?\d*|\.\d+)%$/
 
 /** What can be a size in the `font` shorthand, with its `/<line-height>` if it has one: a length, a percentage or a size keyword, not an angle. */
-const SIZE = /^(?:(?:\d+\.?\d*|\.\d+)(?:%|(?!(?:deg|grad|rad|turn)(?:\/|$))[a-z]+)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/|$)/i
+const SIZE =
+  /^(?:(?:\d+\.?\d*|\.\d+)(?:%|(?!(?:deg|grad|rad|turn)(?:\/|$))[a-z]+)|xx-small|x-small|small|medium|large|x-large|xx-large|xxx-large|larger|smaller)(?:\/|$)/i
 
 /** A declaration's value as its space-separated words, a quoted string or a function call kept whole. */
 function words(value) {
@@ -114,7 +118,8 @@ function widthProblems(rules) {
   for (const [, value] of rules.matchAll(/(?:^|[{;\s])font\s*:([^;}]*)/gi)) {
     const said = words(value)
     const size = said.findIndex((word, at) => SIZE.test(word) && !(PERCENTAGE.test(word) && SIZE.test(said[at + 1] ?? '')))
-    if (size > 0 && said.slice(0, size).some((word) => WIDTH.test(word) || PERCENTAGE.test(word))) problems.push(`asks a width in the font shorthand, ${value.trim()}`)
+    if (size > 0 && said.slice(0, size).some((word) => WIDTH.test(word) || PERCENTAGE.test(word)))
+      problems.push(`asks a width in the font shorthand, ${value.trim()}`)
   }
   return problems
 }
@@ -160,7 +165,12 @@ describe('no page asks another host for anything (0072)', () => {
   // quoted, and protocol-relative too.
   test.each(APPS)("%s's index.html names no address on another host", (app) => {
     const html = readFileSync(join(repo, 'apps', app, 'index.html'), 'utf8')
-    expect(elsewhere(references(html).map(({ value }) => value), PAGE)).toEqual([])
+    expect(
+      elsewhere(
+        references(html).map(({ value }) => value),
+        PAGE,
+      ),
+    ).toEqual([])
   })
 
   // What the build wrote is what is served: a stylesheet that imports
@@ -168,7 +178,10 @@ describe('no page asks another host for anything (0072)', () => {
   // source index.html never shows.
   test.each(APPS)('%s, as built: the page and every stylesheet it links name no address on another host', (app) => {
     const dist = built(app)
-    const found = elsewhere(references(readFileSync(join(dist, 'index.html'), 'utf8')).map(({ value }) => value), PAGE)
+    const found = elsewhere(
+      references(readFileSync(join(dist, 'index.html'), 'utf8')).map(({ value }) => value),
+      PAGE,
+    )
     for (const { url, text } of builtStylesheets(dist)) found.push(...elsewhere(styleReferences(text), url.href))
     expect(found).toEqual([])
   })
@@ -192,8 +205,10 @@ describe('no page asks another host for anything (0072)', () => {
           }
           const target = new URL(source, url)
           const file = target.pathname.split('/').at(-1) ?? ''
-          if (target.origin !== url.origin || !target.pathname.startsWith('/assets/')) problems.push(`a face of ${family} is ${target.href}, not a file under assets/`)
-          else if (!existsSync(join(dist, decodeURIComponent(target.pathname)))) problems.push(`a face of ${family} is ${target.pathname}, which the build does not hold`)
+          if (target.origin !== url.origin || !target.pathname.startsWith('/assets/'))
+            problems.push(`a face of ${family} is ${target.href}, not a file under assets/`)
+          else if (!existsSync(join(dist, decodeURIComponent(target.pathname))))
+            problems.push(`a face of ${family} is ${target.pathname}, which the build does not hold`)
           else if (unhashed(file) === undefined) problems.push(`a face of ${family}, ${file}, is named without a hash`)
           else if (!shipped.has(unhashed(file))) problems.push(`a face of ${family}, ${file}, is no file of the font packages apps/${app} imports`)
         }
@@ -240,7 +255,9 @@ describe('no page asks another host for anything (0072)', () => {
     expect(stackProblem('--display', "'Archivo', 'IBM Plex Sans', 'Archivo Variable', sans-serif", families)).toBe(
       "--display's first family, Archivo, has no face in the build, and Archivo Variable, which has, is not the family the stack names next",
     )
-    expect(stackProblem('--display', "'Archivo', 'Archivo Variable', sans-serif", ['IBM Plex Sans'])).toBe("--display's first family, Archivo, has no face in the build")
+    expect(stackProblem('--display', "'Archivo', 'Archivo Variable', sans-serif", ['IBM Plex Sans'])).toBe(
+      "--display's first family, Archivo, has no face in the build",
+    )
   })
 
   // The Archivo the apps import is its weight axis alone (wght.css): a rule
@@ -264,10 +281,16 @@ describe('no page asks another host for anything (0072)', () => {
     expect(widthProblems('.a{font-weight:700;font-stretch:90%}')).toEqual(['sets font-stretch'])
     expect(widthProblems(`.a{font-variation-settings:"wdth" 90}`)).toEqual(['sets a wdth variation'])
     expect(widthProblems('.a{font:700 90% 1rem/1.2 Archivo}')).toEqual(['asks a width in the font shorthand, 700 90% 1rem/1.2 Archivo'])
-    expect(widthProblems('.a{font:italic 700 112.5% 2rem/1.1 Archivo,sans-serif}')).toEqual(['asks a width in the font shorthand, italic 700 112.5% 2rem/1.1 Archivo,sans-serif'])
+    expect(widthProblems('.a{font:italic 700 112.5% 2rem/1.1 Archivo,sans-serif}')).toEqual([
+      'asks a width in the font shorthand, italic 700 112.5% 2rem/1.1 Archivo,sans-serif',
+    ])
     expect(widthProblems('.b{font:700 condensed 2rem var(--display)}')).toEqual(['asks a width in the font shorthand, 700 condensed 2rem var(--display)'])
     expect(widthProblems('.c{font:oblique 10deg Semi-Expanded 1rem x}')).toEqual(['asks a width in the font shorthand, oblique 10deg Semi-Expanded 1rem x'])
-    expect(widthProblems('.d{font:700 1rem Roboto Condensed}.e{font:90%/1.2 Archivo}.f{font:500 90% Archivo}.g{font:inherit}.h{font-family:var(--display);--font:condensed}')).toEqual([])
+    expect(
+      widthProblems(
+        '.d{font:700 1rem Roboto Condensed}.e{font:90%/1.2 Archivo}.f{font:500 90% Archivo}.g{font:inherit}.h{font-family:var(--display);--font:condensed}',
+      ),
+    ).toEqual([])
   })
 
   // One room, said once, as scripts/palette.test.mjs says it for the
@@ -284,11 +307,13 @@ describe('no page asks another host for anything (0072)', () => {
       const manifest = JSON.parse(readFileSync(join(repo, 'apps', app, 'package.json'), 'utf8'))
       const said = imports[app].flatMap(({ stylesheets }) => stylesheets)
       const firstSaid = imports[first].flatMap(({ stylesheets }) => stylesheets)
-      if (JSON.stringify(said) !== JSON.stringify(firstSaid)) problems.push(`apps/${app} imports ${said.join(', ') || 'no face'}, where apps/${first} imports ${firstSaid.join(', ')}`)
+      if (JSON.stringify(said) !== JSON.stringify(firstSaid))
+        problems.push(`apps/${app} imports ${said.join(', ') || 'no face'}, where apps/${first} imports ${firstSaid.join(', ')}`)
       for (const { name, version } of imports[app]) {
         if (!/^\d+\.\d+\.\d+$/.test(String(catalog?.[name]))) problems.push(`the catalog pins ${name} as ${String(catalog?.[name])}, not one exact version`)
         else if (version !== catalog[name]) problems.push(`apps/${app} has ${name} ${version} installed, and the catalog pins ${String(catalog[name])}`)
-        if (manifest.dependencies?.[name] !== 'catalog:') problems.push(`apps/${app} depends on ${name} as ${String(manifest.dependencies?.[name])}, not catalog:`)
+        if (manifest.dependencies?.[name] !== 'catalog:')
+          problems.push(`apps/${app} depends on ${name} as ${String(manifest.dependencies?.[name])}, not catalog:`)
       }
     }
     expect(problems).toEqual([])

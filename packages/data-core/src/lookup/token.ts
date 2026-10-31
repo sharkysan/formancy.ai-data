@@ -147,10 +147,7 @@ export function encodeKey(spelling: KeySpelling, values: readonly string[]): Key
       return refuse('not-text', `Key value ${position} is not text; a ${spelling.name} carries each column's canonical string.`)
     }
     if (LONE_SURROGATE.test(value)) {
-      return refuse(
-        'ill-formed-text',
-        `Key value ${position} holds an unpaired UTF-16 surrogate, which PostgreSQL cannot store and UTF-8 cannot carry.`,
-      )
+      return refuse('ill-formed-text', `Key value ${position} holds an unpaired UTF-16 surrogate, which PostgreSQL cannot store and UTF-8 cannot carry.`)
     }
     for (let unit = 0; unit < value.length; unit += 1) length += isLiteral(value.charCodeAt(unit)) ? 1 : ESCAPE_LENGTH
   }

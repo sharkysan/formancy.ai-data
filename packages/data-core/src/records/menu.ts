@@ -75,7 +75,15 @@ export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const fields = readableFields(bundle.policy, context, bundle.bindings)
   const read = new Set(fields.ok ? fields.fields : [])
   const readable = bundle.bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && read.has(binding.field))
-  return { id: bundle.id, title: bundle.title, operations, listedBy: listed.ok ? [...listed.fields] : null, key: parentKey(bundle), lookups: childLookups(bundle), readable }
+  return {
+    id: bundle.id,
+    title: bundle.title,
+    operations,
+    listedBy: listed.ok ? [...listed.fields] : null,
+    key: parentKey(bundle),
+    lookups: childLookups(bundle),
+    readable,
+  }
 }
 
 /**

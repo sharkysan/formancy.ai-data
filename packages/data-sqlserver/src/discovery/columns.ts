@@ -188,7 +188,10 @@ export async function readColumns(pool: ConnectionPool, schemas: readonly string
   const gaps: ObjectGap[] = []
   const byObject = new Map<number, ColumnMeta[]>()
   for (const [objectId, group] of groupBy(rows, byObjectId)) {
-    byObject.set(objectId, group.map((row) => toColumn(row, gaps)))
+    byObject.set(
+      objectId,
+      group.map((row) => toColumn(row, gaps)),
+    )
   }
   return { byObject, gaps }
 }

@@ -27,18 +27,28 @@ export interface SectionGrid {
   sort: ListSortTerm[]
   choices: ColumnChoice[]
   /** The filter applied, by the filter panel. */
-  setFilter(filter: ListFilterTerm[]): void
+  setFilter: (filter: ListFilterTerm[]) => void
   /** A header sorted by the person. */
-  setSort(sort: ListSortTerm[]): void
+  setSort: (sort: ListSortTerm[]) => void
   /** A view shown, or "All records": its filter and its sort together, so the grid asks one first page. */
-  pick(filter: ListFilterTerm[], sort: ListSortTerm[]): void
+  pick: (filter: ListFilterTerm[], sort: ListSortTerm[]) => void
   /** A column shown, hidden or moved. */
-  setChoices(choices: ColumnChoice[]): void
+  setChoices: (choices: ColumnChoice[]) => void
   /** The form's order, every column shown, and no columns kept any more; a list kept stays kept. */
-  resetChoices(): void
+  resetChoices: () => void
 }
 
-export function useGridState({ formId, section, columns, list }: { formId: string; section: GridSection; columns: readonly GridColumn[]; list: PublishedForm['list'] }): SectionGrid {
+export function useGridState({
+  formId,
+  section,
+  columns,
+  list,
+}: {
+  formId: string
+  section: GridSection
+  columns: readonly GridColumn[]
+  list: PublishedForm['list']
+}): SectionGrid {
   const storage = useMemo(browserStorage, [])
   const key = gridKey(section, formId)
   const [state, setState] = useState<GridState>(() => openGrid(parseKept(readPreference(storage, key)), columns, list))

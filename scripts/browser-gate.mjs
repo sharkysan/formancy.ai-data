@@ -141,7 +141,10 @@ export function hearViolations(page) {
     Object.defineProperty(window, '__formancyGateViolations', { value: heard })
     document.addEventListener(
       'securitypolicyviolation',
-      (event) => heard.push(`${event.effectiveDirective} refused ${event.blockedURI || 'something inline'} (${event.sourceFile || 'the page'}:${String(event.lineNumber)})`),
+      (event) =>
+        heard.push(
+          `${event.effectiveDirective} refused ${event.blockedURI || 'something inline'} (${event.sourceFile || 'the page'}:${String(event.lineNumber)})`,
+        ),
       true,
     )
   })
@@ -176,7 +179,9 @@ export function canary(page) {
   return page.evaluate(async (wait) => {
     const heard = window.__formancyGateViolations ?? []
     const unread = heard.splice(0)
-    const arrived = new Promise((settle) => document.addEventListener('securitypolicyviolation', () => settle(performance.now()), { once: true, capture: true }))
+    const arrived = new Promise((settle) =>
+      document.addEventListener('securitypolicyviolation', () => settle(performance.now()), { once: true, capture: true }),
+    )
     const started = performance.now()
     const script = document.createElement('script')
     script.textContent = 'window.__formancyGateCanary = true'
@@ -320,7 +325,8 @@ export function systemOf(browser, { run = answer } = {}) {
 }
 
 /** The sentence a check of one of 0058's facts fails with: what the browser did, what the table says, and what changed it. */
-export const unlikeTheTable = (browser, { did, says, changedBy = browserName(browser) }) => `${browserName(browser)} ${did}; 0058’s table says ${says}: a ${changedBy} release changed this, measure it again`
+export const unlikeTheTable = (browser, { did, says, changedBy = browserName(browser) }) =>
+  `${browserName(browser)} ${did}; 0058’s table says ${says}: a ${changedBy} release changed this, measure it again`
 
 /** What may have changed a lost create's row in `browser`: the browser, and libsoup where the row rests on it. */
 const changedByOf = (browser) => (FACTS.resendsLostPost.restsOn?.[browser] === undefined ? undefined : `${browserName(browser)} or libsoup`)
@@ -344,15 +350,28 @@ export function lostCreate(browser, sendings) {
   const changedBy = changedByOf(browser)
   const takes = FACTS.postConnection.values[browser]
   let took = null
-  if (takes === 'fresh' && connection === 'reused') took = unlikeTheTable(browser, { did: `sent it on a connection that had carried ${String(first.earlier)} request(s)`, says: 'it takes a new one for every POST', changedBy })
+  if (takes === 'fresh' && connection === 'reused')
+    took = unlikeTheTable(browser, {
+      did: `sent it on a connection that had carried ${String(first.earlier)} request(s)`,
+      says: 'it takes a new one for every POST',
+      changedBy,
+    })
   if (takes === 'idle' && connection === 'fresh' && first.passedOver > 0) {
-    took = unlikeTheTable(browser, { did: `sent it on a new connection while ${String(first.passedOver)} kept-alive connection(s) stood idle`, says: 'it takes an idle one where there is one', changedBy })
+    took = unlikeTheTable(browser, {
+      did: `sent it on a new connection while ${String(first.passedOver)} kept-alive connection(s) stood idle`,
+      says: 'it takes an idle one where there is one',
+      changedBy,
+    })
   }
   const twice = FACTS.resendsLostPost.values[browser][connection]
   const often =
     sendings.length === (twice ? 2 : 1)
       ? null
-      : unlikeTheTable(browser, { did: `sent the lost create ${sendings.length === 1 ? 'once' : `${String(sendings.length)} times`} on a ${connection} connection`, says: twice ? 'twice' : 'once', changedBy })
+      : unlikeTheTable(browser, {
+          did: `sent the lost create ${sendings.length === 1 ? 'once' : `${String(sendings.length)} times`} on a ${connection} connection`,
+          says: twice ? 'twice' : 'once',
+          changedBy,
+        })
   return { connection, took, often }
 }
 
@@ -446,5 +465,9 @@ export async function afterEveryPass(gate, page, { dist, refused, guard }) {
   gate.check('the page asked no other origin for anything', foreignProblem(guard.foreign()))
   const problem = fontProblem({ families: declaredFamilies(dist), ...(await webFonts(page)), refused })
   gate.check(refused ? 'with the web fonts refused, none loaded' : 'every web font the page asks for loaded', problem)
-  gate.measure({ name: 'the scrollbar’s width, innerWidth less the root’s clientWidth', value: await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth), unit: 'px' })
+  gate.measure({
+    name: 'the scrollbar’s width, innerWidth less the root’s clientWidth',
+    value: await page.evaluate(() => window.innerWidth - document.documentElement.clientWidth),
+    unit: 'px',
+  })
 }

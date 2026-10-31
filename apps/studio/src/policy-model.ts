@@ -19,7 +19,14 @@ export function lookupBindings(bindings: FormBindings): LookupBinding[] {
 
 /** Roles as a person types them: separated by commas, blanks and repeats dropped, order kept. */
 export function parseRoles(text: string): string[] {
-  return [...new Set(text.split(',').map((role) => role.trim()).filter((role) => role !== ''))]
+  return [
+    ...new Set(
+      text
+        .split(',')
+        .map((role) => role.trim())
+        .filter((role) => role !== ''),
+    ),
+  ]
 }
 
 export function formatRoles(roles: readonly string[]): string {
@@ -136,7 +143,10 @@ export function withThrough(policy: FormPolicy, through: readonly string[]): For
 export function withoutLookup(policy: FormPolicy, key: string): FormPolicy {
   const lookups = { ...policy.lookups }
   delete lookups[key]
-  return withThrough({ ...policy, lookups }, (policy.through ?? []).filter((entry) => entry !== key))
+  return withThrough(
+    { ...policy, lookups },
+    (policy.through ?? []).filter((entry) => entry !== key),
+  )
 }
 
 /**
@@ -167,7 +177,9 @@ export function withOperationRoles(policy: FormPolicy, operation: PolicyOperatio
 
 /** Whether two acceptances name the same key with the same action. */
 function sameRule(left: CascadeRule, right: CascadeRule): boolean {
-  return left.table.schema === right.table.schema && left.table.name === right.table.name && left.foreignKey === right.foreignKey && left.onDelete === right.onDelete
+  return (
+    left.table.schema === right.table.schema && left.table.name === right.table.name && left.foreignKey === right.foreignKey && left.onDelete === right.onDelete
+  )
 }
 
 /** The policy with `cascades` set (0051), the property left out when it names nothing, as `through` is. */
@@ -187,12 +199,18 @@ export function withCascade(policy: FormPolicy, rule: CascadeRule): FormPolicy {
 
 /** The policy no longer accepting `rule`, with that action: a box unticked. */
 export function withoutCascade(policy: FormPolicy, rule: CascadeRule): FormPolicy {
-  return withCascades(policy, (policy.cascades ?? []).filter((entry) => !sameRule(entry, rule)))
+  return withCascades(
+    policy,
+    (policy.cascades ?? []).filter((entry) => !sameRule(entry, rule)),
+  )
 }
 
 /** The policy without its `cascades` entry at `index`: an acceptance removed by its place, as the publish check names it. */
 export function withoutCascadeAt(policy: FormPolicy, index: number): FormPolicy {
-  return withCascades(policy, (policy.cascades ?? []).filter((_, at) => at !== index))
+  return withCascades(
+    policy,
+    (policy.cascades ?? []).filter((_, at) => at !== index),
+  )
 }
 
 /**
@@ -203,7 +221,10 @@ export function withoutCascadeAt(policy: FormPolicy, index: number): FormPolicy 
  */
 export function stateFields(bindings: FormBindings): string[] {
   return bindings.fields
-    .filter((binding) => binding.kind === 'column' && (binding.type.kind === 'text' || binding.type.kind === 'integer') && (binding.writes.create || binding.writes.update))
+    .filter(
+      (binding) =>
+        binding.kind === 'column' && (binding.type.kind === 'text' || binding.type.kind === 'integer') && (binding.writes.create || binding.writes.update),
+    )
     .map((binding) => binding.field)
 }
 

@@ -85,7 +85,11 @@ async function readBackSqlServer(pool: mssql.ConnectionPool): Promise<SizedReadB
     const request = pool.request().input('size', mssql.Int, READ_PAGE_ROWS)
     const where = after === undefined ? '' : 'where tenant_id > @t or (tenant_id = @t and customer_no > @n)'
     if (after !== undefined) request.input('t', mssql.Int, after.tenantId).input('n', mssql.Int, after.customerNo)
-    const page = (await request.query<{ t: number; n: number; m: string }>(`select top (@size) tenant_id as t, customer_no as n, name as m from sales.customer ${where} order by tenant_id, customer_no`)).recordset
+    const page = (
+      await request.query<{ t: number; n: number; m: string }>(
+        `select top (@size) tenant_id as t, customer_no as n, name as m from sales.customer ${where} order by tenant_id, customer_no`,
+      )
+    ).recordset
     for (const row of page) {
       after = { tenantId: row.t, customerNo: row.n, name: row.m }
       compare.take(after)

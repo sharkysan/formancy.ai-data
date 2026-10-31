@@ -67,7 +67,9 @@ export function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
@@ -86,7 +88,12 @@ export const lookupsOf = (bindings: Proposed): Array<{ field: string; foreignKey
 /** Each operation the form offers, granted to the clerk, unless `readOnly` -- delete only when `deletes` asks for it (0053). */
 export function offered(bindings: Proposed, readOnly = false, deletes = false): FormPolicy['operations'] {
   const grant = (operation: unknown): string[] => (readOnly || operation === false || operation === undefined ? [] : ['clerk'])
-  return { read: ['clerk'], create: grant(bindings.operations.create), update: grant(bindings.operations.update), ...(deletes ? { delete: grant(bindings.operations.delete) } : {}) }
+  return {
+    read: ['clerk'],
+    create: grant(bindings.operations.create),
+    update: grant(bindings.operations.update),
+    ...(deletes ? { delete: grant(bindings.operations.delete) } : {}),
+  }
 }
 
 /** One child form of `ENGINES`, as `startPlane` publishes it. */
@@ -110,7 +117,10 @@ export interface ChildPublication {
  * update whose records a crumb names by a field (0090): its carrier; with
  * `views` too, with `DELIVERY_VIEWS` (0105).
  */
-export function childForms(engine: Engine, { deletes, deliveries, views = false }: { deletes: boolean; deliveries: boolean; views?: boolean }): ChildPublication[] {
+export function childForms(
+  engine: Engine,
+  { deletes, deliveries, views = false }: { deletes: boolean; deliveries: boolean; views?: boolean },
+): ChildPublication[] {
   // On SQL Server these tables carry a rowversion, which the generator finds itself.
   const version = engine.connection === 'pg' ? { versionColumn: 'row_version' } : {}
   return [
@@ -121,7 +131,13 @@ export function childForms(engine: Engine, { deletes, deliveries, views = false 
       lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
       ...version,
       // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings, false, deletes), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }),
+      policy: (bindings) => ({
+        ...clerkPolicy(bindings.fields),
+        operations: offered(bindings, false, deletes),
+        rowFilters: [],
+        lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+        through: ['order'],
+      }),
     },
     {
       formId: engine.employees,
@@ -129,7 +145,12 @@ export function childForms(engine: Engine, { deletes, deliveries, views = false 
       table: 'employee',
       lookups: [{ foreignKey: 'fk_employee_manager', display: ['name'] }],
       // Employees are nobody's tenant: no row filter, and a manager may be any of them.
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings), rowFilters: [], lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])) }),
+      policy: (bindings) => ({
+        ...clerkPolicy(bindings.fields),
+        operations: offered(bindings),
+        rowFilters: [],
+        lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])),
+      }),
     },
     {
       formId: engine.staff,
@@ -145,7 +166,11 @@ export function childForms(engine: Engine, { deletes, deliveries, views = false 
       // The generator labels both lookups by their table, "Employee"; a person tells them apart.
       labels: { fk_order_created_by: 'Created by', fk_order_approved_by: 'Approved by' },
       // Read only, so the page draws a record of it with every field disabled.
-      policy: (bindings) => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings, true), lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])) }),
+      policy: (bindings) => ({
+        ...clerkPolicy(bindings.fields),
+        operations: offered(bindings, true),
+        lookups: Object.fromEntries(lookupsOf(bindings).map(({ field }) => [field, []])),
+      }),
     },
     ...(deliveries
       ? [
@@ -159,7 +184,11 @@ export function childForms(engine: Engine, { deletes, deliveries, views = false 
             pinned: ['tenant_id'],
             ...(views ? { views: DELIVERY_VIEWS } : {}),
             // No delete: one takes its parcels with it, a cascade this policy does not accept (0051).
-            policy: (bindings: Proposed): FormPolicy => ({ ...clerkPolicy(bindings.fields), operations: offered(bindings), lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] } }),
+            policy: (bindings: Proposed): FormPolicy => ({
+              ...clerkPolicy(bindings.fields),
+              operations: offered(bindings),
+              lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+            }),
           },
         ]
       : []),

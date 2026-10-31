@@ -38,14 +38,29 @@ export function freshStatement(request: InsertRequest): RecordStatement {
  * nothing rather than several rows. `one` is NULL when nothing was ended;
  * the next version's columns follow it, as `outputs` writes them.
  */
-export function supersedeStatement(request: SupersedeRequest, terms: readonly RowFilterTerm[], through: readonly ThroughTerms[], definition: Definition, path: WritePath): RecordStatement {
+export function supersedeStatement(
+  request: SupersedeRequest,
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  definition: Definition,
+  path: WritePath,
+): RecordStatement {
   const statement = new Statement()
   const table = request.target.table
   const version = request.target.concurrency.column
   const set = [`${quoteIdentifier(request.ends)} = ${bound(statement, request.start)}`, `${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`]
-  const where = [...located(statement, request.key, terms, through), versionIs(statement, request), `${column(request.ends)} is null`, ...guard(statement, table, definition, path)]
+  const where = [
+    ...located(statement, request.key, terms, through),
+    versionIs(statement, request),
+    `${column(request.ends)} is null`,
+    ...guard(statement, table, definition, path),
+  ]
   const names = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
-  const selected = [...request.chain.map((entry) => `${ENDED}.${quoteIdentifier(entry.name)}`), bound(statement, request.start), ...request.values.map((value) => bound(statement, value))]
+  const selected = [
+    ...request.chain.map((entry) => `${ENDED}.${quoteIdentifier(entry.name)}`),
+    bound(statement, request.start),
+    ...request.values.map((value) => bound(statement, value)),
+  ]
   const text = [
     `with ${ENDED} as (`,
     `update ${quoteTable(table)} as ${ROW}`,

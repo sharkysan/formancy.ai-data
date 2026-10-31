@@ -43,7 +43,10 @@ describe("the grid's theme parameters", () => {
     const loose = strings(ROOM_GRID, 'params').filter(([at, value]) => {
       if (at === 'params.browserColorScheme') return value !== 'dark'
       if (at.endsWith('Border.style')) return value !== 'solid'
-      if (/\.(ref|onto)$/.test(at)) return !named.has(value) || !/^var\(--/.test(String(ROOM_GRID[value as keyof typeof ROOM_GRID]))
+      if (/\.(ref|onto)$/.test(at)) {
+        const target: unknown = ROOM_GRID[value as keyof typeof ROOM_GRID]
+        return !named.has(value) || typeof target !== 'string' || !/^var\(--/.test(target)
+      }
       const variable = /^var\((--[\w-]+)\)$/.exec(value)?.[1]
       return variable === undefined || !ROOM.has(variable)
     })
@@ -54,7 +57,7 @@ describe("the grid's theme parameters", () => {
   // The focused cell is drawn by the range-selection border, which defaults
   // to the accent: violet, the room's colour for what a person acts on. The
   // room's focus is teal, and the gate measures it against both rows.
-  test('draw the focus in the room\'s teal', () => {
+  test("draw the focus in the room's teal", () => {
     expect(ROOM_GRID.rangeSelectionBorderColor).toBe('var(--server)')
     expect(ROOM_GRID.focusShadow).toEqual({ spread: 2, color: 'var(--server)' })
   })

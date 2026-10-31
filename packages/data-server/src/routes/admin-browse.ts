@@ -98,7 +98,14 @@ export function browseRoutes(app: FastifyInstance, options: BrowseOptions): void
       return refuse(reply, failure.status, failure.code, failure.message)
     }
     const page = browsePage(outcome.rows, query.query.limit)
-    const answer: BrowseAnswer = { object: plan.request.target.table, kind: (object as ObjectMeta).kind, columns: plan.columns, omitted: plan.omitted, ordered: plan.ordered, ...page }
+    const answer: BrowseAnswer = {
+      object: plan.request.target.table,
+      kind: (object as ObjectMeta).kind,
+      columns: plan.columns,
+      omitted: plan.omitted,
+      ordered: plan.ordered,
+      ...page,
+    }
     return answer
   })
 }

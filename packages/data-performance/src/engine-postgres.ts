@@ -50,7 +50,9 @@ export function observePostgres(admin: string): Observer {
                pg_table_size('sales."order"')::text as order_table, pg_indexes_size('sales."order"')::text as order_indexes,
                pg_total_relation_size('sales."order"')::text as order_total,
                (select count(*) from sales."order")::text as orders, pg_database_size(current_database())::text as database`
-      const tenants = await sql<Array<{ tenant: number; rows: string }>>`select tenant_id as tenant, count(*)::text as rows from sales.customer group by tenant_id order by tenant_id`
+      const tenants = await sql<
+        Array<{ tenant: number; rows: string }>
+      >`select tenant_id as tenant, count(*)::text as rows from sales.customer group by tenant_id order by tenant_id`
       const value = (name: string): number => Number(row?.[name] ?? Number.NaN)
       const perTenant = Object.fromEntries(tenants.map((tenant) => [String(tenant.tenant), Number(tenant.rows)]))
       return {
@@ -59,7 +61,12 @@ export function observePostgres(admin: string): Observer {
         customerIndexBytes: value('customer_indexes'),
         orderRows: value('orders'),
         databaseBytes: value('database'),
-        detail: { customerTotalBytes: value('customer_total'), orderTableBytes: value('order_table'), orderIndexBytes: value('order_indexes'), orderTotalBytes: value('order_total') },
+        detail: {
+          customerTotalBytes: value('customer_total'),
+          orderTableBytes: value('order_table'),
+          orderIndexBytes: value('order_indexes'),
+          orderTotalBytes: value('order_total'),
+        },
       }
     },
     async disturbance() {
@@ -72,14 +79,19 @@ export function observePostgres(admin: string): Observer {
       return { autovacuum: Number(rows[0]?.autovacuum), autoanalyze: Number(rows[0]?.autoanalyze) }
     },
     disturbances(before, after) {
-      return { autovacuum: Number(after['autovacuum']) - Number(before['autovacuum']), autoanalyze: Number(after['autoanalyze']) - Number(before['autoanalyze']) }
+      return {
+        autovacuum: Number(after['autovacuum']) - Number(before['autovacuum']),
+        autoanalyze: Number(after['autoanalyze']) - Number(before['autoanalyze']),
+      }
     },
     async createdCustomers() {
       const [row] = await sql<Array<{ n: number }>>`select count(distinct (tenant_id, customer_no))::int as n from sales."order" where notes = 'performance'`
       return row?.n ?? 0
     },
     async writerSessions() {
-      const rows = await sql<Array<{ pid: number; started: string }>>`select pid, backend_start::text as started from pg_stat_activity where usename = 'formancy_writer'`
+      const rows = await sql<
+        Array<{ pid: number; started: string }>
+      >`select pid, backend_start::text as started from pg_stat_activity where usename = 'formancy_writer'`
       return new Set(rows.map((row) => `${String(row.pid)}@${row.started}`))
     },
     close: () => sql.end({ timeout: 5 }),

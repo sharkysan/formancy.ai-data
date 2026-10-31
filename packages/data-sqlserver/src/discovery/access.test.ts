@@ -15,7 +15,9 @@ describe('toAccess', () => {
   // The same for a table's DELETE (0049): read as "no", a quoting slip would
   // quietly take a delete away from a form, for a reason nobody could see.
   test('a NULL answer for DELETE on an object is refused as a defect, naming the object', () => {
-    expect(() => toObjectAccess({ access_object: "[sales].[it's [odd]]]", can_delete: null })).toThrow("HAS_PERMS_BY_NAME could not resolve [sales].[it's [odd]]] for DELETE")
+    expect(() => toObjectAccess({ access_object: "[sales].[it's [odd]]]", can_delete: null })).toThrow(
+      "HAS_PERMS_BY_NAME could not resolve [sales].[it's [odd]]] for DELETE",
+    )
     expect(toObjectAccess({ access_object: '[sales].[order]', can_delete: 1 })).toEqual({ delete: true })
     expect(toObjectAccess({ access_object: '[sales].[order]', can_delete: 0 })).toEqual({ delete: false })
   })

@@ -79,7 +79,9 @@ export function reachGuard(parameters: Parameters, reach: ReachTerms): string {
           .join(', ')}) as [a]([from], [key], [onto], [action])
       where [k].[parent_object_id] = object_id([a].[from]) and [k].[name] = [a].[key] collate Latin1_General_100_BIN2
         and [k].[referenced_object_id] = object_id([a].[onto]) and [k].[delete_referential_action] = [a].[action])`
-  const cleared = reach.cleared.flatMap(({ table, columns }) => columns.map((column) => `(${named(parameters, table)}, ${parameters.add(mssql.NVarChar(mssql.MAX), column)})`))
+  const cleared = reach.cleared.flatMap(({ table, columns }) =>
+    columns.map((column) => `(${named(parameters, table)}, ${parameters.add(mssql.NVarChar(mssql.MAX), column)})`),
+  )
   const followed =
     cleared.length === 0
       ? []
@@ -149,7 +151,11 @@ export function deleteStatement(request: DeleteRequest, terms: DeleteTerms, expe
     statement: (output) => `delete ${ROW} ${output} from ${quoteTable(terms.root)} as ${ROW} where ${where.join(' and ')}`,
     assigned: [],
     returned: selection(target.identity, target.concurrency, 'deleted.'),
-    afterWrite: [reachGuard(parameters, terms.reach), ...reachDeletable(parameters, terms.reach), `if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`],
+    afterWrite: [
+      reachGuard(parameters, terms.reach),
+      ...reachDeletable(parameters, terms.reach),
+      `if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`,
+    ],
   })
   return parameters.statement(sql)
 }

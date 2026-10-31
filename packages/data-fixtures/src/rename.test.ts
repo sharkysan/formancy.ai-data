@@ -12,7 +12,18 @@ const INT32 = { kind: 'integer', min: '-2147483648', max: '2147483647' } as cons
 
 function column(name: string, ordinal: number): ColumnMeta {
   const access = { select: true, insert: true, update: name !== 'id' }
-  return { name, ordinal, databaseType: 'integer', type: INT32, nullable: name !== 'id', hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access }
+  return {
+    name,
+    ordinal,
+    databaseType: 'integer',
+    type: INT32,
+    nullable: name !== 'id',
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access,
+  }
 }
 
 function table(name: string, columns: readonly string[], facts: Partial<ObjectMeta> = {}): ObjectMeta {
@@ -100,7 +111,9 @@ describe('renamedColumn', () => {
     ['its table’s own foreign key', 'parent_id', 'foreign key fk_t_parent'],
     ['a check', 'size', 'check ck_t_size'],
   ])('refuses a column named by %s', (_title, from, named) => {
-    expect(() => renamedColumn(snapshot(), T, from, 'renamed')).toThrow(`s.t.${from} is named by ${named}; renamedColumn renames only a column nothing else names`)
+    expect(() => renamedColumn(snapshot(), T, from, 'renamed')).toThrow(
+      `s.t.${from} is named by ${named}; renamedColumn renames only a column nothing else names`,
+    )
   })
 
   // A check is judged by its text, and a check whose text is null might name
@@ -108,7 +121,10 @@ describe('renamedColumn', () => {
   // check the cases above refuse.
   test('refuses a column of a table with a check whose text the account could not read', () => {
     const { fingerprint: _, ...contents } = snapshot()
-    const unread = createSnapshot({ ...contents, objects: contents.objects.map((object) => (object.ref.name === 't' ? { ...object, checks: [check('ck_t_size', null)] } : object)) })
+    const unread = createSnapshot({
+      ...contents,
+      objects: contents.objects.map((object) => (object.ref.name === 't' ? { ...object, checks: [check('ck_t_size', null)] } : object)),
+    })
     expect(() => renamedColumn(unread, T, 'note', 'memo')).toThrow('s.t.note is named by check ck_t_size, whose text this account could not read;')
   })
 
@@ -118,18 +134,40 @@ describe('renamedColumn', () => {
   // sentence about the key and not about the rename.
   test('refuses a column that a key from outside the snapshot refers to', () => {
     const { fingerprint: _, ...contents } = snapshot()
-    const outside = { table: { schema: 'audit', name: 'copy' }, name: 'fk_copy_t', columns: ['t_note'], referencedColumns: ['note'], onDelete: 'cascade' as const, onUpdate: 'no-action' as const, enforced: true }
+    const outside = {
+      table: { schema: 'audit', name: 'copy' },
+      name: 'fk_copy_t',
+      columns: ['t_note'],
+      referencedColumns: ['note'],
+      onDelete: 'cascade' as const,
+      onUpdate: 'no-action' as const,
+      enforced: true,
+    }
     const inbound = (name: string) =>
       contents.objects.flatMap((object) =>
         object.foreignKeys
           .filter((key) => key.references?.table.name === name)
-          .map((key) => ({ table: object.ref, name: key.name, columns: key.columns, referencedColumns: key.references?.columns ?? [], onDelete: key.onDelete, onUpdate: key.onUpdate, enforced: key.enforced })),
+          .map((key) => ({
+            table: object.ref,
+            name: key.name,
+            columns: key.columns,
+            referencedColumns: key.references?.columns ?? [],
+            onDelete: key.onDelete,
+            onUpdate: key.onUpdate,
+            enforced: key.enforced,
+          })),
       )
     const recorded = createSnapshot({
       ...contents,
-      objects: contents.objects.map((object) => ({ ...object, access: { delete: true }, referencedBy: [...inbound(object.ref.name), ...(object.ref.name === 't' ? [outside] : [])] })),
+      objects: contents.objects.map((object) => ({
+        ...object,
+        access: { delete: true },
+        referencedBy: [...inbound(object.ref.name), ...(object.ref.name === 't' ? [outside] : [])],
+      })),
     })
-    expect(() => renamedColumn(recorded, T, 'note', 'memo')).toThrow('s.t.note is named by foreign key fk_copy_t of audit.copy, which refers to it; renamedColumn renames only a column nothing else names')
+    expect(() => renamedColumn(recorded, T, 'note', 'memo')).toThrow(
+      's.t.note is named by foreign key fk_copy_t of audit.copy, which refers to it; renamedColumn renames only a column nothing else names',
+    )
   })
 
   // The name it is given is the table's already: two columns of one name is

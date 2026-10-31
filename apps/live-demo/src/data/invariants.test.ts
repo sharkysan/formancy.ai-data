@@ -31,7 +31,11 @@ const deliveriesOf = (order: DemoOrder) => data.deliveries.filter((delivery) => 
 const key = (customer: DemoCustomer) => `${String(customer.tenantId)}/${String(customer.customerNo)}`
 const anchor = dayNumber(ANCHOR)
 
-const shipped = find(data.orders, (order) => order.status === 'shipped' && linesOf(order).length >= 2 && deliveriesOf(order).length === 1, 'shipped order of two lines and one delivery')
+const shipped = find(
+  data.orders,
+  (order) => order.status === 'shipped' && linesOf(order).length >= 2 && deliveriesOf(order).length === 1,
+  'shipped order of two lines and one delivery',
+)
 const placed = find(data.orders, (order) => order.status === 'placed', 'placed order')
 const draft = find(data.orders, (order) => order.status === 'draft', 'draft')
 const swiss = find(data.customers, (customer) => customer.countryCode === 'CH' && customer.name.endsWith(' AG'), 'Swiss AG')
@@ -83,10 +87,15 @@ describe('the demo data’s invariants refuse', () => {
   test('a tenant short of a customer, a third tenant, numbers out of order, a country nobody may be in', () => {
     const last = data.customers.filter((customer) => customer.tenantId === 1).at(-1)!
     expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(last))!.tenantId = 3 as 1))).toEqual(
-      expect.arrayContaining([`tenant 1 has ${String(PER_TENANT.customers - 1)} customers, not ${String(PER_TENANT.customers)}`, `customer 3/${String(last.customerNo)} is of no tenant of the demo's`]),
+      expect.arrayContaining([
+        `tenant 1 has ${String(PER_TENANT.customers - 1)} customers, not ${String(PER_TENANT.customers)}`,
+        `customer 3/${String(last.customerNo)} is of no tenant of the demo's`,
+      ]),
     )
     expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(last))!.customerNo += 1))).toEqual(
-      expect.arrayContaining([`tenant 1's customers are not numbered ${String(FIRST_CUSTOMER_NO)} to ${String(FIRST_CUSTOMER_NO + PER_TENANT.customers - 1)} in order`]),
+      expect.arrayContaining([
+        `tenant 1's customers are not numbered ${String(FIRST_CUSTOMER_NO)} to ${String(FIRST_CUSTOMER_NO + PER_TENANT.customers - 1)} in order`,
+      ]),
     )
     expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(swiss))!.countryCode = 'NL'))).toEqual(
       expect.arrayContaining([`customer ${key(swiss)} is in NL, where tenant 1 has no customers`]),
@@ -102,12 +111,17 @@ describe('the demo data’s invariants refuse', () => {
   test('a customer created after its first order, an inactive one ordering lately, a credit limit off the steps', () => {
     const order = find(data.orders, (each) => anchor - dayNumber(each.orderDate) < 30, 'order of the last month')
     const buyer = find(data.customers, (customer) => customer.tenantId === order.tenantId && customer.customerNo === order.customerNo, 'buyer')
-    const first = data.orders.filter((each) => each.tenantId === buyer.tenantId && each.customerNo === buyer.customerNo).map((each) => each.orderDate).sort()[0]!
-    expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(buyer))!.createdAt = startOfDay(dayNumber(first)) + 3_600_000))).toEqual([
-      `customer ${key(buyer)} was created on ${first}, not before its first order of ${first}`,
-    ])
+    const first = data.orders
+      .filter((each) => each.tenantId === buyer.tenantId && each.customerNo === buyer.customerNo)
+      .map((each) => each.orderDate)
+      .sort()[0]!
+    expect(
+      problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(buyer))!.createdAt = startOfDay(dayNumber(first)) + 3_600_000)),
+    ).toEqual([`customer ${key(buyer)} was created on ${first}, not before its first order of ${first}`])
     expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(buyer))!.active = false))).toEqual(
-      expect.arrayContaining([expect.stringMatching(new RegExp(`^customer ${key(buyer)} is inactive and ordered on \\d{4}-\\d{2}-\\d{2}, within 180 days of ${ANCHOR}$`))]),
+      expect.arrayContaining([
+        expect.stringMatching(new RegExp(`^customer ${key(buyer)} is inactive and ordered on \\d{4}-\\d{2}-\\d{2}, within 180 days of ${ANCHOR}$`)),
+      ]),
     )
     expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(swiss))!.creditLimitCents = 12_345_00))).toEqual([
       `customer ${key(swiss)} has a credit limit of 12345.00, which is no step of the list`,
@@ -118,7 +132,11 @@ describe('the demo data’s invariants refuse', () => {
   // validating fk_employee_manager is meant to show; a cycle or a second
   // root is no organisation.
   test('an employee whose manager does not exist, a second root, a cycle, a fourth level', () => {
-    const staff = find(data.employees, (employee) => employee.managerId !== null && data.employees.find((manager) => manager.id === employee.managerId)?.managerId !== null, 'staff member')
+    const staff = find(
+      data.employees,
+      (employee) => employee.managerId !== null && data.employees.find((manager) => manager.id === employee.managerId)?.managerId !== null,
+      'staff member',
+    )
     const other = find(data.employees, (employee) => employee.id !== staff.id && employee.managerId === staff.managerId, 'colleague')
     expect(problemsAfter((copy) => void (copy.employees.find((employee) => employee.id === staff.id)!.managerId = 999))).toEqual(
       expect.arrayContaining([`employee ${String(staff.id)} reports to 999, who is no employee`]),
@@ -134,18 +152,29 @@ describe('the demo data’s invariants refuse', () => {
         copy.employees.find((employee) => employee.id === staff.id)!.managerId = other.id
         copy.employees.find((employee) => employee.id === other.id)!.managerId = staff.id
       }),
-    ).toEqual(expect.arrayContaining([`employee ${String(staff.id)} does not reach the managing director`, `employee ${String(other.id)} does not reach the managing director`]))
+    ).toEqual(
+      expect.arrayContaining([
+        `employee ${String(staff.id)} does not reach the managing director`,
+        `employee ${String(other.id)} does not reach the managing director`,
+      ]),
+    )
   })
 
   // Who created and who approved an order are lookups on the order form; a
   // draft approved, a placed order approved by nobody, or a head creating
   // orders breaks the roles the data is drawn to show.
   test('a draft approved, a placed order unapproved, an order created by a head', () => {
-    const head = find(data.employees, (employee) => employee.managerId !== null && data.employees.find((manager) => manager.id === employee.managerId)?.managerId === null, 'head')
+    const head = find(
+      data.employees,
+      (employee) => employee.managerId !== null && data.employees.find((manager) => manager.id === employee.managerId)?.managerId === null,
+      'head',
+    )
     expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === draft.id)!.approvedBy = head.id))).toEqual([
       `order ${String(draft.id)} is a draft and approved by employee ${String(head.id)}`,
     ])
-    expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.approvedBy = null))).toEqual([`order ${String(placed.id)} is placed and not approved by a head`])
+    expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.approvedBy = null))).toEqual([
+      `order ${String(placed.id)} is placed and not approved by a head`,
+    ])
     expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.createdBy = head.id))).toEqual([
       `order ${String(placed.id)} was created by employee ${String(head.id)}, who is not staff`,
     ])
@@ -164,7 +193,10 @@ describe('the demo data’s invariants refuse', () => {
     // Not the first order: moved earlier, the first would still be in order.
     const later = data.orders[100]!
     expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === later.id)!.orderDate = '2024-01-02'))).toEqual(
-      expect.arrayContaining([`order ${String(later.id)} is dated 2024-01-02, outside 2025-04-01 to ${ANCHOR}`, 'the orders are not numbered from 1 in order of tenant and date']),
+      expect.arrayContaining([
+        `order ${String(later.id)} is dated 2024-01-02, outside 2025-04-01 to ${ANCHOR}`,
+        'the orders are not numbered from 1 in order of tenant and date',
+      ]),
     )
   })
 
@@ -174,7 +206,9 @@ describe('the demo data’s invariants refuse', () => {
     expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.customerNo = 99_999))).toEqual([
       `order ${String(placed.id)} is for ${String(placed.tenantId)}/99999, who is no customer of tenant ${String(placed.tenantId)}`,
     ])
-    expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.notes = 'Leave it anywhere'))).toEqual([`order ${String(placed.id)}'s note "Leave it anywhere" is none of the list`])
+    expect(problemsAfter((copy) => void (copy.orders.find((order) => order.id === placed.id)!.notes = 'Leave it anywhere'))).toEqual([
+      `order ${String(placed.id)}'s note "Leave it anywhere" is none of the list`,
+    ])
   })
 
   // Lines: numbered from one without a gap, one to six of them, a quantity
@@ -195,7 +229,9 @@ describe('the demo data’s invariants refuse', () => {
     )
     const lines = linesOf(shipped).length
     expect(
-      problemsAfter((copy) => copy.lines.push(...Array.from({ length: 7 - lines }, (_, i) => ({ ...line!, lineNo: lines + i + 1, quantity: 1, unitPriceCents: 390 })))),
+      problemsAfter((copy) =>
+        copy.lines.push(...Array.from({ length: 7 - lines }, (_, i) => ({ ...line!, lineNo: lines + i + 1, quantity: 1, unitPriceCents: 390 }))),
+      ),
     ).toEqual(expect.arrayContaining([`order ${String(shipped.id)} has 7 lines, not 1 to 6`]))
   })
 
@@ -204,22 +240,31 @@ describe('the demo data’s invariants refuse', () => {
   test('a delivery of another tenant, a carrier of another country, a ship date out of range, a malformed or repeated id', () => {
     const [delivery] = deliveriesOf(shipped)
     const buyer = find(data.customers, (customer) => customer.tenantId === shipped.tenantId && customer.customerNo === shipped.customerNo, 'buyer')
-    const change = (edit: (copy: NonNullable<typeof delivery>) => void) => problemsAfter((copy) => edit(copy.deliveries.find((each) => each.id === delivery!.id)!))
+    const change = (edit: (copy: NonNullable<typeof delivery>) => void) =>
+      problemsAfter((copy) => edit(copy.deliveries.find((each) => each.id === delivery!.id)!))
     expect(change((copy) => void (copy.tenantId = shipped.tenantId === 1 ? 2 : 1))).toEqual([
       `delivery ${delivery!.id} is of tenant ${String(shipped.tenantId === 1 ? 2 : 1)}, its order ${String(shipped.id)} of tenant ${String(shipped.tenantId)}`,
     ])
-    expect(change((copy) => void (copy.carrier = 'Pony Express'))).toEqual([`delivery ${delivery!.id} is carried by Pony Express, who does not deliver to ${buyer.countryCode}`])
+    expect(change((copy) => void (copy.carrier = 'Pony Express'))).toEqual([
+      `delivery ${delivery!.id} is carried by Pony Express, who does not deliver to ${buyer.countryCode}`,
+    ])
     expect(change((copy) => void (copy.shippedAt = startOfDay(dayNumber(shipped.orderDate)) + 3_600_000))).toEqual([
       `delivery ${delivery!.id} shipped 0 days after its order, not 1 to 6`,
     ])
-    expect(change((copy) => void (copy.shippedAt = startOfDay(anchor + 1) + 3_600_000))).toEqual(expect.arrayContaining([`delivery ${delivery!.id} shipped on ${dayOf(anchor + 1)}, after ${ANCHOR}`]))
+    expect(change((copy) => void (copy.shippedAt = startOfDay(anchor + 1) + 3_600_000))).toEqual(
+      expect.arrayContaining([`delivery ${delivery!.id} shipped on ${dayOf(anchor + 1)}, after ${ANCHOR}`]),
+    )
     const upper = delivery!.id.toUpperCase()
-    expect(problemsAfter((copy) => {
-      copy.deliveries.find((each) => each.id === delivery!.id)!.id = upper
-      for (const parcel of copy.parcels) if (parcel.deliveryId === delivery!.id) parcel.deliveryId = upper
-    })).toEqual([`delivery id ${upper} is not a lower-case version-4 uuid`])
+    expect(
+      problemsAfter((copy) => {
+        copy.deliveries.find((each) => each.id === delivery!.id)!.id = upper
+        for (const parcel of copy.parcels) if (parcel.deliveryId === delivery!.id) parcel.deliveryId = upper
+      }),
+    ).toEqual([`delivery id ${upper} is not a lower-case version-4 uuid`])
     const other = data.deliveries.find((each) => each.id !== delivery!.id)!
-    expect(problemsAfter((copy) => void (copy.deliveries.find((each) => each.id === other.id)!.id = delivery!.id))).toEqual(expect.arrayContaining([`delivery id ${delivery!.id} is given twice`]))
+    expect(problemsAfter((copy) => void (copy.deliveries.find((each) => each.id === other.id)!.id = delivery!.id))).toEqual(
+      expect.arrayContaining([`delivery id ${delivery!.id} is given twice`]),
+    )
   })
 
   // What a visitor reads on an order, its child rows must not contradict:
@@ -232,7 +277,11 @@ describe('the demo data’s invariants refuse', () => {
       `order ${String(shipped.id)} says "${COLLECTS}" and was shipped by ${delivery!.carrier}`,
     ])
     const day = dayNumber(shipped.orderDate)
-    const weekend = find([1, 2, 3, 4, 5, 6].map((after) => day + after), (each) => !isWeekday(each) && each <= anchor, 'weekend day within six days of the order')
+    const weekend = find(
+      [1, 2, 3, 4, 5, 6].map((after) => day + after),
+      (each) => !isWeekday(each) && each <= anchor,
+      'weekend day within six days of the order',
+    )
     expect(problemsAfter((copy) => void (copy.deliveries.find((each) => each.id === delivery!.id)!.shippedAt = startOfDay(weekend) + 3_600_000))).toEqual([
       `delivery ${delivery!.id} shipped on ${dayOf(weekend)}, a weekend day`,
     ])
@@ -244,9 +293,11 @@ describe('the demo data’s invariants refuse', () => {
     const [delivery] = deliveriesOf(shipped)
     const own = data.parcels.filter((parcel) => parcel.deliveryId === delivery!.id)
     const next = data.parcels.length + 1
-    expect(problemsAfter((copy) => copy.parcels.push(...Array.from({ length: 4 - own.length }, (_, i) => ({ id: next + i, deliveryId: delivery!.id, label: 'Parcel 4 of 4' }))))).toEqual(
-      expect.arrayContaining([`delivery ${delivery!.id} has 4 parcels, not 1 to 3`]),
-    )
+    expect(
+      problemsAfter((copy) =>
+        copy.parcels.push(...Array.from({ length: 4 - own.length }, (_, i) => ({ id: next + i, deliveryId: delivery!.id, label: 'Parcel 4 of 4' }))),
+      ),
+    ).toEqual(expect.arrayContaining([`delivery ${delivery!.id} has 4 parcels, not 1 to 3`]))
     expect(problemsAfter((copy) => void (copy.parcels[0]!.deliveryId = '00000000-0000-4000-8000-000000000000'))).toEqual(
       expect.arrayContaining([`parcel ${String(data.parcels[0]!.id)} is of no delivery`]),
     )
@@ -261,13 +312,17 @@ describe('the demo data’s invariants refuse', () => {
   // a lookup cannot tell apart; a customer created after the anchor is one
   // the data says does not exist yet.
   test('a tenant mostly in another country, an employee name given twice, a customer created after the anchor', () => {
-    expect(problemsAfter((copy) => copy.customers.forEach((customer) => void (customer.tenantId === 1 && customer.countryCode === 'CH' && (customer.countryCode = 'DE'))))).toEqual(
-      expect.arrayContaining(["tenant 1's customers are mostly in DE, not CH"]),
-    )
-    expect(problemsAfter((copy) => void (copy.employees[1]!.name = copy.employees[0]!.name))).toEqual([`"${data.employees[0]!.name}" is the name of 2 employees`])
-    expect(problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(swiss))!.createdAt = startOfDay(anchor + 1) + 3_600_000))).toEqual(
-      expect.arrayContaining([`customer ${key(swiss)} was created on ${dayOf(anchor + 1)}, after ${ANCHOR}`]),
-    )
+    expect(
+      problemsAfter((copy) =>
+        copy.customers.forEach((customer) => void (customer.tenantId === 1 && customer.countryCode === 'CH' && (customer.countryCode = 'DE'))),
+      ),
+    ).toEqual(expect.arrayContaining(["tenant 1's customers are mostly in DE, not CH"]))
+    expect(problemsAfter((copy) => void (copy.employees[1]!.name = copy.employees[0]!.name))).toEqual([
+      `"${data.employees[0]!.name}" is the name of 2 employees`,
+    ])
+    expect(
+      problemsAfter((copy) => void (copy.customers.find((customer) => key(customer) === key(swiss))!.createdAt = startOfDay(anchor + 1) + 3_600_000)),
+    ).toEqual(expect.arrayContaining([`customer ${key(swiss)} was created on ${dayOf(anchor + 1)}, after ${ANCHOR}`]))
   })
 
   // Each tenant's orders fill its pages; an order moved to the other tenant
@@ -321,7 +376,9 @@ describe('the demo data’s invariants refuse', () => {
   // The countries the demo adds are its whole list: one missing is a
   // customer whose country the lookup cannot show.
   test('a country left out, or misnamed', () => {
-    expect(problemsAfter((copy) => void copy.countries.pop())).toEqual(expect.arrayContaining(['the countries added are AT, BE, FR, IT, LI, LU, NL, not AT, BE, FR, IT, LI, LU']))
+    expect(problemsAfter((copy) => void copy.countries.pop())).toEqual(
+      expect.arrayContaining(['the countries added are AT, BE, FR, IT, LI, LU, NL, not AT, BE, FR, IT, LI, LU']),
+    )
     expect(problemsAfter((copy) => void (copy.countries[0]!.name = 'Österreich'))).toEqual(['country AT is named Österreich, not Austria'])
   })
 })

@@ -56,7 +56,10 @@ function green() {
       ].map((purl) => ({ purl })),
       dependencies: [
         { ref: 'pkg:npm/%40formancy/data-core@0.1.0', dependsOn: ['pkg:npm/%40formancy/spec@0.3.0'] },
-        { ref: 'pkg:npm/%40formancy/data-server@0.1.0', dependsOn: ['pkg:npm/%40formancy/data-core@0.1.0', 'pkg:npm/postgres@3.4.9', 'pkg:npm/mssql@12.7.4', 'pkg:npm/fastify@5.12.7'] },
+        {
+          ref: 'pkg:npm/%40formancy/data-server@0.1.0',
+          dependsOn: ['pkg:npm/%40formancy/data-core@0.1.0', 'pkg:npm/postgres@3.4.9', 'pkg:npm/mssql@12.7.4', 'pkg:npm/fastify@5.12.7'],
+        },
         { ref: 'pkg:npm/mssql@12.7.4', dependsOn: ['pkg:npm/tedious@20.3.3'] },
       ],
     },
@@ -107,7 +110,9 @@ describe('the report', () => {
   // A report that failed, or one made on a machine with parts allowed
   // missing, did not gate this release.
   test('is refused when it has problems, or is partial or local', () => {
-    expect(refusals((inputs) => (inputs.report.problems = ['@formancy/data-core: 1 test(s) failed']))).toEqual(['the report has 1 problem(s), the first: @formancy/data-core: 1 test(s) failed'])
+    expect(refusals((inputs) => (inputs.report.problems = ['@formancy/data-core: 1 test(s) failed']))).toEqual([
+      'the report has 1 problem(s), the first: @formancy/data-core: 1 test(s) failed',
+    ])
     expect(refusals((inputs) => (inputs.report.partial = ['install']))).toEqual(['the report is partial: install allowed missing'])
     expect(refusals((inputs) => (inputs.report.local = true))).toEqual(['the report is a local one, and a release reads only the report its own gates built'])
   })
@@ -125,16 +130,25 @@ describe('the tarballs', () => {
         ['package/dist/index.mjs', Buffer.from('export const name = "@formancy/data-servex"\n')],
       ])
     }
-    expect(refusals(tampered)).toEqual([expect.stringMatching(/^formancy-data-server-0\.1\.0\.tgz has sha256 [0-9a-f]{64}, not that of the formancy-data-server-0\.1\.0\.tgz the install gate installed and ran, [0-9a-f]{64}$/)])
+    expect(refusals(tampered)).toEqual([
+      expect.stringMatching(
+        /^formancy-data-server-0\.1\.0\.tgz has sha256 [0-9a-f]{64}, not that of the formancy-data-server-0\.1\.0\.tgz the install gate installed and ran, [0-9a-f]{64}$/,
+      ),
+    ])
   })
 
   // A package without a tarball is a release that leaves it behind; a
   // tarball of something else is one that publishes what no gate meant to.
   test('are refused when one is missing, or one is no published package’s', () => {
     expect(refusals((inputs) => inputs.tarballs.pop())).toEqual(['@formancy/data-server: 0 tarballs, where a release publishes exactly one'])
-    expect(refusals((inputs) => inputs.tarballs.push({ file: 'formancy-data-fixtures-0.1.0.tgz', bytes: packageTarball({ name: '@formancy/data-fixtures', version: '0.1.0', license: LICENSE_FIELD }) }))).toEqual([
-      'formancy-data-fixtures-0.1.0.tgz is @formancy/data-fixtures, which is no published package',
-    ])
+    expect(
+      refusals((inputs) =>
+        inputs.tarballs.push({
+          file: 'formancy-data-fixtures-0.1.0.tgz',
+          bytes: packageTarball({ name: '@formancy/data-fixtures', version: '0.1.0', license: LICENSE_FIELD }),
+        }),
+      ),
+    ).toEqual(['formancy-data-fixtures-0.1.0.tgz is @formancy/data-fixtures, which is no published package'])
   })
 
   // One number for every package is what bump.mjs makes and what the tag
@@ -150,10 +164,12 @@ describe('the tarballs', () => {
   // 0001: a commercial package under the scope's Apache-2.0 declaration, or
   // without its terms and notices, cannot be unpublished into not having happened.
   test('are refused without NOTICE or with another licence field', () => {
-    expect(refusals((inputs) => repack(inputs, '@formancy/data-core', packageTarball(MANIFESTS['@formancy/data-core'], { without: ['NOTICE'] })))).toEqual(['formancy-data-core-0.1.0.tgz carries no package/NOTICE'])
-    expect(refusals((inputs) => repack(inputs, '@formancy/data-core', packageTarball({ ...MANIFESTS['@formancy/data-core'], license: 'Apache-2.0' })))).toEqual([
-      `formancy-data-core-0.1.0.tgz declares the licence Apache-2.0, not "${LICENSE_FIELD}"`,
+    expect(refusals((inputs) => repack(inputs, '@formancy/data-core', packageTarball(MANIFESTS['@formancy/data-core'], { without: ['NOTICE'] })))).toEqual([
+      'formancy-data-core-0.1.0.tgz carries no package/NOTICE',
     ])
+    expect(refusals((inputs) => repack(inputs, '@formancy/data-core', packageTarball({ ...MANIFESTS['@formancy/data-core'], license: 'Apache-2.0' })))).toEqual(
+      [`formancy-data-core-0.1.0.tgz declares the licence Apache-2.0, not "${LICENSE_FIELD}"`],
+    )
   })
 })
 
@@ -170,8 +186,12 @@ describe('the SBOM', () => {
   // they are links (0092; watched failing on the check by name, which
   // asked neither).
   test('is refused without a driver, or without a package this release publishes at its version', () => {
-    expect(refusals((inputs) => inputs.sbom.components.splice(at('postgres')(inputs), 1))).toContain("the SBOM names no postgres, a driver that talks to a customer's database")
-    expect(refusals(replace('%40formancy/data-core', 'pkg:npm/%40formancy/data-core@0.0.9'))).toEqual(['the SBOM names no @formancy/data-core 0.1.0, which this release publishes'])
+    expect(refusals((inputs) => inputs.sbom.components.splice(at('postgres')(inputs), 1))).toContain(
+      "the SBOM names no postgres, a driver that talks to a customer's database",
+    )
+    expect(refusals(replace('%40formancy/data-core', 'pkg:npm/%40formancy/data-core@0.0.9'))).toEqual([
+      'the SBOM names no @formancy/data-core 0.1.0, which this release publishes',
+    ])
   })
 
   // An upstream package a published package's install brings is named, at
@@ -179,8 +199,12 @@ describe('the SBOM', () => {
   // renderer here -- is not asked for (0092; watched failing on the check by
   // name, which asked neither and never read `shipped`).
   test('is refused without a shipped upstream package, or with another version of one, and not for one nothing installs', () => {
-    expect(refusals((inputs) => inputs.sbom.components.splice(at('%40formancy/spec')(inputs), 1))).toEqual(['the SBOM names no @formancy/spec, which a published package depends on'])
-    expect(refusals(replace('%40formancy/spec', 'pkg:npm/%40formancy/spec@0.2.0'))).toEqual(['the SBOM names @formancy/spec 0.2.0, where the suites loaded 0.3.0'])
+    expect(refusals((inputs) => inputs.sbom.components.splice(at('%40formancy/spec')(inputs), 1))).toEqual([
+      'the SBOM names no @formancy/spec, which a published package depends on',
+    ])
+    expect(refusals(replace('%40formancy/spec', 'pkg:npm/%40formancy/spec@0.2.0'))).toEqual([
+      'the SBOM names @formancy/spec 0.2.0, where the suites loaded 0.3.0',
+    ])
     expect(refusals()).toEqual([])
   })
 
@@ -195,10 +219,12 @@ describe('the SBOM', () => {
     expect(refusals(edge('pkg:npm/%40formancy/data-server@0.1.0', 'fastify', 'pkg:npm/fastify@5.0.0'))).toEqual([
       'the SBOM gives @formancy/data-server fastify 5.0.0, where its suites loaded 5.12.5 and a clean install resolved 5.12.7',
     ])
-    expect(refusals(edge('pkg:npm/mssql@12.7.4', 'tedious', 'pkg:npm/tedious@19.0.0'))).toEqual(['the SBOM gives mssql tedious 19.0.0, where its suites loaded 20.3.3'])
-    expect(refusals((inputs) => (inputs.sbom.dependencies[1].dependsOn = inputs.sbom.dependencies[1].dependsOn.filter((purl) => !purl.includes('postgres'))))).toEqual([
-      'the SBOM records no dependency of @formancy/data-server on postgres',
+    expect(refusals(edge('pkg:npm/mssql@12.7.4', 'tedious', 'pkg:npm/tedious@19.0.0'))).toEqual([
+      'the SBOM gives mssql tedious 19.0.0, where its suites loaded 20.3.3',
     ])
+    expect(
+      refusals((inputs) => (inputs.sbom.dependencies[1].dependsOn = inputs.sbom.dependencies[1].dependsOn.filter((purl) => !purl.includes('postgres')))),
+    ).toEqual(['the SBOM records no dependency of @formancy/data-server on postgres'])
     // A second tedious, under something else, is no refusal: mssql is given the one the suites loaded.
     expect(
       refusals((inputs) => {
@@ -215,7 +241,9 @@ describe('the SBOM', () => {
   // check by name, which refused the fresh fastify).
   test('takes a version the install gate resolved, and no other the suites did not run', () => {
     expect(refusals()).toEqual([])
-    expect(refusals((inputs) => (inputs.report.testedOn.runtime[3].fresh = null))).toEqual(['the SBOM gives @formancy/data-server fastify 5.12.7, where its suites loaded 5.12.5'])
+    expect(refusals((inputs) => (inputs.report.testedOn.runtime[3].fresh = null))).toEqual([
+      'the SBOM gives @formancy/data-server fastify 5.12.7, where its suites loaded 5.12.5',
+    ])
   })
 
   // A nested dependency is held under the version of its parent the
@@ -291,7 +319,9 @@ describe('the SBOM against the install it describes', () => {
   // check).
   test('names exactly what the install holds', () => {
     expect(sbomInstallProblems(sbom(named), lockfile())).toEqual([])
-    expect(sbomInstallProblems(sbom([...named, 'pkg:npm/vitest@5.0.3']), lockfile())).toEqual(['the SBOM names vitest 5.0.3, which the install it describes does not hold'])
+    expect(sbomInstallProblems(sbom([...named, 'pkg:npm/vitest@5.0.3']), lockfile())).toEqual([
+      'the SBOM names vitest 5.0.3, which the install it describes does not hold',
+    ])
     expect(sbomInstallProblems(sbom(named.slice(0, 2)), lockfile())).toEqual(['the SBOM leaves out tedious 20.3.3, which the install it describes holds'])
     expect(sbomInstallProblems({ components: [...sbom(named).components, { name: 'a-binary' }] }, lockfile())).toEqual([
       'the SBOM names a-binary, a component with no npm package URL, in an inventory of an npm install',
@@ -311,7 +341,9 @@ describe('the SBOM against the install it describes', () => {
   // An empty or missing lockfile holds nothing, so nothing the SBOM names
   // could be held to it: refused, never passed.
   test('is refused against an install that holds nothing', () => {
-    expect(sbomInstallProblems(sbom(named), { packages: {} })).toEqual(['the install the SBOM describes holds no package, so nothing it names can be held to it'])
+    expect(sbomInstallProblems(sbom(named), { packages: {} })).toEqual([
+      'the install the SBOM describes holds no package, so nothing it names can be held to it',
+    ])
   })
 })
 
@@ -337,7 +369,15 @@ describe('what the publish job downloads', () => {
     const checked = pinned(downloads(inputs))
     change(inputs)
     const files = inputs.files ?? downloads(inputs)
-    return downloadedProblems({ checked: inputs.checked ?? checked, files, report: inputs.report, release: inputs.release, version: inputs.version, commit: inputs.commit, runId: inputs.runId })
+    return downloadedProblems({
+      checked: inputs.checked ?? checked,
+      files,
+      report: inputs.report,
+      release: inputs.release,
+      version: inputs.version,
+      commit: inputs.commit,
+      runId: inputs.runId,
+    })
   }
 
   // The artefact store is the run's, and every job of it can write there:
@@ -346,10 +386,20 @@ describe('what the publish job downloads', () => {
   // before any of that ran, or nothing.
   test('are refused unless they are, byte for byte, what the check job checked', () => {
     expect(again()).toEqual([])
-    const swapped = again((inputs) => (inputs.tarballs[1].bytes = packageTarball({ ...MANIFESTS['@formancy/data-server'], description: 'not what was checked' })))
-    expect(swapped).toEqual([expect.stringMatching(/^release-tarballs\/formancy-data-server-0\.1\.0\.tgz is not the file the check job checked: sha256 [0-9a-f]{64}, checked [0-9a-f]{64}$/)])
-    expect(again((inputs) => inputs.tarballs.push({ file: 'formancy-data-extra-0.1.0.tgz', bytes: Buffer.from('x') }))).toEqual(['release-tarballs/formancy-data-extra-0.1.0.tgz was downloaded, and the check job never checked it'])
-    expect(again((inputs) => inputs.tarballs.pop())).toEqual(['release-tarballs/formancy-data-server-0.1.0.tgz was checked by the check job, and was not downloaded'])
+    const swapped = again(
+      (inputs) => (inputs.tarballs[1].bytes = packageTarball({ ...MANIFESTS['@formancy/data-server'], description: 'not what was checked' })),
+    )
+    expect(swapped).toEqual([
+      expect.stringMatching(
+        /^release-tarballs\/formancy-data-server-0\.1\.0\.tgz is not the file the check job checked: sha256 [0-9a-f]{64}, checked [0-9a-f]{64}$/,
+      ),
+    ])
+    expect(again((inputs) => inputs.tarballs.push({ file: 'formancy-data-extra-0.1.0.tgz', bytes: Buffer.from('x') }))).toEqual([
+      'release-tarballs/formancy-data-extra-0.1.0.tgz was downloaded, and the check job never checked it',
+    ])
+    expect(again((inputs) => inputs.tarballs.pop())).toEqual([
+      'release-tarballs/formancy-data-server-0.1.0.tgz was checked by the check job, and was not downloaded',
+    ])
   })
 
   // A missing pin is no pin: an output the check job did not write is '',

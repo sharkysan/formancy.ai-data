@@ -32,7 +32,15 @@ export { CASCADE_PARITY, cascadeAnswer, PARITY_CASCADES, REACH_PRIVILEGE_LOSSES 
 export type { CascadeCase } from './cascades.js'
 export type { DeleteAnswer, DeleteCase, DeleteExpectation } from './deletes.js'
 export type { ThroughCase } from './cases.js'
-export { READER, SQLSERVER_DATABASE, startPostgresContainer, startPostgresFixture, startSqlServerContainer, startSqlServerFixture, WRITER } from './containers.js'
+export {
+  READER,
+  SQLSERVER_DATABASE,
+  startPostgresContainer,
+  startPostgresFixture,
+  startSqlServerContainer,
+  startSqlServerFixture,
+  WRITER,
+} from './containers.js'
 export { DEFAULT_IMAGES, imageMajor, IMAGES_VARIABLE, MATRIX_IMAGES, POSTGRES_IMAGE, selectedImage, selectedImages, SQLSERVER_IMAGE } from './images.js'
 export type { PostgresFixture, SqlServerFixture, SqlServerStart, StartedServer } from './containers.js'
 export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
@@ -49,15 +57,7 @@ export type { ListCase } from './lists.js'
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
 export { FIXTURE_MODEL, FIXTURE_SCOPE } from './model.js'
-export type {
-  ExpectedCheck,
-  ExpectedCheckFacts,
-  ExpectedColumn,
-  ExpectedColumnFacts,
-  ExpectedForeignKey,
-  ExpectedObject,
-  ExpectedType,
-} from './model.js'
+export type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedForeignKey, ExpectedObject, ExpectedType } from './model.js'
 export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { renamedColumn } from './rename.js'

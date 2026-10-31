@@ -46,7 +46,12 @@ describe('check', () => {
   test('exits 0 and lists what is in force and what is left out', async () => {
     const path = join(directory, 'keys.json')
     const signing = { ...generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ format: 'jwk' }), kid: 'sig-1', use: 'sig' }
-    const encryption = { ...generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ format: 'jwk' }), kid: 'rsa-enc', use: 'enc', alg: 'RSA-OAEP' }
+    const encryption = {
+      ...generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ format: 'jwk' }),
+      kid: 'rsa-enc',
+      use: 'enc',
+      alg: 'RSA-OAEP',
+    }
     await writeFile(path, JSON.stringify({ keys: [signing, encryption] }))
     expect(await runKeysTool(['check', path, 'RS256'], {}, io)).toBe(0)
     expect(out).toBe('in force: sig-1\nleft out: rsa-enc (use)\n')
@@ -95,9 +100,16 @@ describe('convert', () => {
     await writeFile(file, `${secret}\n`)
     const env = { FORMANCY_DATA_IDENTITY_SECRET: `file:${file}` }
     expect(await runKeysTool(['convert', 'host-1'], env, io)).toBe(0)
-    expect(err).toBe('Set FORMANCY_DATA_IDENTITY_KEYS_FILE to where this set is, FORMANCY_DATA_IDENTITY_ALGORITHM=HS256, and unset FORMANCY_DATA_IDENTITY_SECRET.\n')
+    expect(err).toBe(
+      'Set FORMANCY_DATA_IDENTITY_KEYS_FILE to where this set is, FORMANCY_DATA_IDENTITY_ALGORITHM=HS256, and unset FORMANCY_DATA_IDENTITY_SECRET.\n',
+    )
 
-    const token = await new SignJWT({ sub: 'u' }).setProtectedHeader({ alg: 'HS256' }).setIssuer(ISSUER).setAudience(AUDIENCE).setExpirationTime('5m').sign(new TextEncoder().encode(secret))
+    const token = await new SignJWT({ sub: 'u' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setExpirationTime('5m')
+      .sign(new TextEncoder().encode(secret))
     const set = readKeySet(out, 'HS256')
     expect(set.kids).toEqual(['host-1'])
     const underSet = await createIdentityVerifier({ key: { kind: 'key-set', keys: () => set }, issuer: ISSUER, audience: AUDIENCE, attributes: {} })
@@ -138,15 +150,29 @@ describe('convert', () => {
   test('refuses a public key under which anyone signs', async () => {
     const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey.export({ format: 'jwk' })
     const weak = [
-      { algorithm: 'RS256', key: createPublicKey({ key: { ...rsa, e: 'AQ' }, format: 'jwk' }), says: /RSA public exponent is not an odd number of at least 65537/ },
-      { algorithm: 'EdDSA', key: createPublicKey({ key: { kty: 'OKP', crv: 'Ed25519', x: Buffer.concat([Buffer.from([1]), Buffer.alloc(31)]).toString('base64url') }, format: 'jwk' }), says: /is an Ed25519 point of small order/ },
+      {
+        algorithm: 'RS256',
+        key: createPublicKey({ key: { ...rsa, e: 'AQ' }, format: 'jwk' }),
+        says: /RSA public exponent is not an odd number of at least 65537/,
+      },
+      {
+        algorithm: 'EdDSA',
+        key: createPublicKey({
+          key: { kty: 'OKP', crv: 'Ed25519', x: Buffer.concat([Buffer.from([1]), Buffer.alloc(31)]).toString('base64url') },
+          format: 'jwk',
+        }),
+        says: /is an Ed25519 point of small order/,
+      },
     ]
     for (const { algorithm, key, says } of weak) {
       const pem = join(directory, `${algorithm}.pem`)
       await writeFile(pem, key.export({ type: 'spki', format: 'pem' }))
       out = ''
       err = ''
-      expect(await runKeysTool(['convert', 'weak'], { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: pem, FORMANCY_DATA_IDENTITY_ALGORITHM: algorithm }, io), algorithm).toBe(1)
+      expect(
+        await runKeysTool(['convert', 'weak'], { FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE: pem, FORMANCY_DATA_IDENTITY_ALGORITHM: algorithm }, io),
+        algorithm,
+      ).toBe(1)
       expect(err, algorithm).toMatch(says)
       expect(out, algorithm).toBe('')
     }

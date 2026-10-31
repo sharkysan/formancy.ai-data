@@ -75,8 +75,20 @@ describe('a preview pane', () => {
     }
     const watched: FormEngine = {
       ...engine,
-      subscribe: (listener) => counted((inner) => engine.subscribe(() => { inner(); listener() })),
-      subscribeField: (path, listener) => counted((inner) => engine.subscribeField(path, () => { inner(); listener() })),
+      subscribe: (listener) =>
+        counted((inner) =>
+          engine.subscribe(() => {
+            inner()
+            listener()
+          }),
+        ),
+      subscribeField: (path, listener) =>
+        counted((inner) =>
+          engine.subscribeField(path, () => {
+            inner()
+            listener()
+          }),
+        ),
     }
 
     const { unmount } = render(<AngularPane tableId="t" table="sales.order" engine={watched} sources={{}} />)
@@ -134,7 +146,13 @@ describe.each([
     await user.keyboard('{ArrowDown}')
     const list = await screen.findByRole('listbox', { name: 'Customer suggestions' })
     const offered = ['Muster AG', 'Other Tenant GmbH']
-    await waitFor(() => expect(within(list).getAllByRole('option').map((option) => computeAccessibleName(option))).toEqual(offered))
+    await waitFor(() =>
+      expect(
+        within(list)
+          .getAllByRole('option')
+          .map((option) => computeAccessibleName(option)),
+      ).toEqual(offered),
+    )
     for (let pressed = 0; activeOption(box) !== 'Other Tenant GmbH'; pressed += 1) {
       if (pressed === offered.length) throw new Error(`${String(pressed)} presses of ArrowDown left the box pointing at ${activeOption(box) ?? 'no option'}`)
       const before = activeOption(box)

@@ -24,18 +24,56 @@ import type { ConnectionRegistry } from '../connections.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true },
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
 })
 const ref = (name: string) => ({ schema: 'sales', name })
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
-    { ref: ref('country'), kind: 'table', comment: null, columns: [col('code', 1, TEXT), col('name', 2, TEXT)], primaryKey: { name: 'pk_country', columns: ['code'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none' },
     {
-      ref: ref('customer'), kind: 'table', comment: null, columns: [col('id', 1, INT32), col('country_code', 2, TEXT)],
-      primaryKey: { name: 'pk_customer', columns: ['id'] }, uniqueKeys: [],
-      foreignKeys: [{ name: 'fk_customer_country', columns: ['country_code'], references: { table: ref('country'), columns: ['code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
-      checks: [], rowSecurity: 'none',
+      ref: ref('country'),
+      kind: 'table',
+      comment: null,
+      columns: [col('code', 1, TEXT), col('name', 2, TEXT)],
+      primaryKey: { name: 'pk_country', columns: ['code'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
+    },
+    {
+      ref: ref('customer'),
+      kind: 'table',
+      comment: null,
+      columns: [col('id', 1, INT32), col('country_code', 2, TEXT)],
+      primaryKey: { name: 'pk_customer', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [
+        {
+          name: 'fk_customer_country',
+          columns: ['country_code'],
+          references: { table: ref('country'), columns: ['code'] },
+          onUpdate: 'no-action',
+          onDelete: 'no-action',
+          enforced: true,
+          validated: true,
+        },
+      ],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -46,7 +84,8 @@ const POLICY: FormPolicy = {
   rowFilters: [],
   lookups: { country: [] },
 }
-const verifyIdentity: IdentityVerifier = async (token) => (token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } } : { ok: false, reason: 'bad' })
+const verifyIdentity: IdentityVerifier = async (token) =>
+  token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } } : { ok: false, reason: 'bad' }
 
 /** How long the fake registry takes to open the connection: a cold login and its ping. */
 let opening: number
@@ -74,17 +113,29 @@ function run<T>(signal: LookupSignal, answer: T): Promise<T> {
 function registry(): ConnectionRegistry {
   const lookups: LookupAdapter = {
     search: (_config, _query, _filters, signal) => run(signal, { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 }),
-    resolve: (_config, tokens, _filters, signal) => run(signal, tokens.map((token) => ({ token, label: 'Switzerland' }))),
+    resolve: (_config, tokens, _filters, signal) =>
+      run(
+        signal,
+        tokens.map((token) => ({ token, label: 'Switzerland' })),
+      ),
     rejects: (_config, _tokens, _filters, signal) => run(signal, []),
   }
   const records = {
-    describe: async (table: ObjectRef) => ({ ok: true, described: { ...(describedOf(SNAPSHOT, table) as NonNullable<ReturnType<typeof describedOf>>), definition: 'd' } }),
+    describe: async (table: ObjectRef) => ({
+      ok: true,
+      described: { ...(describedOf(SNAPSHOT, table) as NonNullable<ReturnType<typeof describedOf>>), definition: 'd' },
+    }),
     insert: async () => {
       inserts += 1
       return { ok: true, values: { id: '1', country_code: 'CH' }, version: null }
     },
   } as unknown as RecordAdapter
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),
@@ -101,7 +152,12 @@ async function serve(lookupDeadlineMs?: number): Promise<string> {
   const app = await createDataServer({
     verifyIdentity,
     logger: { stream: { write: (line) => void logs.push(JSON.parse(line) as { msg?: string }) } },
-    runtime: { registry: registry(), store, audit: { sink: (event) => void events.push(event as RuntimeAuditEvent) }, ...(lookupDeadlineMs === undefined ? {} : { lookupDeadlineMs }) },
+    runtime: {
+      registry: registry(),
+      store,
+      audit: { sink: (event) => void events.push(event as RuntimeAuditEvent) },
+      ...(lookupDeadlineMs === undefined ? {} : { lookupDeadlineMs }),
+    },
   })
   apps.push(app)
   await app.listen({ host: '127.0.0.1', port: 0 })
@@ -109,8 +165,13 @@ async function serve(lookupDeadlineMs?: number): Promise<string> {
 }
 
 async function post(base: string, path: string, body: unknown, signal?: AbortSignal): Promise<{ status: number; json: unknown }> {
-  const response = await fetch(`${base}${path}`, { method: 'POST', headers: { authorization: 'Bearer clerk', 'content-type': 'application/json' }, body: JSON.stringify(body), ...(signal === undefined ? {} : { signal }) })
-  return { status: response.status, json: (await response.json()) as unknown }
+  const response = await fetch(`${base}${path}`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer clerk', 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    ...(signal === undefined ? {} : { signal }),
+  })
+  return { status: response.status, json: await response.json() }
 }
 
 beforeEach(async () => {
@@ -122,7 +183,13 @@ beforeEach(async () => {
   logs = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-lookups-'))
   store = createFileConfigurationStore(root)
-  const { form, bindings } = generateForm(SNAPSHOT, { connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] })
+  const { form, bindings } = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('customer'),
+    formId: 'customer',
+    title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+  })
   const lookup = bindings.fields.find((binding) => binding.kind === 'lookup')
   if (lookup?.kind !== 'lookup') throw new Error('the customer form has no lookup')
   source = encodeURIComponent(lookup.source)
@@ -141,8 +208,14 @@ describe('the lookup routes', () => {
   // the adapter cancel statements that had already finished.
   test('answer a lookup that completes exactly as the port answered, its signal never aborted', async () => {
     const base = await serve(10_000)
-    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({ status: 200, json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 } })
-    expect(await post(base, `/v1/forms/customer/lookups/${source}/resolve`, { operation: 'create', tokens: ['k1:CH'] })).toEqual({ status: 200, json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }] } })
+    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({
+      status: 200,
+      json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 },
+    })
+    expect(await post(base, `/v1/forms/customer/lookups/${source}/resolve`, { operation: 'create', tokens: ['k1:CH'] })).toEqual({
+      status: 200,
+      json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }] },
+    })
     expect(signals.map((signal) => signal.aborted)).toEqual([false, false])
   })
 
@@ -155,7 +228,10 @@ describe('the lookup routes', () => {
     const base = await serve(50)
     expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({
       status: 503,
-      json: { code: 'lookup-timeout', message: 'The search took longer than this server allows (50 ms), and the database was told to stop it. The same search will take as long again.' },
+      json: {
+        code: 'lookup-timeout',
+        message: 'The search took longer than this server allows (50 ms), and the database was told to stop it. The same search will take as long again.',
+      },
     })
     expect(signals.map((signal) => (signal.reason as Error).name)).toEqual(['TimeoutError'])
     expect(logs.filter((line) => line.msg?.includes('passed its deadline') === true)).toEqual([expect.objectContaining({ lookup: 'search', deadlineMs: 50 })])
@@ -170,7 +246,10 @@ describe('the lookup routes', () => {
   test('answer a resolve past the deadline 503 unavailable, and name the deadline in the log', async () => {
     behaviour = 'wait'
     const base = await serve(50)
-    expect(await post(base, `/v1/forms/customer/lookups/${source}/resolve`, { operation: 'create', tokens: ['k1:CH'] })).toEqual({ status: 503, json: { code: 'unavailable', message: 'The selected options could not be loaded.' } })
+    expect(await post(base, `/v1/forms/customer/lookups/${source}/resolve`, { operation: 'create', tokens: ['k1:CH'] })).toEqual({
+      status: 503,
+      json: { code: 'unavailable', message: 'The selected options could not be loaded.' },
+    })
     expect(signals.map((signal) => (signal.reason as Error).name)).toEqual(['TimeoutError'])
     expect(logs.filter((line) => line.msg?.includes('passed its deadline') === true)).toEqual([expect.objectContaining({ lookup: 'resolve', deadlineMs: 50 })])
   })
@@ -185,7 +264,10 @@ describe('the lookup routes', () => {
   test('count the deadline from the adapter call, not from opening the connection', async () => {
     opening = 150
     const base = await serve(50)
-    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({ status: 200, json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 } })
+    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({
+      status: 200,
+      json: { rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 },
+    })
     expect(signals.map((signal) => signal.aborted)).toEqual([false])
   })
 
@@ -196,7 +278,10 @@ describe('the lookup routes', () => {
   test('answer a port that rejects with anything but the reason itself 503 unavailable', async () => {
     behaviour = 'fail-translated'
     const base = await serve(50)
-    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({ status: 503, json: { code: 'unavailable', message: 'The options could not be loaded.' } })
+    expect(await post(base, `/v1/forms/customer/lookups/${source}/query`, { operation: 'create', search: 'Sw' })).toEqual({
+      status: 503,
+      json: { code: 'unavailable', message: 'The options could not be loaded.' },
+    })
   })
 
   // The browser's abort is what 0061 carries to the database. The port's
@@ -223,7 +308,10 @@ describe('the lookup routes', () => {
   test('refuse a create whose membership check passes the deadline, unchanged, with nothing inserted', async () => {
     behaviour = 'wait'
     const base = await serve(50)
-    expect(await post(base, '/v1/forms/customer/records/create', { answers: { id: 1, country: 'k1:CH' } })).toEqual({ status: 503, json: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' } })
+    expect(await post(base, '/v1/forms/customer/records/create', { answers: { id: 1, country: 'k1:CH' } })).toEqual({
+      status: 503,
+      json: { code: 'unavailable', message: 'A selection could not be checked. Nothing was saved.' },
+    })
     expect(inserts).toBe(0)
     expect(logs.filter((line) => line.msg?.includes('passed its deadline') === true)).toEqual([expect.objectContaining({ deadlineMs: 50 })])
   })

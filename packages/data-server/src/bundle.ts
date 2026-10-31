@@ -1,4 +1,12 @@
-import { bindingsVersionProblem, createSnapshot, deleteProblems, findObject, rowFilterColumnProblem, throughProblems, validatePolicy } from '@formancy/data-core'
+import {
+  bindingsVersionProblem,
+  createSnapshot,
+  deleteProblems,
+  findObject,
+  rowFilterColumnProblem,
+  throughProblems,
+  validatePolicy,
+} from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { format2Problems } from './bundle-format2.js'
@@ -139,7 +147,8 @@ function checkedBundle(document: unknown): BundleValidation {
   // A snapshot no catalog could produce cannot be searched for filter columns.
   if (wellFormed) problems.push(...policyProblems(snapshot, bindings, policy))
   else problems.push(...fitProblems(policy, bindings))
-  if (format === 2 && form.valid && Array.isArray(bindings.fields)) problems.push(...format2Problems(document, form.schema, bindings, wellFormed ? snapshot : null))
+  if (format === 2 && form.valid && Array.isArray(bindings.fields))
+    problems.push(...format2Problems(document, form.schema, bindings, wellFormed ? snapshot : null))
 
   return problems.length === 0 ? { ok: true, bundle: document as unknown as PublishedBundle } : { ok: false, problems }
 }

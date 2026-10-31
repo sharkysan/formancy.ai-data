@@ -2,7 +2,17 @@ import type { DatabaseKind } from '../adapter.js'
 import { describedOf } from '../drift/diff.js'
 import { generateForm } from '../generate/generate.js'
 import type { FieldBinding, FormBindings, GeneratedForm, LookupChoice } from '../generate/types.js'
-import type { ColumnAccess, ColumnMeta, DiscoveryAccount, ForeignKeyMeta, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, TextLengthUnit } from '../metadata.js'
+import type {
+  ColumnAccess,
+  ColumnMeta,
+  DiscoveryAccount,
+  ForeignKeyMeta,
+  MetadataSnapshot,
+  NormalizedType,
+  ObjectMeta,
+  ObjectRef,
+  TextLengthUnit,
+} from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { createSnapshot } from '../snapshot.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
@@ -27,7 +37,12 @@ export const DATE: NormalizedType = { kind: 'date' }
 export const BOOLEAN: NormalizedType = { kind: 'boolean' }
 export const AMOUNT: NormalizedType = { kind: 'decimal', precision: 18, scale: 4 }
 // One length unit for every text: these suites test planning, not units, which codec.test.ts covers (0026).
-export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
+export const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({
+  kind: 'text',
+  maxLength,
+  lengthUnit,
+  fixedLength,
+})
 
 /** 2^53 + 1, the fixture's sales.order.id. */
 export const ORDER_ID = '9007199254740993'
@@ -39,7 +54,19 @@ export const sales = (name: string): ObjectRef => ({ schema: 'sales', name })
 export const FULL_ACCESS: ColumnAccess = { select: true, insert: true, update: true }
 
 export function col(name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { ...FULL_ACCESS }, ...extra }
+  return {
+    name,
+    ordinal,
+    databaseType: type.kind,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { ...FULL_ACCESS },
+    ...extra,
+  }
 }
 
 /** Narrow what the account may do with one column of one table, as a revoked grant would. */
@@ -50,11 +77,30 @@ export function restrict(objects: ObjectMeta[], table: string, column: string, a
 }
 
 export function fk(name: string, columns: string[], target: string, targetColumns: string[]): ForeignKeyMeta {
-  return { name, columns, references: { table: sales(target), columns: targetColumns }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }
+  return {
+    name,
+    columns,
+    references: { table: sales(target), columns: targetColumns },
+    onUpdate: 'no-action',
+    onDelete: 'no-action',
+    enforced: true,
+    validated: true,
+  }
 }
 
 export function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
-  return { ref: sales(name), kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
+  return {
+    ref: sales(name),
+    kind: 'table',
+    comment: null,
+    columns,
+    primaryKey: null,
+    uniqueKeys: [],
+    foreignKeys: [],
+    checks: [],
+    rowSecurity: 'none',
+    ...extra,
+  }
 }
 
 export const OWNER: DiscoveryAccount = { user: 'owner', login: 'owner' }
@@ -76,7 +122,10 @@ export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
         col('active', 6, BOOLEAN, { hasDefault: true }),
         col('created_at', 7, { kind: 'timestamp', withTimeZone: true, precision: 6 }, { hasDefault: true }),
       ],
-      { primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])] },
+      {
+        primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] },
+        foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])],
+      },
     ),
     table('employee', [col('id', 1, INT32), col('tenant_id', 2, INT32), col('name', 3, text(200)), col('manager_id', 4, INT32, { nullable: true })], {
       primaryKey: { name: 'pk_employee', columns: ['id'] },
@@ -95,7 +144,9 @@ export function snapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
         col('created_by', 9, INT32, { nullable: true }),
         col('approved_by', 10, INT32, { nullable: true }),
         col('paid', 11, BOOLEAN, { nullable: true }),
-        kind === 'sqlserver' ? col('row_version', 12, { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', 12, INT64, { hasDefault: true }),
+        kind === 'sqlserver'
+          ? col('row_version', 12, { kind: 'rowversion' }, { generated: 'rowversion' })
+          : col('row_version', 12, INT64, { hasDefault: true }),
       ],
       {
         primaryKey: { name: 'pk_order', columns: ['id'] },
@@ -167,10 +218,19 @@ export function sectioned(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => v
   return snapshot(kind, (objects) => {
     ;(objects.find((object) => object.ref.name === 'customer') as ObjectMeta).columns.push(col('kind', 8, text(20), { hasDefault: true }))
     objects.push(
-      table('customer_company', [col('tenant_id', 1, INT32), col('customer_no', 2, INT32), col('vat_no', 3, text(20)), col('rating', 4, { kind: 'float', bits: 64 }, { nullable: true })], {
-        primaryKey: { name: 'pk_customer_company', columns: ['customer_no', 'tenant_id'] },
-        foreignKeys: [fk('fk_customer_company_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no'])],
-      }),
+      table(
+        'customer_company',
+        [
+          col('tenant_id', 1, INT32),
+          col('customer_no', 2, INT32),
+          col('vat_no', 3, text(20)),
+          col('rating', 4, { kind: 'float', bits: 64 }, { nullable: true }),
+        ],
+        {
+          primaryKey: { name: 'pk_customer_company', columns: ['customer_no', 'tenant_id'] },
+          foreignKeys: [fk('fk_customer_company_customer', ['tenant_id', 'customer_no'], 'customer', ['tenant_id', 'customer_no'])],
+        },
+      ),
     )
     edit(objects)
   })
@@ -337,7 +397,11 @@ export function withDeleteFacts(objects: ObjectMeta[], mayDelete: (object: Objec
 }
 
 /** The test snapshot as discovery takes one since 0049, after `edit`: see `withDeleteFacts`. */
-export function factsSnapshot(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, mayDelete?: (object: ObjectMeta) => boolean): MetadataSnapshot {
+export function factsSnapshot(
+  kind: DatabaseKind,
+  edit: (objects: ObjectMeta[]) => void = () => {},
+  mayDelete?: (object: ObjectMeta) => boolean,
+): MetadataSnapshot {
   return snapshot(kind, (objects) => {
     edit(objects)
     withDeleteFacts(objects, mayDelete)
@@ -380,5 +444,8 @@ export const DEFINITION = 'the definition the description was read with'
  * table, which only bindings the planner refuses first can name.
  */
 export function described(source: MetadataSnapshot, bindings: FormBindings): DescribedTable {
-  return { ...(describedOf(source, bindings.root) ?? { kind: 'table', columns: [], primaryKey: null, uniqueKeys: [], foreignKeys: [] }), definition: DEFINITION }
+  return {
+    ...(describedOf(source, bindings.root) ?? { kind: 'table', columns: [], primaryKey: null, uniqueKeys: [], foreignKeys: [] }),
+    definition: DEFINITION,
+  }
 }

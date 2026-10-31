@@ -57,7 +57,7 @@ function value(text) {
   const quoted = QUOTED.exec(text)
   if (quoted === null) throw new Unreadable('the quoted value is never closed')
   // One escape at a time, so the "x41" of an escaped backslash followed by x41 stays text.
-  const json = quoted[1].replace(/\\(x([0-9a-fA-F]{2})|[\s\S])/g, (whole, escape, hex) => (hex === undefined ? whole : `\\u00${hex}`))
+  const json = quoted[1].replace(/\\(x([0-9a-fA-F]{2})|[\s\S])/g, (whole, _escape, hex) => (hex === undefined ? whole : `\\u00${hex}`))
   return JSON.parse(`"${json}"`)
 }
 
@@ -101,7 +101,7 @@ export function decode(snapshot) {
         return line(parsed[2], parsed[1].length / 2)
       } catch (error) {
         if (!(error instanceof Unreadable) && !(error instanceof SyntaxError)) throw error
-        throw new Error(`line ${String(index + 1)} is not an accessibility snapshot line: ${error.message}`)
+        throw new Error(`line ${String(index + 1)} is not an accessibility snapshot line: ${error.message}`, { cause: error })
       }
     })
 }

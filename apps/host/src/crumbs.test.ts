@@ -37,7 +37,13 @@ describe("a level's name", () => {
     expect(recordName(FIELDS, { ...ANSWERS, name: '  ' }, 'owner')).toBeNull()
     expect(recordName(FIELDS, { ...ANSWERS, name: null }, 'owner')).toBeNull()
     expect(recordName(FIELDS, { ...ANSWERS, name: 7 }, 'owner')).toBeNull()
-    expect(recordName(FIELDS.filter((field) => field.key !== 'name' && field.key !== 'owner'), ANSWERS, null)).toBeNull()
+    expect(
+      recordName(
+        FIELDS.filter((field) => field.key !== 'name' && field.key !== 'owner'),
+        ANSWERS,
+        null,
+      ),
+    ).toBeNull()
   })
 
   // A lookup's answer is another record's token, and a select's a code:

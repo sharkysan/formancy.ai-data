@@ -31,7 +31,10 @@ describe('deploy/cloudflare/doors.json', () => {
   test('is what the built server’s router gives', () => {
     const missing = fresh.routes.filter((route) => !committed.routes.some((entry) => key(entry) === key(route)))
     const gone = committed.routes.filter((route) => !fresh.routes.some((entry) => key(entry) === key(route)))
-    expect([...missing.map((route) => `${key(route)} is not in ${DOORS}`), ...gone.map((route) => `${key(route)} is in ${DOORS} and the server has no such route`)], 'run node scripts/cloudflare/doors.mjs --write').toEqual([])
+    expect(
+      [...missing.map((route) => `${key(route)} is not in ${DOORS}`), ...gone.map((route) => `${key(route)} is in ${DOORS} and the server has no such route`)],
+      'run node scripts/cloudflare/doors.mjs --write',
+    ).toEqual([])
     expect(committed, `${DOORS} is not what the server gives: run node scripts/cloudflare/doors.mjs --write`).toEqual(fresh)
   })
 
@@ -48,13 +51,22 @@ describe('deploy/cloudflare/doors.json', () => {
     const server = await import(pathToFileURL(join(repo, 'packages', 'data-server', 'dist', 'index.mjs')).href)
     const scratch = mkdtempSync(join(tmpdir(), 'formancy-data-doors-review-'))
     try {
-      const admin = { registry: server.createConnectionRegistry([], {}), store: server.createFileConfigurationStore(scratch), adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink: () => {} } }
+      const admin = {
+        registry: server.createConnectionRegistry([], {}),
+        store: server.createFileConfigurationStore(scratch),
+        adminRoles: ['data-admin', 'data-publisher'],
+        publisherRoles: ['data-publisher'],
+        audit: { sink: () => {} },
+      }
       const app = await server.createDataServer({ verifyIdentity: async () => ({ ok: false, reason: 'no token is valid here' }), admin })
       await app.ready()
       const registered = parsePrintedRoutes(app.printRoutes({ commonPrefix: false }))
       await app.close()
       expect(registered.some((route) => route.path.includes(':draft'))).toBe(true)
-      expect(registered.filter((route) => !committed.routes.some((entry) => key(entry) === key(route) && entry.plane !== 'runtime')).map(key), `run node scripts/cloudflare/doors.mjs --write`).toEqual([])
+      expect(
+        registered.filter((route) => !committed.routes.some((entry) => key(entry) === key(route) && entry.plane !== 'runtime')).map(key),
+        `run node scripts/cloudflare/doors.mjs --write`,
+      ).toEqual([])
     } finally {
       rmSync(scratch, { recursive: true, force: true })
     }
@@ -77,8 +89,16 @@ describe('the runtime door’s pattern', () => {
   // cloudflared's RE2 agree on this subset -- literals, `[^/]+`,
   // alternation and anchors -- and the CI job asks cloudflared itself.
   test('matches every runtime route’s sample and no administrator’s or shared one', () => {
-    expect(samples((plane) => plane === 'runtime').filter((route) => !pattern.test(route.sample)).map(key)).toEqual([])
-    expect(samples((plane) => plane !== 'runtime').filter((route) => pattern.test(route.sample)).map(key)).toEqual([])
+    expect(
+      samples((plane) => plane === 'runtime')
+        .filter((route) => !pattern.test(route.sample))
+        .map(key),
+    ).toEqual([])
+    expect(
+      samples((plane) => plane !== 'runtime')
+        .filter((route) => pattern.test(route.sample))
+        .map(key),
+    ).toEqual([])
   })
 
   // cloudflared routes by path and never by method, so a path it forwards
@@ -119,7 +139,14 @@ describe('a runtime server with an origin listed (0060)', () => {
 describe('the router’s printed routes', () => {
   // A line the reader skipped would be a route doors.json never decided.
   test('are read whole, HEAD folded into GET, and anything else refused', () => {
-    const text = ['├── /health (GET, HEAD)', '└── /v1/forms/:id (GET, HEAD)', '    ├── /records/read (POST)', '    └── /versions (POST, GET, HEAD)', '        └── /:version (GET, HEAD)', ''].join('\n')
+    const text = [
+      '├── /health (GET, HEAD)',
+      '└── /v1/forms/:id (GET, HEAD)',
+      '    ├── /records/read (POST)',
+      '    └── /versions (POST, GET, HEAD)',
+      '        └── /:version (GET, HEAD)',
+      '',
+    ].join('\n')
     expect(parsePrintedRoutes(text)).toEqual([
       { method: 'GET', path: '/health' },
       { method: 'GET', path: '/v1/forms/:id' },
@@ -141,7 +168,9 @@ describe('docs/deploy/cloudflare.md', () => {
   // door the guide describes and nothing configures.
   test('holds the five blocks doors.json and rate-limited.json render', () => {
     const stale = staleBlocks(readFileSync(join(repo, GUIDE), 'utf8'), committed, readJson(RATE_LIMITED))
-    expect(stale.map(({ name }) => `the block "${name}" is not what scripts/cloudflare/doors.mjs renders: run node scripts/cloudflare/doors.mjs --write`)).toEqual([])
+    expect(
+      stale.map(({ name }) => `the block "${name}" is not what scripts/cloudflare/doors.mjs renders: run node scripts/cloudflare/doors.mjs --write`),
+    ).toEqual([])
   })
 })
 

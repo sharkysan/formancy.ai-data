@@ -15,7 +15,13 @@ Three things follow, and each has a guard:
   refuses a range, a `workspace:` link or a path
   ([0002](docs/decisions/0002-depend-on-upstream-never-copy-it.md)). A generic
   improvement the module needs goes upstream through formancy's own
-  contribution rules, not into a patched copy here.
+  contribution rules, not into a patched copy here. One copy waits for its
+  release: the lint and format rules, `scripts/code-style/`, Formancy
+  Health's byte for byte, which is what formancy.ai will publish as
+  `@formancy/code-style`, called with this repository's paths by
+  `eslint.config.mjs`. A rule changes in Health's first and is copied here,
+  never changed here alone, and the copy goes when this repository pins the
+  package ([0116](docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **Every package declares the source-available licence**, never Apache-2.0.
   `scripts/verify-licenses.mjs` refuses a manifest that says otherwise and a
   tarball without `LICENSE.md` and `NOTICE`. The realistic mistake is a
@@ -163,7 +169,13 @@ and the document says what. Three shapes, in order of preference:
    at, names nothing, when a path from the repository's root written there
    in backticks names nothing, when the building blocks leave out a
    workspace package and when no section links a decision record -- it
-   never reads whether a sentence is still true. All of them run as
+   never reads whether a sentence is still true; `scripts/lint.test.mjs`
+   fails when a TypeScript or JavaScript file git holds is not linted, has
+   a rule at warn or a recommended rule off beyond `require-await`, a
+   test's seven relaxations and the install fixtures' typed rules, is in no
+   program lint types it with, or resolves to another style, and when the
+   format check stops naming a misformatted file of an extension git holds
+   (0116). All of them run as
    `pnpm test:repo`, and CI runs that — **a guard that is not a gate is a
    comment.**
 3. **Measure it.** Below.
@@ -339,6 +351,18 @@ Not a generated name: the branch is what a reviewer sees first.
 No stacked pull requests. Branch from `main`, target `main`, and where a branch
 replaces another say "supersedes #N" in the description rather than stacking.
 
+A branch begun before 0116's format conflicts with it nearly everywhere it
+changed a line. Take `main` into it with
+`node "$MAIN/scripts/prettier-merge.mjs" origin/main` in the branch's
+worktree, `$MAIN` a checkout of `main` at least as new as the
+`origin/main` it merges, with `pnpm install` run there, as
+`CONTRIBUTING.md` shows: each side is formatted before git merges a file,
+and only what both sides changed, and code `main` moved to another file,
+are left to carry across by hand. A pull request that
+brings a commit `.git-blame-ignore-revs` names -- a format, or a Prettier
+release's reformat -- merges with a merge commit, never a squash or a
+rebase, which would leave the file naming nothing on `main`.
+
 **A merged branch is deleted by the merge.** GitHub deletes the head branch
 when the pull request merges, a repository setting that nothing here can
 check ([0036](docs/decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
@@ -423,6 +447,12 @@ pnpm --filter @formancy/data-core exec vitest run src/lookup/token.test.ts # one
 pnpm --filter @formancy/data-core exec vitest run -t "a test's name"       # one case
 ```
 
+Run `pnpm format` before committing, and `pnpm lint` after `pnpm build`,
+since the type-aware rules read the built declarations: `verify` fails a
+TypeScript or JavaScript file that Prettier would write otherwise or that
+breaks a lint rule (0116). A finding is fixed, not disabled; a disable
+comment is for a finding that is deliberate, and says why after `--`.
+
 In the packages, a file that starts containers is named
 `*.integration.test.ts`. `data-client` and `apps/host` start both databases
 once per run in a vitest `globalSetup` instead, so every file there needs
@@ -437,10 +467,11 @@ CI runs every browser. The dev servers and the snapshot captures are in
 
 The gates are `.github/workflows/gates.yml`, which `ci.yml` calls on every
 pull request and `release.yml` calls before it publishes, so a release passes
-exactly what CI does. It runs `pnpm build`, `pnpm typecheck`, `pnpm check:pkg`,
-`node scripts/verify-licenses.mjs` and `pnpm test:repo` in one job; each
-package's `test:coverage` in a job of its own, on its own runner, because nine
-suites sharing one runner timed out a test that takes two seconds alone
+exactly what CI does. It runs `pnpm build`, `pnpm typecheck`, `pnpm lint`,
+`pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`
+and `pnpm test:repo` in one job; each package's `test:coverage` in a job of
+its own, on its own runner, because nine suites sharing one runner timed
+out a test that takes two seconds alone
 (`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
 disagree); in jobs of their own `pnpm test:e2e:install`, `pnpm test:browser`
 once per browser, `pnpm test:pictures` and the server image; and `pnpm test:getting-started` in the
@@ -457,8 +488,9 @@ and fails the run when a job ended other than success or left no results, a
 test or a file was skipped or failed, a shared case passed through one
 adapter only, an engine's default image never answered, or two builds of one
 package differ; `scripts/release-report/workflows.test.mjs` holds the three
-workflows to that shape. Locally `pnpm test:coverage` still runs every
-package's suite. Run the ones for what you changed.
+workflows to that shape, `verify`'s lint and format check after the
+typecheck and before the guards among it. Locally `pnpm test:coverage`
+still runs every package's suite. Run the ones for what you changed.
 
 Two things `pnpm test:repo` fails on until you do them. After a dependency
 or an image changes, `node scripts/release-report/readme.mjs --write`, so the

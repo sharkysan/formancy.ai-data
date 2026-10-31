@@ -1,6 +1,16 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { LookupConfig, LookupOptions, LookupQuery, LookupRow, MetadataSnapshot, ObjectRef, RowFilters, RowFilterTerm, RowFilterType } from '@formancy/data-core'
+import type {
+  LookupConfig,
+  LookupOptions,
+  LookupQuery,
+  LookupRow,
+  MetadataSnapshot,
+  ObjectRef,
+  RowFilters,
+  RowFilterTerm,
+  RowFilterType,
+} from '@formancy/data-core'
 import { buildLookupConfig, findObject, generateForm } from '@formancy/data-core'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import { startSqlServerFixture } from '@formancy/data-fixtures'
@@ -121,7 +131,10 @@ describe('the tenant filter', () => {
     await expect(lookups.resolve(customers(), ['k1:1,1001'], empty, NOT_ABORTED)).rejects.toThrow(/Row filters are/)
     const everyone = await lookups.search(customers(), page('GmbH'), EVERY_ROW, NOT_ABORTED)
     expect(labels(everyone.rows)).toEqual(['Other Tenant GmbH'])
-    const wrongColumn: RowFilters = { kind: 'restricted', equal: [{ column: 'region', type: { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, value: 'north' }] }
+    const wrongColumn: RowFilters = {
+      kind: 'restricted',
+      equal: [{ column: 'region', type: { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, value: 'north' }],
+    }
     await expect(lookups.search(customers(), page(''), wrongColumn, NOT_ABORTED)).rejects.toMatchObject({ number: 207 })
   })
 })

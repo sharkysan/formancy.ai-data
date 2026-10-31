@@ -21,8 +21,16 @@ const OUTSIDE = join(REPO, '..', 'pictures-review')
 describe('the arguments', () => {
   // A misspelt scene or app would otherwise run nothing and say it succeeded.
   test('are checked against scenes.json', () => {
-    expect(parse(['--app', 'studio', '--scene', 'studio-drift'], SCENES)).toEqual({ apps: ['studio'], scenes: ['studio-drift'], all: false, check: false, review: undefined })
-    expect(() => parse(['--app', 'site'], SCENES)).toThrow('--app site is no app with a scene in scripts/pictures/scenes.json; those are host, examples, studio')
+    expect(parse(['--app', 'studio', '--scene', 'studio-drift'], SCENES)).toEqual({
+      apps: ['studio'],
+      scenes: ['studio-drift'],
+      all: false,
+      check: false,
+      review: undefined,
+    })
+    expect(() => parse(['--app', 'site'], SCENES)).toThrow(
+      '--app site is no app with a scene in scripts/pictures/scenes.json; those are host, examples, studio',
+    )
     expect(() => parse(['--scene', 'studio-drfit'], SCENES)).toThrow('--scene studio-drfit is no scene of scripts/pictures/scenes.json')
     expect(() => parse(['--scene'], SCENES)).toThrow(/^--scene needs a value/)
     expect(() => parse(['--scene', '--all'], SCENES)).toThrow(/^--scene needs a value/)
@@ -56,7 +64,15 @@ describe('the plan', () => {
   // Every app, in scenes.json's order, when nothing narrows it; a scene only
   // to the app that has it, so no app is asked for a scene it cannot take.
   test("runs the apps in scenes.json's order, each with only its own scenes", () => {
-    expect(plan(parse([], SCENES), SCENES)).toEqual({ runs: [{ app: 'host', args: [] }, { app: 'examples', args: [] }, { app: 'studio', args: [] }], fresh: false, write: true })
+    expect(plan(parse([], SCENES), SCENES)).toEqual({
+      runs: [
+        { app: 'host', args: [] },
+        { app: 'examples', args: [] },
+        { app: 'studio', args: [] },
+      ],
+      fresh: false,
+      write: true,
+    })
     expect(plan(parse(['--scene', 'studio-drift', '--scene', 'host-stale', '--review', OUTSIDE], SCENES), SCENES).runs).toEqual([
       { app: 'host', args: ['--scene', 'host-stale', '--review', OUTSIDE] },
       { app: 'studio', args: ['--scene', 'studio-drift', '--review', OUTSIDE] },
@@ -68,7 +84,11 @@ describe('the plan', () => {
   test('starts from an empty record only for --all without --app, and writes nothing for --check', () => {
     expect(plan(parse(['--all'], SCENES), SCENES)).toMatchObject({ fresh: true, write: true })
     expect(plan(parse(['--all', '--app', 'studio'], SCENES), SCENES)).toEqual({ runs: [{ app: 'studio', args: ['--all'] }], fresh: false, write: true })
-    expect(plan(parse(['--check'], SCENES), SCENES)).toEqual({ runs: ['host', 'examples', 'studio'].map((app) => ({ app, args: ['--check'] })), fresh: false, write: false })
+    expect(plan(parse(['--check'], SCENES), SCENES)).toEqual({
+      runs: ['host', 'examples', 'studio'].map((app) => ({ app, args: ['--check'] })),
+      fresh: false,
+      write: false,
+    })
   })
 })
 
@@ -78,8 +98,14 @@ describe('the record after --all', () => {
   // date and captured.json would change on a retake that changed no picture.
   test('keeps the date of every picture retaken as the same bytes and text', () => {
     const look = { platform: 'linux-x64', playwright: '1.63.0', chromium: '153.0.8010.12', fonts: {} }
-    const before = { 'studio-connect': { captured: '2026-10-01', sha256: 'a', look, text: { Seen: '- region "x"' } }, 'studio-drift': { captured: '2026-10-01', sha256: 'b', look, text: { Drift: '- main "Drift"' } } }
-    const after = { 'studio-connect': { ...before['studio-connect'], captured: '2026-10-09' }, 'studio-drift': { ...before['studio-drift'], captured: '2026-10-09', sha256: 'c' } }
+    const before = {
+      'studio-connect': { captured: '2026-10-01', sha256: 'a', look, text: { Seen: '- region "x"' } },
+      'studio-drift': { captured: '2026-10-01', sha256: 'b', look, text: { Drift: '- main "Drift"' } },
+    }
+    const after = {
+      'studio-connect': { ...before['studio-connect'], captured: '2026-10-09' },
+      'studio-drift': { ...before['studio-drift'], captured: '2026-10-09', sha256: 'c' },
+    }
     expect(redated(before, after, SCENES)).toEqual({ 'studio-connect': before['studio-connect'], 'studio-drift': after['studio-drift'] })
   })
 })
@@ -88,8 +114,15 @@ describe('the table', () => {
   // What a reviewer lists in the pull request: which pictures are new, which
   // changed by their bytes, and which a retake left as they were.
   test('says of each scene its CSS size, its bytes, and whether its picture is new, changed or unchanged', () => {
-    const before = { 'studio-connect': { css: { width: 842, height: 614 }, bytes: 149262, sha256: 'a' }, 'studio-drift': { css: { width: 892, height: 1357 }, bytes: 212320, sha256: 'b' } }
-    const after = { ...before, 'studio-drift': { ...before['studio-drift'], sha256: 'c' }, 'host-stale': { css: { width: 1168, height: 1004 }, bytes: 94846, sha256: 'd' } }
+    const before = {
+      'studio-connect': { css: { width: 842, height: 614 }, bytes: 149262, sha256: 'a' },
+      'studio-drift': { css: { width: 892, height: 1357 }, bytes: 212320, sha256: 'b' },
+    }
+    const after = {
+      ...before,
+      'studio-drift': { ...before['studio-drift'], sha256: 'c' },
+      'host-stale': { css: { width: 1168, height: 1004 }, bytes: 94846, sha256: 'd' },
+    }
     expect(table(before, after, SCENES).split('\n')).toEqual([
       'scene           CSS size   bytes   picture',
       'host-loaded     -          -       not taken',

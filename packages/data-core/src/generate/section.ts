@@ -31,19 +31,31 @@ function spelled(type: NormalizedType, value: string): boolean {
  * - the value is not spelled as that column holds it, so no record would
  *   ever show the section.
  */
-export function sectionFor(root: ObjectMeta, identity: readonly string[] | null, choice: LookupChoice, foreignKey: ForeignKeyMeta, target: ObjectMeta): SectionBinding | undefined {
+export function sectionFor(
+  root: ObjectMeta,
+  identity: readonly string[] | null,
+  choice: LookupChoice,
+  foreignKey: ForeignKeyMeta,
+  target: ObjectMeta,
+): SectionBinding | undefined {
   if (choice.section === undefined) return undefined
   if (identity === null || !sameSet(foreignKey.columns, identity)) {
-    throw new Error(`${choice.foreignKey} is not the whole key of ${root.ref.name}, so a ${target.ref.name} could have more than one of its rows: it cannot be a section`)
+    throw new Error(
+      `${choice.foreignKey} is not the whole key of ${root.ref.name}, so a ${target.ref.name} could have more than one of its rows: it cannot be a section`,
+    )
   }
   const when = choice.section.when
   if (when === null) return { when: null }
   const column = target.columns.find((candidate) => candidate.name === when.column)
   if (column === undefined) throw new Error(`${choice.foreignKey}: ${target.ref.name} has no column ${when.column} to show the section by`)
-  if (!column.access.select) throw new Error(`${choice.foreignKey}: this connection's account may not read ${target.ref.name}.${column.name}, so it cannot show the section by it`)
+  if (!column.access.select)
+    throw new Error(`${choice.foreignKey}: this connection's account may not read ${target.ref.name}.${column.name}, so it cannot show the section by it`)
   if (column.type.kind !== 'boolean' && !isLookupKeyType(column.type)) {
-    throw new Error(`${choice.foreignKey}: ${column.name} is ${column.databaseType}; a section is shown by text, a whole number, a decimal, a uuid, a date or a yes/no`)
+    throw new Error(
+      `${choice.foreignKey}: ${column.name} is ${column.databaseType}; a section is shown by text, a whole number, a decimal, a uuid, a date or a yes/no`,
+    )
   }
-  if (!spelled(column.type, when.value)) throw new Error(`${choice.foreignKey}: the value that shows the section is not spelled as ${target.ref.name}.${column.name} holds it`)
+  if (!spelled(column.type, when.value))
+    throw new Error(`${choice.foreignKey}: the value that shows the section is not spelled as ${target.ref.name}.${column.name} holds it`)
   return { when: { column: column.name, type: column.type, value: when.value } }
 }

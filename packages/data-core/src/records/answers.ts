@@ -153,10 +153,12 @@ export function canonicalValue(binding: ColumnBinding, answer: ApiValue): ApiVal
   const shape = shapeOf(binding)
   if (answer === null || shape === 'as-is') return answer
   if (shape === 'three-state') {
-    if (answer !== 'true' && answer !== 'false') throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a select of the two.`)
+    if (answer !== 'true' && answer !== 'false')
+      throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a select of the two.`)
     return answer === 'true'
   }
-  if (typeof answer !== 'number' || !Number.isSafeInteger(answer)) throw new Error(`${binding.field} answers something other than a whole number its control holds.`)
+  if (typeof answer !== 'number' || !Number.isSafeInteger(answer))
+    throw new Error(`${binding.field} answers something other than a whole number its control holds.`)
   return String(answer)
 }
 

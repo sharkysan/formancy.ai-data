@@ -22,5 +22,9 @@ export function isOpen(answers: Readonly<Record<string, unknown>> | null, versio
 
 /** What the line says once the next version is open: what the person does next. */
 export function nextLine(token: string, both: boolean): Said {
-  return [`${both ? 'Both forms hold' : 'The form holds'} the next version of `, { code: token }, ": give the date it starts, change what changes, and save. Saving ends this version on that date."]
+  return [
+    `${both ? 'Both forms hold' : 'The form holds'} the next version of `,
+    { code: token },
+    ': give the date it starts, change what changes, and save. Saving ends this version on that date.',
+  ]
 }

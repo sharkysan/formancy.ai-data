@@ -76,7 +76,16 @@ export type PresentedForm = { ok: true; form: FormSchema } | { ok: false; proble
 /** What a rebase could not carry as it was, and what it did instead. */
 export type PresentationConflict =
   /** `field` is the old key. */
-  | { kind: 'field-gone'; field: string; anchor: FieldAnchor; property: 'label' | 'span' | 'section'; yours: Text | 'all' | 'one' | SectionAnchor; resolution: 'dropped'; message: string }
+  | {
+      kind: 'field-gone'
+      field: string
+      anchor: FieldAnchor
+      property: 'label' | 'span' | 'section'
+      // A span's `all` or `one` is a string, which Text holds.
+      yours: Text | SectionAnchor
+      resolution: 'dropped'
+      message: string
+    }
   /** `field` is the new key, `from` the old. */
   | { kind: 'field-rekeyed'; field: string; from: string; anchor: FieldAnchor; resolution: 'followed'; message: string }
   /** Labels only: span has two values, so a span override is either still one or now the generator's. */

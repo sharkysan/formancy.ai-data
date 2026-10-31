@@ -10,7 +10,11 @@ import { openingView, sameSort, viewMatching } from './views.js'
  * engines.
  */
 
-const LARGE: ListView = { name: 'Large orders', filter: [{ field: 'amount', op: 'range', from: '1000', to: null }], sort: [{ field: 'amount', direction: 'desc' }] }
+const LARGE: ListView = {
+  name: 'Large orders',
+  filter: [{ field: 'amount', op: 'range', from: '1000', to: null }],
+  sort: [{ field: 'amount', direction: 'desc' }],
+}
 const PLACED: ListView = {
   name: 'North, by date',
   filter: [
@@ -85,7 +89,12 @@ describe('the view a filter and a sort are', () => {
   // in order and direction, and the empty sort is the empty sort.
   test('says two sorts are one when they are in order and direction', () => {
     expect(sameSort([], [])).toBe(true)
-    expect(sameSort(PLACED.sort, PLACED.sort.map((term) => ({ ...term })))).toBe(true)
+    expect(
+      sameSort(
+        PLACED.sort,
+        PLACED.sort.map((term) => ({ ...term })),
+      ),
+    ).toBe(true)
     expect(sameSort(PLACED.sort, [...PLACED.sort].reverse())).toBe(false)
     expect(sameSort(LARGE.sort, [{ field: 'amount', direction: 'asc' }])).toBe(false)
   })

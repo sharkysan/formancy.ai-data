@@ -49,7 +49,9 @@ const copy = (ref: ObjectRef): ObjectRef => ({ schema: ref.schema, name: ref.nam
 
 /** The key: exactly the identity's columns, in its order, each with a value. */
 function keyOf(request: DeleteRequest): RecordValue[] {
-  const identity = Array.isArray(request.target?.identity) ? request.target.identity.map((column) => column.name) : []
+  // `Array.isArray` narrows to `any[]`, so it is asked of an `unknown` copy.
+  const columns: unknown = request.target?.identity
+  const identity = Array.isArray(columns) ? request.target.identity.map((column) => column.name) : []
   const given: unknown = request.key
   if (identity.length === 0) throw refuse('deletes from a target with an identity')
   if (!Array.isArray(given) || given.length !== identity.length) throw refuse('names every column of the identity, in order')
@@ -64,23 +66,24 @@ function keyOf(request: DeleteRequest): RecordValue[] {
 /** Each part of the reach, read: well formed, every table once, and every column and key named. */
 function partsOf(reach: Record<string, unknown>): ReachTerms {
   const removed = reach['removed'] as unknown[]
-  if (!removed.every(isRef) || removed.some((table, index) => removed.findIndex((other) => sameRef(other as ObjectRef, table)) !== index)) {
+  if (!removed.every(isRef) || removed.some((table, index) => removed.findIndex((other) => sameRef(other, table)) !== index)) {
     throw refuse('names each table it removes rows of once')
   }
   const cleared = (reach['cleared'] as unknown[]).map((entry) => {
     if (!isRecord(entry) || !isRef(entry['table']) || !Array.isArray(entry['columns']) || entry['columns'].length === 0 || !entry['columns'].every(isName)) {
       throw refuse('names each table it clears with the columns it clears')
     }
-    return { table: copy(entry['table']), columns: [...(entry['columns'] as string[])] }
+    return { table: copy(entry['table']), columns: [...entry['columns']] }
   })
-  if (cleared.some((entry, index) => cleared.findIndex((other) => sameRef(other.table, entry.table)) !== index)) throw refuse('names each table it clears with the columns it clears')
+  if (cleared.some((entry, index) => cleared.findIndex((other) => sameRef(other.table, entry.table)) !== index))
+    throw refuse('names each table it clears with the columns it clears')
   const accepted = (reach['accepted'] as unknown[]).map((entry) => {
     if (!isRecord(entry) || !isRef(entry['from']) || !isName(entry['name']) || !isRef(entry['onto']) || !ACTIONS.includes(entry['onDelete'])) {
       throw refuse('names each key it accepts by its table, its name, the table it refers to and an action that acts on delete')
     }
     return { from: copy(entry['from']), name: entry['name'], onto: copy(entry['onto']), onDelete: entry['onDelete'] as DeleteAction }
   })
-  return { removed: (removed as ObjectRef[]).map(copy), cleared, accepted }
+  return { removed: removed.map(copy), cleared, accepted }
 }
 
 /**

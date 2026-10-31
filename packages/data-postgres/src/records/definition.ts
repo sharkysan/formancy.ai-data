@@ -181,14 +181,27 @@ interface Facts {
 export function describedFrom(facts: string | null, spellings: string | null, encoding: string, definition: Definition): DescribedTable | undefined {
   if (facts === null) return undefined
   const parsed = JSON.parse(facts) as Facts
-  const spelled = new Map((JSON.parse(spellings ?? '[]') as Array<[number, string, string | null]>).map(([attnum, type, expression]) => [attnum, { type, expression }]))
+  const spelled = new Map(
+    (JSON.parse(spellings ?? '[]') as Array<[number, string, string | null]>).map(([attnum, type, expression]) => [attnum, { type, expression }]),
+  )
   const textUnit = textUnitOf(encoding)
   const columns = parsed.columns.map(([attnum, name, _typeOid, modifier, typeName, typeSchema, notNull, identity, generated]) => {
     const spelling = spelled.get(attnum)
     // Both lists are one statement's read of the same pg_attribute rows.
     if (spelling === undefined) throw new Error(`the facts and their spellings disagree about column ${String(attnum)}`)
     return columnOf(
-      { name, ordinal: attnum, database_type: spelling.type, type_name: typeName, type_schema: typeSchema, type_modifier: modifier, not_null: notNull, identity, generated, default_expression: spelling.expression },
+      {
+        name,
+        ordinal: attnum,
+        database_type: spelling.type,
+        type_name: typeName,
+        type_schema: typeSchema,
+        type_modifier: modifier,
+        not_null: notNull,
+        identity,
+        generated,
+        default_expression: spelling.expression,
+      },
       textUnit,
     )
   })

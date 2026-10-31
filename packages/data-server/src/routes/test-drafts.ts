@@ -28,11 +28,26 @@ import { adminRoutes } from './admin.js'
 export const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 export const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 export const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** sales.employee as each test starts with it. */
-export const EMPLOYEE = (): ColumnMeta[] => [col('id', 1, INT32), col('name', 2, TEXT), col('title', 3, TEXT, { nullable: true }), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })]
+export const EMPLOYEE = (): ColumnMeta[] => [
+  col('id', 1, INT32),
+  col('name', 2, TEXT),
+  col('title', 3, TEXT, { nullable: true }),
+  col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+]
 
 /**
  * The database as it is "now", the allowlist that reaches it, and what
@@ -49,11 +64,24 @@ export const db: { columns: ColumnMeta[]; engine: 'sqlserver' | 'postgres'; reac
 
 function snapshot(): MetadataSnapshot {
   return createSnapshot({
-    kind: db.engine, serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns: db.columns,
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-    }],
+    kind: db.engine,
+    serverVersion: '16.0',
+    account: { user: 'dbo', login: 'sa' },
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns: db.columns,
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys: [],
+        checks: [],
+        rowSecurity: 'none',
+      },
+    ],
   })
 }
 
@@ -63,7 +91,12 @@ export function registry(): ConnectionRegistry {
     await db.discovering()
     return snapshot()
   }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover, close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover,
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => [...db.allowlist],
     scope: (id) => (db.allowlist.includes(id) ? { schemas: ['sales'] } : undefined),
@@ -129,7 +162,9 @@ export async function plane(): Promise<{ app: FastifyInstance; routes: Array<{ m
   bare.addHook('onRoute', (route) => {
     for (const method of [route.method].flat()) if (method !== 'HEAD') routes.push({ method, url: route.url })
   })
-  await bare.register(async (instance) => adminRoutes(instance, { registry: registry(), store, adminRoles: ADMIN_ROLES, publisherRoles: PUBLISHER_ROLES, authenticate, audit: { sink: () => {} } }))
+  await bare.register(async (instance) =>
+    adminRoutes(instance, { registry: registry(), store, adminRoles: ADMIN_ROLES, publisherRoles: PUBLISHER_ROLES, authenticate, audit: { sink: () => {} } }),
+  )
   await bare.ready()
   return { app: bare, routes }
 }
@@ -158,23 +193,44 @@ export const as = (token: string) => ({ authorization: `Bearer ${token}` })
 const policyFor = (bindings: FormBindings, role: string) => ({
   version: 1,
   operations: { read: [role], create: [role], update: [role] },
-  fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: [role], write: binding.writes.create || binding.writes.update ? [role] : [] }])),
+  fields: Object.fromEntries(
+    bindings.fields.map((binding) => [binding.field, { read: [role], write: binding.writes.create || binding.writes.update ? [role] : [] }]),
+  ),
   rowFilters: [],
   lookups: {},
 })
 
 /** A proposal as an author proposes it, made into the bundle the studio would publish: a policy granting `role`, nothing chosen over the base. */
 export async function proposed({ formId = 'employee', connection = 'erp', role = 'clerk', title = 'Employee', on = app } = {}) {
-  const response = await on.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('author'), payload: { connection, root: { schema: 'sales', name: 'employee' }, formId, title } })
+  const response = await on.inject({
+    method: 'POST',
+    url: '/v1/form-proposals',
+    headers: as('author'),
+    payload: { connection, root: { schema: 'sales', name: 'employee' }, formId, title },
+  })
   expect(response.statusCode, response.body).toBe(200)
-  const proposal = response.json() as { form: unknown; bindings: FormBindings; snapshot: unknown; generation: unknown }
-  return { format: 2, connection, generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: policyFor(proposal.bindings, role), snapshot: proposal.snapshot }
+  const proposal = response.json<{ form: unknown; bindings: FormBindings; snapshot: unknown; generation: unknown }>()
+  return {
+    format: 2,
+    connection,
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation: EMPTY_PRESENTATION,
+    form: proposal.form,
+    bindings: proposal.bindings,
+    policy: policyFor(proposal.bindings, role),
+    snapshot: proposal.snapshot,
+  }
 }
 
-export const submit = (token: string, payload: Record<string, unknown>, form = 'employee', on = app) => on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts`, headers: as(token), payload })
-export const approve = (token: string, draft: number | string, form = 'employee', on = app) => on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts/${String(draft)}/approval`, headers: as(token) })
-export const reject = (token: string, draft: number | string, form = 'employee', on = app) => on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts/${String(draft)}/rejection`, headers: as(token) })
-export const read = (token: string, draft: number | string, form = 'employee', on = app) => on.inject({ method: 'GET', url: `/v1/forms/${form}/drafts/${String(draft)}`, headers: as(token) })
+export const submit = (token: string, payload: Record<string, unknown>, form = 'employee', on = app) =>
+  on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts`, headers: as(token), payload })
+export const approve = (token: string, draft: number | string, form = 'employee', on = app) =>
+  on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts/${String(draft)}/approval`, headers: as(token) })
+export const reject = (token: string, draft: number | string, form = 'employee', on = app) =>
+  on.inject({ method: 'POST', url: `/v1/forms/${form}/drafts/${String(draft)}/rejection`, headers: as(token) })
+export const read = (token: string, draft: number | string, form = 'employee', on = app) =>
+  on.inject({ method: 'GET', url: `/v1/forms/${form}/drafts/${String(draft)}`, headers: as(token) })
 export const queue = (token: string) => app.inject({ method: 'GET', url: '/v1/drafts', headers: as(token) })
 export const versionFile = (version: number, form = 'employee') => readFile(join(root, form, `${String(version)}.json`), 'utf8')
 export const answer = (response: { statusCode: number; json: () => unknown }) => [response.statusCode, response.json()]
@@ -183,9 +239,9 @@ export const answer = (response: { statusCode: number; json: () => unknown }) =>
 export async function published(bundle: unknown, expectedBase: number | null = null, by = 'author'): Promise<number> {
   const submitted = await submit(by, { expectedBase, bundle })
   expect(submitted.statusCode, submitted.body).toBe(201)
-  const approved = await approve('publisher', (submitted.json() as { draft: number }).draft)
+  const approved = await approve('publisher', submitted.json<{ draft: number }>().draft)
   expect(approved.statusCode, approved.body).toBe(201)
-  return (approved.json() as { version: number }).version
+  return approved.json<{ version: number }>().version
 }
 
 export const INTERNAL = { code: 'internal', message: "This could not be completed; the operator's log says why." }

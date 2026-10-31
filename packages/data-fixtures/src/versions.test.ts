@@ -30,7 +30,12 @@ function titled(source: string, title: string): boolean {
     const parts = template.split('%s')
     if (parts.length !== 2) return false
     const [before = '', after = ''] = parts
-    return title.length >= before.length + after.length && title.startsWith(before) && title.endsWith(after) && literals.has(title.slice(before.length, title.length - after.length))
+    return (
+      title.length >= before.length + after.length &&
+      title.startsWith(before) &&
+      title.endsWith(after) &&
+      literals.has(title.slice(before.length, title.length - after.length))
+    )
   })
 }
 
@@ -72,9 +77,11 @@ describe('VERSION_FACTS', () => {
   // value is measured and written before the leg can be green.
   test('refuses a major a fact has no value for, and a server of another engine', () => {
     expect(() => versionFact('transactionTimeout', record('postgres', '14.19'))).toThrow(
-      "VERSION_FACTS.transactionTimeout has no value for postgres 14: measure it on that version and add it, or leave the version out of the matrix",
+      'VERSION_FACTS.transactionTimeout has no value for postgres 14: measure it on that version and add it, or leave the version out of the matrix',
     )
-    expect(() => versionFact('transactionTimeout', record('sqlserver', '16.0.4295.3'))).toThrow('VERSION_FACTS.transactionTimeout is a postgres fact, and this server is sqlserver')
+    expect(() => versionFact('transactionTimeout', record('sqlserver', '16.0.4295.3'))).toThrow(
+      'VERSION_FACTS.transactionTimeout is a postgres fact, and this server is sqlserver',
+    )
   })
 
   // A row without a value for an image of the matrix is a leg that fails on

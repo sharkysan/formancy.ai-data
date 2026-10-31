@@ -29,6 +29,7 @@ node scripts/performance-stale.mjs
 
 # 3. Verify locally — the workflow runs these again, but finding out here is cheaper
 pnpm build && pnpm typecheck && pnpm test:coverage && pnpm check:pkg && pnpm test:repo
+pnpm lint && pnpm format:check
 node scripts/verify-licenses.mjs
 pnpm test:getting-started   # docs/getting-started.md as written; needs Docker, not the build
 pnpm test:cloudflare        # docs/deploy/cloudflare.md's overlay, offline; needs Docker and the server's build

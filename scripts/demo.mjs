@@ -113,32 +113,48 @@ export function demoUrl(config) {
  */
 export function configProblems(config) {
   const problems = []
-  if (config.name !== WORKER) problems.push(`the config names the Worker ${String(config.name)}, not ${WORKER}: the deploy would replace whatever that Worker serves`)
+  if (config.name !== WORKER)
+    problems.push(`the config names the Worker ${String(config.name)}, not ${WORKER}: the deploy would replace whatever that Worker serves`)
   if (config.main !== undefined) problems.push(`the config names main, ${String(config.main)}: the demo's Worker serves the built page and runs no code`)
-  for (const key of Object.keys(config)) if (key !== 'main' && !KEYS.includes(key)) problems.push(`the config has ${key}, which the demo's Worker does not: it is a directory of files and holds nothing else`)
-  for (const key of Object.keys(config.assets ?? {})) if (!ASSET_KEYS.includes(key)) problems.push(`the config has assets.${key}, which the demo's Worker does not: no code reaches its files or runs before them`)
+  for (const key of Object.keys(config))
+    if (key !== 'main' && !KEYS.includes(key))
+      problems.push(`the config has ${key}, which the demo's Worker does not: it is a directory of files and holds nothing else`)
+  for (const key of Object.keys(config.assets ?? {}))
+    if (!ASSET_KEYS.includes(key))
+      problems.push(`the config has assets.${key}, which the demo's Worker does not: no code reaches its files or runs before them`)
   if (config.workers_dev !== false) problems.push('workers_dev is not false: the demo would answer on a workers.dev address beside formancy.ai')
   if (config.preview_urls !== false) problems.push('preview_urls is not false: every version would answer on an address of its own')
   const routes = config.routes ?? []
   for (const route of routes) {
-    if (route.custom_domain !== undefined) problems.push(`the route ${String(route.pattern)} sets custom_domain: a Custom Domain takes a whole hostname, and the demo is one path of ${HOST}`)
+    if (route.custom_domain !== undefined)
+      problems.push(`the route ${String(route.pattern)} sets custom_domain: a Custom Domain takes a whole hostname, and the demo is one path of ${HOST}`)
     else if (route.zone_name !== HOST) problems.push(`the route ${String(route.pattern)} is on the zone ${String(route.zone_name)}, not ${HOST}`)
   }
   const base = demoBase(config)
   if (base === undefined) problems.push(`no route ${HOST}${PRODUCT}<path>/*: nothing says which path of ${HOST} the demo is`)
   else if (!new RegExp(`^${PRODUCT}[a-z][a-z0-9-]*/$`).test(base)) {
-    problems.push(`the demo's path is ${base}: it is one path below ${HOST}${PRODUCT}, never ${PRODUCT} itself, which is the product's page in formancy.ai's site, nor anything wider`)
+    problems.push(
+      `the demo's path is ${base}: it is one path below ${HOST}${PRODUCT}, never ${PRODUCT} itself, which is the product's page in formancy.ai's site, nor anything wider`,
+    )
   } else {
     const bare = `${HOST}${base.slice(0, -1)}`
     const expected = [`${HOST}${base}*`, bare]
-    if (!routes.some((route) => route.pattern === bare)) problems.push(`no route ${bare}: the path without its slash would be answered by formancy.ai's 404 instead of being sent to ${base}`)
+    if (!routes.some((route) => route.pattern === bare))
+      problems.push(`no route ${bare}: the path without its slash would be answered by formancy.ai's 404 instead of being sent to ${base}`)
     for (const route of routes.filter((each) => !expected.includes(each.pattern))) {
       problems.push(`the route ${String(route.pattern)} is not the demo's path: it would send the demo more of ${HOST} than ${base}`)
     }
   }
-  if (config.assets?.directory !== STAGE) problems.push(`assets.directory is ${String(config.assets?.directory)}, not ${STAGE}: the deploy stages the build there, under the demo's path`)
-  if (config.assets?.html_handling !== 'auto-trailing-slash') problems.push(`assets.html_handling is ${String(config.assets?.html_handling)}, not auto-trailing-slash, which sends the path without its slash to the page and its relative files`)
-  if (config.assets?.not_found_handling !== 'none') problems.push(`assets.not_found_handling is ${String(config.assets?.not_found_handling)}, not none: a path the build does not have is a 404, never the page`)
+  if (config.assets?.directory !== STAGE)
+    problems.push(`assets.directory is ${String(config.assets?.directory)}, not ${STAGE}: the deploy stages the build there, under the demo's path`)
+  if (config.assets?.html_handling !== 'auto-trailing-slash')
+    problems.push(
+      `assets.html_handling is ${String(config.assets?.html_handling)}, not auto-trailing-slash, which sends the path without its slash to the page and its relative files`,
+    )
+  if (config.assets?.not_found_handling !== 'none')
+    problems.push(
+      `assets.not_found_handling is ${String(config.assets?.not_found_handling)}, not none: a path the build does not have is a 404, never the page`,
+    )
   return problems
 }
 
@@ -231,7 +247,11 @@ export function namingProblems({ assetsDir, output }) {
 export async function viteBuild(root = app, mode = 'production') {
   const vite = await import(pathToFileURL(createRequire(join(root, 'package.json')).resolve('vite')).href)
   const config = await vite.resolveConfig({ root, configFile: join(root, 'vite.config.ts'), logLevel: 'silent', mode }, 'build', mode)
-  return { publicDir: config.publicDir || null, assetsDir: config.build.assetsDir, output: config.build.rolldownOptions?.output ?? config.build.rollupOptions?.output }
+  return {
+    publicDir: config.publicDir || null,
+    assetsDir: config.build.assetsDir,
+    output: config.build.rolldownOptions?.output ?? config.build.rollupOptions?.output,
+  }
 }
 
 /**
@@ -247,7 +267,10 @@ export function run(command, args, options = {}) {
   // (DEP0190).
   const result =
     (command === 'npx' || command === 'pnpm') && process.platform === 'win32'
-      ? spawnSync([`${command}.cmd`, ...args.map((arg) => (/[\s"]/.test(arg) ? `"${arg.replaceAll('"', '\\"')}"` : arg))].join(' '), { ...settings, shell: true })
+      ? spawnSync([`${command}.cmd`, ...args.map((arg) => (/[\s"]/.test(arg) ? `"${arg.replaceAll('"', '\\"')}"` : arg))].join(' '), {
+          ...settings,
+          shell: true,
+        })
       : spawnSync(command, args, settings)
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} exited ${String(result.status)}`)
   return (result.stdout ?? '').trimEnd()
@@ -265,19 +288,30 @@ export async function buildProblems(dist, address, page = {}) {
   const { root = app, mode = 'production', name = 'the examples page', policy = POLICY, allowed = {} } = page
   const html = readFileSync(join(dist, 'index.html'), 'utf8')
   const absolute = indexProblems(html, address)
-  const problems = absolute.length === 0 ? [] : [`the built page asks formancy.ai for files other than by a path relative to it, which formancy.ai answers from its own site: ${absolute.join(', ')}`]
+  const problems =
+    absolute.length === 0
+      ? []
+      : [`the built page asks formancy.ai for files other than by a path relative to it, which formancy.ai answers from its own site: ${absolute.join(', ')}`]
   const vite = await viteBuild(root, mode)
   for (const problem of namingProblems(vite)) problems.push(`${name}'s Vite config ${problem}`)
   const copiedFrom = vite.publicDir === null ? null : join(vite.publicDir, HASHED)
   const copied = copiedFrom !== null && existsSync(copiedFrom) ? readdirSync(copiedFrom) : []
   const assets = readdirSync(join(dist, HASHED))
   const unhashed = unhashedAssets(assets, copied)
-  if (unhashed.length > 0) problems.push(`${HASHED} holds files copied from the public directory or whose names carry no hash, which the headers would cache for a year: ${unhashed.join(', ')}`)
+  if (unhashed.length > 0)
+    problems.push(
+      `${HASHED} holds files copied from the public directory or whose names carry no hash, which the headers would cache for a year: ${unhashed.join(', ')}`,
+    )
   const unloaded = unloadedAssets(Object.fromEntries(assets.map((name) => [name, readFileSync(join(dist, HASHED, name), 'utf8')])), html)
-  if (unloaded.length > 0) problems.push(`${HASHED} holds files the page never loads, an earlier build's, which the deploy would serve too; delete ${relative(repo, dist).replaceAll('\\', '/')} and build again: ${unloaded.join(', ')}`)
+  if (unloaded.length > 0)
+    problems.push(
+      `${HASHED} holds files the page never loads, an earlier build's, which the deploy would serve too; delete ${relative(repo, dist).replaceAll('\\', '/')} and build again: ${unloaded.join(', ')}`,
+    )
   const stylesheets = assets.filter((name) => name.endsWith('.css')).map((name) => readFileSync(join(dist, HASHED, name), 'utf8'))
-  for (const problem of policyProblems(policy, { html, stylesheets, address }, { allowed })) problems.push(`the Content-Security-Policy does not fit the built page: ${problem}`)
-  if (!existsSync(join(dist, NOTICES_FILE))) problems.push(`the build has no ${NOTICES_FILE}, and the page bundles other people's packages, whose licences go with it (0046)`)
+  for (const problem of policyProblems(policy, { html, stylesheets, address }, { allowed }))
+    problems.push(`the Content-Security-Policy does not fit the built page: ${problem}`)
+  if (!existsSync(join(dist, NOTICES_FILE)))
+    problems.push(`the build has no ${NOTICES_FILE}, and the page bundles other people's packages, whose licences go with it (0046)`)
   return problems
 }
 
@@ -289,9 +323,11 @@ async function main(args) {
   const problems = configProblems(config)
   if (problems.length > 0) throw new Error(`apps/examples/wrangler.json is not the demo's:\n  ${problems.join('\n  ')}`)
   const changed = run('git', ['status', '--porcelain'])
-  if (changed !== '' && !dryRun) throw new Error(`the checkout has changes, and the deployment would name a commit that does not hold them; commit them first:\n${changed}`)
+  if (changed !== '' && !dryRun)
+    throw new Error(`the checkout has changes, and the deployment would name a commit that does not hold them; commit them first:\n${changed}`)
   const dist = join(app, 'dist')
-  if (!existsSync(join(dist, 'index.html'))) throw new Error('apps/examples/dist/index.html is not there: run `pnpm build` first, or `pnpm demo:deploy`, which does')
+  if (!existsSync(join(dist, 'index.html')))
+    throw new Error('apps/examples/dist/index.html is not there: run `pnpm build` first, or `pnpm demo:deploy`, which does')
   const built = await buildProblems(dist, demoUrl(config))
   if (built.length > 0) throw new Error(`the build is not the demo's:\n  ${built.join('\n  ')}`)
   const commit = run('git', ['rev-parse', 'HEAD'])
@@ -301,12 +337,25 @@ async function main(args) {
   try {
     cpSync(dist, join(stage, base), { recursive: true })
     writeFileSync(join(stage, '_headers'), headersFile(headerRules(base)))
-    const deploy = ['--yes', WRANGLER, 'deploy', '--config', 'apps/examples/wrangler.json', '--message', `formancy.ai-data@${commit}`, ...(dryRun ? ['--dry-run'] : [])]
+    const deploy = [
+      '--yes',
+      WRANGLER,
+      'deploy',
+      '--config',
+      'apps/examples/wrangler.json',
+      '--message',
+      `formancy.ai-data@${commit}`,
+      ...(dryRun ? ['--dry-run'] : []),
+    ]
     run('npx', deploy, { stdio: 'inherit' })
   } finally {
     rmSync(stage, { recursive: true, force: true })
   }
-  console.log(dryRun ? `\nchecked, and nothing uploaded: ${commit}${changed === '' ? '' : ', with uncommitted changes'} would be served at ${demoUrl(config)}` : `\n${commit} is served at ${demoUrl(config)}`)
+  console.log(
+    dryRun
+      ? `\nchecked, and nothing uploaded: ${commit}${changed === '' ? '' : ', with uncommitted changes'} would be served at ${demoUrl(config)}`
+      : `\n${commit} is served at ${demoUrl(config)}`,
+  )
 }
 
 // Run as a program, and only as one: scripts/live-demo.mjs imports this

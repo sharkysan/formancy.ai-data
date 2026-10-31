@@ -34,10 +34,12 @@ export function listed(heading: string): Array<{ label: string; shown: boolean }
 }
 
 /** A column's Show in the panel. */
-export const showBox = (heading: string, label: string): HTMLInputElement => within(columnList(heading)).getByRole('checkbox', { name: `Show ${label}` }) as HTMLInputElement
+export const showBox = (heading: string, label: string): HTMLInputElement =>
+  within(columnList(heading)).getByRole<HTMLInputElement>('checkbox', { name: `Show ${label}` })
 
 /** A column's move in the panel. */
-export const moveButton = (heading: string, label: string, way: 'up' | 'down'): HTMLElement => within(columnList(heading)).getByRole('button', { name: `Move ${label} ${way}` })
+export const moveButton = (heading: string, label: string, way: 'up' | 'down'): HTMLElement =>
+  within(columnList(heading)).getByRole('button', { name: `Move ${label} ${way}` })
 
 /**
  * The grid's column headers, in the order drawn: each one's text, with the

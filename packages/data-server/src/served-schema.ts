@@ -26,13 +26,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function servedSchema(label: 'form' | 'base', document: unknown): ServedSchema {
   const only = `and this server publishes and serves only spec ${JSON.stringify(GENERATED_SPEC_VERSION)}, the version it generates (0042)`
   const declared = isRecord(document) ? document['specVersion'] : undefined
-  if (typeof declared === 'string' && declared !== GENERATED_SPEC_VERSION) return { valid: false, problems: [`${label}: is spec ${JSON.stringify(declared)}, ${only}`] }
+  if (typeof declared === 'string' && declared !== GENERATED_SPEC_VERSION)
+    return { valid: false, problems: [`${label}: is spec ${JSON.stringify(declared)}, ${only}`] }
   const checked = validateSchema(document)
   if (checked.valid) return checked
   return {
     valid: false,
     problems: checked.errors.map((error) =>
-      error.code.startsWith('version.') ? `${label}: ${error.path} needs spec ${JSON.stringify(String(error.values['version']))}, ${only}` : `${label}: ${error.message}`,
+      error.code.startsWith('version.')
+        ? `${label}: ${error.path} needs spec ${JSON.stringify(String(error.values['version']))}, ${only}`
+        : `${label}: ${error.message}`,
     ),
   }
 }

@@ -158,14 +158,7 @@ export type RowFilter = ReadonlyArray<{ column: string; value: string }>
  *   actor's roles may make (0112).
  */
 export type PolicyRefusalCode =
-  | 'invalid-context'
-  | 'invalid-policy'
-  | 'operation-denied'
-  | 'missing-attribute'
-  | 'over-posting'
-  | 'field-denied'
-  | 'unknown-lookup'
-  | 'transition-denied'
+  'invalid-context' | 'invalid-policy' | 'operation-denied' | 'missing-attribute' | 'over-posting' | 'field-denied' | 'unknown-lookup' | 'transition-denied'
 
 export interface PolicyRefusal {
   ok: false

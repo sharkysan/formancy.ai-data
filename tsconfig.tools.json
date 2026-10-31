@@ -1,0 +1,34 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    // The configs are loaded by Vite, which resolves as a bundler does and
+    // runs the root's files as modules though the root manifest has no type.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    // The apps' Vite configs import the repository's plain-JavaScript
+    // scripts (third-party-notices.mjs); their types are inferred and not
+    // checked, as the scripts are not part of any package's program.
+    "allowJs": true,
+    "types": ["node"]
+  },
+  "include": [
+    "packages/*/vitest.config.ts",
+    "packages/*/tsdown.config.ts",
+    "apps/*/vite.config.ts",
+    "apps/*/vitest.config.ts",
+    "apps/*/tsdown.config.ts",
+    "vitest.coverage.ts",
+    "vitest.repo.config.mts",
+    "vitest.results.ts",
+    // The declaration beside walk.mjs: the apps' suites import it through
+    // their own programs, which is why ESLint found it, but no tsconfig
+    // names it, so a program that stopped importing it would leave it linted
+    // by nothing. Named here, it is typed and linted in its own right.
+    "scripts/getting-started/walk.d.mts"
+  ]
+}

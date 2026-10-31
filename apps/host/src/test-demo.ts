@@ -67,7 +67,11 @@ export function demoDoor(plane: Pick<Plane, 'fetch' | 'demoKey'>): DemoDoor {
   const toServer = async (request: Request): Promise<Response> => {
     const url = new URL(request.url)
     const body = request.body === null ? undefined : await request.text()
-    return plane.fetch(`${url.pathname}${url.search}`, { method: request.method, headers: Object.fromEntries(request.headers.entries()), ...(body === undefined ? {} : { body }) })
+    return plane.fetch(`${url.pathname}${url.search}`, {
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries()),
+      ...(body === undefined ? {} : { body }),
+    })
   }
 
   const named = (name: string): DemoInstance => ({

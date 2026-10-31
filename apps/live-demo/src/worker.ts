@@ -36,7 +36,7 @@ import { handle } from './worker/handle.js'
 import { IDLE_MINUTES, KEY_LIFETIME_MS } from './worker/limits.js'
 import { claimsFor, personaById } from './worker/session.js'
 import type { SignInResult } from './worker/session.js'
-import { failedStartLine, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './worker/start.js'
+import { failedStartLine, monitorRejected, newKey, noInstance, startedLine, untilStopped, waitUntilHealthy } from './worker/start.js'
 import type { FailedStart } from './worker/start.js'
 
 interface Env {
@@ -172,7 +172,7 @@ export class DemoServer extends DurableObject<Env> {
         if (refused !== undefined) {
           if (!noInstance(refused) || container.running) {
             failure = refused
-            throw new Error(`monitor() rejected: ${refused instanceof Error ? refused.message : String(refused)}`)
+            throw new Error(monitorRejected(refused))
           }
           restarts += 1
           launch()
@@ -250,7 +250,7 @@ export default {
   fetch(request, env) {
     return handle(request, (name) => {
       const stub = env.DEMO.get(env.DEMO.idFromName(name))
-      return { signIn: async (persona) => (await stub.signIn(persona)) as SignInResult, fetch: (forwarded) => stub.fetch(forwarded) }
+      return { signIn: async (persona) => await stub.signIn(persona), fetch: (forwarded) => stub.fetch(forwarded) }
     })
   },
 } satisfies ExportedHandler<Env>

@@ -1,5 +1,15 @@
 import { encodeRowversion, generateForm, planRead, planUpdate } from '@formancy/data-core'
-import type { DescribedRead, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, ReadRequest, RecordAdapter, RecordOutcome, UpdateRequest } from '@formancy/data-core'
+import type {
+  DescribedRead,
+  FormBindings,
+  FormPolicy,
+  MetadataSnapshot,
+  PolicyContext,
+  ReadRequest,
+  RecordAdapter,
+  RecordOutcome,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { covers, EDGE_VALUES, FIXTURE_SCOPE, startSqlServerFixture, throughCase } from '@formancy/data-fixtures'
 import type { SqlServerFixture } from '@formancy/data-fixtures'
 import mssql from 'mssql'
@@ -139,14 +149,25 @@ function found(read: DescribedRead): Record<string, unknown> | null {
 
 /** The line as the owner reads it: what no request of anybody's changed. */
 async function stored(order: string): Promise<{ quantity: number; row_version: string }> {
-  const result = await owner.request().input('order', mssql.BigInt, order).query<{ quantity: number; row_version: Buffer }>('select quantity, row_version from sales.order_line where order_id = @order and line_no = 1')
+  const result = await owner
+    .request()
+    .input('order', mssql.BigInt, order)
+    .query<{ quantity: number; row_version: Buffer }>('select quantity, row_version from sales.order_line where order_id = @order and line_no = 1')
   const row = result.recordset[0]
   if (row === undefined) throw new Error(`no line of ${order}`)
   return { quantity: row.quantity, row_version: encodeRowversion(row.row_version) }
 }
 
 /** An update planned for `actor` as the server plans one: over the table as `describe` reads it now, through `via`. */
-async function plannedUpdate(via: RecordAdapter, bindings: FormBindings, policy: FormPolicy, actor: PolicyContext, token: string, version: string, answers: Record<string, unknown>): Promise<UpdateRequest> {
+async function plannedUpdate(
+  via: RecordAdapter,
+  bindings: FormBindings,
+  policy: FormPolicy,
+  actor: PolicyContext,
+  token: string,
+  version: string,
+  answers: Record<string, unknown>,
+): Promise<UpdateRequest> {
   const described = await via.describe(bindings.root)
   if (!described.ok) throw new Error(`expected a description, got ${described.code}`)
   const plan = planUpdate(snapshot, bindings, policy, actor, token, version, answers, undefined, described.described)
@@ -161,7 +182,10 @@ async function update(actor: PolicyContext, order: string, version: string, quan
 
 /** The order's tenant, notes and rowversion as the owner reads them. */
 async function orderOf(id: string): Promise<{ tenant_id: number; notes: string | null; row_version: string }> {
-  const result = await owner.request().input('id', mssql.BigInt, id).query<{ tenant_id: number; notes: string | null; row_version: Buffer }>('select tenant_id, notes, row_version from sales.[order] where id = @id')
+  const result = await owner
+    .request()
+    .input('id', mssql.BigInt, id)
+    .query<{ tenant_id: number; notes: string | null; row_version: Buffer }>('select tenant_id, notes, row_version from sales.[order] where id = @id')
   const row = result.recordset[0]
   if (row === undefined) throw new Error(`no order ${id}`)
   return { tenant_id: row.tenant_id, notes: row.notes, row_version: encodeRowversion(row.row_version) }
@@ -268,7 +292,8 @@ describe('a table scoped through a key onto itself', covers('sqlserver', through
   // employee's own, and the scope would ask whether the manager manages
   // itself.
   test('finds only the employees whose manager the filter admits', async () => {
-    const read = async (attributes: Record<string, string>, id: string) => found(await records.read(planned(staff, STAFF_POLICY, clerk(attributes), `k1:${id}`)))
+    const read = async (attributes: Record<string, string>, id: string) =>
+      found(await records.read(planned(staff, STAFF_POLICY, clerk(attributes), `k1:${id}`)))
     expect(await read({ manager: 'Ada' }, '2')).toMatchObject({ id: '2', name: 'Grace' })
     expect(await read({ manager: 'Ada' }, '1')).toBeNull()
     expect(await read({ manager: 'Ada' }, '3')).toBeNull()

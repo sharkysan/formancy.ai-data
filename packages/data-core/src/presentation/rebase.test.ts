@@ -35,12 +35,17 @@ const relabel = (key: string, label: string) => (form: FormSchema) => {
 }
 const move = (at: number, key: string, to: number) => (form: FormSchema) => {
   const children = grid(form, at)
-  const [moved] = children.splice(children.findIndex((entry) => entry.path === key), 1)
+  const [moved] = children.splice(
+    children.findIndex((entry) => entry.path === key),
+    1,
+  )
   children.splice(to, 0, moved as Child)
 }
-const both = (...edits: Array<(form: FormSchema) => void>) => (form: FormSchema) => {
-  for (const edit of edits) edit(form)
-}
+const both =
+  (...edits: Array<(form: FormSchema) => void>) =>
+  (form: FormSchema) => {
+    for (const edit of edits) edit(form)
+  }
 /** `key` out of whichever section holds it, into section `to` at `index`, last by default, as the studio's Move to does. */
 const moveTo = (key: string, to: number, index?: number) => (form: FormSchema) => {
   for (const [at] of sections(form).entries()) {
@@ -89,7 +94,18 @@ describe('rebasePresentation', () => {
   // The fast path every regeneration of an unchanged database takes: all
   // four edits come through untouched and nobody is told about anything.
   test('identical bases carry everything, with no conflict', () => {
-    const published = publish(both(relabel('notes', 'Delivery notes'), (form) => { (sections(form)[0] as { label: string }).label = 'Order details' }, move(0, 'notes', 3), (form) => { (grid(form, 0)[2] as Child).span = 'all' }))
+    const published = publish(
+      both(
+        relabel('notes', 'Delivery notes'),
+        (form) => {
+          ;(sections(form)[0] as { label: string }).label = 'Order details'
+        },
+        move(0, 'notes', 3),
+        (form) => {
+          ;(grid(form, 0)[2] as Child).span = 'all'
+        },
+      ),
+    )
     const rebased = regenerate(published)
     expect(rebased.conflicts).toEqual([])
     expect(rebased.presentation).toEqual(published.presentation)
@@ -116,7 +132,15 @@ describe('rebasePresentation', () => {
     const labelled = publish(relabel('paid', 'Settled'))
     const gone = regenerate(labelled, (objects) => dropColumn(objects, 'order', 'paid'))
     expect(gone.conflicts).toEqual([
-      { kind: 'field-gone', field: 'paid', anchor: { kind: 'column', column: 'paid' }, property: 'label', yours: 'Settled', resolution: 'dropped', message: expect.stringContaining('paid') },
+      {
+        kind: 'field-gone',
+        field: 'paid',
+        anchor: { kind: 'column', column: 'paid' },
+        property: 'label',
+        yours: 'Settled',
+        resolution: 'dropped',
+        message: expect.stringContaining('paid'),
+      },
     ])
     expect(gone.presentation).toEqual(EMPTY_PRESENTATION)
 
@@ -131,7 +155,7 @@ describe('rebasePresentation', () => {
   // order_date_2 to order_date. Carried by key, the label chosen for the
   // dropped column would land on the other one, and the label chosen for
   // the other would be lost.
-  test('a dropped colliding column renumbers a key: the label follows the column, and is not given to the key\'s new holder', () => {
+  test("a dropped colliding column renumbers a key: the label follows the column, and is not given to the key's new holder", () => {
     const published = publish(both(relabel('order_date', 'Ordered on'), relabel('order_date_2', 'Ship date')), orderDate2)
     const after = (objects: ObjectMeta[]) => {
       orderDate2(objects)
@@ -140,12 +164,21 @@ describe('rebasePresentation', () => {
     const rebased = regenerate(published, after)
     expect(rebased.conflicts).toEqual([
       expect.objectContaining({ kind: 'field-gone', field: 'order_date', property: 'label', yours: 'Ordered on' }),
-      { kind: 'field-rekeyed', field: 'order_date', from: 'order_date_2', anchor: { kind: 'column', column: 'order date' }, resolution: 'followed', message: expect.stringContaining('order_date_2') },
+      {
+        kind: 'field-rekeyed',
+        field: 'order_date',
+        from: 'order_date_2',
+        anchor: { kind: 'column', column: 'order date' },
+        resolution: 'followed',
+        message: expect.stringContaining('order_date_2'),
+      },
     ])
     expect(labelOf(rebased.form, 'order_date')).toBe('Ship date')
     expect(rebased.presentation.fields).toEqual([{ field: 'order_date', anchor: { kind: 'column', column: 'order date' }, label: 'Ship date' }])
     // And grants written for order_date now name another column.
-    expect(reassignedKeys(published.bindings, rebased.next.bindings)).toEqual([{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }])
+    expect(reassignedKeys(published.bindings, rebased.next.bindings)).toEqual([
+      { field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } },
+    ])
   })
 
   // The same foreign key now references another table: the key and the
@@ -185,7 +218,14 @@ describe('rebasePresentation', () => {
       column(objects, 'order', 'created_by').generated = 'computed'
     })
     expect(rebased.conflicts).toEqual([
-      { kind: 'moved-section', field: 'created_by', from: { label: 'Order', occurrence: 0 }, to: { label: 'Record', occurrence: 0 }, resolution: 'followed', message: expect.stringContaining('Record') },
+      {
+        kind: 'moved-section',
+        field: 'created_by',
+        from: { label: 'Order', occurrence: 0 },
+        to: { label: 'Record', occurrence: 0 },
+        resolution: 'followed',
+        message: expect.stringContaining('Record'),
+      },
     ])
     expect(keys(rebased.form, 0)).toEqual(['customer', 'order_date', 'status', 'notes', 'amount', 'paid'])
     expect(keys(rebased.form, 1)).toEqual(['id', 'created_by'])
@@ -195,13 +235,22 @@ describe('rebasePresentation', () => {
   // so does the section, and the label chosen for it is reported dropped
   // rather than given to some other section.
   test('the last generated column dropped is section-gone for Record', () => {
-    const published = publish((form) => { (sections(form)[1] as { label: string }).label = 'Bookkeeping' })
+    const published = publish((form) => {
+      ;(sections(form)[1] as { label: string }).label = 'Bookkeeping'
+    })
     const rebased = regenerate(published, (objects) => {
       dropColumn(objects, 'order', 'id')
       object(objects, 'order').primaryKey = null
     })
     expect(rebased.conflicts).toEqual([
-      { kind: 'section-gone', section: { label: 'Record', occurrence: 0 }, property: 'label', yours: 'Bookkeeping', resolution: 'dropped', message: expect.stringContaining('Record') },
+      {
+        kind: 'section-gone',
+        section: { label: 'Record', occurrence: 0 },
+        property: 'label',
+        yours: 'Bookkeeping',
+        resolution: 'dropped',
+        message: expect.stringContaining('Record'),
+      },
     ])
     expect(sections(rebased.form).map((entry) => entry.label)).toEqual(['Order'])
   })
@@ -212,15 +261,29 @@ describe('rebasePresentation', () => {
   test('a root named record keeps its two sections apart by occurrence', () => {
     const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'record' }, formId: 'sales-record', title: 'Record', lookups: [] }
     const records = (objects: ObjectMeta[]) => {
-      objects.push(table('record', [col('id', 'int', INT32, { generated: 'identity-always' }), col('name', 'nvarchar(50)', text(50))], { primaryKey: { name: 'pk_record', columns: ['id'] } }))
+      objects.push(
+        table('record', [col('id', 'int', INT32, { generated: 'identity-always' }), col('name', 'nvarchar(50)', text(50))], {
+          primaryKey: { name: 'pk_record', columns: ['id'] },
+        }),
+      )
     }
-    const published = publish((form) => { (sections(form)[1] as { label: string }).label = 'Bookkeeping' }, records, request)
+    const published = publish(
+      (form) => {
+        ;(sections(form)[1] as { label: string }).label = 'Bookkeeping'
+      },
+      records,
+      request,
+    )
     expect(sections(published.base).map((entry) => entry.label)).toEqual(['Record', 'Record'])
     expect(published.presentation.sections).toEqual([{ anchor: { label: 'Record', occurrence: 1 }, label: 'Bookkeeping' }])
-    const rebased = regenerate(published, (objects) => {
-      records(objects)
-      addColumn(objects, 'record', col('code', 'int', INT32, { nullable: true }))
-    }, request)
+    const rebased = regenerate(
+      published,
+      (objects) => {
+        records(objects)
+        addColumn(objects, 'record', col('code', 'int', INT32, { nullable: true }))
+      },
+      request,
+    )
     expect(sections(rebased.form).map((entry) => entry.label)).toEqual(['Record', 'Bookkeeping'])
     expect(rebased.conflicts).toEqual([])
   })
@@ -235,33 +298,77 @@ describe('rebasePresentation', () => {
   test('a record root whose sections change in number carries neither section, and says so', () => {
     const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'record' }, formId: 'sales-record', title: 'Record', lookups: [] }
     const records = (readable: boolean) => (objects: ObjectMeta[]) => {
-      objects.push(table('record', [
-        col('id', 'int', INT32, { generated: 'identity-always' }),
-        col('stamp', 'int', INT32, { generated: 'computed' }),
-        col('name', 'nvarchar(50)', text(50), { access: { select: readable, insert: readable, update: readable } }),
-        col('note', 'nvarchar(50)', text(50), { nullable: true, access: { select: readable, insert: readable, update: readable } }),
-      ], { primaryKey: { name: 'pk_record', columns: ['id'] } }))
+      objects.push(
+        table(
+          'record',
+          [
+            col('id', 'int', INT32, { generated: 'identity-always' }),
+            col('stamp', 'int', INT32, { generated: 'computed' }),
+            col('name', 'nvarchar(50)', text(50), { access: { select: readable, insert: readable, update: readable } }),
+            col('note', 'nvarchar(50)', text(50), { nullable: true, access: { select: readable, insert: readable, update: readable } }),
+          ],
+          { primaryKey: { name: 'pk_record', columns: ['id'] } },
+        ),
+      )
     }
 
     // The main section goes: its label and order must not reach the system section.
-    const twice = publish(both(
-      (form) => { (sections(form)[0] as { label: string }).label = 'Details' },
-      (form) => { (sections(form)[1] as { label: string }).label = 'System' },
-      move(0, 'note', 0),
-    ), records(true), request)
+    const twice = publish(
+      both(
+        (form) => {
+          ;(sections(form)[0] as { label: string }).label = 'Details'
+        },
+        (form) => {
+          ;(sections(form)[1] as { label: string }).label = 'System'
+        },
+        move(0, 'note', 0),
+      ),
+      records(true),
+      request,
+    )
     expect(sections(twice.base).map((entry) => entry.label)).toEqual(['Record', 'Record'])
     const vanished = regenerate(twice, records(false), request)
     expect(sections(vanished.form).map((entry) => entry.label)).toEqual(['Record'])
     expect(vanished.presentation).toEqual(EMPTY_PRESENTATION)
     expect(vanished.conflicts).toEqual([
-      { kind: 'section-gone', section: { label: 'Record', occurrence: 0 }, property: 'label', yours: 'Details', resolution: 'dropped', message: expect.stringContaining('cannot be told apart') },
-      { kind: 'section-gone', section: { label: 'Record', occurrence: 0 }, property: 'order', yours: ['note', 'name'], resolution: 'dropped', message: expect.stringContaining('cannot be told apart') },
-      { kind: 'section-gone', section: { label: 'Record', occurrence: 1 }, property: 'label', yours: 'System', resolution: 'dropped', message: expect.stringContaining('cannot be told apart') },
+      {
+        kind: 'section-gone',
+        section: { label: 'Record', occurrence: 0 },
+        property: 'label',
+        yours: 'Details',
+        resolution: 'dropped',
+        message: expect.stringContaining('cannot be told apart'),
+      },
+      {
+        kind: 'section-gone',
+        section: { label: 'Record', occurrence: 0 },
+        property: 'order',
+        yours: ['note', 'name'],
+        resolution: 'dropped',
+        message: expect.stringContaining('cannot be told apart'),
+      },
+      {
+        kind: 'section-gone',
+        section: { label: 'Record', occurrence: 1 },
+        property: 'label',
+        yours: 'System',
+        resolution: 'dropped',
+        message: expect.stringContaining('cannot be told apart'),
+      },
     ])
 
     // The main section appears: the system section's label and order must
     // not reach it, and no field is said to have moved, because none did.
-    const once = publish(both((form) => { (sections(form)[0] as { label: string }).label = 'Identity' }, move(0, 'stamp', 0)), records(false), request)
+    const once = publish(
+      both(
+        (form) => {
+          ;(sections(form)[0] as { label: string }).label = 'Identity'
+        },
+        move(0, 'stamp', 0),
+      ),
+      records(false),
+      request,
+    )
     expect(sections(once.base).map((entry) => entry.label)).toEqual(['Record'])
     const appeared = regenerate(once, records(true), request)
     expect(sections(appeared.form).map((entry) => entry.label)).toEqual(['Record', 'Record'])
@@ -292,12 +399,18 @@ describe('rebasePresentation', () => {
 
   // A span is a label's sibling: gone with its column and said, or no
   // longer an override once the generator spans the field itself.
-  test("a span goes with its column, and one the generator now agrees with is dropped silently", () => {
-    const narrowed = publish((form) => { delete (grid(form, 0).find((entry) => entry.path === 'notes') as Child).span })
+  test('a span goes with its column, and one the generator now agrees with is dropped silently', () => {
+    const narrowed = publish((form) => {
+      delete (grid(form, 0).find((entry) => entry.path === 'notes') as Child).span
+    })
     const gone = regenerate(narrowed, (objects) => dropColumn(objects, 'order', 'notes'))
-    expect(gone.conflicts).toEqual([expect.objectContaining({ kind: 'field-gone', field: 'notes', property: 'span', yours: 'one', message: expect.stringContaining("'one'") })])
+    expect(gone.conflicts).toEqual([
+      expect.objectContaining({ kind: 'field-gone', field: 'notes', property: 'span', yours: 'one', message: expect.stringContaining("'one'") }),
+    ])
 
-    const widened = publish((form) => { (grid(form, 0).find((entry) => entry.path === 'status') as Child).span = 'all' })
+    const widened = publish((form) => {
+      ;(grid(form, 0).find((entry) => entry.path === 'status') as Child).span = 'all'
+    })
     const agreed = regenerate(widened, (objects) => retype(objects, 'order', 'status', 'nvarchar(max)', text(null)))
     expect(agreed.conflicts).toEqual([])
     expect(agreed.presentation).toEqual(EMPTY_PRESENTATION)
@@ -358,7 +471,8 @@ describe('rebasePresentation', () => {
         section: RECORD,
         to: MAIN,
         resolution: 'dropped',
-        message: 'The move of paid to section "Record" was dropped: "Record" is not in the regenerated form, so paid is in section "Order", where the generator put it.',
+        message:
+          'The move of paid to section "Record" was dropped: "Record" is not in the regenerated form, so paid is in section "Order", where the generator put it.',
       },
     ])
     expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
@@ -409,7 +523,13 @@ describe('rebasePresentation', () => {
       dropColumn(objects, 'order', 'created_by')
     })
     expect(rebased.conflicts).toEqual([
-      expect.objectContaining({ kind: 'move-dropped', field: 'id', section: MAIN, to: RECORD, message: expect.stringContaining('would leave section "Record" with no field') }),
+      expect.objectContaining({
+        kind: 'move-dropped',
+        field: 'id',
+        section: MAIN,
+        to: RECORD,
+        message: expect.stringContaining('would leave section "Record" with no field'),
+      }),
     ])
     expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
     expect(keys(rebased.form, 1)).toEqual(['id'])
@@ -423,19 +543,32 @@ describe('rebasePresentation', () => {
   test('a record root whose sections change in number drops a move into one of them, and says no field moved', () => {
     const request: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'record' }, formId: 'sales-record', title: 'Record', lookups: [] }
     const records = (readable: boolean) => (objects: ObjectMeta[]) => {
-      objects.push(table('record', [
-        col('id', 'int', INT32, { generated: 'identity-always' }),
-        col('stamp', 'int', INT32, { generated: 'computed' }),
-        col('name', 'nvarchar(50)', text(50), { access: { select: readable, insert: readable, update: readable } }),
-      ], { primaryKey: { name: 'pk_record', columns: ['id'] } }))
+      objects.push(
+        table(
+          'record',
+          [
+            col('id', 'int', INT32, { generated: 'identity-always' }),
+            col('stamp', 'int', INT32, { generated: 'computed' }),
+            col('name', 'nvarchar(50)', text(50), { access: { select: readable, insert: readable, update: readable } }),
+          ],
+          { primaryKey: { name: 'pk_record', columns: ['id'] } },
+        ),
+      )
     }
     const published = publish(moveTo('stamp', 0), records(true), request)
-    expect(published.presentation.fields).toEqual([{ field: 'stamp', anchor: { kind: 'column', column: 'stamp' }, section: { label: 'Record', occurrence: 0 } }])
+    expect(published.presentation.fields).toEqual([
+      { field: 'stamp', anchor: { kind: 'column', column: 'stamp' }, section: { label: 'Record', occurrence: 0 } },
+    ])
     const rebased = regenerate(published, records(false), request)
     expect(sections(rebased.form).map((entry) => entry.label)).toEqual(['Record'])
     expect(rebased.presentation).toEqual(EMPTY_PRESENTATION)
     expect(rebased.conflicts).toEqual([
-      expect.objectContaining({ kind: 'move-dropped', field: 'stamp', section: { label: 'Record', occurrence: 0 }, message: expect.stringContaining('cannot be told apart') }),
+      expect.objectContaining({
+        kind: 'move-dropped',
+        field: 'stamp',
+        section: { label: 'Record', occurrence: 0 },
+        message: expect.stringContaining('cannot be told apart'),
+      }),
     ])
   })
 
@@ -470,7 +603,10 @@ describe('rebasePresentation', () => {
   // A person reviews the result, and a regeneration of an unchanged input
   // must not show a different one: no clock, no map iteration order leaking.
   test('two runs are byte-identical', () => {
-    const published = publish(both(relabel('order_date', 'Ordered on'), relabel('order_date_2', 'Ship date'), move(0, 'paid', 0), moveTo('order_date_2', 1, 0)), orderDate2)
+    const published = publish(
+      both(relabel('order_date', 'Ordered on'), relabel('order_date_2', 'Ship date'), move(0, 'paid', 0), moveTo('order_date_2', 1, 0)),
+      orderDate2,
+    )
     const after = (objects: ObjectMeta[]) => {
       orderDate2(objects)
       dropColumn(objects, 'order', 'order_date')
@@ -486,8 +622,13 @@ describe('rebasePresentation', () => {
   test('refuses to carry a presentation that does not apply to its own base', () => {
     const published = publish(() => {})
     const next = generateForm(snapshot(), ORDER)
-    const broken = { ...published, presentation: { ...EMPTY_PRESENTATION, fields: [{ field: 'ghost', anchor: { kind: 'column' as const, column: 'ghost' }, label: 'x' }] } }
-    expect(() => rebasePresentation(broken, { base: next.form, bindings: next.bindings })).toThrow(/the published presentation does not apply to its base: \/fields\/0\/field/)
+    const broken = {
+      ...published,
+      presentation: { ...EMPTY_PRESENTATION, fields: [{ field: 'ghost', anchor: { kind: 'column' as const, column: 'ghost' }, label: 'x' }] },
+    }
+    expect(() => rebasePresentation(broken, { base: next.form, bindings: next.bindings })).toThrow(
+      /the published presentation does not apply to its base: \/fields\/0\/field/,
+    )
   })
 })
 
@@ -501,7 +642,13 @@ describe('reassignedKeys', () => {
 })
 
 describe('grantsOnKey', () => {
-  const policy = (fields: FormPolicy['fields'], lookups: FormPolicy['lookups'] = {}): FormPolicy => ({ version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields, rowFilters: [], lookups })
+  const policy = (fields: FormPolicy['fields'], lookups: FormPolicy['lookups'] = {}): FormPolicy => ({
+    version: 1,
+    operations: { read: ['clerk'], create: [], update: [] },
+    fields,
+    rowFilters: [],
+    lookups,
+  })
 
   // A role, read or write, is a grant. A lookup's filter is not one by
   // itself: every lookup field has one, so counting it left no way to
@@ -524,7 +671,10 @@ describe('grantsOnKey', () => {
   // is a grant to decide as a role is (watched failing: a through key with
   // no role counted as nothing, and was published unasked).
   test('is also a through on the key, which scopes every row the form reaches', () => {
-    const scoped = (fields: FormPolicy['fields']): FormPolicy => ({ ...policy(fields, { order: [{ column: 'tenant_id', attribute: 'tenant' }] }), through: ['order'] })
+    const scoped = (fields: FormPolicy['fields']): FormPolicy => ({
+      ...policy(fields, { order: [{ column: 'tenant_id', attribute: 'tenant' }] }),
+      through: ['order'],
+    })
     expect(grantsOnKey(scoped({}), 'order')).toBe(true)
     expect(grantsOnKey(scoped({ order: { read: [], write: [] } }), 'order')).toBe(true)
     expect(grantsOnKey(scoped({}), 'customer')).toBe(false)
@@ -540,8 +690,8 @@ describe('describeReassigned', () => {
     expect(describeReassigned({ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } })).toBe(
       'Grants for order_date were written for column order_date; it now stands for column order date.',
     )
-    expect(describeReassigned({ field: 'customer', was: { kind: 'column', column: 'customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_customer' } })).toBe(
-      'Grants for customer were written for column customer; it now stands for the lookup over fk_order_customer.',
-    )
+    expect(
+      describeReassigned({ field: 'customer', was: { kind: 'column', column: 'customer' }, now: { kind: 'lookup', foreignKey: 'fk_order_customer' } }),
+    ).toBe('Grants for customer were written for column customer; it now stands for the lookup over fk_order_customer.')
   })
 })

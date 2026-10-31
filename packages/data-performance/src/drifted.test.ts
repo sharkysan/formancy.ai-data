@@ -15,8 +15,12 @@ describe("the refusals' case", () => {
   // the update would be refused before the read the pin counts.
   test('is the shared narrowed-decimal case, which stops both writes and allows reading', () => {
     expect(driftedCase().name).toBe('narrowed-decimal')
-    expect(() => driftedCase(changed((entry) => ({ ...entry, verdict: { read: true, create: true, update: false, delete: true } })))).toThrow(/no longer stops both writes while allowing reads/)
-    expect(() => driftedCase(changed((entry) => ({ ...entry, verdict: { read: false, create: false, update: false, delete: false } })))).toThrow(/no longer stops both writes while allowing reads/)
+    expect(() => driftedCase(changed((entry) => ({ ...entry, verdict: { read: true, create: true, update: false, delete: true } })))).toThrow(
+      /no longer stops both writes while allowing reads/,
+    )
+    expect(() => driftedCase(changed((entry) => ({ ...entry, verdict: { read: false, create: false, update: false, delete: false } })))).toThrow(
+      /no longer stops both writes while allowing reads/,
+    )
   })
 
   // Both engines are counted; a case one engine lost would leave that

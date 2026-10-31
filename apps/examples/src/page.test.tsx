@@ -15,6 +15,7 @@ import { NOTE_KINDS } from './notes.js'
 import { FIXTURE_SNAPSHOT } from './snapshot.js'
 import { ANSWERING_ROLES, answerable, paragraphs } from './test-accessible.js'
 import { ANGULAR_ARRIVES } from './test-timing.js'
+import { fieldHeading } from '@formancy/data-core'
 
 /**
  * The page around the previews: what it says, and whether it can be used.
@@ -39,7 +40,9 @@ const REPOSITORY = (
   JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'packages', 'data-core', 'package.json'), 'utf8')) as {
     repository: { url: string }
   }
-).repository.url.replace(/^git\+/, '').replace(/\.git$/, '')
+).repository.url
+  .replace(/^git\+/, '')
+  .replace(/\.git$/, '')
 
 function tableOf(subject: Example): string {
   return `${subject.request.root.schema}.${subject.request.root.name}`
@@ -67,22 +70,19 @@ beforeEach(() => {
  * and buttons, and every control in every preview.
  */
 function operable(): HTMLElement[] {
-  const names = EXAMPLES.flatMap((subject) => subject.generated.form.model.fields.map((field) => String(field.label)))
+  const names = EXAMPLES.flatMap((subject) => subject.generated.form.model.fields.map(fieldHeading))
   return [...screen.queryAllByRole('link'), ...screen.queryAllByRole('button'), ...answerable(document.body, names)]
 }
 
 async function mounted(): Promise<void> {
   render(<App />)
-  await waitFor(
-    () => {
-      for (const subject of EXAMPLES) {
-        const angular = screen.getByRole('region', { name: `${tableOf(subject)} Angular` })
-        const first = String(subject.generated.form.model.fields[0]?.label ?? '')
-        expect(within(angular).queryByLabelText(first)).not.toBeNull()
-      }
-    },
-    ANGULAR_ARRIVES,
-  )
+  await waitFor(() => {
+    for (const subject of EXAMPLES) {
+      const angular = screen.getByRole('region', { name: `${tableOf(subject)} Angular` })
+      const first = fieldHeading(subject.generated.form.model.fields[0] ?? { key: '' })
+      expect(within(angular).queryByLabelText(first)).not.toBeNull()
+    }
+  }, ANGULAR_ARRIVES)
 }
 
 describe('the generator says what it chose, beside each form', () => {
@@ -115,18 +115,16 @@ describe('the generator says what it chose, beside each form', () => {
   // What can be done with the form at all is a fact of the bindings, and it is
   // printed from them -- a page that said "create and update" for a table
   // whose update is blocked would contradict the blocked note beside it.
-  test.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))(
-    '%s says which operations the bindings offer',
-    async (_table, subject) => {
-      await mounted()
-      const { create, update } = subject.generated.bindings.operations
-      const said = within(section(subject)).getByRole('list', { name: 'Operations' })
-      expect(within(said).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
-        `Create: ${create ? 'offered' : 'not offered'}`,
-        `Update: ${update ? 'offered' : 'not offered'}`,
-      ])
-    },
-  )
+  test.each(EXAMPLES.map((subject) => [tableOf(subject), subject] as const))('%s says which operations the bindings offer', async (_table, subject) => {
+    await mounted()
+    const { create, update } = subject.generated.bindings.operations
+    const said = within(section(subject)).getByRole('list', { name: 'Operations' })
+    expect(
+      within(said)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([`Create: ${create ? 'offered' : 'not offered'}`, `Update: ${update ? 'offered' : 'not offered'}`])
+  })
 
   // The customer list on this page is not the server's, because this page has
   // no server; a page that did not say so would pass its captured rows off as

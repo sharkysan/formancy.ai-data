@@ -55,7 +55,10 @@ export async function openFloor(engine: EngineKey, endpoint: WriterEndpoint): Pr
 }
 
 /** Each scenario's, each refusal's and the floor's round trips, per engine, counted through the hop; a refusal with what answered it. */
-export type Counted = Record<EngineKey, { scenarios: Record<string, number>; refusals: Record<string, { roundTrips: number; status: number; code: string }>; floor: number }>
+export type Counted = Record<
+  EngineKey,
+  { scenarios: Record<string, number>; refusals: Record<string, { roundTrips: number; status: number; code: string }>; floor: number }
+>
 
 /**
  * One warm-up request, then one counted: the hop counts turns, the client
@@ -91,7 +94,8 @@ export async function countingPass(
       const wrong = addressedProblem(`${ENGINE_NAMES[engine]} ${entry.name}`, entry.operation, before, addressed())
       if (wrong !== undefined) problems.push(wrong)
       counted[engine].scenarios[entry.name] = n
-      if (n !== entry.roundTrips[engine]) problems.push(`${ENGINE_NAMES[engine]} ${entry.name}: counted ${String(n)} round trips, the catalogue pins ${String(entry.roundTrips[engine])}`)
+      if (n !== entry.roundTrips[engine])
+        problems.push(`${ENGINE_NAMES[engine]} ${entry.name}: counted ${String(n)} round trips, the catalogue pins ${String(entry.roundTrips[engine])}`)
     }
     // A refusal answers as the catalogue says or the run stops, and is counted like a scenario.
     const refusals = refused(engine)
@@ -103,7 +107,8 @@ export async function countingPass(
       const answer = await refusal.send()
       const n = turns()
       counted[engine].refusals[entry.name] = { roundTrips: n, ...refusal.check(answer) }
-      if (n !== entry.roundTrips[engine]) problems.push(`${ENGINE_NAMES[engine]} ${entry.name}: counted ${String(n)} round trips, the catalogue pins ${String(entry.roundTrips[engine])}`)
+      if (n !== entry.roundTrips[engine])
+        problems.push(`${ENGINE_NAMES[engine]} ${entry.name}: counted ${String(n)} round trips, the catalogue pins ${String(entry.roundTrips[engine])}`)
     }
     const floor = await floorThroughHop(engine)
     try {
@@ -115,9 +120,13 @@ export async function countingPass(
     } finally {
       await floor.close()
     }
-    if (counted[engine].floor !== catalogue.floor.roundTrips[engine]) problems.push(`${ENGINE_NAMES[engine]} floor: counted ${String(counted[engine].floor)} round trips, the catalogue pins ${String(catalogue.floor.roundTrips[engine])}`)
+    if (counted[engine].floor !== catalogue.floor.roundTrips[engine])
+      problems.push(
+        `${ENGINE_NAMES[engine]} floor: counted ${String(counted[engine].floor)} round trips, the catalogue pins ${String(catalogue.floor.roundTrips[engine])}`,
+      )
   }
-  if (problems.length > 0) throw new Error(`The round trips or the operations differ from catalogue.ts; explain the change and update it:\n  ${problems.join('\n  ')}`)
+  if (problems.length > 0)
+    throw new Error(`The round trips or the operations differ from catalogue.ts; explain the change and update it:\n  ${problems.join('\n  ')}`)
   return counted
 }
 
@@ -145,9 +154,16 @@ export interface ComponentInputs {
 }
 
 /** The fixed costs, in this process: what the server pays per request before and beside the database. */
-export async function components(inputs: ComponentInputs): Promise<{ verifyToken: ComponentResult; readBundle: Record<EngineKey, ComponentResult & { form: string }>; floor: Record<EngineKey, FloorResult> }> {
+export async function components(
+  inputs: ComponentInputs,
+): Promise<{ verifyToken: ComponentResult; readBundle: Record<EngineKey, ComponentResult & { form: string }>; floor: Record<EngineKey, FloorResult> }> {
   const { protocol } = inputs
-  const verify = await createIdentityVerifier({ key: { kind: 'secret', secret: inputs.secret }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
+  const verify = await createIdentityVerifier({
+    key: { kind: 'secret', secret: inputs.secret },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: 'tid' },
+  })
   const verifyToken = {
     label: 'Verify a host token',
     ...summarise(

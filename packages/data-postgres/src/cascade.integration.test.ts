@@ -1,6 +1,15 @@
 import { generateForm, planDelete } from '@formancy/data-core'
 import type { DeleteOutcome, DeleteRequest, FormBindings, FormPolicy, MetadataSnapshot, PolicyContext, RecordAdapter } from '@formancy/data-core'
-import { cascadeAnswer, cascadeCase, covers, PARITY_CASCADES, PARITY_SCOPE, REACH_PRIVILEGE_LOSSES, startPostgresFixture, versionFact } from '@formancy/data-fixtures'
+import {
+  cascadeAnswer,
+  cascadeCase,
+  covers,
+  PARITY_CASCADES,
+  PARITY_SCOPE,
+  REACH_PRIVILEGE_LOSSES,
+  startPostgresFixture,
+  versionFact,
+} from '@formancy/data-fixtures'
 import type { CascadeCase, DeleteAnswer, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql, TransactionSql } from 'postgres'
@@ -47,7 +56,14 @@ beforeAll(async () => {
   fixture = await startPostgresFixture()
   owner = postgres(fixture.admin, { onnotice: () => {} })
   parity = await discoverPostgres(owner, PARITY_SCOPE)
-  bindings = generateForm(parity, { connection: 'test', root: { schema: 'parity', name: 'removable_parent' }, formId: 'removable-parent', title: 'Parent', lookups: [], versionColumn: 'version' }).bindings
+  bindings = generateForm(parity, {
+    connection: 'test',
+    root: { schema: 'parity', name: 'removable_parent' },
+    formId: 'removable-parent',
+    title: 'Parent',
+    lookups: [],
+    versionColumn: 'version',
+  }).bindings
   records = createPostgresRecords(owner)
 })
 
@@ -139,7 +155,9 @@ async function asRole(role: string, grants: readonly string[]): Promise<Sql> {
 
 /** The role that owns `table`, as the catalog names it: the role a referential action on it runs as. */
 async function ownerOf(table: string): Promise<string> {
-  const [row] = await owner<{ owned: string }[]>`select pg_catalog.pg_get_userbyid(relowner)::text as owned from pg_catalog.pg_class where oid = ${table}::regclass`
+  const [row] = await owner<
+    { owned: string }[]
+  >`select pg_catalog.pg_get_userbyid(relowner)::text as owned from pg_catalog.pg_class where oid = ${table}::regclass`
   if (row === undefined) throw new Error(`no relation ${table}`)
   return row.owned
 }
@@ -166,12 +184,21 @@ describe('a delete that cascades and clears through keys the policy names', () =
   // column stays where it was, so a person editing it is not told (0051).
   // Writing the reference it had back is refused by the key, whose target
   // is gone: 23503.
-  test('clears: a row that referred to the record keeps its place, with no reference and its version unchanged', covers('postgres', cascadeCase('clears')), async () => {
-    const parent = await family('clears', 0, 1)
-    expect(answer(await records.delete(await planned(parent)))).toBe(expected('clears'))
-    expect([...(await owner.unsafe("select parent_id, version::text as version from parity.removable_null where note = 'clears'"))]).toEqual([{ parent_id: null, version: '1' }])
-    await expect(owner.unsafe("update parity.removable_null set parent_id = $1 where note = 'clears'", [parent])).rejects.toMatchObject({ code: '23503', constraint_name: 'fk_removable_null_parent' })
-  })
+  test(
+    'clears: a row that referred to the record keeps its place, with no reference and its version unchanged',
+    covers('postgres', cascadeCase('clears')),
+    async () => {
+      const parent = await family('clears', 0, 1)
+      expect(answer(await records.delete(await planned(parent)))).toBe(expected('clears'))
+      expect([...(await owner.unsafe("select parent_id, version::text as version from parity.removable_null where note = 'clears'"))]).toEqual([
+        { parent_id: null, version: '1' },
+      ])
+      await expect(owner.unsafe("update parity.removable_null set parent_id = $1 where note = 'clears'", [parent])).rejects.toMatchObject({
+        code: '23503',
+        constraint_name: 'fk_removable_null_parent',
+      })
+    },
+  )
 
   // The cascading rows' own cascade is followed too, two levels below.
   test('grandchild: a cascade two levels below the record is followed', covers('postgres', cascadeCase('grandchild')), async () => {
@@ -182,7 +209,8 @@ describe('a delete that cascades and clears through keys the policy names', () =
 })
 
 describe('what moved since the delete was decided', () => {
-  const addCopyKey = 'alter table parity.removable_copy add constraint fk_removable_copy_cascade foreign key (cascade_id) references parity.removable_cascade (id) on delete cascade'
+  const addCopyKey =
+    'alter table parity.removable_copy add constraint fk_removable_copy_cascade foreign key (cascade_id) references parity.removable_cascade (id) on delete cascade'
 
   /** A copy of a family's cascading rows, which a key added in the case would delete with them. */
   async function copied(note: string): Promise<void> {
@@ -196,20 +224,28 @@ describe('what moved since the delete was decided', () => {
   // deleted, the record's own cascade included (watched failing with the
   // guard over the root alone: the record, its rows and their copies were
   // deleted).
-  test('reach-moved: a cascading key onto a table the delete reaches, added before it ran, deletes nothing', covers('postgres', cascadeCase('reach-moved')), async () => {
-    await owner.unsafe('create table parity.removable_copy (cascade_id int not null)')
-    try {
-      const parent = await family('reach-moved')
-      const request = await planned(parent)
-      await copied('reach-moved')
-      await owner.unsafe(addCopyKey)
-      expect(await records.delete(request)).toMatchObject({ ok: false, code: expected('reach-moved'), message: expect.stringMatching(/foreign key now acts/) })
-      expect(await left('reach-moved')).toEqual(whole())
-      expect(await copies()).toEqual([{ n: 2 }])
-    } finally {
-      await owner.unsafe('drop table parity.removable_copy')
-    }
-  })
+  test(
+    'reach-moved: a cascading key onto a table the delete reaches, added before it ran, deletes nothing',
+    covers('postgres', cascadeCase('reach-moved')),
+    async () => {
+      await owner.unsafe('create table parity.removable_copy (cascade_id int not null)')
+      try {
+        const parent = await family('reach-moved')
+        const request = await planned(parent)
+        await copied('reach-moved')
+        await owner.unsafe(addCopyKey)
+        expect(await records.delete(request)).toMatchObject({
+          ok: false,
+          code: expected('reach-moved'),
+          message: expect.stringMatching(/foreign key now acts/),
+        })
+        expect(await left('reach-moved')).toEqual(whole())
+        expect(await copies()).toEqual([{ n: 2 }])
+      } finally {
+        await owner.unsafe('drop table parity.removable_copy')
+      }
+    },
+  )
 
   // The same key, committed while the delete waits. A statement locks only
   // the table it names before its snapshot: the cascade opens the lines'
@@ -219,29 +255,41 @@ describe('what moved since the delete was decided', () => {
   // guard in the statement and no locks: the delete was answered done and
   // the copies deleted; and with the locks taken ACCESS SHARE, which ADD
   // FOREIGN KEY does not wait for: the same).
-  test('reach-moved-waiting: the same key committed while the delete waits, under either isolation, deletes nothing', covers('postgres', cascadeCase('reach-moved-waiting')), async () => {
-    await owner.unsafe('create table parity.removable_copy (cascade_id int not null)')
-    try {
-      for (const isolation of ['read committed', 'repeatable read'] as const) {
-        const sql = postgres(fixture.admin, { onnotice: () => {}, connection: { default_transaction_isolation: isolation } })
-        const note = `reach-moved-waiting, ${isolation}`
-        try {
-          const via = createPostgresRecords(sql)
-          const request = await planned(await family(note), via)
-          await copied(note)
-          const outcome = await racedWith((tx) => tx.unsafe(addCopyKey), () => via.delete(request))
-          expect(answer(outcome), isolation).toBe(expected('reach-moved-waiting'))
-          expect(await left(note), isolation).toEqual(whole())
-          expect([...(await owner.unsafe('select count(*)::int as n from parity.removable_copy c join parity.removable_cascade r on r.id = c.cascade_id where r.note = $1', [note]))]).toEqual([{ n: 2 }])
-        } finally {
-          await sql.end()
-          await owner.unsafe('alter table parity.removable_copy drop constraint if exists fk_removable_copy_cascade')
+  test(
+    'reach-moved-waiting: the same key committed while the delete waits, under either isolation, deletes nothing',
+    covers('postgres', cascadeCase('reach-moved-waiting')),
+    async () => {
+      await owner.unsafe('create table parity.removable_copy (cascade_id int not null)')
+      try {
+        for (const isolation of ['read committed', 'repeatable read'] as const) {
+          const sql = postgres(fixture.admin, { onnotice: () => {}, connection: { default_transaction_isolation: isolation } })
+          const note = `reach-moved-waiting, ${isolation}`
+          try {
+            const via = createPostgresRecords(sql)
+            const request = await planned(await family(note), via)
+            await copied(note)
+            const outcome = await racedWith(
+              (tx) => tx.unsafe(addCopyKey),
+              () => via.delete(request),
+            )
+            expect(answer(outcome), isolation).toBe(expected('reach-moved-waiting'))
+            expect(await left(note), isolation).toEqual(whole())
+            expect([
+              ...(await owner.unsafe(
+                'select count(*)::int as n from parity.removable_copy c join parity.removable_cascade r on r.id = c.cascade_id where r.note = $1',
+                [note],
+              )),
+            ]).toEqual([{ n: 2 }])
+          } finally {
+            await sql.end()
+            await owner.unsafe('alter table parity.removable_copy drop constraint if exists fk_removable_copy_cascade')
+          }
         }
+      } finally {
+        await owner.unsafe('drop table parity.removable_copy')
       }
-    } finally {
-      await owner.unsafe('drop table parity.removable_copy')
-    }
-  })
+    },
+  )
 
   // A key accepted as SET NULL that now cascades deletes rows the policy
   // accepted it would keep: the guard matches each key by its action as
@@ -265,22 +313,26 @@ describe('what moved since the delete was decided', () => {
   // a table nobody named. One added after the delete was decided is refused
   // by the guard, and nothing is cleared (watched failing with the cleared
   // columns unguarded: the reference was cleared and the copy's with it).
-  test('clears-moved: a key that follows a cleared reference on update, added after the delete was decided, deletes nothing', covers('postgres', cascadeCase('clears-moved')), async () => {
-    await owner.unsafe('create table parity.removable_null_copy (parent_id int, null_id int not null)')
-    try {
-      const parent = await family('clears-moved', 0, 1)
-      const request = await planned(parent)
-      await owner.unsafe("insert into parity.removable_null_copy select parent_id, id from parity.removable_null where note = 'clears-moved'")
-      await owner.unsafe(
-        'alter table parity.removable_null_copy add constraint fk_removable_null_copy foreign key (parent_id, null_id) references parity.removable_null (parent_id, id) on update cascade',
-      )
-      expect(answer(await records.delete(request))).toBe(expected('clears-moved'))
-      expect(await left('clears-moved')).toEqual(whole(0, 1))
-      expect([...(await owner.unsafe('select count(*)::int as n from parity.removable_null_copy where parent_id = $1', [parent]))]).toEqual([{ n: 1 }])
-    } finally {
-      await owner.unsafe('drop table parity.removable_null_copy')
-    }
-  })
+  test(
+    'clears-moved: a key that follows a cleared reference on update, added after the delete was decided, deletes nothing',
+    covers('postgres', cascadeCase('clears-moved')),
+    async () => {
+      await owner.unsafe('create table parity.removable_null_copy (parent_id int, null_id int not null)')
+      try {
+        const parent = await family('clears-moved', 0, 1)
+        const request = await planned(parent)
+        await owner.unsafe("insert into parity.removable_null_copy select parent_id, id from parity.removable_null where note = 'clears-moved'")
+        await owner.unsafe(
+          'alter table parity.removable_null_copy add constraint fk_removable_null_copy foreign key (parent_id, null_id) references parity.removable_null (parent_id, id) on update cascade',
+        )
+        expect(answer(await records.delete(request))).toBe(expected('clears-moved'))
+        expect(await left('clears-moved')).toEqual(whole(0, 1))
+        expect([...(await owner.unsafe('select count(*)::int as n from parity.removable_null_copy where parent_id = $1', [parent]))]).toEqual([{ n: 1 }])
+      } finally {
+        await owner.unsafe('drop table parity.removable_null_copy')
+      }
+    },
+  )
 })
 
 describe("the account's grants and row security on the tables a delete reaches", () => {
@@ -296,22 +348,26 @@ describe("the account's grants and row security on the tables a delete reaches",
   // grandchildren as their owner; and with DELETE left to the lock: where
   // the account kept INSERT on the grandchildren or UPDATE on the cleared
   // table, answered done).
-  test('reach-privilege: an account that lost DELETE on a table the delete reaches is refused, and nothing is deleted', covers('postgres', cascadeCase('reach-privilege')), async () => {
-    for (const { table, keeps } of REACH_PRIVILEGE_LOSSES) {
-      const role = `reach_deleter_${table}_${keeps ?? 'nothing'}`
-      const note = `reach-privilege: ${table.replace('removable_', '')}, ${keeps ?? 'nothing'}`
-      const sql = await asRole(role, [...DELETER(role), ...(keeps === null ? [] : [`grant ${keeps} on parity.${table} to ${role}`])])
-      try {
-        const via = createPostgresRecords(sql)
-        const request = await planned(await family(note), via)
-        await owner.unsafe(`revoke delete on parity.${table} from ${role}`)
-        expect.soft(answer(await via.delete(request)), note).toBe(expected('reach-privilege'))
-        expect.soft(await left(note), note).toEqual(whole())
-      } finally {
-        await sql.end()
+  test(
+    'reach-privilege: an account that lost DELETE on a table the delete reaches is refused, and nothing is deleted',
+    covers('postgres', cascadeCase('reach-privilege')),
+    async () => {
+      for (const { table, keeps } of REACH_PRIVILEGE_LOSSES) {
+        const role = `reach_deleter_${table}_${keeps ?? 'nothing'}`
+        const note = `reach-privilege: ${table.replace('removable_', '')}, ${keeps ?? 'nothing'}`
+        const sql = await asRole(role, [...DELETER(role), ...(keeps === null ? [] : [`grant ${keeps} on parity.${table} to ${role}`])])
+        try {
+          const via = createPostgresRecords(sql)
+          const request = await planned(await family(note), via)
+          await owner.unsafe(`revoke delete on parity.${table} from ${role}`)
+          expect.soft(answer(await via.delete(request)), note).toBe(expected('reach-privilege'))
+          expect.soft(await left(note), note).toEqual(whole())
+        } finally {
+          await sql.end()
+        }
       }
-    }
-  })
+    },
+  )
 
   // Row security on a table a cascade reaches is not asked: the account
   // sees none of the cascading rows, FORCE included, and they go with the

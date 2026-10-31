@@ -73,6 +73,9 @@ function fieldOf(bindings: FormBindings, column: string | undefined): string | u
   return undefined
 }
 
+/** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
+export const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
+
 /**
  * A database's refusal as an HTTP answer (0015).
  *
@@ -100,7 +103,10 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
       // An ended version is history; the open one is changed from a date instead (0113).
       return { status: 409, body: { code: 'version-ended', message: 'This version has ended, and only the open version is changed. Nothing was saved.' } }
     case 'chain-exists':
-      return { status: 409, body: { code: 'chain-exists', message: 'This already has versions: change its open version from a date instead. Nothing was saved.' } }
+      return {
+        status: 409,
+        body: { code: 'chain-exists', message: 'This already has versions: change its open version from a date instead. Nothing was saved.' },
+      }
     case 'unique-violation':
       return withField(422, 'unique-violation', 'Another record already has this value.')
     case 'foreign-key-violation':
@@ -142,7 +148,10 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
  * names what was addressed; here it is a bug, as for a read.
  */
 export function deleteFailure(failure: RecordFailure): HttpRefusal {
-  const refused: HttpRefusal = { status: 422, body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' } }
+  const refused: HttpRefusal = {
+    status: 422,
+    body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' },
+  }
   switch (failure.code) {
     case 'not-found':
       return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
@@ -190,17 +199,21 @@ export function unknownOutcome(operation: UnknownOutcome['operation'], record: s
   if (operation === 'supersede') {
     // It ended the version sent, or nothing: sent again with that version, a
     // change that committed finds the version moved on (0113).
-    message = 'The connection to the database failed after the change from a date was sent. It may have been saved. Sending it again with the same version is safe: it is stored at most once, and if it was, that is answered as changed since it was read.'
+    message =
+      'The connection to the database failed after the change from a date was sent. It may have been saved. Sending it again with the same version is safe: it is stored at most once, and if it was, that is answered as changed since it was read.'
   } else if (operation === 'delete') {
     // A delete is protected by its version as an update is, and a key a
     // version proves a record by is never another record's (0050).
-    message = 'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'
+    message =
+      'The connection to the database failed after the deletion was sent. It may have been deleted. Deleting again with the same version deletes nothing else: if it was deleted, that is answered as not found.'
   } else if (operation === 'update') {
-    message = 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
+    message =
+      'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.'
   } else if (record !== null) {
     message = 'The connection to the database failed after the record was sent. It may have been saved: read it before entering it again.'
   } else {
-    message = 'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.'
+    message =
+      'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.'
   }
   return { status: 502, body: { code: 'unknown-outcome', message, operation, record, version } }
 }

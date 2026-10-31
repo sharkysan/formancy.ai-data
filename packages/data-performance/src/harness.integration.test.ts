@@ -58,7 +58,9 @@ describe('the harness, run with the smoke protocol', () => {
     for (const engine of ENGINE_KEYS) {
       const first = run.scenarios.find((entry) => entry.engine === engine && entry.scenario === 'lookup-first-page' && entry.concurrency === 1)
       expect(first?.rowsAnswered, engine).toBe(50)
-      expect(run.scenarios.find((entry) => entry.engine === engine && entry.scenario === 'resolve-100' && entry.concurrency === 1)?.rowsAnswered, engine).toBe(100)
+      expect(run.scenarios.find((entry) => entry.engine === engine && entry.scenario === 'resolve-100' && entry.concurrency === 1)?.rowsAnswered, engine).toBe(
+        100,
+      )
     }
   })
 
@@ -76,7 +78,8 @@ describe('the harness, run with the smoke protocol', () => {
     const run = measured()
     for (const engine of ENGINE_KEYS) {
       for (const entry of CATALOGUE.scenarios) {
-        for (const result of run.scenarios.filter((candidate) => candidate.engine === engine && candidate.scenario === entry.name)) expect(result.roundTrips, `${engine} ${entry.name}`).toBe(entry.roundTrips[engine])
+        for (const result of run.scenarios.filter((candidate) => candidate.engine === engine && candidate.scenario === entry.name))
+          expect(result.roundTrips, `${engine} ${entry.name}`).toBe(entry.roundTrips[engine])
       }
       expect(run.components.floor[engine].roundTrips, `${engine} floor`).toBe(CATALOGUE.floor.roundTrips[engine])
     }
@@ -89,7 +92,15 @@ describe('the harness, run with the smoke protocol', () => {
   test('counts each refusal as the catalogue pins it, answered as the catalogue says', () => {
     const run = measured()
     expect(run.refusals).toEqual(
-      ENGINE_KEYS.flatMap((engine) => CATALOGUE.refusals.map((entry) => ({ engine, scenario: entry.name, roundTrips: entry.roundTrips[engine], status: entry.answer.status, code: entry.answer.code }))),
+      ENGINE_KEYS.flatMap((engine) =>
+        CATALOGUE.refusals.map((entry) => ({
+          engine,
+          scenario: entry.name,
+          roundTrips: entry.roundTrips[engine],
+          status: entry.answer.status,
+          code: entry.answer.code,
+        })),
+      ),
     )
   })
 

@@ -42,7 +42,18 @@ function col(name: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}
 }
 
 function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta {
-  return { ref: { schema: 'sales', name }, kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', ...extra }
+  return {
+    ref: { schema: 'sales', name },
+    kind: 'table',
+    comment: null,
+    columns,
+    primaryKey: null,
+    uniqueKeys: [],
+    foreignKeys: [],
+    checks: [],
+    rowSecurity: 'none',
+    ...extra,
+  }
 }
 
 function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
@@ -79,11 +90,18 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
         col('active', { kind: 'boolean' }, { hasDefault: true }),
         col('created_at', { kind: 'timestamp', withTimeZone: true, precision: 6 }, { hasDefault: true }),
       ],
-      { primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])] },
+      {
+        primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] },
+        foreignKeys: [fk('fk_customer_country', ['country_code'], 'country', ['iso_code'])],
+      },
     ),
     table(
       'employee',
-      [col('id', INT32), col('name', { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }), col('manager_id', INT32, { nullable: true })],
+      [
+        col('id', INT32),
+        col('name', { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }),
+        col('manager_id', INT32, { nullable: true }),
+      ],
       { primaryKey: { name: 'pk_employee', columns: ['id'] }, foreignKeys: [fk('fk_employee_manager', ['manager_id'], 'employee', ['id'])] },
     ),
     table(
@@ -99,9 +117,7 @@ function fixtureLike(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void =
         col('group', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }, { nullable: true }),
         col('created_by', INT32, { nullable: true }),
         col('approved_by', INT32, { nullable: true }),
-        kind === 'sqlserver'
-          ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })
-          : col('row_version', INT64, { hasDefault: true }),
+        kind === 'sqlserver' ? col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }) : col('row_version', INT64, { hasDefault: true }),
       ],
       {
         primaryKey: { name: 'pk_order', columns: ['id'] },
@@ -163,7 +179,10 @@ describe('generateForm', () => {
   test('every fixture object, on both engines, produces a spec 3 document formancy accepts', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const snapshot = fixtureLike(kind)
-      const requests = [...snapshot.objects.map((object) => ({ connection: 'erp', root: object.ref, formId: `f-${object.ref.name}`, title: object.ref.name, lookups: [] })), ORDER]
+      const requests = [
+        ...snapshot.objects.map((object) => ({ connection: 'erp', root: object.ref, formId: `f-${object.ref.name}`, title: object.ref.name, lookups: [] })),
+        ORDER,
+      ]
       for (const request of requests) {
         const result = generateForm(snapshot, request)
         expect(result.form.specVersion).toBe('3')
@@ -183,7 +202,9 @@ describe('generateForm', () => {
     })
     const result = generateForm(snapshot, ORDER)
     valid(result)
-    expect(result.bindings.fields.filter((binding) => binding.kind === 'column' && binding.column === '__proto__').map((binding) => binding.field)).toEqual(['__proto___'])
+    expect(result.bindings.fields.filter((binding) => binding.kind === 'column' && binding.column === '__proto__').map((binding) => binding.field)).toEqual([
+      '__proto___',
+    ])
   })
 
   // `constructor` keeps its name (0093), which is sound only because formancy
@@ -235,7 +256,13 @@ describe('generateForm', () => {
     expect(keys).not.toContain('tenant_id')
     expect(keys).not.toContain('customer_no')
     expect(keys.indexOf('customer')).toBe(1)
-    expect(form.model.fields[1]).toMatchObject({ key: 'customer', type: 'select', optionsSource: 'erp-sales-order-fk-order-customer', widget: 'typeahead', required: true })
+    expect(form.model.fields[1]).toMatchObject({
+      key: 'customer',
+      type: 'select',
+      optionsSource: 'erp-sales-order-fk-order-customer',
+      widget: 'typeahead',
+      required: true,
+    })
     expect(bindings.fields.find((binding) => binding.field === 'customer')).toMatchObject({
       kind: 'lookup',
       columns: ['tenant_id', 'customer_no'],
@@ -263,11 +290,14 @@ describe('generateForm', () => {
   // An integer past 2^53 cannot be a number field: the browser would round it
   // before anybody saw it.
   test('an integer wider than JavaScript can hold is text; one that fits is a bounded number', () => {
-    const { form } = generateForm(fixtureLike('postgres', (objects) => {
-      const order = objects.find((object) => object.ref.name === 'order')
-      const id = order?.columns[0]
-      if (id !== undefined) id.generated = 'none'
-    }), { ...ORDER, lookups: [] })
+    const { form } = generateForm(
+      fixtureLike('postgres', (objects) => {
+        const order = objects.find((object) => object.ref.name === 'order')
+        const id = order?.columns[0]
+        if (id !== undefined) id.generated = 'none'
+      }),
+      { ...ORDER, lookups: [] },
+    )
     expect(form.model.fields.find((field) => field.key === 'id')).toMatchObject({ type: 'text', pattern: '^-?[0-9]{1,19}$' })
     expect(form.model.fields.find((field) => field.key === 'created_by')).toMatchObject({ type: 'number', min: -2147483648, max: 2147483647 })
   })
@@ -318,9 +348,15 @@ describe('generateForm', () => {
   // turns away; the plan tests prove the planner's half.
   test('refuses to confirm a version column that is the key or a lookup’s column', () => {
     const employee = { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] }
-    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'id' })).toThrow(/id cannot be a version column: it is part of the record's key/)
-    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'gone' })).toThrow(/gone cannot be a version column: employee has no such column/)
-    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, versionColumn: 'tenant_id' })).toThrow(/tenant_id cannot be a version column: a field is bound to it/)
+    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'id' })).toThrow(
+      /id cannot be a version column: it is part of the record's key/,
+    )
+    expect(() => generateForm(fixtureLike('postgres'), { ...employee, versionColumn: 'gone' })).toThrow(
+      /gone cannot be a version column: employee has no such column/,
+    )
+    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, versionColumn: 'tenant_id' })).toThrow(
+      /tenant_id cannot be a version column: a field is bound to it/,
+    )
     // The same column with no lookup over it is neither, and can be confirmed.
     expect(generateForm(fixtureLike('postgres'), { ...ORDER, lookups: [], versionColumn: 'tenant_id' }).bindings.concurrency).toEqual({
       kind: 'version-column',
@@ -334,9 +370,15 @@ describe('generateForm', () => {
   // out of the form and could never be confirmed; it stays a field instead.
   test('does not suggest a key column as a version column, however it is named', () => {
     const revisions = fixtureLike('postgres', (objects) => {
-      objects.push(table('document', [col('id', INT32), col('version', INT32), col('body', { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false })], {
-        primaryKey: { name: 'pk_document', columns: ['id', 'version'] },
-      }))
+      objects.push(
+        table(
+          'document',
+          [col('id', INT32), col('version', INT32), col('body', { kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false })],
+          {
+            primaryKey: { name: 'pk_document', columns: ['id', 'version'] },
+          },
+        ),
+      )
     })
     const { bindings } = generateForm(revisions, { ...ORDER, root: { schema: 'sales', name: 'document' }, lookups: [] })
     expect(bindings.concurrency).toBeNull()
@@ -383,7 +425,11 @@ describe('generateForm', () => {
         'The database numbers this value when a create leaves it out (identity-by-default). It would accept one, and the form never gives it: a number chosen by hand is one its sequence would later hand out again.',
     })
     const always = generateForm(fixtureLike('postgres'), { ...ORDER, root: { schema: 'sales', name: 'country' }, lookups: [] })
-    expect(always.notes).toContainEqual({ subject: 'id', kind: 'read-only', message: 'The database numbers this value (identity-always) and refuses one given to it.' })
+    expect(always.notes).toContainEqual({
+      subject: 'id',
+      kind: 'read-only',
+      message: 'The database numbers this value (identity-always) and refuses one given to it.',
+    })
     // A computed column is not numbered, and a note saying so would mislead the reviewer.
     const computed = fixtureLike('postgres', (objects) => {
       const name = objects.find((object) => object.ref.name === 'country')?.columns.find((column) => column.name === 'name')
@@ -401,7 +447,7 @@ describe('generateForm', () => {
   // as it does an identity (0056), and create stays offered because the
   // database fills it. A composite key keeps every part a person gives: a
   // default on a line number is a first line, not an address.
-  test("a one-column key the database fills by default is read-only, never required, and create is still offered", () => {
+  test('a one-column key the database fills by default is read-only, never required, and create is still offered', () => {
     const delivery = fixtureLike('postgres', (objects) => {
       objects.push(
         table(
@@ -413,14 +459,17 @@ describe('generateForm', () => {
           ],
           { primaryKey: { name: 'pk_delivery', columns: ['id'] } },
         ),
-        table(
-          'line',
-          [col('order_id', INT64), col('line_no', INT32, { hasDefault: true, defaultExpression: '1' }), col('quantity', INT32)],
-          { primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] } },
-        ),
+        table('line', [col('order_id', INT64), col('line_no', INT32, { hasDefault: true, defaultExpression: '1' }), col('quantity', INT32)], {
+          primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] },
+        }),
       )
     })
-    const { form, bindings, notes } = generateForm(delivery, { ...ORDER, root: { schema: 'sales', name: 'delivery' }, lookups: [], versionColumn: 'row_version' })
+    const { form, bindings, notes } = generateForm(delivery, {
+      ...ORDER,
+      root: { schema: 'sales', name: 'delivery' },
+      lookups: [],
+      versionColumn: 'row_version',
+    })
     expect(form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
     expect(bindings.fields.find((binding) => binding.field === 'id')).toMatchObject({ writes: { create: false, update: false } })
     expect(bindings.identity).toEqual(['id'])
@@ -431,7 +480,8 @@ describe('generateForm', () => {
     expect(notes).toContainEqual({
       subject: 'id',
       kind: 'read-only',
-      message: "The database fills this key by its default when a create leaves it out, and the form never gives it: a record's address is the database's to choose, as an identity's is.",
+      message:
+        "The database fills this key by its default when a create leaves it out, and the form never gives it: a record's address is the database's to choose, as an identity's is.",
     })
     const line = generateForm(delivery, { ...ORDER, root: { schema: 'sales', name: 'line' }, lookups: [] })
     expect(line.bindings.fields.find((binding) => binding.field === 'line_no')).toMatchObject({ writes: { create: true, update: true } })
@@ -461,7 +511,12 @@ describe('generateForm', () => {
         ),
         table(
           'leg',
-          [col('tenant_id', INT32), col('route', INT32), col('id', { kind: 'uuid' }, { hasDefault: true, defaultExpression: 'gen_random_uuid()' }), col('stop', INT32)],
+          [
+            col('tenant_id', INT32),
+            col('route', INT32),
+            col('id', { kind: 'uuid' }, { hasDefault: true, defaultExpression: 'gen_random_uuid()' }),
+            col('stop', INT32),
+          ],
           { primaryKey: { name: 'pk_leg', columns: ['tenant_id', 'route', 'id'] } },
         ),
       )
@@ -473,7 +528,9 @@ describe('generateForm', () => {
     expect(writesOf(pinned, 'id')).toEqual({ create: false, update: false })
     expect(pinned.form.model.fields.find((field) => field.key === 'id')).not.toHaveProperty('required')
     expect(pinned.bindings.operations).toEqual({ create: true, update: true, delete: false })
-    expect(pinned.notes).toContainEqual(expect.objectContaining({ subject: 'id', kind: 'read-only', message: expect.stringMatching(/^The database fills this key/) }))
+    expect(pinned.notes).toContainEqual(
+      expect.objectContaining({ subject: 'id', kind: 'read-only', message: expect.stringMatching(/^The database fills this key/) }),
+    )
     expect(writesOf(generateForm(delivery, request), 'id')).toEqual({ create: true, update: true })
     const leg = generateForm(delivery, { ...ORDER, root: { schema: 'sales', name: 'leg' }, lookups: [], pinned: ['tenant_id'] })
     expect(writesOf(leg, 'id')).toMatchObject({ create: true })
@@ -498,7 +555,9 @@ describe('generateForm', () => {
       notes.filter((note) => note.subject === subject && note.kind === 'inferred').map((note) => note.message)
 
     const order = generateForm(snapshot, ORDER).notes
-    expect(inferred(order, 'id')).toEqual(['A whole number held as text, because it can exceed what JavaScript represents exactly from bigint; label from the column name.'])
+    expect(inferred(order, 'id')).toEqual([
+      'A whole number held as text, because it can exceed what JavaScript represents exactly from bigint; label from the column name.',
+    ])
     expect(inferred(order, 'amount')).toEqual([expect.stringContaining('never as a floating-point number')])
     const customer = generateForm(snapshot, { ...ORDER, root: { schema: 'sales', name: 'customer' }, lookups: [] }).notes
     expect(inferred(customer, 'created_at')).toEqual([expect.stringContaining('in UTC')])
@@ -558,7 +617,13 @@ describe('generateForm', () => {
       { ...ORDER, root: { schema: 'sales', name: 'customer' }, lookups: [] },
     )
     expect(form.model.fields.find((field) => field.key === 'active')?.type).toBe('checkbox')
-    expect(form.model.fields.find((field) => field.key === 'vip')).toMatchObject({ type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] })
+    expect(form.model.fields.find((field) => field.key === 'vip')).toMatchObject({
+      type: 'select',
+      options: [
+        { value: 'true', label: 'Yes' },
+        { value: 'false', label: 'No' },
+      ],
+    })
   })
 
   // formancy's datetime is a UTC instant; a zoned timestamp maps onto it. A
@@ -580,11 +645,23 @@ describe('generateForm', () => {
   // key is an identity when there is no primary key.
   test('identity comes from the primary key, else a unique key, else update is refused', () => {
     const keyless = fixtureLike('sqlserver', (objects) => {
-      objects.push(table('log', [col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })]))
       objects.push(
-        table('code', [col('code', { kind: 'text', maxLength: 10, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })], {
-          uniqueKeys: [{ name: 'uq_code', columns: ['code'] }],
-        }),
+        table('log', [
+          col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }),
+          col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }),
+        ]),
+      )
+      objects.push(
+        table(
+          'code',
+          [
+            col('code', { kind: 'text', maxLength: 10, lengthUnit: 'utf16-code-units', fixedLength: false }),
+            col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }),
+          ],
+          {
+            uniqueKeys: [{ name: 'uq_code', columns: ['code'] }],
+          },
+        ),
       )
     })
     const log = generateForm(keyless, { ...ORDER, root: { schema: 'sales', name: 'log' }, lookups: [] })
@@ -620,7 +697,10 @@ describe('generateForm', () => {
     expect(() => generateForm(hidden, ORDER)).toThrow(/not visible to this connection/)
 
     const outside = fixtureLike('postgres', (objects) => {
-      objects.splice(objects.findIndex((object) => object.ref.name === 'customer'), 1)
+      objects.splice(
+        objects.findIndex((object) => object.ref.name === 'customer'),
+        1,
+      )
     })
     expect(() => generateForm(outside, ORDER)).toThrow(/outside the discovered scope/)
   })
@@ -639,9 +719,9 @@ describe('generateForm', () => {
         validated: true,
       })
     })
-    expect(() =>
-      generateForm(shared, { ...ORDER, lookups: [...ORDER.lookups, { foreignKey: 'fk_order_tenant', display: ['name'] }] }),
-    ).toThrow(/tenant_id belongs to both fk_order_customer and fk_order_tenant/)
+    expect(() => generateForm(shared, { ...ORDER, lookups: [...ORDER.lookups, { foreignKey: 'fk_order_tenant', display: ['name'] }] })).toThrow(
+      /tenant_id belongs to both fk_order_customer and fk_order_tenant/,
+    )
   })
 })
 
@@ -652,7 +732,11 @@ describe('generateForm', () => {
  * every key that refers to it, derived from the foreign keys as the
  * fixture's comparators derive them.
  */
-function withDeleteFacts(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => void = () => {}, mayDelete: (object: ObjectMeta) => boolean = () => true): MetadataSnapshot {
+function withDeleteFacts(
+  kind: DatabaseKind,
+  edit: (objects: ObjectMeta[]) => void = () => {},
+  mayDelete: (object: ObjectMeta) => boolean = () => true,
+): MetadataSnapshot {
   return fixtureLike(kind, (objects) => {
     objects.push(
       table(
@@ -694,7 +778,9 @@ function withDeleteFacts(kind: DatabaseKind, edit: (objects: ObjectMeta[]) => vo
           onUpdate: key.onUpdate,
           enforced: key.enforced,
         }))
-        .sort((left, right) => (left.table.name < right.table.name ? -1 : left.table.name > right.table.name ? 1 : left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
+        .sort((left, right) =>
+          left.table.name < right.table.name ? -1 : left.table.name > right.table.name ? 1 : left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+        )
     }
   })
 }
@@ -718,7 +804,12 @@ function deleteNotes(notes: ReturnType<typeof generateForm>['notes']): string[] 
  * not read the definition -- guarded by a version column or a rowversion;
  * `composite` puts a tenant before the uuid in the key.
  */
-function deliveries(kind: DatabaseKind, expression: string | null, token: 'version-column' | 'rowversion' = 'version-column', composite = false): MetadataSnapshot {
+function deliveries(
+  kind: DatabaseKind,
+  expression: string | null,
+  token: 'version-column' | 'rowversion' = 'version-column',
+  composite = false,
+): MetadataSnapshot {
   return withDeleteFacts(kind, (objects) => {
     objects.push(
       table(
@@ -773,11 +864,23 @@ describe('delete (0050)', () => {
       "Delete is not offered: a record of sales.order_line created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that gen_random_uuid() fills and no foreign key includes, or SQL Server's rowversion, can.",
     ])
     const serial = withDeleteFacts('postgres', (objects) => {
-      objects.push(table('ticket', [col('id', INT32, { generated: 'identity-by-default', hasDefault: true }), col('note', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', INT64, { hasDefault: true })], {
-        primaryKey: { name: 'pk_ticket', columns: ['id'] },
-      }))
+      objects.push(
+        table(
+          'ticket',
+          [
+            col('id', INT32, { generated: 'identity-by-default', hasDefault: true }),
+            col('note', { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false }),
+            col('row_version', INT64, { hasDefault: true }),
+          ],
+          {
+            primaryKey: { name: 'pk_ticket', columns: ['id'] },
+          },
+        ),
+      )
     })
-    expect(generateForm(serial, { ...LINE, root: { schema: 'sales', name: 'ticket' }, lookups: [], versionColumn: 'row_version' }).bindings.operations.delete).toBe(true)
+    expect(
+      generateForm(serial, { ...LINE, root: { schema: 'sales', name: 'ticket' }, lookups: [], versionColumn: 'row_version' }).bindings.operations.delete,
+    ).toBe(true)
   })
 
   // A key the database fills by its default (0056) is never written by a
@@ -791,7 +894,7 @@ describe('delete (0050)', () => {
   // whatever its key. What the delete also does to its parcels is the
   // policy's (watched failing before the rule: PostgreSQL's delivery offered
   // no delete).
-  test('offers delete where a version column guards a key of one column that the engine\'s never-repeating default fills', () => {
+  test("offers delete where a version column guards a key of one column that the engine's never-repeating default fills", () => {
     const postgres = generateForm(deliveries('postgres', 'gen_random_uuid()'), { ...DELIVERY, versionColumn: 'row_version' })
     expect(postgres.bindings.fields.find((binding) => binding.field === 'id')?.writes).toEqual({ create: false, update: false })
     expect(postgres.bindings.operations).toEqual({ create: true, update: true, delete: true })
@@ -817,7 +920,7 @@ describe('delete (0050)', () => {
   // other engine's spellings among them; with the expression matched by the
   // function's name inside it: the three lookalikes offered delete; and with
   // the one-column rule removed: both keys of two columns offered delete).
-  test('offers no delete where the key\'s default is a constant, another function, a lookalike, hidden, or on a key of two columns', () => {
+  test("offers no delete where the key's default is a constant, another function, a lookalike, hidden, or on a key of two columns", () => {
     const note = (kind: DatabaseKind) =>
       `Delete is not offered: a record of sales.delivery created again with a deleted record's key starts its row_version where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that ${kind === 'postgres' ? 'gen_random_uuid()' : 'newsequentialid()'} fills and no foreign key includes, or SQL Server's rowversion, can.`
     const cases: Array<[DatabaseKind, string | null, string?]> = [
@@ -842,7 +945,9 @@ describe('delete (0050)', () => {
       })
       return { kind, expression, shape, operations: bindings.operations, notes: deleteNotes(notes) }
     })
-    expect(generated).toEqual(cases.map(([kind, expression, shape]) => ({ kind, expression, shape, operations: { create: true, update: true, delete: false }, notes: [note(kind)] })))
+    expect(generated).toEqual(
+      cases.map(([kind, expression, shape]) => ({ kind, expression, shape, operations: { create: true, update: true, delete: false }, notes: [note(kind)] })),
+    )
   })
 
   // A key that is also a foreign key is one a form writes, whatever fills
@@ -861,7 +966,9 @@ describe('delete (0050)', () => {
         const uuid = (name: string) => col(name, { kind: 'uuid' }, { hasDefault: true, defaultExpression: spelled(kind) })
         const text = (name: string) => col(name, { kind: 'text', maxLength: 40, lengthUnit: 'utf16-code-units', fixedLength: false })
         objects.push(
-          table('delivery', [uuid('id'), text('carrier'), col('row_version', INT64, { hasDefault: true })], { primaryKey: { name: 'pk_delivery', columns: ['id'] } }),
+          table('delivery', [uuid('id'), text('carrier'), col('row_version', INT64, { hasDefault: true })], {
+            primaryKey: { name: 'pk_delivery', columns: ['id'] },
+          }),
           table('delivery_note', [uuid('id'), text('note'), col('row_version', INT64, { hasDefault: true })], {
             primaryKey: { name: 'pk_delivery_note', columns: ['id'] },
             foreignKeys: [
@@ -902,12 +1009,21 @@ describe('delete (0050)', () => {
   // not DELETE; a snapshot taken before 0049 does not say, and is read as
   // "not offered" with a way out, never as "may". Each says why, once.
   test('offers no delete where the account may not DELETE, or the snapshot does not say whether it may', () => {
-    const reader = generateForm(withDeleteFacts('sqlserver', () => {}, () => false), ORDER)
+    const reader = generateForm(
+      withDeleteFacts(
+        'sqlserver',
+        () => {},
+        () => false,
+      ),
+      ORDER,
+    )
     expect(reader.bindings.operations.delete).toBe(false)
     expect(deleteNotes(reader.notes)).toEqual(["Delete is not offered: this connection's account may not DELETE from sales.order."])
     const before = generateForm(fixtureLike('sqlserver'), ORDER)
     expect(before.bindings.operations.delete).toBe(false)
-    expect(deleteNotes(before.notes)).toEqual(['Delete is not offered: this snapshot was taken before it recorded whether its account may delete. Discover again.'])
+    expect(deleteNotes(before.notes)).toEqual([
+      'Delete is not offered: this snapshot was taken before it recorded whether its account may delete. Discover again.',
+    ])
   })
 
   // A delete names its record by the key and the version the person read,
@@ -917,11 +1033,18 @@ describe('delete (0050)', () => {
     const facts = withDeleteFacts('postgres')
     const employee = generateForm(facts, { ...ORDER, root: { schema: 'sales', name: 'employee' }, lookups: [] })
     expect(employee.bindings.operations.delete).toBe(false)
-    expect(deleteNotes(employee.notes)).toEqual(['Update and delete are not offered: no rowversion and no confirmed version column, so a stale save could not be detected.'])
+    expect(deleteNotes(employee.notes)).toEqual([
+      'Update and delete are not offered: no rowversion and no confirmed version column, so a stale save could not be detected.',
+    ])
     const inferred = generateForm(facts, ORDER)
     expect(deleteNotes(inferred.notes)).toEqual(['Update and delete are not offered until row_version is confirmed as a version column.'])
     const keyless = withDeleteFacts('sqlserver', (objects) => {
-      objects.push(table('log', [col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }), col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' })]))
+      objects.push(
+        table('log', [
+          col('message', { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }),
+          col('row_version', { kind: 'rowversion' }, { generated: 'rowversion' }),
+        ]),
+      )
     })
     const log = generateForm(keyless, { ...ORDER, root: { schema: 'sales', name: 'log' }, lookups: [] })
     expect(log.bindings.operations).toEqual({ create: true, update: false, delete: false })
@@ -948,13 +1071,24 @@ describe('lookup controls (0066)', () => {
   // as a typeahead, and the note the reviewer reads before publishing says
   // which control and what a person's typing searches (watched failing on
   // main, which wrote no widget and named no control).
-  test("a lookup a person can search is a typeahead, and its note says what typing searches", () => {
+  test('a lookup a person can search is a typeahead, and its note says what typing searches', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const { field, notes } = lookupOf(generateForm(fixtureLike(kind), ORDER))
-      expect(field, kind).toEqual({ key: 'customer', type: 'select', label: 'Customer', optionsSource: 'erp-sales-order-fk-order-customer', widget: 'typeahead', required: true })
-      expect(notes, kind).toEqual(['A lookup over fk_order_customer (tenant_id, customer_no), showing name of customer, drawn as a typeahead searching name; label from the table name.'])
+      expect(field, kind).toEqual({
+        key: 'customer',
+        type: 'select',
+        label: 'Customer',
+        optionsSource: 'erp-sales-order-fk-order-customer',
+        widget: 'typeahead',
+        required: true,
+      })
+      expect(notes, kind).toEqual([
+        'A lookup over fk_order_customer (tenant_id, customer_no), showing name of customer, drawn as a typeahead searching name; label from the table name.',
+      ])
       const both = lookupOf(generateForm(fixtureLike(kind), { ...ORDER, lookups: [{ foreignKey: 'fk_order_customer', display: ['customer_no', 'name'] }] }))
-      expect(both.notes, kind).toEqual(['A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.'])
+      expect(both.notes, kind).toEqual([
+        'A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.',
+      ])
     }
   })
 
@@ -988,7 +1122,13 @@ describe('lookup controls (0066)', () => {
   test('refuses a lookup that shows a column with no text form, in the words the config refuses it with', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const snapshot = fixtureLike(kind)
-      const customer: GenerationRequest = { connection: 'erp', root: { schema: 'sales', name: 'customer' }, formId: 'sales-customer', title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] }
+      const customer: GenerationRequest = {
+        connection: 'erp',
+        root: { schema: 'sales', name: 'customer' },
+        formId: 'sales-customer',
+        title: 'Customer',
+        lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+      }
       const shown = generateForm(snapshot, customer)
       const { binding } = lookupOf(shown)
       const country = findObject(snapshot, { schema: 'sales', name: 'country' }) as ObjectMeta
@@ -996,8 +1136,13 @@ describe('lookup controls (0066)', () => {
         const words = `display column ${column.name} is ${column.databaseType}, which has no text form for a label`
         for (const display of [[column.name], ['name', column.name]]) {
           const edited = { ...shown.bindings, fields: shown.bindings.fields.map((entry) => (entry === binding ? { ...binding, display } : entry)) }
-          expect(() => buildLookupConfig(edited, binding.field, { snapshot }), `${kind} ${display.join(', ')}`).toThrow(`fk_customer_country (sales.country): ${words}`)
-          expect(() => generateForm(snapshot, { ...customer, lookups: [{ foreignKey: 'fk_customer_country', display }] }), `${kind} ${display.join(', ')}`).toThrow(`fk_customer_country: ${words}`)
+          expect(() => buildLookupConfig(edited, binding.field, { snapshot }), `${kind} ${display.join(', ')}`).toThrow(
+            `fk_customer_country (sales.country): ${words}`,
+          )
+          expect(
+            () => generateForm(snapshot, { ...customer, lookups: [{ foreignKey: 'fk_customer_country', display }] }),
+            `${kind} ${display.join(', ')}`,
+          ).toThrow(`fk_customer_country: ${words}`)
         }
       }
     }
@@ -1039,7 +1184,13 @@ describe('lookup controls (0066)', () => {
             const shown = `${foreignKey.name}: ${column.name}`
             let generated: ReturnType<typeof generateForm>
             try {
-              generated = generateForm(snapshot, { connection: 'erp', root: root.ref, formId: `f-${root.ref.name}`, title: root.ref.name, lookups: [{ foreignKey: foreignKey.name, display: [column.name] }] })
+              generated = generateForm(snapshot, {
+                connection: 'erp',
+                root: root.ref,
+                formId: `f-${root.ref.name}`,
+                title: root.ref.name,
+                lookups: [{ foreignKey: foreignKey.name, display: [column.name] }],
+              })
             } catch {
               notGenerated.push(shown)
               continue
@@ -1092,6 +1243,8 @@ describe('pinned columns', () => {
   // table; generating anyway would silently pin nothing.
   test('refuses to pin a column the root does not have, and a pinned column as the version column', () => {
     expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['nope'] })).toThrow(/has no column nope to pin/)
-    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['row_version'], versionColumn: 'row_version' })).toThrow(/cannot be a version column/)
+    expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['row_version'], versionColumn: 'row_version' })).toThrow(
+      /cannot be a version column/,
+    )
   })
 })

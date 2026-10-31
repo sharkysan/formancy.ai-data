@@ -30,8 +30,8 @@ function Gaps({ snapshot }: { snapshot: MetadataSnapshot }): ReactElement {
       ) : (
         <>
           <p>
-            Each of these is <strong>cannot tell</strong>, not <strong>does not exist</strong>: a table, key or relationship
-            missing below may be there, out of this account&rsquo;s sight.
+            Each of these is <strong>cannot tell</strong>, not <strong>does not exist</strong>: a table, key or relationship missing below may be there, out of
+            this account&rsquo;s sight.
           </p>
           <ul aria-labelledby="gaps-heading">
             {snapshot.gaps.map((gap, index) => (
@@ -142,11 +142,7 @@ function ObjectDetails({ snapshot, object }: { snapshot: MetadataSnapshot; objec
         {object.uniqueKeys.map((key) => ` Unique ${key.name} (${key.columns.join(', ')}).`).join('')}
       </p>
       <ForeignKeys snapshot={snapshot} object={object} />
-      {other.length === 0 ? null : (
-        <p className="cannot-tell">
-          Could not see: {other.map((gap) => `${gap.aspect}, ${gap.detail}`).join('; ')}
-        </p>
-      )}
+      {other.length === 0 ? null : <p className="cannot-tell">Could not see: {other.map((gap) => `${gap.aspect}, ${gap.detail}`).join('; ')}</p>}
     </details>
   )
 }
@@ -166,8 +162,8 @@ export function MetadataView({ connection, snapshot }: { connection: string; sna
     <section className="metadata" aria-labelledby="seen-heading">
       <h3 id="seen-heading">What {connection} can see</h3>
       <p>
-        {ENGINE_NAMES[snapshot.kind]} {snapshot.serverVersion}, schemas {snapshot.scope.schemas.join(', ')}: {tables}{' '}
-        {tables === 1 ? 'table' : 'tables'} and {views} {views === 1 ? 'view' : 'views'}. Discovered as <code>{user}</code>
+        {ENGINE_NAMES[snapshot.kind]} {snapshot.serverVersion}, schemas {snapshot.scope.schemas.join(', ')}: {tables} {tables === 1 ? 'table' : 'tables'} and{' '}
+        {views} {views === 1 ? 'view' : 'views'}. Discovered as <code>{user}</code>
         {login === user ? null : (
           <>
             , connected as <code>{login}</code>

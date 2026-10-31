@@ -74,7 +74,10 @@ describe("README.md's live demo", () => {
   // change to the generator's share would leave the README promising more
   // or fewer customers and orders than the demo has.
   test("the customers and orders the Live demo section says each tenant has are the generator's", () => {
-    const shares = [...live.matchAll(/\b(\d+)\s+customers\s+and\s+(\d+)\s+orders\b/g)].map((match) => ({ customers: Number(match[1]), orders: Number(match[2]) }))
+    const shares = [...live.matchAll(/\b(\d+)\s+customers\s+and\s+(\d+)\s+orders\b/g)].map((match) => ({
+      customers: Number(match[1]),
+      orders: Number(match[2]),
+    }))
     expect(shares.length).toBeGreaterThan(0)
     for (const share of shares) expect(share).toEqual({ customers: PER_TENANT.customers, orders: PER_TENANT.orders })
   })
@@ -91,7 +94,7 @@ describe("README.md's live demo", () => {
 
   // The demo's page is the host page's demo build; Host example says so, by
   // the script that makes it.
-  test('Host example names the host page\'s demo build by the script that makes it', () => {
+  test("Host example names the host page's demo build by the script that makes it", () => {
     expect(host.scripts['build:demo']).toBeDefined()
     expect(section('Host example')).toContain('build:demo')
   })

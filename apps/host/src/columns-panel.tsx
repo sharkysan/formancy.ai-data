@@ -55,7 +55,14 @@ export function ColumnsPanel({
 
   return (
     <>
-      <button type="button" className="button quiet disclosure" id={`${idBase}-toggle`} aria-expanded={open} aria-controls={`${idBase}-tool`} onClick={() => setOpen(!open)}>
+      <button
+        type="button"
+        className="button quiet disclosure"
+        id={`${idBase}-toggle`}
+        aria-expanded={open}
+        aria-controls={`${idBase}-tool`}
+        onClick={() => setOpen(!open)}
+      >
         <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
           <path d={open ? 'M2 4l4 4 4-4' : 'M4 2l4 4-4 4'} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -79,10 +86,22 @@ export function ColumnsPanel({
                     onChange={(event) => change(showChoice(current, column.key, event.target.checked))}
                   />
                   <label htmlFor={id}>{column.label}</label>
-                  <button type="button" className="button" aria-label={`Move ${column.label} up`} aria-disabled={index === 0 ? 'true' : undefined} onClick={() => change(moveChoice(current, column.key, -1))}>
+                  <button
+                    type="button"
+                    className="button"
+                    aria-label={`Move ${column.label} up`}
+                    aria-disabled={index === 0 ? 'true' : undefined}
+                    onClick={() => change(moveChoice(current, column.key, -1))}
+                  >
                     Up
                   </button>
-                  <button type="button" className="button" aria-label={`Move ${column.label} down`} aria-disabled={index === arranged.length - 1 ? 'true' : undefined} onClick={() => change(moveChoice(current, column.key, 1))}>
+                  <button
+                    type="button"
+                    className="button"
+                    aria-label={`Move ${column.label} down`}
+                    aria-disabled={index === arranged.length - 1 ? 'true' : undefined}
+                    onClick={() => change(moveChoice(current, column.key, 1))}
+                  >
                     Down
                   </button>
                 </li>

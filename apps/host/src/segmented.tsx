@@ -36,7 +36,14 @@ export function Segmented<T extends string>({
       <div className="segmented">
         {options.map((option) => (
           <label className="segment" key={option.value}>
-            <input type="radio" id={`${name}-${option.value}`} name={name} value={option.value} checked={option.value === value} onChange={() => onChange(option.value)} />
+            <input
+              type="radio"
+              id={`${name}-${option.value}`}
+              name={name}
+              value={option.value}
+              checked={option.value === value}
+              onChange={() => onChange(option.value)}
+            />
             {option.label}
           </label>
         ))}

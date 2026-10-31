@@ -12,7 +12,14 @@ import { validatePolicy } from './validate.js'
 /** `true` writes on both operations, `false` on neither, and an object says which (0027). */
 function column(field: string, writes: boolean | FieldWrites = true): FieldBinding {
   const both = typeof writes === 'boolean' ? { create: writes, update: writes } : writes
-  return { kind: 'column', field, column: field, type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }, nullable: true, writes: both }
+  return {
+    kind: 'column',
+    field,
+    column: field,
+    type: { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false },
+    nullable: true,
+    writes: both,
+  }
 }
 
 function lookup(field: string, columns: string[], table: string, targetColumns: string[]): FieldBinding {
@@ -142,7 +149,10 @@ describe('validatePolicy', () => {
     expect(problems(writesId)).toEqual(['fields.id grants write, and the form never writes id'])
     // Written on one operation is written (0027): a grant on a field the
     // account may INSERT and not UPDATE means something on create.
-    const createOnlyAmount = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)) }
+    const createOnlyAmount = {
+      ...ORDER,
+      fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', { create: true, update: false }) : binding)),
+    }
     expect(problems(ORDER_POLICY, createOnlyAmount)).toEqual([])
     const neither = { ...ORDER, fields: ORDER.fields.map((binding) => (binding.field === 'amount' ? column('amount', false) : binding)) }
     expect(problems(ORDER_POLICY, neither)).toEqual(['fields.amount grants write, and the form never writes amount'])
@@ -175,7 +185,8 @@ describe('validatePolicy', () => {
   // order (watched failing: every delete grant was accepted).
   test('refuses delete granted to a role that may not read with the form', () => {
     const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager', 'purger', 'Archivist'] } }
-    const sentence = (role: string) => `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`
+    const sentence = (role: string) =>
+      `operations.delete grants ${role}, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete`
     expect(problems(deleting, DELETABLE_ORDER)).toEqual([sentence('Archivist'), sentence('purger')])
   })
 
@@ -210,7 +221,9 @@ describe('validatePolicy', () => {
     const deleting = { ...ORDER_POLICY, operations: { ...ORDER_POLICY.operations, delete: ['manager'] } }
     const line = { table: { schema: 'sales', name: 'order_line' }, foreignKey: 'fk_order_line_order', onDelete: 'cascade' }
     expect(problems({ ...deleting, cascades: [line] }, DELETABLE_ORDER)).toEqual([])
-    expect(problems({ ...deleting, cascades: 'fk_order_line_order' }, DELETABLE_ORDER)).toEqual(['cascades is not a list of the foreign keys a delete may act through'])
+    expect(problems({ ...deleting, cascades: 'fk_order_line_order' }, DELETABLE_ORDER)).toEqual([
+      'cascades is not a list of the foreign keys a delete may act through',
+    ])
     expect(
       problems(
         {

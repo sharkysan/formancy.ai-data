@@ -74,7 +74,14 @@ describe("the harness's tally", () => {
   })
 
   test('turns counts into rows in a fixed order', () => {
-    expect(tallyRows(new Map([['update\tpg-order\t200', 2], ['create\tpg-order\t201', 1]]))).toEqual([
+    expect(
+      tallyRows(
+        new Map([
+          ['update\tpg-order\t200', 2],
+          ['create\tpg-order\t201', 1],
+        ]),
+      ),
+    ).toEqual([
       { operation: 'create', form: 'pg-order', status: 201, count: 1 },
       { operation: 'update', form: 'pg-order', status: 200, count: 2 },
     ])
@@ -91,8 +98,20 @@ describe('what one counted request addressed', () => {
     const before = new Map([['lookup-query', 3]])
     expect(addressedProblem('lookup-common', 'lookup-query', before, new Map([['lookup-query', 4]]))).toBeUndefined()
     expect(addressedProblem('health', null, before, new Map(before))).toBeUndefined()
-    expect(addressedProblem('resolve-1', 'lookup-resolve', before, new Map([['lookup-query', 4]]))).toBe('resolve-1 addressed lookup-query once; the catalogue says lookup-resolve')
-    expect(addressedProblem('health', null, before, new Map([['lookup-query', 3], ['form', 1]]))).toBe('health addressed form once; the catalogue says no runtime operation')
+    expect(addressedProblem('resolve-1', 'lookup-resolve', before, new Map([['lookup-query', 4]]))).toBe(
+      'resolve-1 addressed lookup-query once; the catalogue says lookup-resolve',
+    )
+    expect(
+      addressedProblem(
+        'health',
+        null,
+        before,
+        new Map([
+          ['lookup-query', 3],
+          ['form', 1],
+        ]),
+      ),
+    ).toBe('health addressed form once; the catalogue says no runtime operation')
     expect(addressedProblem('create', 'create', new Map(), new Map([['create', 2]]))).toBe('create addressed create twice; the catalogue says create')
     expect(addressedProblem('read', undefined, new Map(), new Map([['read', 1]]))).toBe('read names no operation in the catalogue')
   })

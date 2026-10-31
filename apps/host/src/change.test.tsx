@@ -56,7 +56,7 @@ const changeButton = (): HTMLElement | null => screen.queryByRole('button', { na
 
 /** The price's React paper, and a control of it by its name: the shared helpers' paper is the order's. */
 const paper = (): HTMLElement => within(pane('React')).getByRole('form', { name: 'Price, React' })
-const control = (name: string): HTMLInputElement => within(paper()).getByLabelText(name, { exact: true }) as HTMLInputElement
+const control = (name: string): HTMLInputElement => within(paper()).getByLabelText<HTMLInputElement>(name, { exact: true })
 
 /** A version of a fresh product, ended by a change from 2026-07-01 made beside the page, and the open version after it. */
 async function endedVersion(engine: Engine): Promise<{ ended: string; open: string }> {

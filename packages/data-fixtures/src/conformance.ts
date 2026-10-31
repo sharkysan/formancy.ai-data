@@ -121,7 +121,8 @@ export function restrictedDisagreements(snapshot: MetadataSnapshot, model: reado
   for (const wanted of expectedReferrers(model, entry.ref)) {
     const reported = actual.referencedBy?.find((key) => key.name === wanted.name && same(key.table, wanted.table))
     if (reported === undefined) {
-      if (before0049 === null && !admitsReferrers) out.push(`${wanted.name} of ${name(wanted.table)} refers to sales.order, and is missing with no gap that says the reader cannot see it`)
+      if (before0049 === null && !admitsReferrers)
+        out.push(`${wanted.name} of ${name(wanted.table)} refers to sales.order, and is missing with no gap that says the reader cannot see it`)
       continue
     }
     out.push(...inboundDisagreements(reported, wanted, `sales.order ${wanted.name} of ${name(wanted.table)}`))
@@ -185,7 +186,8 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
     const found = actual.foreignKeys.find((candidate) => candidate.name === foreignKey.name)
     if (found === undefined) continue
     const at = `${where} ${foreignKey.name}`
-    if (found.columns.join() !== foreignKey.columns.join()) out.push(`${at} columns are [${found.columns.join(', ')}], expected [${foreignKey.columns.join(', ')}]`)
+    if (found.columns.join() !== foreignKey.columns.join())
+      out.push(`${at} columns are [${found.columns.join(', ')}], expected [${foreignKey.columns.join(', ')}]`)
     if (found.references === null) {
       out.push(`${at} has an unknown target`)
     } else {
@@ -211,8 +213,10 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
     if (found === undefined) continue
     const facts = resolveCheck(check, kind)
     const at = `${where} ${check.name}`
-    if (facts.enforced !== undefined && found.enforced !== facts.enforced) out.push(`${at} enforced is ${String(found.enforced)}, expected ${String(facts.enforced)}`)
-    if (facts.validated !== undefined && found.validated !== facts.validated) out.push(`${at} validated is ${String(found.validated)}, expected ${String(facts.validated)}`)
+    if (facts.enforced !== undefined && found.enforced !== facts.enforced)
+      out.push(`${at} enforced is ${String(found.enforced)}, expected ${String(facts.enforced)}`)
+    if (facts.validated !== undefined && found.validated !== facts.validated)
+      out.push(`${at} validated is ${String(found.validated)}, expected ${String(facts.validated)}`)
   }
 
   return out
@@ -236,7 +240,13 @@ function expectedReferrers(model: readonly ExpectedObject[], ref: ObjectRef): Ex
   return model.flatMap((referrer) =>
     referrer.foreignKeys
       .filter((foreignKey) => same(foreignKey.references.table, ref))
-      .map((foreignKey) => ({ table: referrer.ref, name: foreignKey.name, columns: foreignKey.columns, referencedColumns: foreignKey.references.columns, onDelete: foreignKey.onDelete })),
+      .map((foreignKey) => ({
+        table: referrer.ref,
+        name: foreignKey.name,
+        columns: foreignKey.columns,
+        referencedColumns: foreignKey.references.columns,
+        onDelete: foreignKey.onDelete,
+      })),
   )
 }
 
@@ -248,7 +258,8 @@ function deleteFactsMissing(actual: ObjectMeta): string | null {
 function inboundDisagreements(found: InboundKey, wanted: ExpectedReferrer, at: string): string[] {
   const out: string[] = []
   if (found.columns.join() !== wanted.columns.join()) out.push(`${at} columns are [${found.columns.join(', ')}], expected [${wanted.columns.join(', ')}]`)
-  if (found.referencedColumns.join() !== wanted.referencedColumns.join()) out.push(`${at} refers to [${found.referencedColumns.join(', ')}], expected [${wanted.referencedColumns.join(', ')}]`)
+  if (found.referencedColumns.join() !== wanted.referencedColumns.join())
+    out.push(`${at} refers to [${found.referencedColumns.join(', ')}], expected [${wanted.referencedColumns.join(', ')}]`)
   if (found.onDelete !== wanted.onDelete) out.push(`${at} on delete is ${found.onDelete}, expected ${wanted.onDelete}`)
   if (!found.enforced) out.push(`${at} is not enforced`)
   return out
@@ -267,7 +278,8 @@ function referrerDisagreements(actual: ObjectMeta, model: readonly ExpectedObjec
   const wanted = expectedReferrers(model, actual.ref)
   const listed = found.map(label)
   const expected = wanted.map(label).sort(byCodepoint)
-  if ([...listed].sort(byCodepoint).join('\u0000') !== expected.join('\u0000')) return [`${where} is referred to by [${listed.join(', ')}], expected [${expected.join(', ')}]`]
+  if ([...listed].sort(byCodepoint).join('\u0000') !== expected.join('\u0000'))
+    return [`${where} is referred to by [${listed.join(', ')}], expected [${expected.join(', ')}]`]
   return wanted.flatMap((key) => {
     const reported = found.find((candidate) => candidate.name === key.name && same(candidate.table, key.table))
     return reported === undefined ? [] : inboundDisagreements(reported, key, `${where} ${key.name} of ${name(key.table)}`)
@@ -288,9 +300,12 @@ function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, 
       }
     }
   }
-  if (expected.nullable !== undefined && actual.nullable !== expected.nullable) out.push(`${where} nullable is ${String(actual.nullable)}, expected ${String(expected.nullable)}`)
-  if (expected.generated !== undefined && actual.generated !== expected.generated) out.push(`${where} generated is ${actual.generated}, expected ${expected.generated}`)
-  if (expected.hasDefault !== undefined && actual.hasDefault !== expected.hasDefault) out.push(`${where} hasDefault is ${String(actual.hasDefault)}, expected ${String(expected.hasDefault)}`)
+  if (expected.nullable !== undefined && actual.nullable !== expected.nullable)
+    out.push(`${where} nullable is ${String(actual.nullable)}, expected ${String(expected.nullable)}`)
+  if (expected.generated !== undefined && actual.generated !== expected.generated)
+    out.push(`${where} generated is ${actual.generated}, expected ${expected.generated}`)
+  if (expected.hasDefault !== undefined && actual.hasDefault !== expected.hasDefault)
+    out.push(`${where} hasDefault is ${String(actual.hasDefault)}, expected ${String(expected.hasDefault)}`)
   return out
 }
 

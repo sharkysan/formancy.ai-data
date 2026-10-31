@@ -67,7 +67,8 @@ function isDemoToken(value: unknown): value is DemoToken {
 
 /** A refusal: the Worker's code and sentence when it gave them, and the page's words when what answered was not the Worker. */
 function refusal(status: number, body: unknown): Refusal {
-  if (isRecord(body) && typeof body['code'] === 'string' && typeof body['message'] === 'string') return { ok: false, status, code: body['code'], message: body['message'] }
+  if (isRecord(body) && typeof body['code'] === 'string' && typeof body['message'] === 'string')
+    return { ok: false, status, code: body['code'], message: body['message'] }
   return { ok: false, status, code: 'unexpected', message: UNEXPECTED }
 }
 

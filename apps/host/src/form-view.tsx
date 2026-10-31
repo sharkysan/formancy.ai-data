@@ -13,15 +13,15 @@ import type { DeleteTarget } from './deletion.js'
 import { Detail } from './detail.js'
 import type { MasterOpen } from './detail.js'
 import { copiedLine, copyOf, leftOut } from './duplicate.js'
-import { FormHead } from './form-head.js'
-import { isOpen, nextLine, nextOf } from './next-version.js'
 import { DrillLevel } from './drill-level.js'
+import { FormHead } from './form-head.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
+import { isOpen, nextLine, nextOf } from './next-version.js'
 import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
@@ -137,7 +137,10 @@ export function FormView({
   /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
   const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
-  const sessions = useMemo(() => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })), [client, formId, definition])
+  const sessions = useMemo(
+    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })),
+    [client, formId, definition],
+  )
   const entries = useMemo<PaneEntry[]>(
     () =>
       sessions.map((session) =>
@@ -293,7 +296,8 @@ export function FormView({
               setMasterName(null)
               setStored(null)
               setLoadRefusal(null)
-              const line = kind === 'duplicate' ? copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both) : nextLine(done.token, both)
+              const line =
+                kind === 'duplicate' ? copiedLine(done.token, leftOut(definition.form.model.fields, record, copied), both) : nextLine(done.token, both)
               say([...(done.discarded ? DISCARDED : []), ...line])
               toDetail()
             },
@@ -315,7 +319,8 @@ export function FormView({
       request,
       (discarded) =>
         opening.read(request, token, discarded, {
-          opened: (now) => opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
+          opened: (now) =>
+            opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
           refused: (message) => {
             setLoadRefusal(message)
             setTokenOpen(true)
@@ -423,6 +428,7 @@ export function FormView({
     if (view === 'record' && openRef.current !== null) after(() => detailHeading.current?.focus())
     else if (view === 'records') toOpenRow()
     // On each change made by history, and only then.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs on each change made by history, from the render that saw it, so what it reads is current
   }, [historyView])
 
   const sideBySide = layout === 'side-by-side'
@@ -469,7 +475,11 @@ export function FormView({
           onNew={startNew}
           onOpen={askRow}
           remove={canDelete ? { noun: title, press: deleteRow } : undefined}
-          after={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" /> : null}
+          after={
+            removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
+              <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" />
+            ) : null
+          }
           drilling={drilling}
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
           onTreeOpen={openFrom}
@@ -516,35 +526,60 @@ export function FormView({
           saving={saving}
           deleteRef={deleteButton}
           onDelete={deleteOpen}
-          deleteRegion={removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" /> : null}
+          deleteRegion={
+            removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'detail' && definition.deleting !== null ? (
+              <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" />
+            ) : null
+          }
         >
           {parent === null
             ? null
             : childForms.map((form, index) =>
                 form.child.one ? (
                   sectionShown(form.child, stored) ? (
-                    <OneChild key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`} client={client} form={form} index={index} parentNoun={title} parent={parent} renderer={renderer} />
+                    <OneChild
+                      key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
+                      client={client}
+                      form={form}
+                      index={index}
+                      parentNoun={title}
+                      parent={parent}
+                      renderer={renderer}
+                    />
                   ) : null
                 ) : (
-                <ChildSection
-                  key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
-                  client={client}
-                  form={form}
-                  index={index}
-                  twice={twice(form.child.form)}
-                  parentNoun={title}
-                  parent={parent}
-                  renderer={renderer}
-                  refit={released}
-                  onShow={() => reveal('record')}
-                  levels={drill.levels}
-                  drill={drilling && parent.kind === 'record' ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token }) : undefined}
-                />
+                  <ChildSection
+                    key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
+                    client={client}
+                    form={form}
+                    index={index}
+                    twice={twice(form.child.form)}
+                    parentNoun={title}
+                    parent={parent}
+                    renderer={renderer}
+                    refit={released}
+                    onShow={() => reveal('record')}
+                    levels={drill.levels}
+                    drill={
+                      drilling && parent.kind === 'record'
+                        ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token })
+                        : undefined
+                    }
+                  />
                 ),
               )}
         </Detail>
         {drill.path.map((step) => (
-          <DrillLevel key={step.key} client={client} step={step} childForms={drill.childrenOf(step.form.child.form)} renderer={renderer} hidden={!drilling || drill.shown !== step.level} refit={released} drill={drill} />
+          <DrillLevel
+            key={step.key}
+            client={client}
+            step={step}
+            childForms={drill.childrenOf(step.form.child.form)}
+            renderer={renderer}
+            hidden={!drilling || drill.shown !== step.level}
+            refit={released}
+            drill={drill}
+          />
         ))}
       </div>
     </>

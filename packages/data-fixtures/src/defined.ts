@@ -21,7 +21,10 @@ import type { DeleteOutcome, DeleteRequest, InsertRequest, ObjectRef, ReadReques
 export type Undefined<Request> = Omit<Request, 'definition'> & { definition?: string }
 
 export function defined(records: RecordAdapter) {
-  async function definitionOf(request: { target: { table: InsertRequest['target']['table'] }; definition?: string }): Promise<{ ok: true; definition: string } | Exclude<RecordOutcome, { ok: true }>> {
+  async function definitionOf(request: {
+    target: { table: InsertRequest['target']['table'] }
+    definition?: string
+  }): Promise<{ ok: true; definition: string } | Exclude<RecordOutcome, { ok: true }>> {
     if (request.definition !== undefined) return { ok: true, definition: request.definition }
     const described = await records.describe(request.target.table)
     return described.ok ? { ok: true, definition: described.described.definition } : described

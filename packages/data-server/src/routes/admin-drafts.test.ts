@@ -5,7 +5,29 @@ import { describe, expect, test } from 'vitest'
 import type { ConfigurationStore } from '../config-store.js'
 import { REFUSALS } from '../governance.js'
 import { ADMIN_OPERATIONS } from './admin-audit.js'
-import { answer, app, approve, as, col, db, EMPLOYEE, fresh, plane, proposed, published, queue, read, reject, root, serve, store, submit, TEXT, useDrafts, versionFile } from './test-drafts.js'
+import {
+  answer,
+  app,
+  approve,
+  as,
+  col,
+  db,
+  EMPLOYEE,
+  fresh,
+  plane,
+  proposed,
+  published,
+  queue,
+  read,
+  reject,
+  root,
+  serve,
+  store,
+  submit,
+  TEXT,
+  useDrafts,
+  versionFile,
+} from './test-drafts.js'
 
 /*
  * Publication under review (0065): with publisher roles set, nobody writes
@@ -21,7 +43,6 @@ import { answer, app, approve, as, col, db, EMPLOYEE, fresh, plane, proposed, pu
  */
 
 useDrafts()
-
 
 describe('writing a version under review', () => {
   // Under review nobody writes a version alone. A publisher who could
@@ -47,7 +68,7 @@ describe('writing a version under review', () => {
   // else -- not regenerated, not stamped with who approved it, which is
   // the trail's (0033). A version file with an approval written into it
   // would be a second write that can fail after the first.
-  test('an author submits, a publisher approves, and the version written is the draft\'s bundle exactly', async () => {
+  test("an author submits, a publisher approves, and the version written is the draft's bundle exactly", async () => {
     const bundle = await proposed()
     const submitted = await submit('author', { expectedBase: null, bundle })
     expect(submitted.statusCode, submitted.body).toBe(201)
@@ -60,7 +81,16 @@ describe('writing a version under review', () => {
     expect(await versionFile(1)).toBe(`${JSON.stringify(bundle, null, 2)}\n`)
     expect(await readdir(join(root, 'employee'))).toEqual(['1.json'])
     expect((await readdir(root)).sort()).toEqual(['.drafts', 'employee'])
-    expect((await read('author', 1)).json()).toMatchObject({ form: 'employee', draft: 1, state: 'published', expectedBase: null, submittedBy: 'author', keysConfirmed: [], current: 1, bundle })
+    expect((await read('author', 1)).json()).toMatchObject({
+      form: 'employee',
+      draft: 1,
+      state: 'published',
+      expectedBase: null,
+      submittedBy: 'author',
+      keysConfirmed: [],
+      current: 1,
+      bundle,
+    })
     expect((await queue('publisher')).json()).toEqual({ drafts: [], unreadable: [] })
   })
 
@@ -68,7 +98,7 @@ describe('writing a version under review', () => {
   // who could approve would be the review's second pair of eyes by holding
   // the same role as the first. Restore stays one publisher's action, and
   // needs no draft: what it writes was reviewed when it was first written.
-  test('an author is refused approving or rejecting another\'s draft and restoring; a publisher restores alone', async () => {
+  test("an author is refused approving or rejecting another's draft and restoring; a publisher restores alone", async () => {
     const bundle = await proposed()
     await submit('colleague', { expectedBase: null, bundle })
     for (const response of [await approve('author', 1), await reject('author', 1)]) {
@@ -77,7 +107,8 @@ describe('writing a version under review', () => {
     expect((await read('author', 1)).json()).toMatchObject({ state: 'pending' })
     expect((await approve('publisher', 1)).statusCode).toBe(201)
 
-    const restore = (token: string) => app.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as(token), payload: { version: 1, expectedBase: 1 } })
+    const restore = (token: string) =>
+      app.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as(token), payload: { version: 1, expectedBase: 1 } })
     expect(answer(await restore('author'))).toEqual([403, { code: 'publisher-required', message: REFUSALS['publisher-required'].message }])
     expect(await store.versions('employee')).toEqual([1])
     const restored = await restore('publisher')
@@ -106,7 +137,10 @@ describe('writing a version under review', () => {
     expect((await approve('publisher', 1)).statusCode).toBe(201)
     expect((await read('colleague', 2)).json()).toMatchObject({ state: 'stale', current: 1 })
     for (const response of [await approve('publisher', 2), await reject('publisher', 2)]) {
-      expect([response.statusCode, response.json()]).toEqual([409, { code: 'stale', message: expect.stringMatching(/^Draft 2 of employee was submitted as the first version/), current: 1 }])
+      expect([response.statusCode, response.json()]).toEqual([
+        409,
+        { code: 'stale', message: expect.stringMatching(/^Draft 2 of employee was submitted as the first version/), current: 1 },
+      ])
     }
     expect((await queue('publisher')).json()).toEqual({ drafts: [], unreadable: [] })
     expect(await store.versions('employee')).toEqual([1])
@@ -132,7 +166,7 @@ describe('writing a version under review', () => {
   // A rejection is an entry beside the draft, never an edit of it, and
   // says who rejected. A rejected draft is decided: approving it, or
   // rejecting it again, would be a second decision on one draft.
-  test('a publisher rejects another\'s draft; it reads rejected, by whom, and is refused approval and a second rejection', async () => {
+  test("a publisher rejects another's draft; it reads rejected, by whom, and is refused approval and a second rejection", async () => {
     await submit('author', { expectedBase: null, bundle: await proposed() })
     const rejected = await reject('publisher', 1)
     expect(answer(rejected)).toEqual([201, { draft: 1, state: 'rejected', withdrawn: false }])
@@ -194,21 +228,32 @@ describe('what an approval asks again', () => {
     if (name !== undefined) name.type.maxLength = 4000
     const snapshotEdited = await submit('author', { expectedBase: null, bundle: edited })
     expect([snapshotEdited.statusCode, snapshotEdited.json().code]).toEqual([422, 'invalid-bundle'])
-    expect((await submit('author', { expectedBase: null, bundle }, 'staff')).json()).toMatchObject({ code: 'invalid-bundle', message: "The form's id is employee, not staff." })
+    expect((await submit('author', { expectedBase: null, bundle }, 'staff')).json()).toMatchObject({
+      code: 'invalid-bundle',
+      message: "The form's id is employee, not staff.",
+    })
 
     db.allowlist = ['erp', 'crm']
     const crm = await proposed({ connection: 'crm' })
     db.allowlist = ['erp']
-    expect(answer(await submit('author', { expectedBase: null, bundle: crm }))).toEqual([422, {
-      code: 'invalid-bundle',
-      message: "No connection is called crm in this deployment: a version keeps its connection's name, which each deployment's allowlist resolves to its own database.",
-    }])
+    expect(answer(await submit('author', { expectedBase: null, bundle: crm }))).toEqual([
+      422,
+      {
+        code: 'invalid-bundle',
+        message:
+          "No connection is called crm in this deployment: a version keeps its connection's name, which each deployment's allowlist resolves to its own database.",
+      },
+    ])
 
     db.engine = 'postgres'
-    expect(answer(await submit('author', { expectedBase: null, bundle }))).toEqual([422, {
-      code: 'other-engine',
-      message: "This draft cannot be submitted: connection erp is a postgres database here, and the version is bound to sqlserver. A form's bindings belong to one engine.",
-    }])
+    expect(answer(await submit('author', { expectedBase: null, bundle }))).toEqual([
+      422,
+      {
+        code: 'other-engine',
+        message:
+          "This draft cannot be submitted: connection erp is a postgres database here, and the version is bound to sqlserver. A form's bindings belong to one engine.",
+      },
+    ])
     db.engine = 'sqlserver'
 
     db.columns = db.columns.filter((column) => column.name !== 'title')
@@ -237,7 +282,11 @@ describe('what an approval asks again', () => {
     const job = [col('job_title', 5, TEXT, { nullable: true }), col('job title', 6, TEXT, { nullable: true })]
     db.columns.push(...job)
     await published(await proposed())
-    db.columns = [...db.columns.filter((column) => column.name !== 'job_title' && column.name !== 'job title'), job[1] as ColumnMeta, col('job-title', 7, TEXT, { nullable: true })]
+    db.columns = [
+      ...db.columns.filter((column) => column.name !== 'job_title' && column.name !== 'job title'),
+      job[1] as ColumnMeta,
+      col('job-title', 7, TEXT, { nullable: true }),
+    ]
     const bundle = await proposed()
     const column = (name: string) => ({ kind: 'column', column: name })
     const reassigned = [
@@ -249,7 +298,7 @@ describe('what an approval asks again', () => {
     expect(undecided.json()).toMatchObject({ code: 'keys-reassigned', keys: reassigned })
     const confirmed = await submit('author', { expectedBase: 1, bundle, keysConfirmed: reassigned })
     expect(confirmed.statusCode, confirmed.body).toBe(201)
-    const draft = (confirmed.json() as { draft: number }).draft
+    const draft = confirmed.json<{ draft: number }>().draft
     expect((await read('publisher', draft)).json().keysConfirmed).toEqual(reassigned)
     const approved = await approve('publisher', draft)
     expect([approved.statusCode, approved.json().version]).toEqual([201, 2])
@@ -317,19 +366,43 @@ describe('without review', () => {
   // administration answer says so -- so a studio asks rather than guesses.
   test('the draft routes do not exist, an administrator publishes alone, and the administration answer says review is off', async () => {
     const plain = await serve(false)
-    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: as('author') })).json()).toEqual({ review: false, publisher: true, refuses: { browse: { code: 'browse-role-required', message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you." } } })
-    for (const [method, url] of [['GET', '/v1/drafts'], ['POST', '/v1/forms/employee/drafts'], ['GET', '/v1/forms/employee/drafts/1'], ['POST', '/v1/forms/employee/drafts/1/approval'], ['POST', '/v1/forms/employee/drafts/1/rejection']] as const) {
+    expect((await plain.inject({ method: 'GET', url: '/v1/administration', headers: as('author') })).json()).toEqual({
+      review: false,
+      publisher: true,
+      refuses: {
+        browse: {
+          code: 'browse-role-required',
+          message: "Reading a connection's rows needs a browse role, which this deployment gives to nobody or not to you.",
+        },
+      },
+    })
+    for (const [method, url] of [
+      ['GET', '/v1/drafts'],
+      ['POST', '/v1/forms/employee/drafts'],
+      ['GET', '/v1/forms/employee/drafts/1'],
+      ['POST', '/v1/forms/employee/drafts/1/approval'],
+      ['POST', '/v1/forms/employee/drafts/1/rejection'],
+    ] as const) {
       expect((await plain.inject({ method, url, headers: as('author') })).statusCode, `${method} ${url}`).toBe(404)
     }
     const bundle = await proposed({ on: plain })
-    expect((await plain.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('author'), payload: { expectedBase: null, bundle } })).statusCode).toBe(201)
-    expect((await plain.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as('author'), payload: { version: 1, expectedBase: 1 } })).statusCode).toBe(201)
+    expect(
+      (await plain.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('author'), payload: { expectedBase: null, bundle } })).statusCode,
+    ).toBe(201)
+    expect(
+      (await plain.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as('author'), payload: { version: 1, expectedBase: 1 } }))
+        .statusCode,
+    ).toBe(201)
     expect(await store.versions('employee')).toEqual([1, 2])
   })
 })
 
 /** `route.url` with each parameter given a value: the connection, the form, version 1, and `draft`. */
-const sampled = (url: string, draft: number) => url.replace(':id', url.startsWith('/v1/connections/') ? 'erp' : 'employee').replace(':version', '1').replace(':draft', String(draft))
+const sampled = (url: string, draft: number) =>
+  url
+    .replace(':id', url.startsWith('/v1/connections/') ? 'erp' : 'employee')
+    .replace(':version', '1')
+    .replace(':draft', String(draft))
 const routeKey = (route: { method: string; url: string }) => `${route.method} ${route.url}`
 
 describe('what the answers say a caller may do, against what every route does', () => {
@@ -339,13 +412,25 @@ describe('what the answers say a caller may do, against what every route does', 
   // No caller here holds a browse role, and browsing is refused review or not (0099).
   const BR = 'browse-role-required'
   const EXPECTED = {
-    author: { refuses: { publish: RR, import: RR, restore: PR, 'draft-approve': PR, 'draft-reject': PR, browse: BR }, submitters: { approve: PR, reject: PR }, own: { approve: PR } },
+    author: {
+      refuses: { publish: RR, import: RR, restore: PR, 'draft-approve': PR, 'draft-reject': PR, browse: BR },
+      submitters: { approve: PR, reject: PR },
+      own: { approve: PR },
+    },
     publisher: { refuses: { publish: RR, import: RR, browse: BR }, submitters: {}, own: { approve: 'own-draft' } },
     submitter: { refuses: { publish: RR, import: RR, browse: BR }, submitters: { approve: 'own-draft' }, own: { approve: 'own-draft' } },
   } as const
 
   /** A body every route of the plane accepts, as far as its shape goes: a proposal, a publish over version 1, a restore of version 1. */
-  const body = (bundle: unknown) => ({ connection: 'erp', root: { schema: 'sales', name: 'employee' }, formId: 'employee', title: 'Employee', expectedBase: 1, bundle, version: 1 })
+  const body = (bundle: unknown) => ({
+    connection: 'erp',
+    root: { schema: 'sales', name: 'employee' },
+    formId: 'employee',
+    title: 'Employee',
+    expectedBase: 1,
+    bundle,
+    version: 1,
+  })
 
   // The studio draws its buttons from the administration answer and a
   // draft's `refuses`; a route that then refused what the answer allowed,
@@ -357,34 +442,58 @@ describe('what the answers say a caller may do, against what every route does', 
   // allowed route must answer 2xx, so the body was one it accepts; and the
   // derived refusals are held to the table, so a server that refused
   // nothing would not pass by agreeing with itself.
-  test.each(['author', 'publisher', 'submitter'] as const)('for %s, every route answers what the administration answer and the draft\'s refuses say', async (caller) => {
-    const bundle = await proposed()
-    const expected = EXPECTED[caller]
-    const { routes } = await plane()
-    expect(routes.map(routeKey).sort()).toEqual(Object.keys(ADMIN_OPERATIONS).sort())
-    const results: Array<{ route: string; whose: string; derived: string; answered: string }> = []
-    for (const route of routes) {
-      const operation = ADMIN_OPERATIONS[routeKey(route)]
-      for (const whose of route.url.includes(':draft') ? (['submitters', 'own'] as const) : (['submitters'] as const)) {
-        await fresh()
-        const { app: deployment } = await plane()
-        await store.publish('employee', null, bundle)
-        const pending = await submit(whose === 'own' ? caller : 'submitter', { expectedBase: 1, bundle }, 'employee', deployment)
-        const draft = (pending.json() as { draft: number }).draft
-        const administration = (await deployment.inject({ method: 'GET', url: '/v1/administration', headers: as(caller) })).json() as { review: boolean; publisher: boolean; refuses: Record<string, { code: string; message: string }> }
-        const read = (await deployment.inject({ method: 'GET', url: `/v1/forms/employee/drafts/${String(draft)}`, headers: as(caller) })).json() as { refuses: Record<string, { code: string; message: string }> }
-        expect(administration).toMatchObject({ review: true, publisher: caller !== 'author' })
-        expect(Object.fromEntries(Object.entries(administration.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected.refuses)
-        expect(Object.fromEntries(Object.entries(read.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected[whose])
-        const derived = operation === 'draft-approve' ? read.refuses['approve'] : operation === 'draft-reject' ? read.refuses['reject'] : administration.refuses[operation ?? '']
-        const response = await deployment.inject({ method: route.method as 'GET', url: sampled(route.url, draft), headers: as(caller), ...(route.method === 'POST' ? { payload: body(bundle) } : {}) })
-        const answered = response.statusCode === 403 ? (response.json() as { code: string }).code : response.statusCode < 300 ? 'allowed' : `answered ${String(response.statusCode)}: ${response.body}`
-        if (derived !== undefined && response.statusCode === 403) expect(response.json(), routeKey(route)).toEqual(derived)
-        results.push({ route: routeKey(route), whose, derived: derived?.code ?? 'allowed', answered })
+  test.each(['author', 'publisher', 'submitter'] as const)(
+    "for %s, every route answers what the administration answer and the draft's refuses say",
+    async (caller) => {
+      const bundle = await proposed()
+      const expected = EXPECTED[caller]
+      const { routes } = await plane()
+      expect(routes.map(routeKey).sort()).toEqual(Object.keys(ADMIN_OPERATIONS).sort())
+      const results: Array<{ route: string; whose: string; derived: string; answered: string }> = []
+      for (const route of routes) {
+        const operation = ADMIN_OPERATIONS[routeKey(route)]
+        for (const whose of route.url.includes(':draft') ? (['submitters', 'own'] as const) : (['submitters'] as const)) {
+          await fresh()
+          const { app: deployment } = await plane()
+          await store.publish('employee', null, bundle)
+          const pending = await submit(whose === 'own' ? caller : 'submitter', { expectedBase: 1, bundle }, 'employee', deployment)
+          const draft = pending.json<{ draft: number }>().draft
+          const administration = (await deployment.inject({ method: 'GET', url: '/v1/administration', headers: as(caller) })).json<{
+            review: boolean
+            publisher: boolean
+            refuses: Record<string, { code: string; message: string }>
+          }>()
+          const read = (await deployment.inject({ method: 'GET', url: `/v1/forms/employee/drafts/${String(draft)}`, headers: as(caller) })).json<{
+            refuses: Record<string, { code: string; message: string }>
+          }>()
+          expect(administration).toMatchObject({ review: true, publisher: caller !== 'author' })
+          expect(Object.fromEntries(Object.entries(administration.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected.refuses)
+          expect(Object.fromEntries(Object.entries(read.refuses).map(([name, refusal]) => [name, refusal.code]))).toEqual(expected[whose])
+          const derived =
+            operation === 'draft-approve'
+              ? read.refuses['approve']
+              : operation === 'draft-reject'
+                ? read.refuses['reject']
+                : administration.refuses[operation ?? '']
+          const response = await deployment.inject({
+            method: route.method as 'GET',
+            url: sampled(route.url, draft),
+            headers: as(caller),
+            ...(route.method === 'POST' ? { payload: body(bundle) } : {}),
+          })
+          const answered =
+            response.statusCode === 403
+              ? response.json<{ code: string }>().code
+              : response.statusCode < 300
+                ? 'allowed'
+                : `answered ${String(response.statusCode)}: ${response.body}`
+          if (derived !== undefined && response.statusCode === 403) expect(response.json(), routeKey(route)).toEqual(derived)
+          results.push({ route: routeKey(route), whose, derived: derived?.code ?? 'allowed', answered })
+        }
       }
-    }
-    expect(results.filter((result) => result.derived !== result.answered)).toEqual([])
-  })
+      expect(results.filter((result) => result.derived !== result.answered)).toEqual([])
+    },
+  )
 
   // The property review exists for, derived from the router rather than a
   // list: whatever route an author sends, with a body that would write
@@ -395,12 +504,17 @@ describe('what the answers say a caller may do, against what every route does', 
     await store.publish('employee', null, bundle)
     const before = await versionFile(1)
     const { app: deployment, routes } = await plane()
-    const others = ((await submit('colleague', { expectedBase: 1, bundle }, 'employee', deployment)).json() as { draft: number }).draft
-    const own = ((await submit('author', { expectedBase: 1, bundle }, 'employee', deployment)).json() as { draft: number }).draft
+    const others = (await submit('colleague', { expectedBase: 1, bundle }, 'employee', deployment)).json<{ draft: number }>().draft
+    const own = (await submit('author', { expectedBase: 1, bundle }, 'employee', deployment)).json<{ draft: number }>().draft
     let sent = 0
     for (const route of routes) {
       for (const draft of route.url.includes(':draft') ? [others, own] : [others]) {
-        await deployment.inject({ method: route.method as 'GET', url: sampled(route.url, draft), headers: as('author'), ...(route.method === 'POST' ? { payload: body(bundle) } : {}) })
+        await deployment.inject({
+          method: route.method as 'GET',
+          url: sampled(route.url, draft),
+          headers: as('author'),
+          ...(route.method === 'POST' ? { payload: body(bundle) } : {}),
+        })
         sent += 1
       }
     }

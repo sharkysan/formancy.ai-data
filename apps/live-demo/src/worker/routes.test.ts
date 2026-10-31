@@ -35,7 +35,10 @@ describe("the Worker's routes", () => {
     expect(routeOf('GET', at(`${PREFIX}/v1/forms`))).toEqual({ kind: 'forward', path: '/v1/forms' })
     expect(routeOf('GET', at(`${PREFIX}/v1/forms/order`))).toEqual({ kind: 'forward', path: '/v1/forms/order' })
     expect(routeOf('POST', at(`${PREFIX}/v1/forms/order/records/list`))).toEqual({ kind: 'forward', path: '/v1/forms/order/records/list' })
-    expect(routeOf('POST', at(`${PREFIX}/v1/forms/order/lookups/customer/query?x=1`))).toEqual({ kind: 'forward', path: '/v1/forms/order/lookups/customer/query?x=1' })
+    expect(routeOf('POST', at(`${PREFIX}/v1/forms/order/lookups/customer/query?x=1`))).toEqual({
+      kind: 'forward',
+      path: '/v1/forms/order/lookups/customer/query?x=1',
+    })
     for (const route of RUNTIME_ROUTES) {
       const path = route.path.replace(':id', 'order-line').replace(':source', 'order')
       expect(routeOf(route.method, at(`${PREFIX}${path}`)), `${route.method} ${route.path}`).toEqual({ kind: 'forward', path })
@@ -49,11 +52,30 @@ describe("the Worker's routes", () => {
   // server registers there, as deploy/cloudflare/doors.json samples it, is
   // the Worker's own 404, by either method, and wakes no server.
   test("answers 404 for the administrator's routes under /v1/forms, by either method", () => {
-    const administrator = ['versions', 'versions/1', 'versions/latest', 'imports', 'restorations', 'regenerations', 'drift', 'drafts', 'drafts/1', 'drafts/1/approval', 'drafts/1/rejection']
+    const administrator = [
+      'versions',
+      'versions/1',
+      'versions/latest',
+      'imports',
+      'restorations',
+      'regenerations',
+      'drift',
+      'drafts',
+      'drafts/1',
+      'drafts/1/approval',
+      'drafts/1/rejection',
+    ]
     for (const rest of administrator) {
       for (const method of ['GET', 'POST']) expect(routeOf(method, at(`${PREFIX}/v1/forms/order/${rest}`)), `${method} ${rest}`).toEqual({ kind: 'not-found' })
     }
-    for (const path of ['/v1/forms/order/records', '/v1/forms/order/records/list/x', '/v1/forms/order/lookups/customer', '/v1/forms/order/lookups/customer/search', '/v1/forms/order/x', '/v1/forms/order/']) {
+    for (const path of [
+      '/v1/forms/order/records',
+      '/v1/forms/order/records/list/x',
+      '/v1/forms/order/lookups/customer',
+      '/v1/forms/order/lookups/customer/search',
+      '/v1/forms/order/x',
+      '/v1/forms/order/',
+    ]) {
       expect(routeOf('POST', at(`${PREFIX}${path}`)), path).toEqual({ kind: 'not-found' })
     }
   })
@@ -74,7 +96,18 @@ describe("the Worker's routes", () => {
   // no request the page makes, and the Worker does not wake a server for
   // it.
   test('answers 404 for /v1/ outside forms, and for any other path under the demo', () => {
-    for (const path of ['/v1', '/v1/', '/v1/connections', '/v1/health', '/v1/formsx', '/v1/forms-old/x', '/health', '/', '/nope.js', '/assets/missing-12345678.js']) {
+    for (const path of [
+      '/v1',
+      '/v1/',
+      '/v1/connections',
+      '/v1/health',
+      '/v1/formsx',
+      '/v1/forms-old/x',
+      '/health',
+      '/',
+      '/nope.js',
+      '/assets/missing-12345678.js',
+    ]) {
       expect(routeOf('GET', at(`${PREFIX}${path}`)), path).toEqual({ kind: 'not-found' })
       expect(routeOf('POST', at(`${PREFIX}${path}`)), path).toEqual({ kind: 'not-found' })
     }

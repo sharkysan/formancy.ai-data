@@ -29,7 +29,10 @@ beforeEach(() => {
   write('packages/data-server/tsdown.config.ts', 'export default {}\n')
   write('packages/data-server/tsconfig.json', '{}\n')
   write('packages/data-server/src/main.ts', "import { createApp } from './app.js'\nimport type { Unused } from './types.js'\ncreateApp()\n")
-  write('packages/data-server/src/app.ts', "import { plan, type Plan } from '@formancy/data-core'\nimport Fastify from 'fastify'\nexport const createApp = () => plan(Fastify)\n")
+  write(
+    'packages/data-server/src/app.ts',
+    "import { plan, type Plan } from '@formancy/data-core'\nimport Fastify from 'fastify'\nexport const createApp = () => plan(Fastify)\n",
+  )
   write('packages/data-server/src/types.ts', 'export type Unused = string\n')
   write('packages/data-server/src/app.test.ts', "import { createApp } from './app.js'\n")
   write('packages/data-server/src/unreached.ts', 'export const nobody = 1\n')
@@ -45,7 +48,10 @@ beforeEach(() => {
   write('packages/data-fixtures/fixtures/postgres.sql', 'create table t ();\n')
   write('packages/data-performance/package.json', manifest('@formancy/data-performance', '0.1.0', { '@formancy/data-core': 'workspace:*' }))
   write('packages/data-performance/src/measure.ts', "import * as core from '@formancy/data-core'\nexport const all = core\n")
-  write('node_modules/fastify/package.json', manifest('fastify', '5.12.5', { pino: '^10.0.0' }, { optionalDependencies: { 'not-installed': '1.0.0' }, peerDependencies: { 'absent-peer': '1.0.0' } }))
+  write(
+    'node_modules/fastify/package.json',
+    manifest('fastify', '5.12.5', { pino: '^10.0.0' }, { optionalDependencies: { 'not-installed': '1.0.0' }, peerDependencies: { 'absent-peer': '1.0.0' } }),
+  )
   write('node_modules/pino/package.json', manifest('pino', '10.4.0'))
   write('node_modules/@formancy/spec/package.json', manifest('@formancy/spec', '0.3.0', {}, { exports: { '.': './dist/index.js' } }))
   write('node_modules/@types/node/package.json', manifest('@types/node', '22.20.5'))
@@ -68,7 +74,9 @@ describe('the stale check on a repository in miniature', () => {
   // The measured product changed: the figures describe code that no longer
   // ships, and the release must re-measure. Named, so the reader knows why.
   test('names a changed byte of an imported source file', () => {
-    expect(staleAfter(() => write('packages/data-core/src/helper.ts', 'export const helper = (x: unknown) => [x]\n'))).toEqual(['changed: packages/data-core/src/helper.ts'])
+    expect(staleAfter(() => write('packages/data-core/src/helper.ts', 'export const helper = (x: unknown) => [x]\n'))).toEqual([
+      'changed: packages/data-core/src/helper.ts',
+    ])
   })
 
   // None of these runs inside a timed sample: a test, a file nothing the
@@ -102,7 +110,10 @@ describe('the stale check on a repository in miniature', () => {
     expect(
       staleAfter(() => {
         write('packages/data-core/src/extra.ts', 'export const extra = 1\n')
-        write('packages/data-core/src/plan.ts', "import { helper } from './helper.js'\nimport { extra } from './extra.js'\nexport type Plan = string\nexport const plan = (x: unknown) => helper([x, extra])\n")
+        write(
+          'packages/data-core/src/plan.ts',
+          "import { helper } from './helper.js'\nimport { extra } from './extra.js'\nexport type Plan = string\nexport const plan = (x: unknown) => helper([x, extra])\n",
+        )
       }),
     ).toEqual(['added: packages/data-core/src/extra.ts', 'changed: packages/data-core/src/plan.ts'])
     expect(
@@ -121,7 +132,9 @@ describe('the stale check on a repository in miniature', () => {
 
   // The build turns the source into what runs; its configuration is part of it.
   test("names a change to a reached package's build configuration", () => {
-    expect(staleAfter(() => write('packages/data-core/tsdown.config.ts', 'export default { minify: true }\n'))).toEqual(['build input changed: packages/data-core/tsdown.config.ts'])
+    expect(staleAfter(() => write('packages/data-core/tsdown.config.ts', 'export default { minify: true }\n'))).toEqual([
+      'build input changed: packages/data-core/tsdown.config.ts',
+    ])
     expect(staleAfter(() => write('node_modules/typescript/package.json', manifest('typescript', '6.0.4')))).toEqual(['build input changed: typescript'])
   })
 
@@ -230,7 +243,10 @@ describe('the product on this repository', () => {
   test('leaves out a file that holds the one number and nothing else', () => {
     for (const path of Object.keys(OUTSIDE_THE_PRODUCT)) {
       const text = readFileSync(join(repo, path), 'utf8')
-      const code = text.replaceAll(/\/\*[\s\S]*?\*\//g, '').replaceAll(/^\s*\/\/.*$/gm, '').trim()
+      const code = text
+        .replaceAll(/\/\*[\s\S]*?\*\//g, '')
+        .replaceAll(/^\s*\/\/.*$/gm, '')
+        .trim()
       expect(code, path).toMatch(/^export const DEFAULT_LOOKUP_DEADLINE_MS = \d+$/)
     }
   })
@@ -263,7 +279,11 @@ describe('the release', () => {
   test('is run by no workflow', () => {
     const files = readdirSync(join(repo, '.github/workflows')).filter((name) => /\.ya?ml$/.test(name))
     expect(files).toEqual(expect.arrayContaining(['ci.yml', 'gates.yml', 'release.yml']))
-    const named = files.flatMap((name) => steps(readWorkflow(repo, `.github/workflows/${name}`)).filter(({ step }) => String(step.run ?? '').includes('performance-stale')).map(({ job }) => `${name}: ${job}`))
+    const named = files.flatMap((name) =>
+      steps(readWorkflow(repo, `.github/workflows/${name}`))
+        .filter(({ step }) => String(step.run ?? '').includes('performance-stale'))
+        .map(({ job }) => `${name}: ${job}`),
+    )
     expect(named).toEqual([])
   })
 

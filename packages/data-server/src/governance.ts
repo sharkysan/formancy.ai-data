@@ -145,7 +145,8 @@ export function refusalFor(operation: AdminOperation, caller: Caller, review: bo
 /** A refusal as the answers carry it: the code and the sentence the route would answer with. */
 export type Refused = Pick<GovernanceRefusal, 'code' | 'message'>
 
-const carried = (refusal: GovernanceRefusal | undefined): Refused | undefined => (refusal === undefined ? undefined : { code: refusal.code, message: refusal.message })
+const carried = (refusal: GovernanceRefusal | undefined): Refused | undefined =>
+  refusal === undefined ? undefined : { code: refusal.code, message: refusal.message }
 
 /** What `GET /v1/administration` answers: whether this deployment reviews, whether the caller publishes, and every operation the grant alone refuses them. */
 export interface Administration {

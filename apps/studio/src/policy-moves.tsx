@@ -34,18 +34,25 @@ export function StateMoves({
   // A field the policy names and the form no longer offers stays chosen, for the check to say why.
   const offered = rule === undefined || fields.includes(rule.field) ? fields : [rule.field, ...fields]
   const write = (field: string, next: readonly TransitionMove[]) => onPolicy(withTransitions(policy, { field, moves: [...next] }))
-  const replace = (field: string, at: number, move: TransitionMove) => write(field, moves.map((entry, index) => (index === at ? move : entry)))
+  const replace = (field: string, at: number, move: TransitionMove) =>
+    write(
+      field,
+      moves.map((entry, index) => (index === at ? move : entry)),
+    )
   const remove = (field: string, at: number) => {
-    write(field, moves.filter((_, index) => index !== at))
+    write(
+      field,
+      moves.filter((_, index) => index !== at),
+    )
     focusAfter(at < moves.length - 1 ? `move-${String(at)}-remove` : 'move-add')
   }
   return (
     <fieldset>
       <legend>State moves</legend>
       <p className="hint">
-        A field whose value is where a record stands, and the moves each role may make of it. An update changes it only by a
-        move listed for one of the person&rsquo;s roles; a create starts it by a move from a new record, or leaves it to the
-        column&rsquo;s default. Without a state field, every change is the field&rsquo;s write roles alone.
+        A field whose value is where a record stands, and the moves each role may make of it. An update changes it only by a move listed for one of the
+        person&rsquo;s roles; a create starts it by a move from a new record, or leaves it to the column&rsquo;s default. Without a state field, every change is
+        the field&rsquo;s write roles alone.
       </p>
       <div className="field">
         <label htmlFor="state-field">State field</label>
@@ -75,7 +82,7 @@ export function StateMoves({
                   <li key={id} className="move">
                     <div className="field">
                       <label htmlFor={`${id}-from`}>
-                        From{' '}<span className="visually-hidden">in {name}</span>
+                        From <span className="visually-hidden">in {name}</span>
                       </label>
                       <input
                         id={`${id}-from`}
@@ -90,7 +97,7 @@ export function StateMoves({
                     </span>
                     <div className="field">
                       <label htmlFor={`${id}-to`}>
-                        To{' '}<span className="visually-hidden">in {name}</span>
+                        To <span className="visually-hidden">in {name}</span>
                       </label>
                       <input
                         id={`${id}-to`}
@@ -104,14 +111,14 @@ export function StateMoves({
                       id={`${id}-roles`}
                       label={
                         <>
-                          Roles{' '}<span className="visually-hidden">that may make {name}</span>
+                          Roles <span className="visually-hidden">that may make {name}</span>
                         </>
                       }
                       roles={move.roles}
                       onRoles={(roles) => replace(rule.field, index, { ...move, roles })}
                     />
                     <button type="button" id={`${id}-remove`} className="button" onClick={() => remove(rule.field, index)}>
-                      Remove{' '}<span className="visually-hidden">{name}</span>
+                      Remove <span className="visually-hidden">{name}</span>
                     </button>
                   </li>
                 )

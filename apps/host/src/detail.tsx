@@ -100,7 +100,14 @@ export function Detail({
 }): ReactElement {
   const separate = layout === 'separate'
   const shown = renderersOf(renderer)
-  const heading: Said = open === null ? ['No record open'] : open.kind === 'new' ? ['New record'] : open.kind === 'next' ? ['Next version of ', { code: open.of }] : [`${formTitle} `, { code: open.token }]
+  const heading: Said =
+    open === null
+      ? ['No record open']
+      : open.kind === 'new'
+        ? ['New record']
+        : open.kind === 'next'
+          ? ['Next version of ', { code: open.of }]
+          : [`${formTitle} `, { code: open.token }]
 
   return (
     <section className="detail" id="detail" aria-labelledby="detail-heading" hidden={hidden}>
@@ -132,7 +139,14 @@ export function Detail({
           ) : null}
           {canDelete && open?.kind === 'record' ? (
             // An outline in --invalid, never a fill: the one control here that cannot be taken back.
-            <button type="button" className="button danger" ref={deleteRef} aria-disabled={saving ? 'true' : undefined} aria-describedby={saving ? 'detail-delete-waits' : undefined} onClick={onDelete}>
+            <button
+              type="button"
+              className="button danger"
+              ref={deleteRef}
+              aria-disabled={saving ? 'true' : undefined}
+              aria-describedby={saving ? 'detail-delete-waits' : undefined}
+              onClick={onDelete}
+            >
               Delete record
             </button>
           ) : null}
@@ -163,7 +177,14 @@ export function Detail({
         {sessions
           .filter((session) => shown.includes(session.renderer))
           .map((session) => (
-            <Pane key={session.renderer} session={session} title={formTitle} idBase={formId} onAnswer={(result) => onAnswer(result, session)} onLoaded={() => onLoaded(session)} />
+            <Pane
+              key={session.renderer}
+              session={session}
+              title={formTitle}
+              idBase={formId}
+              onAnswer={(result) => onAnswer(result, session)}
+              onLoaded={() => onLoaded(session)}
+            />
           ))}
       </div>
       {children}

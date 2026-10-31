@@ -7,7 +7,18 @@ import { createAdminClient } from './api.js'
 import type { Drift } from './api.js'
 import { audit, generateOrder, goTo, grantOrderDelete, paragraphs, signIn, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
-import { onServer, OWNER_SNAPSHOT, READER_SNAPSHOT, startPlane, TOKENS, withColumn, withForeignKey, withGap, withoutColumn, withoutDelete } from './test-server.js'
+import {
+  onServer,
+  OWNER_SNAPSHOT,
+  READER_SNAPSHOT,
+  startPlane,
+  TOKENS,
+  withColumn,
+  withForeignKey,
+  withGap,
+  withoutColumn,
+  withoutDelete,
+} from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -53,7 +64,14 @@ function withShipmentsOfOrders(base: MetadataSnapshot): MetadataSnapshot {
   const id = base.objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'id')
   if (id === undefined) throw new Error('the snapshot has no order id')
   const column = { ...structuredClone(id), name: 'order_id', ordinal: 99, nullable: true, generated: 'none' as const }
-  return withForeignKey(withColumn(base, 'shipment', column), { from: 'shipment', name: 'fk_shipment_order', columns: ['order_id'], onto: 'order', referencedColumns: ['id'], onDelete: 'cascade' })
+  return withForeignKey(withColumn(base, 'shipment', column), {
+    from: 'shipment',
+    name: 'fk_shipment_order',
+    columns: ['order_id'],
+    onto: 'order',
+    referencedColumns: ['id'],
+    onDelete: 'cascade',
+  })
 }
 
 /**
@@ -88,12 +106,25 @@ function boxes(policy: HTMLElement): Array<[string, boolean]> {
 function withNewColumn(base: MetadataSnapshot): MetadataSnapshot {
   const { fingerprint: _, ...contents } = structuredClone(base)
   const order = contents.objects.find((object) => object.ref.name === 'order')
-  order?.columns.push({ name: 'discount', ordinal: 99, databaseType: 'integer', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, nullable: true, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true } })
+  order?.columns.push({
+    name: 'discount',
+    ordinal: 99,
+    databaseType: 'integer',
+    type: { kind: 'integer', min: '-2147483648', max: '2147483647' },
+    nullable: true,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+  })
   return createSnapshot(contents)
 }
 
 function items(container: HTMLElement, name: string): string[] {
-  return within(within(container).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return within(within(container).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 /** How the step writes one change, built from the server's report rather than retyped. */
@@ -106,7 +137,8 @@ function written(change: DriftChange, labels: Record<string, string>): string {
         : change.subject.kind === 'object'
           ? `${change.subject.object.schema}.${change.subject.object.name}`
           : `${change.subject.object.schema}.${change.subject.object.name}, ${change.subject.kind} ${change.subject.name}`
-  const affects = change.affects.length === 0 ? 'Affects no field of this form.' : `Affects ${change.affects.map((key) => `${labels[key] ?? key} (${key})`).join(', ')}.`
+  const affects =
+    change.affects.length === 0 ? 'Affects no field of this form.' : `Affects ${change.affects.map((key) => `${labels[key] ?? key} (${key})`).join(', ')}.`
   return `${change.severity} ${change.kind} on ${subject}${change.message}${affects}`
 }
 
@@ -118,7 +150,12 @@ describe('drift', () => {
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
     expect(within(report).getByRole('status').textContent).toBe('Nothing this form rests on has changed since version 1 was published.')
-    expect(items(report, 'What the published form may still do')).toEqual(['Read: still allowed', 'Create: still allowed', 'Update: still allowed', 'As a whole: usable as published.'])
+    expect(items(report, 'What the published form may still do')).toEqual([
+      'Read: still allowed',
+      'Create: still allowed',
+      'Update: still allowed',
+      'As a whole: usable as published.',
+    ])
     expect(await audit()).toEqual([])
   })
 
@@ -133,7 +170,9 @@ describe('drift', () => {
     const server = await serverReport()
     expect(server.changes.map((change) => [change.kind, change.severity])).toEqual([['column-dropped', 'blocking']])
     expect(items(report, 'Blocking')).toEqual(server.changes.map((change) => written(change, { notes: 'Notes' })))
-    expect(paragraphs(report)).toContain('Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.')
+    expect(paragraphs(report)).toContain(
+      'Blocks the form as published: a write it offers is stopped, or a field it shows can no longer be read, until it is reviewed.',
+    )
     // The Read line is the report's `readable` (0041): a dropped bound column breaks reads.
     expect(server.readable).toBe(false)
     expect(items(report, 'What the published form may still do')).toEqual([
@@ -176,7 +215,12 @@ describe('drift', () => {
     expect(within(report).getByRole('status').textContent).toBe('1 change, 0 blocking.')
     expect(items(report, 'Review')).toEqual(server.changes.map((change) => written(change, {})))
     expect(items(report, 'Review')[0]).toContain('This release of Formancy Data was not tested on PostgreSQL 14:')
-    expect(items(report, 'What the published form may still do')).toEqual(['Read: still allowed', 'Create: still allowed', 'Update: still allowed', 'As a whole: usable as published.'])
+    expect(items(report, 'What the published form may still do')).toEqual([
+      'Read: still allowed',
+      'Create: still allowed',
+      'Update: still allowed',
+      'As a whole: usable as published.',
+    ])
     expect(await audit()).toEqual([])
   })
 
@@ -198,11 +242,20 @@ describe('drift', () => {
     // Only review sees an account and a privilege: what it blocks and the
     // server still allows is said, so an administrator does not take a
     // blocked form for one nobody can use (0041).
-    const blockedHere = [...(!server.readable && server.runtime.readable ? ['read'] : []), ...(['create', 'update'] as const).filter((operation) => !server.writable[operation] && server.runtime.writable[operation])]
+    const blockedHere = [
+      ...(!server.readable && server.runtime.readable ? ['read'] : []),
+      ...(['create', 'update'] as const).filter((operation) => !server.writable[operation] && server.runtime.writable[operation]),
+    ]
     expect(blockedHere.length).toBeGreaterThan(0)
     const said = items(report, 'What the published form may still do').filter((item) => item.startsWith('The server still allows'))
-    expect(said).toEqual([expect.stringContaining(`The server still allows ${blockedHere.length === 1 ? blockedHere[0] : `${blockedHere.slice(0, -1).join(', ')} and ${blockedHere.at(-1) as string}`}: what blocks`)])
-    expect(said[0]).toMatch(/a lookup’s table, privileges, row security or the account\)\. The database still refuses what the account may not do\. Review the form and publish it again\.$/)
+    expect(said).toEqual([
+      expect.stringContaining(
+        `The server still allows ${blockedHere.length === 1 ? blockedHere[0] : `${blockedHere.slice(0, -1).join(', ')} and ${blockedHere.at(-1) as string}`}: what blocks`,
+      ),
+    ])
+    expect(said[0]).toMatch(
+      /a lookup’s table, privileges, row security or the account\)\. The database still refuses what the account may not do\. Review the form and publish it again\.$/,
+    )
   })
 
   // Where review and the server agree, nothing more is said: a line that
@@ -242,7 +295,11 @@ describe('drift', () => {
 
     plane.databases.set('fixture', withShipmentsOfOrders(OWNER_SNAPSHOT))
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
-    await waitFor(() => expect(within(drift).getByRole('region', { name: 'Version 1 of sales-order, against the database now' }).querySelector('[data-severity="blocking"]')).not.toBeNull())
+    await waitFor(() =>
+      expect(
+        within(drift).getByRole('region', { name: 'Version 1 of sales-order, against the database now' }).querySelector('[data-severity="blocking"]'),
+      ).not.toBeNull(),
+    )
     report = within(drift).getByRole('region', { name: 'Version 1 of sales-order, against the database now' })
     const server = await serverReport()
     expect(server.changes.filter((change) => change.severity === 'blocking').map((change) => change.kind)).toEqual(['referrer-added'])

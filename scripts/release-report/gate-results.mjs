@@ -68,7 +68,15 @@ export function gateRecorder(gate, { browser: asked, log = console.log, now = ()
      */
     launched(instance, options) {
       const name = instance.browserType().name()
-      browser = { name, version: instance.version(), headless: options.headless, options: { ...options }, pwdebug: pwdebugOf(env), platform: process.platform, arch: process.arch }
+      browser = {
+        name,
+        version: instance.version(),
+        headless: options.headless,
+        options: { ...options },
+        pwdebug: pwdebugOf(env),
+        platform: process.platform,
+        arch: process.arch,
+      }
       if (name !== asked) {
         error = `${gate} asked for ${asked}, and the launch gave ${name} ${browser.version}`
         throw new Error(error)
@@ -147,7 +155,9 @@ export async function recordedPerBrowser(app, { load, run, env = process.env, br
       try {
         instance = await playwright[asked].launch(options)
       } catch (error) {
-        throw new Error(`could not launch ${browserName(asked)} (${String(error)}).\nIf this machine does not have it, run \`${installCommand(asked)}\`.`)
+        throw new Error(`could not launch ${browserName(asked)} (${String(error)}).\nIf this machine does not have it, run \`${installCommand(asked)}\`.`, {
+          cause: error,
+        })
       }
       log(`\n${browserName(asked)} ${instance.version()}, ${launchedBuild({ name: asked, options, pwdebug: pwdebugOf(env) }).how}`)
       gate.launched(instance, options)

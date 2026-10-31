@@ -77,10 +77,28 @@ const CLASS = 'DemoServer'
 const BINDING = 'DEMO'
 
 /** The image, built from the repository root so .dockerignore applies, at the size its Dockerfile's header measured for (0070). */
-const CONTAINER = Object.freeze({ class_name: CLASS, image: '../../deploy/demo/Dockerfile', image_build_context: '../..', instance_type: 'basic', max_instances: MAX_INSTANCES })
+const CONTAINER = Object.freeze({
+  class_name: CLASS,
+  image: '../../deploy/demo/Dockerfile',
+  image_build_context: '../..',
+  instance_type: 'basic',
+  max_instances: MAX_INSTANCES,
+})
 
 /** Everything the live demo's config may say. Anything else -- a variable, a secret, a binding of any kind -- is more than the demo has. */
-const KEYS = ['name', 'main', 'compatibility_date', 'workers_dev', 'preview_urls', 'routes', 'assets', 'containers', 'durable_objects', 'exports', 'observability']
+const KEYS = [
+  'name',
+  'main',
+  'compatibility_date',
+  'workers_dev',
+  'preview_urls',
+  'routes',
+  'assets',
+  'containers',
+  'durable_objects',
+  'exports',
+  'observability',
+]
 const ASSET_KEYS = ['directory', 'html_handling', 'not_found_handling', 'run_worker_first']
 
 /** The paths the Worker runs before the assets: the session, and the runtime plane under the demo's path (worker/routes.ts). */
@@ -105,27 +123,41 @@ function routeProblems(routes) {
   const problems = []
   const expected = [`${HOST}${PREFIX}/*`, `${HOST}${PREFIX}`]
   for (const route of routes) {
-    if (route.custom_domain !== undefined) problems.push(`the route ${String(route.pattern)} sets custom_domain: a Custom Domain takes a whole hostname, and the demo is one path of ${HOST}`)
+    if (route.custom_domain !== undefined)
+      problems.push(`the route ${String(route.pattern)} sets custom_domain: a Custom Domain takes a whole hostname, and the demo is one path of ${HOST}`)
     else if (route.zone_name !== HOST) problems.push(`the route ${String(route.pattern)} is on the zone ${String(route.zone_name)}, not ${HOST}`)
-    else if (!expected.includes(route.pattern)) problems.push(`the route ${String(route.pattern)} is not the demo's path: it would send the demo's Worker more of ${HOST} than ${liveDemoBase()}`)
-    for (const key of Object.keys(route)) if (!['pattern', 'zone_name', 'custom_domain'].includes(key)) problems.push(`the route ${String(route.pattern)} has ${key}, which the demo's routes do not`)
+    else if (!expected.includes(route.pattern))
+      problems.push(`the route ${String(route.pattern)} is not the demo's path: it would send the demo's Worker more of ${HOST} than ${liveDemoBase()}`)
+    for (const key of Object.keys(route))
+      if (!['pattern', 'zone_name', 'custom_domain'].includes(key))
+        problems.push(`the route ${String(route.pattern)} has ${key}, which the demo's routes do not`)
   }
   for (const pattern of expected) {
-    if (!routes.some((route) => route.pattern === pattern && route.zone_name === HOST && route.custom_domain === undefined)) problems.push(`no route ${pattern} on the zone ${HOST}: ${pattern.endsWith('*') ? 'the page, its files and its Worker' : `the path without its slash, which the assets send to ${liveDemoBase()},`} would be answered by formancy.ai's site`)
+    if (!routes.some((route) => route.pattern === pattern && route.zone_name === HOST && route.custom_domain === undefined))
+      problems.push(
+        `no route ${pattern} on the zone ${HOST}: ${pattern.endsWith('*') ? 'the page, its files and its Worker' : `the path without its slash, which the assets send to ${liveDemoBase()},`} would be answered by formancy.ai's site`,
+      )
   }
   return problems
 }
 
 /** What would make the one container anything but the demo's image, at its size and cap, with no way in but its Worker. */
 function containerProblems(containers) {
-  if (!Array.isArray(containers) || containers.length !== 1) return [`the config has ${Array.isArray(containers) ? String(containers.length) : 'no list of'} containers, and the demo has exactly one`]
+  if (!Array.isArray(containers) || containers.length !== 1)
+    return [`the config has ${Array.isArray(containers) ? String(containers.length) : 'no list of'} containers, and the demo has exactly one`]
   const [container] = containers
   const problems = []
   for (const key of Object.keys(container)) {
-    if (!(key in CONTAINER)) problems.push(`the container has ${key}, which the demo's does not: its image, size and cap are the Dockerfile's and the Worker's, and nothing reaches it but its Durable Object`)
+    if (!(key in CONTAINER))
+      problems.push(
+        `the container has ${key}, which the demo's does not: its image, size and cap are the Dockerfile's and the Worker's, and nothing reaches it but its Durable Object`,
+      )
   }
   for (const [key, value] of Object.entries(CONTAINER)) {
-    if (container[key] !== value) problems.push(`the container's ${key} is ${shown(container[key])}, not ${shown(value)}${key === 'max_instances' ? ", the Worker's MAX_INSTANCES, which its start failure tells a visitor" : ''}`)
+    if (container[key] !== value)
+      problems.push(
+        `the container's ${key} is ${shown(container[key])}, not ${shown(value)}${key === 'max_instances' ? ", the Worker's MAX_INSTANCES, which its start failure tells a visitor" : ''}`,
+      )
   }
   return problems
 }
@@ -137,28 +169,59 @@ function containerProblems(containers) {
  */
 export function liveConfigProblems(config) {
   const problems = []
-  if (config.name !== LIVE_WORKER) problems.push(`the config names the Worker ${String(config.name)}, not ${LIVE_WORKER}: the deploy would replace whatever that Worker serves`)
+  if (config.name !== LIVE_WORKER)
+    problems.push(`the config names the Worker ${String(config.name)}, not ${LIVE_WORKER}: the deploy would replace whatever that Worker serves`)
   if (config.main !== MAIN) problems.push(`the config's main is ${String(config.main)}, not ${MAIN}, the Worker and its Durable Object`)
-  for (const key of Object.keys(config)) if (!KEYS.includes(key)) problems.push(`the config has ${key}, which the live demo's Worker does not: it has its assets, its container and its Durable Object, and no variable, secret or other binding`)
+  for (const key of Object.keys(config))
+    if (!KEYS.includes(key))
+      problems.push(
+        `the config has ${key}, which the live demo's Worker does not: it has its assets, its container and its Durable Object, and no variable, secret or other binding`,
+      )
   if (config.workers_dev !== false) problems.push('workers_dev is not false: the demo would answer on a workers.dev address beside formancy.ai')
   if (config.preview_urls !== false) problems.push('preview_urls is not false: every version would answer on an address of its own')
   problems.push(...routeProblems(config.routes ?? []))
   const assets = config.assets ?? {}
-  for (const key of Object.keys(assets)) if (!ASSET_KEYS.includes(key)) problems.push(`the config has assets.${key}, which the live demo's Worker does not: no code reads the page's files`)
-  if (assets.directory !== STAGE) problems.push(`assets.directory is ${String(assets.directory)}, not ${STAGE}: the deploy stages the build there, under the demo's path`)
-  if (assets.html_handling !== 'auto-trailing-slash') problems.push(`assets.html_handling is ${String(assets.html_handling)}, not auto-trailing-slash, which sends the path without its slash to the page and its relative files`)
-  if (assets.not_found_handling !== 'none') problems.push(`assets.not_found_handling is ${String(assets.not_found_handling)}, not none: a path the build does not have is the Worker's 404, never the page`)
-  if (!same(assets.run_worker_first, WORKER_FIRST)) problems.push(`assets.run_worker_first is ${shown(assets.run_worker_first)}, not ${shown(WORKER_FIRST)}: the Worker runs before the files for the session and the runtime plane, and for nothing else`)
+  for (const key of Object.keys(assets))
+    if (!ASSET_KEYS.includes(key)) problems.push(`the config has assets.${key}, which the live demo's Worker does not: no code reads the page's files`)
+  if (assets.directory !== STAGE)
+    problems.push(`assets.directory is ${String(assets.directory)}, not ${STAGE}: the deploy stages the build there, under the demo's path`)
+  if (assets.html_handling !== 'auto-trailing-slash')
+    problems.push(
+      `assets.html_handling is ${String(assets.html_handling)}, not auto-trailing-slash, which sends the path without its slash to the page and its relative files`,
+    )
+  if (assets.not_found_handling !== 'none')
+    problems.push(
+      `assets.not_found_handling is ${String(assets.not_found_handling)}, not none: a path the build does not have is the Worker's 404, never the page`,
+    )
+  if (!same(assets.run_worker_first, WORKER_FIRST))
+    problems.push(
+      `assets.run_worker_first is ${shown(assets.run_worker_first)}, not ${shown(WORKER_FIRST)}: the Worker runs before the files for the session and the runtime plane, and for nothing else`,
+    )
   problems.push(...containerProblems(config.containers))
-  if (!same(config.durable_objects, { bindings: [{ name: BINDING, class_name: CLASS }] })) problems.push(`durable_objects is ${shown(config.durable_objects)}: the Worker has one binding, ${BINDING}, to its own ${CLASS}`)
-  if (!same(config.exports, { [CLASS]: { type: 'durable-object', storage: 'sqlite' } })) problems.push(`exports is ${shown(config.exports)}: the one export is ${CLASS}, a Durable Object with SQLite storage, which a container needs`)
-  if (!same(config.observability, { enabled: false })) problems.push(`observability is ${shown(config.observability)}, not {"enabled":false}: Cloudflare would keep the Worker's and the containers' logs of every visitor's requests`)
+  if (!same(config.durable_objects, { bindings: [{ name: BINDING, class_name: CLASS }] }))
+    problems.push(`durable_objects is ${shown(config.durable_objects)}: the Worker has one binding, ${BINDING}, to its own ${CLASS}`)
+  if (!same(config.exports, { [CLASS]: { type: 'durable-object', storage: 'sqlite' } }))
+    problems.push(`exports is ${shown(config.exports)}: the one export is ${CLASS}, a Durable Object with SQLite storage, which a container needs`)
+  if (!same(config.observability, { enabled: false }))
+    problems.push(
+      `observability is ${shown(config.observability)}, not {"enabled":false}: Cloudflare would keep the Worker's and the containers' logs of every visitor's requests`,
+    )
   return problems
 }
 
 /** Wrangler's arguments for the deploy of `commit`, or its dry run. */
 export function deployArguments(commit, dryRun) {
-  return ['--yes', WRANGLER, 'deploy', '--config', LIVE_CONFIG, '--message', `formancy.ai-data@${commit}`, '--containers-rollout=immediate', ...(dryRun ? ['--dry-run'] : [])]
+  return [
+    '--yes',
+    WRANGLER,
+    'deploy',
+    '--config',
+    LIVE_CONFIG,
+    '--message',
+    `formancy.ai-data@${commit}`,
+    '--containers-rollout=immediate',
+    ...(dryRun ? ['--dry-run'] : []),
+  ]
 }
 
 async function main(args) {
@@ -169,7 +232,8 @@ async function main(args) {
   const problems = liveConfigProblems(config)
   if (problems.length > 0) throw new Error(`${LIVE_CONFIG} is not the live demo's:\n  ${problems.join('\n  ')}`)
   const changed = run('git', ['status', '--porcelain'])
-  if (changed !== '' && !dryRun) throw new Error(`the checkout has changes, and the deployment would name a commit that does not hold them; commit them first:\n${changed}`)
+  if (changed !== '' && !dryRun)
+    throw new Error(`the checkout has changes, and the deployment would name a commit that does not hold them; commit them first:\n${changed}`)
   try {
     run('docker', ['info', '--format', '{{.ServerVersion}}'])
   } catch {
@@ -178,7 +242,13 @@ async function main(args) {
   run('pnpm', ['--filter', '@formancy/data-host', 'build:demo'], { stdio: 'inherit' })
   const dist = join(repo, DEMO_BUILD)
   if (!existsSync(join(dist, 'index.html'))) throw new Error(`${DEMO_BUILD}/index.html is not there after build:demo`)
-  const built = await buildProblems(dist, liveDemoUrl(), { root: host, mode: 'demo', name: "the host page's demo build", policy: LIVE_POLICY, allowed: LIVE_ALLOWED })
+  const built = await buildProblems(dist, liveDemoUrl(), {
+    root: host,
+    mode: 'demo',
+    name: "the host page's demo build",
+    policy: LIVE_POLICY,
+    allowed: LIVE_ALLOWED,
+  })
   if (built.length > 0) throw new Error(`the build is not the live demo's:\n  ${built.join('\n  ')}`)
   const commit = run('git', ['rev-parse', 'HEAD'])
   const stage = join(app, STAGE)

@@ -46,7 +46,11 @@ const TENANT = '7c1f6a2e-3b4d-4e5f-9a8b-0c1d2e3f4a5b'
 const CLIENT = '0f9e8d7c-6b5a-4c3d-8e2f-1a0b9c8d7e6f'
 const SECRET = 'Zq8~entra-client-secret-value-e81'
 const LOGINS: ReadonlyArray<{ name: string; entra: EntraLogin; credential: { prototype: object } }> = [
-  { name: 'a service principal', entra: { type: 'service-principal', tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET }, credential: ClientSecretCredential },
+  {
+    name: 'a service principal',
+    entra: { type: 'service-principal', tenantId: TENANT, clientId: CLIENT, clientSecret: SECRET },
+    credential: ClientSecretCredential,
+  },
   { name: 'a managed identity', entra: { type: 'managed-identity', clientId: CLIENT }, credential: ManagedIdentityCredential },
 ]
 
@@ -79,7 +83,15 @@ function address(): { host: string; port: number; database: string; encrypt: boo
 
 /** The server's own count of failed logins, from its errorlog: what was tried, whatever the driver said. */
 async function failedLogins(): Promise<number> {
-  const sa = await connectSqlServer({ host: container.getHost(), port: container.getPort(), database: 'master', user: container.getUsername(), password: container.getPassword(), encrypt: false, trustServerCertificate: true })
+  const sa = await connectSqlServer({
+    host: container.getHost(),
+    port: container.getPort(),
+    database: 'master',
+    user: container.getUsername(),
+    password: container.getPassword(),
+    encrypt: false,
+    trustServerCertificate: true,
+  })
   try {
     // With no line to match, the procedure returns no result set at all.
     const found = await sa.request().query<{ Text: string }>(`exec xp_readerrorlog 0, 1, N'Login failed'`)
@@ -180,6 +192,9 @@ describe('the configuration of an Entra pool', () => {
 })
 
 /** What mssql hands tedious for each connection it opens: the pool's private `_config()`. */
-function tediousConfigOf(pool: mssql.ConnectionPool): { authentication: { type: string; options: Record<string, unknown> }; options: { debug?: unknown; encrypt?: unknown; trustServerCertificate?: unknown } } {
+function tediousConfigOf(pool: mssql.ConnectionPool): {
+  authentication: { type: string; options: Record<string, unknown> }
+  options: { debug?: unknown; encrypt?: unknown; trustServerCertificate?: unknown }
+} {
   return (pool as unknown as { _config(): ReturnType<typeof tediousConfigOf> })._config()
 }

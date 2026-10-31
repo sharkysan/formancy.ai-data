@@ -34,7 +34,8 @@ export function driftedCase(cases: readonly DriftingCase[] = DRIFTING): Drifting
   const entry = cases.find((candidate) => candidate.name === CASE_NAME)
   if (entry === undefined) throw new Error(`DRIFTING has no ${CASE_NAME} case`)
   const runtime = runtimeOf(entry)
-  if (runtime === null || !runtime.read || runtime.create || runtime.update) throw new Error(`${CASE_NAME} no longer stops both writes while allowing reads: ${JSON.stringify(runtime)}`)
+  if (runtime === null || !runtime.read || runtime.create || runtime.update)
+    throw new Error(`${CASE_NAME} no longer stops both writes while allowing reads: ${JSON.stringify(runtime)}`)
   if (entry.setUp.postgres === undefined || entry.setUp.sqlserver === undefined || entry.alter.postgres === undefined || entry.alter.sqlserver === undefined) {
     throw new Error(`${CASE_NAME} no longer runs on both engines`)
   }
@@ -70,8 +71,17 @@ async function asOwner(owners: Owners, engine: EngineKey, statements: readonly s
 export async function prepareDrifted(owners: Owners): Promise<void> {
   const entry = driftedCase()
   const table = `drifting.${entry.table}`
-  await asOwner(owners, 'pg', ['create schema drifting', ...(entry.setUp.postgres as readonly string[]), `grant usage on schema drifting to ${WRITER.user}`, `grant select, insert, update on ${table} to ${WRITER.user}`])
-  await asOwner(owners, 'ms', ['create schema drifting', ...(entry.setUp.sqlserver as readonly string[]), `grant select, insert, update on ${table} to ${WRITER.user}`])
+  await asOwner(owners, 'pg', [
+    'create schema drifting',
+    ...(entry.setUp.postgres as readonly string[]),
+    `grant usage on schema drifting to ${WRITER.user}`,
+    `grant select, insert, update on ${table} to ${WRITER.user}`,
+  ])
+  await asOwner(owners, 'ms', [
+    'create schema drifting',
+    ...(entry.setUp.sqlserver as readonly string[]),
+    `grant select, insert, update on ${table} to ${WRITER.user}`,
+  ])
 }
 
 /** The case's ALTER, as the owner, after the forms are published and their record read. */
@@ -92,7 +102,9 @@ function everythingPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [],
     lookups: Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []])),
   }
@@ -149,7 +161,12 @@ export interface RefusalExecutable {
 }
 
 /** Each catalogue refusal for one engine, against its drifted form. */
-export function refusalsFor(engine: EngineKey, refusals: readonly CatalogueRefusal[], client: DataClient, record: DriftedRecord): Map<string, RefusalExecutable> {
+export function refusalsFor(
+  engine: EngineKey,
+  refusals: readonly CatalogueRefusal[],
+  client: DataClient,
+  record: DriftedRecord,
+): Map<string, RefusalExecutable> {
   const entry = driftedCase()
   const formId = driftedFormId(engine)
   // The reproduction's own first write: on the narrowed column, a value its new scale would have rounded.
@@ -171,7 +188,9 @@ export function refusalsFor(engine: EngineKey, refusals: readonly CatalogueRefus
           const wanted = `${String(refusal.answer.status)} ${refusal.answer.code}`
           if (answer.ok) throw new Error(`${engine} ${refusal.name} on ${formId}: saved, where the catalogue says ${wanted}`)
           if (answer.status !== refusal.answer.status || answer.code !== refusal.answer.code) {
-            throw new Error(`${engine} ${refusal.name} on ${formId}: answered ${String(answer.status)} ${answer.code}: ${answer.message}, where the catalogue says ${wanted}`)
+            throw new Error(
+              `${engine} ${refusal.name} on ${formId}: answered ${String(answer.status)} ${answer.code}: ${answer.message}, where the catalogue says ${wanted}`,
+            )
           }
           return { status: answer.status, code: answer.code }
         },

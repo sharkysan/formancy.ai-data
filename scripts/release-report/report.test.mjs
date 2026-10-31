@@ -29,7 +29,9 @@ describe('a package’s suite', () => {
   // A package whose job left nothing would be a package nobody tested, in a
   // report that said nothing about it.
   test('with no results fails the run', () => {
-    expect(withDefect((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== 'test-app-host')))).toEqual(['@formancy/data-host: no results from its suite'])
+    expect(withDefect((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== 'test-app-host')))).toEqual([
+      '@formancy/data-host: no results from its suite',
+    ])
   })
 
   // CLAUDE.md: a suite that can be skipped is a suite that is skipped.
@@ -38,7 +40,9 @@ describe('a package’s suite', () => {
       withDefect((inputs) => {
         job(inputs, 'test-data-core').suites[0].files[0].tests[0].status = 'skipped'
       }),
-    ).toEqual(['@formancy/data-core: 1 test(s) did not run (skipped), and a suite that can be skipped is a suite that is skipped: packages/data-core/src/a.test.ts › parses an amount'])
+    ).toEqual([
+      '@formancy/data-core: 1 test(s) did not run (skipped), and a suite that can be skipped is a suite that is skipped: packages/data-core/src/a.test.ts › parses an amount',
+    ])
   })
 
   test('with a failed test fails the run', () => {
@@ -88,9 +92,12 @@ describe('the shared cases', () => {
   test('fail the run for a case no SQL Server test declares', () => {
     expect(
       withDefect((inputs) => {
-        for (const entry of job(inputs, 'test-data-sqlserver').suites[0].files) for (const one of entry.tests) one.meta.covers = one.meta.covers.filter((id) => id !== CASES[1])
+        for (const entry of job(inputs, 'test-data-sqlserver').suites[0].files)
+          for (const one of entry.tests) one.meta.covers = one.meta.covers.filter((id) => id !== CASES[1])
       }),
-    ).toEqual([`${CASES[1]}: passed on postgres:17-alpine, missing on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`])
+    ).toEqual([
+      `${CASES[1]}: passed on postgres:17-alpine, missing on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`,
+    ])
   })
 
   // An id typed by hand, or left behind when the data changed, is a
@@ -123,7 +130,9 @@ describe('versions', () => {
         withFirefox(inputs)
         inputs.facts.browser.pins = inputs.facts.browser.pins.filter((pin) => pin.browser !== 'firefox')
       }),
-    ).toEqual(['the browser gates of apps/host launched firefox 155.0, which no gate here runs: the gates hold only Chromium to a build Playwright 1.63.0 pins'])
+    ).toEqual([
+      'the browser gates of apps/host launched firefox 155.0, which no gate here runs: the gates hold only Chromium to a build Playwright 1.63.0 pins',
+    ])
   })
 
   // Playwright 1.63.0 pins the headless shell and the full Chromium at one
@@ -150,7 +159,8 @@ describe('versions', () => {
   // default as tested on the README's word alone; and every case those tests
   // declared ran on that image, not the default's, so each is missing there.
   test('fail the run when an engine’s default image never answered a test', () => {
-    const missing = (id) => `${id}: missing on postgres:17-alpine, passed on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`
+    const missing = (id) =>
+      `${id}: missing on postgres:17-alpine, passed on mcr.microsoft.com/mssql/server:2022-latest (declared with covers(); see packages/data-fixtures/README.md)`
     expect(
       withDefect((inputs) => {
         for (const result of inputs.results) {
@@ -162,9 +172,9 @@ describe('versions', () => {
 
   // A server whose record names no file cannot be said to have run any test.
   test('fail the run for a server on another image that no file asked for', () => {
-    expect(withDefect((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:18-alpine', version: '18.6', caller: null })))).toEqual([
-      'PostgreSQL on postgres:18-alpine answered a test whose file no record names',
-    ])
+    expect(
+      withDefect((inputs) => job(inputs, 'test-data-postgres').servers.push(server({ image: 'postgres:18-alpine', version: '18.6', caller: null }))),
+    ).toEqual(['PostgreSQL on postgres:18-alpine answered a test whose file no record names'])
   })
 })
 
@@ -231,12 +241,18 @@ describe('the browser gates', () => {
       withDefect((inputs) => {
         Object.assign(job(inputs, 'browser-chromium').browserGates[0], { checks: { ok: 0, failed: [] } })
       }),
-    ).toEqual(['the browser gate of apps/host in Chromium made no check', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+    ).toEqual([
+      'the browser gate of apps/host in Chromium made no check',
+      'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass',
+    ])
     expect(
       withDefect((inputs) => {
         Object.assign(job(inputs, 'browser-chromium').browserGates[0], { passes: 0, widths: [] })
       }),
-    ).toEqual(['the browser gate of apps/host in Chromium made no pass at a viewport width', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+    ).toEqual([
+      'the browser gate of apps/host in Chromium made no pass at a viewport width',
+      'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass',
+    ])
   })
 
   // An app's gate that ran in Chromium and left nothing in Firefox is a gate
@@ -248,7 +264,10 @@ describe('the browser gates', () => {
         withFirefox(inputs)
         job(inputs, 'browser-firefox').browserGates = []
       }),
-    ).toEqual(['the browser gate of apps/host left no results in Firefox', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not run in Firefox'])
+    ).toEqual([
+      'the browser gate of apps/host left no results in Firefox',
+      'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not run in Firefox',
+    ])
   })
 
   // A gate's own failure, in the browser it failed in: with a file per
@@ -258,7 +277,11 @@ describe('the browser gates', () => {
     expect(
       withDefect((inputs) => {
         withFirefox(inputs)
-        Object.assign(job(inputs, 'browser-firefox').browserGates[0], { error: 'the server did not start', browser: null, checks: { ok: 39, failed: ['Signed out: no sideways scroll: 12px of horizontal overflow'] } })
+        Object.assign(job(inputs, 'browser-firefox').browserGates[0], {
+          error: 'the server did not start',
+          browser: null,
+          checks: { ok: 39, failed: ['Signed out: no sideways scroll: 12px of horizontal overflow'] },
+        })
       }),
     ).toEqual([
       'the browser gate of apps/host in Firefox ended with an error: the server did not start',
@@ -303,7 +326,11 @@ describe('the same checks in every browser', () => {
     const inputs = withWebKit(copy(greenRun()))
     const made = [
       pass(null, null, []),
-      pass('reflow, 320', 320, ['Signed out: no sideways scroll', ...heldChecks('apps/host'), 'Records, side by side: dragging the separator moves it, within its limits, and keeps it']),
+      pass('reflow, 320', 320, [
+        'Signed out: no sideways scroll',
+        ...heldChecks('apps/host'),
+        'Records, side by side: dragging the separator moves it, within its limits, and keeps it',
+      ]),
       pass('laptop, 1440', 1440, ['Signed out: no sideways scroll']),
     ]
     host(inputs, 'chromium').made = structuredClone(made)
@@ -359,7 +386,10 @@ describe('the same checks in every browser', () => {
         Object.assign(host(inputs, 'webkit'), { error: 'the server did not start' })
         host(inputs, 'webkit').made = [pass(null, null, [])]
       }),
-    ).toEqual(['the browser gate of apps/host in WebKit ended with an error: the server did not start', 'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass'])
+    ).toEqual([
+      'the browser gate of apps/host in WebKit ended with an error: the server did not start',
+      'gate 2: its evidence did not pass in this run: the browser gate of apps/host did not pass',
+    ])
   })
 })
 
@@ -451,7 +481,7 @@ describe('the run', () => {
 
   // A job missing from the report's needs is one whose end it never waited for.
   test('fails when the report’s needs do not name a job', () => {
-    expect(ciDefect((inputs) => delete inputs.needs.container)).toEqual(['the report\'s needs do not name the container job, so how it ended is unknown'])
+    expect(ciDefect((inputs) => delete inputs.needs.container)).toEqual(["the report's needs do not name the container job, so how it ended is unknown"])
   })
 
   // An artefact uploaded twice under one name -- a job re-run that kept both
@@ -479,14 +509,16 @@ describe('the run', () => {
         const artefact = inputs.artefacts.find((entry) => entry.name === 'release-results-container')
         artefact.files[0].result.job = 'install'
       }),
-    ).toEqual(['release-results-container holds container.json, the results of key container from job install, where it holds container.json from job container'])
+    ).toEqual([
+      'release-results-container holds container.json, the results of key container from job install, where it holds container.json from job container',
+    ])
   })
 
   // Results from another run -- a re-run's leftovers, or another commit's --
   // describe a run that is not this one.
   test('fails results from another run or another commit', () => {
-    expect(ciDefect((inputs) => (ciJob(inputs, 'test-data-core').run.id = '41'))).toEqual(['release-results-test-data-core is from run 41, not this run\'s 42'])
-    expect(ciDefect((inputs) => (ciJob(inputs, 'install').commit = 'decaf'))).toEqual(['release-results-install is from commit decaf, not this run\'s c0ffee'])
+    expect(ciDefect((inputs) => (ciJob(inputs, 'test-data-core').run.id = '41'))).toEqual(["release-results-test-data-core is from run 41, not this run's 42"])
+    expect(ciDefect((inputs) => (ciJob(inputs, 'install').commit = 'decaf'))).toEqual(["release-results-install is from commit decaf, not this run's c0ffee"])
   })
 })
 
@@ -513,7 +545,9 @@ describe('the release gates', () => {
   // The register is read every run; one that does not hold is a report of
   // gates nobody can judge.
   test('fail the run when the register does not hold', () => {
-    expect(ciDefect((inputs) => inputs.gatesRegister.gates.splice(6, 1))).toEqual(['docs/release/gates.json: the gates are 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, where the plan numbers 1 to 12, each once and in order'])
+    expect(ciDefect((inputs) => inputs.gatesRegister.gates.splice(6, 1))).toEqual([
+      'docs/release/gates.json: the gates are 1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, where the plan numbers 1 to 12, each once and in order',
+    ])
   })
 
   // A document is stated, and a stated gate is a limitation, not a failure.

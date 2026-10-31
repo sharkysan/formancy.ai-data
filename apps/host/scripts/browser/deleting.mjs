@@ -22,7 +22,11 @@ const status = (page) => records(page).getByRole('status', { name: /^$/ }).first
 const question = (page, record) => page.getByRole('region', { name: `Delete Order ${record}?`, exact: true })
 
 /** The row of the Records grid whose first cell says `first`. */
-const row = (page, first) => grid(page).getByRole('row').filter({ has: page.getByRole('gridcell', { name: first, exact: true }) }).first()
+const row = (page, first) =>
+  grid(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('gridcell', { name: first, exact: true }) })
+    .first()
 
 /**
  * The confirmation's frame -- its 1px `--invalid` border -- against the
@@ -51,7 +55,9 @@ async function frame(region) {
 /** On a phone the two answers stand one under the other, Keep it first, each the region's width; beside each other elsewhere. */
 async function stacked(region) {
   return region.evaluate((element) => {
-    const [keep, remove] = ['Keep it', 'Delete it'].map((name) => [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === name)?.getBoundingClientRect())
+    const [keep, remove] = ['Keep it', 'Delete it'].map((name) =>
+      [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === name)?.getBoundingClientRect(),
+    )
     if (keep === undefined || remove === undefined) return { problem: 'the region has no Keep it and Delete it' }
     return { under: remove.top >= keep.bottom - 0.5, wide: Math.abs(keep.width - remove.width) < 1, phone: window.matchMedia('(max-width: 40rem)').matches }
   })
@@ -73,7 +79,10 @@ async function rowConfirming(page, { plane, check, run, notes }) {
     if (await page.evaluate((wanted) => document.activeElement?.getAttribute('aria-label') === wanted, name)) break
     await page.keyboard.press('ArrowRight')
   }
-  const onIt = await page.evaluate((wanted) => document.activeElement instanceof HTMLButtonElement && document.activeElement.getAttribute('aria-label') === wanted, name)
+  const onIt = await page.evaluate(
+    (wanted) => document.activeElement instanceof HTMLButtonElement && document.activeElement.getAttribute('aria-label') === wanted,
+    name,
+  )
   check("the arrow keys reach a row's Delete, a button named for its record", onIt ? null : `the focus is on ${await describeFocus(page)}`)
   // Tab from it leaves the grid in one stop, as from any cell: the button is no stop of its own.
   await page.keyboard.press('Tab')
@@ -84,7 +93,7 @@ async function rowConfirming(page, { plane, check, run, notes }) {
   await question(page, run.gone).waitFor(WITHIN)
   check("a row's Delete: the keyboard is on its confirmation", await focusedOn(page, question(page, run.gone)))
   const below = await question(page, run.gone).evaluate((region) => region.closest('section[aria-labelledby="records-heading"]') !== null)
-  check("which is under the grid that asked", below ? null : 'the confirmation is not in the Records panel')
+  check('which is under the grid that asked', below ? null : 'the confirmation is not in the Records panel')
 }
 
 /** The record's Delete and its question under the header: Keep it the next Tab, the frame, the answers on a phone. */
@@ -92,7 +101,10 @@ async function recordConfirming(page, { check, run }) {
   // The gate's measure took the keyboard off the page: given back to the question first.
   await question(page, run.gone).focus()
   await page.keyboard.press('Escape')
-  check("Escape gives the keyboard back to the row's Delete", await focusedOn(page, row(page, run.gone.slice(3)).getByRole('button', { name: `Delete Order ${run.gone}`, exact: true })))
+  check(
+    "Escape gives the keyboard back to the row's Delete",
+    await focusedOn(page, row(page, run.gone.slice(3)).getByRole('button', { name: `Delete Order ${run.gone}`, exact: true })),
+  )
   await row(page, run.kept.slice(3)).getByRole('gridcell').first().focus()
   await page.keyboard.press('Enter')
   await page.getByRole('heading', { level: 3, name: `Order ${run.kept}` }).waitFor(WITHIN)
@@ -107,7 +119,14 @@ async function recordConfirming(page, { check, run }) {
   const answers = await stacked(region)
   check(
     'its answers stand one under the other, Keep it first, on a phone only',
-    answers.problem ?? (answers.phone ? (answers.under && answers.wide ? null : 'beside each other, or of different widths, on a phone') : answers.under ? 'one under the other where there is room' : null),
+    answers.problem ??
+      (answers.phone
+        ? answers.under && answers.wide
+          ? null
+          : 'beside each other, or of different widths, on a phone'
+        : answers.under
+          ? 'one under the other where there is room'
+          : null),
   )
 }
 
@@ -132,12 +151,18 @@ async function cannotFind(page, { plane, check, run }) {
   // from the grid too, and nothing is left to press: once on CI, 2026-10-20.
   const listed = page.waitForResponse((response) => response.request().method() === 'POST' && /\/records\/list$/.test(new URL(response.url()).pathname))
   await page.getByRole('region', { name: 'Not deleted', exact: true }).getByRole('button', { name: 'Load the saved record', exact: true }).click()
-  await page.getByRole('region', { name: `Order ${run.kept}`, exact: true }).getByRole('status').filter({ hasText: 'Loaded record' }).waitFor(WITHIN)
+  await page
+    .getByRole('region', { name: `Order ${run.kept}`, exact: true })
+    .getByRole('status')
+    .filter({ hasText: 'Loaded record' })
+    .waitFor(WITHIN)
   await listed
   // Deleted beside the page first, while its row is still listed: the server's 404.
   await plane.remove(run.gone)
   await until(async () => (await row(page, run.gone.slice(3)).count()) === 1, 'the deleted row was no longer listed, so its Delete cannot be pressed')
-  await row(page, run.gone.slice(3)).getByRole('button', { name: `Delete Order ${run.gone}`, exact: true }).click()
+  await row(page, run.gone.slice(3))
+    .getByRole('button', { name: `Delete Order ${run.gone}`, exact: true })
+    .click()
   await question(page, run.gone).getByRole('button', { name: 'Delete it', exact: true }).click()
   const notFound = page.getByRole('region', { name: `Cannot find Order ${run.gone}`, exact: true })
   await notFound.waitFor(WITHIN)
@@ -166,14 +191,26 @@ async function checked(page, { check }) {
   const unknown = page.getByRole('region', { name: 'It may have been deleted', exact: true })
   await unknown.getByRole('button', { name: 'Check whether it was deleted', exact: true }).click()
   await unknown.getByRole('button', { name: 'Delete it again', exact: true }).waitFor(WITHIN)
-  check('after the check, the keyboard is on the notice, and no button under it', await until(async () => (await focusedOn(page, unknown)) === null && (await page.evaluate(() => !(document.activeElement instanceof HTMLButtonElement))), 'the keyboard never came to the notice').then(() => null, (error) => String(error.message)))
+  check(
+    'after the check, the keyboard is on the notice, and no button under it',
+    await until(
+      async () => (await focusedOn(page, unknown)) === null && (await page.evaluate(() => !(document.activeElement instanceof HTMLButtonElement))),
+      'the keyboard never came to the notice',
+    ).then(
+      () => null,
+      (error) => String(error.message),
+    ),
+  )
 }
 
 /** Deleted: the grid says so, with the keyboard on Records. */
 async function deleted(page, { plane, check, run, notes }) {
   await page.getByRole('button', { name: 'Delete it again', exact: true }).click()
   await question(page, run.kept).getByRole('button', { name: 'Delete it', exact: true }).click()
-  await until(async () => (await status(page).textContent()) === `Deleted Order ${run.kept}. No records match “${notes}”.`, 'the grid never said what was deleted')
+  await until(
+    async () => (await status(page).textContent()) === `Deleted Order ${run.kept}. No records match “${notes}”.`,
+    'the grid never said what was deleted',
+  )
   check('after a delete, the keyboard is on the Records heading', await focusedOn(page, page.getByRole('heading', { level: 3, name: 'Records', exact: true })))
   check('and the order is gone from the database', (await plane.stored(run.kept)) ? 'the order is still stored' : null)
 }

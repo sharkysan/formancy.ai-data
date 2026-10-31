@@ -76,8 +76,7 @@ const ACTIONS: Readonly<Record<ReferentialAction, true>> = { 'no-action': true, 
 
 const CAPABILITIES: ReadonlyArray<keyof ColumnAccess> = ['select', 'insert', 'update']
 
-const isListed = (record: Readonly<Record<string, true>>, value: unknown): boolean =>
-  typeof value === 'string' && Object.hasOwn(record, value)
+const isListed = (record: Readonly<Record<string, true>>, value: unknown): boolean => typeof value === 'string' && Object.hasOwn(record, value)
 
 /**
  * The column facts contract v2 added (0026), which a snapshot stored before it
@@ -164,6 +163,22 @@ function assertAccount(input: Omit<MetadataSnapshot, 'fingerprint'>): void {
 }
 
 /**
+ * A value a refusal names, as it was given: a primitive as `String` spells it
+ * (JSON throws on a bigint and writes NaN as null); an object as JSON, a
+ * bigint inside it as its digits, never "[object Object]" -- but for an
+ * object JSON cannot write at all, a cycle, which is named by its tag. The
+ * values are an embedder's, so the refusal is never JSON's own error.
+ */
+function shown(value: unknown): string {
+  if (typeof value !== 'object' || value === null) return String(value)
+  try {
+    return JSON.stringify(value, (_key, inner: unknown) => (typeof inner === 'bigint' ? String(inner) : inner))
+  } catch {
+    return Object.prototype.toString.call(value)
+  }
+}
+
+/**
  * The server facts (0068), when there are any, as the contract names them:
  * outside the fingerprint, so a posted bundle's would otherwise hash to its
  * fingerprint whatever they said. Read back from JSON, so nothing about
@@ -173,8 +188,9 @@ function checkedServer(server: ServerFacts): ServerFacts {
   const facts = server as unknown as Record<string, unknown>
   if (!isServerProduct(facts['product'])) throw new Error(`the server's product ${JSON.stringify(facts['product'])} is not one the contract names`)
   const { major, compatibility } = facts
-  if (major !== null && !Number.isInteger(major)) throw new Error(`the server's major ${String(major)} is neither a whole number nor null`)
-  if (compatibility !== undefined && !Number.isInteger(compatibility)) throw new Error(`the server's compatibility level ${String(compatibility)} is not a whole number`)
+  if (major !== null && !Number.isInteger(major)) throw new Error(`the server's major ${shown(major)} is neither a whole number nor null`)
+  if (compatibility !== undefined && !Number.isInteger(compatibility))
+    throw new Error(`the server's compatibility level ${shown(compatibility)} is not a whole number`)
   const checked: ServerFacts = { product: facts['product'], major: major as number | null }
   if (compatibility !== undefined) checked.compatibility = compatibility as number
   return checked
@@ -235,7 +251,8 @@ function carriesDeleteFacts(object: ObjectMeta): object is Recording {
   const access = object.access as unknown
   const referencedBy = object.referencedBy as unknown
   if (access === undefined && referencedBy === undefined) return false
-  if (referencedBy === undefined) throw new Error(`${where}: access without referencedBy; a snapshot taken since 0049 records both, and one taken before it neither`)
+  if (referencedBy === undefined)
+    throw new Error(`${where}: access without referencedBy; a snapshot taken since 0049 records both, and one taken before it neither`)
   if (access === undefined) throw new Error(`${where}: referencedBy without access; a snapshot taken since 0049 records both, and one taken before it neither`)
   if (typeof access !== 'object' || access === null || typeof (access as Partial<Record<string, unknown>>)['delete'] !== 'boolean') {
     throw new Error(`${where}: access delete is not a boolean`)
@@ -250,7 +267,8 @@ const isName = (value: unknown): value is string => typeof value === 'string' &&
 function assertInboundKey(object: ObjectMeta, key: InboundKey): void {
   const where = describe(object.ref)
   const table = key.table as Partial<ObjectRef> | undefined
-  if (typeof table !== 'object' || table === null || !isName(table.schema) || !isName(table.name)) throw new Error(`${where}: an inbound key's table is not one the contract names`)
+  if (typeof table !== 'object' || table === null || !isName(table.schema) || !isName(table.name))
+    throw new Error(`${where}: an inbound key's table is not one the contract names`)
   const from = describe(key.table)
   if (!isName(key.name)) throw new Error(`${where}: an inbound key of ${from} has no name`)
   const at = `${where}: inbound key ${key.name} of ${from}`
@@ -263,10 +281,10 @@ function assertInboundKey(object: ObjectMeta, key: InboundKey): void {
   // `foreign key (a, a)` -- so a repeat is not refused.
   if (!columns.every(isName)) throw new Error(`${at} names a column that is not a name`)
   // Neither engine lets a key refer to one column twice.
-  const twice = referenced.find((name, index) => referenced.indexOf(name) !== index)
-  if (twice !== undefined) throw new Error(`${at} refers to ${String(twice)} twice`)
+  const twice: unknown = referenced.find((name, index) => referenced.indexOf(name) !== index)
+  if (twice !== undefined) throw new Error(`${at} refers to ${shown(twice)} twice`)
   for (const name of referenced) {
-    if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${String(name)}, which the table does not have`)
+    if (!object.columns.some((column) => column.name === name)) throw new Error(`${at} refers to ${shown(name)}, which the table does not have`)
   }
   if (!isListed(ACTIONS, key.onDelete) || !isListed(ACTIONS, key.onUpdate)) throw new Error(`${at} has an action that is not one the contract names`)
   if (typeof (key.enforced as unknown) !== 'boolean') throw new Error(`${at} has no enforced flag`)
@@ -301,7 +319,9 @@ function assertDeleteFacts(objects: readonly ObjectMeta[]): void {
   const recorded = new Set<ObjectMeta>(carrying)
   const without = objects.find((object) => !recorded.has(object))
   if (without !== undefined) {
-    throw new Error(`${describe(without.ref)}: has neither access nor referencedBy, while ${describe(first.ref)} has both; a snapshot is taken before 0049 or since, not both`)
+    throw new Error(
+      `${describe(without.ref)}: has neither access nor referencedBy, while ${describe(first.ref)} has both; a snapshot is taken before 0049 or since, not both`,
+    )
   }
 
   const byRef = new Map(carrying.map((object) => [refKey(object.ref), object]))
@@ -317,7 +337,9 @@ function assertDeleteFacts(objects: readonly ObjectMeta[]): void {
       seen.add(id)
       const referrer = byRef.get(refKey(key.table))
       if (referrer === undefined) continue
-      const own = referrer.foreignKeys.find((foreignKey) => foreignKey.name === key.name && foreignKey.references !== null && refKey(foreignKey.references.table) === refKey(object.ref))
+      const own = referrer.foreignKeys.find(
+        (foreignKey) => foreignKey.name === key.name && foreignKey.references !== null && refKey(foreignKey.references.table) === refKey(object.ref),
+      )
       if (own === undefined) throw new Error(`${where}: referencedBy names ${key.name} of ${describe(key.table)}, which has no such foreign key onto it`)
       if (!sameKey(key, own)) throw new Error(`${where}: referencedBy says ${key.name} of ${describe(key.table)} otherwise than its own foreign keys do`)
     }
@@ -338,7 +360,9 @@ function assertDeleteFacts(objects: readonly ObjectMeta[]): void {
  * `createSnapshot` sorts every object so, and an adapter's description of a
  * root (0041) is put in the same order, so the two read alike.
  */
-export function inSnapshotOrder<T extends { columns: ReadonlyArray<{ ordinal: number }>; uniqueKeys: ReadonlyArray<{ name: string }>; foreignKeys: ReadonlyArray<{ name: string }> }>(object: T): T {
+export function inSnapshotOrder<
+  T extends { columns: ReadonlyArray<{ ordinal: number }>; uniqueKeys: ReadonlyArray<{ name: string }>; foreignKeys: ReadonlyArray<{ name: string }> },
+>(object: T): T {
   return {
     ...object,
     columns: [...object.columns].sort((a, b) => a.ordinal - b.ordinal),
@@ -407,9 +431,7 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
   assertDeleteFacts(input.objects)
   assertAccount(input)
 
-  const objects = input.objects
-    .map(sortObject)
-    .sort((a, b) => byCodepoint(a.ref.schema, b.ref.schema) || byCodepoint(a.ref.name, b.ref.name))
+  const objects = input.objects.map(sortObject).sort((a, b) => byCodepoint(a.ref.schema, b.ref.schema) || byCodepoint(a.ref.name, b.ref.name))
   const gaps = sortGaps(input.gaps)
   const scope = { schemas: [...new Set(input.scope.schemas)].sort(byCodepoint) }
 

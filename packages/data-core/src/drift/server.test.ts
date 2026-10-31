@@ -29,7 +29,10 @@ describe('diffSnapshots: the server', () => {
   // matrix covered it. Said as a block, an estate this release was not
   // tested on could serve nothing, which 0068 decides against.
   test('a snapshot from a server this release was not tested on is for review, names it, and stops nothing', () => {
-    for (const [kind, server] of [['postgres', POSTGRES_14], ['sqlserver', COMPAT_140]] as const) {
+    for (const [kind, server] of [
+      ['postgres', POSTGRES_14],
+      ['sqlserver', COMPAT_140],
+    ] as const) {
       const report = drift(undefined, { kind, server })
       expect(only(report)).toEqual({
         kind: 'server-untested',
@@ -55,7 +58,12 @@ describe('diffSnapshots: the server', () => {
     const { bindings } = generateForm(base, ORDER)
     expect(kinds(diffSnapshots(base, base, bindings, NO_FILTERS))).toEqual(['server-untested'])
     // And beside a change that blocks: the root gone is not a reason to say less.
-    const gone = diffSnapshots(base, snapshot((objects) => remove(objects, 'order'), { kind: 'postgres', server: POSTGRES_14 }), bindings, NO_FILTERS)
+    const gone = diffSnapshots(
+      base,
+      snapshot((objects) => remove(objects, 'order'), { kind: 'postgres', server: POSTGRES_14 }),
+      bindings,
+      NO_FILTERS,
+    )
     expect(kinds(gone)).toEqual(['root-dropped', 'server-untested'])
     expect(gone.changes.find((change) => change.kind === 'server-untested')?.severity).toBe('review')
   })

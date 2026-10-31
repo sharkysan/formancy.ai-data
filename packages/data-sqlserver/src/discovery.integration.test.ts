@@ -135,7 +135,11 @@ describe('discovery as the owner', () => {
   // number given by hand collided with the sequence later (2627, measured).
   test('sales.shipment: a sequence default is by-default numbering, a UTF-8 varchar counts bytes, a disabled check is not enforced', async () => {
     const shipment = object(await discoverSqlServer(owner, FIXTURE_SCOPE), 'sales', 'shipment')
-    expect(column(shipment, 'id')).toMatchObject({ generated: 'identity-by-default', hasDefault: true, defaultExpression: '(NEXT VALUE FOR [sales].[shipment_id])' })
+    expect(column(shipment, 'id')).toMatchObject({
+      generated: 'identity-by-default',
+      hasDefault: true,
+      defaultExpression: '(NEXT VALUE FOR [sales].[shipment_id])',
+    })
     expect(column(shipment, 'reference')).toMatchObject({
       databaseType: 'varchar(20)',
       type: { kind: 'text', maxLength: 20, lengthUnit: 'utf8-bytes', fixedLength: false },
@@ -280,7 +284,11 @@ describe('discovery as the owner', () => {
     // kept, its name's bracket escaped as SQL Server stores it. A default that
     // computes with the next value is an ordinary one; a rule matching
     // "contains NEXT VALUE FOR" would make that column read-only too.
-    expect(column(every, 't_sequenced')).toMatchObject({ generated: 'identity-by-default', hasDefault: true, defaultExpression: '(NEXT VALUE FOR [kinds].[tick]]et])' })
+    expect(column(every, 't_sequenced')).toMatchObject({
+      generated: 'identity-by-default',
+      hasDefault: true,
+      defaultExpression: '(NEXT VALUE FOR [kinds].[tick]]et])',
+    })
     expect(column(every, 't_sequence_scaled')).toMatchObject({ generated: 'none', hasDefault: true })
     expect(column(every, 't_computed').generated).toBe('computed')
     expect(column(every, 't_rowversion').generated).toBe('rowversion')
@@ -371,7 +379,11 @@ describe('discovery as the owner', () => {
     expect(object(snapshot, 'rel', 'code').referencedBy?.map(({ name, onDelete, enforced }) => ({ name, onDelete, enforced }))).toEqual([
       { name: 'fk_child_set_default', onDelete: 'set-default', enforced: false },
     ])
-    await asOwner('insert into rel.code (code, label) values (1, 5)', 'insert into rel.child (id, parent_code) values (1, 5)', 'delete from rel.code where code = 1')
+    await asOwner(
+      'insert into rel.code (code, label) values (1, 5)',
+      'insert into rel.child (id, parent_code) values (1, 5)',
+      'delete from rel.code where code = 1',
+    )
     const kept = await owner.request().query<{ parent_code: number }>('select parent_code from rel.child where id = 1')
     expect(kept.recordset).toEqual([{ parent_code: 5 }])
 
@@ -439,10 +451,28 @@ describe('discovery as the owner', () => {
       const snapshot = await discoverSqlServer(owner, FIXTURE_SCOPE)
       expect(snapshot.objects.filter((entry) => entry.ref.schema !== 'sales')).toEqual([])
       expect(object(snapshot, 'sales', 'country').referencedBy).toEqual([
-        { table: { schema: 'outside', name: 'stray' }, name: 'fk_stray_country', columns: ['country_id'], referencedColumns: ['id'], onDelete: 'no-action', onUpdate: 'no-action', enforced: true },
-        { table: { schema: 'sales', name: 'customer' }, name: 'fk_customer_country', columns: ['country_code'], referencedColumns: ['iso_code'], onDelete: 'no-action', onUpdate: 'no-action', enforced: true },
+        {
+          table: { schema: 'outside', name: 'stray' },
+          name: 'fk_stray_country',
+          columns: ['country_id'],
+          referencedColumns: ['id'],
+          onDelete: 'no-action',
+          onUpdate: 'no-action',
+          enforced: true,
+        },
+        {
+          table: { schema: 'sales', name: 'customer' },
+          name: 'fk_customer_country',
+          columns: ['country_code'],
+          referencedColumns: ['iso_code'],
+          onDelete: 'no-action',
+          onUpdate: 'no-action',
+          enforced: true,
+        },
       ])
-      expect(snapshotDisagreements(snapshot)).toEqual(['sales.country is referred to by [outside.stray fk_stray_country, sales.customer fk_customer_country], expected [sales.customer fk_customer_country]'])
+      expect(snapshotDisagreements(snapshot)).toEqual([
+        'sales.country is referred to by [outside.stray fk_stray_country, sales.customer fk_customer_country], expected [sales.customer fk_customer_country]',
+      ])
     } finally {
       await asOwner('drop table outside.stray', 'drop schema outside')
     }
@@ -475,9 +505,21 @@ describe('discovery as the owner', () => {
       const snapshot = await discoverSqlServer(owner, { schemas: ['nodes'] })
       expect(snapshot.objects.map((entry) => entry.ref.name)).toEqual(['city', 'person', 'tag'])
       expect(snapshot.gaps.map((gap) => [gap.subject.kind === 'object' ? gap.subject.object.name : gap.subject.kind, gap.aspect, gap.detail])).toEqual([
-        ['city', 'referenced-by', 'edge constraint ec_lives of edges.lives connects this node table, ON DELETE NO_ACTION, so a delete of its rows acts on that table\'s edges or is refused by them; this release lists foreign keys, not edge constraints'],
-        ['person', 'referenced-by', 'edge constraint ec_knows of edges.knows connects this node table, ON DELETE CASCADE, so a delete of its rows acts on that table\'s edges or is refused by them; this release lists foreign keys, not edge constraints'],
-        ['person', 'referenced-by', 'edge constraint ec_lives of edges.lives connects this node table, ON DELETE NO_ACTION, so a delete of its rows acts on that table\'s edges or is refused by them; this release lists foreign keys, not edge constraints'],
+        [
+          'city',
+          'referenced-by',
+          "edge constraint ec_lives of edges.lives connects this node table, ON DELETE NO_ACTION, so a delete of its rows acts on that table's edges or is refused by them; this release lists foreign keys, not edge constraints",
+        ],
+        [
+          'person',
+          'referenced-by',
+          "edge constraint ec_knows of edges.knows connects this node table, ON DELETE CASCADE, so a delete of its rows acts on that table's edges or is refused by them; this release lists foreign keys, not edge constraints",
+        ],
+        [
+          'person',
+          'referenced-by',
+          "edge constraint ec_lives of edges.lives connects this node table, ON DELETE NO_ACTION, so a delete of its rows acts on that table's edges or is refused by them; this release lists foreign keys, not edge constraints",
+        ],
       ])
       expect(snapshot.objects.map((entry) => entry.referencedBy)).toEqual([[], [], []])
       await asOwner('delete from nodes.person where id = 2')
@@ -485,7 +527,15 @@ describe('discovery as the owner', () => {
       expect(knows.recordset).toEqual([{ edges: 0 }])
       await expect(owner.request().query('delete from nodes.person where id = 3')).rejects.toMatchObject({ number: 547 })
     } finally {
-      await asOwner('drop table edges.knows', 'drop table edges.lives', 'drop table nodes.person', 'drop table nodes.city', 'drop table nodes.tag', 'drop schema edges', 'drop schema nodes')
+      await asOwner(
+        'drop table edges.knows',
+        'drop table edges.lives',
+        'drop table nodes.person',
+        'drop table nodes.city',
+        'drop table nodes.tag',
+        'drop schema edges',
+        'drop schema nodes',
+      )
     }
   })
 
@@ -552,7 +602,11 @@ describe('discovery as the restricted reader', () => {
     const on = { kind: 'object', object: ORDER }
     expect(snapshot.gaps).toEqual([
       // fk_order_line_order and fk_delivery_order are on tables the reader cannot see: what refers to the order is "cannot tell" (0049).
-      { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/) },
+      {
+        subject: { kind: 'scope' },
+        aspect: 'referenced-by',
+        detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/),
+      },
       { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
       { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: expect.stringMatching(/VIEW DEFINITION on schema sales/) },
       { subject: on, aspect: 'checks', detail: expect.stringMatching(/^ck_order_status: /) },
@@ -665,23 +719,31 @@ describe('discovery as the restricted reader', () => {
   // are unknown, behind one scope gap -- never "none", which is what 0007's
   // schema-level minimum would report for a table a policy it cannot see
   // filters (B10b).
-  test('VIEW DEFINITION on the schema, without SELECT, describes every object and cannot settle row security', covers('sqlserver', MODEL_CASES.structure), async () => {
-    const viewer = await connectAs('formancy_viewer', 'grant view definition on schema::sales to formancy_viewer')
-    try {
-      const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
-      expect(structuralDisagreements(snapshot)).toEqual([])
-      const granted = snapshot.objects.flatMap((entry) => entry.columns).filter(({ access }) => access.select || access.insert || access.update)
-      expect(granted).toEqual([])
-      expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('unknown'))
-      expect(snapshot.gaps).toEqual([
-        { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/) },
-        { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
-      ])
-      await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
-    } finally {
-      await viewer.close()
-    }
-  })
+  test(
+    'VIEW DEFINITION on the schema, without SELECT, describes every object and cannot settle row security',
+    covers('sqlserver', MODEL_CASES.structure),
+    async () => {
+      const viewer = await connectAs('formancy_viewer', 'grant view definition on schema::sales to formancy_viewer')
+      try {
+        const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
+        expect(structuralDisagreements(snapshot)).toEqual([])
+        const granted = snapshot.objects.flatMap((entry) => entry.columns).filter(({ access }) => access.select || access.insert || access.update)
+        expect(granted).toEqual([])
+        expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('unknown'))
+        expect(snapshot.gaps).toEqual([
+          {
+            subject: { kind: 'scope' },
+            aspect: 'referenced-by',
+            detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/),
+          },
+          { subject: { kind: 'scope' }, aspect: 'row-security', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database/) },
+        ])
+        await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
+      } finally {
+        await viewer.close()
+      }
+    },
+  )
 
   // The documented minimum for a snapshot with no gap at all (0027): VIEW
   // DEFINITION on the database, and still no data access. Every policy is
@@ -689,18 +751,22 @@ describe('discovery as the restricted reader', () => {
   // If it were not enough, every customer following the documentation would
   // get gaps; if SELECT were also needed, the documentation would be asking
   // for more than discovery uses.
-  test('VIEW DEFINITION on the database, without SELECT, sees everything the owner sees and settles row security', covers('sqlserver', MODEL_CASES.structure), async () => {
-    const viewer = await connectAs('formancy_db_viewer', 'grant view definition to formancy_db_viewer')
-    try {
-      const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
-      expect(structuralDisagreements(snapshot)).toEqual([])
-      expect(snapshot.gaps).toEqual([])
-      expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('none'))
-      await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
-    } finally {
-      await viewer.close()
-    }
-  })
+  test(
+    'VIEW DEFINITION on the database, without SELECT, sees everything the owner sees and settles row security',
+    covers('sqlserver', MODEL_CASES.structure),
+    async () => {
+      const viewer = await connectAs('formancy_db_viewer', 'grant view definition to formancy_db_viewer')
+      try {
+        const snapshot = await discoverSqlServer(viewer, FIXTURE_SCOPE)
+        expect(structuralDisagreements(snapshot)).toEqual([])
+        expect(snapshot.gaps).toEqual([])
+        expect(rowSecurities(snapshot)).toEqual(expectedRowSecurities('none'))
+        await expect(viewer.request().query('select * from sales.customer')).rejects.toMatchObject({ number: 229 })
+      } finally {
+        await viewer.close()
+      }
+    },
+  )
 
   // What refers to a table may be on a table in any schema (0049), and SQL
   // Server lists a foreign key only to an account that may see the table it
@@ -719,14 +785,23 @@ describe('discovery as the restricted reader', () => {
     const byDatabase = await connectAs('formancy_ref_db', 'grant view definition to formancy_ref_db')
     const bySchema = await connectAs('formancy_ref_schema', 'grant view definition on schema::sales to formancy_ref_schema')
     try {
-      const referrers = (snapshot: MetadataSnapshot) => (object(snapshot, 'sales', 'order').referencedBy ?? []).map((key) => `${key.table.schema}.${key.table.name} ${key.name} ${key.onDelete}`)
+      const referrers = (snapshot: MetadataSnapshot) =>
+        (object(snapshot, 'sales', 'order').referencedBy ?? []).map((key) => `${key.table.schema}.${key.table.name} ${key.name} ${key.onDelete}`)
       const seen = await discoverSqlServer(byDatabase, FIXTURE_SCOPE)
-      expect(referrers(seen)).toEqual(['beyond.copy fk_copy_order cascade', 'sales.delivery fk_delivery_order cascade', 'sales.order_line fk_order_line_order cascade'])
+      expect(referrers(seen)).toEqual([
+        'beyond.copy fk_copy_order cascade',
+        'sales.delivery fk_delivery_order cascade',
+        'sales.order_line fk_order_line_order cascade',
+      ])
       expect(seen.gaps).toEqual([])
       const schemaOnly = await discoverSqlServer(bySchema, FIXTURE_SCOPE)
       expect(referrers(schemaOnly)).toEqual(['sales.delivery fk_delivery_order cascade', 'sales.order_line fk_order_line_order cascade'])
       expect(schemaOnly.gaps.filter((gap) => gap.aspect === 'referenced-by')).toEqual([
-        { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/) },
+        {
+          subject: { kind: 'scope' },
+          aspect: 'referenced-by',
+          detail: expect.stringMatching(/^this account lacks VIEW DEFINITION on the database, which is what lists every foreign key/),
+        },
       ])
     } finally {
       await bySchema.close()

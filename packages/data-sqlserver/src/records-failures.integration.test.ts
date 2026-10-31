@@ -1,6 +1,17 @@
 import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
-import type { ApiValue, MetadataSnapshot, ObjectRef, RecordColumn, RecordOutcome, RecordTarget, RecordValue, RowFilters, RowFilterType, UpdateRequest } from '@formancy/data-core'
+import type {
+  ApiValue,
+  MetadataSnapshot,
+  ObjectRef,
+  RecordColumn,
+  RecordOutcome,
+  RecordTarget,
+  RecordValue,
+  RowFilters,
+  RowFilterType,
+  UpdateRequest,
+} from '@formancy/data-core'
 import { findObject } from '@formancy/data-core'
 import type { DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
 import { defined, EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
@@ -88,7 +99,7 @@ beforeAll(async () => {
     'create trigger ops.reopened_insert on ops.reopened after insert as begin set nocount on; commit transaction; begin transaction; end',
     "create trigger ops.ended_insert on ops.ended after insert as begin set nocount on; if exists (select 1 from inserted where note = N'commit') commit transaction; else rollback transaction; end",
     // Ends the write's transaction and then refuses it, by what the row's note asks for.
-    "create trigger ops.raised_insert on ops.raised after insert as begin set nocount on; declare @note nvarchar(20) = (select top (1) note from inserted); " +
+    'create trigger ops.raised_insert on ops.raised after insert as begin set nocount on; declare @note nvarchar(20) = (select top (1) note from inserted); ' +
       "if @note = N'commit' commit transaction; else if @note = N'reopen' begin commit transaction; begin transaction; end; else if @note = N'rollback' rollback transaction; " +
       "raiserror(N'a refusal of the customer''s own', 16, 1); end",
   ]) {
@@ -110,12 +121,19 @@ function columnOf(ref: ObjectRef, name: string): RecordColumn {
 }
 
 const valueOf = (ref: ObjectRef, name: string, value: ApiValue): RecordValue => ({ ...columnOf(ref, name), value })
-const tenant = (value: string): RowFilters => ({ kind: 'restricted', equal: [{ column: 'tenant_id', type: columnOf(ORDER, 'tenant_id').type as RowFilterType, value }] })
+const tenant = (value: string): RowFilters => ({
+  kind: 'restricted',
+  equal: [{ column: 'tenant_id', type: columnOf(ORDER, 'tenant_id').type as RowFilterType, value }],
+})
 const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 
 function target(ref: ObjectRef, versionColumn: string | null = null): RecordTarget {
   const key = findObject(snapshot, ref)?.primaryKey?.columns ?? []
-  return { table: ref, identity: key.map((name) => columnOf(ref, name)), concurrency: versionColumn === null ? null : { kind: 'version-column', column: versionColumn } }
+  return {
+    table: ref,
+    identity: key.map((name) => columnOf(ref, name)),
+    concurrency: versionColumn === null ? null : { kind: 'version-column', column: versionColumn },
+  }
 }
 
 function orderTarget(): RecordTarget {
@@ -133,7 +151,15 @@ const insertOrder = (records: DefinedRecords, values: RecordValue[]): Promise<Re
   records.insert({ target: orderTarget(), values, returning: [columnOf(ORDER, 'id')] })
 
 function versioned(ref: ObjectRef, set: RecordValue[], expectedVersion: string, key: RecordValue[] = [valueOf(ref, 'id', '1')]): Undefined<UpdateRequest> {
-  return { target: { ...target(ref), concurrency: { kind: 'version-column', column: 'version' } }, key, set, expectedVersion, filters: EVERY_ROW, through: [], returning: [] }
+  return {
+    target: { ...target(ref), concurrency: { kind: 'version-column', column: 'version' } },
+    key,
+    set,
+    expectedVersion,
+    filters: EVERY_ROW,
+    through: [],
+    returning: [],
+  }
 }
 
 /**
@@ -173,9 +199,11 @@ describe('each constraint the fixture can be made to break', () => {
     expect(
       await records.insert({ target: target(EMPLOYEE), values: [valueOf(EMPLOYEE, 'id', '1'), valueOf(EMPLOYEE, 'name', 'Again')], returning: [] }),
     ).toMatchObject({ ok: false, code: 'unique-violation', constraint: 'pk_employee' })
-    expect(
-      await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '2'), valueOf(UNIQ, 'code', 'taken')], returning: [] }),
-    ).toMatchObject({ ok: false, code: 'unique-violation', constraint: 'ux_uniq_code' })
+    expect(await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '2'), valueOf(UNIQ, 'code', 'taken')], returning: [] })).toMatchObject({
+      ok: false,
+      code: 'unique-violation',
+      constraint: 'ux_uniq_code',
+    })
   })
 
   // Error 547 is a foreign key and a check alike. Told apart by the kind of
@@ -206,7 +234,9 @@ describe('each constraint the fixture can be made to break', () => {
     const records = defined(createSqlServerRecords(owner))
     const node: ObjectRef = { schema: 'ops', name: 'node' }
     const broken = { ok: false, code: 'foreign-key-violation', constraint: 'fk_node_parent' }
-    expect(await records.insert({ target: target(node), values: [valueOf(node, 'id', '3'), valueOf(node, 'parent_id', '99')], returning: [] })).toMatchObject(broken)
+    expect(await records.insert({ target: target(node), values: [valueOf(node, 'id', '3'), valueOf(node, 'parent_id', '99')], returning: [] })).toMatchObject(
+      broken,
+    )
     expect(await records.update(versioned(node, [valueOf(node, 'id', '4')], '0'))).toMatchObject(broken)
   })
 
@@ -236,7 +266,11 @@ describe('each constraint the fixture can be made to break', () => {
       const oldSnapshot = await discoverSqlServer(old, { schemas: ['dbo'] })
       const code = findObject(oldSnapshot, { schema: 'dbo', name: 'code' })?.columns ?? []
       const values = code.map((column) => ({ name: column.name, type: column.type, value: column.name === 'id' ? '1' : 'ABC' }))
-      const outcome = await defined(createSqlServerRecords(old)).insert({ target: { table: { schema: 'dbo', name: 'code' }, identity: [], concurrency: null }, values, returning: [] })
+      const outcome = await defined(createSqlServerRecords(old)).insert({
+        target: { table: { schema: 'dbo', name: 'code' }, identity: [], concurrency: null },
+        values,
+        returning: [],
+      })
       expect(outcome).toMatchObject({ ok: false, code: 'too-long' })
       expect(outcome).not.toHaveProperty('column')
     } finally {
@@ -262,7 +296,13 @@ describe('each constraint the fixture can be made to break', () => {
     ])
 
     for (const tenantId of ['acme', '99999999999']) {
-      const read = records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant(tenantId), through: [] })
+      const read = records.read({
+        target: orderTarget(),
+        key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
+        columns: [columnOf(ORDER, 'status')],
+        filters: tenant(tenantId),
+        through: [],
+      })
       await expect(read).rejects.toThrow(/not spelled as its column holds it/)
     }
   })
@@ -305,7 +345,11 @@ describe('each constraint the fixture can be made to break', () => {
   test("a failure's message never repeats a value the person entered", async () => {
     const records = defined(createSqlServerRecords(owner))
     const duplicate = await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '3'), valueOf(UNIQ, 'code', 'taken')], returning: [] })
-    const truncated = await records.insert({ target: target(UNIQ), values: [valueOf(UNIQ, 'id', '4'), valueOf(UNIQ, 'code', 'much-too-long-code')], returning: [] })
+    const truncated = await records.insert({
+      target: target(UNIQ),
+      values: [valueOf(UNIQ, 'id', '4'), valueOf(UNIQ, 'code', 'much-too-long-code')],
+      returning: [],
+    })
     expect(duplicate).toMatchObject({ ok: false, code: 'unique-violation' })
     expect(truncated).toMatchObject({ ok: false, code: 'too-long' })
     for (const outcome of [duplicate, truncated]) {
@@ -360,7 +404,8 @@ describe('a character the column cannot store', () => {
       key,
       set: [valueOf(ORDER, 'status', 'drąft')],
       expectedVersion: before.version,
-      filters: tenant('1'), through: [],
+      filters: tenant('1'),
+      through: [],
       returning: [],
     })
     expect(outcome).toMatchObject({ ok: false, code: 'out-of-range', column: 'status' })
@@ -374,14 +419,21 @@ describe("the account's own grants", () => {
   test('a write the account may not make is permission-denied', async () => {
     const records = defined(createSqlServerRecords(reader))
     expect(await insertOrder(records, newOrder())).toMatchObject({ ok: false, code: 'permission-denied' })
-    const read = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'notes')], filters: tenant('1'), through: [] })
+    const read = await records.read({
+      target: orderTarget(),
+      key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
+      columns: [columnOf(ORDER, 'notes')],
+      filters: tenant('1'),
+      through: [],
+    })
     if (!read.ok || read.version === null) throw new Error('the reader can read the order and its version')
     const update = await records.update({
       target: { ...orderTarget(), concurrency: { kind: 'rowversion', column: 'row_version' } },
       key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
       set: [valueOf(ORDER, 'notes', 'not mine to write')],
       expectedVersion: read.version,
-      filters: tenant('1'), through: [],
+      filters: tenant('1'),
+      through: [],
       returning: [],
     })
     expect(update).toMatchObject({ ok: false, code: 'permission-denied' })
@@ -394,7 +446,13 @@ describe("the account's own grants", () => {
     try {
       const records = defined(createSqlServerRecords(narrow))
       const read = (column: string) =>
-        records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, column)], filters: tenant('1'), through: [] })
+        records.read({
+          target: orderTarget(),
+          key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
+          columns: [columnOf(ORDER, column)],
+          filters: tenant('1'),
+          through: [],
+        })
       expect(await read('amount')).toMatchObject({ ok: false, code: 'permission-denied', column: 'amount' })
       expect(await read('status')).toMatchObject({ ok: true, values: { status: 'placed' } })
     } finally {
@@ -436,7 +494,9 @@ describe('a security policy that blocks a write', () => {
       create table blk.kept (id int not null constraint pk_kept primary key, tenant_id int not null,
         version int not null constraint df_kept_version default 0);
       insert into blk.kept (id, tenant_id) values (1, 1)`)
-    await owner.request().batch('create function blk.fn_tenant_one(@tenant_id int) returns table with schemabinding as return select 1 as allowed where @tenant_id = 1')
+    await owner
+      .request()
+      .batch('create function blk.fn_tenant_one(@tenant_id int) returns table with schemabinding as return select 1 as allowed where @tenant_id = 1')
     await owner.request().batch(`
       create security policy blk.tenant_one
         add block predicate blk.fn_tenant_one(tenant_id) on blk.kept after insert,
@@ -457,7 +517,8 @@ describe('a security policy that blocks a write', () => {
       key: [column('id', '1')],
       set: [column('tenant_id', '2')],
       expectedVersion: '0',
-      filters: EVERY_ROW, through: [],
+      filters: EVERY_ROW,
+      through: [],
       returning: [],
     })
     expect(update).toMatchObject({ ok: false, code: 'permission-denied' })
@@ -482,12 +543,20 @@ describe('a trigger that decides what a write stores', () => {
     const ignored: ObjectRef = { schema: 'ops', name: 'ignored' }
     const rewritten: ObjectRef = { schema: 'ops', name: 'rewritten' }
     const refused = { ok: false, code: 'refused', message: expect.stringContaining('INSTEAD OF') }
-    expect(await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'new')], returning: [columnOf(ignored, 'id')] })).toMatchObject(refused)
+    expect(await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'new')], returning: [columnOf(ignored, 'id')] })).toMatchObject(
+      refused,
+    )
     expect(await records.update(versioned(ignored, [valueOf(ignored, 'note', 'changed')], '0'))).toMatchObject(refused)
     expect(
-      await records.insert({ target: target(rewritten), values: [valueOf(rewritten, 'note', 'new')], returning: [columnOf(rewritten, 'id'), columnOf(rewritten, 'note')] }),
+      await records.insert({
+        target: target(rewritten),
+        values: [valueOf(rewritten, 'note', 'new')],
+        returning: [columnOf(rewritten, 'id'), columnOf(rewritten, 'note')],
+      }),
     ).toMatchObject(refused)
-    const stored = await owner.request().query('select (select count(*) from ops.ignored) as ignored, (select note from ops.ignored) as note, (select count(*) from ops.rewritten) as rewritten')
+    const stored = await owner
+      .request()
+      .query('select (select count(*) from ops.ignored) as ignored, (select note from ops.ignored) as note, (select count(*) from ops.rewritten) as rewritten')
     expect(stored.recordset).toEqual([{ ignored: 1, note: 'start', rewritten: 0 }])
   })
 
@@ -501,7 +570,9 @@ describe('a trigger that decides what a write stores', () => {
       { schema: 'ops', name: 'update_only' },
       { schema: 'ops', name: 'dormant' },
     ]) {
-      expect(await records.insert({ target: target(ref), values: [valueOf(ref, 'id', '1'), valueOf(ref, 'note', 'stored')], returning: [columnOf(ref, 'note')] })).toEqual({
+      expect(
+        await records.insert({ target: target(ref), values: [valueOf(ref, 'id', '1'), valueOf(ref, 'note', 'stored')], returning: [columnOf(ref, 'note')] }),
+      ).toEqual({
         ok: true,
         values: { note: 'stored' },
         version: null,
@@ -531,13 +602,26 @@ describe('a trigger that decides what a write stores', () => {
       const records = createSqlServerRecords(blind)
       expect(await records.describe(ignored)).toMatchObject({ ok: false, code: 'schema-changed' })
       // A read too, though the account holds SELECT: its description is the same NULL facts, so no form over the table is served to it.
-      expect(await records.read({ target: target(ignored), key: [valueOf(ignored, 'id', '1')], columns: [columnOf(ignored, 'note')], filters: EVERY_ROW, through: [] })).toMatchObject({
+      expect(
+        await records.read({
+          target: target(ignored),
+          key: [valueOf(ignored, 'id', '1')],
+          columns: [columnOf(ignored, 'note')],
+          filters: EVERY_ROW,
+          through: [],
+        }),
+      ).toMatchObject({
         ok: false,
         code: 'schema-changed',
       })
       const seen = await createSqlServerRecords(owner).describe(ignored)
       if (!seen.ok) throw new Error('the owner sees ops.ignored')
-      const outcome = await records.insert({ target: target(ignored), values: [valueOf(ignored, 'note', 'unseen')], returning: [], definition: seen.described.definition })
+      const outcome = await records.insert({
+        target: target(ignored),
+        values: [valueOf(ignored, 'note', 'unseen')],
+        returning: [],
+        definition: seen.described.definition,
+      })
       expect(outcome).toMatchObject({ ok: false, code: 'schema-changed' })
     } finally {
       await blind.close()
@@ -558,10 +642,18 @@ describe('a trigger that decides what a write stores', () => {
     const restarted: ObjectRef = { schema: 'ops', name: 'restarted' }
     const reopened: ObjectRef = { schema: 'ops', name: 'reopened' }
     const unknown = { ok: false, code: 'unknown-outcome' }
-    expect(await records.insert({ target: target(restarted), values: [valueOf(restarted, 'id', '2'), valueOf(restarted, 'note', 'new')], returning: [] })).toMatchObject(unknown)
+    expect(
+      await records.insert({ target: target(restarted), values: [valueOf(restarted, 'id', '2'), valueOf(restarted, 'note', 'new')], returning: [] }),
+    ).toMatchObject(unknown)
     expect(await records.update(versioned(restarted, [valueOf(restarted, 'note', 'changed')], '0'))).toMatchObject(unknown)
-    expect(await records.insert({ target: target(reopened), values: [valueOf(reopened, 'id', '1'), valueOf(reopened, 'note', 'kept')], returning: [] })).toMatchObject(unknown)
-    const stored = await owner.request().query("select (select string_agg(concat(id, ':', note, ':', version), ',') from ops.restarted) as restarted, (select string_agg(concat(id, ':', note), ',') from ops.reopened) as reopened")
+    expect(
+      await records.insert({ target: target(reopened), values: [valueOf(reopened, 'id', '1'), valueOf(reopened, 'note', 'kept')], returning: [] }),
+    ).toMatchObject(unknown)
+    const stored = await owner
+      .request()
+      .query(
+        "select (select string_agg(concat(id, ':', note, ':', version), ',') from ops.restarted) as restarted, (select string_agg(concat(id, ':', note), ',') from ops.reopened) as reopened",
+      )
     expect(stored.recordset).toEqual([{ restarted: '1:start:0', reopened: '1:kept' }])
   })
 
@@ -623,7 +715,8 @@ describe('a schema that moved under the binding', () => {
   // review can be suggested, and never a generic failure.
   test('a dropped column or a renamed table is schema-changed', async () => {
     const records = defined(createSqlServerRecords(owner))
-    const read = (columns: RecordColumn[]) => records.read({ target: target(MOVING), key: [valueOf(MOVING, 'id', '1')], columns, filters: EVERY_ROW, through: [] })
+    const read = (columns: RecordColumn[]) =>
+      records.read({ target: target(MOVING), key: [valueOf(MOVING, 'id', '1')], columns, filters: EVERY_ROW, through: [] })
     const note = columnOf(MOVING, 'note')
     expect(await read([note])).toMatchObject({ ok: true, values: { note: 'here' } })
     await owner.request().batch('alter table ops.moving drop column note')
@@ -653,10 +746,12 @@ describe('a schema that moved under the binding', () => {
       const { definition } = before.described
       await owner.request().batch("exec sp_rename 'ops.drifting', 'drifted'")
       expect(await records.update({ ...versioned(drifting, [note('lost')], '0'), definition })).toMatchObject({ ok: false, code: 'schema-changed' })
-      expect(await records.insert({ target: target(drifting), values: [valueOf(drifting, 'id', '2'), note('lost')], returning: [], definition })).toMatchObject({
-        ok: false,
-        code: 'schema-changed',
-      })
+      expect(await records.insert({ target: target(drifting), values: [valueOf(drifting, 'id', '2'), note('lost')], returning: [], definition })).toMatchObject(
+        {
+          ok: false,
+          code: 'schema-changed',
+        },
+      )
       const open = await single.request().query<{ n: number }>('select @@trancount as n')
       expect(open.recordset[0]?.n).toBe(0)
       await owner.request().batch("exec sp_rename 'ops.drifted', 'drifting'")
@@ -704,9 +799,18 @@ describe('when the connection fails', () => {
     await closed.close()
     const records = defined(createSqlServerRecords(closed))
     const definition = await ownersDefinition(ORDER)
-    expect(await records.insert({ target: orderTarget(), values: newOrder(), returning: [columnOf(ORDER, 'id')], definition })).toMatchObject({ ok: false, code: 'unavailable' })
+    expect(await records.insert({ target: orderTarget(), values: newOrder(), returning: [columnOf(ORDER, 'id')], definition })).toMatchObject({
+      ok: false,
+      code: 'unavailable',
+    })
     expect(
-      await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', FIXTURE_ORDER)], columns: [columnOf(ORDER, 'status')], filters: tenant('1'), through: [] }),
+      await records.read({
+        target: orderTarget(),
+        key: [valueOf(ORDER, 'id', FIXTURE_ORDER)],
+        columns: [columnOf(ORDER, 'status')],
+        filters: tenant('1'),
+        through: [],
+      }),
     ).toMatchObject({ ok: false, code: 'unavailable' })
   })
 
@@ -720,10 +824,16 @@ describe('when the connection fails', () => {
   // this one does, and is refused. Watched failing with failureFor's first
   // branch removed (the write was unknown-outcome).
   test('a login refused after the pool opened is unavailable, for a write too', async () => {
-    const later = await account('probe_later', 'grant select on sales.country to probe_later', { min: 0, max: 1, idleTimeoutMillis: 100, reapIntervalMillis: 50 })
+    const later = await account('probe_later', 'grant select on sales.country to probe_later', {
+      min: 0,
+      max: 1,
+      idleTimeoutMillis: 100,
+      reapIntervalMillis: 50,
+    })
     try {
       const records = defined(createSqlServerRecords(later))
-      const read = () => records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW, through: [] })
+      const read = () =>
+        records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW, through: [] })
       expect(await read()).toMatchObject({ ok: true })
       await owner.request().batch('alter login probe_later disable')
       // An open session outlives the login's disabling; the pool's idle one is closed first.
@@ -765,10 +875,17 @@ describe('when the connection fails', () => {
     }
   }
 
-  const countryInsert = (name: string) => ({ target: target(COUNTRY), values: [valueOf(COUNTRY, 'iso_code', 'KK'), valueOf(COUNTRY, 'name', name)], returning: [] })
+  const countryInsert = (name: string) => ({
+    target: target(COUNTRY),
+    values: [valueOf(COUNTRY, 'iso_code', 'KK'), valueOf(COUNTRY, 'name', name)],
+    returning: [],
+  })
 
   async function countries(name: string): Promise<number | undefined> {
-    const found = await owner.request().input('name', mssql.NVarChar(mssql.MAX), name).query<{ n: number }>('select count(*) as n from sales.country where name = @name')
+    const found = await owner
+      .request()
+      .input('name', mssql.NVarChar(mssql.MAX), name)
+      .query<{ n: number }>('select count(*) as n from sales.country where name = @name')
     return found.recordset[0]?.n
   }
 
@@ -786,7 +903,15 @@ describe('when the connection fails', () => {
     try {
       const records = defined(createSqlServerRecords(busy))
       expect(await records.insert({ ...countryInsert('Never sent'), definition })).toMatchObject({ ok: false, code: 'unavailable' })
-      expect(await records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW, through: [] })).toMatchObject({
+      expect(
+        await records.read({
+          target: target(COUNTRY),
+          key: [valueOf(COUNTRY, 'id', '1')],
+          columns: [columnOf(COUNTRY, 'name')],
+          filters: EVERY_ROW,
+          through: [],
+        }),
+      ).toMatchObject({
         ok: false,
         code: 'unavailable',
       })
@@ -829,7 +954,15 @@ describe('when the connection fails', () => {
     try {
       const records = defined(createSqlServerRecords(impatient))
       expect(await records.insert(countryInsert('Timed out'))).toMatchObject({ ok: false, code: 'unknown-outcome' })
-      expect(await records.read({ target: target(COUNTRY), key: [valueOf(COUNTRY, 'id', '1')], columns: [columnOf(COUNTRY, 'name')], filters: EVERY_ROW, through: [] })).toMatchObject({
+      expect(
+        await records.read({
+          target: target(COUNTRY),
+          key: [valueOf(COUNTRY, 'id', '1')],
+          columns: [columnOf(COUNTRY, 'name')],
+          filters: EVERY_ROW,
+          through: [],
+        }),
+      ).toMatchObject({
         ok: false,
         code: 'unavailable',
       })

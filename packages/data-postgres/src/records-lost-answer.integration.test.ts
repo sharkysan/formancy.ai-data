@@ -1,5 +1,15 @@
 import { findObject } from '@formancy/data-core'
-import type { ApiValue, DeleteOutcome, MetadataSnapshot, RecordColumn, RecordFailure, RecordOutcome, RecordTarget, RecordValue, RowFilters } from '@formancy/data-core'
+import type {
+  ApiValue,
+  DeleteOutcome,
+  MetadataSnapshot,
+  RecordColumn,
+  RecordFailure,
+  RecordOutcome,
+  RecordTarget,
+  RecordValue,
+  RowFilters,
+} from '@formancy/data-core'
 import type { PostgresFixture, TcpHop } from '@formancy/data-fixtures'
 import { answerBytes, cascadeCase, covers, defined, startPostgresFixture, startTcpHop } from '@formancy/data-fixtures'
 import { randomUUID } from 'node:crypto'
@@ -34,7 +44,10 @@ let snapshot: MetadataSnapshot
 let hop: TcpHop
 let viaHop: Sql
 
-const TENANT_1: RowFilters = { kind: 'restricted', equal: [{ column: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, value: '1' }] }
+const TENANT_1: RowFilters = {
+  kind: 'restricted',
+  equal: [{ column: 'tenant_id', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, value: '1' }],
+}
 const ORDER_ID: RecordColumn = { name: 'id', type: { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } }
 const ORDER = {
   table: { schema: 'sales', name: 'order' },
@@ -106,10 +119,12 @@ function col(schema: string, table: string, name: string): RecordColumn {
 }
 
 function orderValues(notes: string): RecordValue[] {
-  return Object.entries({ tenant_id: '1', customer_no: '1001', order_date: '2026-10-09', amount: '1.0000', notes } satisfies Record<string, ApiValue>).map(([name, value]) => ({
-    ...col('sales', 'order', name),
-    value,
-  }))
+  return Object.entries({ tenant_id: '1', customer_no: '1001', order_date: '2026-10-09', amount: '1.0000', notes } satisfies Record<string, ApiValue>).map(
+    ([name, value]) => ({
+      ...col('sales', 'order', name),
+      value,
+    }),
+  )
 }
 
 function failed(outcome: RecordOutcome | DeleteOutcome): RecordFailure {
@@ -156,7 +171,9 @@ async function removableCoded(code: string): Promise<number> {
 
 /** The rows of lost.cascading and of its lines that carry `code`. */
 async function cascadingCoded(code: string): Promise<[number, number]> {
-  const [row] = await owner<{ rows: number; lines: number }[]>`select (select count(*)::int from lost.cascading where code = ${code}) as rows, (select count(*)::int from lost.cascading_line where cascading_code = ${code}) as lines`
+  const [row] = await owner<
+    { rows: number; lines: number }[]
+  >`select (select count(*)::int from lost.cascading where code = ${code}) as rows, (select count(*)::int from lost.cascading_line where cascading_code = ${code}) as lines`
   return [row?.rows ?? 0, row?.lines ?? 0]
 }
 
@@ -187,7 +204,11 @@ describe('an answer lost after the write committed', () => {
     const bytes = answerBytes('postgres', notes)
     const sent = hop.countSent(bytes)
     const lost = hop.swallowAnswersFrom(bytes)
-    const pending = defined(createPostgresRecords(viaHop)).insert({ target: ORDER, values: orderValues(notes), returning: [ORDER_ID, col('sales', 'order', 'notes')] })
+    const pending = defined(createPostgresRecords(viaHop)).insert({
+      target: ORDER,
+      values: orderValues(notes),
+      returning: [ORDER_ID, col('sales', 'order', 'notes')],
+    })
 
     await within(lost.matched, 'the marker never appeared in an answer')
     await until(() => ordersNoted(notes), 1)
@@ -204,7 +225,11 @@ describe('an answer lost after the write committed', () => {
   // version is the one sent plus one, and the adapter answered unknown, not
   // stale or unavailable.
   test('an update is unknown-outcome, its change is stored, and its version moved exactly once', async () => {
-    const created = await defined(createPostgresRecords(owner)).insert({ target: ORDER, values: orderValues(marker('before the update')), returning: [ORDER_ID] })
+    const created = await defined(createPostgresRecords(owner)).insert({
+      target: ORDER,
+      values: orderValues(marker('before the update')),
+      returning: [ORDER_ID],
+    })
     if (!created.ok) throw new Error(created.message)
     const id = String(created.values.id)
     const version = String(created.version)
@@ -217,7 +242,8 @@ describe('an answer lost after the write committed', () => {
       key: [{ ...ORDER_ID, value: id }],
       set: [{ ...col('sales', 'order', 'notes'), value: notes }],
       expectedVersion: version,
-      filters: TENANT_1, through: [],
+      filters: TENANT_1,
+      through: [],
       returning: [col('sales', 'order', 'notes')],
     })
     const stored = async (): Promise<unknown> => [...(await owner`select notes, row_version::text as version from sales."order" where id = ${id}`)]
@@ -246,7 +272,11 @@ describe('an answer lost after a delete committed', () => {
     const code = marker('delete')
     const [row] = await owner<{ id: string }[]>`insert into lost.removable (code) values (${code}) returning id::text as id`
     const table = { schema: 'lost', name: 'removable' }
-    const target = { table, identity: [col('lost', 'removable', 'id'), col('lost', 'removable', 'code')], concurrency: { kind: 'version-column', column: 'version' } } as const
+    const target = {
+      table,
+      identity: [col('lost', 'removable', 'id'), col('lost', 'removable', 'code')],
+      concurrency: { kind: 'version-column', column: 'version' },
+    } as const
     const bytes = answerBytes('postgres', code)
     const sent = hop.countSent(bytes)
     const lost = hop.swallowAnswersFrom(bytes)
@@ -283,39 +313,50 @@ describe('an answer lost after a delete that cascades', () => {
   // the row and its line both still there once nothing holds their locks.
   // SQL Server's batch commits before it answers, so there the same cut
   // leaves both gone (its own suite).
-  test('a cascading delete on the locked path is unknown-outcome, was sent once, and its rows are still there', covers('postgres', cascadeCase('lost-answer')), async () => {
-    const code = marker('delete, cascading')
-    const [row] = await owner<{ id: string }[]>`insert into lost.cascading (code) values (${code}) returning id::text as id`
-    await owner`insert into lost.cascading_line (cascading_id, cascading_code) values (${row?.id ?? null}::integer, ${code})`
-    const table = { schema: 'lost', name: 'cascading' }
-    const line = { schema: 'lost', name: 'cascading_line' }
-    const target = { table, identity: [col('lost', 'cascading', 'id'), col('lost', 'cascading', 'code')], concurrency: { kind: 'version-column', column: 'version' } } as const
-    const bytes = answerBytes('postgres', code)
-    const sent = hop.countSent(bytes)
-    const lost = hop.swallowAnswersFrom(bytes)
-    const pending = defined(createPostgresRecords(viaHop)).delete({
-      target,
-      key: [
-        { ...col('lost', 'cascading', 'id'), value: row?.id ?? null },
-        { ...col('lost', 'cascading', 'code'), value: code },
-      ],
-      expectedVersion: '1',
-      filters: { kind: 'unrestricted' },
-      through: [],
-      reach: { removed: [table, line], cleared: [], accepted: [{ from: line, name: 'fk_cascading_line_cascading', onto: table, onDelete: 'cascade' }] },
-    })
+  test(
+    'a cascading delete on the locked path is unknown-outcome, was sent once, and its rows are still there',
+    covers('postgres', cascadeCase('lost-answer')),
+    async () => {
+      const code = marker('delete, cascading')
+      const [row] = await owner<{ id: string }[]>`insert into lost.cascading (code) values (${code}) returning id::text as id`
+      await owner`insert into lost.cascading_line (cascading_id, cascading_code) values (${row?.id ?? null}::integer, ${code})`
+      const table = { schema: 'lost', name: 'cascading' }
+      const line = { schema: 'lost', name: 'cascading_line' }
+      const target = {
+        table,
+        identity: [col('lost', 'cascading', 'id'), col('lost', 'cascading', 'code')],
+        concurrency: { kind: 'version-column', column: 'version' },
+      } as const
+      const bytes = answerBytes('postgres', code)
+      const sent = hop.countSent(bytes)
+      const lost = hop.swallowAnswersFrom(bytes)
+      const pending = defined(createPostgresRecords(viaHop)).delete({
+        target,
+        key: [
+          { ...col('lost', 'cascading', 'id'), value: row?.id ?? null },
+          { ...col('lost', 'cascading', 'code'), value: code },
+        ],
+        expectedVersion: '1',
+        filters: { kind: 'unrestricted' },
+        through: [],
+        reach: { removed: [table, line], cleared: [], accepted: [{ from: line, name: 'fk_cascading_line_cascading', onto: table, onDelete: 'cascade' }] },
+      })
 
-    await within(lost.matched, 'the marker never appeared in an answer')
-    lost.cut()
+      await within(lost.matched, 'the marker never appeared in an answer')
+      lost.cut()
 
-    const outcome = failed(await pending)
-    expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
-    expect(sent()).toBe(1)
-    // Once the server has noticed the cut, nothing holds the tables the
-    // delete locked, and what is there is what was committed.
-    await until(async () => [...(await owner`select count(*)::int as n from pg_locks where relation = 'lost.cascading'::regclass and pid <> pg_backend_pid()`)], [{ n: 0 }])
-    expect(await cascadingCoded(code)).toEqual([1, 1])
-  })
+      const outcome = failed(await pending)
+      expect([outcome.code, outcome.message]).toEqual(['unknown-outcome', expect.stringMatching(/CONNECTION_CLOSED/)])
+      expect(sent()).toBe(1)
+      // Once the server has noticed the cut, nothing holds the tables the
+      // delete locked, and what is there is what was committed.
+      await until(
+        async () => [...(await owner`select count(*)::int as n from pg_locks where relation = 'lost.cascading'::regclass and pid <> pg_backend_pid()`)],
+        [{ n: 0 }],
+      )
+      expect(await cascadingCoded(code)).toEqual([1, 1])
+    },
+  )
 })
 
 describe('a refusal that follows the row', () => {
@@ -406,10 +447,21 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
   // connection goes, so this over-reports, but it is unknown-outcome as any
   // write sent and not answered is, and the same driver answers afterwards.
   test('an update whose answer is lost is unknown-outcome, and the driver answers the next request', async () => {
-    const repeatable = postgres({ ...connectionOf(fixture.admin), host: '127.0.0.1', port: hop.port, max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read' } })
+    const repeatable = postgres({
+      ...connectionOf(fixture.admin),
+      host: '127.0.0.1',
+      port: hop.port,
+      max: 1,
+      onnotice: () => {},
+      connection: { default_transaction_isolation: 'repeatable read' },
+    })
     try {
       const records = createPostgresRecords(repeatable)
-      const created = await defined(createPostgresRecords(owner)).insert({ target: ORDER, values: orderValues(marker('before the locked update')), returning: [ORDER_ID] })
+      const created = await defined(createPostgresRecords(owner)).insert({
+        target: ORDER,
+        values: orderValues(marker('before the locked update')),
+        returning: [ORDER_ID],
+      })
       if (!created.ok) throw new Error(created.message)
       const key = [{ ...ORDER_ID, value: String(created.values.id) }]
       const read = await records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1, through: [] })
@@ -417,11 +469,25 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
       expect(read.described.definition).toMatch(/@repeatable read$/)
       const notes = marker('locked update, answer lost')
       const lost = hop.swallowAnswersFrom(answerBytes('postgres', notes))
-      const pending = records.update({ target: ORDER, key, set: [{ ...col('sales', 'order', 'notes'), value: notes }], expectedVersion: read.record.version as string, filters: TENANT_1, through: [], returning: [col('sales', 'order', 'notes')], definition: read.described.definition })
+      const pending = records.update({
+        target: ORDER,
+        key,
+        set: [{ ...col('sales', 'order', 'notes'), value: notes }],
+        expectedVersion: read.record.version as string,
+        filters: TENANT_1,
+        through: [],
+        returning: [col('sales', 'order', 'notes')],
+        definition: read.described.definition,
+      })
       await within(lost.matched, 'the marker never appeared in an answer')
       lost.cut()
-      expect(failed(await within(pending, 'the update never answered'))).toMatchObject({ code: 'unknown-outcome', message: expect.stringMatching(/CONNECTION_CLOSED/) })
-      expect(await within(records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1, through: [] }), 'the driver never answered again')).toMatchObject({ ok: true })
+      expect(failed(await within(pending, 'the update never answered'))).toMatchObject({
+        code: 'unknown-outcome',
+        message: expect.stringMatching(/CONNECTION_CLOSED/),
+      })
+      expect(
+        await within(records.read({ target: ORDER, key, columns: [ORDER_ID], filters: TENANT_1, through: [] }), 'the driver never answered again'),
+      ).toMatchObject({ ok: true })
     } finally {
       await repeatable.end({ timeout: 1 })
     }
@@ -431,7 +497,14 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
   // unavailable, nothing written, and the driver answers again.
   test('a write whose connection is lost while it waits for the lock is unavailable, and nothing is written', async () => {
     const server = new URL(fixture.admin)
-    const repeatable = postgres({ ...connectionOf(fixture.admin), host: server.hostname, port: Number(server.port), max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-cut' } })
+    const repeatable = postgres({
+      ...connectionOf(fixture.admin),
+      host: server.hostname,
+      port: Number(server.port),
+      max: 1,
+      onnotice: () => {},
+      connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-cut' },
+    })
     try {
       const records = createPostgresRecords(repeatable)
       const described = await records.describe(ORDER.table)
@@ -446,9 +519,18 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
       })
       await new Promise<void>((resolve) => (locked = resolve))
       const pending = records.insert({ target: ORDER, values: orderValues(notes), returning: [], definition: described.described.definition })
-      await until(async () => [...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-cut' and wait_event_type = 'Lock'`)][0]?.n, 1)
+      await until(
+        async () =>
+          [
+            ...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-cut' and wait_event_type = 'Lock'`),
+          ][0]?.n,
+        1,
+      )
       await owner`select pg_catalog.pg_terminate_backend(pid) from pg_catalog.pg_stat_activity where application_name = 'locked-and-cut'`
-      expect(failed(await within(pending, 'the insert never answered'))).toMatchObject({ code: 'unavailable', message: expect.stringMatching(/CONNECTION_CLOSED/) })
+      expect(failed(await within(pending, 'the insert never answered'))).toMatchObject({
+        code: 'unavailable',
+        message: expect.stringMatching(/CONNECTION_CLOSED/),
+      })
       release()
       await holding
       expect(await ordersNoted(notes)).toBe(0)
@@ -481,7 +563,14 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
       return used.heapUsed + used.external
     }
     const server = new URL(fixture.admin)
-    const repeatable = postgres({ ...connectionOf(fixture.admin), host: server.hostname, port: Number(server.port), max: 1, onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-kept' } })
+    const repeatable = postgres({
+      ...connectionOf(fixture.admin),
+      host: server.hostname,
+      port: Number(server.port),
+      max: 1,
+      onnotice: () => {},
+      connection: { default_transaction_isolation: 'repeatable read', application_name: 'locked-and-kept' },
+    })
     const LOST = 4
     const SIZE = 16 * 1024 * 1024
     try {
@@ -501,8 +590,19 @@ describe('the lock-first path, under a default isolation other than READ COMMITT
         // A value of its own each time, never sent: the lock is all the server
         // hears of this write. Flat, as a typed value is: a repeated string
         // is a few nodes until something flattens it, and would weigh nothing.
-        const pending = records.insert({ target: ORDER, values: orderValues(Buffer.alloc(SIZE, 0x61 + lost).toString('latin1')), returning: [], definition: described.described.definition })
-        await until(async () => [...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-kept' and wait_event_type = 'Lock'`)][0]?.n, 1)
+        const pending = records.insert({
+          target: ORDER,
+          values: orderValues(Buffer.alloc(SIZE, 0x61 + lost).toString('latin1')),
+          returning: [],
+          definition: described.described.definition,
+        })
+        await until(
+          async () =>
+            [
+              ...(await owner`select count(*)::int as n from pg_catalog.pg_stat_activity where application_name = 'locked-and-kept' and wait_event_type = 'Lock'`),
+            ][0]?.n,
+          1,
+        )
         await owner`select pg_catalog.pg_terminate_backend(pid) from pg_catalog.pg_stat_activity where application_name = 'locked-and-kept'`
         expect(failed(await within(pending, 'the insert never answered'))).toMatchObject({ code: 'unavailable' })
         release()

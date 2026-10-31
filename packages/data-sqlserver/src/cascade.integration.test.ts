@@ -46,7 +46,14 @@ beforeAll(async () => {
   fixture = await startSqlServerFixture()
   owner = await new mssql.ConnectionPool(fixture.admin).connect()
   parity = await discoverSqlServer(owner, PARITY_SCOPE)
-  bindings = generateForm(parity, { connection: 'test', root: { schema: 'parity', name: 'removable_parent' }, formId: 'removable-parent', title: 'Parent', lookups: [], versionColumn: 'version' }).bindings
+  bindings = generateForm(parity, {
+    connection: 'test',
+    root: { schema: 'parity', name: 'removable_parent' },
+    formId: 'removable-parent',
+    title: 'Parent',
+    lookups: [],
+    versionColumn: 'version',
+  }).bindings
   records = createSqlServerRecords(owner)
 })
 
@@ -74,7 +81,9 @@ async function inserted(table: string, values: Record<string, string | number | 
   const request = owner.request()
   const names = Object.keys(values)
   names.forEach((name) => request.input(name, values[name]))
-  const result = await request.query<{ id: number }>(`insert into parity.${table} (${names.join(', ')}) output inserted.id values (${names.map((name) => `@${name}`).join(', ')})`)
+  const result = await request.query<{ id: number }>(
+    `insert into parity.${table} (${names.join(', ')}) output inserted.id values (${names.map((name) => `@${name}`).join(', ')})`,
+  )
   const id = result.recordset[0]?.id
   if (id === undefined) throw new Error(`nothing inserted into parity.${table}`)
   return String(id)
@@ -116,7 +125,10 @@ async function count(sql: string): Promise<number> {
 /** Waits until the server shows `session` waiting on another's lock: polled, never a fixed delay. */
 async function blocked(session: number): Promise<void> {
   for (let attempt = 0; attempt < 400; attempt += 1) {
-    const found = await owner.request().input('session', mssql.Int, session).query<{ blocker: number }>('select blocking_session_id as blocker from sys.dm_exec_requests where session_id = @session')
+    const found = await owner
+      .request()
+      .input('session', mssql.Int, session)
+      .query<{ blocker: number }>('select blocking_session_id as blocker from sys.dm_exec_requests where session_id = @session')
     if ((found.recordset[0]?.blocker ?? 0) > 0) return
     await new Promise((resolve) => setTimeout(resolve, 25))
   }
@@ -184,22 +196,33 @@ describe('a delete that cascades and clears through keys the policy names', () =
   // Server stamps every update of a row, the referential action's included,
   // so a save guarded by one is stale. Writing the reference the row had
   // back is refused by the key, whose target is gone: 547.
-  test('clears: a row that referred to the record keeps its place, with no reference and its version unchanged', covers('sqlserver', cascadeCase('clears')), async () => {
-    await owner.request().batch('alter table parity.removable_null add stamped rowversion')
-    try {
-      const stamp = async () => (await owner.request().query<{ stamped: Buffer }>("select stamped from parity.removable_null where note = N'clears'")).recordset[0]?.stamped.toString('hex')
-      const parent = await family('clears', 0, 1)
-      const before = await stamp()
-      expect(before).toMatch(/^[0-9a-f]{16}$/)
-      expect(answer(await records.delete(await planned(parent)))).toBe(expected('clears'))
-      const result = await owner.request().query<{ parent_id: number | null; version: number }>("select parent_id, version from parity.removable_null where note = N'clears'")
-      expect(result.recordset).toEqual([{ parent_id: null, version: 1 }])
-      expect(await stamp()).not.toBe(before)
-      await expect(owner.request().input('parent', mssql.Int, Number(parent)).query("update parity.removable_null set parent_id = @parent where note = N'clears'")).rejects.toMatchObject({ number: 547 })
-    } finally {
-      await owner.request().batch('alter table parity.removable_null drop column stamped')
-    }
-  })
+  test(
+    'clears: a row that referred to the record keeps its place, with no reference and its version unchanged',
+    covers('sqlserver', cascadeCase('clears')),
+    async () => {
+      await owner.request().batch('alter table parity.removable_null add stamped rowversion')
+      try {
+        const stamp = async () =>
+          (await owner.request().query<{ stamped: Buffer }>("select stamped from parity.removable_null where note = N'clears'")).recordset[0]?.stamped.toString(
+            'hex',
+          )
+        const parent = await family('clears', 0, 1)
+        const before = await stamp()
+        expect(before).toMatch(/^[0-9a-f]{16}$/)
+        expect(answer(await records.delete(await planned(parent)))).toBe(expected('clears'))
+        const result = await owner
+          .request()
+          .query<{ parent_id: number | null; version: number }>("select parent_id, version from parity.removable_null where note = N'clears'")
+        expect(result.recordset).toEqual([{ parent_id: null, version: 1 }])
+        expect(await stamp()).not.toBe(before)
+        await expect(
+          owner.request().input('parent', mssql.Int, Number(parent)).query("update parity.removable_null set parent_id = @parent where note = N'clears'"),
+        ).rejects.toMatchObject({ number: 547 })
+      } finally {
+        await owner.request().batch('alter table parity.removable_null drop column stamped')
+      }
+    },
+  )
 
   // The cascading rows' own cascade is followed too, two levels below.
   test('grandchild: a cascade two levels below the record is followed', covers('sqlserver', cascadeCase('grandchild')), async () => {
@@ -210,10 +233,14 @@ describe('a delete that cascades and clears through keys the policy names', () =
 })
 
 describe('what moved since the delete was decided', () => {
-  const addCopyKey = 'alter table parity.removable_copy add constraint fk_removable_copy_cascade foreign key (cascade_id) references parity.removable_cascade (id) on delete cascade'
+  const addCopyKey =
+    'alter table parity.removable_copy add constraint fk_removable_copy_cascade foreign key (cascade_id) references parity.removable_cascade (id) on delete cascade'
 
   async function copied(note: string): Promise<void> {
-    await owner.request().input('note', mssql.NVarChar(50), note).query('insert into parity.removable_copy (cascade_id) select id from parity.removable_cascade where note = @note')
+    await owner
+      .request()
+      .input('note', mssql.NVarChar(50), note)
+      .query('insert into parity.removable_copy (cascade_id) select id from parity.removable_cascade where note = @note')
   }
 
   // A key onto a table past the root, committed after the delete was
@@ -221,36 +248,48 @@ describe('what moved since the delete was decided', () => {
   // key onto every table the delete removes rows of, after the statement,
   // and rolls back what the cascade did (watched failing with the guard over
   // the root alone: the record, its rows and their copies were deleted).
-  test('reach-moved: a cascading key onto a table the delete reaches, added before it ran, deletes nothing', covers('sqlserver', cascadeCase('reach-moved')), async () => {
-    await owner.request().batch('create table parity.removable_copy (cascade_id int not null)')
-    try {
-      const parent = await family('reach-moved')
-      const request = await planned(parent)
-      await copied('reach-moved')
-      await owner.request().batch(addCopyKey)
-      expect(await records.delete(request)).toMatchObject({ ok: false, code: expected('reach-moved'), message: expect.stringMatching(/foreign key now acts/) })
-      expect(await left('reach-moved')).toEqual(whole())
-      expect(await count('select count(*) as n from parity.removable_copy')).toBe(2)
-    } finally {
-      await owner.request().batch('drop table parity.removable_copy')
-    }
-  })
+  test(
+    'reach-moved: a cascading key onto a table the delete reaches, added before it ran, deletes nothing',
+    covers('sqlserver', cascadeCase('reach-moved')),
+    async () => {
+      await owner.request().batch('create table parity.removable_copy (cascade_id int not null)')
+      try {
+        const parent = await family('reach-moved')
+        const request = await planned(parent)
+        await copied('reach-moved')
+        await owner.request().batch(addCopyKey)
+        expect(await records.delete(request)).toMatchObject({
+          ok: false,
+          code: expected('reach-moved'),
+          message: expect.stringMatching(/foreign key now acts/),
+        })
+        expect(await left('reach-moved')).toEqual(whole())
+        expect(await count('select count(*) as n from parity.removable_copy')).toBe(2)
+      } finally {
+        await owner.request().batch('drop table parity.removable_copy')
+      }
+    },
+  )
 
   // The same key, committed while the delete waits for it: the guard runs
   // after the statement, under its locks, so it reads the key either way.
-  test('reach-moved-waiting: the same key committed while the delete waits deletes nothing', covers('sqlserver', cascadeCase('reach-moved-waiting')), async () => {
-    await owner.request().batch('create table parity.removable_copy (cascade_id int not null)')
-    try {
-      const request = await planned(await family('reach-moved-waiting'))
-      await copied('reach-moved-waiting')
-      const outcome = await racedWith(addCopyKey, (via) => via.delete(request))
-      expect(answer(outcome)).toBe(expected('reach-moved-waiting'))
-      expect(await left('reach-moved-waiting')).toEqual(whole())
-      expect(await count('select count(*) as n from parity.removable_copy')).toBe(2)
-    } finally {
-      await owner.request().batch('drop table parity.removable_copy')
-    }
-  })
+  test(
+    'reach-moved-waiting: the same key committed while the delete waits deletes nothing',
+    covers('sqlserver', cascadeCase('reach-moved-waiting')),
+    async () => {
+      await owner.request().batch('create table parity.removable_copy (cascade_id int not null)')
+      try {
+        const request = await planned(await family('reach-moved-waiting'))
+        await copied('reach-moved-waiting')
+        const outcome = await racedWith(addCopyKey, (via) => via.delete(request))
+        expect(answer(outcome)).toBe(expected('reach-moved-waiting'))
+        expect(await left('reach-moved-waiting')).toEqual(whole())
+        expect(await count('select count(*) as n from parity.removable_copy')).toBe(2)
+      } finally {
+        await owner.request().batch('drop table parity.removable_copy')
+      }
+    },
+  )
 
   // A key accepted as SET NULL that now cascades deletes rows the policy
   // accepted it would keep: the guard matches each key by its action as
@@ -276,22 +315,28 @@ describe('what moved since the delete was decided', () => {
   // by the guard, and the clearing is rolled back (watched failing with the
   // cleared columns unguarded: the reference was cleared and the copy's
   // with it).
-  test('clears-moved: a key that follows a cleared reference on update, added after the delete was decided, deletes nothing', covers('sqlserver', cascadeCase('clears-moved')), async () => {
-    await owner.request().batch('create table parity.removable_null_copy (parent_id int null, null_id int not null)')
-    try {
-      const parent = await family('clears-moved', 0, 1)
-      const request = await planned(parent)
-      await owner.request().batch("insert into parity.removable_null_copy select parent_id, id from parity.removable_null where note = N'clears-moved'")
-      await owner
-        .request()
-        .batch('alter table parity.removable_null_copy add constraint fk_removable_null_copy foreign key (parent_id, null_id) references parity.removable_null (parent_id, id) on update cascade')
-      expect(answer(await records.delete(request))).toBe(expected('clears-moved'))
-      expect(await left('clears-moved')).toEqual(whole(0, 1))
-      expect(await count(`select count(*) as n from parity.removable_null_copy where parent_id = ${Number(parent)}`)).toBe(1)
-    } finally {
-      await owner.request().batch('drop table parity.removable_null_copy')
-    }
-  })
+  test(
+    'clears-moved: a key that follows a cleared reference on update, added after the delete was decided, deletes nothing',
+    covers('sqlserver', cascadeCase('clears-moved')),
+    async () => {
+      await owner.request().batch('create table parity.removable_null_copy (parent_id int null, null_id int not null)')
+      try {
+        const parent = await family('clears-moved', 0, 1)
+        const request = await planned(parent)
+        await owner.request().batch("insert into parity.removable_null_copy select parent_id, id from parity.removable_null where note = N'clears-moved'")
+        await owner
+          .request()
+          .batch(
+            'alter table parity.removable_null_copy add constraint fk_removable_null_copy foreign key (parent_id, null_id) references parity.removable_null (parent_id, id) on update cascade',
+          )
+        expect(answer(await records.delete(request))).toBe(expected('clears-moved'))
+        expect(await left('clears-moved')).toEqual(whole(0, 1))
+        expect(await count(`select count(*) as n from parity.removable_null_copy where parent_id = ${Number(parent)}`)).toBe(1)
+      } finally {
+        await owner.request().batch('drop table parity.removable_null_copy')
+      }
+    },
+  )
 })
 
 describe("the account's grants and row security on the tables a delete reaches", () => {
@@ -304,22 +349,26 @@ describe("the account's grants and row security on the tables a delete reaches",
   // that check: the delete was answered done, and the grandchildren
   // deleted). The same losses as on PostgreSQL, where the lock is taken with
   // the grants kept.
-  test('reach-privilege: an account that lost DELETE on a table the delete reaches is refused, and nothing is deleted', covers('sqlserver', cascadeCase('reach-privilege')), async () => {
-    for (const { table, keeps } of REACH_PRIVILEGE_LOSSES) {
-      const user = `reach_deleter_${table}_${keeps ?? 'nothing'}`
-      const note = `reach-privilege: ${table.replace('removable_', '')}, ${keeps ?? 'nothing'}`
-      const pool = await asUser(user, [...DELETER(user), ...(keeps === null ? [] : [`grant ${keeps} on parity.${table} to ${user}`])])
-      try {
-        const via = createSqlServerRecords(pool)
-        const request = await planned(await family(note), via)
-        await owner.request().batch(`revoke delete on parity.${table} from ${user}`)
-        expect.soft(answer(await via.delete(request)), note).toBe(expected('reach-privilege'))
-        expect.soft(await left(note), note).toEqual(whole())
-      } finally {
-        await pool.close()
+  test(
+    'reach-privilege: an account that lost DELETE on a table the delete reaches is refused, and nothing is deleted',
+    covers('sqlserver', cascadeCase('reach-privilege')),
+    async () => {
+      for (const { table, keeps } of REACH_PRIVILEGE_LOSSES) {
+        const user = `reach_deleter_${table}_${keeps ?? 'nothing'}`
+        const note = `reach-privilege: ${table.replace('removable_', '')}, ${keeps ?? 'nothing'}`
+        const pool = await asUser(user, [...DELETER(user), ...(keeps === null ? [] : [`grant ${keeps} on parity.${table} to ${user}`])])
+        try {
+          const via = createSqlServerRecords(pool)
+          const request = await planned(await family(note), via)
+          await owner.request().batch(`revoke delete on parity.${table} from ${user}`)
+          expect.soft(answer(await via.delete(request)), note).toBe(expected('reach-privilege'))
+          expect.soft(await left(note), note).toEqual(whole())
+        } finally {
+          await pool.close()
+        }
       }
-    }
-  })
+    },
+  )
 
   // A security policy on a table a cascade reaches is not asked: a filter
   // that hides every row of it from the account, and a block predicate
@@ -329,7 +378,11 @@ describe("the account's grants and row security on the tables a delete reaches",
   test("cascade-security: rows the account's security policy hides go with the record", covers('sqlserver', cascadeCase('cascade-security')), async () => {
     const pool = await asUser('policed_cascader', [...DELETER('policed_cascader'), 'grant select on parity.removable_cascade to policed_cascader'])
     await owner.request().batch('create schema cascade_security')
-    await owner.request().batch("create function cascade_security.nobody(@note nvarchar(50)) returns table with schemabinding as return select 1 as visible where @note = N'never'")
+    await owner
+      .request()
+      .batch(
+        "create function cascade_security.nobody(@note nvarchar(50)) returns table with schemabinding as return select 1 as visible where @note = N'never'",
+      )
     await owner
       .request()
       .batch(

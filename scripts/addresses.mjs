@@ -34,7 +34,10 @@ export function references(html) {
 }
 
 /** The words of a link's `rel`, lowercased. */
-export const rel = (attributes) => String(attributes.rel ?? '').toLowerCase().split(/\s+/)
+export const rel = (attributes) =>
+  String(attributes.rel ?? '')
+    .toLowerCase()
+    .split(/\s+/)
 
 /** The `href` of every `<link rel="stylesheet">` of `html`, as written, in order. */
 export function stylesheetLinks(html) {
@@ -54,7 +57,9 @@ export function resolved(value, address) {
 
 /** The address of every `@import` of a stylesheet, quoted or as a `url()`, as written. */
 export function styleImports(css) {
-  return [...css.matchAll(/@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')/gi)].map((match) => match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5])
+  return [...css.matchAll(/@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')/gi)].map(
+    (match) => match[1] ?? match[2] ?? match[3] ?? match[4] ?? match[5],
+  )
 }
 
 /** Every `url(...)` and quoted `@import` of a stylesheet, as written. */

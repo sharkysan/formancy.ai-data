@@ -3,9 +3,23 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { getRole } from 'dom-accessibility-api'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { answer, answeredOnce, chooseForm, chooseRenderer, gridSection, gridStatus, mount, rendered, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  gridSection,
+  gridStatus,
+  mount,
+  rendered,
+  searchRecords,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
@@ -48,7 +62,13 @@ async function freshOrder(engine: Engine, notes: string): Promise<string> {
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error(`the order was not created: ${created.ok ? 'no token' : created.message}`)
   return created.value.record
 }
@@ -153,7 +173,9 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     const listed = await plane.clerk.list(engine.formId, { search: notes })
     const version = listed.ok ? listed.value.rows.find((candidate) => candidate.record === other)?.version : undefined
     const sent = plane.sent.length
-    within(row('Records', other.slice(3))).getByRole('button', { name: `Delete Order ${other}` }).focus()
+    within(row('Records', other.slice(3)))
+      .getByRole('button', { name: `Delete Order ${other}` })
+      .focus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Delete Order ${other}?`))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${other}?` })).getByRole('button', { name: 'Delete it' }))
@@ -181,7 +203,11 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     await answer(user, 'React', 'Notes', 'a draft deleted from its row')
     await user.click(within(row('Records', open.slice(3))).getByRole('button', { name: `Delete Order ${open}` }))
     const region = screen.getByRole('region', { name: `Delete Order ${open}?` })
-    expect(within(region).getAllByRole('listitem').map((item) => item.textContent)).toEqual([`Order ${open}, React: changes that are not saved.`])
+    expect(
+      within(region)
+        .getAllByRole('listitem')
+        .map((item) => item.textContent),
+    ).toEqual([`Order ${open}, React: changes that are not saved.`])
     await user.click(within(region).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(focusedName()).toBe('Records'), ARRIVES)
     expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy()
@@ -225,7 +251,10 @@ describe.each(ENGINES)("a row's Delete on $engine", (engine) => {
     const record = await freshOrder(engine, notes)
     const user = await workspace(engine.formId)
     await searchRecords(user, notes, [record.slice(3)])
-    const cells = (): Array<string | null> => within(row('Records', record.slice(3))).getAllByRole('gridcell').map((cell) => cell.textContent)
+    const cells = (): Array<string | null> =>
+      within(row('Records', record.slice(3)))
+        .getAllByRole('gridcell')
+        .map((cell) => cell.textContent)
     await moveOn(engine.formId, record, { notes: `${notes} moved` })
     await user.click(within(row('Records', record.slice(3))).getByRole('button', { name: `Delete Order ${record}` }))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))

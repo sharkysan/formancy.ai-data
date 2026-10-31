@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { TENANTS } from './data/model.js'
 import { DEMO_FORMS, describeGrants, PERSONAS, ROLE_GRANTS } from './personas.js'
-import type { DemoRole } from './personas.js'
 
 /**
  * The people a visitor signs in as. What each may do is ROLE_GRANTS alone:
@@ -48,7 +47,9 @@ describe('the personas', () => {
     expect(describeGrants('Clerk', may, 2)).toBe(
       "Clerk of tenant 2: reads tenant 2's customers, orders, order lines and deliveries, and nothing of tenant 1's; adds and changes customers and order lines; adds, changes and deletes orders.",
     )
-    expect(describeGrants('Reader', { ...ROLE_GRANTS.auditor.may, delivery: [] }, 1)).toBe("Reader of tenant 1: reads tenant 1's customers, orders and order lines, and nothing of tenant 2's; changes nothing.")
+    expect(describeGrants('Reader', { ...ROLE_GRANTS.auditor.may, delivery: [] }, 1)).toBe(
+      "Reader of tenant 1: reads tenant 1's customers, orders and order lines, and nothing of tenant 2's; changes nothing.",
+    )
   })
 
   // The menu names only forms a person may read, and a delete names the
@@ -79,6 +80,6 @@ describe('the personas', () => {
   // Every role a persona carries has a row in the table, which is what the
   // policy is derived from: a role with none would be granted nothing.
   test('carry only roles the table grants', () => {
-    for (const persona of PERSONAS) for (const role of persona.roles) expect(Object.keys(ROLE_GRANTS)).toContain(role as DemoRole)
+    for (const persona of PERSONAS) for (const role of persona.roles) expect(Object.keys(ROLE_GRANTS)).toContain(role)
   })
 })

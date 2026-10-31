@@ -48,24 +48,44 @@ function suiteRow(suites, servers, { name, path, published, image = null }) {
     skipped: count('skipped'),
     todo: count('todo'),
     notPassed: tests.filter((test) => test.status !== 'passed').map((test) => ({ file: test.file, name: test.name, status: test.status })),
-    failedFiles: files.filter((file) => file.status === 'failed').map((file) => ({ file: file.file, testsPassed: file.tests.every((test) => test.status === 'passed') })),
+    failedFiles: files
+      .filter((file) => file.status === 'failed')
+      .map((file) => ({ file: file.file, testsPassed: file.tests.every((test) => test.status === 'passed') })),
     success: suites.every((suite) => suite.success === true),
     numFailedTestSuites: suites.reduce((total, suite) => total + (suite.numFailedTestSuites ?? 0), 0),
     wallMs: tasks.length === 0 ? null : tasks.reduce((total, task) => total + (task.endTime - task.startTime), 0),
     spanMs: starts.length === 0 || ends.length === 0 ? null : Math.max(...ends) - Math.min(...starts),
-    engines: distinct(servers.filter((server) => server.package === name && server.package !== null && jobs.includes(server.job)).map((server) => server.engine)).sort(),
+    engines: distinct(
+      servers.filter((server) => server.package === name && server.package !== null && jobs.includes(server.job)).map((server) => server.engine),
+    ).sort(),
     coverage: coverage === null ? null : { lines: pct('lines'), branches: pct('branches'), functions: pct('functions'), statements: pct('statements') },
   }
 }
 
 /** The suites of the run, each with the key of the results file it came in and, for an image leg, its image. */
-const suitesOf = (results) => results.flatMap((result) => (result.suites ?? []).map((suite) => ({ ...suite, job: result.key, image: result.job === 'test-images' ? (result.variant ?? null) : null })))
+const suitesOf = (results) =>
+  results.flatMap((result) =>
+    (result.suites ?? []).map((suite) => ({ ...suite, job: result.key, image: result.job === 'test-images' ? (result.variant ?? null) : null })),
+  )
 
 /** A package's rows: its default leg, present or not, then each image leg it ran in. */
 function packageRows(suites, servers, entry) {
   const own = suites.filter((suite) => suite.package === entry.name)
   const images = distinct(own.map((suite) => suite.image).filter((image) => image !== null))
-  return [suiteRow(own.filter((suite) => suite.image === null), servers, entry), ...images.map((image) => suiteRow(own.filter((suite) => suite.image === image), servers, { ...entry, image }))]
+  return [
+    suiteRow(
+      own.filter((suite) => suite.image === null),
+      servers,
+      entry,
+    ),
+    ...images.map((image) =>
+      suiteRow(
+        own.filter((suite) => suite.image === image),
+        servers,
+        { ...entry, image },
+      ),
+    ),
+  ]
 }
 
 /** Every package's row, the repository's guards, the three gates, build identity and the observations. */
@@ -77,7 +97,11 @@ export function resultsInRun({ results, covered, published }) {
   const container = results.map((result) => result.container).find((entry) => entry != null) ?? null
   return {
     packages: covered.flatMap((entry) => packageRows(suites, servers, { ...entry, published: published.includes(entry.name) })),
-    repository: suiteRow(suites.filter((suite) => suite.package === null), servers, { name: null, path: '.', published: false }),
+    repository: suiteRow(
+      suites.filter((suite) => suite.package === null),
+      servers,
+      { name: null, path: '.', published: false },
+    ),
     browserGates: gates.map((gate) => ({
       gate: gate.gate,
       asked: gate.asked ?? null,
@@ -97,14 +121,28 @@ export function resultsInRun({ results, covered, published }) {
     install:
       install === null
         ? null
-        : { passed: install.passed === true, error: install.error ?? null, node: install.node, npm: install.npm, resolved: install.resolved ?? [], tarballs: install.tarballs ?? [] },
+        : {
+            passed: install.passed === true,
+            error: install.error ?? null,
+            node: install.node,
+            npm: install.npm,
+            resolved: install.resolved ?? [],
+            tarballs: install.tarballs ?? [],
+          },
     container,
     missing: results.flatMap((result) => (result.missing ?? []).map((what) => ({ job: result.key, what }))),
     buildIdentity: published.map((name) => {
-      const builds = results.flatMap((result) => (result.dist ?? []).filter((entry) => entry.package === name).map((entry) => ({ job: result.key, distHash: entry.distHash })))
+      const builds = results.flatMap((result) =>
+        (result.dist ?? []).filter((entry) => entry.package === name).map((entry) => ({ job: result.key, distHash: entry.distHash })),
+      )
       const tarball = (install?.tarballs ?? []).find((entry) => entry.name === name) ?? null
       const hashes = distinct([...builds.map((build) => build.distHash), ...(tarball === null ? [] : [tarball.distHash])])
-      return { package: name, tarball: tarball === null ? null : { file: tarball.file, sha256: tarball.sha256, distHash: tarball.distHash }, builds, identical: hashes.length <= 1 }
+      return {
+        package: name,
+        tarball: tarball === null ? null : { file: tarball.file, sha256: tarball.sha256, distHash: tarball.distHash },
+        builds,
+        identical: hashes.length <= 1,
+      }
     }),
     observations: observationsOf(gates),
   }
@@ -116,7 +154,10 @@ export function resultsInRun({ results, covered, published }) {
  * Each a phrase; none for a gate that did both. problems.mjs fails a run on
  * each and gates.mjs a gate's evidence, so the two cannot disagree.
  */
-export const unmeasured = (row) => [...(row.ok + row.failed.length === 0 ? ['made no check'] : []), ...(row.passes === 0 ? ['made no pass at a viewport width'] : [])]
+export const unmeasured = (row) => [
+  ...(row.ok + row.failed.length === 0 ? ['made no check'] : []),
+  ...(row.passes === 0 ? ['made no pass at a viewport width'] : []),
+]
 
 /**
  * Every measurement a gate recorded, grouped by gate, browser, name and unit,
@@ -129,8 +170,16 @@ function observationsOf(gates) {
     for (const measurement of gate.measurements ?? []) {
       const browser = gate.asked ?? null
       const key = `${gate.gate}\0${String(browser)}\0${measurement.name}\0${measurement.unit}`
-      const runner = gate.runner?.image == null ? gate.runner?.platform ?? null : `${gate.runner.image} ${gate.runner.imageVersion ?? ''}`.trim()
-      const group = groups.get(key) ?? { gate: gate.gate, browser, name: measurement.name, unit: measurement.unit, values: [], passes: gate.passes ?? 0, runner }
+      const runner = gate.runner?.image == null ? (gate.runner?.platform ?? null) : `${gate.runner.image} ${gate.runner.imageVersion ?? ''}`.trim()
+      const group = groups.get(key) ?? {
+        gate: gate.gate,
+        browser,
+        name: measurement.name,
+        unit: measurement.unit,
+        values: [],
+        passes: gate.passes ?? 0,
+        runner,
+      }
       group.values.push(measurement.value)
       groups.set(key, group)
     }

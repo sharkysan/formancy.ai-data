@@ -8,17 +8,50 @@ const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '21474
 const CODE: NormalizedType = { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }
 const STAMP: NormalizedType = { kind: 'timestamp', withTimeZone: true, precision: 6 }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 const sales = (name: string): ObjectRef => ({ schema: 'sales', name })
 const table = (name: string, columns: ColumnMeta[], rest: Partial<ObjectMeta> = {}): ObjectMeta => ({
-  ref: sales(name), kind: 'table', comment: null, columns, primaryKey: null, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none', access: { delete: true }, referencedBy: [], ...rest,
+  ref: sales(name),
+  kind: 'table',
+  comment: null,
+  columns,
+  primaryKey: null,
+  uniqueKeys: [],
+  foreignKeys: [],
+  checks: [],
+  rowSecurity: 'none',
+  access: { delete: true },
+  referencedBy: [],
+  ...rest,
 })
 const key = (name: string, columns: string[], references: ForeignKeyMeta['references']): ForeignKeyMeta => ({
-  name, columns, references, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true,
+  name,
+  columns,
+  references,
+  onUpdate: 'no-action',
+  onDelete: 'no-action',
+  enforced: true,
+  validated: true,
 })
 const inbound = (on: ObjectRef, name: string, columns: string[], referencedColumns: string[]): InboundKey => ({
-  table: on, name, columns, referencedColumns, onDelete: 'no-action', onUpdate: 'no-action', enforced: true,
+  table: on,
+  name,
+  columns,
+  referencedColumns,
+  onDelete: 'no-action',
+  onUpdate: 'no-action',
+  enforced: true,
 })
 const HIDDEN = { select: false, insert: false, update: false }
 
@@ -30,7 +63,10 @@ const HIDDEN = { select: false, insert: false, update: false }
  * manager, another employee.
  */
 const SNAPSHOT = createSnapshot({
-  kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] },
+  kind: 'postgres',
+  serverVersion: '17.6',
+  account: { user: 'owner', login: 'owner' },
+  scope: { schemas: ['sales'] },
   gaps: [
     { subject: { kind: 'object', object: sales('customer') }, aspect: 'foreign-keys', detail: 'fk_customer_region refers to a table this account cannot see.' },
     { subject: { kind: 'object', object: sales('period') }, aspect: 'referenced-by', detail: 'A table this account cannot see may refer to it.' },
@@ -39,14 +75,29 @@ const SNAPSHOT = createSnapshot({
     table('country', [col('id', 1, INT32), col('iso_code', 2, CODE)], {
       primaryKey: { name: 'pk_country', columns: ['id'] },
       uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
-      referencedBy: [inbound({ schema: 'audit', name: 'trail' }, 'fk_trail_country', ['country_id'], ['id']), inbound(sales('customer'), 'fk_customer_country', ['country_code'], ['iso_code'])],
+      referencedBy: [
+        inbound({ schema: 'audit', name: 'trail' }, 'fk_trail_country', ['country_id'], ['id']),
+        inbound(sales('customer'), 'fk_customer_country', ['country_code'], ['iso_code']),
+      ],
     }),
-    table('customer', [col('id', 1, INT32, { access: HIDDEN }), col('code', 2, CODE), col('country_code', 3, CODE, { nullable: true }), col('region_id', 4, INT32, { nullable: true })], {
-      primaryKey: { name: 'pk_customer', columns: ['id'] },
-      uniqueKeys: [{ name: 'uq_customer_code', columns: ['code'] }],
-      foreignKeys: [key('fk_customer_country', ['country_code'], { table: sales('country'), columns: ['iso_code'] }), key('fk_customer_region', ['region_id'], null)],
-      referencedBy: [inbound(sales('invoice'), 'fk_invoice_customer', ['customer_id'], ['id'])],
-    }),
+    table(
+      'customer',
+      [
+        col('id', 1, INT32, { access: HIDDEN }),
+        col('code', 2, CODE),
+        col('country_code', 3, CODE, { nullable: true }),
+        col('region_id', 4, INT32, { nullable: true }),
+      ],
+      {
+        primaryKey: { name: 'pk_customer', columns: ['id'] },
+        uniqueKeys: [{ name: 'uq_customer_code', columns: ['code'] }],
+        foreignKeys: [
+          key('fk_customer_country', ['country_code'], { table: sales('country'), columns: ['iso_code'] }),
+          key('fk_customer_region', ['region_id'], null),
+        ],
+        referencedBy: [inbound(sales('invoice'), 'fk_invoice_customer', ['customer_id'], ['id'])],
+      },
+    ),
     table('employee', [col('id', 1, INT32), col('manager_id', 2, INT32, { nullable: true })], {
       primaryKey: { name: 'pk_employee', columns: ['id'] },
       foreignKeys: [key('fk_employee_manager', ['manager_id'], { table: sales('employee'), columns: ['id'] })],
@@ -54,7 +105,10 @@ const SNAPSHOT = createSnapshot({
     }),
     table('invoice', [col('id', 1, INT32), col('customer_id', 2, INT32), col('period', 3, STAMP)], {
       primaryKey: { name: 'pk_invoice', columns: ['id'] },
-      foreignKeys: [key('fk_invoice_customer', ['customer_id'], { table: sales('customer'), columns: ['id'] }), key('fk_invoice_period', ['period'], { table: sales('period'), columns: ['starts'] })],
+      foreignKeys: [
+        key('fk_invoice_customer', ['customer_id'], { table: sales('customer'), columns: ['id'] }),
+        key('fk_invoice_period', ['period'], { table: sales('period'), columns: ['starts'] }),
+      ],
     }),
     table('period', [col('starts', 1, STAMP)], {
       uniqueKeys: [{ name: 'uq_period_starts', columns: ['starts'] }],
@@ -88,7 +142,9 @@ describe('browseRelations', () => {
       { direction: 'refers-to', key: 'fk_customer_region', object: null, reason: 'unseen' },
       { direction: 'referred-by', key: 'fk_invoice_customer', object: sales('invoice'), reason: 'not-comparable' },
     ])
-    expect(browseRelations(SNAPSHOT, sales('country')).unfollowed).toEqual([{ direction: 'referred-by', key: 'fk_trail_country', object: { schema: 'audit', name: 'trail' }, reason: 'not-browsed' }])
+    expect(browseRelations(SNAPSHOT, sales('country')).unfollowed).toEqual([
+      { direction: 'referred-by', key: 'fk_trail_country', object: { schema: 'audit', name: 'trail' }, reason: 'not-browsed' },
+    ])
   })
 
   // A follow narrows by equality, which a browse allows on a shown column of a key kind at both ends: a column the account may not read, or an instant, would be refused when pressed.
@@ -111,8 +167,24 @@ describe('browseRelations', () => {
   // A snapshot taken before 0049 does not say what refers to anything; an empty list from it would claim nothing does.
   test('a snapshot that does not record what refers to an object is not complete', () => {
     const older = createSnapshot({
-      kind: 'postgres', serverVersion: '17.6', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, gaps: [],
-      objects: [{ ref: sales('lone'), kind: 'table', comment: null, columns: [col('id', 1, INT32)], primaryKey: { name: 'pk_lone', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none' }],
+      kind: 'postgres',
+      serverVersion: '17.6',
+      account: { user: 'owner', login: 'owner' },
+      scope: { schemas: ['sales'] },
+      gaps: [],
+      objects: [
+        {
+          ref: sales('lone'),
+          kind: 'table',
+          comment: null,
+          columns: [col('id', 1, INT32)],
+          primaryKey: { name: 'pk_lone', columns: ['id'] },
+          uniqueKeys: [],
+          foreignKeys: [],
+          checks: [],
+          rowSecurity: 'none',
+        },
+      ],
     })
     expect(browseRelations(older, sales('lone'))).toEqual({ relations: [], unfollowed: [], inboundComplete: false })
   })
@@ -124,7 +196,12 @@ describe('browseRelations', () => {
 })
 
 describe('followTerms', () => {
-  const composite: BrowseRelation = { direction: 'referred-by', key: 'fk_order_customer', from: ['tenant_id', 'customer_no'], to: { object: sales('order'), columns: ['tenant_id', 'customer_no'] } }
+  const composite: BrowseRelation = {
+    direction: 'referred-by',
+    key: 'fk_order_customer',
+    from: ['tenant_id', 'customer_no'],
+    to: { object: sales('order'), columns: ['tenant_id', 'customer_no'] },
+  }
 
   // The values pair with the other end's columns by position, which is how a composite key pairs them.
   test("narrows the other end's columns to the row's values, pair by pair", () => {

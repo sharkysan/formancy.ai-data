@@ -35,24 +35,36 @@ export function identityKeySource(env: Environment): IdentityKeySetting {
   const keysFile = env['FORMANCY_DATA_IDENTITY_KEYS_FILE']
   const algorithm = env['FORMANCY_DATA_IDENTITY_ALGORITHM']
   if ([reference, publicKeyFile, keysFile].filter((value) => value !== undefined).length !== 1) {
-    return { ok: false, problem: 'Set exactly one of FORMANCY_DATA_IDENTITY_SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE and FORMANCY_DATA_IDENTITY_KEYS_FILE.' }
+    return {
+      ok: false,
+      problem: 'Set exactly one of FORMANCY_DATA_IDENTITY_SECRET, FORMANCY_DATA_IDENTITY_PUBLIC_KEY_FILE and FORMANCY_DATA_IDENTITY_KEYS_FILE.',
+    }
   }
   if (reference !== undefined) return { ok: true, source: { kind: 'secret', reference } }
 
   if (publicKeyFile !== undefined) {
     if (algorithm === undefined || algorithm === '') return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is required.' }
     // A PEM's text taken as an HMAC secret verifies any token its reader signs with it.
-    if (algorithm === 'HS256') return { ok: false, problem: 'HS256 is a shared secret: it is FORMANCY_DATA_IDENTITY_SECRET or a key set, never a public key file.' }
-    if (algorithm !== 'RS256' && algorithm !== 'ES256' && algorithm !== 'EdDSA') return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256 or EdDSA.' }
+    if (algorithm === 'HS256')
+      return { ok: false, problem: 'HS256 is a shared secret: it is FORMANCY_DATA_IDENTITY_SECRET or a key set, never a public key file.' }
+    if (algorithm !== 'RS256' && algorithm !== 'ES256' && algorithm !== 'EdDSA')
+      return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256 or EdDSA.' }
     return { ok: true, source: { kind: 'public-key', path: publicKeyFile, algorithm } }
   }
 
   const path = keysFile as string
   if (algorithm === undefined || algorithm === '') {
-    return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE: RS256, ES256, EdDSA or HS256, for every key in the set.' }
+    return {
+      ok: false,
+      problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is required with FORMANCY_DATA_IDENTITY_KEYS_FILE: RS256, ES256, EdDSA or HS256, for every key in the set.',
+    }
   }
   if (!isKeySetAlgorithm(algorithm)) return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_ALGORITHM is RS256, ES256, EdDSA or HS256 for a key set.' }
-  if (!isAbsolute(path)) return { ok: false, problem: 'FORMANCY_DATA_IDENTITY_KEYS_FILE is an absolute path: the file is read again, on SIGHUP, from wherever the server then runs.' }
+  if (!isAbsolute(path))
+    return {
+      ok: false,
+      problem: 'FORMANCY_DATA_IDENTITY_KEYS_FILE is an absolute path: the file is read again, on SIGHUP, from wherever the server then runs.',
+    }
   return { ok: true, source: { kind: 'key-set', path, algorithm } }
 }
 

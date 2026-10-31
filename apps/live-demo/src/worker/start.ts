@@ -60,7 +60,13 @@ export interface HealthWait {
  * for the line a failed start writes.
  */
 export async function waitUntilHealthy(probe: (remainingMs: number) => Promise<boolean>, options: WaitOptions): Promise<HealthWait> {
-  const { alive, deadlineMs = START_DEADLINE_MS, pollMs = POLL_MS, now = Date.now, sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)) } = options
+  const {
+    alive,
+    deadlineMs = START_DEADLINE_MS,
+    pollMs = POLL_MS,
+    now = Date.now,
+    sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  } = options
   const started = now()
   let probes = 0
   let lastError: string | undefined
@@ -117,6 +123,17 @@ export function noInstance(error: unknown): boolean {
 }
 
 /**
+ * What the wait for /health is told when `ctx.container.monitor()` rejected
+ * with anything but Cloudflare having no instance: the failed start's line
+ * quotes it, and it is all the live log shows of the rejection. An error
+ * is said in its own words, its message; any other value as `errorText`
+ * says a thrown one.
+ */
+export function monitorRejected(refused: unknown): string {
+  return `monitor() rejected: ${refused instanceof Error ? refused.message : errorText(refused)}`
+}
+
+/**
  * The line a start that answered writes (0087): how long it took, which no
  * gate measures on Cloudflare, and how often it was started again; the
  * deadline is to be set from these lines.
@@ -135,7 +152,18 @@ function probes(count: number): string {
   return `${String(count)} probe${count === 1 ? '' : 's'}`
 }
 
-/** An error as `Name: message`, or a thrown value that is no error as itself. */
+/**
+ * An error as `Name: message`, or a thrown value that is no error as
+ * `String` spells it: an error from another realm, which is no `Error`
+ * here, by its own `toString`, and a string as itself. A value `String`
+ * cannot spell -- an object with no prototype, or whose `toString` throws
+ * -- is named by its tag, so saying an error never throws one.
+ */
 function errorText(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  if (error instanceof Error) return `${error.name}: ${error.message}`
+  try {
+    return String(error)
+  } catch {
+    return Object.prototype.toString.call(error)
+  }
 }

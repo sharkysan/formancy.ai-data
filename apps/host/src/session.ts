@@ -84,7 +84,6 @@ export const CHANGED_SINCE_UNKNOWN =
 /** What `check()` answers when this form has no save whose outcome is unknown. */
 const NOTHING_TO_CHECK: Reconciliation = { ok: false, status: 0, code: 'nothing-to-check', message: 'This form has no save whose outcome is unknown.' }
 
-
 export interface SessionState {
   /** The record's token, once there is one: read, or created here. */
   record: string | undefined
@@ -166,7 +165,10 @@ export function createSession({ client, formId, definition, renderer, namespace,
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).
-  const readOnly = disableFields(form, form.model.fields.map((field) => field.key))
+  const readOnly = disableFields(
+    form,
+    form.model.fields.map((field) => field.key),
+  )
   const ids = namespace ?? form.id
   const allows = (operation: LookupOperation): boolean => definition.operations.includes(operation)
   const operationFor = (record: string | undefined): LookupOperation =>
@@ -196,7 +198,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
   /** The fields a next version takes from the one it follows, and its end: never the person's (0115). */
   const following = disableFields(form, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
   /** Whether `record` is a version that has ended: history, drawn as nothing to write (0113). */
-  const ended = (record: FormRecord | undefined): boolean => definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
+  const ended = (record: FormRecord | undefined): boolean =>
+    definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
 
   function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
     const token = record?.record ?? undefined
@@ -225,7 +228,14 @@ export function createSession({ client, formId, definition, renderer, namespace,
    * is the answers as they went: a stored answer replaces only one still as
    * it was sent, never one the person has changed since.
    */
-  function settle(engine: FormEngine, generation: number, sent: Record<string, unknown>, at: Pick<SessionState, 'record' | 'version'>, outcome: WriteOutcome, created: boolean): SaveResult {
+  function settle(
+    engine: FormEngine,
+    generation: number,
+    sent: Record<string, unknown>,
+    at: Pick<SessionState, 'record' | 'version'>,
+    outcome: WriteOutcome,
+    created: boolean,
+  ): SaveResult {
     if (isUnknownWrite(outcome)) {
       // Nothing is applied: the record and the version stay what they were
       // when it was sent. Only a create holds -- an update protects itself.
@@ -235,7 +245,14 @@ export function createSession({ client, formId, definition, renderer, namespace,
     // Stale against the version this form's unknown update sent: the record
     // moved on, most likely by that update. Still unknown, and still checkable.
     const here = lostHere()
-    if (!outcome.ok && outcome.status === 409 && outcome.code === 'stale' && (here?.write.operation === 'update' || here?.write.operation === 'supersede') && here.write.record === at.record && here.write.version === at.version) {
+    if (
+      !outcome.ok &&
+      outcome.status === 409 &&
+      outcome.code === 'stale' &&
+      (here?.write.operation === 'update' || here?.write.operation === 'supersede') &&
+      here.write.record === at.record &&
+      here.write.version === at.version
+    ) {
       return { kind: 'unknown', message: CHANGED_SINCE_UNKNOWN, unknown: here.write }
     }
     // Answered: an earlier unknown save of this form is no longer the last one.
@@ -325,7 +342,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     saved,
     /** The engine on screen. The same object between opens, so `useSyncExternalStore` can read it. */
     opened: current,
-    subscribe(listener: () => void): () => void {
+    subscribe: (listener: () => void): (() => void) => {
       listeners.add(listener)
       return () => {
         listeners.delete(listener)

@@ -17,7 +17,12 @@ export interface SupersedeRouteSteps {
   connection(bundle: PublishedBundle, reply: FastifyReply): Promise<OpenConnection | undefined>
   context(request: FastifyRequest): PolicyContext
   /** Runs `perform` once per sending of a write id, and answers a later sending with its answer (0031). */
-  sendOnce(request: RuntimeRequest, operation: UnknownOutcome['operation'], id: string | undefined, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated?: boolean }>
+  sendOnce(
+    request: RuntimeRequest,
+    operation: UnknownOutcome['operation'],
+    id: string | undefined,
+    perform: () => Promise<WriteAnswer>,
+  ): Promise<WriteAnswer & { repeated?: boolean }>
   /** A write sent whose answer was lost: said in the log, answered 502 with what was addressed, never sent again. */
   lost(request: RuntimeRequest, operation: UnknownOutcome['operation'], record: string | null, version: string | null, failure: string): WriteAnswer
   /** A planner's refusal as the answer, its drift said in the log first. */
@@ -32,7 +37,14 @@ export interface SupersedeRouteSteps {
     record: string,
   ): Promise<{ ok: true; current: FormRecord | undefined; unread: RecordFailure | undefined; described: DescribedTable } | { ok: false; answer: WriteAnswer }>
   /** The answers less the echoes of fields this actor may not write on `operation` (0022, 0098). */
-  withoutEchoes(bundle: PublishedBundle, actor: PolicyContext, operation: 'create' | 'update', answers: unknown, current?: Readonly<Record<string, unknown>>, behind?: boolean): unknown
+  withoutEchoes(
+    bundle: PublishedBundle,
+    actor: PolicyContext,
+    operation: 'create' | 'update',
+    answers: unknown,
+    current?: Readonly<Record<string, unknown>>,
+    behind?: boolean,
+  ): unknown
   /** Every membership check run, or the refusal to answer (0031, 0061). */
   memberships(open: OpenConnection, checks: readonly MembershipCheck[], log: FastifyBaseLogger): Promise<WriteAnswer | undefined>
 }
@@ -57,7 +69,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * next version, 201, as a create's is; the audit names the version ended,
  * the record the request addressed.
  */
-async function superseded(steps: SupersedeRouteSteps, request: RuntimeRequest, bundle: PublishedBundle, open: OpenConnection, record: string, version: string, answers: Record<string, unknown>): Promise<WriteAnswer> {
+async function superseded(
+  steps: SupersedeRouteSteps,
+  request: RuntimeRequest,
+  bundle: PublishedBundle,
+  open: OpenConnection,
+  record: string,
+  version: string,
+  answers: Record<string, unknown>,
+): Promise<WriteAnswer> {
   const actor = steps.context(request)
   for (const operation of ['update', 'create'] as const) {
     const authorized = authorizeOperation(bundle.policy, actor, operation)

@@ -19,7 +19,11 @@ const DIGEST = /@sha256:[0-9a-f]{64}$/
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical)
   if (value === null || typeof value !== 'object') return value
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical(value[key])]))
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, canonical(value[key])]),
+  )
 }
 const same = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b))
 
@@ -74,41 +78,57 @@ export function cloudflareProblems(config, base, dockerfile) {
   const image = String(cloudflared.image ?? '')
   if (!PINNED.test(image)) problems.push(`cloudflared's image is not cloudflare/cloudflared at a release tag and a digest`)
   const from = /^FROM\s+(\S+)\s+AS\s+cloudflared\s*$/im.exec(dockerfile)?.[1]
-  if (from !== image) problems.push(`${DOCKERFILE} copies cloudflared from ${String(from)}, not from the image the cloudflared service runs, so the tools would check the configuration with another binary`)
+  if (from !== image)
+    problems.push(
+      `${DOCKERFILE} copies cloudflared from ${String(from)}, not from the image the cloudflared service runs, so the tools would check the configuration with another binary`,
+    )
 
   const command = (cloudflared.command ?? []).map(String)
-  if (flagValue(command, '--config') !== '/etc/formancy-cloudflare/config.yml') problems.push('cloudflared does not run the configuration setup writes, /etc/formancy-cloudflare/config.yml')
+  if (flagValue(command, '--config') !== '/etc/formancy-cloudflare/config.yml')
+    problems.push('cloudflared does not run the configuration setup writes, /etc/formancy-cloudflare/config.yml')
   if (command.at(-1) !== 'run') problems.push('cloudflared’s command does not end with run')
   for (const flag of ['--token', '--token-file', '--credentials-contents']) {
     if (command.some((part) => part === flag || part.startsWith(`${flag}=`))) problems.push(`cloudflared is given ${flag}, a secret on its command line`)
   }
-  if (!['info', 'warn', 'error', 'fatal'].includes(String(flagValue(command, '--loglevel')))) problems.push('cloudflared logs below info, or does not say: debug writes every request header, host tokens included')
-  if (!String(flagValue(command, '--metrics') ?? '').startsWith('127.0.0.1:')) problems.push('cloudflared serves its metrics past loopback, or does not say where: the default is every interface')
-  if (!command.includes('--management-diagnostics=false')) problems.push('cloudflared leaves the management service’s diagnostics on, which serve pprof and metrics')
+  if (!['info', 'warn', 'error', 'fatal'].includes(String(flagValue(command, '--loglevel'))))
+    problems.push('cloudflared logs below info, or does not say: debug writes every request header, host tokens included')
+  if (!String(flagValue(command, '--metrics') ?? '').startsWith('127.0.0.1:'))
+    problems.push('cloudflared serves its metrics past loopback, or does not say where: the default is every interface')
+  if (!command.includes('--management-diagnostics=false'))
+    problems.push('cloudflared leaves the management service’s diagnostics on, which serve pprof and metrics')
 
   for (const [name, service] of Object.entries(overlay)) {
     for (const setting of Object.keys(service.environment ?? {})) {
       if (/^TUNNEL_/i.test(setting)) problems.push(`${name} sets ${setting}, which cloudflared reads as configuration, a token among it`)
     }
-    if (service.build === undefined && !DIGEST.test(String(service.image ?? ''))) problems.push(`${name} is neither built from this checkout nor pinned by digest`)
+    if (service.build === undefined && !DIGEST.test(String(service.image ?? '')))
+      problems.push(`${name} is neither built from this checkout nor pinned by digest`)
     if ((service.ports ?? []).length > 0 && name !== 'cloudflared') problems.push(`${name} publishes a port`)
     for (const mount of service.volumes ?? []) {
-      if (mount.type === 'volume' && (mount.source === undefined || mount.source === '')) problems.push(`${name} mounts an anonymous volume at ${mount.target}, which no down removes`)
+      if (mount.type === 'volume' && (mount.source === undefined || mount.source === ''))
+        problems.push(`${name} mounts an anonymous volume at ${mount.target}, which no down removes`)
     }
   }
   for (const [name, service] of Object.entries(services)) {
     const mounts = (service.volumes ?? []).filter((mount) => mount.type === 'volume' && mount.source === TUNNEL_VOLUME)
     if (mounts.length === 0) continue
     if (!['cloudflared', 'tunnel-setup', 'tunnel-config'].includes(name)) problems.push(`${name} mounts the tunnel's volume, which holds its credentials`)
-    if (name === 'cloudflared' && mounts.some((mount) => mount.read_only !== true)) problems.push('cloudflared can write the tunnel’s volume; it mounts it read-only')
+    if (name === 'cloudflared' && mounts.some((mount) => mount.read_only !== true))
+      problems.push('cloudflared can write the tunnel’s volume; it mounts it read-only')
   }
   // cloudflared reaches whatever its container reaches, for whoever changes
   // its ingress or routes a private network to the tunnel: on `edge` alone,
   // the web front and nothing else of the stack.
-  const onEdge = Object.entries(services).filter(([, service]) => networksOf(service).includes(EDGE)).map(([name]) => name)
+  const onEdge = Object.entries(services)
+    .filter(([, service]) => networksOf(service).includes(EDGE))
+    .map(([name]) => name)
   const cloudflaredNetworks = networksOf(cloudflared)
-  if (cloudflaredNetworks.length !== 1 || cloudflaredNetworks[0] !== EDGE) problems.push(`cloudflared is on ${cloudflaredNetworks.join(', ') || 'no network'}, not on ${EDGE} alone, so a changed ingress or a private route would reach the server past nginx and the databases`)
-  for (const name of onEdge.filter((entry) => !['web', 'cloudflared'].includes(entry))) problems.push(`${name} joins ${EDGE}, beside cloudflared, which only the web front may`)
+  if (cloudflaredNetworks.length !== 1 || cloudflaredNetworks[0] !== EDGE)
+    problems.push(
+      `cloudflared is on ${cloudflaredNetworks.join(', ') || 'no network'}, not on ${EDGE} alone, so a changed ingress or a private route would reach the server past nginx and the databases`,
+    )
+  for (const name of onEdge.filter((entry) => !['web', 'cloudflared'].includes(entry)))
+    problems.push(`${name} joins ${EDGE}, beside cloudflared, which only the web front may`)
   if (!onEdge.includes('web')) problems.push(`web is not on ${EDGE}, so cloudflared cannot reach it`)
   const network = { 'tunnel-setup': 'bridge', 'tunnel-config': 'none', 'doors-check': 'bridge' }
   for (const [name, mode] of Object.entries(network)) {
@@ -117,13 +137,16 @@ export function cloudflareProblems(config, base, dockerfile) {
   }
   const check = overlay['doors-check']
   if (check !== undefined) {
-    if (['', '0', 'root', '0:0', 'root:root'].includes(String(check.user ?? ''))) problems.push('doors-check runs as root; it reads three files and sends requests')
-    if ((check.volumes ?? []).some((mount) => mount.type !== 'bind')) problems.push('doors-check mounts a volume; it is given nothing but the scripts and doors.json')
+    if (['', '0', 'root', '0:0', 'root:root'].includes(String(check.user ?? '')))
+      problems.push('doors-check runs as root; it reads three files and sends requests')
+    if ((check.volumes ?? []).some((mount) => mount.type !== 'bind'))
+      problems.push('doors-check mounts a volume; it is given nothing but the scripts and doors.json')
   }
   const setup = overlay['tunnel-setup']
   if (setup !== undefined) {
     const home = setup.environment?.HOME
-    if (home === undefined || !(setup.tmpfs ?? []).includes(home)) problems.push('tunnel-setup’s HOME is not a tmpfs, so the login’s cert.pem would be written somewhere that outlives the container')
+    if (home === undefined || !(setup.tmpfs ?? []).includes(home))
+      problems.push('tunnel-setup’s HOME is not a tmpfs, so the login’s cert.pem would be written somewhere that outlives the container')
   }
   return problems
 }

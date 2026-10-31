@@ -72,7 +72,13 @@ async function publishOne(target: PublishTarget, spec: DemoFormSpec): Promise<Pu
   const bundle = demoBundle(spec, proposal)
   const published = await post(target, `/v1/forms/${spec.id}/versions`, { expectedBase: null, bundle })
   if (published.status !== 201) throw unexpected(`${spec.id}: POST /v1/forms/${spec.id}/versions`, published, 201)
-  return { id: spec.id, account: proposal.snapshot.account.user, offers: proposal.bindings.operations, notes: proposal.notes, milliseconds: Date.now() - started }
+  return {
+    id: spec.id,
+    account: proposal.snapshot.account.user,
+    offers: proposal.bindings.operations,
+    notes: proposal.notes,
+    milliseconds: Date.now() - started,
+  }
 }
 
 /** Each form, one after another, every demo form unless told; throws on the first refusal, naming the form and the request. */
@@ -86,10 +92,7 @@ export async function publishDemoForms(target: PublishTarget, specs: readonly De
  * Waits until `GET /health` answers 200, asking every `pollMs`, and says
  * how long that took; throws when `deadlineMs` passes first.
  */
-export async function waitForHealth(
-  base: string,
-  { deadlineMs = 30_000, pollMs = 100 }: { deadlineMs?: number; pollMs?: number } = {},
-): Promise<number> {
+export async function waitForHealth(base: string, { deadlineMs = 30_000, pollMs = 100 }: { deadlineMs?: number; pollMs?: number } = {}): Promise<number> {
   const started = Date.now()
   for (;;) {
     try {

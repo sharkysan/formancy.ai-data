@@ -60,7 +60,8 @@ interface ServerError {
 const UNIQUE_KEY = /^Violation of (?:PRIMARY KEY|UNIQUE KEY) constraint '(.+?)'\. Cannot insert duplicate key in object '/
 const UNIQUE_INDEX = /^Cannot insert duplicate key row in object '.+?' with unique index '(.+?)'\. The duplicate key value is /
 /** A foreign key to its own table is FOREIGN KEY SAME TABLE for a reference to no row, SAME TABLE REFERENCE for a row still referenced. */
-const CONFLICT = /^The [A-Z]+ statement conflicted with the (FOREIGN KEY(?: SAME TABLE)?|(?:SAME TABLE )?REFERENCE|CHECK) constraint "(.+?)"\. The conflict occurred in /
+const CONFLICT =
+  /^The [A-Z]+ statement conflicted with the (FOREIGN KEY(?: SAME TABLE)?|(?:SAME TABLE )?REFERENCE|CHECK) constraint "(.+?)"\. The conflict occurred in /
 /** Every translation of 547 keeps these SQL keywords: checked by hand in the 34 languages of SQL Server 2022 on 2026-10-09, and in German by the failures suite. */
 const FOREIGN_KEY_WORDS = /\b(?:FOREIGN KEY|REFERENCE)\b/
 const NULL_COLUMN = /^Cannot insert the value NULL into column '(.+?)', table '/
@@ -176,10 +177,7 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
     return failure('refused', 'A change from a date ended a version and inserted no next one, so the batch rolled it back; nothing was written (0113).')
   }
   if (error.number === DECIDED_BY_TRIGGER && error.message === DECIDED_BY_TRIGGER_MESSAGE) {
-    return failure(
-      'refused',
-      'An INSTEAD OF trigger would decide what this write stores, so the adapter refused it; nothing was written.',
-    )
+    return failure('refused', 'An INSTEAD OF trigger would decide what this write stores, so the adapter refused it; nothing was written.')
   }
   if (error.number === TRANSACTION_REPLACED && error.message === TRANSACTION_REPLACED_MESSAGE) {
     return failure('unknown-outcome', `A trigger ended the transaction of the write and began another; ${ENDED_BY_TRIGGER}`)
@@ -200,13 +198,20 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
   }
   if (error.number === REACH_UNDELETABLE && error.message === REACH_UNDELETABLE_MESSAGE) {
     // The batch rolled the delete back, and what its cascade did with it (0051).
-    return failure('permission-denied', 'This account may not DELETE from a table this delete reaches, so the delete was refused and rolled back; nothing was deleted.')
+    return failure(
+      'permission-denied',
+      'This account may not DELETE from a table this delete reaches, so the delete was refused and rolled back; nothing was deleted.',
+    )
   }
   const index = error.number === TEXT_NOT_STORED ? TEXT_NOT_STORED_MESSAGE.exec(error.message)?.[1] : undefined
   if (index === undefined) return undefined
-  return failure('out-of-range', 'SQL Server did not store this text as sent: its code page lacks a character, or the column drops trailing spaces, and the write was rolled back.', {
-    column: written[Number(index)]?.name,
-  })
+  return failure(
+    'out-of-range',
+    'SQL Server did not store this text as sent: its code page lacks a character, or the column drops trailing spaces, and the write was rolled back.',
+    {
+      column: written[Number(index)]?.name,
+    },
+  )
 }
 
 /**
@@ -264,7 +269,10 @@ function refusal(error: ServerError, written: readonly RecordValue[]): RecordFai
       }
       if (PASSING.has(number)) return failure('unavailable', `SQL Server could not complete this now (${String(number)}), and nothing was written.`)
       if (number >= FIRST_USER_ERROR) {
-        return failure('refused', `The database refused the statement with an error of its own (${String(number)}), a trigger's or a procedure's, and nothing was written.`)
+        return failure(
+          'refused',
+          `The database refused the statement with an error of its own (${String(number)}), a trigger's or a procedure's, and nothing was written.`,
+        )
       }
       // A refusal this adapter does not recognise. It was reported for the
       // statement, and the batch rolled back on it; nothing says it will pass,

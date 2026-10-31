@@ -68,7 +68,16 @@ export function forwardFailed(): Response {
  * Worker's, and never cf-* or x-forwarded-*: the container never learns a
  * visitor's address.
  */
-export const FORWARDED_HEADERS = ['authorization', 'content-type', 'accept', WRITE_ID_HEADER, 'origin', 'sec-fetch-site', 'sec-fetch-mode', 'sec-fetch-dest'] as const
+export const FORWARDED_HEADERS = [
+  'authorization',
+  'content-type',
+  'accept',
+  WRITE_ID_HEADER,
+  'origin',
+  'sec-fetch-site',
+  'sec-fetch-mode',
+  'sec-fetch-dest',
+] as const
 
 /**
  * What a request whose body is a stream is built with, on a platform whose

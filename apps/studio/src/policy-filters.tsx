@@ -51,7 +51,7 @@ function RuleList({
           <li key={id} className="rule">
             <div className="field">
               <label htmlFor={`${id}-column`}>
-                Column{' '}<span className="visually-hidden">of {name}</span>
+                Column <span className="visually-hidden">of {name}</span>
               </label>
               <select id={`${id}-column`} value={rule.column} onChange={(event) => replace(index, { ...rule, column: event.target.value })}>
                 {offered.map((column) => (
@@ -66,12 +66,17 @@ function RuleList({
             </span>
             <div className="field">
               <label htmlFor={`${id}-attribute`}>
-                Trusted attribute{' '}<span className="visually-hidden">of {name}</span>
+                Trusted attribute <span className="visually-hidden">of {name}</span>
               </label>
-              <input id={`${id}-attribute`} value={rule.attribute} spellCheck={false} onChange={(event) => replace(index, { ...rule, attribute: event.target.value })} />
+              <input
+                id={`${id}-attribute`}
+                value={rule.attribute}
+                spellCheck={false}
+                onChange={(event) => replace(index, { ...rule, attribute: event.target.value })}
+              />
             </div>
             <button type="button" id={`${id}-remove`} className="button" onClick={() => remove(index)}>
-              Remove{' '}<span className="visually-hidden">{name}</span>
+              Remove <span className="visually-hidden">{name}</span>
             </button>
           </li>
         )
@@ -113,13 +118,13 @@ export function RowFilters({
     <fieldset>
       <legend>Row filters on {root}</legend>
       <p className="hint">
-        Which rows of {root} this form reaches: on read and update the filter, on create the values the pinned columns are
-        written with, from the signed-in person&rsquo;s attributes and never from the form.
+        Which rows of {root} this form reaches: on read and update the filter, on create the values the pinned columns are written with, from the signed-in
+        person&rsquo;s attributes and never from the form.
       </p>
       {rules.length === 0 ? (
         <p className="none">
-          No row filter: every row of {root} is in reach of anybody an operation names. That is a statement this policy
-          makes; a table kept per tenant needs one.
+          No row filter: every row of {root} is in reach of anybody an operation names. That is a statement this policy makes; a table kept per tenant needs
+          one.
         </p>
       ) : (
         <RuleList prefix="row-filter" what="row filter" rules={rules} columns={columns} onRules={onRules} add="row-filter-add" focusAfter={focusAfter} />
@@ -132,19 +137,14 @@ export function RowFilters({
       {stale ? (
         <div className="notice" role="note">
           <p>
-            The form was generated with other pinned columns. The generator shows a pinned column read-only, so until it
-            runs again the form and this policy disagree about which fields a person fills in.
+            The form was generated with other pinned columns. The generator shows a pinned column read-only, so until it runs again the form and this policy
+            disagree about which fields a person fills in.
           </p>
           <p className="hint" id="regenerate-replaces">
-            Generating again carries the labels, order and widths set in Presentation to the new form, and Presentation lists
-            anything it could not carry. The policy is kept.
+            Generating again carries the labels, order and widths set in Presentation to the new form, and Presentation lists anything it could not carry. The
+            policy is kept.
           </p>
-          <button
-            type="button"
-            className="primary"
-            aria-describedby="regenerate-replaces"
-            onClick={() => void onRegenerate().then(setRefused)}
-          >
+          <button type="button" className="primary" aria-describedby="regenerate-replaces" onClick={() => void onRegenerate().then(setRefused)}>
             Generate again with these pins
           </button>
           {refused === null ? null : (
@@ -182,7 +182,12 @@ function ThroughChoice({
   onScoping: (scoping: boolean) => void
 }): ReactElement | null {
   const id = `through-${field}`
-  const reason = blocker === null || !filtered ? null : <p className="hint">Rows of {root} are not reached through {label}: {blocker}.</p>
+  const reason =
+    blocker === null || !filtered ? null : (
+      <p className="hint">
+        Rows of {root} are not reached through {label}: {blocker}.
+      </p>
+    )
   if (!scoping && (!filtered || blocker !== null)) return reason
   return (
     <>
@@ -193,8 +198,8 @@ function ThroughChoice({
         </label>
       </div>
       <p className="hint" id={`${id}-about`}>
-        For a table with no tenant of its own: a row of {root} is read and updated only while the row its {label} names is one
-        this list may offer, and created only under one. A row that names none is reached by nobody.
+        For a table with no tenant of its own: a row of {root} is read and updated only while the row its {label} names is one this list may offer, and created
+        only under one. A row that names none is reached by nobody.
       </p>
       {reason}
     </>
@@ -244,18 +249,18 @@ export function LookupFilters({
         const target = describeRef(binding.target.table)
         // Only what a filter can compare (0028); a rule already on another column stays listed, and publish names it.
         const table = findObject(snapshot, binding.target.table)
-        const columns = table?.columns.map((column) => column.name).filter((name) => rowFilterColumnProblem(table, name) === null) ?? [...binding.target.columns]
+        const columns = table?.columns.map((column) => column.name).filter((name) => rowFilterColumnProblem(table, name) === null) ?? [
+          ...binding.target.columns,
+        ]
         const rules = Object.hasOwn(policy.lookups, binding.field) ? policy.lookups[binding.field] : undefined
         const label = labels[binding.field] ?? binding.field
         const add = `lookup-${binding.field}-add`
         return (
           <fieldset key={binding.field}>
-            <legend>
-              Rows the {label} list may offer
-            </legend>
+            <legend>Rows the {label} list may offer</legend>
             <p className="hint">
-              The {label} field chooses a row of {target}. A choice is checked again on save against these filters, so a
-              row they exclude cannot be submitted even by somebody who knows its key.
+              The {label} field chooses a row of {target}. A choice is checked again on save against these filters, so a row they exclude cannot be submitted
+              even by somebody who knows its key.
             </p>
             {rules === undefined ? (
               <p className="cannot-tell">Not decided: the policy is refused until it says which rows of {target} the list may offer.</p>
@@ -283,11 +288,11 @@ export function LookupFilters({
                     focusAfter(add)
                   }}
                 >
-                  Offer every row{' '}<span className="visually-hidden">of {target}</span>
+                  Offer every row <span className="visually-hidden">of {target}</span>
                 </button>
               ) : null}
               <button type="button" id={add} className="button" onClick={() => set(binding.field, [...(rules ?? []), nextRule(rules ?? [], columns)])}>
-                Add a filter{' '}<span className="visually-hidden">to the {label} list</span>
+                Add a filter <span className="visually-hidden">to the {label} list</span>
               </button>
             </p>
             <ThroughChoice

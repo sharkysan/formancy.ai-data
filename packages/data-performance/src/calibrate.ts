@@ -21,7 +21,14 @@ if (!Number.isInteger(seconds) || seconds < 10) {
 }
 
 const docker = await connectDocker()
-const problems = preconditions({ platform: process.platform, containers: await docker.running(), dirtyFiles: [], env: process.env, missingImages: [], tolerance: 'unbounded' })
+const problems = preconditions({
+  platform: process.platform,
+  containers: await docker.running(),
+  dirtyFiles: [],
+  env: process.env,
+  missingImages: [],
+  tolerance: 'unbounded',
+})
 if (problems.length > 0) {
   console.error(`The calibration did not start:\n  ${problems.join('\n  ')}`)
   process.exit(1)

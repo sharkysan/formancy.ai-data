@@ -55,7 +55,9 @@ async function regenerate(user: User): Promise<HTMLElement> {
 }
 
 function items(container: HTMLElement, name: string): string[] {
-  return within(within(container).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return within(within(container).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 /** One column of sales.order in `base` renamed: to the catalog, one dropped and one added at the same place. */
@@ -115,19 +117,23 @@ describe('regenerating a published form', () => {
     const presentation = await screen.findByRole('main', { name: 'Presentation' })
     const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
     const target = within(carried).getByRole('combobox', { name: 'Give “Delivery notes” to' })
-    expect(within(target).getAllByRole('option').map((option) => option.textContent)).toEqual(['Total (total)', 'Remarks (remarks)'])
+    expect(
+      within(target)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Total (total)', 'Remarks (remarks)'])
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])
     const give = within(carried).getByRole('button', { name: 'Give “Delivery notes”' })
     await user.selectOptions(target, 'total')
     await pressEnter(user, give)
-    expect((within(presentation).getByLabelText('Label of total') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of total').value).toBe('Delivery notes')
     expect(focusedName()).toBe('Give “Delivery notes”')
     await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
-    expect((within(presentation).getByLabelText('Label of total') as HTMLInputElement).value).toBe('Total')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of total').value).toBe('Total')
     await user.selectOptions(target, 'remarks')
     await user.click(give)
-    expect((within(presentation).getByLabelText('Label of remarks') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of remarks').value).toBe('Delivery notes')
 
     await publishDraft(user, ['notes', 'amount'], [])
     const latest = await admin.latest('sales-order')
@@ -159,9 +165,13 @@ describe('regenerating a published form', () => {
     expect(within(carried).queryByText('Everything you chose was carried.')).toBeNull()
     expect(within(carried).getByText(/The label "Delivery notes" you chose for notes was dropped/)).toBeTruthy()
     const target = within(carried).getByRole('combobox', { name: 'Give “Delivery notes” to' })
-    expect(within(target).getAllByRole('option').map((option) => option.textContent)).toEqual(['Remarks (remarks)'])
+    expect(
+      within(target)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Remarks (remarks)'])
     await user.click(within(carried).getByRole('button', { name: 'Give “Delivery notes”' }))
-    expect((within(presentation).getByLabelText('Label of remarks') as HTMLInputElement).value).toBe('Delivery notes')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of remarks').value).toBe('Delivery notes')
     expect(await audit()).toEqual([])
   })
 
@@ -199,10 +209,10 @@ describe('regenerating a published form', () => {
 
     await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
     const presentation = await screen.findByRole('main', { name: 'Presentation' })
-    expect((within(presentation).getByLabelText('Label of client') as HTMLInputElement).value).toBe('Buyer')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of client').value).toBe('Buyer')
     const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
     await pressEnter(user, within(carried).getByRole('button', { name: 'Use the generator’s label for client' }))
-    expect((within(presentation).getByLabelText('Label of client') as HTMLInputElement).value).toBe('Client')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of client').value).toBe('Client')
     expect(focusedName()).toBe('Use the generator’s label for client')
     expect(await audit()).toEqual([])
 
@@ -323,7 +333,9 @@ describe('regenerating a published form', () => {
     await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
     await within(publish).findByText('Published version 2 of sales-order.')
     const sent = plane.requests.filter((request) => request.method === 'POST' && request.path === '/v1/forms/sales-order/versions').at(-1)
-    expect(sent?.body).toMatchObject({ keysConfirmed: [{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }] })
+    expect(sent?.body).toMatchObject({
+      keysConfirmed: [{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }],
+    })
   })
 
   // A regenerated draft's base is the version it was regenerated from, not
@@ -351,7 +363,9 @@ describe('regenerating a published form', () => {
       'Regenerated from version 1 of sales-order. Publishing makes version 2; if somebody has published since, the server says so and replaces nothing.',
     )
     await user.click(within(publish).getByRole('button', { name: 'Publish version 2' }))
-    expect(paragraphs(await within(publish).findByRole('alert'))[0]).toBe('Somebody published version 2 while you worked. Yours was not published, and theirs is untouched.')
+    expect(paragraphs(await within(publish).findByRole('alert'))[0]).toBe(
+      'Somebody published version 2 while you worked. Yours was not published, and theirs is untouched.',
+    )
     expect(await plane.store.versions('sales-order')).toEqual([1, 2])
   })
 
@@ -359,7 +373,15 @@ describe('regenerating a published form', () => {
   // server says so; the studio says what to do instead, and offers nothing
   // to continue with.
   test('a version published before 0030 says to propose the form again', async () => {
-    const proposal = await admin.propose({ connection: 'fixture', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [], pinned: [], versionColumn: 'row_version' })
+    const proposal = await admin.propose({
+      connection: 'fixture',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'sales-order',
+      title: 'Order',
+      lookups: [],
+      pinned: [],
+      versionColumn: 'row_version',
+    })
     if (!proposal.ok) throw new Error(proposal.message)
     const { form, bindings, snapshot } = proposal.value
     const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: {}, rowFilters: [], lookups: {} }
@@ -404,8 +426,14 @@ describe('regenerating a published form', () => {
     ])
     const report = within(drift).getByRole('region', { name: 'Version 1 of sales-order, against the database now' })
     const blocking = server.drift.changes.filter((change) => change.severity === 'blocking').length
-    expect(within(report).getByRole('status').textContent).toBe(`${String(server.drift.changes.length)} ${server.drift.changes.length === 1 ? 'change' : 'changes'}, ${String(blocking)} blocking.`)
-    expect(within(report).getAllByRole('listitem').some((item) => /concurrency-changed/.test(item.textContent ?? ''))).toBe(true)
+    expect(within(report).getByRole('status').textContent).toBe(
+      `${String(server.drift.changes.length)} ${server.drift.changes.length === 1 ? 'change' : 'changes'}, ${String(blocking)} blocking.`,
+    )
+    expect(
+      within(report)
+        .getAllByRole('listitem')
+        .some((item) => /concurrency-changed/.test(item.textContent ?? '')),
+    ).toBe(true)
     expect(within(drift).queryByRole('button', { name: 'Continue to presentation' })).toBeNull()
     expect(await audit()).toEqual([])
   })
@@ -445,7 +473,9 @@ describe('regenerating a published form', () => {
     await publishDraft(user, ['notes'], [])
     const latest = await admin.latest('sales-order')
     if (!latest.ok || latest.value.bundle.format !== 2) throw new Error('version 2 is not a format-2 bundle')
-    expect(latest.value.bundle.presentation.views).toEqual([{ name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [], default: true }])
+    expect(latest.value.bundle.presentation.views).toEqual([
+      { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [], default: true },
+    ])
   })
 
   // "Generate again" carries a draft's views through the same rebase, so a
@@ -467,7 +497,9 @@ describe('regenerating a published form', () => {
     await screen.findByRole('main', { name: 'Generate' })
 
     const presentation = await goTo(user, 'Presentation')
-    expect(items(presentation, 'Carried from your earlier draft')).toEqual(['View “Noted” names notes, which is not in the regenerated form, so it was dropped.'])
+    expect(items(presentation, 'Carried from your earlier draft')).toEqual([
+      'View “Noted” names notes, which is not in the regenerated form, so it was dropped.',
+    ])
     expect(savedViews()).toEqual(['Placed: where Status = placed; opens the grid.'])
     expect(await audit()).toEqual([])
   })
@@ -481,7 +513,10 @@ describe('regenerating a published form', () => {
     plane.databases.set('fixture', renamed('notes', 'remarks'))
     const unread = createAdminClient({
       token: TOKENS.admin,
-      fetch: async (input, init) => (String(input).endsWith('/v1/forms/sales-order/versions/1') ? new Response(null, { status: 503 }) : plane.fetch(input, init)),
+      fetch: async (input, init) =>
+        (input instanceof Request ? input.url : String(input)).endsWith('/v1/forms/sales-order/versions/1')
+          ? new Response(null, { status: 503 })
+          : plane.fetch(input, init),
     })
     const regenerated = await regenerateForm(unread, 'sales-order')
     if (!regenerated.ok) throw new Error(regenerated.message)

@@ -1,9 +1,29 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName, paragraphs } from './test-accessible.js'
-import { answer, answeredOnce, chooseCustomer, chooseForm, control, formLink, gridSection, mount, newRecord, openForm, pane, said, save, searchRecords, shows, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  answeredOnce,
+  chooseCustomer,
+  chooseForm,
+  control,
+  formLink,
+  gridSection,
+  mount,
+  newRecord,
+  openForm,
+  pane,
+  said,
+  save,
+  searchRecords,
+  shows,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { User } from './test-host.js'
-import { EDGES, ENGINES, holdingRequests, startPlane, TOKENS } from './test-plane.js'
+import { holdingRequests } from './test-network.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
@@ -53,7 +73,13 @@ async function freshOrder(engine: Engine, notes: string, lines: readonly number[
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount: '1', notes })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: EDGES.orderDate,
+    status: 'placed',
+    amount: '1',
+    notes,
+  })
   if (!created.ok || created.value.record === null) throw new Error('the order was not created')
   const order = created.value.record
   const made: string[] = []
@@ -119,7 +145,10 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
     const words = stamp('typed')
     const first = await freshOrder(engine, words)
     const second = await freshOrder(engine, words)
-    const holding = holdingRequests(plane.fetch, ({ path, body }) => path === `/v1/forms/${engine.formId}/records/read` && body?.includes(second.order) === true)
+    const holding = holdingRequests(
+      plane.fetch,
+      ({ path, body }) => path === `/v1/forms/${engine.formId}/records/read` && body?.includes(second.order) === true,
+    )
     const user = await workspace(holding.fetch, engine.formId)
     await searchRecords(user, words, [first.order.slice(3), second.order.slice(3)])
     await clickRow(user, 'Records', first.order.slice(3))
@@ -152,13 +181,13 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
     await clickRow(user, 'Order line', '1')
     await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
     await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
-    const quantity = await waitFor(() => within(childPane('New Order line')).getByLabelText(/^Quantity\b/) as HTMLInputElement, ARRIVES)
+    const quantity = await waitFor(() => within(childPane('New Order line')).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
     await user.type(quantity, '9')
 
     await holding.pass()
     await settle()
     expect(screen.getByRole('heading', { level: 5, name: 'New Order line' })).toBeTruthy()
-    expect((within(childPane('New Order line')).getByLabelText(/^Quantity\b/) as HTMLInputElement).value).toBe('9')
+    expect(within(childPane('New Order line')).getByLabelText<HTMLInputElement>(/^Quantity\b/).value).toBe('9')
     expect(unsavedNotice()).toBeNull()
   })
 
@@ -182,7 +211,11 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
     expect(screen.getByRole('heading', { level: 2, name: `Order ${engine.formId}` })).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
     expect(control('React', 'Amount').value).toBe('42')
-    expect(within(screen.getByRole('navigation', { name: 'Forms' })).getByRole('link', { name: `Order ${engine.formId}` }).getAttribute('aria-current')).toBe('page')
+    expect(
+      within(screen.getByRole('navigation', { name: 'Forms' }))
+        .getByRole('link', { name: `Order ${engine.formId}` })
+        .getAttribute('aria-current'),
+    ).toBe('page')
     // Read from the browser's location: the address is not the page's tree.
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=side-by-side&view=records`)
   })
@@ -257,4 +290,3 @@ describe.each(ENGINES)('a record created in one of two panes on $engine', (engin
     await shows('React', 'Amount', '5.0000')
   })
 })
-

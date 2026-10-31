@@ -38,10 +38,10 @@ export type VersionFactName =
 export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   transactionTimeout: {
     engine: 'postgres',
-    says:
-      'PostgreSQL knows transaction_timeout, a setting a client may send when it connects, and ends a transaction that outlives it by closing the connection (25P04, FATAL); a server without it refuses the connection that sends it with 42704 before any statement runs, and the adapter, which reads class 42 as its own SQL at fault, throws that rather than answering a failure',
+    says: 'PostgreSQL knows transaction_timeout, a setting a client may send when it connects, and ends a transaction that outlives it by closing the connection (25P04, FATAL); a server without it refuses the connection that sends it with 42704 before any statement runs, and the adapter, which reads class 42 as its own SQL at fault, throws that rather than answering a failure',
     values: { 15: false, 16: false, 17: true, 18: true },
-    source: 'PostgreSQL 17’s release notes: "Add server variable transaction_timeout to restrict the duration of transactions"; 15’s and 16’s server configuration chapters have no such setting',
+    source:
+      'PostgreSQL 17’s release notes: "Add server variable transaction_timeout to restrict the duration of transactions"; 15’s and 16’s server configuration chapters have no such setting',
     measured: {
       15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the insert through a client that sent transaction_timeout threw PostgresError 42704, unrecognized configuration parameter "transaction_timeout"',
       16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
@@ -55,8 +55,7 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   notNullTestsRemoved: {
     engine: 'postgres',
-    says:
-      'PostgreSQL’s planner drops an IS NOT NULL test on a column declared NOT NULL, so the `is not null` a lookup puts on each key never reaches its plan; a server without it keeps the tests and prints them in the index condition beside the tenant’s, as ((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL)), reading the same rows by the same scans',
+    says: 'PostgreSQL’s planner drops an IS NOT NULL test on a column declared NOT NULL, so the `is not null` a lookup puts on each key never reaches its plan; a server without it keeps the tests and prints them in the index condition beside the tenant’s, as ((tenant_id IS NOT NULL) AND (tenant_id = 1) AND (customer_no IS NOT NULL)), reading the same rows by the same scans',
     values: { 15: false, 16: false, 17: true, 18: true },
     source: 'PostgreSQL 17’s release notes, under the optimizer: IS NOT NULL restrictions on NOT NULL columns are removed',
     measured: {
@@ -72,10 +71,10 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   membershipInherit: {
     engine: 'postgres',
-    says:
-      'PostgreSQL makes inheritance a property of each membership, set by GRANT role TO member WITH INHERIT TRUE or FALSE (0027, B4); a server without it refuses that grant as a syntax error at or near "inherit" (42601), and whether a member inherits is the member role’s own INHERIT or NOINHERIT',
+    says: 'PostgreSQL makes inheritance a property of each membership, set by GRANT role TO member WITH INHERIT TRUE or FALSE (0027, B4); a server without it refuses that grant as a syntax error at or near "inherit" (42601), and whether a member inherits is the member role’s own INHERIT or NOINHERIT',
     values: { 15: false, 16: true, 17: true, 18: true },
-    source: 'PostgreSQL 16’s release notes, under privileges: GRANT gains WITH INHERIT, which sets whether one membership inherits, where the member role’s INHERIT or NOINHERIT alone decided it before; 15’s GRANT has no such option',
+    source:
+      'PostgreSQL 16’s release notes, under privileges: GRANT gains WITH INHERIT, which sets whether one membership inherits, where the member role’s INHERIT or NOINHERIT alone decided it before; 15’s GRANT has no such option',
     measured: {
       15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: GRANT … WITH INHERIT FALSE failed with PostgresError 42601, syntax error at or near "inherit", and a NOINHERIT member’s privilege functions answered false and its read 42501',
       16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 17',
@@ -89,10 +88,10 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   afterTriggerAsQueuer: {
     engine: 'postgres',
-    says:
-      'PostgreSQL runs an AFTER trigger as the role that was active when its event was queued, so a cascaded table’s AFTER DELETE trigger, queued while the referential action deleted as that table’s owner, runs as the owner, with the owner’s grants, and a delete whose trigger writes where only the owner may is done; a server without it runs the trigger as the role active when it fires, the deleting account at the end of its statement, with that account’s grants, and such a delete is refused, permission-denied (0051, P5). Neither is seen or governed by the adapter',
+    says: 'PostgreSQL runs an AFTER trigger as the role that was active when its event was queued, so a cascaded table’s AFTER DELETE trigger, queued while the referential action deleted as that table’s owner, runs as the owner, with the owner’s grants, and a delete whose trigger writes where only the owner may is done; a server without it runs the trigger as the role active when it fires, the deleting account at the end of its statement, with that account’s grants, and such a delete is refused, permission-denied (0051, P5). Neither is seen or governed by the adapter',
     values: { 15: false, 16: false, 17: false, 18: true },
-    source: 'PostgreSQL 18’s release notes, under the migration to version 18: "Execute AFTER triggers as the role that was active when trigger events were queued"; before, they ran as the role active when they fired',
+    source:
+      'PostgreSQL 18’s release notes, under the migration to version 18: "Execute AFTER triggers as the role that was active when trigger events were queued"; before, they ran as the role active when they fired',
     measured: {
       15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the cascaded table’s AFTER DELETE trigger recorded the deleting account as current_user, its BEFORE trigger and its rule the owner; and with a trigger inserting into a table only the owner may write, the delete was refused, 42501, permission-denied, the record and its rows kept',
       16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
@@ -106,10 +105,10 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   restrictViolation: {
     engine: 'postgres',
-    says:
-      'PostgreSQL refuses a delete that an ON DELETE RESTRICT key forbids with restrict_violation, 23001, "violates RESTRICT setting of foreign key constraint", the key named; a server without it refuses one with foreign_key_violation, 23503, as it refuses NO ACTION (0050, P3). The adapter answers foreign-key-violation, the key named, for both, which the server answers referenced; a NO ACTION key is 23503 on every version',
+    says: 'PostgreSQL refuses a delete that an ON DELETE RESTRICT key forbids with restrict_violation, 23001, "violates RESTRICT setting of foreign key constraint", the key named; a server without it refuses one with foreign_key_violation, 23503, as it refuses NO ACTION (0050, P3). The adapter answers foreign-key-violation, the key named, for both, which the server answers referenced; a NO ACTION key is 23503 on every version',
     values: { 15: false, 16: false, 17: false, 18: true },
-    source: 'PostgreSQL commit 086c84b23d, "Fix error code for referential action RESTRICT" (2024-12-02), first released in 18.0, which 18’s release notes do not list: ri_triggers.c raises ERRCODE_RESTRICT_VIOLATION on REL_18_STABLE and nowhere on REL_17_STABLE',
+    source:
+      'PostgreSQL commit 086c84b23d, "Fix error code for referential action RESTRICT" (2024-12-02), first released in 18.0, which 18’s release notes do not list: ri_triggers.c raises ERRCODE_RESTRICT_VIOLATION on REL_18_STABLE and nowhere on REL_17_STABLE',
     measured: {
       15: '2026-10-16, postgres:15-alpine answering 15.19, on Docker Desktop on Windows: the delete of a row an ON DELETE RESTRICT key refers to failed with 23503, "violates foreign key constraint", the constraint named, as under NO ACTION',
       16: '2026-10-16, postgres:16-alpine answering 16.15, on Docker Desktop on Windows: as 15',
@@ -123,8 +122,7 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   notNullConstraints: {
     engine: 'postgres',
-    says:
-      'PostgreSQL files each column’s NOT NULL in pg_constraint, a row of type n for every column pg_attribute holds NOT NULL, which every role reads as it reads the rest of pg_catalog; a server without it keeps NOT NULL in pg_attribute.attnotnull alone, and pg_constraint has no row for it. Discovery reads NOT NULL from attnotnull, and a row of type n only when it is not validated, which only a NOT NULL added NOT VALID is and which it reads as a check (0077); no table of the shared model has one, so its snapshot of one table is the same on both',
+    says: 'PostgreSQL files each column’s NOT NULL in pg_constraint, a row of type n for every column pg_attribute holds NOT NULL, which every role reads as it reads the rest of pg_catalog; a server without it keeps NOT NULL in pg_attribute.attnotnull alone, and pg_constraint has no row for it. Discovery reads NOT NULL from attnotnull, and a row of type n only when it is not validated, which only a NOT NULL added NOT VALID is and which it reads as a check (0077); no table of the shared model has one, so its snapshot of one table is the same on both',
     values: { 15: false, 16: false, 17: false, 18: true },
     source: 'PostgreSQL 18’s release notes, under constraints: "Store column NOT NULL specifications in pg_constraint"',
     measured: {
@@ -155,10 +153,10 @@ export const VERSION_FACTS: Readonly<Record<VersionFactName, VersionFact>> = {
   },
   windowReadsAhead: {
     engine: 'postgres',
-    says:
-      'PostgreSQL computes a row_number() over an ORDER BY under the window’s default RANGE frame, which reads past each row to its last peer, so the window under a page’s LIMIT reads one row more than the page and its extra row before it stops (0108); a server that runs such a window in ROWS mode reads none past them',
+    says: 'PostgreSQL computes a row_number() over an ORDER BY under the window’s default RANGE frame, which reads past each row to its last peer, so the window under a page’s LIMIT reads one row more than the page and its extra row before it stops (0108); a server that runs such a window in ROWS mode reads none past them',
     values: { 15: true, 16: false, 17: false, 18: false },
-    source: 'PostgreSQL 16’s release notes, under the optimizer: window functions use the faster ROWS mode internally when RANGE mode is active but unnecessary',
+    source:
+      'PostgreSQL 16’s release notes, under the optimizer: window functions use the faster ROWS mode internally when RANGE mode is active but unnecessary',
     measured: {
       15: '2026-10-30, postgres:15-alpine answering 15.19, on Docker Desktop on an arm64 Mac: under the WindowAgg that returned 51 rows, the Index Scan of customer read 52 for the page after the 50,001st customer and 50,053 at the offset that reaches it',
       16: '2026-10-30, postgres:16-alpine answering 16.15, on Docker Desktop on an arm64 Mac: the Index Scan read 51 under the WindowAgg’s 51, and 50,052 at the offset',
@@ -193,6 +191,9 @@ export function versionFact(name: VersionFactName, server: Pick<ServerRecord, 'e
   if (server.engine !== fact.engine) throw new Error(`VERSION_FACTS.${name} is a ${fact.engine} fact, and this server is ${server.engine}`)
   const major = serverMajor(server)
   const value = fact.values[major]
-  if (value === undefined) throw new Error(`VERSION_FACTS.${name} has no value for ${fact.engine} ${String(major)}: measure it on that version and add it, or leave the version out of the matrix`)
+  if (value === undefined)
+    throw new Error(
+      `VERSION_FACTS.${name} has no value for ${fact.engine} ${String(major)}: measure it on that version and add it, or leave the version out of the matrix`,
+    )
   return value
 }

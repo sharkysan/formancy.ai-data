@@ -117,7 +117,10 @@ export const LIST_PARITY = {
       [{ field: 'customer_no', direction: 'desc' }],
       [{ field: 'credit_limit', direction: 'asc' }],
       [{ field: 'credit_limit', direction: 'desc' }],
-      [{ field: 'active', direction: 'asc' }, { field: 'credit_limit', direction: 'desc' }],
+      [
+        { field: 'active', direction: 'asc' },
+        { field: 'credit_limit', direction: 'desc' },
+      ],
       [{ field: 'name', direction: 'asc' }],
       [{ field: 'name', direction: 'desc' }],
     ],
@@ -158,15 +161,29 @@ export const LIST_PARITY = {
     desc: [...KEY_ORDER].reverse(),
   },
   parent: {
-    ours: { order: SECOND, lines: [[SECOND, '1'], [SECOND, '2']] },
+    ours: {
+      order: SECOND,
+      lines: [
+        [SECOND, '1'],
+        [SECOND, '2'],
+      ],
+    },
     theirs: { order: THEIRS, lines: [] },
   },
   through: {
-    lines: [[OURS, '1'], [SECOND, '1'], [SECOND, '2']],
+    lines: [
+      [OURS, '1'],
+      [SECOND, '1'],
+      [SECOND, '2'],
+    ],
   },
   read: {
     customers: KEY_ORDER,
-    lines: [[OURS, '1'], [SECOND, '1'], [SECOND, '2']],
+    lines: [
+      [OURS, '1'],
+      [SECOND, '1'],
+      [SECOND, '2'],
+    ],
   },
   'text-parent': {
     field: 'country',
@@ -175,7 +192,10 @@ export const LIST_PARITY = {
   },
   key: {
     /** `code`, `label`, inserted in this order. */
-    rows: [['2', 'two'], ['1', 'one']],
+    rows: [
+      ['2', 'two'],
+      ['1', 'one'],
+    ],
     listed: ['1', '2'],
     refused: 'drift',
   },

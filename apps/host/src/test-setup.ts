@@ -26,7 +26,11 @@ getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting())
  * what it means in the server's process. A browser has one realm, so the page
  * loses nothing it would have.
  */
-Object.defineProperty(globalThis, 'Uint8Array', { value: Object.getPrototypeOf(Buffer.prototype).constructor, configurable: true, writable: true })
+Object.defineProperty(globalThis, 'Uint8Array', {
+  value: (Object.getPrototypeOf(Buffer.prototype) as { constructor: unknown }).constructor,
+  configurable: true,
+  writable: true,
+})
 
 /*
  * The live demo's Worker runs in this worker too, in front of the server

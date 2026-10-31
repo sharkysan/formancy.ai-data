@@ -8,7 +8,8 @@ import type { AccessToken, GetTokenOptions, TokenCredential } from '@azure/ident
  * this package's declarations. No test of this release logs in as either:
  * no container takes an Entra login, and no test asks Entra.
  */
-export type EntraLogin = { type: 'managed-identity'; clientId?: string } | { type: 'service-principal'; tenantId: string; clientId: string; clientSecret: string }
+export type EntraLogin =
+  { type: 'managed-identity'; clientId?: string } | { type: 'service-principal'; tenantId: string; clientId: string; clientSecret: string }
 
 /** The one resource a token is asked for: Azure SQL's, whatever the server names. */
 export const AZURE_SQL_SCOPE = 'https://database.windows.net/.default'

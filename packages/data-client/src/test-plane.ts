@@ -96,7 +96,9 @@ function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
     version: 1,
     operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-    fields: Object.fromEntries(fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }])),
+    fields: Object.fromEntries(
+      fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
   }
@@ -143,9 +145,18 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
   })
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-client-'))
   const store = createFileConfigurationStore(root)
-  const verifyIdentity = await createIdentityVerifier({ key: { kind: 'secret', secret: SECRET }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: 'tid' } })
+  const verifyIdentity = await createIdentityVerifier({
+    key: { kind: 'secret', secret: SECRET },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: 'tid' },
+  })
   // The administrator's trail is the server's suites' subject; here it is required and discarded.
-  const app = await createDataServer({ verifyIdentity, admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store } })
+  const app = await createDataServer({
+    verifyIdentity,
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store },
+  })
   await app.listen({ host: '127.0.0.1', port: 0 })
   const base = `http://127.0.0.1:${String((app.server.address() as AddressInfo).port)}`
   const tokens = {
@@ -177,7 +188,10 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     const policy = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   for (const { connection, versionColumn } of options.lines === true ? ENGINES : []) {
     const formId = `${connection}-order-line`
@@ -190,32 +204,76 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
       ...(versionColumn === undefined ? {} : { versionColumn }),
     })
     // No tenant column of its own: its rows are its tenant's orders' lines, through the order lookup's filter (0043).
-    const policy: FormPolicy = { ...clerkPolicy((bindings as { fields: FieldBinding[] }).fields), rowFilters: [], lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['order'] }
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    const policy: FormPolicy = {
+      ...clerkPolicy((bindings as { fields: FieldBinding[] }).fields),
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   // A customer form whose lookup reads `sales.country`, which no other form here
   // reads and no write here checks: a suite may hold that table locked
   // without waiting on, or holding up, a file that shares the database.
   for (const { connection } of options.countries === true ? ENGINES : []) {
     const formId = `${connection}-customer`
-    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', { connection, root: { schema: 'sales', name: 'customer' }, formId, title: 'Customer', lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }] })
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'sales', name: 'customer' },
+      formId,
+      title: 'Customer',
+      lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+    })
     const fields = (bindings as { fields: FieldBinding[] }).fields
     const lookups = Object.fromEntries(fields.filter((binding) => binding.kind === 'lookup').map((binding) => [binding.field, []]))
     // No version column, so no update; the tenant comes from the row filter, so nobody writes it.
     const base = clerkPolicy(fields)
-    const policy: FormPolicy = { ...base, operations: { read: ['clerk'], create: ['clerk'], update: [] }, fields: { ...base.fields, tenant_id: { read: ['clerk'], write: [] } }, lookups }
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    const policy: FormPolicy = {
+      ...base,
+      operations: { read: ['clerk'], create: ['clerk'], update: [] },
+      fields: { ...base.fields, tenant_id: { read: ['clerk'], write: [] } },
+      lookups,
+    }
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   // Forms a clerk may delete with (0050): within their tenant over the parity schema, and every row of lost.removable through the hops.
   const deletable: Array<[string, string, Record<string, unknown>, FormPolicy['rowFilters']]> = [
-    ...(options.removable === true ? ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [`${connection}-parity`, `${connection}-removable`, { root: { schema: 'parity', name: 'removable' }, pinned: ['tenant_id'] }, [{ column: 'tenant_id', attribute: 'tenant' }]]) : []),
-    ...(hops === undefined ? [] : ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [`${connection}-hop-lost`, `${connection}-hop-removable`, { root: { schema: 'lost', name: 'removable' } }, []])),
+    ...(options.removable === true
+      ? ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [
+          `${connection}-parity`,
+          `${connection}-removable`,
+          { root: { schema: 'parity', name: 'removable' }, pinned: ['tenant_id'] },
+          [{ column: 'tenant_id', attribute: 'tenant' }],
+        ])
+      : []),
+    ...(hops === undefined
+      ? []
+      : ENGINES.map(({ connection }): [string, string, Record<string, unknown>, FormPolicy['rowFilters']] => [
+          `${connection}-hop-lost`,
+          `${connection}-hop-removable`,
+          { root: { schema: 'lost', name: 'removable' } },
+          [],
+        ])),
   ]
   for (const [connection, formId, generation, rowFilters] of deletable) {
-    const { form, bindings, snapshot, generation: generated } = await admin('/v1/form-proposals', { connection, formId, title: 'Removable', lookups: [], versionColumn: 'version', ...generation })
+    const {
+      form,
+      bindings,
+      snapshot,
+      generation: generated,
+    } = await admin('/v1/form-proposals', { connection, formId, title: 'Removable', lookups: [], versionColumn: 'version', ...generation })
     const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
     const policy: FormPolicy = { ...base, operations: { ...base.operations, delete: ['clerk'] }, rowFilters, lookups: {} }
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation: generated, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation: generated, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
 
   const sent: Sent[] = []
@@ -231,7 +289,10 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
     sent,
     fetch: spied,
     client: (token = tokens.clerk) => createDataClient({ token: typeof token === 'function' ? token : () => token, base, fetch: spied }),
-    lossy: hops === undefined || owners === undefined ? undefined : { hops, ordersWithNotes: owners.ordersWithNotes, insertRemovable: owners.insertRemovable, removableCoded: owners.removableCoded },
+    lossy:
+      hops === undefined || owners === undefined
+        ? undefined
+        : { hops, ordersWithNotes: owners.ordersWithNotes, insertRemovable: owners.insertRemovable, removableCoded: owners.removableCoded },
     close: async () => {
       await app.close()
       // Awaited behind the hops too: the PostgreSQL adapter bounds postgres.js's
@@ -249,7 +310,10 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
  * `lost.removable` on each, made once for the run: a numbered id and a
  * code, its key, so a delete's answer echoes a text the suite chose (0050).
  */
-async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<Pick<Lossy, 'ordersWithNotes' | 'insertRemovable' | 'removableCoded'> & { close(): Promise<void> }> {
+async function openOwners(
+  pg: DatabaseDetails,
+  ms: DatabaseDetails,
+): Promise<Pick<Lossy, 'ordersWithNotes' | 'insertRemovable' | 'removableCoded'> & { close(): Promise<void> }> {
   const pgOwner = postgres({ host: pg.host, port: pg.port, database: pg.database, username: pg.user, password: pg.password, onnotice: () => {} })
   const msOwner = await new mssql.ConnectionPool({
     server: ms.host,
@@ -259,7 +323,9 @@ async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<Pic
     password: ms.password,
     options: { encrypt: false, trustServerCertificate: true },
   }).connect()
-  await pgOwner.unsafe('create schema if not exists lost; create table if not exists lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))')
+  await pgOwner.unsafe(
+    'create schema if not exists lost; create table if not exists lost.removable (id integer generated always as identity, code varchar(100) not null, version integer not null default 1, primary key (id, code))',
+  )
   await msOwner.request().batch("if schema_id('lost') is null exec('create schema lost')")
   await msOwner.request().batch(`if object_id('lost.removable') is null create table lost.removable (
     id int identity(1, 1) not null, code nvarchar(100) not null, version int not null constraint df_lost_removable_version default 1,
@@ -269,18 +335,31 @@ async function openOwners(pg: DatabaseDetails, ms: DatabaseDetails): Promise<Pic
       const id =
         connection === 'pg'
           ? ((await pgOwner<Array<{ id: string }>>`insert into lost.removable (code) values (${code}) returning id::text as id`)[0]?.id ?? '')
-          : String((await msOwner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]?.id)
+          : String(
+              (
+                await msOwner
+                  .request()
+                  .input('code', mssql.NVarChar(100), code)
+                  .query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')
+              ).recordset[0]?.id,
+            )
       const token = recordToken(['id', 'code'], { id, code })
       if (!token.ok) throw new Error(token.message)
       return token.token
     },
     removableCoded: async (connection, code) => {
       if (connection === 'pg') return (await pgOwner<Array<{ n: number }>>`select count(*)::int as n from lost.removable where code = ${code}`)[0]?.n ?? 0
-      return (await msOwner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code')).recordset[0]?.n ?? 0
+      return (
+        (await msOwner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code'))
+          .recordset[0]?.n ?? 0
+      )
     },
     ordersWithNotes: async (connection, notes) => {
       if (connection === 'pg') return (await pgOwner<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
-      const result = await msOwner.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+      const result = await msOwner
+        .request()
+        .input('notes', mssql.NVarChar(mssql.MAX), notes)
+        .query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
       return result.recordset[0]?.n ?? 0
     },
     close: async () => {

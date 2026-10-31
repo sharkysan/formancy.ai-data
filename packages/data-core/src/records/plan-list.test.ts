@@ -86,7 +86,11 @@ describe('planList', () => {
       fields: ['id', 'order_date', 'status'],
     })
     const clerk = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: 'c1:100', limit: 7 }))
-    expect(clerk).toMatchObject({ ok: true, fields: CLERK_FIELDS, request: { columns: CLERK_COLUMNS, after: [{ name: 'id', type: INT64, value: '100' }], offset: 0, limit: 7 } })
+    expect(clerk).toMatchObject({
+      ok: true,
+      fields: CLERK_FIELDS,
+      request: { columns: CLERK_COLUMNS, after: [{ name: 'id', type: INT64, value: '100' }], offset: 0, limit: 7 },
+    })
     // Each row of a list is what a read of its token shows: the same columns, the same fields.
     const read = planRead(PG, PG_ORDER, ORDER_POLICY, CLERK, ORDER_TOKEN)
     if (!read.ok || !clerk.ok) throw new Error('expected both to plan')
@@ -112,7 +116,11 @@ describe('planList', () => {
       },
     })
     expect(planList(PG, PG_ORDER, ORDER_POLICY, actor(['clerk'], {}), FIRST)).toMatchObject({ ok: false, code: 'missing-attribute' })
-    expect(planList(PG, bindings, LINE_POLICY, actor(['clerk'], {}), FIRST)).toMatchObject({ ok: false, code: 'missing-attribute', message: expect.stringMatching(/^lookups\.order: /) as unknown as string })
+    expect(planList(PG, bindings, LINE_POLICY, actor(['clerk'], {}), FIRST)).toMatchObject({
+      ok: false,
+      code: 'missing-attribute',
+      message: expect.stringMatching(/^lookups\.order: /),
+    })
   })
 
   // A list is a read: there is no list grant, so an actor granted fields and
@@ -133,11 +141,18 @@ describe('planList', () => {
     const hiddenNumber: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...CUSTOMER_POLICY.fields, customer_no: { read: [], write: ['clerk'] } } }
     expect(validatePolicy(hiddenNumber, customers)).toEqual({ ok: true })
     for (const refused of [listable(customerSource(), customers, hiddenNumber, CLERK), planList(customerSource(), customers, hiddenNumber, CLERK, FIRST)]) {
-      expect(refused).toEqual({ ok: false, code: 'field-denied', message: "This form's records are named by fields you may not read, so they are not listed for you." })
+      expect(refused).toEqual({
+        ok: false,
+        code: 'field-denied',
+        message: "This form's records are named by fields you may not read, so they are not listed for you.",
+      })
     }
     const hiddenTenant: FormPolicy = { ...CUSTOMER_POLICY, fields: { ...CUSTOMER_POLICY.fields, tenant_id: { read: [], write: [] } } }
     const listed = planList(customerSource(), customers, hiddenTenant, CLERK, FIRST)
-    expect(listed).toMatchObject({ ok: true, request: { columns: expect.arrayContaining([column('tenant_id', INT32), column('customer_no', INT32)]) as unknown as [] } })
+    expect(listed).toMatchObject({
+      ok: true,
+      request: { columns: expect.arrayContaining([column('tenant_id', INT32), column('customer_no', INT32)]) },
+    })
     if (listed.ok) expect(listed.fields).not.toContain('tenant_id')
     // A key column bound by a lookup is read through that lookup's field: a line's order.
     const lines = lineForm(PG).bindings
@@ -159,7 +174,13 @@ describe('planList', () => {
       })
       const { bindings } = generateForm(source, { connection: 'erp', root: sales('country'), formId: 'country', title: 'Country', lookups: [] })
       expect(bindings.identity, kind).toEqual(['iso_code'])
-      const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { id: { read: ['clerk'], write: [] }, iso_code: CLERK_RW, name: CLERK_RW }, rowFilters: [], lookups: {} }
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: [] },
+        fields: { id: { read: ['clerk'], write: [] }, iso_code: CLERK_RW, name: CLERK_RW },
+        rowFilters: [],
+        lookups: {},
+      }
       expect(planRead(source, bindings, policy, CLERK, 'k1:CH'), kind).toMatchObject({ ok: true })
       expect(planList(source, bindings, policy, CLERK, FIRST), kind).toEqual({
         ok: false,
@@ -193,7 +214,11 @@ describe('planList', () => {
     expect(validatePolicy(unscoped, lines)).toEqual({ ok: true })
     expect(unscopedLookups(lines, unscoped)).toEqual(['order'])
     expect(unscopedLookups(lines, LINE_POLICY)).toEqual([])
-    const refusal = { ok: false, code: 'operation-unavailable', message: "Nothing scopes this form's records, though the options of order are filtered, so they are not listed." }
+    const refusal = {
+      ok: false,
+      code: 'operation-unavailable',
+      message: "Nothing scopes this form's records, though the options of order are filtered, so they are not listed.",
+    }
     expect(listable(PG, lines, unscoped, CLERK)).toEqual(refusal)
     expect(planList(PG, lines, unscoped, CLERK, FIRST)).toEqual(refusal)
     // The policy is asked first here too: the intake clerk may not read.
@@ -219,9 +244,19 @@ describe('planList', () => {
     const planned = (sort: RecordListQuery['sort']) => planList(customerSource(), customers, CUSTOMER_POLICY, CLERK, query({ sort }))
     expect(planned([{ field: 'customer_no', direction: 'desc' }])).toMatchObject({
       ok: true,
-      request: { sort: [{ column: 'customer_no', direction: 'desc', nulls: null }, { column: 'tenant_id', direction: 'asc', nulls: null }] },
+      request: {
+        sort: [
+          { column: 'customer_no', direction: 'desc', nulls: null },
+          { column: 'tenant_id', direction: 'asc', nulls: null },
+        ],
+      },
     })
-    expect(planned([{ field: 'credit_limit', direction: 'desc' }, { field: 'name', direction: 'asc' }])).toMatchObject({
+    expect(
+      planned([
+        { field: 'credit_limit', direction: 'desc' },
+        { field: 'name', direction: 'asc' },
+      ]),
+    ).toMatchObject({
       ok: true,
       request: {
         sort: [
@@ -281,7 +316,12 @@ describe('planList', () => {
     }
     expect(planList(PG, PG_ORDER, ORDER_POLICY, AUDITOR, query({ sort: [{ field: 'order_date', direction: 'desc' }] }))).toMatchObject({
       ok: true,
-      request: { sort: [{ column: 'order_date', direction: 'desc', nulls: null }, { column: 'id', direction: 'asc', nulls: null }] },
+      request: {
+        sort: [
+          { column: 'order_date', direction: 'desc', nulls: null },
+          { column: 'id', direction: 'asc', nulls: null },
+        ],
+      },
     })
   })
 
@@ -295,7 +335,14 @@ describe('planList', () => {
     })
     const bindings = edited(orderForm(source).bindings, (draft) => {
       draft.fields.push(
-        { kind: 'column', field: 'scan', column: 'scan', type: { kind: 'binary', maxLength: 16, fixedLength: false }, nullable: true, writes: { create: false, update: false } },
+        {
+          kind: 'column',
+          field: 'scan',
+          column: 'scan',
+          type: { kind: 'binary', maxLength: 16, fixedLength: false },
+          nullable: true,
+          writes: { create: false, update: false },
+        },
         { kind: 'column', field: 'stamp', column: 'row_version', type: { kind: 'rowversion' }, nullable: false, writes: { create: false, update: false } },
       )
     })
@@ -303,7 +350,10 @@ describe('planList', () => {
     const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, scan: READ_ONLY, stamp: READ_ONLY } }
     expect(listColumns(bindings, ['id', 'scan', 'stamp'], []).sortable).toEqual(['id'])
     for (const field of ['scan', 'stamp']) {
-      expect(planList(source, bindings, policy, CLERK, query({ sort: [{ field, direction: 'asc' }] })), field).toMatchObject({ ok: false, code: 'not-sortable' })
+      expect(planList(source, bindings, policy, CLERK, query({ sort: [{ field, direction: 'asc' }] })), field).toMatchObject({
+        ok: false,
+        code: 'not-sortable',
+      })
     }
   })
 
@@ -350,12 +400,26 @@ describe('planList', () => {
   // is no search, and lists.
   test('refuses a search where no readable field can match one', () => {
     const source = snapshot('postgres', (objects) => {
-      objects.push(table('tag', [col('id', 1, { kind: 'uuid' }), col('day', 2, DATE), col('weight', 3, AMOUNT), col('done', 4, BOOLEAN)], { primaryKey: { name: 'pk_tag', columns: ['id'] } }))
+      objects.push(
+        table('tag', [col('id', 1, { kind: 'uuid' }), col('day', 2, DATE), col('weight', 3, AMOUNT), col('done', 4, BOOLEAN)], {
+          primaryKey: { name: 'pk_tag', columns: ['id'] },
+        }),
+      )
     })
     const { bindings } = generateForm(source, { connection: 'erp', root: sales('tag'), formId: 'tag', title: 'Tag', lookups: [] })
-    const policy: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { id: CLERK_RW, day: CLERK_RW, weight: CLERK_RW, done: CLERK_RW }, rowFilters: [], lookups: {} }
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: { id: CLERK_RW, day: CLERK_RW, weight: CLERK_RW, done: CLERK_RW },
+      rowFilters: [],
+      lookups: {},
+    }
     expect(listColumns(bindings, ['id', 'day', 'weight', 'done'], []).searchable).toEqual([])
-    expect(planList(source, bindings, policy, CLERK, query({ search: 'x' }))).toEqual({ ok: false, code: 'not-searchable', message: 'This form has no field you may read that a search can match.' })
+    expect(planList(source, bindings, policy, CLERK, query({ search: 'x' }))).toEqual({
+      ok: false,
+      code: 'not-searchable',
+      message: 'This form has no field you may read that a search can match.',
+    })
     expect(planList(source, bindings, policy, CLERK, FIRST)).toMatchObject({ ok: true, request: { search: null } })
   })
 
@@ -381,8 +445,14 @@ describe('planList', () => {
       ;(objects.find((object) => object.ref.name === 'order_line')?.columns.find((entry) => entry.name === 'order_id') as ColumnMeta).type = INT32
     })
     const narrowLines = lineForm(narrow).bindings
-    expect(planList(narrow, narrowLines, LINE_POLICY, CLERK, query({ parent: { field: 'order', record: ORDER_TOKEN } }))).toMatchObject({ ok: false, code: 'invalid-record-token' })
-    expect(planList(narrow, narrowLines, LINE_POLICY, CLERK, query({ parent: { field: 'order', record: 'k1:7' } }))).toMatchObject({ ok: true, request: { equal: [value('order_id', INT32, '7')] } })
+    expect(planList(narrow, narrowLines, LINE_POLICY, CLERK, query({ parent: { field: 'order', record: ORDER_TOKEN } }))).toMatchObject({
+      ok: false,
+      code: 'invalid-record-token',
+    })
+    expect(planList(narrow, narrowLines, LINE_POLICY, CLERK, query({ parent: { field: 'order', record: 'k1:7' } }))).toMatchObject({
+      ok: true,
+      request: { equal: [value('order_id', INT32, '7')] },
+    })
   })
 
   // A parent must be a lookup the actor may read: a column field names no
@@ -390,7 +460,11 @@ describe('planList', () => {
   // actor may not see would let them test which rows reference what.
   test('refuses a parent that is not a lookup field the actor may read', () => {
     const hidden: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, customer: { read: [], write: ['clerk'] } } }
-    for (const [policy, field] of [[ORDER_POLICY, 'status'], [ORDER_POLICY, 'nothing'], [hidden, 'customer']] as const) {
+    for (const [policy, field] of [
+      [ORDER_POLICY, 'status'],
+      [ORDER_POLICY, 'nothing'],
+      [hidden, 'customer'],
+    ] as const) {
       expect(planList(PG, PG_ORDER, policy, CLERK, query({ parent: { field, record: 'k1:1,1001' } })), field).toEqual({
         ok: false,
         code: 'invalid-request',
@@ -410,11 +484,32 @@ describe('planList', () => {
   // absence would say which rows reference something. Watched failing with
   // the NULL conditions left out: the roots were every order.
   test('narrows to the rows referencing no parent, every column of the field NULL', () => {
-    const planned = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ parent: { field: 'employee', record: null }, filter: [{ field: 'notes', op: 'null' }] }))
-    expect(planned).toMatchObject({ ok: true, request: { equal: [], filter: [{ op: 'null', column: 'notes' }, { op: 'null', column: 'created_by' }] } })
+    const planned = planList(
+      PG,
+      PG_ORDER,
+      ORDER_POLICY,
+      CLERK,
+      query({ parent: { field: 'employee', record: null }, filter: [{ field: 'notes', op: 'null' }] }),
+    )
+    expect(planned).toMatchObject({
+      ok: true,
+      request: {
+        equal: [],
+        filter: [
+          { op: 'null', column: 'notes' },
+          { op: 'null', column: 'created_by' },
+        ],
+      },
+    })
     expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ parent: { field: 'customer', record: null } }))).toMatchObject({
       ok: true,
-      request: { equal: [], filter: [{ op: 'null', column: 'tenant_id' }, { op: 'null', column: 'customer_no' }] },
+      request: {
+        equal: [],
+        filter: [
+          { op: 'null', column: 'tenant_id' },
+          { op: 'null', column: 'customer_no' },
+        ],
+      },
     })
     const hidden: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, customer: { read: [], write: ['clerk'] } } }
     expect(planList(PG, PG_ORDER, hidden, CLERK, query({ parent: { field: 'customer', record: null } }))).toMatchObject({ ok: false, code: 'invalid-request' })
@@ -461,7 +556,11 @@ describe('recordPage', () => {
       hasMore: true,
       next: 'c1:3',
     })
-    expect(recordPage(PG_ORDER, planned(3, ['id']), [order('1', null)])).toEqual({ rows: [{ record: 'k1:1', version: '1', answers: { id: '1' } }], hasMore: false, next: null })
+    expect(recordPage(PG_ORDER, planned(3, ['id']), [order('1', null)])).toEqual({
+      rows: [{ record: 'k1:1', version: '1', answers: { id: '1' } }],
+      hasMore: false,
+      next: null,
+    })
   })
 
   // The page after continues after the last row shown (0108), so its cursor
@@ -473,7 +572,10 @@ describe('recordPage', () => {
     const long = '9'.repeat(5000)
     expect(recordPage(PG_ORDER, planned(2, ['id']), [order('1', null), order(long, null), order('3', null)]).next).toBe(`c1:${long}`)
     const page = recordPage(PG_ORDER, planned(2, ['id']), [order('1', null), order('9007199254740993', null), order('3', null)])
-    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: page.next }))).toMatchObject({ ok: true, request: { after: [{ name: 'id', type: INT64, value: '9007199254740993' }] } })
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ after: page.next }))).toMatchObject({
+      ok: true,
+      request: { after: [{ name: 'id', type: INT64, value: '9007199254740993' }] },
+    })
   })
 
   // A token twice on one page is an adapter that joined wrongly; a grid would
@@ -485,7 +587,13 @@ describe('recordPage', () => {
   // listable lists only a key held NOT NULL, so a last row without its key
   // is an adapter's bug, never a cursor the next page would misread.
   test('throws on a last row without its key', () => {
-    expect(() => recordPage(PG_ORDER, planned(1, ['notes']), [order('1', null), order('2', null)].map((row) => ({ ...row, values: { notes: null } })))).toThrow('no key to continue after')
+    expect(() =>
+      recordPage(
+        PG_ORDER,
+        planned(1, ['notes']),
+        [order('1', null), order('2', null)].map((row) => ({ ...row, values: { notes: null } })),
+      ),
+    ).toThrow('no key to continue after')
   })
 })
 

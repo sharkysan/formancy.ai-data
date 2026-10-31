@@ -69,7 +69,13 @@ function identityChanges(comparison: Comparison): NamedDraft[] {
   if (candidateKeys(after).some((candidate) => sameList(candidate.columns, key.columns))) return []
 
   // A delete removes the record its key names, as an update changes it (0050).
-  const shared = { subject: { kind: 'key', object: after.ref, name: key.name } as const, affects: fieldsOver(bindings, key.columns), stops: ['update', 'delete'] as const, breaksReads: false, otherwise: 'info' as const }
+  const shared = {
+    subject: { kind: 'key', object: after.ref, name: key.name } as const,
+    affects: fieldsOver(bindings, key.columns),
+    stops: ['update', 'delete'] as const,
+    breaksReads: false,
+    otherwise: 'info' as const,
+  }
   const gaps = hiding(comparison.current.gaps, after.ref, 'keys')
   if (gaps.length > 0) {
     return [cite(comparison, gaps, { ...shared, kind: 'access-narrowed', message: unseen(`Key ${key.name} of ${describe(after.ref)}`, gaps) })]
@@ -157,13 +163,34 @@ function lookupKeyChanges(comparison: Comparison, lookup: Lookup): Draft[] {
     const gaps = hiding(comparison.current.gaps, after.ref, 'foreign-keys')
     // A key reported with no target says by itself that the target is out of sight (0004).
     if (now !== undefined || gaps.length > 0) {
-      return [cite(comparison, gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(now === undefined ? `Foreign key ${lookup.foreignKey} of ${describe(after.ref)}` : `What ${lookup.foreignKey} references`, gaps) })]
+      return [
+        cite(comparison, gaps, {
+          ...blocked,
+          kind: 'access-narrowed',
+          subject,
+          message: unseen(now === undefined ? `Foreign key ${lookup.foreignKey} of ${describe(after.ref)}` : `What ${lookup.foreignKey} references`, gaps),
+        }),
+      ]
     }
-    return [{ ...blocked, kind: 'lookup-changed', subject, message: `${lookup.foreignKey} is gone, and the ${lookup.field} lookup selects through it. The lookup is blocked until the form is reviewed.` }]
+    return [
+      {
+        ...blocked,
+        kind: 'lookup-changed',
+        subject,
+        message: `${lookup.foreignKey} is gone, and the ${lookup.field} lookup selects through it. The lookup is blocked until the form is reviewed.`,
+      },
+    ]
   }
 
   const changed = differences(FOREIGN_KEY, was, now)
-  return [{ ...blocked, kind: 'lookup-changed', subject, message: `${lookup.foreignKey} changed: ${changed.join('; ')}. The ${lookup.field} lookup selects through it, so it is blocked until the form is reviewed.` }]
+  return [
+    {
+      ...blocked,
+      kind: 'lookup-changed',
+      subject,
+      message: `${lookup.foreignKey} changed: ${changed.join('; ')}. The ${lookup.field} lookup selects through it, so it is blocked until the form is reviewed.`,
+    },
+  ]
 }
 
 /** The far side of an unchanged foreign key: the target table, the key it points at, and the display columns. */
@@ -175,12 +202,26 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
     const subject: DriftSubject = { kind: 'object', object: ref }
     const absent = absence(comparison.current, ref)
     if (absent.why === 'scope') {
-      return [{ ...blocked, kind: 'scope-narrowed', subject, message: `${where}, the target of the ${lookup.field} lookup, is outside the discovery scope: ${ref.schema} is no longer approved, so the lookup cannot be checked. It is blocked until the scope is restored or the form is reviewed.` }]
+      return [
+        {
+          ...blocked,
+          kind: 'scope-narrowed',
+          subject,
+          message: `${where}, the target of the ${lookup.field} lookup, is outside the discovery scope: ${ref.schema} is no longer approved, so the lookup cannot be checked. It is blocked until the scope is restored or the form is reviewed.`,
+        },
+      ]
     }
     if (absent.why === 'access') {
       return [cite(comparison, absent.gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(where, absent.gaps) })]
     }
-    return [{ ...blocked, kind: 'lookup-changed', subject, message: `${where}, the target of the ${lookup.field} lookup, is gone. The lookup is blocked until the form is reviewed.` }]
+    return [
+      {
+        ...blocked,
+        kind: 'lookup-changed',
+        subject,
+        message: `${where}, the target of the ${lookup.field} lookup, is gone. The lookup is blocked until the form is reviewed.`,
+      },
+    ]
   }
 
   const drafts: Draft[] = []
@@ -189,7 +230,12 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
     drafts.push(
       gaps.length > 0
         ? cite(comparison, gaps, { ...blocked, kind: 'access-narrowed', subject, message: unseen(thing, gaps) })
-        : { ...blocked, kind: 'lookup-changed', subject, message: `${gone} The ${lookup.field} lookup rests on it, so it is blocked until the form is reviewed.` },
+        : {
+            ...blocked,
+            kind: 'lookup-changed',
+            subject,
+            message: `${gone} The ${lookup.field} lookup rests on it, so it is blocked until the form is reviewed.`,
+          },
     )
   }
 
@@ -197,7 +243,12 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
   const covers = (object: ObjectMeta) => candidateKeys(object).find((key) => sameSet(key.columns, lookup.target.columns))
   const key = covers(objectIn(comparison.base, ref))
   if (key !== undefined && covers(target) === undefined) {
-    lost({ kind: 'key', object: ref, name: key.name }, 'keys', `Key ${key.name} of ${where}`, `No key of ${where} covers (${list(lookup.target.columns)}) any more; ${key.name} did.`)
+    lost(
+      { kind: 'key', object: ref, name: key.name },
+      'keys',
+      `Key ${key.name} of ${where}`,
+      `No key of ${where} covers (${list(lookup.target.columns)}) any more; ${key.name} did.`,
+    )
   }
   for (const name of lookup.display) {
     if (!target.columns.some((column) => column.name === name)) {
@@ -207,7 +258,12 @@ function targetChanges(comparison: Comparison, lookup: Lookup, blocked: Pick<Dra
   const filtered = filterColumns(comparison, lookup)
   for (const name of filtered) {
     if (!target.columns.some((column) => column.name === name)) {
-      lost({ kind: 'column', object: ref, name }, 'columns', `Column ${name} of ${where}`, `${name} of ${where} is gone, and the lookup's row filter compares it.`)
+      lost(
+        { kind: 'column', object: ref, name },
+        'columns',
+        `Column ${name} of ${where}`,
+        `${name} of ${where} is gone, and the lookup's row filter compares it.`,
+      )
     }
   }
   return [...drafts, ...retypedColumns(comparison, lookup, target, filtered, blocked)]
@@ -231,7 +287,13 @@ function filterColumns(comparison: Comparison, lookup: Lookup): string[] {
  * failed every search. Each blocks the lookup until the form is reviewed and
  * published again from the snapshot as it is.
  */
-function retypedColumns(comparison: Comparison, lookup: Lookup, target: ObjectMeta, filtered: readonly string[], blocked: Pick<Draft, 'affects' | 'stops' | 'breaksReads' | 'otherwise'>): Draft[] {
+function retypedColumns(
+  comparison: Comparison,
+  lookup: Lookup,
+  target: ObjectMeta,
+  filtered: readonly string[],
+  blocked: Pick<Draft, 'affects' | 'stops' | 'breaksReads' | 'otherwise'>,
+): Draft[] {
   const before = objectIn(comparison.base, lookup.target.table)
   const uses = new Map<string, string[]>()
   const use = (names: readonly string[], role: string) => {
@@ -274,7 +336,13 @@ interface Unbound<T> {
  * refuses fails with the database's error. One that vanished behind a gap is
  * left to the gap, which is reported on its own.
  */
-function unboundChanges<T extends { name: string }>(comparison: Comparison, before: readonly T[], after: readonly T[], skip: ReadonlySet<string>, rules: Unbound<T>): Draft[] {
+function unboundChanges<T extends { name: string }>(
+  comparison: Comparison,
+  before: readonly T[],
+  after: readonly T[],
+  skip: ReadonlySet<string>,
+  rules: Unbound<T>,
+): Draft[] {
   const root = comparison.after.ref
   const hidden = hiding(comparison.current.gaps, root, rules.aspect).length > 0
   const note = (item: T, message: string): Draft => ({
@@ -315,7 +383,8 @@ function keyChanges(comparison: Comparison, reported: ReadonlySet<string>): Draf
     aspect: 'keys',
     properties: KEY,
     columns: (key) => key.columns,
-    added: (key) => `${key.name} is a new ${key.primary ? 'primary' : 'unique'} key over (${list(key.columns)}); the database will refuse a save that duplicates it.`,
+    added: (key) =>
+      `${key.name} is a new ${key.primary ? 'primary' : 'unique'} key over (${list(key.columns)}); the database will refuse a save that duplicates it.`,
     tail: 'The identity does not rest on it.',
   })
 }
@@ -330,10 +399,15 @@ function foreignKeyChanges(comparison: Comparison, used: ReadonlySet<string>): D
     added: (key) => `${key.name} is a new foreign key over (${list(key.columns)}); it could be offered as a lookup.`,
     tail: 'No lookup of this form uses it.',
   })
-  return drafts.map((draft) => (draft.subject.kind === 'foreign-key' && takesKey(comparison, draft.subject.name) ? { ...draft, stops: ['delete'], otherwise: 'review', message: `${draft.message} ${KEY_TAKEN}` } : draft))
+  return drafts.map((draft) =>
+    draft.subject.kind === 'foreign-key' && takesKey(comparison, draft.subject.name)
+      ? { ...draft, stops: ['delete'], otherwise: 'review', message: `${draft.message} ${KEY_TAKEN}` }
+      : draft,
+  )
 }
 
-const KEY_TAKEN = "It includes the record's key, and a lookup over it writes the key from the record a person chooses, so a record created again under a deleted one's key would start its version where the deleted one did: delete is blocked until the form is reviewed."
+const KEY_TAKEN =
+  "It includes the record's key, and a lookup over it writes the key from the record a person chooses, so a record created again under a deleted one's key would start its version where the deleted one did: delete is blocked until the form is reviewed."
 
 /**
  * The generator's version rule, asked again (0050, 0057): whether the

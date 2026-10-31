@@ -12,7 +12,7 @@ import type { DeleteRequest } from './types.js'
  */
 
 const REQUEST: DeleteRequest = {
-  target: ORDER_TARGET.sqlserver as unknown as DeleteRequest['target'],
+  target: ORDER_TARGET.sqlserver,
   key: [value('id', INT64, ORDER_ID)],
   expectedVersion: '00000000000007d1',
   filters: TENANT_ONE as unknown as DeleteRequest['filters'],
@@ -21,7 +21,7 @@ const REQUEST: DeleteRequest = {
   definition: 'd',
 }
 
-const altered = (change: Record<string, unknown>): DeleteRequest => ({ ...REQUEST, ...change }) as DeleteRequest
+const altered = (change: Record<string, unknown>): DeleteRequest => ({ ...REQUEST, ...change })
 
 describe('deleteTerms', () => {
   // The terms are fresh, and hold what the request said and nothing more.
@@ -67,7 +67,9 @@ describe('deleteTerms', () => {
   test('refuses a reach that does not begin with the root', () => {
     expect(() => deleteTerms(altered({ reach: undefined }))).toThrow(/says what it reaches/)
     expect(() => deleteTerms(altered({ reach: { removed: [sales('order_line')], cleared: [], accepted: [] } }))).toThrow(/removes rows of its root first/)
-    expect(() => deleteTerms(altered({ reach: { removed: [sales('order'), sales('order')], cleared: [], accepted: [] } }))).toThrow(/each table it removes rows of once/)
+    expect(() => deleteTerms(altered({ reach: { removed: [sales('order'), sales('order')], cleared: [], accepted: [] } }))).toThrow(
+      /each table it removes rows of once/,
+    )
   })
 
   // Past the root since 0051: the tables a cascade removes rows of, those a
@@ -98,10 +100,14 @@ describe('deleteTerms', () => {
     const reach = (removed: unknown[], cleared: unknown[], accepted: unknown[]) => altered({ reach: { removed, cleared, accepted } })
     expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], []))).toThrow(/no key it accepts cascades into/)
     expect(() => deleteTerms(reach([sales('order')], [], [line]))).toThrow(/a cascade into a table it does not say it removes rows of/)
-    expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], [{ ...line, onto: sales('customer') }]))).toThrow(/a key onto a table it does not remove rows of/)
+    expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], [{ ...line, onto: sales('customer') }]))).toThrow(
+      /a key onto a table it does not remove rows of/,
+    )
     expect(() => deleteTerms(reach([sales('order')], [{ table: sales('order_memo'), columns: ['order_id'] }], []))).toThrow(/no key it accepts clears/)
     expect(() => deleteTerms(reach([sales('order')], [], [memo]))).toThrow(/a key that clears a table it does not say it clears/)
-    expect(() => deleteTerms(reach([sales('order')], [{ table: sales('order_memo'), columns: [] }], [memo]))).toThrow(/each table it clears with the columns it clears/)
+    expect(() => deleteTerms(reach([sales('order')], [{ table: sales('order_memo'), columns: [] }], [memo]))).toThrow(
+      /each table it clears with the columns it clears/,
+    )
     expect(() => deleteTerms(reach([sales('order'), sales('order_line')], [], [{ ...line, onDelete: 'no-action' }]))).toThrow(/each key it accepts by/)
   })
 })

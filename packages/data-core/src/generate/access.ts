@@ -62,10 +62,19 @@ export function writesFor(columns: readonly ColumnMeta[], possible: boolean, sub
   if (!possible || (writes.create && writes.update)) return writes
   // A column field says "it"; a lookup names the columns that lack the privilege.
   const lacking = (capability: 'insert' | 'update') =>
-    columns.length === 1 ? 'it' : columns.filter((column) => !column.access[capability]).map((column) => column.name).join(', ')
+    columns.length === 1
+      ? 'it'
+      : columns
+          .filter((column) => !column.access[capability])
+          .map((column) => column.name)
+          .join(', ')
   let message: string
   if (!writes.create && !writes.update) message = `Read-only: this connection's account may neither INSERT nor UPDATE ${lacking('insert')}.`
-  else if (!writes.update) message = `Read-only on update: this connection's account may not UPDATE ${columns.filter((column) => !column.access.update).map((column) => column.name).join(', ')}.`
+  else if (!writes.update)
+    message = `Read-only on update: this connection's account may not UPDATE ${columns
+      .filter((column) => !column.access.update)
+      .map((column) => column.name)
+      .join(', ')}.`
   else message = `Not written on create: this connection's account may not INSERT ${lacking('insert')}.`
   notes.push({ subject, kind: 'read-only', message })
   return writes
@@ -82,7 +91,9 @@ export function uninsertablePins(root: ObjectMeta, pinned: ReadonlySet<string>):
   const columns = root.columns.filter((column) => pinned.has(column.name))
   for (const column of columns) {
     if (unreadable(column)) {
-      throw new Error(`${column.name} is pinned by the policy, and this connection's account may not read it: the tenant filter would fail every read and update`)
+      throw new Error(
+        `${column.name} is pinned by the policy, and this connection's account may not read it: the tenant filter would fail every read and update`,
+      )
     }
   }
   return columns.filter((column) => !column.access.insert)
@@ -102,7 +113,11 @@ export function identityFor(root: ObjectMeta, notes: GenerationNote[]): string[]
   const first = keys[0]
   if (first !== undefined) {
     const hidden = first.columns.find((name) => !readable(name)) as string
-    notes.push({ subject: root.ref.name, kind: 'blocked', message: `Records cannot be read back or updated: this connection's account may not read key column ${hidden}.` })
+    notes.push({
+      subject: root.ref.name,
+      kind: 'blocked',
+      message: `Records cannot be read back or updated: this connection's account may not read key column ${hidden}.`,
+    })
   }
   return null
 }
@@ -114,7 +129,8 @@ export function versionAccessProblem(column: ColumnMeta): string | null {
   return null
 }
 
-const NO_SESSION_STATE = 'records outside its policies read as not found, a write its policies refuse is refused, and this module sets no session state a policy may read (0011)'
+const NO_SESSION_STATE =
+  'records outside its policies read as not found, a write its policies refuse is refused, and this module sets no session state a policy may read (0011)'
 
 /** Why row security on `object` cannot be established: the details of the row-security gaps that cover it. */
 function whyUnknown(snapshot: MetadataSnapshot, object: ObjectMeta): string {
@@ -142,9 +158,14 @@ export function rowSecurityNotes(snapshot: MetadataSnapshot, objects: readonly O
     if (seen.has(where)) continue
     seen.add(where)
     const subject = object.ref.name
-    if (object.rowSecurity === 'applies') notes.push({ subject, kind: 'access', message: `Row-level security applies to this connection on ${where}: ${NO_SESSION_STATE}.` })
+    if (object.rowSecurity === 'applies')
+      notes.push({ subject, kind: 'access', message: `Row-level security applies to this connection on ${where}: ${NO_SESSION_STATE}.` })
     if (object.rowSecurity === 'unknown') {
-      notes.push({ subject, kind: 'access', message: `This connection cannot tell whether row-level security applies to ${where}: ${whyUnknown(snapshot, object)}` })
+      notes.push({
+        subject,
+        kind: 'access',
+        message: `This connection cannot tell whether row-level security applies to ${where}: ${whyUnknown(snapshot, object)}`,
+      })
     }
     if (object.kind === 'view') {
       notes.push({

@@ -22,7 +22,9 @@ describe('a published result', () => {
   // A smoke run proves the harness runs, on five samples and a busy machine.
   // Committed as the page's figures, it would publish noise as a measurement.
   test('refuses the smoke protocol', () => {
-    expect(problems((r) => (r.protocol = { ...SMOKE_PROTOCOL }))).toContain('protocol.name: smoke, where a published result is measured with the publish protocol')
+    expect(problems((r) => (r.protocol = { ...SMOKE_PROTOCOL }))).toContain(
+      'protocol.name: smoke, where a published result is measured with the publish protocol',
+    )
   })
 
   // A block the catalogue names and the run never measured would leave a
@@ -35,8 +37,12 @@ describe('a published result', () => {
 
   // And a block measured twice, or one no catalogue entry names.
   test('refuses a block twice or one the catalogue does not name', () => {
-    expect(problems((r) => r.scenarios.push({ ...(r.scenarios[0] as Results['scenarios'][number]) }))).toContain('scenarios[52]: pg health at 1 in flight, a second time')
-    expect(problems((r) => r.scenarios.push({ ...(r.scenarios[0] as Results['scenarios'][number]), scenario: 'export' }))).toContain('scenarios[52]: pg export at 1 in flight, which the catalogue does not name')
+    expect(problems((r) => r.scenarios.push({ ...(r.scenarios[0] as Results['scenarios'][number]) }))).toContain(
+      'scenarios[52]: pg health at 1 in flight, a second time',
+    )
+    expect(problems((r) => r.scenarios.push({ ...(r.scenarios[0] as Results['scenarios'][number]), scenario: 'export' }))).toContain(
+      'scenarios[52]: pg export at 1 in flight, which the catalogue does not name',
+    )
   })
 
   // Percentiles of one sample set never decrease; a p90 below the p50 is a
@@ -48,7 +54,9 @@ describe('a published result', () => {
   // The pins are what explains the figures. A result whose counted round
   // trips differ from its own catalogue was measured against something else.
   test('refuses counted round trips that differ from the pins', () => {
-    expect(problems((r) => ((r.scenarios[4] as Results['scenarios'][number]).roundTrips = 4))).toContain('scenarios[4].roundTrips: counted 4, the catalogue pins 2')
+    expect(problems((r) => ((r.scenarios[4] as Results['scenarios'][number]).roundTrips = 4))).toContain(
+      'scenarios[4].roundTrips: counted 4, the catalogue pins 2',
+    )
     expect(problems((r) => (r.components.floor.ms.roundTrips = 3))).toContain('components.floor.ms.roundTrips: counted 3, the catalogue pins 2')
   })
 
@@ -63,8 +71,12 @@ describe('a published result', () => {
       'refusals: no ms update-drifted, which the catalogue names',
     )
     expect(problems((r) => r.refusals.push({ ...first(r) }))).toContain('refusals[4]: pg create-drifted, a second time')
-    expect(problems((r) => r.refusals.push({ ...first(r), scenario: 'delete-drifted' }))).toContain('refusals[4]: pg delete-drifted, which the catalogue does not name')
-    expect(problems((r) => ((r.refusals[1] as Results['refusals'][number]).roundTrips = 4))).toContain('refusals[1].roundTrips: counted 4, the catalogue pins 2')
+    expect(problems((r) => r.refusals.push({ ...first(r), scenario: 'delete-drifted' }))).toContain(
+      'refusals[4]: pg delete-drifted, which the catalogue does not name',
+    )
+    expect(problems((r) => ((r.refusals[1] as Results['refusals'][number]).roundTrips = 4))).toContain(
+      'refusals[1].roundTrips: counted 4, the catalogue pins 2',
+    )
   })
 
   // The answer is half of what a refusal shows: a stopped write answered
@@ -85,9 +97,9 @@ describe('a published result', () => {
   // A hypervisor that reports no steal since boot has said nothing; a 0
   // printed for it would claim the host took nothing away.
   test('refuses a steal of 0 where steal was not reported', () => {
-    expect(problems((r) => ((r.scenarios[0] as Results['scenarios'][number]).run = { ...(r.scenarios[0] as Results['scenarios'][number]).run, steal: 0 }))).toContain(
-      'scenarios[0].run.steal: 0, where this hypervisor reports no steal',
-    )
+    expect(
+      problems((r) => ((r.scenarios[0] as Results['scenarios'][number]).run = { ...(r.scenarios[0] as Results['scenarios'][number]).run, steal: 0 })),
+    ).toContain('scenarios[0].run.steal: 0, where this hypervisor reports no steal')
   })
 
   // The round's client token is minted per run and never written down; one
@@ -118,12 +130,16 @@ describe('a published result', () => {
       entry.undelayedMs = (direct.p50 as number) + r.protocol.latency.delayMs + 0.5
     })
     expect(outcome.filter((problem) => problem.includes('through the hop'))).toHaveLength(1)
-    expect(outcome.find((problem) => problem.includes('through the hop'))).toMatch(/^latency\[\d+\]\.undelayedMs: ms resolve-100 took .* through the hop undelayed and .* direct, more than the 5 ms it adds/)
+    expect(outcome.find((problem) => problem.includes('through the hop'))).toMatch(
+      /^latency\[\d+\]\.undelayedMs: ms resolve-100 took .* through the hop undelayed and .* direct, more than the 5 ms it adds/,
+    )
   })
 
   // A run that started beside another container measured that container too.
   test('refuses containers running before the run', () => {
-    expect(problems((r) => (r.machine.quiet.containersBefore = ['demo-postgres']))).toContain('machine.quiet.containersBefore: demo-postgres was running before the run started')
+    expect(problems((r) => (r.machine.quiet.containersBefore = ['demo-postgres']))).toContain(
+      'machine.quiet.containersBefore: demo-postgres was running before the run started',
+    )
   })
 
   // The audit reconciliation is a check the run makes on itself: every
@@ -138,12 +154,16 @@ describe('a published result', () => {
   // Without P13's tolerance the calibration repeated nothing and refused
   // nothing, so a block the host slowed down would be published.
   test('refuses a missing calibration tolerance', () => {
-    expect(problems((r) => (r.protocol.calibration = { ...r.protocol.calibration, tolerance: null }))).toContain('protocol.calibration.tolerance: none, which P13 sets before a publish run')
+    expect(problems((r) => (r.protocol.calibration = { ...r.protocol.calibration, tolerance: null }))).toContain(
+      'protocol.calibration.tolerance: none, which P13 sets before a publish run',
+    )
   })
 
   // Rendering trusts the shape; a field of the wrong type is named before it can print as "undefined".
   test('refuses a field of the wrong type, naming its path', () => {
-    expect(problems((r) => ((r.engines.pg as unknown as Record<string, unknown>)['memoryBytes'] = '300MB'))).toContain('engines.pg.memoryBytes: expected a number')
+    expect(problems((r) => ((r.engines.pg as unknown as Record<string, unknown>)['memoryBytes'] = '300MB'))).toContain(
+      'engines.pg.memoryBytes: expected a number',
+    )
     expect(problems((r) => delete (r as unknown as Record<string, unknown>)['commit'])).toContain('commit: expected a string')
   })
 })
@@ -155,7 +175,9 @@ describe('a smoke result', () => {
     const smoke = structuredClone(publishedResults())
     smoke.protocol = { ...SMOKE_PROTOCOL }
     smoke.machine.quiet = { ...smoke.machine.quiet, enforced: false, containersBefore: ['demo-postgres'] }
-    smoke.scenarios = smoke.scenarios.filter((s) => s.concurrency !== 8).concat(smoke.scenarios.filter((s) => s.concurrency === 8).map((s) => ({ ...s, concurrency: 2 })))
+    smoke.scenarios = smoke.scenarios
+      .filter((s) => s.concurrency !== 8)
+      .concat(smoke.scenarios.filter((s) => s.concurrency === 8).map((s) => ({ ...s, concurrency: 2 })))
     smoke.latency = smoke.latency.map((entry) => ({ ...entry, rounds: entry.rounds.slice(0, 1) }))
     expect(validateResults(smoke, { published: false })).toEqual({ ok: true })
     const refused = validateResults(smoke, { published: true })

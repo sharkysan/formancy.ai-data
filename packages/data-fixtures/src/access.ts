@@ -73,7 +73,10 @@ function grants(capability: ExpectedCapability | undefined, column: string): boo
   return capability === 'all' || (Array.isArray(capability) && capability.includes(column))
 }
 
-function resolve(entry: ExpectedObjectAccess | undefined, kind: DatabaseKind): Required<Omit<ExpectedObjectFacts, 'rowSecurity'>> & { rowSecurity: RowSecurity } {
+function resolve(
+  entry: ExpectedObjectAccess | undefined,
+  kind: DatabaseKind,
+): Required<Omit<ExpectedObjectFacts, 'rowSecurity'>> & { rowSecurity: RowSecurity } {
   const facts = { ...entry, ...entry?.byKind?.[kind] }
   const rowSecurity = facts.rowSecurity ?? 'none'
   return {
@@ -107,7 +110,8 @@ export function accessDisagreements(snapshot: MetadataSnapshot, expected: Expect
     for (const capability of CAPABILITIES) {
       const listed = facts[capability]
       if (Array.isArray(listed)) {
-        for (const name of listed) if (!model.columns.some((column) => column.name === name)) out.push(`the expectation for ${where} names ${name}, which the model does not have`)
+        for (const name of listed)
+          if (!model.columns.some((column) => column.name === name)) out.push(`the expectation for ${where} names ${name}, which the model does not have`)
       }
     }
     const usable = facts.delete || CAPABILITIES.some((capability) => facts[capability] !== 'none')
@@ -128,14 +132,16 @@ export function accessDisagreements(snapshot: MetadataSnapshot, expected: Expect
     for (const column of actual.columns) {
       for (const capability of CAPABILITIES) {
         const wanted = grants(facts[capability], column.name)
-        if (column.access[capability] !== wanted) out.push(`${where}.${column.name} ${capability} is ${String(column.access[capability])}, expected ${String(wanted)}`)
+        if (column.access[capability] !== wanted)
+          out.push(`${where}.${column.name} ${capability} is ${String(column.access[capability])}, expected ${String(wanted)}`)
       }
     }
     if (actual.access === undefined) out.push(`${where} says nothing about deleting; it was taken before 0049`)
     else if (actual.access.delete !== facts.delete) out.push(`${where} delete is ${String(actual.access.delete)}, expected ${String(facts.delete)}`)
     if (actual.rowSecurity !== facts.rowSecurity) {
       if (actual.rowSecurity !== 'unknown') out.push(`${where} row security is ${actual.rowSecurity}, expected ${facts.rowSecurity}`)
-      else if (!snapshot.gaps.some((gap) => gap.aspect === 'row-security' && gapCovers(gap, model.ref))) out.push(`${where} row security is unknown and no row-security gap says why`)
+      else if (!snapshot.gaps.some((gap) => gap.aspect === 'row-security' && gapCovers(gap, model.ref)))
+        out.push(`${where} row security is unknown and no row-security gap says why`)
     }
   }
   return out

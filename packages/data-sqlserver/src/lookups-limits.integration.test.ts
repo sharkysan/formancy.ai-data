@@ -74,12 +74,23 @@ beforeAll(async () => {
   // Idle connections are kept for the whole file: the pool's default 30 s
   // reaping would replace the one session the cases compare, and a new
   // login would count as turns on the hop.
-  pool = await new mssql.ConnectionPool({ ...fixture.writer, server: '127.0.0.1', port: hop.port, pool: { min: 0, max: 1, idleTimeoutMillis: 3_600_000 } }).connect()
+  pool = await new mssql.ConnectionPool({
+    ...fixture.writer,
+    server: '127.0.0.1',
+    port: hop.port,
+    pool: { min: 0, max: 1, idleTimeoutMillis: 3_600_000 },
+  }).connect()
   // Derived as a deployment derives the order form's customer lookup.
   const owner = await new mssql.ConnectionPool(fixture.admin).connect()
   try {
     const snapshot = await discoverSqlServer(owner, { schemas: ['sales'] })
-    const { bindings } = generateForm(snapshot, { connection: 'erp', root: { schema: 'sales', name: 'order' }, formId: 'form', title: 'Form', lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }] })
+    const { bindings } = generateForm(snapshot, {
+      connection: 'erp',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'form',
+      title: 'Form',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+    })
     const field = bindings.fields.find((binding) => binding.kind === 'lookup')
     if (field === undefined) throw new Error('the order form has no customer lookup')
     config = buildLookupConfig(bindings, field.field, { snapshot })
@@ -151,9 +162,11 @@ async function settledAtOnce(lookup: Stopping): Promise<boolean> {
 
 /** The session state a lookup could leave behind on its connection, read on the pool's one connection. */
 async function sessionState(): Promise<{ spid: number; trancount: number; options: number; lockTimeout: number }> {
-  const result = await pool.request().query<{ spid: number; trancount: number; options: number; lockTimeout: number }>(
-    'select @@spid as spid, @@trancount as trancount, @@options as options, @@lock_timeout as lockTimeout',
-  )
+  const result = await pool
+    .request()
+    .query<{ spid: number; trancount: number; options: number; lockTimeout: number }>(
+      'select @@spid as spid, @@trancount as trancount, @@options as options, @@lock_timeout as lockTimeout',
+    )
   const state = result.recordset[0]
   if (state === undefined) throw new Error('the session state came back empty')
   return state

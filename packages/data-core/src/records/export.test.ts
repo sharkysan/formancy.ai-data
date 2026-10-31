@@ -110,7 +110,11 @@ describe('the columns of a file', () => {
   // headed by the key there, where the grid's String(label) would head the
   // column "[object Object]".
   test('are headed by the field’s key where its label is not a string', () => {
-    const presented = applyPresentation(ORDER.form, { version: 1, fields: [{ field: 'status', anchor: { kind: 'column', column: 'status' }, label: { $t: 'order.status' } }], sections: [] }, ORDER.bindings)
+    const presented = applyPresentation(
+      ORDER.form,
+      { version: 1, fields: [{ field: 'status', anchor: { kind: 'column', column: 'status' }, label: { $t: 'order.status' } }], sections: [] },
+      ORDER.bindings,
+    )
     if (!presented.ok) throw new Error(presented.problems.join('; '))
     expect(validateSchema(presented.form)).toMatchObject({ valid: false, errors: [{ code: 'i18n.noSection' }] })
     const stored: FormSchema = { ...presented.form, i18n: { defaultLocale: 'de', messages: { de: { 'order.status': 'Status' } } } }
@@ -163,7 +167,11 @@ describe('a record of a file', () => {
   // the file refuses rather than say NULL where the row holds one.
   test('refuses a lookup whose key no token can carry, naming its header', () => {
     const { customer: _, ...answers } = record(STORED).answers
-    expect(exportRecord(columns, { ...record(STORED), answers }, LABELS)).toMatchObject({ ok: false, code: 'unencodable', message: expect.stringContaining('Customer') })
+    expect(exportRecord(columns, { ...record(STORED), answers }, LABELS)).toMatchObject({
+      ok: false,
+      code: 'unencodable',
+      message: expect.stringContaining('Customer'),
+    })
   })
 
   // A lookup with no labels at all is a caller that forgot to resolve it:

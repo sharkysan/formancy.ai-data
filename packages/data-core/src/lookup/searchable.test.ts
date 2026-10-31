@@ -74,6 +74,11 @@ describe('searchableDisplay', () => {
       { name: 'name', type: name },
       { name: 'customer_no', type: number },
     ])
-    expect(searchableDisplay([{ name: 'order_date', type: DECIDED.date.type }, { name: 'amount', type: DECIDED.decimal.type }])).toEqual([])
+    expect(
+      searchableDisplay([
+        { name: 'order_date', type: DECIDED.date.type },
+        { name: 'amount', type: DECIDED.decimal.type },
+      ]),
+    ).toEqual([])
   })
 })

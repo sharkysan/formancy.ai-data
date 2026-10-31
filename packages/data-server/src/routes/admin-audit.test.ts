@@ -29,7 +29,17 @@ import { ROUTE_OPERATIONS, runtimeRoutes } from './runtime.js'
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const TEXT: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 
 /** Planted where an event must never look: the form's title, a role the policy names, a column the database has, a driver's address and a password. */
@@ -43,19 +53,35 @@ const PASSWORD = 'S3cret-pw-e81'
 let columns: ColumnMeta[]
 function snapshot(): MetadataSnapshot {
   return createSnapshot({
-    kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
-    objects: [{
-      ref: { schema: 'sales', name: 'employee' }, kind: 'table', comment: null, columns,
-      primaryKey: { name: 'pk_employee', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
-    }],
+    kind: 'sqlserver',
+    serverVersion: '16.0',
+    account: { user: 'dbo', login: 'sa' },
+    scope: { schemas: ['sales'] },
+    gaps: [],
+    objects: [
+      {
+        ref: { schema: 'sales', name: 'employee' },
+        kind: 'table',
+        comment: null,
+        columns,
+        primaryKey: { name: 'pk_employee', columns: ['id'] },
+        uniqueKeys: [],
+        foreignKeys: [],
+        checks: [],
+        rowSecurity: 'none',
+      },
+    ],
   })
 }
 
 /** Accepts four literal tokens: an administrator, a publisher -- who administers too, under review (0065) -- a clerk, and nothing else. */
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'admin' ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
-    : token === 'publisher' ? { ok: true, identity: { actor: { id: 'p', roles: ['data-publisher'] }, attributes: {} } }
-      : token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
+  token === 'admin'
+    ? { ok: true, identity: { actor: { id: 'a', roles: ['data-admin'] }, attributes: {} } }
+    : token === 'publisher'
+      ? { ok: true, identity: { actor: { id: 'p', roles: ['data-publisher'] }, attributes: {} } }
+      : token === 'clerk'
+        ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: {} } }
         : { ok: false, reason: 'bad' }
 
 /** The same, for a plane registered on a Fastify instance this suite builds itself. */
@@ -69,7 +95,12 @@ async function authenticate(request: FastifyRequest): Promise<HostIdentity | und
 let reachable: boolean
 /** The allowlist knows `erp` and nothing else; a database that is down throws what a driver throws, address and all. */
 function registry(): ConnectionRegistry {
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => snapshot(), close: async () => {} } as DatabaseAdapter
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => snapshot(),
+    close: async () => {},
+  } as DatabaseAdapter
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
@@ -92,12 +123,18 @@ const sink: AuditSink = (event) => {
 }
 
 function serve(overrides: { store?: ConfigurationStore } = {}): Promise<FastifyInstance> {
-  return createDataServer({ verifyIdentity, admin: { registry: registry(), store: overrides.store ?? store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } } })
+  return createDataServer({
+    verifyIdentity,
+    admin: { registry: registry(), store: overrides.store ?? store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } },
+  })
 }
 
 /** The same plane under review (0065): `publisher` approves what `admin` submits. */
 function serveReviewed(): Promise<FastifyInstance> {
-  return createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink, now: () => NOW } } })
+  return createDataServer({
+    verifyIdentity,
+    admin: { registry: registry(), store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], audit: { sink, now: () => NOW } },
+  })
 }
 
 beforeEach(async () => {
@@ -124,7 +161,17 @@ const POLICY = {
 
 /** A proposal published as proposed, format 2 (0030). */
 function bundleOf(proposal: any) {
-  return { format: 2, connection: 'erp', generation: proposal.generation, base: proposal.form, presentation: EMPTY_PRESENTATION, form: proposal.form, bindings: proposal.bindings, policy: POLICY, snapshot: proposal.snapshot }
+  return {
+    format: 2,
+    connection: 'erp',
+    generation: proposal.generation,
+    base: proposal.form,
+    presentation: EMPTY_PRESENTATION,
+    form: proposal.form,
+    bindings: proposal.bindings,
+    policy: POLICY,
+    snapshot: proposal.snapshot,
+  }
 }
 
 async function propose(server: FastifyInstance) {
@@ -140,7 +187,17 @@ const of = (operation: AdminAuditEvent['operation']) => events.filter((entry) =>
 
 /** An expected event, every field present: what a case does not give is null, as the plane writes it. */
 const event = (fields: Partial<AdminAuditEvent> & Pick<AdminAuditEvent, 'operation' | 'status' | 'outcome'>): AdminAuditEvent => ({
-  at: NOW, plane: 'admin', actor: 'a', connection: null, form: null, formVersion: null, expectedBase: null, restoredFrom: null, draft: null, object: null, ...fields,
+  at: NOW,
+  plane: 'admin',
+  actor: 'a',
+  connection: null,
+  form: null,
+  formVersion: null,
+  expectedBase: null,
+  restoredFrom: null,
+  draft: null,
+  object: null,
+  ...fields,
 })
 
 describe('what holds the trail in place', () => {
@@ -172,8 +229,25 @@ describe('what holds the trail in place', () => {
   // the plane's hooks, where `onRoute` never sees it, included. The plane is
   // under review (0065), so its draft routes are in the router too.
   test.each([
-    { plane: 'admin', names: ADMIN_OPERATIONS, register: (instance: FastifyInstance, to: AuditSink) => adminRoutes(instance, { registry: registry(), store, adminRoles: ['data-admin', 'data-publisher'], publisherRoles: ['data-publisher'], authenticate, audit: { sink: to } }) },
-    { plane: 'runtime', names: ROUTE_OPERATIONS, register: (instance: FastifyInstance, to: AuditSink) => runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, audit: { sink: to } }) },
+    {
+      plane: 'admin',
+      names: ADMIN_OPERATIONS,
+      register: (instance: FastifyInstance, to: AuditSink) =>
+        adminRoutes(instance, {
+          registry: registry(),
+          store,
+          adminRoles: ['data-admin', 'data-publisher'],
+          publisherRoles: ['data-publisher'],
+          authenticate,
+          audit: { sink: to },
+        }),
+    },
+    {
+      plane: 'runtime',
+      names: ROUTE_OPERATIONS,
+      register: (instance: FastifyInstance, to: AuditSink) =>
+        runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, audit: { sink: to } }),
+    },
   ] as const)('every route the $plane plane registers emits exactly one event, named from its table', async ({ plane, names, register }) => {
     const routes: Array<{ method: string; url: string }> = []
     let heard: AuditEvent[] = []
@@ -187,13 +261,17 @@ describe('what holds the trail in place', () => {
     const key = ({ method, url }: { method: string; url: string }) => `${method === 'HEAD' ? 'GET' : method} ${url}`
     expect(new Set(routes.map(key))).toEqual(new Set(Object.keys(names)))
     for (const route of routes) {
-      const path = route.url.replace(':id', route.url.startsWith('/v1/connections/') ? 'erp' : 'employee').replace(':version', '1').replace(':source', 'customer').replace(':draft', '1')
+      const path = route.url
+        .replace(':id', route.url.startsWith('/v1/connections/') ? 'erp' : 'employee')
+        .replace(':version', '1')
+        .replace(':source', 'customer')
+        .replace(':draft', '1')
       heard = []
       const response = await bare.inject({ method: route.method as 'GET', url: path })
       expect({ route, status: response.statusCode }).toEqual({ route, status: 401 })
-      expect(heard.map((entry) => ({ route, plane: entry.plane, operation: entry.operation, actor: entry.actor, status: entry.status, outcome: entry.outcome }))).toEqual([
-        { route, plane, operation: names[key(route)], actor: null, status: 401, outcome: 'unauthenticated' },
-      ])
+      expect(
+        heard.map((entry) => ({ route, plane: entry.plane, operation: entry.operation, actor: entry.actor, status: entry.status, outcome: entry.outcome })),
+      ).toEqual([{ route, plane, operation: names[key(route)], actor: null, status: 401, outcome: 'unauthenticated' }])
     }
   })
 
@@ -216,7 +294,11 @@ describe('what holds the trail in place', () => {
     })
     await early.ready()
     const response = await early.inject({ method: 'POST', url: '/v1/forms/employee/records/archive', headers: as('clerk') })
-    expect({ status: response.statusCode, body: response.json() as unknown, ran }).toEqual({ status: 500, body: { code: 'unaudited-route', message: expect.any(String) }, ran: false })
+    expect({ status: response.statusCode, body: response.json<unknown>(), ran }).toEqual({
+      status: 500,
+      body: { code: 'unaudited-route', message: expect.any(String) },
+      ran: false,
+    })
     expect(lines.map((line) => (JSON.parse(line) as { msg: string }).msg)).toContain('POST /v1/forms/:id/records/archive has no audit name (0023, 0033)')
   })
 
@@ -224,8 +306,12 @@ describe('what holds the trail in place', () => {
   // nobody able to say who. The type requires a sink; this is the check for
   // a caller the type cannot reach -- a .mjs file, or a cast.
   test('the administrator plane does not start without an audit sink', async () => {
-    await expect(createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'] } as never })).rejects.toThrow("The administrator's plane needs an audit sink")
-    await expect(createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: {} } as never })).rejects.toThrow("The administrator's plane needs an audit sink")
+    await expect(createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'] } as never })).rejects.toThrow(
+      "The administrator's plane needs an audit sink",
+    )
+    await expect(createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: {} } as never })).rejects.toThrow(
+      "The administrator's plane needs an audit sink",
+    )
   })
 })
 
@@ -266,15 +352,29 @@ describe("the administrator plane's events", () => {
     const server = await serve()
     await publish(server)
     await publish(server, 1)
-    const restored = await server.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as('admin'), payload: { version: 1, expectedBase: 2 } })
+    const restored = await server.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/restorations',
+      headers: as('admin'),
+      payload: { version: 1, expectedBase: 2 },
+    })
     expect(restored.statusCode, restored.body).toBe(201)
-    expect(of('restore')).toEqual([event({ operation: 'restore', form: 'employee', connection: 'erp', formVersion: 3, expectedBase: 2, restoredFrom: 1, status: 201, outcome: 'ok' })])
+    expect(of('restore')).toEqual([
+      event({ operation: 'restore', form: 'employee', connection: 'erp', formVersion: 3, expectedBase: 2, restoredFrom: 1, status: 201, outcome: 'ok' }),
+    ])
 
     events = []
     columns = columns.filter((entry) => entry.name !== 'name')
-    const refused = await server.inject({ method: 'POST', url: '/v1/forms/employee/restorations', headers: as('admin'), payload: { version: 1, expectedBase: 3 } })
+    const refused = await server.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/restorations',
+      headers: as('admin'),
+      payload: { version: 1, expectedBase: 3 },
+    })
     expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [expect.objectContaining({ kind: 'column-dropped' })] })
-    expect(events).toEqual([event({ operation: 'restore', form: 'employee', connection: 'erp', expectedBase: 3, restoredFrom: 1, status: 409, outcome: 'incompatible' })])
+    expect(events).toEqual([
+      event({ operation: 'restore', form: 'employee', connection: 'erp', expectedBase: 3, restoredFrom: 1, status: 409, outcome: 'incompatible' }),
+    ])
     expect(JSON.stringify(events)).not.toContain('column-dropped')
   })
 
@@ -297,13 +397,23 @@ describe("the administrator plane's events", () => {
     try {
       const production = await serve({ store: createFileConfigurationStore(elsewhere) })
       events = []
-      const imported = await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: null, bundle } })
+      const imported = await production.inject({
+        method: 'POST',
+        url: '/v1/forms/employee/imports',
+        headers: as('admin'),
+        payload: { expectedBase: null, bundle },
+      })
       expect(imported.statusCode, imported.body).toBe(201)
       columns = columns.filter((entry) => entry.name !== 'name')
       const refused = await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 1, bundle } })
       expect(refused.json()).toMatchObject({ code: 'incompatible', changes: [expect.objectContaining({ kind: 'column-dropped' })] })
       await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 'newest', bundle } })
-      await production.inject({ method: 'POST', url: '/v1/forms/employee/imports', headers: as('admin'), payload: { expectedBase: 1, bundle: { ...bundle, connection: `${HOST}:1433;password=${PASSWORD}` } } })
+      await production.inject({
+        method: 'POST',
+        url: '/v1/forms/employee/imports',
+        headers: as('admin'),
+        payload: { expectedBase: 1, bundle: { ...bundle, connection: `${HOST}:1433;password=${PASSWORD}` } },
+      })
       expect(events).toEqual([
         event({ operation: 'import', form: 'employee', connection: 'erp', formVersion: 1, status: 201, outcome: 'ok' }),
         event({ operation: 'import', form: 'employee', connection: 'erp', expectedBase: 1, status: 409, outcome: 'incompatible' }),
@@ -366,8 +476,13 @@ describe("the administrator plane's events", () => {
     await publish(server)
     events = []
     for (const [method, url] of [
-      ['GET', '/v1/connections'], ['GET', '/v1/forms/employee/versions'], ['GET', '/v1/forms/employee/versions/latest'],
-      ['GET', '/v1/forms/employee/versions/1'], ['GET', '/v1/forms/employee/versions/9'], ['POST', '/v1/forms/employee/drift'], ['POST', '/v1/forms/employee/regenerations'],
+      ['GET', '/v1/connections'],
+      ['GET', '/v1/forms/employee/versions'],
+      ['GET', '/v1/forms/employee/versions/latest'],
+      ['GET', '/v1/forms/employee/versions/1'],
+      ['GET', '/v1/forms/employee/versions/9'],
+      ['POST', '/v1/forms/employee/drift'],
+      ['POST', '/v1/forms/employee/regenerations'],
     ] as const) {
       await server.inject({ method, url, headers: as('admin') })
     }
@@ -457,7 +572,12 @@ describe("the administrator plane's events", () => {
     const server = await serve()
     await server.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })
     await server.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, formId: 'Employee' } })
-    await server.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...PROPOSAL, connection: `postgres://sa:${PASSWORD}@${HOST}:5432/erp` } })
+    await server.inject({
+      method: 'POST',
+      url: '/v1/form-proposals',
+      headers: as('admin'),
+      payload: { ...PROPOSAL, connection: `postgres://sa:${PASSWORD}@${HOST}:5432/erp` },
+    })
     expect(events).toEqual([
       event({ operation: 'proposal', form: 'employee', connection: 'erp', status: 200, outcome: 'ok' }),
       event({ operation: 'proposal', status: 400, outcome: 'invalid-request' }),
@@ -474,14 +594,18 @@ describe("the administrator plane's events", () => {
   // does not decode, never reaches the plane: the router answers it, runs no
   // hook, and it leaves no event. 0033 says so rather than claim every request.
   test('a rate-limited request is audited by its status, and one the router refuses is not audited', async () => {
-    const limited = await createDataServer({ verifyIdentity, rateLimit: { max: 1, timeWindowMs: 60_000 }, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } } })
+    const limited = await createDataServer({
+      verifyIdentity,
+      rateLimit: { max: 1, timeWindowMs: 60_000 },
+      admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } },
+    })
     await limited.inject({ method: 'GET', url: '/v1/connections', headers: as('admin') })
     expect((await limited.inject({ method: 'GET', url: '/v1/connections', headers: as('admin') })).statusCode).toBe(429)
     const server = await serve()
     expect((await server.inject({ method: 'GET', url: '/v1/forms/employee/nothing', headers: as('admin') })).statusCode).toBe(404)
     expect((await server.inject({ method: 'GET', url: `/v1/forms/e${'x'.repeat(128)}/versions/latest`, headers: as('admin') })).statusCode).toBe(414)
     const undecodable = await server.inject({ method: 'POST', url: '/v1/forms/%E0/versions', headers: as('admin') })
-    expect({ status: undecodable.statusCode, code: (undecodable.json() as { code: string }).code }).toEqual({ status: 400, code: 'FST_ERR_BAD_URL' })
+    expect({ status: undecodable.statusCode, code: undecodable.json<{ code: string }>().code }).toEqual({ status: 400, code: 'FST_ERR_BAD_URL' })
     expect(events).toEqual([
       event({ operation: 'connection-list', status: 200, outcome: 'ok' }),
       event({ operation: 'connection-list', actor: null, status: 429, outcome: 'http-429' }),
@@ -496,9 +620,9 @@ describe("the administrator plane's events", () => {
   test('a path that is not plain is one event with no actor on a route, and none off one', async () => {
     const server = await serve()
     const refused = await server.inject({ method: 'GET', url: '/v1/forms/a/versions/..%2F..%2Fb', headers: as('admin') })
-    expect({ status: refused.statusCode, code: (refused.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    expect({ status: refused.statusCode, code: refused.json<{ code: string }>().code }).toEqual({ status: 400, code: 'path-not-plain' })
     const nowhere = await server.inject({ method: 'GET', url: '/v1/forms/employee/nothing%2F..', headers: as('admin') })
-    expect({ status: nowhere.statusCode, code: (nowhere.json() as { code: string }).code }).toEqual({ status: 400, code: 'path-not-plain' })
+    expect({ status: nowhere.statusCode, code: nowhere.json<{ code: string }>().code }).toEqual({ status: 400, code: 'path-not-plain' })
     expect(events).toEqual([event({ operation: 'version-read', actor: null, form: 'a', status: 400, outcome: 'path-not-plain' })])
   })
 
@@ -509,7 +633,10 @@ describe("the administrator plane's events", () => {
     const lines: string[] = []
     const logged = Fastify({ logger: { level: 'error', stream: { write: (line: string) => void lines.push(line) } } })
     await logged.register(adminRoutes, {
-      registry: registry(), store, adminRoles: ['data-admin'], authenticate,
+      registry: registry(),
+      store,
+      adminRoles: ['data-admin'],
+      authenticate,
       audit: {
         sink: () => {
           throw new Error('disk full')
@@ -587,7 +714,7 @@ describe('what a caller cannot write into the trail', () => {
   // that happens to be a password is a form id, and is recorded as the form
   // addressed. What the shape keeps out is a connection string, which needs
   // a `:`, `;`, `@`, `=` or `/`; 0033 and the README claim no more than that.
-  test('an address or a word with a form id\'s shape is recorded as the form addressed', async () => {
+  test("an address or a word with a form id's shape is recorded as the form addressed", async () => {
     const server = await serve()
     await server.inject({ method: 'GET', url: `/v1/forms/${HOST}/versions/latest` })
     await server.inject({ method: 'GET', url: '/v1/forms/db.internal.example/versions' })
@@ -688,7 +815,10 @@ async function pipelinedPeak(behind: number): Promise<number> {
       return ['erp']
     },
   }
-  const server = await createDataServer({ verifyIdentity, admin: { registry: counting, store: held.store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } } })
+  const server = await createDataServer({
+    verifyIdentity,
+    admin: { registry: counting, store: held.store, adminRoles: ['data-admin'], audit: { sink, now: () => NOW } },
+  })
   await server.listen({ host: '127.0.0.1', port: 0 })
   try {
     const accepted = new Promise<Socket>((resolve) => server.server.once('connection', resolve))
@@ -752,40 +882,48 @@ describe('over a real socket, however the connection ends', () => {
   // commits. Whether the connection goes after its answer was decided or
   // before, its event is written once, naming the version it wrote; with the
   // response's own `close` as the last way to hear of it, it was never written.
-  test.each(['after', 'before'] as const)('a publish pipelined behind a held request is audited once when the connection goes %s its answer is decided', async (when) => {
-    const plain = await serve()
-    expect((await publish(plain)).statusCode).toBe(201)
-    const bundle = bundleOf(await propose(plain))
-    const held = heldStore(store)
-    if (when === 'after') held.publishing.open()
-    const server = await serve({ store: held.store })
-    events = []
-    await server.listen({ host: '127.0.0.1', port: 0 })
-    try {
-      const accepted = new Promise<Socket>((resolve) => server.server.once('connection', resolve))
-      const client = rawSend(server, wire('GET', '/v1/forms/employee/versions', as('admin')) + wire('POST', '/v1/forms/employee/versions', as('admin'), { expectedBase: 1, bundle }))
-      const serverSide = await accepted
-      await held.listing.entered
-      if (when === 'after') {
+  test.each(['after', 'before'] as const)(
+    'a publish pipelined behind a held request is audited once when the connection goes %s its answer is decided',
+    async (when) => {
+      const plain = await serve()
+      expect((await publish(plain)).statusCode).toBe(201)
+      const bundle = bundleOf(await propose(plain))
+      const held = heldStore(store)
+      if (when === 'after') held.publishing.open()
+      const server = await serve({ store: held.store })
+      events = []
+      await server.listen({ host: '127.0.0.1', port: 0 })
+      try {
+        const accepted = new Promise<Socket>((resolve) => server.server.once('connection', resolve))
+        const client = rawSend(
+          server,
+          wire('GET', '/v1/forms/employee/versions', as('admin')) + wire('POST', '/v1/forms/employee/versions', as('admin'), { expectedBase: 1, bundle }),
+        )
+        const serverSide = await accepted
+        await held.listing.entered
+        if (when === 'after') {
+          await held.written
+          await settle()
+        } else {
+          await held.publishing.entered
+        }
+        const gone = new Promise((resolve) => serverSide.once('close', resolve))
+        client.destroy()
+        await gone
+        held.publishing.open()
         await held.written
-        await settle()
-      } else {
-        await held.publishing.entered
+        held.listing.open()
+        await eventsReach(2)
+      } finally {
+        await server.close()
       }
-      const gone = new Promise((resolve) => serverSide.once('close', resolve))
-      client.destroy()
-      await gone
-      held.publishing.open()
-      await held.written
-      held.listing.open()
-      await eventsReach(2)
-    } finally {
-      await server.close()
-    }
-    expect(await store.latest('employee')).toBe(2)
-    expect(of('publish')).toEqual([event({ operation: 'publish', form: 'employee', connection: 'erp', formVersion: 2, expectedBase: 1, status: 201, outcome: 'ok' })])
-    expect(of('version-list')).toEqual([event({ operation: 'version-list', form: 'employee', status: 200, outcome: 'ok' })])
-  })
+      expect(await store.latest('employee')).toBe(2)
+      expect(of('publish')).toEqual([
+        event({ operation: 'publish', form: 'employee', connection: 'erp', formVersion: 2, expectedBase: 1, status: 201, outcome: 'ok' }),
+      ])
+      expect(of('version-list')).toEqual([event({ operation: 'version-list', form: 'employee', status: 200, outcome: 'ok' })])
+    },
+  )
 
   // A client gone halfway through its body is refused by Fastify's body
   // reader as ECONNRESET before any route runs. It is still a request to the

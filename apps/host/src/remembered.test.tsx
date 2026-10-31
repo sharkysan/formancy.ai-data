@@ -7,9 +7,10 @@ import { applied, applyCondition, listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, gridSection, gridStatus, load, loaded, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { childGrid, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
+import { headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What this browser keeps of a grid, and what it brings back (0106), on
@@ -63,7 +64,7 @@ async function definitionOf(formId: string): Promise<PublishedForm> {
 async function labelsOf(formId: string, parent: string | null = null): Promise<string[]> {
   const definition = await definitionOf(formId)
   const readable = new Set(definition.readable)
-  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map((field) => String(field.label ?? field.key))
+  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map(fieldHeading)
 }
 
 /** The page, signed in as tenant 1's clerk, with `formId` chosen and its grid answered: a first opening, or a reload. */
@@ -82,10 +83,12 @@ async function reopen(formId: string): Promise<User> {
 }
 
 /** The filter and sort of each list request sent for `formId`, with the cursor it continues after. */
-const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> => listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
+const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> =>
+  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
 
 /** What the grid's View picker shows. */
-const shown = (heading: string): string => within(within(gridSection(heading)).getByRole('combobox', { name: 'View' })).getByRole('option', { selected: true }).textContent ?? ''
+const shown = (heading: string): string =>
+  within(within(gridSection(heading)).getByRole('combobox', { name: 'View' })).getByRole('option', { selected: true }).textContent ?? ''
 
 /** Choose `name` in the grid's View picker and press Show view. */
 async function pick(user: User, heading: string, name: string): Promise<void> {
@@ -96,7 +99,9 @@ async function pick(user: User, heading: string, name: string): Promise<void> {
 /** What a header of the grid says of its sort: `aria-sort`, or null for a column that is not sorted. */
 function sortOf(heading: string, label: string): string | null {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  const sort = within(grid).getByRole('columnheader', { name: new RegExp(`^${label}`) }).getAttribute('aria-sort')
+  const sort = within(grid)
+    .getByRole('columnheader', { name: new RegExp(`^${label}`) })
+    .getAttribute('aria-sort')
   return sort === 'none' ? null : sort
 }
 
@@ -113,7 +118,13 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
   const records: string[] = []
   for (const amount of amounts) {
-    const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount, notes })
+    const created = await plane.clerk.create(engine.formId, {
+      customer: found.value.rows[0].token,
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount,
+      notes,
+    })
     if (!created.ok || created.value.record === null) throw new Error('the order was not created')
     records.push(created.value.record)
   }
@@ -153,7 +164,11 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     expect(shown('Records')).toBe(LARGE.name)
     expect([sortOf('Records', 'Amount'), sortOf('Records', 'Id')]).toEqual(['descending', 'ascending'])
     await openColumns(user, 'Records')
-    expect(listed('Records').map((column) => column.label).sort()).toEqual([...labels].sort())
+    expect(
+      listed('Records')
+        .map((column) => column.label)
+        .sort(),
+    ).toEqual([...labels].sort())
     expect(showBox('Records', 'Notes').checked).toBe(false)
     expect(window.location.href).toBe(before)
     expect(await floor('the columns and a view brought back')).toEqual(CLEAN('the columns and a view brought back'))
@@ -180,7 +195,9 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     expect(await floor('all records brought back')).toEqual(CLEAN('all records brought back'))
 
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    within(grid).getByRole('columnheader', { name: /^Order date/ }).focus()
+    within(grid)
+      .getByRole('columnheader', { name: /^Order date/ })
+      .focus()
     await again.keyboard('{Enter}')
     const byDate: ListSortTerm[] = [{ field: 'order_date', direction: 'asc' }]
     await waitFor(() => expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, sort: byDate }), ARRIVES)
@@ -230,12 +247,33 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
   // hidden by the value of another shape).
   test('reads what was kept over what the form offers now', async () => {
     const labels = await labelsOf(engine.formId)
-    localStorage.setItem(gridKey(RECORDS_GRID, engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'gone', shown: true }, { field: 'notes', shown: true }, { field: 'id', shown: false }], view: 'A view since renamed' }))
+    localStorage.setItem(
+      gridKey(RECORDS_GRID, engine.formId),
+      JSON.stringify({
+        version: 1,
+        columns: [
+          { field: 'gone', shown: true },
+          { field: 'notes', shown: true },
+          { field: 'id', shown: false },
+        ],
+        view: 'A view since renamed',
+      }),
+    )
     await workspace(engine.formId)
     await headed('Records', ['Notes', ...labels.filter((label) => label !== 'Notes' && label !== 'Id')])
     expect(shown('Records')).toBe(NEWEST.name)
 
-    localStorage.setItem(gridKey(RECORDS_GRID, engine.formId), JSON.stringify({ version: 1, columns: [{ field: 'notes', shown: true }, { field: 'id', shown: false }], filter: [{ field: 'notes', op: 'contains', text: 'x' }] }))
+    localStorage.setItem(
+      gridKey(RECORDS_GRID, engine.formId),
+      JSON.stringify({
+        version: 1,
+        columns: [
+          { field: 'notes', shown: true },
+          { field: 'id', shown: false },
+        ],
+        filter: [{ field: 'notes', op: 'contains', text: 'x' }],
+      }),
+    )
     await reopen(engine.formId)
     await headed('Records', labels)
     expect(shown('Records')).toBe(NEWEST.name)
@@ -252,7 +290,10 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await headed('Records', labels)
     await openColumns(user, 'Records')
     await user.click(showBox('Records', 'Notes'))
-    await headed('Records', labels.filter((label) => label !== 'Notes'))
+    await headed(
+      'Records',
+      labels.filter((label) => label !== 'Notes'),
+    )
     expect(keptFor(RECORDS_GRID, engine.formId)).toEqual({ version: 1, columns: expect.any(Array) })
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Reset columns' }))
     await headed('Records', labels)
@@ -278,7 +319,10 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await headed('Records', labels)
     await openColumns(user, 'Records')
     await user.click(showBox('Records', 'Notes'))
-    await headed('Records', labels.filter((label) => label !== 'Notes'))
+    await headed(
+      'Records',
+      labels.filter((label) => label !== 'Notes'),
+    )
     await pick(user, 'Records', LARGE.name)
     await says('Records', /^Rows 1–\d+\. Filtered by Notes and Amount\.$/)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Reset columns' }))
@@ -317,7 +361,11 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await answeredOnce('Delivery')
     await headed('Delivery', arranged)
     await openColumns(user, 'Delivery')
-    expect(listed('Delivery').map((column) => column.label).sort()).toEqual([...labels].sort())
+    expect(
+      listed('Delivery')
+        .map((column) => column.label)
+        .sort(),
+    ).toEqual([...labels].sort())
     expect(listed('Delivery').map((column) => column.label)).not.toContain('Order')
     await headed('Records', orderLabels)
     expect(await floor('a child section’s columns under another parent')).toEqual(CLEAN('a child section’s columns under another parent'))

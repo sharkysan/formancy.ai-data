@@ -87,7 +87,10 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
     const problem = outcome.ok ? '' : outcome.problem
     expect(problem).toMatch(new RegExp(`^FORMANCY_DATA_TRUSTED_PROXIES: entry ${String(place)} `))
     expect(problem).toMatch(rule)
-    const entries = text.split(',').map((entry) => entry.trim()).filter((entry) => entry !== '')
+    const entries = text
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== '')
     for (const entry of entries) expect(problem).not.toContain(entry)
   })
 
@@ -106,7 +109,12 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
     ['::/1, 8000::/1', 'IPv6', 'the two halves of IPv6'],
   ] as const)('refuses %j, whose entries together trust every %s peer: %s', (text, family, _what) => {
     const outcome = trustedProxiesSetting(text)
-    expect(outcome).toEqual({ ok: false, problem: expect.stringMatching(new RegExp(`^FORMANCY_DATA_TRUSTED_PROXIES: its entries together cover every ${family} address, which trusts every peer`)) as unknown })
+    expect(outcome).toEqual({
+      ok: false,
+      problem: expect.stringMatching(
+        new RegExp(`^FORMANCY_DATA_TRUSTED_PROXIES: its entries together cover every ${family} address, which trusts every peer`),
+      ) as unknown,
+    })
     for (const entry of text.split(',').map((part) => part.trim())) expect(outcome.ok ? '' : outcome.problem).not.toContain(entry)
   })
 
@@ -124,7 +132,10 @@ describe('FORMANCY_DATA_TRUSTED_PROXIES', () => {
   // fewer proxies than written, and the operator would read one bucket for
   // everybody as the setting not working, or more than written.
   test('refuses the whole list for one bad entry, naming the first', () => {
-    expect(trustedProxiesSetting('10.0.0.1, *, 10.0.0.0/33')).toEqual({ ok: false, problem: expect.stringMatching(/^FORMANCY_DATA_TRUSTED_PROXIES: entry 2 trusts every peer/) as unknown })
+    expect(trustedProxiesSetting('10.0.0.1, *, 10.0.0.0/33')).toEqual({
+      ok: false,
+      problem: expect.stringMatching(/^FORMANCY_DATA_TRUSTED_PROXIES: entry 2 trusts every peer/) as unknown,
+    })
   })
 })
 

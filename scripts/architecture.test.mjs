@@ -137,7 +137,10 @@ function workspacePackages() {
 }
 
 /** Every decision record's path, from the directory listing. */
-const decisionRecords = () => listing(DECISIONS).filter((entry) => entry.isFile() && RECORD.test(entry.name)).map((entry) => `${DECISIONS}/${entry.name}`)
+const decisionRecords = () =>
+  listing(DECISIONS)
+    .filter((entry) => entry.isFile() && RECORD.test(entry.name))
+    .map((entry) => `${DECISIONS}/${entry.name}`)
 
 /** Whether `text` names `name` whole: not as a part of a longer name. */
 function names(text, name) {
@@ -337,7 +340,12 @@ function pathProblems(file, markdown, files) {
 }
 
 /** The entry and every Markdown file in docs/architecture/, by path. */
-const documents = () => [ENTRY, ...listing(ARCHITECTURE).filter((entry) => entry.isFile() && entry.name.endsWith('.md')).map((entry) => `${ARCHITECTURE}/${entry.name}`)]
+const documents = () => [
+  ENTRY,
+  ...listing(ARCHITECTURE)
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .map((entry) => `${ARCHITECTURE}/${entry.name}`),
+]
 
 /**
  * Pages beside the architecture whose links and paths these rules hold too:
@@ -355,9 +363,18 @@ describe('the architecture', () => {
   test("is the entry and arc42's twelve sections, each linked from the entry, and nothing else", () => {
     const missing = [ENTRY, ...SECTIONS.map((name) => `${ARCHITECTURE}/${name}`)].filter((file) => textOf(file) === undefined)
     expect(missing, 'write these; formancy.ai docs/architecture/ has the shape').toEqual([])
-    const linked = new Set(linksIn(textOf(ENTRY)).filter(isRelative).map((href) => resolveLink(ENTRY, href).target))
-    expect(SECTIONS.filter((name) => !linked.has(`${ARCHITECTURE}/${name}`)), `${ENTRY} does not link these`).toEqual([])
-    const extra = listing(ARCHITECTURE).map((entry) => entry.name).filter((name) => !SECTIONS.includes(name))
+    const linked = new Set(
+      linksIn(textOf(ENTRY))
+        .filter(isRelative)
+        .map((href) => resolveLink(ENTRY, href).target),
+    )
+    expect(
+      SECTIONS.filter((name) => !linked.has(`${ARCHITECTURE}/${name}`)),
+      `${ENTRY} does not link these`,
+    ).toEqual([])
+    const extra = listing(ARCHITECTURE)
+      .map((entry) => entry.name)
+      .filter((name) => !SECTIONS.includes(name))
     expect(extra, 'not one of arc42 twelve: fold it into the section it belongs to').toEqual([])
   })
 
@@ -379,9 +396,16 @@ describe('the architecture', () => {
     const cited = new Set(
       documents()
         .filter((file) => file !== ENTRY)
-        .flatMap((file) => linksIn(textOf(file) ?? '').filter(isRelative).map((href) => resolveLink(file, href).target)),
+        .flatMap((file) =>
+          linksIn(textOf(file) ?? '')
+            .filter(isRelative)
+            .map((href) => resolveLink(file, href).target),
+        ),
     )
-    expect(decisionRecords().filter((record) => !cited.has(record)), 'place each in the section it changes, by a link to its file').toEqual([])
+    expect(
+      decisionRecords().filter((record) => !cited.has(record)),
+      'place each in the section it changes, by a link to its file',
+    ).toEqual([])
   })
 
   // A link to a file that moved, to one git ignores -- the plan, a build --
@@ -405,7 +429,16 @@ describe('the architecture', () => {
   // path recognised -- would pass them forever. What the files hold today.
   test('reads the workspace, the records, the links and the paths at all', () => {
     const packages = workspacePackages().map(({ name }) => name)
-    expect(packages).toEqual(expect.arrayContaining(['@formancy/data-core', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-studio', '@formancy/data-host']))
+    expect(packages).toEqual(
+      expect.arrayContaining([
+        '@formancy/data-core',
+        '@formancy/data-postgres',
+        '@formancy/data-sqlserver',
+        '@formancy/data-server',
+        '@formancy/data-studio',
+        '@formancy/data-host',
+      ]),
+    )
     expect(packages).not.toContain('formancy-data')
     expect(decisionRecords()).toContain(`${DECISIONS}/0001-a-paid-module-in-its-own-repository.md`)
     expect(decisionRecords()).not.toContain(`${DECISIONS}/README.md`)
@@ -415,14 +448,20 @@ describe('the architecture', () => {
         .map((href) => resolveLink(file, href))
         .filter((link) => link.outside !== true),
     )
-    expect(links.filter((link) => link.target.endsWith('.md') && (link.fragment ?? '') !== ''), 'no anchor into Markdown was checked').not.toEqual([])
+    expect(
+      links.filter((link) => link.target.endsWith('.md') && (link.fragment ?? '') !== ''),
+      'no anchor into Markdown was checked',
+    ).not.toEqual([])
     expect(links.map((link) => link.target).filter((target) => target.startsWith(`${DECISIONS}/`))).not.toEqual([])
     const files = committable()
     const tops = topLevelDirectories(files)
     expect([...tops]).toEqual(expect.arrayContaining(['.github', 'apps', 'deploy', 'docs', 'packages', 'scripts']))
     const paths = documents().flatMap((file) => codeSpansIn(textOf(file) ?? '').filter((span) => isRepositoryPath(span, tops)))
     expect(paths).toContain('packages/data-core/src/records/plan.ts')
-    expect(paths.filter((path) => GLOB.test(path)), 'no pattern was checked').not.toEqual([])
+    expect(
+      paths.filter((path) => GLOB.test(path)),
+      'no pattern was checked',
+    ).not.toEqual([])
   })
 })
 
@@ -451,8 +490,27 @@ describe('the Markdown reader', () => {
   // link, a dash, a heading given twice, and a `#` inside a fence, which is
   // no heading.
   test("gives a heading GitHub's anchor", () => {
-    const markdown = ['# 5. Building blocks', '## 11.4 The release gates still open', '### `@formancy/data-core`', '### [0005](x.md) and the gate', '## What it costs — and why ##', '## Notes', '## Notes', '```', '# not a heading', '```'].join('\n')
-    expect([...anchorsOf(markdown)]).toEqual(['5-building-blocks', '114-the-release-gates-still-open', 'formancydata-core', '0005-and-the-gate', 'what-it-costs--and-why', 'notes', 'notes-1'])
+    const markdown = [
+      '# 5. Building blocks',
+      '## 11.4 The release gates still open',
+      '### `@formancy/data-core`',
+      '### [0005](x.md) and the gate',
+      '## What it costs — and why ##',
+      '## Notes',
+      '## Notes',
+      '```',
+      '# not a heading',
+      '```',
+    ].join('\n')
+    expect([...anchorsOf(markdown)]).toEqual([
+      '5-building-blocks',
+      '114-the-release-gates-still-open',
+      'formancydata-core',
+      '0005-and-the-gate',
+      'what-it-costs--and-why',
+      'notes',
+      'notes-1',
+    ])
   })
 
   // Each way a link opens on nothing, refused with its reason, beside a
@@ -461,7 +519,8 @@ describe('the Markdown reader', () => {
   test('refuses each link that leads nowhere, and only those', () => {
     const files = new Set(['docs/architecture/01-a.md', 'docs/decisions/README.md', 'packages/x/src/y.ts'])
     const read = (file) => (file === 'docs/decisions/README.md' ? '# Index\n' : '## Here\n')
-    const markdown = '[ok](../decisions/README.md#index) [self](#here) [code](../../packages/x/src/y.ts) [up](../../../elsewhere.md) [dir](../decisions/) [plan](../plan.md) [line](../../packages/x/src/y.ts#L3) [gone](../decisions/README.md#nothing)'
+    const markdown =
+      '[ok](../decisions/README.md#index) [self](#here) [code](../../packages/x/src/y.ts) [up](../../../elsewhere.md) [dir](../decisions/) [plan](../plan.md) [line](../../packages/x/src/y.ts#L3) [gone](../decisions/README.md#nothing)'
     expect(linkProblems('docs/architecture/01-a.md', markdown, files, read)).toEqual([
       'docs/architecture/01-a.md: ../../../elsewhere.md leads out of the repository',
       'docs/architecture/01-a.md: ../decisions/ names docs/decisions, a directory: link its README.md',
@@ -517,15 +576,33 @@ describe('what counts as a repository path', () => {
       'packages/data-core/src/records/plan.ts and more',
       'dist/main.mjs',
     ]
-    expect(spans.filter((span) => isRepositoryPath(span, tops))).toEqual(['packages/data-core/src/records/plan.ts', 'packages/data-core/', '.github/workflows/gates.yml', 'apps/*/scripts/browser-test.mjs'])
+    expect(spans.filter((span) => isRepositoryPath(span, tops))).toEqual([
+      'packages/data-core/src/records/plan.ts',
+      'packages/data-core/',
+      '.github/workflows/gates.yml',
+      'apps/*/scripts/browser-test.mjs',
+    ])
   })
 
   // A code span in a fence is an example of a path, not a claim that one
   // exists; one wrapped over a line break is still one span, as CommonMark
   // reads it.
   test('is read from code spans outside fences, a wrapped span included', () => {
-    const markdown = ['`packages/data-core/src/records/plan.ts` and `packages/data-core/src/records/`', '`scripts/release-report/', 'report.mjs`', '```', '`packages/gone.ts`', '```', '`` `apps/host/` ``'].join('\n')
-    expect(codeSpansIn(markdown)).toEqual(['packages/data-core/src/records/plan.ts', 'packages/data-core/src/records/', 'scripts/release-report/ report.mjs', '`apps/host/`'])
+    const markdown = [
+      '`packages/data-core/src/records/plan.ts` and `packages/data-core/src/records/`',
+      '`scripts/release-report/',
+      'report.mjs`',
+      '```',
+      '`packages/gone.ts`',
+      '```',
+      '`` `apps/host/` ``',
+    ].join('\n')
+    expect(codeSpansIn(markdown)).toEqual([
+      'packages/data-core/src/records/plan.ts',
+      'packages/data-core/src/records/',
+      'scripts/release-report/ report.mjs',
+      '`apps/host/`',
+    ])
   })
 
   // Each way a path names nothing, refused, beside each way one is right: a

@@ -24,10 +24,15 @@ afterEach(() => {
 const read = (dir, browser) => JSON.parse(readFileSync(join(dir, 'test-results', `browser-${browser}.json`), 'utf8'))
 
 /** A launched browser as the recorder sees it: its type's name, its version, and a close that is counted. */
-const instance = (name, version, closed = []) => ({ browserType: () => ({ name: () => name }), version: () => version, close: async () => void closed.push(name) })
+const instance = (name, version, closed = []) => ({
+  browserType: () => ({ name: () => name }),
+  version: () => version,
+  close: async () => void closed.push(name),
+})
 const quiet = () => {}
 /** Playwright as `load` gives it, whose browser types launch through `launch(name, options)`. */
-const playwright = (launch) => async () => Object.fromEntries(['chromium', 'firefox', 'webkit'].map((name) => [name, { launch: (options) => launch(name, options) }]))
+const playwright = (launch) => async () =>
+  Object.fromEntries(['chromium', 'firefox', 'webkit'].map((name) => [name, { launch: (options) => launch(name, options) }]))
 
 describe('a browser gate’s results', () => {
   // The report holds the browser to Playwright's pin and counts the checks;
@@ -100,7 +105,11 @@ describe('a browser gate’s results', () => {
   test('are an error when the browser launched is not the one asked for', () => {
     const gate = gateRecorder('apps/studio', { browser: 'chromium', log: quiet })
     expect(() => gate.launched(instance('firefox', '155.0'), { headless: true })).toThrow('apps/studio asked for chromium, and the launch gave firefox 155.0')
-    expect(gate.write(scratch())).toMatchObject({ asked: 'chromium', browser: { name: 'firefox' }, error: 'apps/studio asked for chromium, and the launch gave firefox 155.0' })
+    expect(gate.write(scratch())).toMatchObject({
+      asked: 'chromium',
+      browser: { name: 'firefox' },
+      error: 'apps/studio asked for chromium, and the launch gave firefox 155.0',
+    })
   })
 
   // Totals say how many checks passed, not which: a browser that skipped one
@@ -177,7 +186,11 @@ describe('a gate run once per browser', () => {
       ['firefox', { headless: true }],
     ])
     expect(closed).toEqual(['chromium', 'firefox'])
-    expect(read(dir, 'chromium')).toMatchObject({ asked: 'chromium', error: '1 browser check(s) failed:\n  signed out: no sideways scroll: 12px', checks: { ok: 1, failed: [] } })
+    expect(read(dir, 'chromium')).toMatchObject({
+      asked: 'chromium',
+      error: '1 browser check(s) failed:\n  signed out: no sideways scroll: 12px',
+      checks: { ok: 1, failed: [] },
+    })
     expect(read(dir, 'firefox')).toMatchObject({ asked: 'firefox', browser: { name: 'firefox', version: '155.0' }, checks: { ok: 1 } })
     expect(read(dir, 'firefox')).not.toHaveProperty('error')
   })
@@ -200,13 +213,22 @@ describe('a gate run once per browser', () => {
     }).catch((thrown) => thrown)
     expect(error).toBeInstanceOf(Error)
     expect(error.message).toBe('the browser gate of apps/host failed in Chromium:\n  1 browser check(s) failed:\n  signed out: no sideways scroll: 12px')
-    expect(read(dir, 'chromium')).toMatchObject({ error: '1 browser check(s) failed:\n  signed out: no sideways scroll: 12px', checks: { ok: 0, failed: ['signed out: no sideways scroll: 12px'] } })
+    expect(read(dir, 'chromium')).toMatchObject({
+      error: '1 browser check(s) failed:\n  signed out: no sideways scroll: 12px',
+      checks: { ok: 0, failed: ['signed out: no sideways scroll: 12px'] },
+    })
   })
 
   // A gate handed no browser would loop over nothing and resolve: green,
   // with no file written and nothing measured.
   test('refuses to run in no browser', async () => {
-    const error = await recordedPerBrowser('apps/host', { browsers: [], dir: scratch(), log: quiet, load: playwright(async () => null), run: async () => {} }).catch((thrown) => thrown)
+    const error = await recordedPerBrowser('apps/host', {
+      browsers: [],
+      dir: scratch(),
+      log: quiet,
+      load: playwright(async () => null),
+      run: async () => {},
+    }).catch((thrown) => thrown)
     expect(error).toBeInstanceOf(Error)
     expect(error.message).toBe('the browser gate of apps/host was given no browser to run in, and a gate run in none measures nothing')
   })

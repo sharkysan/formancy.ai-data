@@ -49,7 +49,17 @@ describe('a scenario over its rounds', () => {
   // over gap seconds, all rounds together (1 ms a second over 2 s and 9 over
   // 6 s here: 7, not 5, the mean of the rounds' rates).
   test("records the database's CPU per second in the idle gaps beside its CPU per request", () => {
-    const result = scenarioResult('pg', 'health', 1, 0, [round(1, 100, 1, { idle: { probeBeforeMs: 4, probeAfterMs: 4, databaseCpuMs: 2, seconds: 2 } }), round(1, 100, 1, { idle: { probeBeforeMs: 4, probeAfterMs: 4, databaseCpuMs: 54, seconds: 6 } })], 4)
+    const result = scenarioResult(
+      'pg',
+      'health',
+      1,
+      0,
+      [
+        round(1, 100, 1, { idle: { probeBeforeMs: 4, probeAfterMs: 4, databaseCpuMs: 2, seconds: 2 } }),
+        round(1, 100, 1, { idle: { probeBeforeMs: 4, probeAfterMs: 4, databaseCpuMs: 54, seconds: 6 } }),
+      ],
+      4,
+    )
     expect(result.databaseIdleCpuMsPerSecond).toBe(7)
   })
 })
@@ -58,8 +68,23 @@ describe('what went on around a block', () => {
   // Steal the hypervisor never reported is recorded in words; a block that
   // ran twice says so; disturbances and reconnects add up over the rounds.
   test('is aggregated over the rounds', () => {
-    const run = runFactsOf([round(1, 10, 1, { machineBusyPct: 4, disturbances: { autovacuum: 1, autoanalyze: 0 }, reconnects: 1 }), round(1, 10, 1, { machineBusyPct: 6, generatorLagP99Ms: 3 }, true)], 4)
-    expect(run).toEqual({ machineBusyPct: 5, steal: 'not reported', generatorLagP99Ms: 3, loadAvgAtStart: 0.1, calibrationRatio: 1, repeated: true, disturbances: { autovacuum: 1, autoanalyze: 0 }, reconnects: 1 })
+    const run = runFactsOf(
+      [
+        round(1, 10, 1, { machineBusyPct: 4, disturbances: { autovacuum: 1, autoanalyze: 0 }, reconnects: 1 }),
+        round(1, 10, 1, { machineBusyPct: 6, generatorLagP99Ms: 3 }, true),
+      ],
+      4,
+    )
+    expect(run).toEqual({
+      machineBusyPct: 5,
+      steal: 'not reported',
+      generatorLagP99Ms: 3,
+      loadAvgAtStart: 0.1,
+      calibrationRatio: 1,
+      repeated: true,
+      disturbances: { autovacuum: 1, autoanalyze: 0 },
+      reconnects: 1,
+    })
   })
 
   // The calibration figure is the worst idle gap of any round against the

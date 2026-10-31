@@ -67,7 +67,12 @@ export function inCatalogValues(root: ObjectMeta, values: readonly RecordValue[]
 }
 
 /** What a write reads back, and the fields `toFormAnswers` may show: nothing but the key for an actor who may not read. */
-export function readBack(prepared: Prepared, bindings: FormBindings, policy: FormPolicy, context: PolicyContext): { fields: string[]; returning: RecordColumn[] } {
+export function readBack(
+  prepared: Prepared,
+  bindings: FormBindings,
+  policy: FormPolicy,
+  context: PolicyContext,
+): { fields: string[]; returning: RecordColumn[] } {
   const readable = readableFields(policy, context, bindings)
   const fields = readable.ok ? readable.fields : []
   return { fields, returning: readColumns(prepared, bindings, fields) }
@@ -106,7 +111,9 @@ export function decodeAnswers(
   for (const binding of bindings.fields) {
     const columns = columnsOf(binding).map((name) => prepared.columns.get(name) as ColumnMeta)
     if (!answers.has(binding.field)) {
-      const required = scoping.has(binding.field) || columns.some((column) => !fixed.has(column.name) && !supplied.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
+      const required =
+        scoping.has(binding.field) ||
+        columns.some((column) => !fixed.has(column.name) && !supplied.has(column.name) && !column.nullable && !column.hasDefault && column.generated === 'none')
       if (operation === 'create' && required) decoded.errors.push({ field: binding.field, ...REQUIRED })
       continue
     }
@@ -181,7 +188,13 @@ export function planRead(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   if (!key.ok) return refuse('invalid-record-token', key.message)
   return {
     ok: true,
-    request: { target: prepared.target, key: key.key, columns: readColumns(prepared, bindings, readable.fields), filters: filters.filters, through: through.through },
+    request: {
+      target: prepared.target,
+      key: key.key,
+      columns: readColumns(prepared, bindings, readable.fields),
+      filters: filters.filters,
+      through: through.through,
+    },
     fields: readable.fields,
   }
 }
@@ -214,7 +227,14 @@ export function pinnedValues(prepared: Prepared, policy: FormPolicy, context: Po
  * (0041): a create it stops is refused `drift`, and the insert carries its
  * definition, so it runs only while the table still has it.
  */
-export function planCreate(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, answers: unknown, described: DescribedTable): PlannedInsert {
+export function planCreate(
+  snapshot: MetadataSnapshot,
+  bindings: FormBindings,
+  policy: FormPolicy,
+  context: PolicyContext,
+  answers: unknown,
+  described: DescribedTable,
+): PlannedInsert {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
   const { prepared } = ready
@@ -291,7 +311,10 @@ function withoutCutEchoes(
   if (cut.length === 0) return { ok: true, answers }
   if (asRead === undefined) {
     const are = cut.length === 1 ? 'is' : 'are'
-    return refuse('record-not-read', `${cut.join(', ')} ${are} read cut to the shape, so only the record as read tells an unedited one from a change: plan the update with it.`)
+    return refuse(
+      'record-not-read',
+      `${cut.join(', ')} ${are} read cut to the shape, so only the record as read tells an unedited one from a change: plan the update with it.`,
+    )
   }
   if (asRead.record !== recordToken) return refuse('record-not-read', 'The record as read is not the record this update addresses.')
   if (asRead.version !== expectedVersion) return { ok: true, answers }

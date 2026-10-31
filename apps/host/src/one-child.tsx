@@ -70,7 +70,10 @@ export function OneChild({
   const canCreate = menu.operations.includes('create') && definition.operations.includes('create')
 
   const sessions = useMemo(
-    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] })),
+    () =>
+      (['react', 'angular'] as const).map((which) =>
+        createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] }),
+      ),
     [client, child.form, child.field, definition, owner],
   )
   const entries = useMemo<PaneEntry[]>(
@@ -110,6 +113,7 @@ export function OneChild({
     )
     return () => controller.abort()
     // The section is mounted again for every record; nothing else asks again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the section is mounted again for every record and level, so its owner is fixed; its definition never changes while it is mounted, since Workspace keys FormView by the opened entry's id and openForm passes through the asking state, which unmounts the view; so the mount's opening, which reads only its sessions, a ref and the guard's stable callbacks, is current
   }, [client, child.form, child.field, parentToken])
 
   function startNew(): void {
@@ -180,7 +184,15 @@ export function OneChild({
             {sessions
               .filter((session) => renderersOf(renderer).includes(session.renderer))
               .map((session) => (
-                <Pane key={session.renderer} session={session} title={held.kind === 'record' ? `${title} ${held.token}` : `New ${title}`} level={6} idBase={owner} namedBy={`${headingId}-detail`} onAnswer={(result) => answered(result, session)} />
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={held.kind === 'record' ? `${title} ${held.token}` : `New ${title}`}
+                  level={6}
+                  idBase={owner}
+                  namedBy={`${headingId}-detail`}
+                  onAnswer={(result) => answered(result, session)}
+                />
               ))}
           </div>
         </div>

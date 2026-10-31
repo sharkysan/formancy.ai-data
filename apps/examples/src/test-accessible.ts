@@ -12,17 +12,7 @@ import { getRole, isInaccessible } from 'dom-accessibility-api'
  */
 
 /** The roles ARIA gives a control a person answers with. */
-export const ANSWERING_ROLES = [
-  'textbox',
-  'searchbox',
-  'combobox',
-  'listbox',
-  'spinbutton',
-  'slider',
-  'checkbox',
-  'switch',
-  'radio',
-] as const
+export const ANSWERING_ROLES = ['textbox', 'searchbox', 'combobox', 'listbox', 'spinbutton', 'slider', 'checkbox', 'switch', 'radio'] as const
 
 /**
  * Every control in `container` a person answers with.
@@ -44,9 +34,7 @@ export const ANSWERING_ROLES = [
 export function answerable(container: HTMLElement, names: readonly string[]): HTMLElement[] {
   const scope = within(container)
   const byRole = ANSWERING_ROLES.flatMap((role) => scope.queryAllByRole(role))
-  const byName = names
-    .flatMap((name) => scope.queryAllByLabelText(name, { exact: true }))
-    .filter((element) => getRole(element) === null)
+  const byName = names.flatMap((name) => scope.queryAllByLabelText(name, { exact: true })).filter((element) => getRole(element) === null)
   return [...new Set([...byRole, ...byName])].filter((element) => !isInaccessible(element))
 }
 

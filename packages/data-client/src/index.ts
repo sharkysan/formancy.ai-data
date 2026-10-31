@@ -40,4 +40,4 @@ export type {
   RecordList,
   RecordListQuery,
 } from '@formancy/data-core'
-export { EXPORT_MAX_BYTES, exportFileName, LIST_PAGE_SIZE } from '@formancy/data-core'
+export { EXPORT_MAX_BYTES, exportFileName, fieldHeading, LIST_PAGE_SIZE } from '@formancy/data-core'

@@ -93,7 +93,8 @@ const signIn = (stand, cookie) =>
   )
 
 /** What each Durable Object kept: its stored keys, its alarm and its container. */
-const left = (stand) => [...stand.objects.values()].map(({ state }) => ({ stored: [...state.stored().keys()], alarm: state.alarm, running: state.container.running }))
+const left = (stand) =>
+  [...stand.objects.values()].map(({ state }) => ({ stored: [...state.stored().keys()], alarm: state.alarm, running: state.container.running }))
 
 describe("a refused sign-in leaves nothing behind (0070's costs)", () => {
   // At the cap Cloudflare's start errors. A Durable Object that stored its
@@ -124,7 +125,9 @@ describe("a refused sign-in leaves nothing behind (0070's costs)", () => {
     const answer = await signIn(stand)
     expect(answer.status).toBe(503)
     expect((await answer.json()).message).toBe(START_FAILED)
-    expect(containers.map((container) => ({ starts: container.starts, running: container.running, destroyed: container.destroyed > 0 }))).toEqual([{ starts: 1, running: false, destroyed: true }])
+    expect(containers.map((container) => ({ starts: container.starts, running: container.running, destroyed: container.destroyed > 0 }))).toEqual([
+      { starts: 1, running: false, destroyed: true },
+    ])
     expect(left(stand)).toEqual([{ stored: [], alarm: undefined, running: false }])
   })
 
@@ -176,7 +179,10 @@ describe('a failed start says why in the live log (0086)', () => {
   test.each([
     ['refuse', /^live demo: a start failed: start threw Error: the start was refused$/],
     ['timeout', /^live demo: a start failed: inactivity-timeout threw Error: the inactivity timeout was refused$/],
-    ['stops', /^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: Container is not listening to port 4390$/],
+    [
+      'stops',
+      /^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: Container is not listening to port 4390$/,
+    ],
   ])('a container that fails with %s', async (way, line) => {
     const said = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
@@ -219,7 +225,9 @@ describe('a start Cloudflare has no instance for is started again (0087)', () =>
       const answer = await signIn(stand)
       expect(answer.status).toBe(200)
       expect({ attempts: container.attempts, starts: container.starts }).toEqual({ attempts: 3, starts: 1 })
-      expect(said.mock.calls).toEqual([[expect.stringMatching(/^live demo: a start answered after \d+ ms, after \d+ probes?, started again 2 times after Cloudflare had no instance$/)]])
+      expect(said.mock.calls).toEqual([
+        [expect.stringMatching(/^live demo: a start answered after \d+ ms, after \d+ probes?, started again 2 times after Cloudflare had no instance$/)],
+      ])
     } finally {
       said.mockRestore()
     }
@@ -236,7 +244,13 @@ describe('a start Cloudflare has no instance for is started again (0087)', () =>
       expect((await signIn(stand)).status).toBe(503)
       expect(Date.now() - started).toBeLessThan(5_000)
       expect(container.attempts).toBe(1)
-      expect(said.mock.calls).toEqual([[expect.stringMatching(/^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: monitor\(\) rejected: the image failed$/)]])
+      expect(said.mock.calls).toEqual([
+        [
+          expect.stringMatching(
+            /^live demo: a start failed: the container stopped after \d+ ms, before \/health answered, after 1 probe; the last threw Error: monitor\(\) rejected: the image failed$/,
+          ),
+        ],
+      ])
     } finally {
       said.mockRestore()
     }

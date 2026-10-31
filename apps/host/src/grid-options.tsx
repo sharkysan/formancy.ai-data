@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties, ReactElement } from 'react'
-import { ColumnApiModule, ColumnAutoSizeModule, InfiniteRowModelModule, LocaleModule, ModuleRegistry, PaginationModule, RenderApiModule, RowApiModule, RowSelectionModule, ScrollApiModule } from 'ag-grid-community'
+import {
+  ColumnApiModule,
+  ColumnAutoSizeModule,
+  InfiniteRowModelModule,
+  LocaleModule,
+  ModuleRegistry,
+  PaginationModule,
+  RenderApiModule,
+  RowApiModule,
+  RowSelectionModule,
+  ScrollApiModule,
+} from 'ag-grid-community'
 import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, Module, RowClickedEvent } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import type { ArrangedColumn } from './columns.js'
@@ -44,7 +55,17 @@ import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
  * grid-keys.test.tsx fails on the console error AG Grid writes for an
  * option whose module is missing.
  */
-export const GRID_MODULES: readonly Module[] = [InfiniteRowModelModule, PaginationModule, RowSelectionModule, RenderApiModule, ScrollApiModule, RowApiModule, ColumnAutoSizeModule, LocaleModule, ColumnApiModule]
+export const GRID_MODULES: readonly Module[] = [
+  InfiniteRowModelModule,
+  PaginationModule,
+  RowSelectionModule,
+  RenderApiModule,
+  ScrollApiModule,
+  RowApiModule,
+  ColumnAutoSizeModule,
+  LocaleModule,
+  ColumnApiModule,
+]
 ModuleRegistry.registerModules([...GRID_MODULES])
 
 export type OpenHow = 'click' | 'space' | 'enter'
@@ -188,7 +209,19 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
   }))
   if (remove === undefined) return fields
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
-  return [...fields, { colId: DELETE_COLUMN, headerName: 'Delete', valueGetter: () => '', sortable: false, minWidth: headerMinWidth('Delete', false), maxWidth: 160, cellRenderer: DeleteCell, cellRendererParams: { remove } }]
+  return [
+    ...fields,
+    {
+      colId: DELETE_COLUMN,
+      headerName: 'Delete',
+      valueGetter: () => '',
+      sortable: false,
+      minWidth: headerMinWidth('Delete', false),
+      maxWidth: 160,
+      cellRenderer: DeleteCell,
+      cellRendererParams: { remove },
+    },
+  ]
 }
 
 /** What a grid tells the page, and asks of it. */

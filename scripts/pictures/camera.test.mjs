@@ -37,7 +37,12 @@ describe('the clip', () => {
   // clip grown by one number on every side showed a sliver of the Steps panel
   // beside each studio step (2026-10-10).
   test('keeps what the bench leaves on each side, and no more', () => {
-    expect(padded({ x: 296, y: 100, width: 892, height: 400 }, { top: 0, right: 12, bottom: 0, left: 12 }, { width: 1200, height: 2000 })).toEqual({ x: 284, y: 100, width: 916, height: 400 })
+    expect(padded({ x: 296, y: 100, width: 892, height: 400 }, { top: 0, right: 12, bottom: 0, left: 12 }, { width: 1200, height: 2000 })).toEqual({
+      x: 284,
+      y: 100,
+      width: 916,
+      height: 400,
+    })
   })
 
   // A margin past the page's edge would be a box the full-page shot cannot
@@ -113,7 +118,9 @@ describe("the look's faces (0072)", () => {
   test('refuse a font file from any origin but the app’s', () => {
     const origin = 'http://examples.invalid'
     expect(foreignFaces(new Set([`${origin}/assets/archivo-latin-wght-normal-D9H2jx1E.woff2`]), origin)).toEqual([])
-    expect(foreignFaces(new Set([`${origin}/assets/a.woff2`, 'https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2']), origin)).toEqual(['https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2'])
+    expect(foreignFaces(new Set([`${origin}/assets/a.woff2`, 'https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2']), origin)).toEqual([
+      'https://fonts.gstatic.com/s/archivo/v25/k3k6o8.woff2',
+    ])
   })
 })
 

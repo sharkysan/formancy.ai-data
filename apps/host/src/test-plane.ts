@@ -32,7 +32,12 @@ import type { Proposed } from './test-forms.js'
  */
 
 /** The tokens the fake verifier accepts. Literal, and meaningless anywhere but this suite. Tenant 3's clerk sees the paged customers alone (0085). */
-export const TOKENS = { admin: 'host-test-administrator', clerk: 'host-test-clerk-tenant-1', otherClerk: 'host-test-clerk-tenant-2', thirdClerk: 'host-test-clerk-tenant-3' } as const
+export const TOKENS = {
+  admin: 'host-test-administrator',
+  clerk: 'host-test-clerk-tenant-1',
+  otherClerk: 'host-test-clerk-tenant-2',
+  thirdClerk: 'host-test-clerk-tenant-3',
+} as const
 
 const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.admin) return { ok: true, identity: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } }
@@ -52,7 +57,12 @@ const verifyIdentity: IdentityVerifier = async (token) => {
  */
 async function verifierFor(demoKey: string | undefined): Promise<IdentityVerifier> {
   if (demoKey === undefined) return verifyIdentity
-  const demo = await createIdentityVerifier({ key: { kind: 'secret', secret: demoKey }, issuer: ISSUER, audience: AUDIENCE, attributes: { tenant: TENANT_CLAIM } })
+  const demo = await createIdentityVerifier({
+    key: { kind: 'secret', secret: demoKey },
+    issuer: ISSUER,
+    audience: AUDIENCE,
+    attributes: { tenant: TENANT_CLAIM },
+  })
   const literal = new Set<string>(Object.values(TOKENS))
   return async (token) => (literal.has(token) ? verifyIdentity(token) : demo(token))
 }
@@ -78,8 +88,40 @@ export const PAGED = inject('paged')
  * Amount, with views whose default is on Amount (0105).
  */
 export const ENGINES = [
-  { engine: 'PostgreSQL', connection: 'pg', formId: 'pg-order', versionColumn: 'row_version' as string | undefined, lines: 'pg-order-line', employees: 'pg-employee', staff: 'pg-order-staff', deliveries: 'pg-delivery', parity: 'pg-parity', removable: 'pg-removable', read: 'pg-order-read', withheld: 'pg-order-withheld', party: 'pg-party', company: 'pg-party-company', price: 'pg-price' },
-  { engine: 'SQL Server', connection: 'ms', formId: 'ms-order', versionColumn: undefined, lines: 'ms-order-line', employees: 'ms-employee', staff: 'ms-order-staff', deliveries: 'ms-delivery', parity: 'ms-parity', removable: 'ms-removable', read: 'ms-order-read', withheld: 'ms-order-withheld', party: 'ms-party', company: 'ms-party-company', price: 'ms-price' },
+  {
+    engine: 'PostgreSQL',
+    connection: 'pg',
+    formId: 'pg-order',
+    versionColumn: 'row_version' as string | undefined,
+    lines: 'pg-order-line',
+    employees: 'pg-employee',
+    staff: 'pg-order-staff',
+    deliveries: 'pg-delivery',
+    parity: 'pg-parity',
+    removable: 'pg-removable',
+    read: 'pg-order-read',
+    withheld: 'pg-order-withheld',
+    party: 'pg-party',
+    company: 'pg-party-company',
+    price: 'pg-price',
+  },
+  {
+    engine: 'SQL Server',
+    connection: 'ms',
+    formId: 'ms-order',
+    versionColumn: undefined,
+    lines: 'ms-order-line',
+    employees: 'ms-employee',
+    staff: 'ms-order-staff',
+    deliveries: 'ms-delivery',
+    parity: 'ms-parity',
+    removable: 'ms-removable',
+    read: 'ms-order-read',
+    withheld: 'ms-order-withheld',
+    party: 'ms-party',
+    company: 'ms-party-company',
+    price: 'ms-price',
+  },
 ] as const
 
 export type Engine = (typeof ENGINES)[number]
@@ -183,7 +225,9 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     // browser's fetch then rejects with the signal's reason, and so does this.
     const signal = init?.signal ?? undefined
     signal?.throwIfAborted()
-    const answering = Promise.resolve(app.inject({ method: method as 'GET' | 'POST', url: `${url.pathname}${url.search}`, headers, ...(body === undefined ? {} : { payload: body }) }))
+    const answering = Promise.resolve(
+      app.inject({ method: method as 'GET' | 'POST', url: `${url.pathname}${url.search}`, headers, ...(body === undefined ? {} : { payload: body }) }),
+    )
     pending.add(answering)
     void answering.finally(() => pending.delete(answering)).catch(() => {})
     const reply = await answering
@@ -196,131 +240,6 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
     }
     // The bytes as the server sent them: a file is compared byte for byte (0080).
     return new Response(reply.statusCode === 204 ? null : new Uint8Array(reply.rawPayload), { status: reply.statusCode, headers: answered })
-  }
-}
-
-/** A `fetch` whose writes are answered late, when the test says so: see `holdingWrites`. */
-export interface Holding {
-  fetch: typeof fetch
-  /** The path of every write the server has answered and this is still holding, oldest first. */
-  held: string[]
-  /** Hand the oldest held answer to whoever asked. */
-  answer(): void
-}
-
-/**
- * `fetch` with every create and update held after the server has answered it:
- * the record is written, and the page does not know yet. That is the moment a
- * person goes on typing, presses Save again or opens another record, and on
- * `app.inject` it otherwise lasts too few ticks to reach. Reads and lookups
- * pass straight through.
- */
-export function holdingWrites(fetch: typeof globalThis.fetch): Holding {
-  const waiting: Array<() => void> = []
-  const held: string[] = []
-  return {
-    held,
-    fetch: async (input, init) => {
-      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
-      if (!/\/records\/(create|update)$/.test(path)) return fetch(input, init)
-      const reply = await fetch(input, init)
-      held.push(path)
-      await new Promise<void>((resolve) => waiting.push(resolve))
-      held.splice(held.indexOf(path), 1)
-      return reply
-    },
-    answer: () => {
-      waiting.shift()?.()
-    },
-  }
-}
-
-/** A `fetch` that holds the requests it is told to, until the test lets each go: see `holdingRequests`. */
-export interface Held {
-  fetch: typeof fetch
-  /** The path of every request held and not yet let go, oldest first. */
-  held: string[]
-  /** Send the oldest held request on to the real server; settles once its answer is handed back to the page. */
-  pass(): Promise<void>
-  /** Fail the oldest held request as a dropped connection does, with the browser's own `TypeError`. */
-  fail(): Promise<void>
-}
-
-/**
- * `fetch` with each request `holds` picks kept back before it is sent: a
- * record's read, or a form's definition, that the person has moved past by
- * the time it is answered. On `app.inject` an answer otherwise arrives within
- * a few ticks, before a person could do anything else. Everything else
- * passes straight through. What `pass` and `fail` settle on is the answer
- * handed back; what the page then does with it is a few ticks more.
- */
-export function holdingRequests(fetch: typeof globalThis.fetch, holds: (request: { method: string; path: string; body: string | undefined }) => boolean): Held {
-  const waiting: Array<(go: boolean) => Promise<void>> = []
-  const held: string[] = []
-  const release = async (go: boolean): Promise<void> => {
-    const next = waiting.shift()
-    if (next === undefined) throw new Error('no request is held')
-    await next(go)
-  }
-  return {
-    held,
-    fetch: async (input, init) => {
-      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
-      const method = (init?.method ?? 'GET').toUpperCase()
-      if (!holds({ method, path, body: typeof init?.body === 'string' ? init.body : undefined })) return fetch(input, init)
-      held.push(path)
-      let answered: () => void = () => {}
-      const handedBack = new Promise<void>((resolve) => {
-        answered = resolve
-      })
-      const go = await new Promise<boolean>((resolve) =>
-        waiting.push(async (decided) => {
-          resolve(decided)
-          await handedBack
-        }),
-      )
-      held.splice(held.indexOf(path), 1)
-      try {
-        if (!go) throw new TypeError('Failed to fetch')
-        return await fetch(input, init)
-      } finally {
-        answered()
-      }
-    },
-    pass: () => release(true),
-    fail: () => release(false),
-  }
-}
-
-/** A `fetch` that loses the answers to writes: see `losingWrites`. */
-export interface Losing {
-  fetch: typeof fetch
-  /** The path of every write whose answer it lost: `times` at most. */
-  lost: string[]
-}
-
-/**
- * `fetch` that loses the answer to the next create or update, as a network
- * between the page and the data server does (0031), and passes everything
- * else through. `after`: the request reaches the real server, which stores
- * it and answers, and the page is told the fetch failed -- what the browser
- * says when the connection drops after sending. `before`: it fails without
- * reaching the server, which the page cannot tell apart from `after`. Either
- * way the rejection is the browser's own `TypeError`, so the client sees
- * exactly what it would see in a page. Once, unless `times` says more: what
- * the page does next is what is under test, and it must reach the server.
- */
-export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, writes = /\/records\/(create|update)$/ }: { when: 'after' | 'before'; times?: number; writes?: RegExp }): Losing {
-  const lost: string[] = []
-  return {
-    lost,
-    fetch: async (input, init) => {
-      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
-      if (lost.length >= times || !writes.test(path)) return fetch(input, init)
-      lost.push(path)
-      if (when === 'after') await fetch(input, init)
-      throw new TypeError('Failed to fetch')
-    },
   }
 }
 
@@ -345,7 +264,18 @@ export function losingWrites(fetch: typeof globalThis.fetch, { when, times = 1, 
  * `company`. With `versions` (0113, 0115), `price` of `ENGINES` is
  * published over `parity.price`, a chain of versions.
  */
-export async function startPlane(options: { children?: boolean; deletes?: boolean; deliveries?: boolean; demo?: boolean; paged?: boolean; sections?: boolean; versions?: boolean; views?: boolean } = {}): Promise<Plane> {
+export async function startPlane(
+  options: {
+    children?: boolean
+    deletes?: boolean
+    deliveries?: boolean
+    demo?: boolean
+    paged?: boolean
+    sections?: boolean
+    versions?: boolean
+    views?: boolean
+  } = {},
+): Promise<Plane> {
   const { pg, ms } = inject('databases')
   // 32 random bytes as base64url: the shape of the key a Durable Object starts its container with.
   const demoKey = options.demo === true ? randomBytes(32).toString('base64url') : undefined
@@ -356,7 +286,10 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     { id: 'pg-parity', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['parity'], tls: { enabled: false } },
     { id: 'ms-parity', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['parity'], tls: { enabled: false, trustServerCertificate: true } },
   ]
-  const real = createConnectionRegistry(connections, DRIVER_FACTORIES, { env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password }, readFile: async () => '' })
+  const real = createConnectionRegistry(connections, DRIVER_FACTORIES, {
+    env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
+    readFile: async () => '',
+  })
   const unreachable = new Set<string>()
   const lose = new Map<string, 'after' | 'before'>()
   const registry: ConnectionRegistry = {
@@ -388,7 +321,11 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
   // The administrator's trail is the server's suites' subject; here it is required and discarded. So is the
   // lookup deadline (0061), which counts a wait for a pooled connection: on CI's runner, beside the other
   // files, a search past 892 ms was 503 lookup-timeout, so the plane runs with the longest, as 0034's does.
-  const app = await createDataServer({ verifyIdentity: await verifierFor(demoKey), admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } }, runtime: { registry, store, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS } })
+  const app = await createDataServer({
+    verifyIdentity: await verifierFor(demoKey),
+    admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
+    runtime: { registry, store, lookupDeadlineMs: MAX_LOOKUP_DEADLINE_MS },
+  })
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })
@@ -409,18 +346,35 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       const base = clerkPolicy((bindings as { fields: FieldBinding[] }).fields)
       // `read` the clerk may only read, so a record of it is drawn with every field disabled;
       // `withheld` they may read too, but for Amount, which its default view is on.
-      const readOnly = { ...base, operations: offered(bindings as unknown as Proposed, true) }
+      const readOnly = { ...base, operations: offered(bindings as Proposed, true) }
       const policy: FormPolicy =
-        formId === read ? readOnly : formId === withheld ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } } : deletes ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES } : base
+        formId === read
+          ? readOnly
+          : formId === withheld
+            ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } }
+            : deletes
+              ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
+              : base
       // A presentation of views alone: the form is its base (0030, 0105).
       const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
       const presentation: PresentationOverrides = named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }
-      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation, form, bindings, policy, snapshot } })
+      await admin(`/v1/forms/${formId}/versions`, {
+        expectedBase: null,
+        bundle: { format: 2, connection, generation, base: form, presentation, form, bindings, policy, snapshot },
+      })
     }
   }
   for (const { parity: connection, removable: formId } of deletes ? ENGINES : []) {
     // A table whose key the database numbers, so its version column proves a record (0050); its tenant pinned to the clerk's.
-    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', { connection, root: { schema: 'parity', name: 'removable' }, formId, title: 'Removable', lookups: [], versionColumn: 'version', pinned: ['tenant_id'] })
+    const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'removable' },
+      formId,
+      title: 'Removable',
+      lookups: [],
+      versionColumn: 'version',
+      pinned: ['tenant_id'],
+    })
     const policy: FormPolicy = {
       version: 1,
       operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'], delete: ['clerk'] },
@@ -428,12 +382,23 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
       lookups: {},
     }
-    await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   for (const { parity: connection, party, company } of options.sections === true ? ENGINES : []) {
     // A party, its tenant pinned to the clerk's, and its company details as a section of it while its kind is company (0109).
     const CLERK_RW = { read: ['clerk'], write: ['clerk'] }
-    const parties = await admin('/v1/form-proposals', { connection, root: { schema: 'parity', name: 'party' }, formId: party, title: 'Party', lookups: [], versionColumn: 'version', pinned: ['tenant_id'] })
+    const parties = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'parity', name: 'party' },
+      formId: party,
+      title: 'Party',
+      lookups: [],
+      versionColumn: 'version',
+      pinned: ['tenant_id'],
+    })
     const partyPolicy: FormPolicy = {
       version: 1,
       operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
@@ -462,7 +427,10 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       [company, companies, companyPolicy],
     ] as const) {
       const { form, bindings, snapshot, generation } = proposed
-      await admin(`/v1/forms/${formId}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+      await admin(`/v1/forms/${formId}/versions`, {
+        expectedBase: null,
+        bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+      })
     }
   }
   for (const { parity: connection, price } of options.versions === true ? ENGINES : []) {
@@ -486,7 +454,10 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
       lookups: {},
     }
-    await admin(`/v1/forms/${price}/versions`, { expectedBase: null, bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot } })
+    await admin(`/v1/forms/${price}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {
@@ -499,7 +470,7 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
         ...(child.versionColumn === undefined ? {} : { versionColumn: child.versionColumn }),
         ...(child.pinned === undefined ? {} : { pinned: child.pinned }),
       })
-      const proposed = bindings as unknown as Proposed & FormBindings
+      const proposed = bindings as Proposed & FormBindings
       const presentation: PresentationOverrides = {
         ...EMPTY_PRESENTATION,
         fields: lookupsOf(proposed).flatMap(({ field, foreignKey }) => {
@@ -510,7 +481,17 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       }
       const presented = applyPresentation(form as FormSchema, presentation, proposed)
       if (!presented.ok) throw new Error(presented.problems.join('; '))
-      const bundle = { format: 2, connection: engine.connection, generation, base: form, presentation, form: presented.form, bindings, policy: child.policy(proposed), snapshot }
+      const bundle = {
+        format: 2,
+        connection: engine.connection,
+        generation,
+        base: form,
+        presentation,
+        form: presented.form,
+        bindings,
+        policy: child.policy(proposed),
+        snapshot,
+      }
       await admin(`/v1/forms/${child.formId}/versions`, { expectedBase: null, bundle })
     }
   }
@@ -539,7 +520,12 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
     db: {
       insertCustomer: async (connection, no, name) => {
         if (connection === 'pg') await pgAdmin`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`
-        else await msAdmin.request().input('no', mssql.Int, no).input('name', mssql.NVarChar(200), name).query('insert into sales.customer (tenant_id, customer_no, name) values (1, @no, @name)')
+        else
+          await msAdmin
+            .request()
+            .input('no', mssql.Int, no)
+            .input('name', mssql.NVarChar(200), name)
+            .query('insert into sales.customer (tenant_id, customer_no, name) values (1, @no, @name)')
       },
       deleteCustomer: async (connection, no) => {
         if (connection === 'pg') await pgAdmin`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`
@@ -554,17 +540,23 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
           .request()
           .input('count', mssql.Int, count)
           .input('notes', mssql.NVarChar(200), notes)
-          .query("insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, notes) select 1, 1001, '2026-10-08', 'placed', 1, concat(@notes, ' ', value) from generate_series(1, @count)")
+          .query(
+            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, notes) select 1, 1001, '2026-10-08', 'placed', 1, concat(@notes, ' ', value) from generate_series(1, @count)",
+          )
       },
       insertApprovedOrder: async (connection, approver) => {
         if (connection === 'pg') {
-          const [row] = await pgAdmin<Array<{ id: string }>>`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, approved_by) values (1, 1001, date '2026-10-08', 'placed', 1, ${approver}) returning id::text as id`
+          const [row] = await pgAdmin<
+            Array<{ id: string }>
+          >`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, approved_by) values (1, 1001, date '2026-10-08', 'placed', 1, ${approver}) returning id::text as id`
           return `k1:${String(row?.id)}`
         }
         const result = await msAdmin
           .request()
           .input('approver', mssql.Int, approver)
-          .query<{ id: string }>("insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver)")
+          .query<{ id: string }>(
+            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver)",
+          )
         return `k1:${String(result.recordset[0]?.id)}`
       },
       referToRemovable: async (connection, record) => {
@@ -579,7 +571,10 @@ export async function startPlane(options: { children?: boolean; deletes?: boolea
       },
       countOrders: async (connection, notes) => {
         if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
-        const result = await msAdmin.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+        const result = await msAdmin
+          .request()
+          .input('notes', mssql.NVarChar(mssql.MAX), notes)
+          .query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
         return result.recordset[0]?.n ?? 0
       },
     },

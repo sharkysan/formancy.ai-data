@@ -5,11 +5,28 @@ import { classify, compareTypes, type TypeVerdict } from './compare.js'
 const INT16: NormalizedType = { kind: 'integer', min: '-32768', max: '32767' }
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const INT64: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
-const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({ kind: 'text', maxLength, lengthUnit, fixedLength })
+const text = (maxLength: number | null, fixedLength = false, lengthUnit: TextLengthUnit = 'utf16-code-units'): NormalizedType => ({
+  kind: 'text',
+  maxLength,
+  lengthUnit,
+  fixedLength,
+})
 const decimal = (precision: number | null, scale: number | null): NormalizedType => ({ kind: 'decimal', precision, scale })
 
 function col(name: string, databaseType: string, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta {
-  return { name, ordinal: 1, databaseType, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra }
+  return {
+    name,
+    ordinal: 1,
+    databaseType,
+    type,
+    nullable: false,
+    hasDefault: false,
+    defaultExpression: null,
+    generated: 'none',
+    comment: null,
+    access: { select: true, insert: true, update: true },
+    ...extra,
+  }
 }
 
 describe('compareTypes', () => {
@@ -139,7 +156,10 @@ describe('classify', () => {
   // generated must be given a value. Either way the form's write changes.
   test('the database starting or stopping generating a column is a generation change', () => {
     const id = col('id', 'bigint', INT64, { generated: 'identity-always' })
-    expect(classify(id, { ...id, generated: 'none' })).toEqual({ kind: 'column-generation-changed', reasons: ['the database no longer generates it (it was identity-always)'] })
+    expect(classify(id, { ...id, generated: 'none' })).toEqual({
+      kind: 'column-generation-changed',
+      reasons: ['the database no longer generates it (it was identity-always)'],
+    })
   })
 
   // ALWAYS refuses a value and BY DEFAULT accepts one. Reported as no change,
@@ -155,6 +175,8 @@ describe('classify', () => {
       kind: 'column-generation-changed',
       reasons: ['the database generates it as identity-always where it was identity-by-default'],
     })
-    expect(classify({ ...id, generated: 'none' }, { ...id, generated: 'identity-by-default' })?.reasons).toEqual(['the database now generates it (identity-by-default)'])
+    expect(classify({ ...id, generated: 'none' }, { ...id, generated: 'identity-by-default' })?.reasons).toEqual([
+      'the database now generates it (identity-by-default)',
+    ])
   })
 })

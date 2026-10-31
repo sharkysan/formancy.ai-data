@@ -75,7 +75,11 @@ describe('what each way of leaving a form discards', () => {
   // (watched failing with a deletion dropped by every renderer request:
   // hiding React asked about an order's unanswered delete).
   test("a deletion is its owner's work, and no renderer's", () => {
-    const deletions: PaneWork[] = [...PANES, { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' }, { owner: 'lines', renderer: null, name: ['Order line ', { code: 'k1:1,1' }], work: 'delete-unknown' }]
+    const deletions: PaneWork[] = [
+      ...PANES,
+      { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' },
+      { owner: 'lines', renderer: null, name: ['Order line ', { code: 'k1:1,1' }], work: 'delete-unknown' },
+    ]
     const of = (request: LeaveRequest): string[] => atRisk(request, deletions).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
     expect(of({ kind: 'row', record: 'k1:2' })).toEqual(['master react', 'lines react', 'lines angular', 'staff react', 'master null', 'lines null'])
     expect(of({ kind: 'child-row', owner: 'lines', record: 'k1:1,2' })).toEqual(['lines react', 'lines angular', 'lines null'])
@@ -98,20 +102,36 @@ describe('what each way of leaving a form discards', () => {
       { owner: gridOwner('lines'), renderer: null, name: ['Order line ', { code: 'k1:1,3' }], work: 'delete-unknown' },
     ]
     const of = (request: LeaveRequest): string[] => atRisk(request, grids).map((pane) => pane.owner)
-    const keeps: LeaveRequest[] = [{ kind: 'row', record: 'k1:2' }, { kind: 'new' }, { kind: 'load', record: 'k1:3' }, { kind: 'duplicate', record: 'k1:4' }, { kind: 'change', record: 'k1:4' }, { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' }]
+    const keeps: LeaveRequest[] = [
+      { kind: 'row', record: 'k1:2' },
+      { kind: 'new' },
+      { kind: 'load', record: 'k1:3' },
+      { kind: 'duplicate', record: 'k1:4' },
+      { kind: 'change', record: 'k1:4' },
+      { kind: 'created', owner: 'master', record: 'k1:5', by: 'react' },
+    ]
     for (const request of keeps) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('lines')] })
     const takes: LeaveRequest[] = [{ kind: 'form', title: 'Customer' }, { kind: 'history', direction: 'back' }, { kind: 'sign-out' }]
-    for (const request of takes) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('master'), gridOwner('lines')] })
-    const leaves: LeaveRequest[] = [{ kind: 'child-row', owner: 'lines', record: 'k1:1,2' }, { kind: 'child-new', owner: 'lines', title: 'Order line' }, { kind: 'created', owner: 'lines', record: 'k1:1,4', by: 'angular' }, { kind: 'renderer', hides: ['react', 'angular'], shows: 'Both' }]
+    for (const request of takes)
+      expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [gridOwner('master'), gridOwner('lines')] })
+    const leaves: LeaveRequest[] = [
+      { kind: 'child-row', owner: 'lines', record: 'k1:1,2' },
+      { kind: 'child-new', owner: 'lines', title: 'Order line' },
+      { kind: 'created', owner: 'lines', record: 'k1:1,4', by: 'angular' },
+      { kind: 'renderer', hides: ['react', 'angular'], shows: 'Both' },
+    ]
     for (const request of leaves) expect({ request: request.kind, asks: of(request) }).toEqual({ request: request.kind, asks: [] })
   })
 
   // Everything stays mounted across a layout or view change, a page, a
   // search and a sort, so none of them can lose a draft and none asks.
-  test.each<LeaveRequest>([{ kind: 'layout' }, { kind: 'view' }, { kind: 'page' }, { kind: 'search' }, { kind: 'sort' }])('$kind discards nothing', (request) => {
-    expect(discards(request)).toBeNull()
-    expect(owners(request)).toEqual([])
-  })
+  test.each<LeaveRequest>([{ kind: 'layout' }, { kind: 'view' }, { kind: 'page' }, { kind: 'search' }, { kind: 'sort' }])(
+    '$kind discards nothing',
+    (request) => {
+      expect(discards(request)).toBeNull()
+      expect(owners(request)).toEqual([])
+    },
+  )
 })
 
 describe("Drill down's levels (0090)", () => {
@@ -191,7 +211,9 @@ describe("Drill down's levels (0090)", () => {
   // keeps to that section, at level 1 and at every level.
   test('the record and a section keep their old reach', () => {
     expect(named({ kind: 'row', record: 'k1:2' })).toHaveLength(LEVELS.filter((pane) => pane.work !== null).length)
-    expect(named({ kind: 'child-row', owner: `${drillBase(2)}pg-order-line~order`, record: 'k1:4711,9' })).toEqual([`${drillBase(2)}pg-order-line~order angular`])
+    expect(named({ kind: 'child-row', owner: `${drillBase(2)}pg-order-line~order`, record: 'k1:4711,9' })).toEqual([
+      `${drillBase(2)}pg-order-line~order angular`,
+    ])
   })
 })
 
@@ -199,7 +221,10 @@ describe('what the notice says', () => {
   // The lead names what was asked for, so the person can tell which press
   // they are being asked about: "closes these forms" alone would not say.
   test('names the target of each request', () => {
-    const text = (request: LeaveRequest) => lead(request).map((part) => (typeof part === 'string' ? part : `\`${part.code}\``)).join('')
+    const text = (request: LeaveRequest) =>
+      lead(request)
+        .map((part) => (typeof part === 'string' ? part : `\`${part.code}\``))
+        .join('')
     expect(text({ kind: 'row', record: 'k1:1004' })).toBe('Opening `k1:1004` closes these forms:')
     expect(text({ kind: 'new' })).toBe('Starting a new record closes these forms:')
     expect(text({ kind: 'load', record: 'k1:1999' })).toBe('Loading `k1:1999` closes these forms:')

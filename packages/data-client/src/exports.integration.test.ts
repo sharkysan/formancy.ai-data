@@ -49,7 +49,11 @@ describe.each(ENGINES)('exports on $engine', ({ connection }) => {
     const mine = expectFile(await plane.client().exportRecords(formId))
     expect(mine.name).toBe(`${formId}.csv`)
     const bytes = Buffer.from(await mine.file.arrayBuffer())
-    const direct = await fetch(`${plane.base}/v1/forms/${formId}/records/export`, { method: 'POST', headers: { authorization: `Bearer ${plane.tokens.clerk}`, 'content-type': 'application/json' }, body: '{}' })
+    const direct = await fetch(`${plane.base}/v1/forms/${formId}/records/export`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${plane.tokens.clerk}`, 'content-type': 'application/json' },
+      body: '{}',
+    })
     expect(bytes.equals(Buffer.from(await direct.arrayBuffer()))).toBe(true)
     expect([...bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf])
     expect(bytes.toString('utf8')).toMatch(new RegExp(`\r\n${TENANT_ONES_ORDER},`))

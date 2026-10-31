@@ -44,7 +44,8 @@ export function customerToken(tenantId: number, customerNo: number): string {
   return encoded.token
 }
 
-const rowsOf = (rows: ReadonlyArray<{ tenantId: number; customerNo: number; name: string }>): LookupRow[] => rows.map((row) => ({ token: customerToken(row.tenantId, row.customerNo), label: row.name }))
+const rowsOf = (rows: ReadonlyArray<{ tenantId: number; customerNo: number; name: string }>): LookupRow[] =>
+  rows.map((row) => ({ token: customerToken(row.tenantId, row.customerNo), label: row.name }))
 
 /** The answers, from the generator, computed once in setup. */
 export interface Expected {
@@ -127,7 +128,8 @@ export function scenariosFor(engine: EngineKey, via: 'direct' | 'hop', context: 
       send: () => client.query(formId, source, { operation: 'create', search: want.search, limit: 50 }),
       check(answer) {
         const value = ok<LookupResult>(name, formId, answer)
-        if (JSON.stringify({ rows: value.rows, hasMore: value.hasMore }) !== want.json) fail(name, formId, 'the page differs from the one the generator expects')
+        if (JSON.stringify({ rows: value.rows, hasMore: value.hasMore }) !== want.json)
+          fail(name, formId, 'the page differs from the one the generator expects')
         return value.rows.length
       },
     }
@@ -140,7 +142,7 @@ export function scenariosFor(engine: EngineKey, via: 'direct' | 'hop', context: 
       formId: null,
       send: async () => {
         const response = await context.fetch(`${context.base}/health`)
-        return { status: response.status, body: (await response.json()) as unknown }
+        return { status: response.status, body: await response.json() }
       },
       check(answer) {
         const { status, body } = answer as { status: number; body: unknown }
@@ -209,7 +211,8 @@ export function scenariosFor(engine: EngineKey, via: 'direct' | 'hop', context: 
       check(answer, slot) {
         const owned = context.orders[engine].slots[slot] as UpdateSlot
         const value = ok<FormRecord>('update', orderForm, answer)
-        if (value.version === owned.version || value.answers['status'] === owned.answers['status']) fail('update', orderForm, 'the version or the status did not move')
+        if (value.version === owned.version || value.answers['status'] === owned.answers['status'])
+          fail('update', orderForm, 'the version or the status did not move')
         context.orders[engine].slots[slot] = slotOf(value)
         return 1
       },
@@ -221,7 +224,13 @@ export function scenariosFor(engine: EngineKey, via: 'direct' | 'hop', context: 
 }
 
 /** Create: the run's i-th create on an engine references the i-th customer of the rotation, mod 100. */
-function create(engine: EngineKey, formId: string, context: ScenarioContext, ok: <T>(name: string, formId: string, answer: unknown) => T, fail: (name: string, formId: string | null, what: string) => never): Executable {
+function create(
+  engine: EngineKey,
+  formId: string,
+  context: ScenarioContext,
+  ok: <T>(name: string, formId: string, answer: unknown) => T,
+  fail: (name: string, formId: string | null, what: string) => never,
+): Executable {
   const sentWith = new Map<number, string>()
   return {
     name: 'create',

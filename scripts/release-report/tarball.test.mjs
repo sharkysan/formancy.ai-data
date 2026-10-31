@@ -41,7 +41,7 @@ describe('a packed tarball', () => {
 
   // The report compares the dist/ of the tarball npm receives with the dist/
   // every job built on disk. The same files must hash alike from either.
-  test("hashes its dist/ as the same files on disk hash", () => {
+  test('hashes its dist/ as the same files on disk hash', () => {
     const dir = mkdtempSync(join(tmpdir(), 'formancy-data-dist-'))
     dirs.push(dir)
     for (const [path, bytes] of FILES.filter(([path]) => path.startsWith('package/dist/'))) {

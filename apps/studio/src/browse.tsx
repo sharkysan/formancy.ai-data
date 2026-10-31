@@ -1,7 +1,16 @@
 import { useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { browseRelations, findObject, LIST_PAGE_SIZE } from '@formancy/data-core'
-import type { ApiValue, BrowseEqualTerm, BrowseFilterTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
+import type {
+  ApiValue,
+  BrowseEqualTerm,
+  BrowseFilterTerm,
+  BrowseRelations,
+  BrowseSortTerm,
+  MetadataSnapshot,
+  ObjectRef,
+  OmittedColumn,
+} from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
 import { FilterPanel, filterables } from './browse-filter.js'
@@ -104,7 +113,15 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
     if (busy.current) return false
     busy.current = true
     setRefusal(null)
-    const outcome = await client.browse(connection, { object: asked.object, equal: asked.equal, filter: asked.filter, search: asked.search, sort: asked.sort === null ? [] : [asked.sort], offset: asked.offset, limit: LIST_PAGE_SIZE })
+    const outcome = await client.browse(connection, {
+      object: asked.object,
+      equal: asked.equal,
+      filter: asked.filter,
+      search: asked.search,
+      sort: asked.sort === null ? [] : [asked.sort],
+      offset: asked.offset,
+      limit: LIST_PAGE_SIZE,
+    })
     busy.current = false
     if (!outcome.ok) {
       setRefusal(outcome.message)
@@ -141,13 +158,17 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
     void load(to, { trail: trail.slice(0, -1), moved: true })
   }
 
-  const option = (ref: ObjectRef) => <option key={describeRef(ref)} value={describeRef(ref)}>{describeRef(ref)}</option>
+  const option = (ref: ObjectRef) => (
+    <option key={describeRef(ref)} value={describeRef(ref)}>
+      {describeRef(ref)}
+    </option>
+  )
 
   return (
     <>
       <p className="lede">
-        The rows of the tables and views <code>{connection}</code> can see, as its account <code>{snapshot.account.user}</code> reads
-        them: its grants and row security decide what is here. Nothing on this step changes a row.
+        The rows of the tables and views <code>{connection}</code> can see, as its account <code>{snapshot.account.user}</code> reads them: its grants and row
+        security decide what is here. Nothing on this step changes a row.
       </p>
       {snapshot.objects.length === 0 ? (
         <p className="none">This connection can see no table or view.</p>
@@ -252,13 +273,18 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
       )}
       {page.ordered === 'key' ? null : (
         <p className="hint">
-          {name} has no key this connection may read, so its rows are ordered by every column shown: two rows alike in all of them may
-          trade places between pages.
+          {name} has no key this connection may read, so its rows are ordered by every column shown: two rows alike in all of them may trade places between
+          pages.
         </p>
       )}
       <KeyHints name={name} kind={page.kind} relations={relations} />
       {/* Keyed apart from the related rows below, whose key is a row's place: two siblings with one key leave React keeping a stale one. */}
-      <FilterPanel key={`filter-${String(visit)}`} columns={filterables} active={asked.filter} onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)} />
+      <FilterPanel
+        key={`filter-${String(visit)}`}
+        columns={filterables}
+        active={asked.filter}
+        onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)}
+      />
       <div className="rows" role="region" aria-labelledby="rows-caption" tabIndex={0}>
         <table>
           <caption id="rows-caption">
@@ -320,10 +346,20 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
         <Related key={related} id="related" name={name} number={asked.offset + related + 1} row={open} relations={relations} onFollow={onFollow} />
       )}
       <p className="actions">
-        <button type="button" className="button" aria-disabled={atStart} onClick={() => (atStart ? undefined : void onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}>
+        <button
+          type="button"
+          className="button"
+          aria-disabled={atStart}
+          onClick={() => (atStart ? undefined : void onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}
+        >
           Previous page
         </button>
-        <button type="button" className="button" aria-disabled={!page.hasMore} onClick={() => (page.hasMore ? void onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}>
+        <button
+          type="button"
+          className="button"
+          aria-disabled={!page.hasMore}
+          onClick={() => (page.hasMore ? void onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}
+        >
           Next page
         </button>
       </p>

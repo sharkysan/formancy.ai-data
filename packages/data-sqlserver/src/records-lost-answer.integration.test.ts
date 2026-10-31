@@ -138,12 +138,18 @@ async function until(check: () => Promise<boolean>, what: string): Promise<void>
 }
 
 async function ordersWith(notes: string): Promise<number> {
-  const found = await owner.request().input('notes', mssql.NVarChar(mssql.MAX), notes).query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
+  const found = await owner
+    .request()
+    .input('notes', mssql.NVarChar(mssql.MAX), notes)
+    .query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
   return found.recordset[0]?.n ?? -1
 }
 
 async function removableCoded(code: string): Promise<number> {
-  const found = await owner.request().input('code', mssql.NVarChar(100), code).query<{ n: number }>('select count(*) as n from lost.removable where code = @code')
+  const found = await owner
+    .request()
+    .input('code', mssql.NVarChar(100), code)
+    .query<{ n: number }>('select count(*) as n from lost.removable where code = @code')
   return found.recordset[0]?.n ?? -1
 }
 
@@ -152,12 +158,17 @@ async function cascadingCoded(code: string): Promise<[number, number]> {
   const found = await owner
     .request()
     .input('code', mssql.NVarChar(100), code)
-    .query<{ rows: number; lines: number }>('select (select count(*) from lost.cascading where code = @code) as rows, (select count(*) from lost.cascading_line where cascading_code = @code) as lines')
+    .query<{ rows: number; lines: number }>(
+      'select (select count(*) from lost.cascading where code = @code) as rows, (select count(*) from lost.cascading_line where cascading_code = @code) as lines',
+    )
   return [found.recordset[0]?.rows ?? -1, found.recordset[0]?.lines ?? -1]
 }
 
 async function countriesNamed(name: string): Promise<number> {
-  const found = await owner.request().input('name', mssql.NVarChar(mssql.MAX), name).query<{ n: number }>('select count(*) as n from sales.country where name = @name')
+  const found = await owner
+    .request()
+    .input('name', mssql.NVarChar(mssql.MAX), name)
+    .query<{ n: number }>('select count(*) as n from sales.country where name = @name')
   return found.recordset[0]?.n ?? -1
 }
 
@@ -240,7 +251,8 @@ describe('an answer lost after the write committed', () => {
         key: [valueOf(ORDER, 'id', id)],
         set: [valueOf(ORDER, 'notes', notes)],
         expectedVersion: sentVersion,
-        filters: { kind: 'unrestricted' }, through: [],
+        filters: { kind: 'unrestricted' },
+        through: [],
         returning: [columnOf(ORDER, 'notes')],
       })
       await within(lost.matched, 'the marker never appeared in an answer')
@@ -248,7 +260,13 @@ describe('an answer lost after the write committed', () => {
       lost.cut()
       expect(await pending).toMatchObject({ ok: false, code: 'unknown-outcome' })
       expect(sent()).toBe(1)
-      const stored = await records.read({ target: orderTarget(), key: [valueOf(ORDER, 'id', id)], columns: [columnOf(ORDER, 'notes')], filters: { kind: 'unrestricted' }, through: [] })
+      const stored = await records.read({
+        target: orderTarget(),
+        key: [valueOf(ORDER, 'id', id)],
+        columns: [columnOf(ORDER, 'notes')],
+        filters: { kind: 'unrestricted' },
+        through: [],
+      })
       expect(stored).toMatchObject({ ok: true, values: { notes } })
       expect((stored as RecordOutcome & { ok: true }).version).not.toBe(sentVersion)
     } finally {
@@ -264,7 +282,10 @@ describe('an answer lost after the write committed', () => {
   // unknown (watched failing with the cut answered as a read's: unavailable).
   test('a delete is unknown-outcome, sent once, and the row is gone', async () => {
     const code = markerText()
-    const created = await owner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')
+    const created = await owner
+      .request()
+      .input('code', mssql.NVarChar(100), code)
+      .query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')
     const id = String(created.recordset[0]?.id)
     const table: ObjectRef = { schema: 'lost', name: 'removable' }
     const { hop, pool, close } = await throughHop()
@@ -298,9 +319,16 @@ describe('an answer lost after the write committed', () => {
   // PostgreSQL's locked path never sent its commit and keeps both.
   test('a cascading delete is unknown-outcome, sent once, and its rows are gone', covers('sqlserver', cascadeCase('lost-answer')), async () => {
     const code = markerText()
-    const created = await owner.request().input('code', mssql.NVarChar(100), code).query<{ id: number }>('insert into lost.cascading (code) output inserted.id values (@code)')
+    const created = await owner
+      .request()
+      .input('code', mssql.NVarChar(100), code)
+      .query<{ id: number }>('insert into lost.cascading (code) output inserted.id values (@code)')
     const id = String(created.recordset[0]?.id)
-    await owner.request().input('id', mssql.Int, Number(id)).input('code', mssql.NVarChar(100), code).query('insert into lost.cascading_line (cascading_id, cascading_code) values (@id, @code)')
+    await owner
+      .request()
+      .input('id', mssql.Int, Number(id))
+      .input('code', mssql.NVarChar(100), code)
+      .query('insert into lost.cascading_line (cascading_id, cascading_code) values (@id, @code)')
     const table: ObjectRef = { schema: 'lost', name: 'cascading' }
     const line: ObjectRef = { schema: 'lost', name: 'cascading_line' }
     const { hop, pool, close } = await throughHop()
@@ -372,7 +400,9 @@ describe('a socket cut while the write waits', () => {
     try {
       const session = await pool
         .request()
-        .query<{ id: number; login: string }>('select @@spid as id, convert(nvarchar(30), login_time, 126) as login from sys.dm_exec_sessions where session_id = @@spid')
+        .query<{ id: number; login: string }>(
+          'select @@spid as id, convert(nvarchar(30), login_time, 126) as login from sys.dm_exec_sessions where session_id = @@spid',
+        )
       const { id, login } = session.recordset[0] ?? { id: 0, login: '' }
       const sent = hop.countSent(answerBytes('sqlserver', name))
       const pending = defined(createSqlServerRecords(pool)).insert({

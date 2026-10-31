@@ -122,10 +122,7 @@ export function releaseAgeExemptionProblems(exempt, locked, siblings) {
 if (process.argv[1]?.endsWith('upstream-deps.mjs')) {
   const manifests = workspaceManifests()
   const siblings = new Set(manifests.map((manifest) => manifest.name))
-  const problems = [
-    ...upstreamDependencyProblems(manifests),
-    ...releaseAgeExemptionProblems(releaseAgeExemptions(), lockedPackages(), siblings),
-  ]
+  const problems = [...upstreamDependencyProblems(manifests), ...releaseAgeExemptionProblems(releaseAgeExemptions(), lockedPackages(), siblings)]
   if (problems.length > 0) {
     console.error('Upstream dependency check failed:')
     for (const problem of problems) console.error(`  - ${problem}`)

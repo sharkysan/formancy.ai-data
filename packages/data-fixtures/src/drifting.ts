@@ -1,5 +1,7 @@
 import type { DatabaseKind } from '@formancy/data-core'
 import { DATABASE_KINDS } from '@formancy/data-core'
+import { DEFINITION_CASES } from './drifting-definition.js'
+import { lookupOf, msTable, msTarget, pgTable, pgTarget, targetColumn, UNTOUCHED } from './drifting-tables.js'
 
 /*
  * Changes to a form's own table after the form was published, written once
@@ -65,30 +67,6 @@ const NOTHING_STOPS: DriftVerdict = { read: true, create: true, update: true, de
 const WRITES_STOP: DriftVerdict = { read: true, create: false, update: false, delete: true }
 const EVERYTHING_STOPS: DriftVerdict = { read: false, create: false, update: false, delete: false }
 
-const UNTOUCHED: DriftSend = { field: 'note', value: 'an untouched field' }
-
-/** The columns every case table ends with. */
-const PG_TAIL = 'memo varchar(40), note varchar(40), row_version bigint not null default 1'
-const MS_TAIL = 'memo nvarchar(40) null, note nvarchar(40) null, rv rowversion'
-
-/** A table keyed by an identity, with `columns` between the key and the tail. */
-const pgTable = (table: string, columns: string): string =>
-  `create table drifting.${table} (id bigint generated always as identity constraint pk_${table} primary key, ${columns}${columns === '' ? '' : ', '}${PG_TAIL})`
-const msTable = (table: string, columns: string): string =>
-  `create table drifting.${table} (id bigint identity(1,1) constraint pk_${table} primary key, ${columns}${columns === '' ? '' : ', '}${MS_TAIL})`
-
-/** A lookup's target, keyed by `id`, with one row: 1, 'one'. */
-const pgTarget = (table: string): string[] => [
-  `create table drifting.${table}_target (id integer constraint pk_${table}_target primary key, label varchar(40) not null)`,
-  `insert into drifting.${table}_target values (1, 'one')`,
-]
-const msTarget = (table: string): string[] => [
-  `create table drifting.${table}_target (id int constraint pk_${table}_target primary key, label nvarchar(40) not null)`,
-  `insert into drifting.${table}_target values (1, N'one')`,
-]
-const targetColumn = (table: string): string => `target_id integer null constraint fk_${table}_target references drifting.${table}_target (id)`
-const lookupOf = (table: string) => [{ foreignKey: `fk_${table}_target`, display: ['label'] }]
-
 export const DRIFTING: readonly DriftingCase[] = [
   // The four cases of the reproduction, with its DDL and its sends.
   {
@@ -98,7 +76,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('tightened_text', 'code varchar(20) not null'), "insert into drifting.tightened_text (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('tightened_text', 'code nvarchar(20) not null'), "insert into drifting.tightened_text (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.tightened_text alter column code type varchar(8)'], sqlserver: ['alter table drifting.tightened_text alter column code nvarchar(8) not null'] },
+    alter: {
+      postgres: ['alter table drifting.tightened_text alter column code type varchar(8)'],
+      sqlserver: ['alter table drifting.tightened_text alter column code nvarchar(8) not null'],
+    },
     moves: true,
     verdict: WRITES_STOP,
     updates: [{ field: 'code', value: 'ABCDEFG' }, { field: 'code', value: 'ABCDEFGHIJ' }, UNTOUCHED],
@@ -108,10 +89,19 @@ export const DRIFTING: readonly DriftingCase[] = [
     name: 'narrowed-decimal',
     table: 'narrowed_decimal',
     setUp: {
-      postgres: [pgTable('narrowed_decimal', 'amount numeric(12, 4) not null'), "insert into drifting.narrowed_decimal (amount, note) values (10.0000, 'seed')"],
-      sqlserver: [msTable('narrowed_decimal', 'amount decimal(12, 4) not null'), "insert into drifting.narrowed_decimal (amount, note) values (10.0000, N'seed')"],
+      postgres: [
+        pgTable('narrowed_decimal', 'amount numeric(12, 4) not null'),
+        "insert into drifting.narrowed_decimal (amount, note) values (10.0000, 'seed')",
+      ],
+      sqlserver: [
+        msTable('narrowed_decimal', 'amount decimal(12, 4) not null'),
+        "insert into drifting.narrowed_decimal (amount, note) values (10.0000, N'seed')",
+      ],
     },
-    alter: { postgres: ['alter table drifting.narrowed_decimal alter column amount type numeric(8, 2)'], sqlserver: ['alter table drifting.narrowed_decimal alter column amount decimal(8, 2) not null'] },
+    alter: {
+      postgres: ['alter table drifting.narrowed_decimal alter column amount type numeric(8, 2)'],
+      sqlserver: ['alter table drifting.narrowed_decimal alter column amount decimal(8, 2) not null'],
+    },
     moves: true,
     verdict: WRITES_STOP,
     updates: [{ field: 'amount', value: '1234.5678' }, { field: 'amount', value: '12345678.1234' }, UNTOUCHED],
@@ -122,7 +112,10 @@ export const DRIFTING: readonly DriftingCase[] = [
     table: 'retyped_integer',
     setUp: {
       postgres: [pgTable('retyped_integer', 'quantity varchar(10) not null'), "insert into drifting.retyped_integer (quantity, note) values ('42', 'seed')"],
-      sqlserver: [msTable('retyped_integer', 'quantity nvarchar(10) not null'), "insert into drifting.retyped_integer (quantity, note) values (N'42', N'seed')"],
+      sqlserver: [
+        msTable('retyped_integer', 'quantity nvarchar(10) not null'),
+        "insert into drifting.retyped_integer (quantity, note) values (N'42', N'seed')",
+      ],
     },
     alter: {
       postgres: ['alter table drifting.retyped_integer alter column quantity type integer using quantity::integer'],
@@ -140,7 +133,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('retyped_real', 'amount numeric(12, 4) not null'), "insert into drifting.retyped_real (amount, note) values (10.0000, 'seed')"],
       sqlserver: [msTable('retyped_real', 'amount decimal(12, 4) not null'), "insert into drifting.retyped_real (amount, note) values (10.0000, N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.retyped_real alter column amount type real'], sqlserver: ['alter table drifting.retyped_real alter column amount real not null'] },
+    alter: {
+      postgres: ['alter table drifting.retyped_real alter column amount type real'],
+      sqlserver: ['alter table drifting.retyped_real alter column amount real not null'],
+    },
     moves: true,
     verdict: EVERYTHING_STOPS,
     updates: [{ field: 'amount', value: '1234.5678' }, { field: 'amount', value: '12345678.1234' }, UNTOUCHED],
@@ -155,7 +151,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('narrowed_float', 'amount double precision not null'), "insert into drifting.narrowed_float (amount, note) values (1.5, 'seed')"],
       sqlserver: [msTable('narrowed_float', 'amount float not null'), "insert into drifting.narrowed_float (amount, note) values (1.5, N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.narrowed_float alter column amount type real'], sqlserver: ['alter table drifting.narrowed_float alter column amount real not null'] },
+    alter: {
+      postgres: ['alter table drifting.narrowed_float alter column amount type real'],
+      sqlserver: ['alter table drifting.narrowed_float alter column amount real not null'],
+    },
     moves: true,
     verdict: WRITES_STOP,
     // Seventeen significant digits a double holds and a real does not.
@@ -190,8 +189,14 @@ export const DRIFTING: readonly DriftingCase[] = [
     name: 'narrowed-instant',
     table: 'narrowed_instant',
     setUp: {
-      postgres: [pgTable('narrowed_instant', 'happened_at timestamp(6) with time zone not null'), "insert into drifting.narrowed_instant (happened_at, note) values ('2026-10-10T10:00:00Z', 'seed')"],
-      sqlserver: [msTable('narrowed_instant', 'happened_at datetimeoffset(7) not null'), "insert into drifting.narrowed_instant (happened_at, note) values ('2026-10-10T10:00:00Z', N'seed')"],
+      postgres: [
+        pgTable('narrowed_instant', 'happened_at timestamp(6) with time zone not null'),
+        "insert into drifting.narrowed_instant (happened_at, note) values ('2026-10-10T10:00:00Z', 'seed')",
+      ],
+      sqlserver: [
+        msTable('narrowed_instant', 'happened_at datetimeoffset(7) not null'),
+        "insert into drifting.narrowed_instant (happened_at, note) values ('2026-10-10T10:00:00Z', N'seed')",
+      ],
     },
     alter: {
       postgres: ['alter table drifting.narrowed_instant alter column happened_at type timestamp(0) with time zone'],
@@ -227,7 +232,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       sqlserver: [msTable('sequence_default', 'quantity int not null'), "insert into drifting.sequence_default (quantity, note) values (5, N'seed')"],
     },
     alter: {
-      postgres: ['create sequence drifting.sequence_default_seq start with 100', "alter table drifting.sequence_default alter column quantity set default nextval('drifting.sequence_default_seq')"],
+      postgres: [
+        'create sequence drifting.sequence_default_seq start with 100',
+        "alter table drifting.sequence_default alter column quantity set default nextval('drifting.sequence_default_seq')",
+      ],
       sqlserver: [
         'create sequence drifting.sequence_default_seq as int start with 100',
         'alter table drifting.sequence_default add constraint df_sequence_default_quantity default (next value for drifting.sequence_default_seq) for quantity',
@@ -245,7 +253,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('set_not_null', 'code varchar(20) not null'), "insert into drifting.set_not_null (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('set_not_null', 'code nvarchar(20) not null'), "insert into drifting.set_not_null (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.set_not_null alter column note set not null'], sqlserver: ['alter table drifting.set_not_null alter column note nvarchar(40) not null'] },
+    alter: {
+      postgres: ['alter table drifting.set_not_null alter column note set not null'],
+      sqlserver: ['alter table drifting.set_not_null alter column note nvarchar(40) not null'],
+    },
     moves: true,
     verdict: WRITES_STOP,
     updates: [{ field: 'code', value: 'XYZ' }, UNTOUCHED],
@@ -257,7 +268,10 @@ export const DRIFTING: readonly DriftingCase[] = [
     table: 'dropped_identity_key',
     setUp: {
       postgres: [pgTable('dropped_identity_key', 'code varchar(20) not null'), "insert into drifting.dropped_identity_key (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('dropped_identity_key', 'code nvarchar(20) not null'), "insert into drifting.dropped_identity_key (code, note) values (N'ABC', N'seed')"],
+      sqlserver: [
+        msTable('dropped_identity_key', 'code nvarchar(20) not null'),
+        "insert into drifting.dropped_identity_key (code, note) values (N'ABC', N'seed')",
+      ],
     },
     alter: {
       postgres: ['alter table drifting.dropped_identity_key drop constraint pk_dropped_identity_key'],
@@ -274,8 +288,16 @@ export const DRIFTING: readonly DriftingCase[] = [
     name: 'dropped-lookup-fk',
     table: 'dropped_lookup_fk',
     setUp: {
-      postgres: [...pgTarget('dropped_lookup_fk'), pgTable('dropped_lookup_fk', targetColumn('dropped_lookup_fk')), "insert into drifting.dropped_lookup_fk (target_id, note) values (1, 'seed')"],
-      sqlserver: [...msTarget('dropped_lookup_fk'), msTable('dropped_lookup_fk', targetColumn('dropped_lookup_fk')), "insert into drifting.dropped_lookup_fk (target_id, note) values (1, N'seed')"],
+      postgres: [
+        ...pgTarget('dropped_lookup_fk'),
+        pgTable('dropped_lookup_fk', targetColumn('dropped_lookup_fk')),
+        "insert into drifting.dropped_lookup_fk (target_id, note) values (1, 'seed')",
+      ],
+      sqlserver: [
+        ...msTarget('dropped_lookup_fk'),
+        msTable('dropped_lookup_fk', targetColumn('dropped_lookup_fk')),
+        "insert into drifting.dropped_lookup_fk (target_id, note) values (1, N'seed')",
+      ],
     },
     alter: {
       postgres: ['alter table drifting.dropped_lookup_fk drop constraint fk_dropped_lookup_fk_target'],
@@ -293,8 +315,16 @@ export const DRIFTING: readonly DriftingCase[] = [
     name: 'disabled-lookup-fk',
     table: 'disabled_lookup_fk',
     setUp: {
-      postgres: [...pgTarget('disabled_lookup_fk'), pgTable('disabled_lookup_fk', targetColumn('disabled_lookup_fk')), "insert into drifting.disabled_lookup_fk (target_id, note) values (1, 'seed')"],
-      sqlserver: [...msTarget('disabled_lookup_fk'), msTable('disabled_lookup_fk', targetColumn('disabled_lookup_fk')), "insert into drifting.disabled_lookup_fk (target_id, note) values (1, N'seed')"],
+      postgres: [
+        ...pgTarget('disabled_lookup_fk'),
+        pgTable('disabled_lookup_fk', targetColumn('disabled_lookup_fk')),
+        "insert into drifting.disabled_lookup_fk (target_id, note) values (1, 'seed')",
+      ],
+      sqlserver: [
+        ...msTarget('disabled_lookup_fk'),
+        msTable('disabled_lookup_fk', targetColumn('disabled_lookup_fk')),
+        "insert into drifting.disabled_lookup_fk (target_id, note) values (1, N'seed')",
+      ],
     },
     alter: {
       postgres: ['alter table drifting.disabled_lookup_fk disable trigger all'],
@@ -315,7 +345,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('widened_text', 'code varchar(20) not null'), "insert into drifting.widened_text (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('widened_text', 'code nvarchar(20) not null'), "insert into drifting.widened_text (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.widened_text alter column code type varchar(40)'], sqlserver: ['alter table drifting.widened_text alter column code nvarchar(40) not null'] },
+    alter: {
+      postgres: ['alter table drifting.widened_text alter column code type varchar(40)'],
+      sqlserver: ['alter table drifting.widened_text alter column code nvarchar(40) not null'],
+    },
     moves: true,
     verdict: NOTHING_STOPS,
     updates: [{ field: 'code', value: 'ABCDEFGHIJ' }, UNTOUCHED],
@@ -328,7 +361,10 @@ export const DRIFTING: readonly DriftingCase[] = [
       postgres: [pgTable('added_nullable', 'code varchar(20) not null'), "insert into drifting.added_nullable (code, note) values ('ABC', 'seed')"],
       sqlserver: [msTable('added_nullable', 'code nvarchar(20) not null'), "insert into drifting.added_nullable (code, note) values (N'ABC', N'seed')"],
     },
-    alter: { postgres: ['alter table drifting.added_nullable add column extra integer'], sqlserver: ['alter table drifting.added_nullable add extra int null'] },
+    alter: {
+      postgres: ['alter table drifting.added_nullable add column extra integer'],
+      sqlserver: ['alter table drifting.added_nullable add extra int null'],
+    },
     moves: true,
     verdict: NOTHING_STOPS,
     updates: [{ field: 'code', value: 'XYZ' }, UNTOUCHED],
@@ -404,8 +440,14 @@ export const DRIFTING: readonly DriftingCase[] = [
     name: 'readded-same-definition',
     table: 'readded_same_definition',
     setUp: {
-      postgres: [pgTable('readded_same_definition', 'code varchar(20) not null'), "insert into drifting.readded_same_definition (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('readded_same_definition', 'code nvarchar(20) not null'), "insert into drifting.readded_same_definition (code, note) values (N'ABC', N'seed')"],
+      postgres: [
+        pgTable('readded_same_definition', 'code varchar(20) not null'),
+        "insert into drifting.readded_same_definition (code, note) values ('ABC', 'seed')",
+      ],
+      sqlserver: [
+        msTable('readded_same_definition', 'code nvarchar(20) not null'),
+        "insert into drifting.readded_same_definition (code, note) values (N'ABC', N'seed')",
+      ],
     },
     alter: {
       postgres: [
@@ -422,123 +464,8 @@ export const DRIFTING: readonly DriftingCase[] = [
     insert: { code: 'NEW' },
   },
 
-  // The adapters' alone: the table dropped and created again under the same
-  // name and definition, its row inserted again, as a restore does. Review
-  // compares names and definitions, and sees nothing; a write decided before
-  // it is refused on both engines, by the relation's own identity in the
-  // facts -- a SQL Server object_id, a PostgreSQL oid -- which no DDL short
-  // of a drop changes. The version starts again at its default, as above.
-  {
-    name: 'recreated-same-definition',
-    table: 'recreated_same_definition',
-    setUp: {
-      postgres: [pgTable('recreated_same_definition', 'code varchar(20) not null'), "insert into drifting.recreated_same_definition (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('recreated_same_definition', 'code nvarchar(20) not null'), "insert into drifting.recreated_same_definition (code, note) values (N'ABC', N'seed')"],
-    },
-    alter: {
-      postgres: [
-        'drop table drifting.recreated_same_definition',
-        pgTable('recreated_same_definition', 'code varchar(20) not null'),
-        "insert into drifting.recreated_same_definition (code, note) values ('ABC', 'seed')",
-      ],
-      sqlserver: [
-        'drop table drifting.recreated_same_definition',
-        msTable('recreated_same_definition', 'code nvarchar(20) not null'),
-        "insert into drifting.recreated_same_definition (code, note) values (N'ABC', N'seed')",
-      ],
-    },
-    moves: true,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { code: 'NEW' },
-  },
-
-  // The adapters' alone: DDL that changes nothing the definition holds.
-  {
-    name: 'unmoved-comment',
-    table: 'unmoved_comment',
-    setUp: {
-      postgres: [pgTable('unmoved_comment', 'code varchar(20) not null'), "insert into drifting.unmoved_comment (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('unmoved_comment', 'code nvarchar(20) not null'), "insert into drifting.unmoved_comment (code, note) values (N'ABC', N'seed')"],
-    },
-    alter: {
-      postgres: ["comment on table drifting.unmoved_comment is 'a table'", "comment on column drifting.unmoved_comment.note is 'a column'"],
-      sqlserver: [
-        "exec sp_addextendedproperty N'MS_Description', N'a table', N'SCHEMA', N'drifting', N'TABLE', N'unmoved_comment'",
-        "exec sp_addextendedproperty N'MS_Description', N'a column', N'SCHEMA', N'drifting', N'TABLE', N'unmoved_comment', N'COLUMN', N'note'",
-      ],
-    },
-    moves: false,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { code: 'NEW' },
-  },
-  {
-    name: 'unmoved-index',
-    table: 'unmoved_index',
-    setUp: {
-      postgres: [pgTable('unmoved_index', 'code varchar(20) not null'), "insert into drifting.unmoved_index (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('unmoved_index', 'code nvarchar(20) not null'), "insert into drifting.unmoved_index (code, note) values (N'ABC', N'seed')"],
-    },
-    alter: { postgres: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'], sqlserver: ['create index ix_unmoved_index_note on drifting.unmoved_index (note)'] },
-    moves: false,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { code: 'NEW' },
-  },
-  {
-    // A grant to another principal: nothing the writing account sees changes.
-    name: 'unmoved-grant',
-    table: 'unmoved_grant',
-    setUp: {
-      postgres: [pgTable('unmoved_grant', 'code varchar(20) not null'), "insert into drifting.unmoved_grant (code, note) values ('ABC', 'seed')"],
-      sqlserver: [msTable('unmoved_grant', 'code nvarchar(20) not null'), "insert into drifting.unmoved_grant (code, note) values (N'ABC', N'seed')"],
-    },
-    alter: { postgres: ['grant select on drifting.unmoved_grant to formancy_reader'], sqlserver: ['grant select on drifting.unmoved_grant to formancy_reader'] },
-    moves: false,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { code: 'NEW' },
-  },
-  {
-    // A limitation, held, SQL Server's alone: dynamic data masking added to a
-    // written column after publication. Neither discovery nor the definition
-    // reads masking, so nothing moves and review sees nothing, while an
-    // account without UNMASK reads the mask -- and a save that sends every
-    // field, as a renderer does (0022), writes it over the stored value.
-    name: 'masked-after-publication',
-    table: 'masked_after_publication',
-    setUp: {
-      sqlserver: [msTable('masked_after_publication', 'code nvarchar(20) not null'), "insert into drifting.masked_after_publication (code, note) values (N'ABC', N'seed')"],
-    },
-    alter: { sqlserver: ["alter table drifting.masked_after_publication alter column note add masked with (function = 'default()')"] },
-    moves: false,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { code: 'NEW' },
-  },
-  {
-    // A partition is storage for its parent, and discovery describes it through
-    // the parent: the root is gone as discovery reports it, and so for `describe`.
-    name: 'replaced-by-partition',
-    table: 'replaced_by_partition',
-    setUp: {
-      postgres: [
-        `create table drifting.replaced_by_partition (id bigint constraint pk_replaced_by_partition primary key, code varchar(20) not null, ${PG_TAIL})`,
-        "insert into drifting.replaced_by_partition (id, code, note) values (1, 'ABC', 'seed')",
-      ],
-    },
-    alter: {
-      postgres: [
-        `create table drifting.replaced_by_partition_parent (id bigint not null, code varchar(20) not null, ${PG_TAIL}) partition by range (id)`,
-        'alter table drifting.replaced_by_partition_parent attach partition drifting.replaced_by_partition for values from (minvalue) to (maxvalue)',
-      ],
-    },
-    moves: true,
-    verdict: null,
-    updates: [UNTOUCHED],
-    insert: { id: '2', code: 'NEW' },
-  },
+  // The adapters' alone, with no verdict (drifting-definition.ts).
+  ...DEFINITION_CASES,
 ]
 
 /** The cases `engine` runs. */

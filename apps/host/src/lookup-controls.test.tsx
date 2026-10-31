@@ -55,7 +55,12 @@ const orderIn = (renderer: RendererName): HTMLElement => within(linePaper(render
 
 /** Read from the DOM: a box to type into and a native select are both role combobox. */
 function shape(renderer: RendererName, element: HTMLElement): { renderer: RendererName; tag: string; autocomplete: string | null; disabled: boolean } {
-  return { renderer, tag: element.tagName, autocomplete: element.getAttribute('aria-autocomplete'), disabled: (element as HTMLInputElement | HTMLSelectElement).disabled }
+  return {
+    renderer,
+    tag: element.tagName,
+    autocomplete: element.getAttribute('aria-autocomplete'),
+    disabled: (element as HTMLInputElement | HTMLSelectElement).disabled,
+  }
 }
 
 /** The names a select offers, its empty first option left out. */
@@ -89,7 +94,13 @@ async function orderDated(engine: Engine, date: string): Promise<string> {
   const source = definition.value.form.model.fields.find((field) => field.key === 'customer')?.optionsSource ?? ''
   const found = await plane.clerk.query(engine.formId, source, { operation: 'create', search: 'Muster' })
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
-  const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: date, status: 'placed', amount: '1', notes: `dated ${date}` })
+  const created = await plane.clerk.create(engine.formId, {
+    customer: found.value.rows[0].token,
+    order_date: date,
+    status: 'placed',
+    amount: '1',
+    notes: `dated ${date}`,
+  })
   if (!created.ok || created.value.record === null) throw new Error(`the order was not created: ${created.ok ? 'no token' : created.message}`)
   return created.value.record
 }
@@ -157,7 +168,11 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
 
     await user.selectOptions(orderIn(renderer), option)
     await waitFor(() => expect(computeAccessibleName(within(orderIn(renderer)).getByRole('option', { selected: true }))).toBe(date), ARRIVES)
-    for (const [name, value] of [[/^Line no\b/, '1'], [/^Quantity\b/, '2'], [/^Unit price\b/, '3.50']] as const) {
+    for (const [name, value] of [
+      [/^Line no\b/, '1'],
+      [/^Quantity\b/, '2'],
+      [/^Unit price\b/, '3.50'],
+    ] as const) {
       const field = within(linePaper(renderer)).getByLabelText(name)
       await user.clear(field)
       await user.type(field, value)
@@ -192,7 +207,10 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
     try {
       await newRecord(user)
       for (const renderer of RENDERERS) {
-        await waitFor(() => expect({ renderer, statuses: statuses(renderer) }).toEqual({ renderer, statuses: expect.arrayContaining([FAILED]) as unknown }), ARRIVES)
+        await waitFor(
+          () => expect({ renderer, statuses: statuses(renderer) }).toEqual({ renderer, statuses: expect.arrayContaining([FAILED]) as unknown }),
+          ARRIVES,
+        )
         expect(shape(renderer, orderIn(renderer))).toEqual({ renderer, tag: 'SELECT', autocomplete: null, disabled: false })
         expect(offered(orderIn(renderer))).toEqual([])
       }
@@ -203,10 +221,26 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
 
     const [first, second] = RENDERERS
     await user.click(orderIn(first))
-    await waitFor(() => expect({ renderer: first, offers: offered(orderIn(first)).includes(EDGES.orderDate), failed: statuses(first).includes(FAILED) }).toEqual({ renderer: first, offers: true, failed: false }), ARRIVES)
+    await waitFor(
+      () =>
+        expect({ renderer: first, offers: offered(orderIn(first)).includes(EDGES.orderDate), failed: statuses(first).includes(FAILED) }).toEqual({
+          renderer: first,
+          offers: true,
+          failed: false,
+        }),
+      ARRIVES,
+    )
     expect({ renderer: second, failed: statuses(second).includes(FAILED) }).toEqual({ renderer: second, failed: true })
     await user.click(orderIn(second))
-    await waitFor(() => expect({ renderer: second, offers: offered(orderIn(second)).includes(EDGES.orderDate), failed: statuses(second).includes(FAILED) }).toEqual({ renderer: second, offers: true, failed: false }), ARRIVES)
+    await waitFor(
+      () =>
+        expect({ renderer: second, offers: offered(orderIn(second)).includes(EDGES.orderDate), failed: statuses(second).includes(FAILED) }).toEqual({
+          renderer: second,
+          offers: true,
+          failed: false,
+        }),
+      ARRIVES,
+    )
     expect(await floor('the plain select, asked again')).toEqual(CLEAN('the plain select, asked again'))
   })
 
@@ -224,7 +258,10 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
   // order form's version 2 (watched failing with the page's rewrite kept:
   // an INPUT).
   test('draws a form published before 0066 as published: its lookup a plain select', async () => {
-    const stored = (await plane.store.read(engine.formId, 1)) as { base: { model: { fields: Array<{ key: string; widget?: string }> } }; form: { model: { fields: Array<{ key: string; widget?: string }> } } }
+    const stored = (await plane.store.read(engine.formId, 1)) as {
+      base: { model: { fields: Array<{ key: string; widget?: string }> } }
+      form: { model: { fields: Array<{ key: string; widget?: string }> } }
+    }
     for (const form of [stored.base, stored.form]) {
       const customer = form.model.fields.find((field) => field.key === 'customer')
       expect(customer?.widget).toBe('typeahead')
@@ -238,7 +275,11 @@ describe.each(ENGINES)('the control a lookup is drawn as on $engine', (engine) =
     for (const renderer of RENDERERS) {
       const select = within(paper(renderer)).getByRole('combobox', { name: 'Customer' })
       expect(shape(renderer, select)).toEqual({ renderer, tag: 'SELECT', autocomplete: null, disabled: false })
-      await waitFor(() => expect({ renderer, offered: offered(select) }).toEqual({ renderer, offered: expect.arrayContaining(['Muster AG', SECOND_CUSTOMER.name]) as unknown }), ARRIVES)
+      await waitFor(
+        () =>
+          expect({ renderer, offered: offered(select) }).toEqual({ renderer, offered: expect.arrayContaining(['Muster AG', SECOND_CUSTOMER.name]) as unknown }),
+        ARRIVES,
+      )
     }
     expect(await floor('a form published before 0066')).toEqual(CLEAN('a form published before 0066'))
   })

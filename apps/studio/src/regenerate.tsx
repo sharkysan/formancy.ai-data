@@ -11,9 +11,7 @@ import { freshFields } from './carry.js'
  * to -- the fields whose column or lookup the regenerated version did not
  * have -- read from that exact version, not from whichever is newest now.
  */
-export type Regenerated =
-  | { ok: true; regeneration: Regeneration; fresh: string[] }
-  | { ok: false; code: string; message: string; drift?: DriftReport }
+export type Regenerated = { ok: true; regeneration: Regeneration; fresh: string[] } | { ok: false; code: string; message: string; drift?: DriftReport }
 
 export async function regenerateForm(client: AdminClient, formId: string): Promise<Regenerated> {
   const outcome = await client.regenerate(formId)
@@ -56,7 +54,13 @@ function Findings({ id, heading, items, none }: { id: string; heading: string; i
  * conflict that has a choice offers it. Nothing is published until the
  * person publishes it.
  */
-export function RegenerationView({ regenerated, onContinue }: { regenerated: Regenerated; onContinue: (regeneration: Regeneration, fresh: string[]) => void }): ReactElement {
+export function RegenerationView({
+  regenerated,
+  onContinue,
+}: {
+  regenerated: Regenerated
+  onContinue: (regeneration: Regeneration, fresh: string[]) => void
+}): ReactElement {
   if (!regenerated.ok) {
     const next = NEXT[regenerated.code]
     return (
@@ -71,8 +75,8 @@ export function RegenerationView({ regenerated, onContinue }: { regenerated: Reg
     <section className="regeneration" aria-labelledby="regeneration-heading">
       <h3 id="regeneration-heading">Regenerated from version {regeneration.version}</h3>
       <p role="status">
-        Generated again from the database now, with your presentation carried by the column or lookup each choice was made
-        for. Nothing is published until you publish it.
+        Generated again from the database now, with your presentation carried by the column or lookup each choice was made for. Nothing is published until you
+        publish it.
       </p>
       <Findings
         id="regeneration-conflicts"
@@ -92,7 +96,12 @@ export function RegenerationView({ regenerated, onContinue }: { regenerated: Reg
         items={regeneration.keysReassigned.map(describeReassigned)}
         none="Every key stands for what it did."
       />
-      <Findings id="regeneration-policy" heading="What the published policy no longer fits" items={regeneration.policyProblems} none="The published policy fits the regenerated form." />
+      <Findings
+        id="regeneration-policy"
+        heading="What the published policy no longer fits"
+        items={regeneration.policyProblems}
+        none="The published policy fits the regenerated form."
+      />
       <p className="next">
         <button type="button" className="primary" onClick={() => onContinue(regeneration, fresh)}>
           Continue to presentation

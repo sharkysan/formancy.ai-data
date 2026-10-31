@@ -13,7 +13,9 @@ import { APP } from './serve.mjs'
  * understand stops the gate rather than checking less than the page loads.
  */
 export function stylesheet() {
-  const text = readFileSync(join(APP, 'src', 'host.css'), 'utf8').replaceAll(/@import\s+'(\.\/[^']+\.css)';/g, (_, path) => readFileSync(join(APP, 'src', path), 'utf8'))
+  const text = readFileSync(join(APP, 'src', 'host.css'), 'utf8').replaceAll(/@import\s+'(\.\/[^']+\.css)';/g, (_, path) =>
+    readFileSync(join(APP, 'src', path), 'utf8'),
+  )
   if (/@import/.test(text.replaceAll(/\/\*[\s\S]*?\*\//g, ''))) throw new Error('src/host.css has an @import the gate does not inline')
   return text
 }
@@ -28,7 +30,8 @@ export function stylesheet() {
 export function mediaConditions(text = stylesheet()) {
   const conditions = [...text.replaceAll(/\/\*[\s\S]*?\*\//g, '').matchAll(/@media\s*([^{]*)\{/g)].map((match) => match[1].trim())
   const unread = conditions.filter((condition) => !/^\(\s*max-width:\s*[\d.]+rem\s*\)$/.test(condition))
-  if (unread.length > 0) throw new Error(`src/host.css has an @media condition the gate does not read, so it would measure no width past it: ${unread.join('; ')}`)
+  if (unread.length > 0)
+    throw new Error(`src/host.css has an @media condition the gate does not read, so it would measure no width past it: ${unread.join('; ')}`)
   return conditions
 }
 

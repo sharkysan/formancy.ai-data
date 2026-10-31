@@ -28,11 +28,21 @@ export async function allowanceProblem(browser, origin) {
     await page.goto(`${origin}/`, { waitUntil: 'load' })
     await page.getByLabel('Host token').fill(TOKENS.clerk)
     await page.getByRole('button', { name: 'Sign in' }).click()
-    await page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}` }).click()
+    await page
+      .getByRole('navigation', { name: 'Forms' })
+      .getByRole('link', { name: `Order ${FORM}` })
+      .click()
     // The grid's line, the Records region's first status with no name (0080): its rows have answered.
-    await page.getByRole('region', { name: 'Records', exact: true }).getByRole('status', { name: /^$/ }).first().filter({ hasText: /^Rows 1–/ }).waitFor(WITHIN)
+    await page
+      .getByRole('region', { name: 'Records', exact: true })
+      .getByRole('status', { name: /^$/ })
+      .first()
+      .filter({ hasText: /^Rows 1–/ })
+      .waitFor(WITHIN)
     const refused = await violationsHeard(page)
-    return refused.some((violation) => violation.startsWith('style-src-elem refused inline')) ? null : `under 0069's policy the page reported ${refused.length === 0 ? 'nothing refused' : refused.slice(0, 4).join('; ')}, so 'unsafe-inline' allows nothing it does`
+    return refused.some((violation) => violation.startsWith('style-src-elem refused inline'))
+      ? null
+      : `under 0069's policy the page reported ${refused.length === 0 ? 'nothing refused' : refused.slice(0, 4).join('; ')}, so 'unsafe-inline' allows nothing it does`
   } finally {
     await page.close()
   }

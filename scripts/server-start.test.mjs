@@ -92,7 +92,16 @@ function start(extra = {}, connections = CONNECTIONS) {
     child.on('error', reject)
     child.on('exit', (code) => {
       clearTimeout(timer)
-      resolve({ listening, code, stdout, stderr, lines: stdout.split('\n').filter((line) => line.startsWith('{')).map((line) => JSON.parse(line)) })
+      resolve({
+        listening,
+        code,
+        stdout,
+        stderr,
+        lines: stdout
+          .split('\n')
+          .filter((line) => line.startsWith('{'))
+          .map((line) => JSON.parse(line)),
+      })
     })
   })
 }
@@ -103,16 +112,20 @@ describe('the built server, with Entra connections in its allowlist', () => {
   // of this release logs in as one, naming the connection and nothing of
   // the principal; nothing for a SQL login. Watched failing with main.ts's
   // loop over the sentences removed.
-  test('says at start, once for each Entra connection, that no test logs in as one, naming the connection alone', async () => {
-    const run = await start()
-    expect(run.listening, run.stderr).toBe(true)
-    const said = run.lines.filter((line) => typeof line.msg === 'string' && line.msg.startsWith('No test of this release'))
-    expect(said.map((line) => [line.level, line.msg])).toEqual([
-      [40, 'No test of this release logs in as an Entra principal; connection erp-mi logs in as one.'],
-      [40, 'No test of this release logs in as an Entra principal; connection erp-sp logs in as one.'],
-    ])
-    for (const value of [TENANT, CLIENT, CLIENT_SECRET]) expect(run.stdout + run.stderr).not.toContain(value)
-  }, STARTS)
+  test(
+    'says at start, once for each Entra connection, that no test logs in as one, naming the connection alone',
+    async () => {
+      const run = await start()
+      expect(run.listening, run.stderr).toBe(true)
+      const said = run.lines.filter((line) => typeof line.msg === 'string' && line.msg.startsWith('No test of this release'))
+      expect(said.map((line) => [line.level, line.msg])).toEqual([
+        [40, 'No test of this release logs in as an Entra principal; connection erp-mi logs in as one.'],
+        [40, 'No test of this release logs in as an Entra principal; connection erp-sp logs in as one.'],
+      ])
+      for (const value of [TENANT, CLIENT, CLIENT_SECRET]) expect(run.stdout + run.stderr).not.toContain(value)
+    },
+    STARTS,
+  )
 
   // With AZURE_FEDERATED_TOKEN_FILE set, @azure/identity's managed identity
   // logs in by workload identity, as the environment's tenant, client and
@@ -120,16 +133,23 @@ describe('the built server, with Entra connections in its allowlist', () => {
   // naming the connection and the variable and never the variable's
   // value; a service principal alone starts. Watched failing with the
   // check removed from main.ts (the server listened).
-  test('stops at start for a managed identity while AZURE_FEDERATED_TOKEN_FILE is set, naming the variable and never its value', async () => {
-    const workload = { AZURE_FEDERATED_TOKEN_FILE: TOKEN_FILE, AZURE_TENANT_ID: TENANT, AZURE_CLIENT_ID: CLIENT }
-    const run = await start(workload)
-    expect(run.listening).toBe(false)
-    expect(run.code).toBe(1)
-    expect(run.stderr.trim()).toBe(
-      'connection erp-mi logs in as a managed identity, which logs in by workload identity while AZURE_FEDERATED_TOKEN_FILE is set, as the tenant, client and authority the environment names; this release does not take workload identity. Unset it, or log in as a service principal (0074).',
-    )
-    for (const value of [TOKEN_FILE, TENANT, CLIENT]) expect(run.stdout + run.stderr).not.toContain(value)
-    const principalOnly = await start(workload, CONNECTIONS.filter((connection) => connection.id !== 'erp-mi'))
-    expect(principalOnly.listening, principalOnly.stderr).toBe(true)
-  }, STARTS)
+  test(
+    'stops at start for a managed identity while AZURE_FEDERATED_TOKEN_FILE is set, naming the variable and never its value',
+    async () => {
+      const workload = { AZURE_FEDERATED_TOKEN_FILE: TOKEN_FILE, AZURE_TENANT_ID: TENANT, AZURE_CLIENT_ID: CLIENT }
+      const run = await start(workload)
+      expect(run.listening).toBe(false)
+      expect(run.code).toBe(1)
+      expect(run.stderr.trim()).toBe(
+        'connection erp-mi logs in as a managed identity, which logs in by workload identity while AZURE_FEDERATED_TOKEN_FILE is set, as the tenant, client and authority the environment names; this release does not take workload identity. Unset it, or log in as a service principal (0074).',
+      )
+      for (const value of [TOKEN_FILE, TENANT, CLIENT]) expect(run.stdout + run.stderr).not.toContain(value)
+      const principalOnly = await start(
+        workload,
+        CONNECTIONS.filter((connection) => connection.id !== 'erp-mi'),
+      )
+      expect(principalOnly.listening, principalOnly.stderr).toBe(true)
+    },
+    STARTS,
+  )
 })

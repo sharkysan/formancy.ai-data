@@ -9,6 +9,7 @@ import type { User } from './test-host.js'
 import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * A grid's Columns on the host page (0106), on both engines, against the
@@ -63,7 +64,7 @@ async function definitionOf(formId: string): Promise<PublishedForm> {
 async function labelsOf(formId: string, parent: string | null = null): Promise<string[]> {
   const definition = await definitionOf(formId)
   const readable = new Set(definition.readable)
-  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map((field) => String(field.label ?? field.key))
+  return definition.form.model.fields.filter((field) => readable.has(field.key) && field.key !== parent).map(fieldHeading)
 }
 
 /** `labels` with one moved to `at`. */
@@ -87,7 +88,8 @@ async function press(user: User, control: HTMLElement, key = '{Enter}'): Promise
 }
 
 /** The filter and sort of each list request sent for `formId`, with the cursor it continues after. */
-const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> => listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
+const asked = (formId: string): Array<Pick<RecordListQuery, 'filter' | 'sort' | 'after'>> =>
+  listsSent(plane.sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after }))
 
 /** Fresh orders of tenant 1's, noted `notes`, one per amount, made beside the page. */
 async function freshOrders(engine: Engine, notes: string, amounts: readonly string[]): Promise<string[]> {
@@ -97,7 +99,13 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
   const records: string[] = []
   for (const amount of amounts) {
-    const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount, notes })
+    const created = await plane.clerk.create(engine.formId, {
+      customer: found.value.rows[0].token,
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount,
+      notes,
+    })
     if (!created.ok || created.value.record === null) throw new Error('the order was not created')
     records.push(created.value.record)
   }
@@ -197,7 +205,9 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await headed('Records', [last, 'Delete'])
     const box = showBox('Records', last)
     expect(box.getAttribute('aria-disabled')).toBe('true')
-    expect(within(gridSection('Records')).getByRole('checkbox', { name: `Show ${last}`, description: 'One column stays shown: a row is opened through its cells.' })).toBe(box)
+    expect(
+      within(gridSection('Records')).getByRole('checkbox', { name: `Show ${last}`, description: 'One column stays shown: a row is opened through its cells.' }),
+    ).toBe(box)
     await press(user, box, ' ')
     expect(box.checked).toBe(true)
     expect(focusedName()).toBe(`Show ${last}`)
@@ -291,7 +301,10 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     await openColumns(user, 'Delivery')
     expect(listed('Delivery')).toEqual(labels.map((label) => ({ label, shown: true })))
     await press(user, showBox('Delivery', 'Carrier'), ' ')
-    await headed('Delivery', labels.filter((label) => label !== 'Carrier'))
+    await headed(
+      'Delivery',
+      labels.filter((label) => label !== 'Carrier'),
+    )
     expect(keptFor(childGrid('order'), engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
     expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
     expect(headers('Records')).toContain('Notes')

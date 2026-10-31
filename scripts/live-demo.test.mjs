@@ -164,7 +164,16 @@ describe('the live demo on formancy.ai (0070)', () => {
   // same command with --dry-run and nothing else, so what it checked is
   // what a deploy would do.
   test('deploys with the pinned Wrangler, the config, the commit and an immediate rollout; the dry run adds --dry-run alone', () => {
-    expect(deployArguments('abc', false)).toEqual(['--yes', WRANGLER, 'deploy', '--config', 'apps/live-demo/wrangler.json', '--message', 'formancy.ai-data@abc', '--containers-rollout=immediate'])
+    expect(deployArguments('abc', false)).toEqual([
+      '--yes',
+      WRANGLER,
+      'deploy',
+      '--config',
+      'apps/live-demo/wrangler.json',
+      '--message',
+      'formancy.ai-data@abc',
+      '--containers-rollout=immediate',
+    ])
     expect(deployArguments('abc', true)).toEqual([...deployArguments('abc', false), '--dry-run'])
     expect(root.scripts['live-demo:deploy']).toBe('pnpm build && node scripts/live-demo.mjs')
   })
@@ -200,7 +209,9 @@ describe('the live demo on formancy.ai (0070)', () => {
     expect(start).toBeGreaterThan(-1)
     const section = metadata.slice(start, metadata.indexOf('\n## ', start + 1))
     const setting = (name) => new RegExp(`^\\| ${name} \\| \`([^\`]+)\` \\|`, 'm').exec(section)?.[1]
-    const repository = JSON.parse(read('packages', 'data-core', 'package.json')).repository.url.replace(/^git\+https:\/\/github\.com\//, '').replace(/\.git$/, '')
+    const repository = JSON.parse(read('packages', 'data-core', 'package.json'))
+      .repository.url.replace(/^git\+https:\/\/github\.com\//, '')
+      .replace(/\.git$/, '')
     expect(setting('Worker')).toBe(LIVE_WORKER)
     expect(setting('Git repository')).toBe(repository)
     expect(setting('Root directory')).toBe('/')
@@ -223,7 +234,9 @@ describe('the live demo on formancy.ai (0070)', () => {
     const files = readdirSync(directory).filter((file) => file.endsWith('.yml'))
     expect(files.length).toBeGreaterThan(0)
     for (const file of files) {
-      expect(read('.github', 'workflows', file), file).not.toMatch(/\bwrangler\b|live-demo\.mjs|live-demo:deploy|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|cloudflare\/wrangler-action/i)
+      expect(read('.github', 'workflows', file), file).not.toMatch(
+        /\bwrangler\b|live-demo\.mjs|live-demo:deploy|CLOUDFLARE_API_TOKEN|CLOUDFLARE_ACCOUNT_ID|cloudflare\/wrangler-action/i,
+      )
     }
   })
 })
@@ -262,9 +275,9 @@ describe("the live demo's headers (0070)", () => {
     // Without the allowance it is a loose policy like any other, and the
     // allowance is no licence for the page itself to carry a style.
     expect(policyProblems(LIVE_POLICY, page)).toEqual(["style-src allows 'unsafe-inline'"])
-    expect(policyProblems(LIVE_POLICY, { ...page, html: html.replace('<div id="root">', '<div id="root" style="color: red">') }, { allowed: LIVE_ALLOWED })).toEqual([
-      'index.html has an inline style, which style-src allows only for what a script injects',
-    ])
+    expect(
+      policyProblems(LIVE_POLICY, { ...page, html: html.replace('<div id="root">', '<div id="root" style="color: red">') }, { allowed: LIVE_ALLOWED }),
+    ).toEqual(['index.html has an inline style, which style-src allows only for what a script injects'])
     expect(policyProblems(LIVE_POLICY, page, { allowed: { 'script-src': ["'unsafe-inline'"] } })).toEqual(["style-src allows 'unsafe-inline'"])
   })
 
@@ -314,7 +327,9 @@ describe("the live demo's build checks (0070)", () => {
   // still refused. A check that ignored the policy or the allowance it was
   // given would pass the first and fail here, or the other way round.
   test('pass a demo build of the shape the host page writes, and refuse what they refuse for the examples', async () => {
-    const html = read('apps', 'host', 'index.html').replace('<script type="module" src="/src/main.tsx"></script>', '<script type="module" crossorigin src="./assets/index-yOTureDI.js"></script>').replace('</head>', '<link rel="stylesheet" crossorigin href="./assets/index-B8R33OWx.css"></head>')
+    const html = read('apps', 'host', 'index.html')
+      .replace('<script type="module" src="/src/main.tsx"></script>', '<script type="module" crossorigin src="./assets/index-yOTureDI.js"></script>')
+      .replace('</head>', '<link rel="stylesheet" crossorigin href="./assets/index-B8R33OWx.css"></head>')
     const page = { root: hostApp, mode: 'demo', name: "the host page's demo build", policy: LIVE_POLICY, allowed: LIVE_ALLOWED }
     const build = (files) => {
       const directory = mkdtempSync(join(tmpdir(), 'live-demo-build-'))
@@ -322,7 +337,12 @@ describe("the live demo's build checks (0070)", () => {
       for (const [name, text] of Object.entries(files)) writeFileSync(join(directory, name), text)
       return directory
     }
-    const files = { 'index.html': html, 'assets/index-yOTureDI.js': 'export {}', 'assets/index-B8R33OWx.css': '.x{background:url("data:image/svg+xml,%3Csvg%3E")}', [NOTICES_FILE]: 'notices' }
+    const files = {
+      'index.html': html,
+      'assets/index-yOTureDI.js': 'export {}',
+      'assets/index-B8R33OWx.css': '.x{background:url("data:image/svg+xml,%3Csvg%3E")}',
+      [NOTICES_FILE]: 'notices',
+    }
     const directories = []
     try {
       const fine = build(files)

@@ -72,7 +72,8 @@ export function parsePrintedRoutes(text) {
     const path = `${parents.at(-1) ?? ''}${segment}`
     parents.push(path)
     const methods = list.split(', ')
-    if (methods.includes('HEAD') && !methods.includes('GET')) throw new Error(`${path} answers HEAD without GET, which Fastify adds HEAD for; the doors have no rule for it`)
+    if (methods.includes('HEAD') && !methods.includes('GET'))
+      throw new Error(`${path} answers HEAD without GET, which Fastify adds HEAD for; the doors have no rule for it`)
     for (const method of methods.filter((entry) => entry !== 'HEAD')) routes.push({ method, path })
   }
   return routes
@@ -87,7 +88,8 @@ export function samplePath(path) {
     .map((segment, index) => {
       if (!segment.startsWith(':')) return segment
       const value = SAMPLES[segments[index - 1]]
-      if (value === undefined) throw new Error(`${path}: the parameter ${segment} follows "${segments[index - 1]}", which has no sample in scripts/cloudflare/doors.mjs`)
+      if (value === undefined)
+        throw new Error(`${path}: the parameter ${segment} follows "${segments[index - 1]}", which has no sample in scripts/cloudflare/doors.mjs`)
       return value
     })
     .join('/')
@@ -104,7 +106,12 @@ const escape = (literal) => literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export function runtimePattern(routes) {
   const paths = [...new Set(routes.filter((route) => route.plane === 'runtime').map((route) => route.path))].sort()
   if (paths.length === 0) throw new Error('the runtime plane registers no route, so the runtime door would forward nothing')
-  const alternatives = paths.map((path) => path.split('/').map((segment) => (segment.startsWith(':') ? '[^/]+' : escape(segment))).join('/'))
+  const alternatives = paths.map((path) =>
+    path
+      .split('/')
+      .map((segment) => (segment.startsWith(':') ? '[^/]+' : escape(segment)))
+      .join('/'),
+  )
   return `^(?:${alternatives.join('|')})$`
 }
 
@@ -154,7 +161,8 @@ export async function routesFromServer(serverRoot = join(repo, 'packages', 'data
     if (twice.length > 0) throw new Error(`both planes register ${twice.map(key).join(', ')}, so no door can tell whose it is`)
     const union = [...printed.none, ...runtime, ...administrator].map(key).sort()
     const all = printed.both.map(key).sort()
-    if (union.join('\n') !== all.join('\n')) throw new Error(`the server with both planes registers ${all.join(', ')}, not the union of the planes alone, ${union.join(', ')}`)
+    if (union.join('\n') !== all.join('\n'))
+      throw new Error(`the server with both planes registers ${all.join(', ')}, not the union of the planes alone, ${union.join(', ')}`)
     const routes = [
       ...printed.none.map((route) => ({ ...route, plane: 'shared' })),
       ...runtime.map((route) => ({ ...route, plane: 'runtime' })),
@@ -173,7 +181,8 @@ async function measureLimit(app) {
     const response = await app.inject({ method: 'GET', url: '/v1/whoami' })
     if (response.statusCode !== 429) continue
     const retryAfter = Number(response.headers['retry-after'])
-    if (!(retryAfter > 0 && retryAfter <= 60)) throw new Error(`the first 429 came after ${String(count)} requests with retry-after ${String(response.headers['retry-after'])}, not within a minute`)
+    if (!(retryAfter > 0 && retryAfter <= 60))
+      throw new Error(`the first 429 came after ${String(count)} requests with retry-after ${String(response.headers['retry-after'])}, not within a minute`)
     return count
   }
   throw new Error('no 429 within a million requests')
@@ -288,7 +297,9 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/cloudflare/doors.mj
     writeFileSync(join(repo, DOORS), text, 'utf8')
     const guide = join(repo, GUIDE)
     writeFileSync(guide, rewriteGuide(readFileSync(guide, 'utf8'), doors, readJson(RATE_LIMITED)), 'utf8')
-    console.log(`${DOORS}: ${String(doors.routes.length)} routes; ${GUIDE}: ${String(Object.keys(blocksFor(doors, readJson(RATE_LIMITED))).length)} blocks written`)
+    console.log(
+      `${DOORS}: ${String(doors.routes.length)} routes; ${GUIDE}: ${String(Object.keys(blocksFor(doors, readJson(RATE_LIMITED))).length)} blocks written`,
+    )
   } else {
     process.stdout.write(text)
   }

@@ -11,7 +11,11 @@ import { postgresServer } from './server.js'
  * PostgreSQL are met only here. What each leg's real server answers is
  * server.integration.test.ts's.
  */
-const answer = (version: string, versionNum: string, description = `PostgreSQL ${version} on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit`) => ({
+const answer = (
+  version: string,
+  versionNum: string,
+  description = `PostgreSQL ${version} on x86_64-pc-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit`,
+) => ({
   version,
   versionNum,
   description,
@@ -23,7 +27,11 @@ describe('postgresServer', () => {
   // after the version. The alpine answer is every leg's.
   test('reads the major from server_version_num, on an alpine and a Debian build and an old 9.6', () => {
     expect(postgresServer(answer('17.6', '170006'))).toEqual({ kind: 'postgres', version: '17.6', product: 'postgresql', major: 17 })
-    const debian = answer('16.4 (Debian 16.4-1.pgdg120+1)', '160004', 'PostgreSQL 16.4 (Debian 16.4-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit')
+    const debian = answer(
+      '16.4 (Debian 16.4-1.pgdg120+1)',
+      '160004',
+      'PostgreSQL 16.4 (Debian 16.4-1.pgdg120+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14) 12.2.0, 64-bit',
+    )
     expect(postgresServer(debian)).toEqual({ kind: 'postgres', version: '16.4 (Debian 16.4-1.pgdg120+1)', product: 'postgresql', major: 16 })
     expect(postgresServer(answer('9.6.24', '90624')).major).toBe(9)
     expect(postgresServer(answer('18beta1', '180000')).major).toBe(18)
@@ -48,7 +56,9 @@ describe('postgresServer', () => {
   // with a major of its own numbering; only version() tells it apart, and
   // read as PostgreSQL it would be called tested.
   test('calls a server PostgreSQL only when version() begins "PostgreSQL "', () => {
-    expect(postgresServer(answer('13.0.0', '130000', 'CockroachDB CCL v23.1.11 (x86_64-pc-linux-gnu, built 2023/09/27 01:53:43, go1.19.10)')).product).toBe('other')
+    expect(postgresServer(answer('13.0.0', '130000', 'CockroachDB CCL v23.1.11 (x86_64-pc-linux-gnu, built 2023/09/27 01:53:43, go1.19.10)')).product).toBe(
+      'other',
+    )
     expect(postgresServer(answer('17.6', '170006', 'postgresql 17.6')).product).toBe('other')
     expect(postgresServer(answer('17.6', '170006', 'PostgreSQLish 17.6')).product).toBe('other')
   })
@@ -61,7 +71,9 @@ describe('postgresServer', () => {
   // would read as one nobody ran; this holds the register's sentence to
   // what the code does.
   test('calls a server built elsewhere PostgreSQL of its major, and tested on a tested major, whatever else it changed', () => {
-    const elsewhere = postgresServer(answer('16.4', '160004', 'PostgreSQL 16.4 on aarch64-unknown-linux-gnu, compiled by aarch64-unknown-linux-gnu-gcc (GCC) 9.5.0, 64-bit'))
+    const elsewhere = postgresServer(
+      answer('16.4', '160004', 'PostgreSQL 16.4 on aarch64-unknown-linux-gnu, compiled by aarch64-unknown-linux-gnu-gcc (GCC) 9.5.0, 64-bit'),
+    )
     expect(elsewhere).toEqual({ kind: 'postgres', version: '16.4', product: 'postgresql', major: 16 })
     expect(serverStanding('postgres', elsewhere).tested).toBe(true)
   })

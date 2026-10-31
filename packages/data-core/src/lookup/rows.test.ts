@@ -69,11 +69,31 @@ describe('lookupKeys', () => {
   // can be a member, so nothing else is asked about.
   test('asks only about values spelled as the key column holds them', () => {
     const asked = (type: LookupKeyType, values: string[]): string[] =>
-      lookupKeys({ ...CUSTOMER, targetColumns: [{ name: 'id', type }] }, values.map((value) => tokenOf([value]))).map(([value]) => value ?? '')
+      lookupKeys(
+        { ...CUSTOMER, targetColumns: [{ name: 'id', type }] },
+        values.map((value) => tokenOf([value])),
+      ).map(([value]) => value ?? '')
 
-    expect(asked(INT32, ['7', '0', '-2147483648', '2147483647', 'abc', '99999999999999999999', '1e3', '2147483648', '-2147483649', '-0', '007', '+5', ' 5', '5 ', '1.0', ''])).toEqual(
-      ['7', '0', '-2147483648', '2147483647'],
-    )
+    expect(
+      asked(INT32, [
+        '7',
+        '0',
+        '-2147483648',
+        '2147483647',
+        'abc',
+        '99999999999999999999',
+        '1e3',
+        '2147483648',
+        '-2147483649',
+        '-0',
+        '007',
+        '+5',
+        ' 5',
+        '5 ',
+        '1.0',
+        '',
+      ]),
+    ).toEqual(['7', '0', '-2147483648', '2147483647'])
     expect(asked({ kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }, ['9223372036854775807', '9223372036854775808'])).toEqual([
       '9223372036854775807',
     ])
@@ -101,12 +121,21 @@ describe('lookupKeys', () => {
     expect(asked({ kind: 'text', maxLength: null, lengthUnit: 'utf16-code-units', fixedLength: false }, ['x'.repeat(39), ''])).toEqual(['x'.repeat(39), ''])
 
     expect(
-      asked({ kind: 'date' }, ['2024-02-29', '0001-01-01', '9999-12-31', '2023-02-29', '2026-13-01', '2026-00-10', '2026-04-31', '2026-04-00', '0000-01-01', '2026-1-01', '20260101', '2026-01-01T00:00:00Z']),
-    ).toEqual([
-      '2024-02-29',
-      '0001-01-01',
-      '9999-12-31',
-    ])
+      asked({ kind: 'date' }, [
+        '2024-02-29',
+        '0001-01-01',
+        '9999-12-31',
+        '2023-02-29',
+        '2026-13-01',
+        '2026-00-10',
+        '2026-04-31',
+        '2026-04-00',
+        '0000-01-01',
+        '2026-1-01',
+        '20260101',
+        '2026-01-01T00:00:00Z',
+      ]),
+    ).toEqual(['2024-02-29', '0001-01-01', '9999-12-31'])
 
     // A composite key is asked about only when every one of its values fits.
     expect(lookupKeys(CUSTOMER, [tokenOf(['7', 'abc']), tokenOf(['7', '1e3']), tokenOf(['7', '1001'])])).toEqual([['7', '1001']])
@@ -147,7 +176,7 @@ describe('lookupPage', () => {
 
   // What the browser receives has to pass formancy's own check, or the whole
   // list is refused there: NULL names, blank names and awkward keys included.
-  test('every page passes formancy\'s check on a remote list', () => {
+  test("every page passes formancy's check on a remote list", () => {
     const fetched = [row('7', '1', 'Acme'), row('7', '2', null), row('7', '3', '   '), row('', 'a,b', 'Comma'), row('7', 'Zürich', 'Ü')]
     const page = lookupPage(CUSTOMER, fetched, 10)
     expect(acceptRemoteOptions(page.rows.map((entry) => ({ value: entry.token, label: entry.label })))).toHaveLength(fetched.length)

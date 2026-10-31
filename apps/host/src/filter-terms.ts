@@ -1,4 +1,5 @@
 import type { FilterInput, FilterOp, FilterableField, ListFilterTerm, PublishedForm } from '@formancy/data-client'
+import { fieldHeading } from '@formancy/data-client'
 
 /*
  * What a grid's filter panel offers and says (0104), as data: the fields a
@@ -35,8 +36,8 @@ export interface PanelField extends FilterableField {
  * column's type knows: never guessed from the control the form draws.
  */
 export function panelFields(definition: PublishedForm): PanelField[] {
-  const labels = new Map(definition.form.model.fields.map((field) => [field.key, field.label]))
-  return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: String(labels.get(offer.field) ?? offer.field) }))
+  const headings = new Map(definition.form.model.fields.map((field) => [field.key, fieldHeading(field)]))
+  return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: headings.get(offer.field) ?? offer.field }))
 }
 
 /** What a person has chosen and typed in the panel, kept as typed. */

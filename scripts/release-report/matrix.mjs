@@ -37,7 +37,11 @@ export function declarations(results) {
           .filter((test) => Array.isArray(test.meta?.covers) && test.meta.covers.length > 0)
           .map((test) => {
             const engine = test.meta.engine ?? null
-            const images = distinct((result.servers ?? []).filter((server) => !composed(server) && server.engine === engine && server.caller === file.file).map((server) => server.image))
+            const images = distinct(
+              (result.servers ?? [])
+                .filter((server) => !composed(server) && server.engine === engine && server.caller === file.file)
+                .map((server) => server.image),
+            )
             return { file: file.file, name: test.name, status: test.status, engine, covers: test.meta.covers, leg: result.key, images }
           }),
       ),
@@ -83,7 +87,9 @@ export function sharedCaseMatrix({ results, cases, engines, matrix }) {
     })),
     unknown: declared.flatMap((test) => test.covers.filter((id) => !known.has(id)).map((id) => ({ file: test.file, name: test.name, id }))),
     withoutEngine: declared.filter((test) => !engines.includes(test.engine)).map(({ file, name, engine }) => ({ file, name, engine })),
-    withoutImage: declared.filter((test) => engines.includes(test.engine) && test.images.length === 0).map(({ file, name, engine, leg }) => ({ file, name, engine, leg })),
+    withoutImage: declared
+      .filter((test) => engines.includes(test.engine) && test.images.length === 0)
+      .map(({ file, name, engine, leg }) => ({ file, name, engine, leg })),
   }
 }
 
@@ -99,7 +105,8 @@ export function browserMatrix({ results, apps }) {
   const suites = new Set(results.flatMap((result) => (result.suites ?? []).map((suite) => suite.package)))
   const rows = []
   for (const app of apps) {
-    if (suites.has(app.name)) rows.push({ environment: `jsdom ${app.jsdom ?? '?'}`, app: app.path, renderers: app.renderers, engines: engines(app.name), source: 'suite' })
+    if (suites.has(app.name))
+      rows.push({ environment: `jsdom ${app.jsdom ?? '?'}`, app: app.path, renderers: app.renderers, engines: engines(app.name), source: 'suite' })
   }
   for (const result of results) {
     for (const gate of result.browserGates ?? []) {

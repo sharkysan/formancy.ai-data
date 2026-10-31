@@ -163,7 +163,18 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { startTcpHop } from '@formancy/data-fixtures'
-import { afterEveryPass, agGridRowProblem, canary, canaryProblem, environmentOf, focusScrollProblem, guardRequests, hearPolicy, policyRefused, rowUnmeasured } from '../../../scripts/browser-gate.mjs'
+import {
+  afterEveryPass,
+  agGridRowProblem,
+  canary,
+  canaryProblem,
+  environmentOf,
+  focusScrollProblem,
+  guardRequests,
+  hearPolicy,
+  policyRefused,
+  rowUnmeasured,
+} from '../../../scripts/browser-gate.mjs'
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
 import { columnsJourney } from './browser/columns.mjs'
@@ -210,10 +221,16 @@ async function run(gate, browser) {
     const result = await audit(page)
     gate.axe(result.axe)
     check(`${state}: axe finds nothing at WCAG 2.2 AA`, result.violations.length === 0 ? null : result.violations.join('; '))
-    check(`${state}: contrast and target size measured, over something`, result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`)
+    check(
+      `${state}: contrast and target size measured, over something`,
+      result.measured.length === 2 ? null : `only ${result.measured.join(', ') || 'nothing'}`,
+    )
     const decided = await decide(page, result.undecided)
     check(`${state}: the contrast of every text decided`, decided.left.length === 0 ? null : `undecided: ${decided.left.slice(0, 4).join('; ')}`)
-    check(`${state}: the grids' text, decided on the pixels, at 4.5:1 or more`, decided.failing.length === 0 ? null : decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; '))
+    check(
+      `${state}: the grids' text, decided on the pixels, at 4.5:1 or more`,
+      decided.failing.length === 0 ? null : decided.failing.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; '),
+    )
     // What axe asked about and no screen shows in this state, said rather than counted: its grid has scrolled it out of view, or covers it.
     if (decided.hidden.length > 0) console.log(`  shown nowhere: ${decided.hidden.join('; ')}`)
     // Everything the page did to reach this state, under the policy it was
@@ -249,7 +266,10 @@ async function run(gate, browser) {
         const response = await page.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
         console.log(`\n${label} -- ${String(width)}x900`)
         const sent = response?.headers()['content-security-policy']
-        check('the page is sent with the policy nginx.conf sends it', sent === POLICY ? null : `it was sent with ${sent === undefined ? 'no policy' : `"${sent}"`}`)
+        check(
+          'the page is sent with the policy nginx.conf sends it',
+          sent === POLICY ? null : `it was sent with ${sent === undefined ? 'no policy' : `"${sent}"`}`,
+        )
         // AG Grid's own tests, copied with its release into 0058's rows,
         // against what the page's browser says it is: they decide the code
         // paths the grids take.
@@ -278,7 +298,17 @@ async function run(gate, browser) {
 
         const run = { record: await plane.order(2), customer: 9000 + pass, reached }
         // The list that goes on last, since it signs in as another clerk.
-        for (const [state, act] of [...workspaceJourney(plane, gate, run), ...recordJourney(plane, hop, gate, run), ...deleteJourney(plane, gate, run), ...exportJourney(plane, gate, run), ...filterJourney(plane, gate), ...viewJourney(plane, gate), ...columnsJourney(plane, gate, run), ...drillJourney(plane, gate, run), ...moreJourney(plane, gate)]) {
+        for (const [state, act] of [
+          ...workspaceJourney(plane, gate, run),
+          ...recordJourney(plane, hop, gate, run),
+          ...deleteJourney(plane, gate, run),
+          ...exportJourney(plane, gate, run),
+          ...filterJourney(plane, gate),
+          ...viewJourney(plane, gate),
+          ...columnsJourney(plane, gate, run),
+          ...drillJourney(plane, gate, run),
+          ...moreJourney(plane, gate),
+        ]) {
           await act(page)
           await measured(page, state)
         }
@@ -304,9 +334,15 @@ async function run(gate, browser) {
     // scrolls the window or a scroller, WebKit goes on saying the scroll
     // from before until its next rendering update -- which is why the
     // workspace waits for one between the keys that scroll its grid.
-    check('a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser', focusScrollProblem(gate.asked, await focusScroll(browser)))
+    check(
+      'a focus that scrolls the window or a scroller: the page says where to at once, as 0058’s table says of this browser',
+      focusScrollProblem(gate.asked, await focusScroll(browser)),
+    )
     // The policy's one allowance, watched being needed in this browser (0083).
-    check('without the policy’s allowance, the browser refuses the style elements AG Grid creates', await allowanceProblem(browser, `http://127.0.0.1:${String(port)}`))
+    check(
+      'without the policy’s allowance, the browser refuses the style elements AG Grid creates',
+      await allowanceProblem(browser, `http://127.0.0.1:${String(port)}`),
+    )
   } finally {
     await hop.close()
     http.close()

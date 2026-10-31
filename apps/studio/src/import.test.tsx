@@ -34,15 +34,39 @@ afterEach(async () => {
 })
 
 /** Clerks read the order, order_date by name: a grant that follows its key (0039). */
-const POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], create: [], update: [] }, fields: { order_date: { read: ['clerk'], write: [] } }, rowFilters: [], lookups: {} }
+const POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: { order_date: { read: ['clerk'], write: [] } },
+  rowFilters: [],
+  lookups: {},
+}
 
 /** The order, generated and published on `plane` over `expectedBase` as an administrator there would. */
 async function publishOn(plane: TestPlane, expectedBase: number | null): Promise<void> {
   const admin = createAdminClient({ token: TOKENS.admin, fetch: plane.fetch })
-  const proposal = await admin.propose({ connection: 'fixture', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [], pinned: [], versionColumn: 'row_version' })
+  const proposal = await admin.propose({
+    connection: 'fixture',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'sales-order',
+    title: 'Order',
+    lookups: [],
+    pinned: [],
+    versionColumn: 'row_version',
+  })
   if (!proposal.ok) throw new Error(proposal.message)
   const { form, bindings, snapshot, generation } = proposal.value
-  const bundle: Bundle = { format: 2, connection: 'fixture', generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy: POLICY, snapshot }
+  const bundle: Bundle = {
+    format: 2,
+    connection: 'fixture',
+    generation,
+    base: form,
+    presentation: EMPTY_PRESENTATION,
+    form,
+    bindings,
+    policy: POLICY,
+    snapshot,
+  }
   const outcome = await admin.publish('sales-order', expectedBase, bundle)
   if (!outcome.ok) throw new Error(outcome.message)
 }
@@ -67,7 +91,9 @@ async function choose(user: User, region: HTMLElement, file: File): Promise<HTML
 }
 
 function items(container: HTMLElement, name: string): string[] {
-  return within(within(container).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return within(within(container).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 /** The order table with one more nullable column: the target's database after `alter table ... add column`. */
@@ -75,7 +101,18 @@ function withDiscount(base: MetadataSnapshot): MetadataSnapshot {
   const { fingerprint: _, ...contents } = structuredClone(base)
   contents.objects
     .find((object) => object.ref.name === 'order')
-    ?.columns.push({ name: 'discount', ordinal: 99, databaseType: 'integer', type: { kind: 'integer', min: '-2147483648', max: '2147483647' }, nullable: true, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true } })
+    ?.columns.push({
+      name: 'discount',
+      ordinal: 99,
+      databaseType: 'integer',
+      type: { kind: 'integer', min: '-2147483648', max: '2147483647' },
+      nullable: true,
+      hasDefault: false,
+      defaultExpression: null,
+      generated: 'none',
+      comment: null,
+      access: { select: true, insert: true, update: true },
+    })
   return createSnapshot(contents)
 }
 
@@ -103,8 +140,12 @@ describe('importing a version', () => {
       'Imported as version 1 of sales-order: the runtime here serves it from now on, with the policy and the snapshot it was published with. The database was not changed.',
     )
     expect((await stored(target, 1)).equals(await stored(source, 1))).toBe(true)
-    expect(imports(target).map((request) => request.body)).toEqual([{ expectedBase: null, bundle: JSON.parse((await stored(source, 1)).toString('utf8')) as unknown }])
-    expect(items(region, 'What differs here, and blocks nothing')).toEqual([expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/)])
+    expect(imports(target).map((request) => request.body)).toEqual([
+      { expectedBase: null, bundle: JSON.parse((await stored(source, 1)).toString('utf8')) as unknown },
+    ])
+    expect(items(region, 'What differs here, and blocks nothing')).toEqual([
+      expect.stringMatching(/^review column-added on sales\.order, column discount.*Affects no field of this form\.$/),
+    ])
     await within(region).findByRole('button', { name: 'Import as version 2' })
     expect(focusedName()).toBe('Import as version 2')
     expect(await audit()).toEqual([])
@@ -121,8 +162,12 @@ describe('importing a version', () => {
     const region = await importRegion(user)
     await pressEnter(user, await choose(user, region, await exported()))
     const alert = await within(region).findByRole('alert')
-    expect(paragraphs(alert)[0]).toBe("This version cannot be imported: this deployment's database differs from the one it was published from in a way it cannot serve.")
-    expect(items(alert, 'What blocks it')).toEqual([expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/)])
+    expect(paragraphs(alert)[0]).toBe(
+      "This version cannot be imported: this deployment's database differs from the one it was published from in a way it cannot serve.",
+    )
+    expect(items(alert, 'What blocks it')).toEqual([
+      expect.stringMatching(/^blocking column-dropped on sales\.order, column notes.*Affects Notes \(notes\)\.$/),
+    ])
     expect(await target.store.latest('sales-order')).toBeNull()
     expect(focusedName()).toBe('Import as version 1')
     expect(await audit()).toEqual([])
@@ -146,13 +191,18 @@ describe('importing a version', () => {
     await pressEnter(user, await choose(user, region, await exported()))
     const alert = await within(region).findByRole('alert')
     expect(paragraphs(alert)[0]).toMatch(/^Version 1 bound order_date to other columns or lookups/)
-    expect(items(alert, 'Keys that stand for something else here')).toEqual(['Grants for order_date were written for column order_date; it now stands for column order date.'])
+    expect(items(alert, 'Keys that stand for something else here')).toEqual([
+      'Grants for order_date were written for column order_date; it now stands for column order date.',
+    ])
     expect(await target.store.versions('sales-order')).toEqual([1])
     expect(await audit()).toEqual([])
     await pressEnter(user, within(alert).getByRole('button', { name: 'Confirm these keys and import' }))
     expect((await within(region).findByRole('status')).textContent).toMatch(/^Imported as version 2 of sales-order/)
     const [refused, confirmed] = imports(target)
-    expect(confirmed?.body).toEqual({ ...(refused?.body as object), keysConfirmed: [{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }] })
+    expect(confirmed?.body).toEqual({
+      ...(refused?.body as object),
+      keysConfirmed: [{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }],
+    })
     await waitFor(() => expect(focusedName()).toBe('Import as version 3'))
   })
 
@@ -174,11 +224,15 @@ describe('importing a version', () => {
     }
 
     target.removed.add('fixture')
-    await refused(/^No connection is called fixture in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database\.$/)
+    await refused(
+      /^No connection is called fixture in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database\.$/,
+    )
     target.removed.delete('fixture')
 
     target.databases.set('fixture', SQLSERVER_SNAPSHOT)
-    await refused(/^This version cannot be imported: connection fixture is a sqlserver database here, and the version is bound to postgres\. A form's bindings belong to one engine\.$/)
+    await refused(
+      /^This version cannot be imported: connection fixture is a sqlserver database here, and the version is bound to postgres\. A form's bindings belong to one engine\.$/,
+    )
     target.databases.set('fixture', OWNER_SNAPSHOT)
 
     target.unreachable.add('fixture')
@@ -229,7 +283,9 @@ describe('importing a version', () => {
     expect((await within(region).findByRole('alert')).textContent).toBe('sales-order-1.json is not a version file: it is not JSON. Nothing was sent.')
     await user.upload(within(region).getByLabelText('Version file'), new File(['{ "hello": "world" }'], 'hello.json', { type: 'application/json' }))
     await within(region).findByText(/^hello\.json/)
-    expect(within(region).getByRole('alert').textContent).toBe('hello.json is not a version file: it names no form, connection or bound table. Nothing was sent.')
+    expect(within(region).getByRole('alert').textContent).toBe(
+      'hello.json is not a version file: it names no form, connection or bound table. Nothing was sent.',
+    )
     expect(within(region).queryByRole('button')).toBeNull()
     expect(target.requests.slice(before)).toEqual([])
     expect(await audit()).toEqual([])
@@ -263,7 +319,7 @@ describe('importing a version', () => {
   // version it wrote is still a version of the form the step shows, so the
   // step is still told: the report heading moving to version 2 is the sign
   // the answer arrived and was handled.
-  test("shows no answer about a file once another has been chosen, and still tells the step it wrote", async () => {
+  test('shows no answer about a file once another has been chosen, and still tells the step it wrote', async () => {
     await publishOn(source, null)
     await publishOn(target, null)
     const user = await signIn(target)
@@ -281,9 +337,11 @@ describe('importing a version', () => {
     slow.release()
     await within(drift).findByRole('region', { name: 'Version 2 of sales-order, against the database now' })
     expect(within(region).queryByRole('status')).toBeNull()
-    expect(within(region).getAllByRole('alert').map((alert) => alert.textContent)).toEqual([
-      'hello.json is not a version file: it names no form, connection or bound table. Nothing was sent.',
-    ])
+    expect(
+      within(region)
+        .getAllByRole('alert')
+        .map((alert) => alert.textContent),
+    ).toEqual(['hello.json is not a version file: it names no form, connection or bound table. Nothing was sent.'])
   })
 
   // Under review (0065) nobody imports directly either: the file is
@@ -309,7 +367,9 @@ describe('importing a version', () => {
       expect(await reviewed.store.latest('sales-order')).toBeNull()
       const file = JSON.parse((await stored(source, 1)).toString('utf8')) as unknown
       expect(imports(reviewed)).toEqual([])
-      expect(reviewed.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/drafts')).map((request) => request.body)).toEqual([{ expectedBase: null, bundle: file }])
+      expect(reviewed.requests.filter((request) => request.method === 'POST' && request.path.endsWith('/drafts')).map((request) => request.body)).toEqual([
+        { expectedBase: null, bundle: file },
+      ])
       const read = await client(reviewed, TOKENS.publisher).draft('sales-order', 1)
       expect(read.ok && read.value.bundle).toEqual(file)
       expect(focusedName()).toBe('Submit as a draft')
@@ -335,12 +395,16 @@ describe('importing a version', () => {
       await user.upload(within(region).getByLabelText('Version file'), await exported())
       await pressEnter(user, await within(region).findByRole('button', { name: 'Submit as a draft' }))
       const alert = await within(region).findByRole('alert')
-      expect(items(alert, 'Keys that stand for something else here')).toEqual(['Grants for order_date were written for column order_date; it now stands for column order date.'])
+      expect(items(alert, 'Keys that stand for something else here')).toEqual([
+        'Grants for order_date were written for column order_date; it now stands for column order date.',
+      ])
       expect(await audit()).toEqual([])
       await pressEnter(user, within(alert).getByRole('button', { name: 'Confirm these keys and submit' }))
       expect((await within(region).findByRole('status')).textContent).toBe('Draft 2 of sales-order submitted: a publisher other than you approves it.')
       const read = await client(reviewed, TOKENS.publisher).draft('sales-order', 2)
-      expect(read.ok && read.value.keysConfirmed).toEqual([{ field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } }])
+      expect(read.ok && read.value.keysConfirmed).toEqual([
+        { field: 'order_date', was: { kind: 'column', column: 'order_date' }, now: { kind: 'column', column: 'order date' } },
+      ])
       expect(await reviewed.store.versions('sales-order')).toEqual([1])
       await waitFor(() => expect(focusedName()).toBe('Submit as a draft'))
       expect(await audit()).toEqual([])

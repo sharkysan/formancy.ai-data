@@ -35,20 +35,46 @@ import type { ConnectionRegistry } from '../connections.js'
  */
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 const col = (name: string, ordinal: number, type: NormalizedType, extra: Partial<ColumnMeta> = {}): ColumnMeta => ({
-  name, ordinal, databaseType: type.kind, type, nullable: false, hasDefault: false, defaultExpression: null, generated: 'none', comment: null, access: { select: true, insert: true, update: true }, ...extra,
+  name,
+  ordinal,
+  databaseType: type.kind,
+  type,
+  nullable: false,
+  hasDefault: false,
+  defaultExpression: null,
+  generated: 'none',
+  comment: null,
+  access: { select: true, insert: true, update: true },
+  ...extra,
 })
 const ref = (name: string) => ({ schema: 'sales', name })
 
 const SNAPSHOT = createSnapshot({
-  kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [],
+  kind: 'sqlserver',
+  serverVersion: '16.0',
+  account: { user: 'dbo', login: 'sa' },
+  scope: { schemas: ['sales'] },
+  gaps: [],
   objects: [
     {
-      ref: ref('country'), kind: 'table', comment: null,
-      columns: [col('id', 1, INT32, { generated: 'identity-always' }), col('iso_code', 2, { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }), col('name', 3, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false })],
-      primaryKey: { name: 'pk_country', columns: ['id'] }, uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }], foreignKeys: [], checks: [], rowSecurity: 'none',
+      ref: ref('country'),
+      kind: 'table',
+      comment: null,
+      columns: [
+        col('id', 1, INT32, { generated: 'identity-always' }),
+        col('iso_code', 2, { kind: 'text', maxLength: 2, lengthUnit: 'utf16-code-units', fixedLength: true }),
+        col('name', 3, { kind: 'text', maxLength: 100, lengthUnit: 'utf16-code-units', fixedLength: false }),
+      ],
+      primaryKey: { name: 'pk_country', columns: ['id'] },
+      uniqueKeys: [{ name: 'uq_country_iso_code', columns: ['iso_code'] }],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('customer'), kind: 'table', comment: null,
+      ref: ref('customer'),
+      kind: 'table',
+      comment: null,
       columns: [
         col('tenant_id', 1, INT32),
         col('customer_no', 2, INT32),
@@ -57,31 +83,81 @@ const SNAPSHOT = createSnapshot({
         col('created_at', 5, { kind: 'timestamp', withTimeZone: true, precision: 7 }, { hasDefault: true }),
         col('row_version', 6, { kind: 'rowversion' }, { generated: 'rowversion' }),
       ],
-      primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] }, uniqueKeys: [],
-      foreignKeys: [{ name: 'fk_customer_country', columns: ['country_code'], references: { table: ref('country'), columns: ['iso_code'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
+      primaryKey: { name: 'pk_customer', columns: ['tenant_id', 'customer_no'] },
+      uniqueKeys: [],
+      foreignKeys: [
+        {
+          name: 'fk_customer_country',
+          columns: ['country_code'],
+          references: { table: ref('country'), columns: ['iso_code'] },
+          onUpdate: 'no-action',
+          onDelete: 'no-action',
+          enforced: true,
+          validated: true,
+        },
+      ],
       checks: [],
       rowSecurity: 'none',
     },
     // An order and its lines: a line has no tenant of its own, and is reached through its order (0043).
     {
-      ref: ref('order'), kind: 'table', comment: null,
+      ref: ref('order'),
+      kind: 'table',
+      comment: null,
       columns: [col('id', 1, INT32), col('tenant_id', 2, INT32), col('placed', 3, { kind: 'date' })],
-      primaryKey: { name: 'pk_order', columns: ['id'] }, uniqueKeys: [], foreignKeys: [], checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_order', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [],
+      checks: [],
+      rowSecurity: 'none',
     },
     {
-      ref: ref('line'), kind: 'table', comment: null,
-      columns: [col('order_id', 1, INT32), col('line_no', 2, INT32), col('quantity', 3, INT32), col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' })],
-      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] }, uniqueKeys: [],
-      foreignKeys: [{ name: 'fk_line_order', columns: ['order_id'], references: { table: ref('order'), columns: ['id'] }, onUpdate: 'no-action', onDelete: 'cascade', enforced: true, validated: true }],
-      checks: [], rowSecurity: 'none',
+      ref: ref('line'),
+      kind: 'table',
+      comment: null,
+      columns: [
+        col('order_id', 1, INT32),
+        col('line_no', 2, INT32),
+        col('quantity', 3, INT32),
+        col('row_version', 4, { kind: 'rowversion' }, { generated: 'rowversion' }),
+      ],
+      primaryKey: { name: 'pk_line', columns: ['order_id', 'line_no'] },
+      uniqueKeys: [],
+      foreignKeys: [
+        {
+          name: 'fk_line_order',
+          columns: ['order_id'],
+          references: { table: ref('order'), columns: ['id'] },
+          onUpdate: 'no-action',
+          onDelete: 'cascade',
+          enforced: true,
+          validated: true,
+        },
+      ],
+      checks: [],
+      rowSecurity: 'none',
     },
     // A memo on an order: its order is nullable and outside its key, so nothing but a through makes it required (0043).
     {
-      ref: ref('memo'), kind: 'table', comment: null,
+      ref: ref('memo'),
+      kind: 'table',
+      comment: null,
       columns: [col('id', 1, INT32), col('order_id', 2, INT32, { nullable: true }), col('priority', 3, INT32)],
-      primaryKey: { name: 'pk_memo', columns: ['id'] }, uniqueKeys: [],
-      foreignKeys: [{ name: 'fk_memo_order', columns: ['order_id'], references: { table: ref('order'), columns: ['id'] }, onUpdate: 'no-action', onDelete: 'no-action', enforced: true, validated: true }],
-      checks: [], rowSecurity: 'none',
+      primaryKey: { name: 'pk_memo', columns: ['id'] },
+      uniqueKeys: [],
+      foreignKeys: [
+        {
+          name: 'fk_memo_order',
+          columns: ['order_id'],
+          references: { table: ref('order'), columns: ['id'] },
+          onUpdate: 'no-action',
+          onDelete: 'no-action',
+          enforced: true,
+          validated: true,
+        },
+      ],
+      checks: [],
+      rowSecurity: 'none',
     },
   ],
 })
@@ -117,15 +193,24 @@ const COUNTRY_POLICY: FormPolicy = {
 }
 
 /** A customer form an `editor` may update and not read: the update describes the table in a statement of its own (0041). */
-const BLIND_POLICY: FormPolicy = { ...POLICY, operations: { ...POLICY.operations, update: ['clerk', 'editor'] }, fields: { ...POLICY.fields, name: { read: ['clerk'], write: ['clerk', 'editor'] } } }
+const BLIND_POLICY: FormPolicy = {
+  ...POLICY,
+  operations: { ...POLICY.operations, update: ['clerk', 'editor'] },
+  fields: { ...POLICY.fields, name: { read: ['clerk'], write: ['clerk', 'editor'] } },
+}
 
 const verifyIdentity: IdentityVerifier = async (token) =>
-  token === 'clerk' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
-    : token === 'clerk-042' ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
-    : token === 'stranger' ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
-    : token === 'editor' ? { ok: true, identity: { actor: { id: 'e', roles: ['editor'] }, attributes: { tenant: '1' } } }
-    : token === 'clerk-untenanted' ? { ok: true, identity: { actor: { id: 'u', roles: ['clerk'] }, attributes: {} } }
-      : { ok: false, reason: 'bad' }
+  token === 'clerk'
+    ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+    : token === 'clerk-042'
+      ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '042' } } }
+      : token === 'stranger'
+        ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
+        : token === 'editor'
+          ? { ok: true, identity: { actor: { id: 'e', roles: ['editor'] }, attributes: { tenant: '1' } } }
+          : token === 'clerk-untenanted'
+            ? { ok: true, identity: { actor: { id: 'u', roles: ['clerk'] }, attributes: {} } }
+            : { ok: false, reason: 'bad' }
 
 const STORED = { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', created_at: '2026-10-08T00:00:00Z' }
 const RECORD = 'k1:1,7'
@@ -144,12 +229,26 @@ const describedAs = (table: ObjectRef, edit: (columns: DescribedTable['columns']
 }
 
 /** The customer's name narrowed to 50: every write of the form stops, and its records still read faithfully. */
-const NARROWED = describedAs(ref('customer'), (columns) => Object.assign(columns.find((column) => column.name === 'name') as object, { type: { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false } }))
+const NARROWED = describedAs(ref('customer'), (columns) =>
+  Object.assign(columns.find((column) => column.name === 'name') as object, {
+    type: { kind: 'text', maxLength: 50, lengthUnit: 'utf16-code-units', fixedLength: false },
+  }),
+)
 /** The customer's name retyped to an integer: the form can no longer show its records faithfully. */
-const RETYPED = describedAs(ref('customer'), (columns) => Object.assign(columns.find((column) => column.name === 'name') as object, { type: INT32, databaseType: 'int' }))
+const RETYPED = describedAs(ref('customer'), (columns) =>
+  Object.assign(columns.find((column) => column.name === 'name') as object, { type: INT32, databaseType: 'int' }),
+)
 
 /** What the fake ports were asked, and what they answer. Each test sets what it needs. */
-let calls: { inserts: InsertRequest[]; updates: UpdateRequest[]; rejects: string[][]; lookups: number; describes: number; reads: number; readRequests: ReadRequest[] }
+let calls: {
+  inserts: InsertRequest[]
+  updates: UpdateRequest[]
+  rejects: string[][]
+  lookups: number
+  describes: number
+  reads: number
+  readRequests: ReadRequest[]
+}
 let writeOutcome: RecordOutcome
 /** What a fake insert waits for before it answers: settled, unless a case holds it. */
 let insertGate: Promise<void>
@@ -197,7 +296,6 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('these routes never delete')
     },
-
   }
   const lookups: LookupAdapter = {
     search: async () => {
@@ -214,8 +312,18 @@ function registry(): ConnectionRegistry {
       return tokens.filter((token) => rejected.includes(token))
     },
   }
-  const adapter = { kind: 'sqlserver', ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }), discover: async () => SNAPSHOT, close: async () => {} } as DatabaseAdapter
-  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined), close: async () => {} }
+  const adapter = {
+    kind: 'sqlserver',
+    ping: async () => ({ kind: 'sqlserver', version: '16.0', product: 'sqlserver', major: 16, compatibility: 160 }),
+    discover: async () => SNAPSHOT,
+    close: async () => {},
+  } as DatabaseAdapter
+  return {
+    ids: () => ['erp'],
+    scope: () => ({ schemas: ['sales'] }),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    close: async () => {},
+  }
 }
 
 beforeEach(async () => {
@@ -229,25 +337,50 @@ beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-'))
   const store = createFileConfigurationStore(root)
   const { form, bindings } = generateForm(SNAPSHOT, {
-    connection: 'erp', root: ref('customer'), formId: 'customer', title: 'Customer',
-    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'],
+    connection: 'erp',
+    root: ref('customer'),
+    formId: 'customer',
+    title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+    pinned: ['tenant_id'],
   })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('customer', null, bundle)
   // The same form whose country list is scoped by the tenant, through the country's integer id.
   const scoped = generateForm(SNAPSHOT, {
-    connection: 'erp', root: ref('customer'), formId: 'scoped', title: 'Customer',
-    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }], pinned: ['tenant_id'],
+    connection: 'erp',
+    root: ref('customer'),
+    formId: 'scoped',
+    title: 'Customer',
+    lookups: [{ foreignKey: 'fk_customer_country', display: ['name'] }],
+    pinned: ['tenant_id'],
   })
-  await store.publish('scoped', null, { ...bundle, form: scoped.form, bindings: scoped.bindings, policy: { ...POLICY, lookups: { country: [{ column: 'id', attribute: 'tenant' }] } } })
+  await store.publish('scoped', null, {
+    ...bundle,
+    form: scoped.form,
+    bindings: scoped.bindings,
+    policy: { ...POLICY, lookups: { country: [{ column: 'id', attribute: 'tenant' }] } },
+  })
   // A country, whose key the database numbers: a create names no key of its own.
   const country = generateForm(SNAPSHOT, { connection: 'erp', root: ref('country'), formId: 'country', title: 'Country', lookups: [] })
   await store.publish('country', null, { ...bundle, form: country.form, bindings: country.bindings, policy: COUNTRY_POLICY })
   await store.publish('blind', null, { ...bundle, policy: BLIND_POLICY })
   // An order's lines, scoped through their order (0043).
-  const line = generateForm(SNAPSHOT, { connection: 'erp', root: ref('line'), formId: 'line', title: 'Line', lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }] })
+  const line = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('line'),
+    formId: 'line',
+    title: 'Line',
+    lookups: [{ foreignKey: 'fk_line_order', display: ['placed'] }],
+  })
   await store.publish('line', null, { ...bundle, form: line.form, bindings: line.bindings, policy: LINE_POLICY })
-  const memo = generateForm(SNAPSHOT, { connection: 'erp', root: ref('memo'), formId: 'memo', title: 'Memo', lookups: [{ foreignKey: 'fk_memo_order', display: ['placed'] }] })
+  const memo = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: ref('memo'),
+    formId: 'memo',
+    title: 'Memo',
+    lookups: [{ foreignKey: 'fk_memo_order', display: ['placed'] }],
+  })
   await store.publish('memo', null, { ...bundle, form: memo.form, bindings: memo.bindings, policy: MEMO_POLICY })
   app = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store } })
 })
@@ -257,7 +390,8 @@ afterEach(async () => {
 })
 
 const as = (token: string) => ({ authorization: `Bearer ${token}` })
-const post = (url: string, payload: unknown, token = 'clerk') => app.inject({ method: 'POST', url, headers: as(token), payload: payload as Record<string, unknown> })
+const post = (url: string, payload: unknown, token = 'clerk') =>
+  app.inject({ method: 'POST', url, headers: as(token), payload: payload as Record<string, unknown> })
 /** What a renderer submits for a new customer: every field, the read-only ones empty. */
 const NEW = { tenant_id: null, customer_no: 8, name: 'Neu GmbH', country: 'k1:CH', created_at: null }
 
@@ -332,7 +466,11 @@ describe('the runtime plane', () => {
     writeOutcome = { ok: false, code: 'unique-violation', column: 'customer_no', message: 'duplicate key value is (8)' }
     const duplicate = await post('/v1/forms/customer/records/create', { answers: NEW })
     expect(duplicate.statusCode).toBe(422)
-    expect(duplicate.json()).toEqual({ code: 'unique-violation', message: 'Another record already has this value.', fieldErrors: [{ field: 'customer_no', code: 'unique-violation', message: 'Another record already has this value.' }] })
+    expect(duplicate.json()).toEqual({
+      code: 'unique-violation',
+      message: 'Another record already has this value.',
+      fieldErrors: [{ field: 'customer_no', code: 'unique-violation', message: 'Another record already has this value.' }],
+    })
     expect(duplicate.body).not.toContain('(8)')
     writeOutcome = { ok: false, code: 'unknown-outcome', message: 'ECONNRESET after commit' }
     const unknown = await post('/v1/forms/customer/records/create', { answers: NEW })
@@ -348,7 +486,11 @@ describe('the runtime plane', () => {
     expect(saved.statusCode).toBe(200)
     expect(calls.updates[0]?.set.map((entry) => entry.name)).toContain('name')
     expect(calls.updates[0]?.set.map((entry) => entry.name)).not.toContain('created_at')
-    const tampered = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: { ...current, created_at: '2020-01-01T00:00:00Z' } })
+    const tampered = await post('/v1/forms/customer/records/update', {
+      record: RECORD,
+      version: VERSION,
+      answers: { ...current, created_at: '2020-01-01T00:00:00Z' },
+    })
     expect(tampered.statusCode).toBe(403)
     expect(calls.updates).toHaveLength(1)
     writeOutcome = { ok: false, code: 'stale', message: 'changed' }
@@ -384,7 +526,18 @@ describe('the runtime plane', () => {
       open: async () => {
         const open = await registry().open('erp')
         if (open === undefined) throw new Error('unreachable')
-        return { ...open, lookups: { ...open.lookups, search: async () => { throw new Error('timeout on 10.0.0.5') }, resolve: async () => { throw new Error('timeout on 10.0.0.5') } } }
+        return {
+          ...open,
+          lookups: {
+            ...open.lookups,
+            search: async () => {
+              throw new Error('timeout on 10.0.0.5')
+            },
+            resolve: async () => {
+              throw new Error('timeout on 10.0.0.5')
+            },
+          },
+        }
       },
     }
     const broken = await createDataServer({ verifyIdentity, runtime: { registry: failing, store } })
@@ -394,25 +547,45 @@ describe('the runtime plane', () => {
       expect(response.statusCode, url).toBe(503)
       expect(response.body).not.toContain('10.0.0.5')
     }
-    const unreachable = await createDataServer({ verifyIdentity, runtime: { registry: { ...registry(), open: async () => { throw new Error('ECONNREFUSED 10.0.0.5') } }, store } })
+    const unreachable = await createDataServer({
+      verifyIdentity,
+      runtime: {
+        registry: {
+          ...registry(),
+          open: async () => {
+            throw new Error('ECONNREFUSED 10.0.0.5')
+          },
+        },
+        store,
+      },
+    })
     const down = await unreachable.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })
     expect(down.statusCode).toBe(503)
     expect(down.body).not.toContain('10.0.0.5')
     const removed = await createDataServer({ verifyIdentity, runtime: { registry: { ...registry(), open: async () => undefined }, store } })
-    expect((await removed.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode).toBe(500)
+    expect(
+      (await removed.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode,
+    ).toBe(500)
   })
 
   // A lookup is found by the option-source name the form document carries,
   // under the policy for the operation the form is open for.
   test('lookups: search and resolve through the policy, and refuse what they cannot honour', async () => {
-    const source = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json().form.model.fields.find((field: { key: string }) => field.key === 'country').optionsSource
+    const source = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') }))
+      .json()
+      .form.model.fields.find((field: { key: string }) => field.key === 'country').optionsSource
     const search = await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create', search: 'Sw' })
     expect(search.statusCode).toBe(200)
     expect(search.json()).toEqual({ rows: [{ token: 'k1:CH', label: 'Switzerland' }], hasMore: false, omitted: 0 })
-    expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'update', tokens: ['k1:CH'] })).json()).toEqual({ rows: [{ token: 'k1:CH', label: 'Switzerland' }] })
+    expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'update', tokens: ['k1:CH'] })).json()).toEqual({
+      rows: [{ token: 'k1:CH', label: 'Switzerland' }],
+    })
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { search: 'Sw' })).statusCode).toBe(400)
     expect((await post('/v1/forms/customer/lookups/nope/query', { operation: 'create' })).statusCode).toBe(404)
-    expect((await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'create', tokens: Array.from({ length: 101 }, () => 'k1:CH') })).statusCode).toBe(400)
+    expect(
+      (await post(`/v1/forms/customer/lookups/${String(source)}/resolve`, { operation: 'create', tokens: Array.from({ length: 101 }, () => 'k1:CH') }))
+        .statusCode,
+    ).toBe(400)
     expect((await post(`/v1/forms/customer/lookups/${String(source)}/query`, { operation: 'create' }, 'stranger')).statusCode).toBe(403)
   })
 
@@ -440,10 +613,15 @@ describe('the runtime plane', () => {
     writeOutcome = { ok: false, code: 'refused', message: 'trigger tr_customer raised 51701' }
     const refused = await post('/v1/forms/customer/records/create', { answers: NEW })
     expect(refused.statusCode).toBe(422)
-    expect(refused.json()).toEqual({ code: 'refused', message: 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.' })
+    expect(refused.json()).toEqual({
+      code: 'refused',
+      message: 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.',
+    })
     expect(refused.body).not.toContain('51701')
     writeOutcome = { ok: false, code: 'refused', column: 'name', message: 'trigger tr_customer refused name' }
-    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json().fieldErrors).toEqual([expect.objectContaining({ field: 'name', code: 'refused' })])
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json().fieldErrors).toEqual([
+      expect.objectContaining({ field: 'name', code: 'refused' }),
+    ])
     writeOutcome = { ok: false, code: 'unavailable', message: 'deadlock victim' }
     const unavailable = await post('/v1/forms/customer/records/create', { answers: NEW })
     expect(unavailable.statusCode).toBe(503)
@@ -486,7 +664,10 @@ describe('a form reached through a parent (0043)', () => {
   // insert without an order). With one, the order is rechecked as every
   // selection is, under the lookup's filter, and the record is created.
   test('a create without the through field is 422 required, and one with it is rechecked and created', async () => {
-    for (const answers of [{ id: 2, priority: 1 }, { id: 2, order: null, priority: 1 }]) {
+    for (const answers of [
+      { id: 2, priority: 1 },
+      { id: 2, order: null, priority: 1 },
+    ]) {
       const refused = await post('/v1/forms/memo/records/create', { answers })
       expect(refused.statusCode, JSON.stringify(refused.json())).toBe(422)
       expect(refused.json()).toMatchObject({ code: 'invalid-values', fieldErrors: [{ field: 'order', code: 'required' }] })
@@ -527,11 +708,11 @@ describe('the menu and the form it names (0045)', () => {
   test('names a form with the operations opening it offers, and no form opening it does not offer to read', async () => {
     const ids = ['blind', 'country', 'customer', 'line', 'memo', 'scoped']
     for (const token of ['clerk', 'clerk-042', 'stranger', 'editor', 'clerk-untenanted']) {
-      const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as(token) })).json() as { forms: Array<{ id: string; operations: string[] }> }
+      const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as(token) })).json<{ forms: Array<{ id: string; operations: string[] }> }>()
       for (const id of ids) {
         const opened = await app.inject({ method: 'GET', url: `/v1/forms/${id}`, headers: as(token) })
         const named = menu.forms.find((entry) => entry.id === id)
-        const offered: string[] = opened.statusCode === 200 ? (opened.json() as { operations: string[] }).operations : []
+        const offered: string[] = opened.statusCode === 200 ? opened.json<{ operations: string[] }>().operations : []
         expect([token, id, offered], opened.body).toEqual([token, id, named?.operations ?? offered.filter((operation) => operation !== 'read')])
       }
     }
@@ -571,7 +752,8 @@ describe('a write whose answer was lost (0031)', () => {
     expect(response.statusCode, response.body).toBe(502)
     expect(response.json()).toEqual({
       code: 'unknown-outcome',
-      message: 'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.',
+      message:
+        'The connection to the database failed after the record was sent. It may have been saved, and the database numbers new records, so only a search of your own can tell.',
       operation: 'create',
       record: null,
       version: null,
@@ -589,7 +771,8 @@ describe('a write whose answer was lost (0031)', () => {
     expect(response.statusCode).toBe(502)
     expect(response.json()).toEqual({
       code: 'unknown-outcome',
-      message: 'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.',
+      message:
+        'The connection to the database failed after the change was sent. It may have been saved. Saving again with the same version is safe: it is stored at most once.',
       operation: 'update',
       record: RECORD,
       version: VERSION,
@@ -612,7 +795,11 @@ describe('a write sent again (0031)', () => {
   const ID = '0123456789abcdef0123456789abcdef'
   const sending = (url: string, payload: unknown, id: string = ID) =>
     app.inject({ method: 'POST', url, headers: { ...as('clerk'), 'formancy-write-id': id }, payload: payload as Record<string, unknown> })
-  const UPDATE = { record: RECORD, version: VERSION, answers: { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' } }
+  const UPDATE = {
+    record: RECORD,
+    version: VERSION,
+    answers: { tenant_id: 1, customer_no: 7, name: 'Neuer Name', country: 'k1:CH', created_at: '2026-10-08T00:00:00Z' },
+  }
 
   // Chromium resends a request whose reused connection closed before any
   // answer, on its own, below the page (measured, 0031). Arriving with the
@@ -706,13 +893,18 @@ describe('the operational audit trail', () => {
   // A key of null means none at all: undefined would bring the default back.
   async function audited(sink: AuditSink, key: string | null = KEY) {
     const store = createFileConfigurationStore(root)
-    return createDataServer({ verifyIdentity, runtime: { registry: registry(), store, audit: { sink, ...(key === null ? {} : { key }), now: () => '2026-10-09T12:00:00.000Z' } } })
+    return createDataServer({
+      verifyIdentity,
+      runtime: { registry: registry(), store, audit: { sink, ...(key === null ? {} : { key }), now: () => '2026-10-09T12:00:00.000Z' } },
+    })
   }
 
   /** Keeps runtime events, narrowed on `plane` as a typed sink must since 0033; an event of another plane is left out, so a comparison fails. */
-  const collect = (events: RuntimeAuditEvent[]): AuditSink => (event) => {
-    if (event.plane === 'runtime') events.push(event)
-  }
+  const collect =
+    (events: RuntimeAuditEvent[]): AuditSink =>
+    (event) => {
+      if (event.plane === 'runtime') events.push(event)
+    }
 
   // One event per request, with what happened and against which version — and
   // nothing the person typed. An audit log holding answers would be a second
@@ -723,7 +915,19 @@ describe('the operational audit trail', () => {
     const response = await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(response.statusCode).toBe(201)
     expect(events).toEqual([
-      { at: '2026-10-09T12:00:00.000Z', plane: 'runtime', actor: 'c', operation: 'create', form: 'customer', formVersion: 1, status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7'), rows: null, moved: null },
+      {
+        at: '2026-10-09T12:00:00.000Z',
+        plane: 'runtime',
+        actor: 'c',
+        operation: 'create',
+        form: 'customer',
+        formVersion: 1,
+        status: 201,
+        outcome: 'ok',
+        record: recordReference(KEY, 'k1:1,7'),
+        rows: null,
+        moved: null,
+      },
     ])
     expect(JSON.stringify(events)).not.toContain('Neu GmbH')
     expect(JSON.stringify(events)).not.toContain('k1:')
@@ -750,7 +954,12 @@ describe('the operational audit trail', () => {
     const events: RuntimeAuditEvent[] = []
     const server = await audited(collect(events))
     for (let n = 0; n < 2; n += 1) {
-      await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: { ...as('clerk'), 'formancy-write-id': '0123456789abcdef0123456789abcdef' }, payload: { answers: NEW } })
+      await server.inject({
+        method: 'POST',
+        url: '/v1/forms/customer/records/create',
+        headers: { ...as('clerk'), 'formancy-write-id': '0123456789abcdef0123456789abcdef' },
+        payload: { answers: NEW },
+      })
     }
     expect(events.map(({ status, outcome, record }) => ({ status, outcome, record }))).toEqual([
       { status: 201, outcome: 'ok', record: recordReference(KEY, 'k1:1,7') },
@@ -827,8 +1036,15 @@ describe('the operational audit trail', () => {
   test('records a body the server cannot read by its code, with no actor whatever the token', async () => {
     const events: RuntimeAuditEvent[] = []
     const server = await audited(collect(events))
-    await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: { ...as('clerk'), 'content-type': 'application/json' }, payload: '{' })
-    expect(events.map(({ actor, status, outcome }) => ({ actor, status, outcome }))).toEqual([{ actor: null, status: 400, outcome: 'FST_ERR_CTP_INVALID_JSON_BODY' }])
+    await server.inject({
+      method: 'POST',
+      url: '/v1/forms/customer/records/read',
+      headers: { ...as('clerk'), 'content-type': 'application/json' },
+      payload: '{',
+    })
+    expect(events.map(({ actor, status, outcome }) => ({ actor, status, outcome }))).toEqual([
+      { actor: null, status: 400, outcome: 'FST_ERR_CTP_INVALID_JSON_BODY' },
+    ])
   })
 
   // By the time the event exists the write has committed or not; refusing to
@@ -837,7 +1053,9 @@ describe('the operational audit trail', () => {
     const server = await audited(() => {
       throw new Error('disk full')
     })
-    expect((await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode).toBe(200)
+    expect(
+      (await server.inject({ method: 'POST', url: '/v1/forms/customer/records/read', headers: as('clerk'), payload: { record: RECORD } })).statusCode,
+    ).toBe(200)
   })
 })
 
@@ -949,7 +1167,10 @@ describe('the database as each request finds it (0041)', () => {
   test('opening a form offers only what the database still allows, and is refused when it can show nothing or leaves nothing', async () => {
     catalog = { ok: true, described: NARROWED }
     expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json().operations).toEqual(['read'])
-    expect((await app.inject({ method: 'GET', url: '/v1/forms/blind', headers: as('editor') })).json()).toEqual({ code: 'drift', message: expect.stringMatching(/nothing this form offers you can be done safely/) })
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/blind', headers: as('editor') })).json()).toEqual({
+      code: 'drift',
+      message: expect.stringMatching(/nothing this form offers you can be done safely/),
+    })
     catalog = { ok: true, described: RETYPED }
     const unreadable = await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })
     expect(unreadable.statusCode).toBe(409)
@@ -961,11 +1182,17 @@ describe('the database as each request finds it (0041)', () => {
   test('a drift refusal is said once in the log, by kind, and never with a value', async () => {
     const lines: Array<Record<string, unknown>> = []
     const store = createFileConfigurationStore(root)
-    const logged = await createDataServer({ verifyIdentity, logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } }, runtime: { registry: registry(), store } })
+    const logged = await createDataServer({
+      verifyIdentity,
+      logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } },
+      runtime: { registry: registry(), store },
+    })
     catalog = { ok: true, described: NARROWED }
     await logged.inject({ method: 'POST', url: '/v1/forms/customer/records/update', headers: as('clerk'), payload: UPDATE })
     const refused = lines.filter((line) => line['msg'] === 'refused: the database no longer fits this form as published')
-    expect(refused).toEqual([expect.objectContaining({ form: 'customer', version: 1, operation: 'update', changes: [{ kind: 'column-tightened', affects: ['name'] }] })])
+    expect(refused).toEqual([
+      expect.objectContaining({ form: 'customer', version: 1, operation: 'update', changes: [{ kind: 'column-tightened', affects: ['name'] }] }),
+    ])
     expect(JSON.stringify(lines)).not.toContain('Neuer Name')
   })
 })

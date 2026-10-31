@@ -1,5 +1,15 @@
 import { findObject, gapCovers, isDisplayType, rowFilterColumnProblem, throughProblems } from '@formancy/data-core'
-import type { ColumnMeta, CoverageGap, ForeignKeyMeta, FormBindings, LookupChoice, MetadataSnapshot, ObjectMeta, ObjectRef, RowFilterRule } from '@formancy/data-core'
+import type {
+  ColumnMeta,
+  CoverageGap,
+  ForeignKeyMeta,
+  FormBindings,
+  LookupChoice,
+  MetadataSnapshot,
+  ObjectMeta,
+  ObjectRef,
+  RowFilterRule,
+} from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
 /**
@@ -45,7 +55,10 @@ export function sameRef(left: ObjectRef, right: ObjectRef): boolean {
 
 /** `sales.order` becomes `sales-order`: a form id the server accepts, where the names allow one. */
 export function formIdFor(ref: ObjectRef): string {
-  const id = `${ref.schema}-${ref.name}`.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')
+  const id = `${ref.schema}-${ref.name}`
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^[^a-z0-9]+/, '')
   return id.slice(0, FORM_ID_MAX)
 }
 
@@ -165,7 +178,14 @@ export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string
  * policy's question, and the step asks it.
  */
 export function throughBlocker(snapshot: MetadataSnapshot, bindings: FormBindings, field: string): string | null {
-  const [problem] = throughProblems(snapshot, bindings, { version: 1, operations: { read: [], create: [], update: [] }, fields: {}, rowFilters: [], lookups: {}, through: [field] })
+  const [problem] = throughProblems(snapshot, bindings, {
+    version: 1,
+    operations: { read: [], create: [], update: [] },
+    fields: {},
+    rowFilters: [],
+    lookups: {},
+    through: [field],
+  })
   return problem === undefined ? null : `it ${problem.slice(`through: ${field} `.length)}`
 }
 
@@ -178,7 +198,13 @@ export function throughBlocker(snapshot: MetadataSnapshot, bindings: FormBinding
 export function versionCandidates(root: ObjectMeta): ColumnMeta[] {
   const key = new Set(root.primaryKey?.columns ?? root.uniqueKeys[0]?.columns ?? [])
   return root.columns.filter(
-    (column) => column.type.kind === 'integer' && !column.nullable && column.generated === 'none' && !key.has(column.name) && column.access.select && column.access.update,
+    (column) =>
+      column.type.kind === 'integer' &&
+      !column.nullable &&
+      column.generated === 'none' &&
+      !key.has(column.name) &&
+      column.access.select &&
+      column.access.update,
   )
 }
 
@@ -233,7 +259,9 @@ function isPoint(column: ColumnMeta): boolean {
  * in its words, when the form is generated.
  */
 export function validityCandidates(root: ObjectMeta): { from: ColumnMeta[]; to: ColumnMeta[] } {
-  const keyed = new Set([...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys].filter((key) => key.columns.length > 1).flatMap((key) => key.columns))
+  const keyed = new Set(
+    [...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys].filter((key) => key.columns.length > 1).flatMap((key) => key.columns),
+  )
   const points = root.columns.filter((column) => column.access.select && column.generated === 'none' && isPoint(column))
   return { from: points.filter((column) => !column.nullable && keyed.has(column.name)), to: points.filter((column) => column.nullable) }
 }
@@ -241,7 +269,10 @@ export function validityCandidates(root: ObjectMeta): { from: ColumnMeta[]; to: 
 /** What is wrong with a choice before it is sent, in words; the server and the generator check again. */
 export function choiceProblems(choice: Choice, rowFilters: readonly RowFilterRule[]): string[] {
   const problems: string[] = []
-  if (!isFormId(choice.formId)) problems.push(`The form id must start with a lower-case letter or digit and hold only those, dot, hyphen or underscore, up to ${String(FORM_ID_MAX)} characters.`)
+  if (!isFormId(choice.formId))
+    problems.push(
+      `The form id must start with a lower-case letter or digit and hold only those, dot, hyphen or underscore, up to ${String(FORM_ID_MAX)} characters.`,
+    )
   if (choice.title.trim() === '') problems.push('The form needs a title.')
   for (const lookup of choice.lookups) {
     if (lookup.display.length === 0) problems.push(`${lookup.foreignKey} needs at least one column to show.`)

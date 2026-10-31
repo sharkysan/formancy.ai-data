@@ -53,6 +53,13 @@ describe('what a copy leaves out', () => {
     expect(leftOut(FIELDS, RECORD, ['id', ...COPIED])).toEqual([])
   })
 
+  // A label that is a `{ $t }` reference names the field by its key, as the
+  // grid does (0079), not as "[object Object]".
+  test('names a field whose label is a message reference by its key', () => {
+    const referenced = [{ key: 'id', type: 'text', label: { $t: 'order.id' } }] as unknown as typeof FIELDS
+    expect(leftOut(referenced, RECORD, [])).toEqual(['id'])
+  })
+
   // The status line: what was copied, into which forms, and what was not.
   test('is said after what was copied, and not at all when nothing was', () => {
     expect(copiedLine('k1:7', ['Id'], false)).toEqual(['Copied ', { code: 'k1:7' }, ' into the form, for a new record. Not copied: Id.'])

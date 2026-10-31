@@ -50,15 +50,21 @@ describe('plainPath', () => {
   // refuses the name itself. The suites that hold a caller's text out of the
   // log and the trail send it this way to reach the routes' own filters. A
   // `;` is ordinary to both readers (Fastify's useSemicolonDelimiter is off).
-  test.each(['/v1/forms/Server=10.0.0.5;Password=x/records/read', '/v1/forms/a;/versions', "/v1/forms/a!$&'()*+,:@~/versions"])('accepts %s, whose characters no reader rewrites', (path) => {
-    expect(plainPath(path)).toBe(true)
-  })
+  test.each(['/v1/forms/Server=10.0.0.5;Password=x/records/read', '/v1/forms/a;/versions', "/v1/forms/a!$&'()*+,:@~/versions"])(
+    'accepts %s, whose characters no reader rewrites',
+    (path) => {
+      expect(plainPath(path)).toBe(true)
+    },
+  )
 
   // The query is not routed by either reader; refusing a `%` in it would
   // refuse every search a lookup sends with a space in it.
-  test.each(['/v1/connections/erp/metadata?schema=%2F..%5C', '/v1/forms/order?a=b#c', '/v1/forms/order?'])('accepts %s: the query is no part of the path', (path) => {
-    expect(plainPath(path)).toBe(true)
-  })
+  test.each(['/v1/connections/erp/metadata?schema=%2F..%5C', '/v1/forms/order?a=b#c', '/v1/forms/order?'])(
+    'accepts %s: the query is no part of the path',
+    (path) => {
+      expect(plainPath(path)).toBe(true)
+    },
+  )
 
   // Each of these is a path cloudflared reads differently from Fastify, or
   // could: an escape it decodes (a slash, a dot, a backslash, a NUL, an
@@ -111,7 +117,11 @@ describe('no valid name is refused', () => {
     const accepted = characters.map((character) => `a${character}0`).filter((id) => CONFIGURATION_ID.test(id))
     expect(accepted.length).toBeGreaterThan(0)
     for (const id of accepted) {
-      for (const route of [(form: string) => `/v1/forms/${form}`, (form: string) => `/v1/forms/${form}/records/read`, (form: string) => `/v1/forms/${form}/versions/latest`]) {
+      for (const route of [
+        (form: string) => `/v1/forms/${form}`,
+        (form: string) => `/v1/forms/${form}/records/read`,
+        (form: string) => `/v1/forms/${form}/versions/latest`,
+      ]) {
         expect(plainPath(sent(route, id)), sent(route, id)).toBe(true)
       }
     }
@@ -133,7 +143,8 @@ describe('PATH_NOT_PLAIN', () => {
   test('is a code and a sentence that says why, and names no part of the path', () => {
     expect(PATH_NOT_PLAIN).toEqual({
       code: 'path-not-plain',
-      message: 'This path holds an encoded character, an empty or a dot segment, or a character a path does not carry as itself. No name here is written that way, and a proxy in front of this server may read such a path differently, so it was not routed to any route\'s work.',
+      message:
+        "This path holds an encoded character, an empty or a dot segment, or a character a path does not carry as itself. No name here is written that way, and a proxy in front of this server may read such a path differently, so it was not routed to any route's work.",
     })
   })
 })

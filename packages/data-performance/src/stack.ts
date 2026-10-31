@@ -69,7 +69,13 @@ function writerOf(pg: PostgresFixture, ms: SqlServerFixture): Record<EngineKey, 
   const url = new URL(pg.writer)
   return {
     pg: { host: url.hostname, port: Number(url.port), database: url.pathname.slice(1), user: WRITER.user, password: WRITER.postgresPassword },
-    ms: { host: String(ms.writer.server), port: Number(ms.writer.port), database: String(ms.writer.database), user: WRITER.user, password: WRITER.sqlServerPassword },
+    ms: {
+      host: String(ms.writer.server),
+      port: Number(ms.writer.port),
+      database: String(ms.writer.database),
+      user: WRITER.user,
+      password: WRITER.sqlServerPassword,
+    },
   }
 }
 
@@ -113,7 +119,10 @@ export async function startStack(options: { runDir: string; rateLimit: number })
     await prepareDrifted({ pg: pg.admin, ms: ms.admin })
     const writers = writerOf(pg, ms)
     const hops = { pg: await startTcpHop({ ...writers.pg, kind: 'postgres' }), ms: await startTcpHop({ ...writers.ms, kind: 'sqlserver' }) }
-    started.unshift(() => hops.pg.close(), () => hops.ms.close())
+    started.unshift(
+      () => hops.pg.close(),
+      () => hops.ms.close(),
+    )
 
     mkdirSync(options.runDir, { recursive: true })
     const storeDir = join(options.runDir, 'store')
@@ -148,7 +157,12 @@ export async function startStack(options: { runDir: string; rateLimit: number })
     const secret = randomBytes(48).toString('base64')
     const port = await freePort()
     const settings = serverSettings({ storeDir, connectionsFile, rateLimit: options.rateLimit, port })
-    const secrets = { PERF_HOST_SECRET: secret, PERF_AUDIT_KEY: randomBytes(32).toString('base64'), PG_WRITER_PASSWORD: writers.pg.password, MS_WRITER_PASSWORD: writers.ms.password }
+    const secrets = {
+      PERF_HOST_SECRET: secret,
+      PERF_AUDIT_KEY: randomBytes(32).toString('base64'),
+      PG_WRITER_PASSWORD: writers.pg.password,
+      MS_WRITER_PASSWORD: writers.ms.password,
+    }
     const logFile = join(options.runDir, 'server.log')
     const log = openSync(logFile, 'a')
     const entryPath = serverEntry()
@@ -168,7 +182,15 @@ export async function startStack(options: { runDir: string; rateLimit: number })
       hops,
       writers,
       secret,
-      server: { base, pid: child.pid as number, entry: entryPath, storeDir, logFile, settings: [...Object.keys(settings), ...Object.keys(secrets)].sort(), rateLimit: options.rateLimit },
+      server: {
+        base,
+        pid: child.pid as number,
+        entry: entryPath,
+        storeDir,
+        logFile,
+        settings: [...Object.keys(settings), ...Object.keys(secrets)].sort(),
+        rateLimit: options.rateLimit,
+      },
       stopServer,
       stop: async () => {
         for (const stop of started) await stop()

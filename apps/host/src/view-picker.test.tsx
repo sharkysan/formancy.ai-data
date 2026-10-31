@@ -4,7 +4,7 @@ import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm, RecordExpor
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, applyCondition, listsApplied, listsSent } from './test-filter.js'
 import { DELIVERY_VIEWS, ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, recordKeys, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane, Sent } from './test-plane.js'
@@ -96,7 +96,9 @@ async function pick(user: User, heading: string, name: string): Promise<void> {
 /** What a header of the grid `heading` names says of its sort: `aria-sort`, or null for a column that is not sorted. A sorted header's name holds its sort's number too, so it is found by how it starts. */
 function sortOf(heading: string, label: string): string | null {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  const sort = within(grid).getByRole('columnheader', { name: new RegExp(`^${label}`) }).getAttribute('aria-sort')
+  const sort = within(grid)
+    .getByRole('columnheader', { name: new RegExp(`^${label}`) })
+    .getAttribute('aria-sort')
   return sort === 'none' ? null : sort
 }
 
@@ -121,7 +123,12 @@ const asked = (sent: readonly Sent[], formId: string): Array<Pick<RecordListQuer
   listsSent(sent, formId).map(({ body }) => ({ filter: body.filter, sort: body.sort, after: body.after, parent: body.parent }))
 
 /** A first page asked with `view`'s filter and sort, under `parent`. */
-const firstPage = (view: { filter: ListFilterTerm[]; sort: ListSortTerm[] }, parent: RecordListQuery['parent'] = null) => ({ filter: view.filter, sort: view.sort, after: null, parent })
+const firstPage = (view: { filter: ListFilterTerm[]; sort: ListSortTerm[] }, parent: RecordListQuery['parent'] = null) => ({
+  filter: view.filter,
+  sort: view.sort,
+  after: null,
+  parent,
+})
 
 async function definitionOf(formId: string): Promise<PublishedForm> {
   const definition = await plane.clerk.form(formId)
@@ -137,7 +144,13 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
   if (!found.ok || found.value.rows[0] === undefined) throw new Error('no customer to order for')
   const ids: string[] = []
   for (const amount of amounts) {
-    const created = await plane.clerk.create(engine.formId, { customer: found.value.rows[0].token, order_date: EDGES.orderDate, status: 'placed', amount, notes })
+    const created = await plane.clerk.create(engine.formId, {
+      customer: found.value.rows[0].token,
+      order_date: EDGES.orderDate,
+      status: 'placed',
+      amount,
+      notes,
+    })
     if (!created.ok || created.value.record === null) throw new Error('the order was not created')
     ids.push(created.value.record.slice('k1:'.length))
   }
@@ -283,7 +296,12 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
 
     await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between', from: '1', to: '50' })
     const narrowed: ListFilterTerm[] = [LARGE.filter[0] as ListFilterTerm, { field: 'amount', op: 'range', from: '1', to: '50' }]
-    await lists('Records', engine.formId, { filter: narrowed, sort: LARGE.sort }, `Rows 1–${String((await serverLists(engine.formId, { filter: narrowed, sort: LARGE.sort })).length)}. Filtered by Notes and Amount.`)
+    await lists(
+      'Records',
+      engine.formId,
+      { filter: narrowed, sort: LARGE.sort },
+      `Rows 1–${String((await serverLists(engine.formId, { filter: narrowed, sort: LARGE.sort })).length)}. Filtered by Notes and Amount.`,
+    )
     expect(shown('Records')).toBe(OWN)
     expect(choices('Records')).toEqual(['All records', NEWEST.name, LARGE.name, OWN])
     expect(await floor('a filter of your own')).toEqual(CLEAN('a filter of your own'))
@@ -310,7 +328,12 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     await user.keyboard('{Enter}')
     await waitFor(() => expect(sortOf('Records', 'Id')).toBe('descending'), ARRIVES)
     const byId: ListSortTerm[] = [{ field: 'id', direction: 'desc' }]
-    await lists('Records', engine.formId, { filter: LARGE.filter, sort: byId }, `Rows 1–${String((await serverLists(engine.formId, { filter: LARGE.filter, sort: byId })).length)}. Filtered by Notes and Amount.`)
+    await lists(
+      'Records',
+      engine.formId,
+      { filter: LARGE.filter, sort: byId },
+      `Rows 1–${String((await serverLists(engine.formId, { filter: LARGE.filter, sort: byId })).length)}. Filtered by Notes and Amount.`,
+    )
     expect(sortOf('Records', 'Amount')).toBeNull()
     expect(shown('Records')).toBe(OWN)
     expect(asked(plane.sent, engine.formId)).toEqual([firstPage({ filter: LARGE.filter, sort: byId })])
@@ -319,10 +342,17 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     // Two presses at once on another header, as a person who wants it
     // descending gives them: AG Grid tells the section of the first only
     // after the second is on the header, and the second is the one kept.
-    within(grid).getByRole('columnheader', { name: /^Order date/ }).focus()
+    within(grid)
+      .getByRole('columnheader', { name: /^Order date/ })
+      .focus()
     await user.keyboard('{Enter}{Enter}')
     const byDate: ListSortTerm[] = [{ field: 'order_date', direction: 'desc' }]
-    await lists('Records', engine.formId, { filter: LARGE.filter, sort: byDate }, `Rows 1–${String((await serverLists(engine.formId, { filter: LARGE.filter, sort: byDate })).length)}. Filtered by Notes and Amount.`)
+    await lists(
+      'Records',
+      engine.formId,
+      { filter: LARGE.filter, sort: byDate },
+      `Rows 1–${String((await serverLists(engine.formId, { filter: LARGE.filter, sort: byDate })).length)}. Filtered by Notes and Amount.`,
+    )
     expect([sortOf('Records', 'Order date'), sortOf('Records', 'Id')]).toEqual(['descending', null])
     expect(asked(plane.sent, engine.formId).at(-1)).toEqual(firstPage({ filter: LARGE.filter, sort: byDate }))
   })
@@ -381,7 +411,11 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     await user.click(exportButton('Records'))
     await waitFor(() => expect(exportLine('Records').textContent).toBe(`Made ${engine.formId}.csv; your browser saves it.`), ARRIVES)
     const query: RecordExportQuery = { search: '', sort: LARGE.sort, parent: null, filter: LARGE.filter }
-    expect(plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/export`).map((request) => JSON.parse(request.body ?? '{}') as unknown)).toEqual([query])
+    expect(
+      plane.sent
+        .filter((request) => request.path === `/v1/forms/${engine.formId}/records/export`)
+        .map((request) => JSON.parse(request.body ?? '{}') as unknown),
+    ).toEqual([query])
     const file = await plane.clerk.exportRecords(engine.formId, query)
     if (!file.ok) throw new Error(file.message)
     const [saved] = kept.saved
@@ -401,7 +435,11 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     const record = `k1:${String(order)}`
     const words = stamp('carrier')
     for (const shipped of ['2026-10-07T08:00:00Z', null, '2026-10-09T08:00:00Z', null]) {
-      const made = await plane.clerk.create(engine.deliveries, { order: record, carrier: `${words} ${String(shipped === null ? 'Rail' : 'Post')}`, ...(shipped === null ? {} : { shipped_at: shipped }) })
+      const made = await plane.clerk.create(engine.deliveries, {
+        order: record,
+        carrier: `${words} ${String(shipped === null ? 'Rail' : 'Post')}`,
+        ...(shipped === null ? {} : { shipped_at: shipped }),
+      })
       if (!made.ok) throw new Error(`the delivery was not created: ${made.message}`)
     }
     const user = await workspace(engine.formId)

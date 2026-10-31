@@ -89,7 +89,12 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
     account,
     scope,
     objects: assembled,
-    gaps: [...visibility.gaps, ...rowSecurity.gaps, ...referencedByGaps(objects.size, visibility), ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...referencedBy.gaps, ...checks.gaps])],
+    gaps: [
+      ...visibility.gaps,
+      ...rowSecurity.gaps,
+      ...referencedByGaps(objects.size, visibility),
+      ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...referencedBy.gaps, ...checks.gaps]),
+    ],
   })
 }
 

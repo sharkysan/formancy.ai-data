@@ -35,8 +35,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /** What an import refuses in. */
 const IMPORT: GateSentences = {
-  unknown: (name) => `No connection is called ${name} in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database.`,
-  otherEngine: (connection, database, bound) => `This version cannot be imported: connection ${connection} is a ${database} database here, and the version is bound to ${bound}. A form's bindings belong to one engine.`,
+  unknown: (name) =>
+    `No connection is called ${name} in this deployment: an import keeps the connection's name, which each deployment's allowlist resolves to its own database.`,
+  otherEngine: (connection, database, bound) =>
+    `This version cannot be imported: connection ${connection} is a ${database} database here, and the version is bound to ${bound}. A form's bindings belong to one engine.`,
   incompatible: "This version cannot be imported: this deployment's database differs from the one it was published from in a way it cannot serve.",
   failed: 'an import failed where it cannot',
 }
@@ -64,7 +66,12 @@ export function promotionRoutes(app: FastifyInstance, { store, allowlisted, disc
     // 1. The body's shape, before anything is checked or a database asked.
     if (!FORM_ID.test(id)) return refuse(reply, 400, 'invalid-request', 'A form id is lower-case letters, digits, dot, hyphen or underscore.')
     const shape = 'Expected { expectedBase: the newest version here, or null for the first, bundle: the version file, keysConfirmed? }.'
-    if (!isRecord(body) || !('expectedBase' in body) || !(body['expectedBase'] === null || Number.isSafeInteger(body['expectedBase'])) || !isRecord(body['bundle'])) {
+    if (
+      !isRecord(body) ||
+      !('expectedBase' in body) ||
+      !(body['expectedBase'] === null || Number.isSafeInteger(body['expectedBase'])) ||
+      !isRecord(body['bundle'])
+    ) {
       return refuse(reply, 400, 'invalid-request', shape)
     }
     const expectedBase = body['expectedBase'] as number | null
@@ -72,7 +79,12 @@ export function promotionRoutes(app: FastifyInstance, { store, allowlisted, disc
     trail.expectedBase = expectedBase
     const confirmed = readKeysConfirmed(body['keysConfirmed'])
     if (confirmed === undefined) {
-      return refuse(reply, 400, 'invalid-request', 'Expected keysConfirmed, when sent, to list { field, was, now } as an import refused 422 keys-reassigned lists them in keys.')
+      return refuse(
+        reply,
+        400,
+        'invalid-request',
+        'Expected keysConfirmed, when sent, to list { field, was, now } as an import refused 422 keys-reassigned lists them in keys.',
+      )
     }
 
     // 2 to 7 (admin-gate.ts). What a publish checks: it validates, in format 2, for this form;

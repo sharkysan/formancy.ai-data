@@ -10,9 +10,33 @@ import type { CascadeRule, FormPolicy } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Proposal, ProposalRequest } from './api.js'
 import { PolicyStep } from './policy.js'
-import { audit, discover, focusedName, generateOrder, goTo, paragraphs, pressEnter, servedDocument, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
+import {
+  audit,
+  discover,
+  focusedName,
+  generateOrder,
+  goTo,
+  paragraphs,
+  pressEnter,
+  servedDocument,
+  signIn,
+  step,
+  unnamed,
+  writeOrderPolicy,
+} from './test-studio.js'
 import type { User } from './test-studio.js'
-import { OWNER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, SQLSERVER_SNAPSHOT, startPlane, TOKENS, withColumn, withDelete, withForeignKey, withGap, withoutDelete } from './test-server.js'
+import {
+  OWNER_SNAPSHOT,
+  SQLSERVER_READER_SNAPSHOT,
+  SQLSERVER_SNAPSHOT,
+  startPlane,
+  TOKENS,
+  withColumn,
+  withDelete,
+  withForeignKey,
+  withGap,
+  withoutDelete,
+} from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -66,12 +90,19 @@ function check(policy: HTMLElement): { summary: string; problems: string[] } {
   const list = within(region).queryByRole('list', { name: 'Policy check' })
   return {
     summary: within(region).getByRole('status').textContent ?? '',
-    problems: list === null ? [] : within(list).getAllByRole('listitem').map((item) => item.textContent ?? ''),
+    problems:
+      list === null
+        ? []
+        : within(list)
+            .getAllByRole('listitem')
+            .map((item) => item.textContent ?? ''),
   }
 }
 
 function items(container: HTMLElement, name: string): string[] {
-  return within(within(container).getByRole('list', { name })).getAllByRole('listitem').map((item) => item.textContent ?? '')
+  return within(within(container).getByRole('list', { name }))
+    .getAllByRole('listitem')
+    .map((item) => item.textContent ?? '')
 }
 
 function boxes(reach: HTMLElement): Array<[string, boolean]> {
@@ -121,7 +152,15 @@ function PolicyOf({ proposal, initial }: { proposal: Proposal; initial: FormPoli
   const [session] = useState(() => createBuilderSession(proposal.form))
   return (
     <main aria-label="Policy">
-      <PolicyStep bindings={proposal.bindings} snapshot={proposal.snapshot} session={session} policy={policy} onPolicy={setPolicy} stale={false} onRegenerate={() => Promise.resolve(null)} />
+      <PolicyStep
+        bindings={proposal.bindings}
+        snapshot={proposal.snapshot}
+        session={session}
+        policy={policy}
+        onPolicy={setPolicy}
+        stale={false}
+        onRegenerate={() => Promise.resolve(null)}
+      />
     </main>
   )
 }
@@ -149,7 +188,8 @@ describe('who may delete', () => {
     )
     await grantDelete(user, policy, 'manager')
     const said = validatePolicy({ ...FITTING, operations: { ...FITTING.operations, delete: ['manager'] } }, (await proposalOf()).bindings)
-    const unread = 'operations.delete grants manager, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete'
+    const unread =
+      'operations.delete grants manager, who may not read with this form: a delete names the version its person read, so grant read to every role that may delete'
     expect(said.ok ? [] : said.problems).toEqual([unread])
     expect(check(policy).problems).toContain(unread)
     expect([...(await audit()), ...unnamed()]).toEqual([])
@@ -232,7 +272,17 @@ describe('what a delete also does', () => {
   // Listed, and nothing more -- no box. The database after the lines' key
   // was made NO ACTION.
   test('keys that only refuse are listed, with no box', async () => {
-    plane.databases.set('fixture', withForeignKey(OWNER_SNAPSHOT, { from: 'order_line', name: 'fk_order_line_order', columns: ['order_id'], onto: 'order', referencedColumns: ['id'], onDelete: 'no-action' }))
+    plane.databases.set(
+      'fixture',
+      withForeignKey(OWNER_SNAPSHOT, {
+        from: 'order_line',
+        name: 'fk_order_line_order',
+        columns: ['order_id'],
+        onto: 'order',
+        referencedColumns: ['id'],
+        onDelete: 'no-action',
+      }),
+    )
     const user = await signIn(plane)
     const policy = await orderPolicyOn(user)
     const reach = within(policy).getByRole('group', { name: REACH })
@@ -254,9 +304,26 @@ describe('what a delete also does', () => {
   test('a key that clears a reference says which columns, and one that refuses the change is listed', async () => {
     const id = OWNER_SNAPSHOT.objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'id')
     if (id === undefined) throw new Error('the snapshot has no order id')
-    const cleared = withForeignKey(OWNER_SNAPSHOT, { from: 'delivery', name: 'fk_delivery_order', columns: ['order_id'], onto: 'order', referencedColumns: ['id'], onDelete: 'set-null' })
+    const cleared = withForeignKey(OWNER_SNAPSHOT, {
+      from: 'delivery',
+      name: 'fk_delivery_order',
+      columns: ['order_id'],
+      onto: 'order',
+      referencedColumns: ['id'],
+      onDelete: 'set-null',
+    })
     const referred = withColumn(cleared, 'parcel', { ...structuredClone(id), name: 'order_id', ordinal: 99, nullable: true, generated: 'none' })
-    plane.databases.set('fixture', withForeignKey(referred, { from: 'parcel', name: 'fk_parcel_order', columns: ['order_id'], onto: 'delivery', referencedColumns: ['order_id'], onDelete: 'no-action' }))
+    plane.databases.set(
+      'fixture',
+      withForeignKey(referred, {
+        from: 'parcel',
+        name: 'fk_parcel_order',
+        columns: ['order_id'],
+        onto: 'delivery',
+        referencedColumns: ['order_id'],
+        onDelete: 'no-action',
+      }),
+    )
     const user = await signIn(plane)
     const policy = await orderPolicyOn(user)
     const reach = within(policy).getByRole('group', { name: REACH })
@@ -264,7 +331,9 @@ describe('what a delete also does', () => {
       ['Sets order_id to NULL in the rows of sales.delivery that refer to it (fk_delivery_order, ON DELETE SET NULL)', false],
       [ORDER_KEYS[1], false],
     ])
-    expect(items(reach, 'The database refuses a delete')).toEqual(['While rows of sales.parcel refer to the reference it would clear in sales.delivery (fk_parcel_order, ON UPDATE NO ACTION)'])
+    expect(items(reach, 'The database refuses a delete')).toEqual([
+      'While rows of sales.parcel refer to the reference it would clear in sales.delivery (fk_parcel_order, ON UPDATE NO ACTION)',
+    ])
     expect(within(reach).getByText(/^This is every foreign key/).textContent).toBe(
       `This is every foreign key the catalog shows onto sales.order and onto each table a delete of it removes rows from, and every one onto a column it clears: a key onto another column of a row it keeps is not affected, and is not listed. ${TRIGGERS}`,
     )
@@ -281,7 +350,10 @@ describe('what a delete also does', () => {
   test('a key that sets a default says so, of one column and of several', async () => {
     servedDocument()
     const reachOf = async (columns: string[], referencedColumns: string[]) => {
-      plane.databases.set('fixture', withForeignKey(OWNER_SNAPSHOT, { from: 'delivery', name: 'fk_delivery_order', columns, onto: 'order', referencedColumns, onDelete: 'set-default' }))
+      plane.databases.set(
+        'fixture',
+        withForeignKey(OWNER_SNAPSHOT, { from: 'delivery', name: 'fk_delivery_order', columns, onto: 'order', referencedColumns, onDelete: 'set-default' }),
+      )
       const shown = render(<PolicyOf proposal={await proposalOf()} initial={FITTING} />)
       const reach = within(screen.getByRole('main', { name: 'Policy' })).getByRole('group', { name: REACH })
       const said = boxes(reach).map(([name]) => name)
@@ -321,7 +393,8 @@ describe('what a delete also does', () => {
   // a refusal no box can fix. SQL Server's owner, with the gap a reader
   // without VIEW DEFINITION has.
   test('behind a gap, the coverage sentence says the list is not every key, and the gap refuses', async () => {
-    const detail = 'this account lacks VIEW DEFINITION on the database, which is what lists every foreign key on a table in any schema, so a key on a table it cannot see may refer to any table in scope'
+    const detail =
+      'this account lacks VIEW DEFINITION on the database, which is what lists every foreign key on a table in any schema, so a key on a table it cannot see may refer to any table in scope'
     plane.databases.set('fixture-sqlserver', withGap(SQLSERVER_SNAPSHOT, { subject: { kind: 'scope' }, aspect: 'referenced-by', detail }))
     const user = await signIn(plane)
     const policy = await orderPolicyOn(user, 'fixture-sqlserver')
@@ -330,7 +403,9 @@ describe('what a delete also does', () => {
     expect(within(reach).getByText(/^This is not every foreign key/).textContent).toBe(
       `This is not every foreign key a delete of sales.order may act through: what the snapshot cannot see is said below. ${TRIGGERS}`,
     )
-    expect(items(reach, 'Delete cannot be granted on this form, whatever is ticked')).toEqual([`this snapshot cannot show everything that refers to sales.order: ${detail}`])
+    expect(items(reach, 'Delete cannot be granted on this form, whatever is ticked')).toEqual([
+      `this snapshot cannot show everything that refers to sales.order: ${detail}`,
+    ])
     expect([...(await audit()), ...unnamed()]).toEqual([])
   })
 
@@ -345,9 +420,21 @@ describe('what a delete also does', () => {
   // shown beside the gap, and with the reader's sentence shown for both).
   test('says that no key acts only where the snapshot can show every key', async () => {
     servedDocument()
-    const lines = await proposalOf({ connection: 'fixture-sqlserver', root: { schema: 'sales', name: 'order_line' }, formId: 'sales-order_line', title: 'Order line', lookups: [], pinned: [] })
+    const lines = await proposalOf({
+      connection: 'fixture-sqlserver',
+      root: { schema: 'sales', name: 'order_line' },
+      formId: 'sales-order_line',
+      title: 'Order line',
+      lookups: [],
+      pinned: [],
+    })
     expect(lines.bindings.operations.delete).toBe(true)
-    const shown = render(<PolicyOf proposal={lines} initial={{ version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {} }} />)
+    const shown = render(
+      <PolicyOf
+        proposal={lines}
+        initial={{ version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {} }}
+      />,
+    )
     const linesReach = within(screen.getByRole('main', { name: 'Policy' })).getByRole('group', { name: 'What deleting a record of sales.order_line also does' })
     expect(within(linesReach).queryAllByRole('checkbox')).toEqual([])
     expect(paragraphs(linesReach)).toEqual([
@@ -358,13 +445,25 @@ describe('what a delete also does', () => {
     shown.unmount()
 
     plane.databases.set('fixture-sqlserver-reader', withDelete(SQLSERVER_READER_SNAPSHOT, 'order'))
-    const proposal = await proposalOf({ connection: 'fixture-sqlserver-reader', root: { schema: 'sales', name: 'order' }, formId: 'sales-order', title: 'Order', lookups: [], pinned: [] })
+    const proposal = await proposalOf({
+      connection: 'fixture-sqlserver-reader',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'sales-order',
+      title: 'Order',
+      lookups: [],
+      pinned: [],
+    })
     expect(proposal.bindings.operations.delete).toBe(true)
     const order = proposal.snapshot.objects.find((object) => object.ref.name === 'order')
     expect(order?.referencedBy).toEqual([])
     const gap = proposal.snapshot.gaps.find((candidate) => candidate.subject.kind === 'scope' && candidate.aspect === 'referenced-by')
     if (gap === undefined) throw new Error("the reader's snapshot has no scope gap over what refers to a table")
-    render(<PolicyOf proposal={proposal} initial={{ version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {} }} />)
+    render(
+      <PolicyOf
+        proposal={proposal}
+        initial={{ version: 1, operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] }, fields: {}, rowFilters: [], lookups: {} }}
+      />,
+    )
     const reach = within(screen.getByRole('main', { name: 'Policy' })).getByRole('group', { name: REACH })
     expect(within(reach).queryAllByRole('checkbox')).toEqual([])
     expect(paragraphs(reach).filter((paragraph) => /^No foreign key/.test(paragraph))).toEqual([])
@@ -374,7 +473,9 @@ describe('what a delete also does', () => {
     expect(within(reach).getByText(/^This is not every foreign key/).textContent).toBe(
       `This is not every foreign key a delete of sales.order may act through: what the snapshot cannot see is said below. ${TRIGGERS}`,
     )
-    expect(items(reach, 'Delete cannot be granted on this form, whatever is ticked')).toEqual([`this snapshot cannot show everything that refers to sales.order: ${gap.detail}`])
+    expect(items(reach, 'Delete cannot be granted on this form, whatever is ticked')).toEqual([
+      `this snapshot cannot show everything that refers to sales.order: ${gap.detail}`,
+    ])
     expect([...(await audit()), ...unnamed()]).toEqual([])
   })
 

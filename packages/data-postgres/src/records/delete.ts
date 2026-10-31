@@ -20,7 +20,9 @@ const ACTION_CODES: Readonly<Record<ReachTerms['accepted'][number]['onDelete'], 
 /** `tables` as the relations they name and every relation below each -- partitions at any depth, tables that inherit -- with `extra` carried along: a recursive CTE's two halves. */
 function below(statement: Statement, name: string, tables: ReadonlyArray<{ table: ObjectRef; extra?: string }>): string {
   const carried = tables.some((entry) => entry.extra !== undefined)
-  const rows = tables.map(({ table, extra }) => `(${statement.text(table.schema)}, ${statement.text(table.name)}${carried ? `, ${statement.text(extra ?? null)}` : ''})`)
+  const rows = tables.map(
+    ({ table, extra }) => `(${statement.text(table.schema)}, ${statement.text(table.name)}${carried ? `, ${statement.text(extra ?? null)}` : ''})`,
+  )
   return `"${name}"("relid"${carried ? ', "extra"' : ''}) as (
       select c.oid${carried ? ', "t"."extra"' : ''}
       from (values ${rows.join(', ')}) as "t"("schema", "name"${carried ? ', "extra"' : ''})
@@ -79,7 +81,10 @@ export function reachClear(statement: Statement, reach: ReachTerms): string {
       : `
       and not exists (
         select from (values ${reach.accepted
-          .map((key) => `(${[key.from.schema, key.from.name, key.name, key.onto.schema, key.onto.name, ACTION_CODES[key.onDelete]].map((value) => statement.text(value)).join(', ')})`)
+          .map(
+            (key) =>
+              `(${[key.from.schema, key.from.name, key.name, key.onto.schema, key.onto.name, ACTION_CODES[key.onDelete]].map((value) => statement.text(value)).join(', ')})`,
+          )
           .join(', ')}) as "a"("from_schema", "from_name", "key", "onto_schema", "onto_name", "action")
         join pg_catalog.pg_namespace fn on fn.nspname ${op('=')} "a"."from_schema"
         join pg_catalog.pg_class f on f.relnamespace ${op('=')} fn.oid and f.relname ${op('=')} "a"."from_name"
@@ -88,7 +93,11 @@ export function reachClear(statement: Statement, reach: ReachTerms): string {
         where k.conrelid ${op('=')} f.oid and k.conname ${op('=')} "a"."key" and k.confrelid ${op('=')} t.oid and k.confdeltype ${op('=')} "a"."action"::pg_catalog."char"
       )`
   const removed = `not exists (
-    with recursive ${below(statement, 'removed', reach.removed.map((table) => ({ table })))}
+    with recursive ${below(
+      statement,
+      'removed',
+      reach.removed.map((table) => ({ table })),
+    )}
     select from pg_catalog.pg_constraint k
     join "removed" on k.confrelid ${op('=')} "removed"."relid"
     where ${DECLARED_FOREIGN_KEY} and k.confdeltype ${op('=')} any ('{c,n,d}'::pg_catalog."char"[])${accepted}
@@ -223,5 +232,8 @@ export function whyNotDeletedStatement(request: DeleteRequest, terms: DeleteTerm
   const where = located(statement, terms.key, terms.terms, terms.through)
   const unchanged = withVersion ? `(${versionIs(statement, { target: request.target, expectedVersion: terms.expectedVersion })})::pg_catalog.text` : `'false'`
   const found = `${selectFrom(terms.root, [`${unchanged} as "unchanged"`], where)}\nlimit 1`
-  return { text: `select ${same}, ${reach}, ${deletable}, ${rules}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`, params: statement.params }
+  return {
+    text: `select ${same}, ${reach}, ${deletable}, ${rules}, ${ISOLATION}, "found"."unchanged"\nfrom (select) as "g"\nleft join lateral (${found}) as "found" on true`,
+    params: statement.params,
+  }
 }

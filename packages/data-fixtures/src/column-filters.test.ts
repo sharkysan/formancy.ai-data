@@ -17,7 +17,8 @@ const DAY = 24 * 60 * 60 * 1000
 const midnight = (day: string): number => Date.parse(`${day}T00:00:00Z`)
 
 /** Whether `at` is in the whole days from `from` to `to`, either end left open by `null`. */
-const within = (at: number, from: string | null, to: string | null): boolean => (from === null || at >= midnight(from)) && (to === null || at < midnight(to) + DAY)
+const within = (at: number, from: string | null, to: string | null): boolean =>
+  (from === null || at >= midnight(from)) && (to === null || at < midnight(to) + DAY)
 
 /** Tenant 1's customers as the list suites leave them: the fixture's 1001, LIST_ROWS', each made active or not by COLUMN_FILTER_ROWS. */
 const CUSTOMERS = [
@@ -67,14 +68,18 @@ function holds(customer: Customer, condition: Condition): boolean {
 }
 
 /** The customer numbers every condition holds for, in key order. */
-const where = (conditions: readonly Condition[]): string[] => CUSTOMERS.filter((customer) => conditions.every((condition) => holds(customer, condition))).map((customer) => customer.customer_no)
+const where = (conditions: readonly Condition[]): string[] =>
+  CUSTOMERS.filter((customer) => conditions.every((condition) => holds(customer, condition))).map((customer) => customer.customer_no)
 
 describe('COLUMN_FILTER_ROWS', () => {
   // The suites update these customers rather than insert them; a number
   // that is not tenant 1's would update nothing, and its expectation would
   // be about a row no suite has.
   test("gives values to tenant 1's customers, each once", () => {
-    const tenant = [...FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).map((row) => String(row.customerNo)), ...LIST_ROWS.customers.map(([number]) => number)]
+    const tenant = [
+      ...FIXTURE_CUSTOMERS.filter((row) => row.tenantId === 1).map((row) => String(row.customerNo)),
+      ...LIST_ROWS.customers.map(([number]) => number),
+    ]
     expect(COLUMN_FILTER_ROWS.customers.map(([number]) => number)).toEqual(tenant)
   })
 
@@ -110,7 +115,10 @@ describe('COLUMN_FILTER_PARITY', () => {
   // Text equals exactly: every unit counts, a trailing space included.
   test('text and uuid: each value names the shipments that hold it exactly', () => {
     for (const { value, references } of COLUMN_FILTER_PARITY.text.entries) {
-      expect(COLUMN_FILTER_ROWS.shipments.filter(([reference]) => reference === value).map(([reference]) => reference), JSON.stringify(value)).toEqual(references)
+      expect(
+        COLUMN_FILTER_ROWS.shipments.filter(([reference]) => reference === value).map(([reference]) => reference),
+        JSON.stringify(value),
+      ).toEqual(references)
     }
     const { value, references } = COLUMN_FILTER_PARITY.uuid
     expect(value).not.toBe(value.toLowerCase())
@@ -126,7 +134,15 @@ describe('COLUMN_FILTER_PARITY', () => {
     const { equals, contains } = COLUMN_FILTER_PARITY.collation
     expect(contains.keys.map(([, item]) => item)).toEqual(['1', '2', '3', '4'])
     expect(contains.keys.filter(([code]) => !code.toLowerCase().includes(contains.text.toLowerCase()))).toEqual([])
-    expect(equals.map((entry) => `${entry.column}=${entry.value}`)).toEqual(['tenant_code=acme', 'tenant_code=acme ', 'tenant_code=ACME', 'tenant_code=Acmé', 'tenant_code=Acme', 'fixed_code=AB', 'fixed_code=ab'])
+    expect(equals.map((entry) => `${entry.column}=${entry.value}`)).toEqual([
+      'tenant_code=acme',
+      'tenant_code=acme ',
+      'tenant_code=ACME',
+      'tenant_code=Acmé',
+      'tenant_code=Acme',
+      'fixed_code=AB',
+      'fixed_code=ab',
+    ])
   })
 
   // Worked out over the customers the suites write, so an expectation typed

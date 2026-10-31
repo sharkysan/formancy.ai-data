@@ -52,7 +52,9 @@ export function prepare(pool: ConnectionPool, statement: Statement): Request {
  */
 export async function send<Row>(request: Request, statement: Statement): Promise<Row[]> {
   const result = await request.query<Row>(statement.sql)
-  return [...(result.recordsets.at(-1) ?? [])]
+  // mssql types a recordset's rows `any`, whatever the query was asked for.
+  const last = result.recordsets.at(-1) as Row[] | undefined
+  return [...(last ?? [])]
 }
 
 /**

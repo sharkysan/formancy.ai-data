@@ -62,8 +62,8 @@ export function ConnectStep({
   return (
     <>
       <p className="lede">
-        The databases this deployment allows forms to bind to, as the server&rsquo;s connections file names them. Test one
-        to see what answers; discover it to see what it can see, and what it cannot.
+        The databases this deployment allows forms to bind to, as the server&rsquo;s connections file names them. Test one to see what answers; discover it to
+        see what it can see, and what it cannot.
       </p>
       {connections.length === 0 ? (
         <p className="none">The server allows no connection: its connections file lists none.</p>
@@ -79,10 +79,10 @@ export function ConnectStep({
                   </h3>
                   <div className="actions">
                     <button type="button" className="button" onClick={() => void test(connection)}>
-                      Test{' '}<span className="visually-hidden">{connection}</span>
+                      Test <span className="visually-hidden">{connection}</span>
                     </button>
                     <button type="button" className="button" onClick={() => void discover(connection)}>
-                      Discover{' '}<span className="visually-hidden">{connection}</span>
+                      Discover <span className="visually-hidden">{connection}</span>
                     </button>
                   </div>
                   {result === undefined || result === 'testing' ? null : result.ok ? (
