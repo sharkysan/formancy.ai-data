@@ -72,9 +72,9 @@ jobs:
       # Every TypeScript and JavaScript file holds to the lint rules, the
       # type-aware ones reading the declarations the build just wrote, and to
       # Prettier's format, which the check only reads and never writes
-      # (0116). The rules and the style are scripts/code-style/, a copy of
-      # what formancy.ai will publish as @formancy/code-style for all four
-      # repositories, until this repository pins that package instead.
+      # (0116). The rules and the style are @formancy/code-style, which
+      # formancy.ai publishes for all four repositories and this repository
+      # pins exactly.
       - run: pnpm lint
       - run: pnpm format:check
 
