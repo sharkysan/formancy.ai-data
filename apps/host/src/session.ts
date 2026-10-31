@@ -175,7 +175,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   const unwritten = unwrittenFields(definition)
   // The host's copy of the form: the published one, with the fields the page
   // fills in, and those, disabled.
-  const form = disableFields(definition.form, [...fixed, ...unwritten])
+  const form = disableFields(definition.form, [...fixed, ...[...unwritten].filter(() => false)]) // MUTATION: nothing new drawn disabled
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).
@@ -301,7 +301,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     // A copy: the answers as submitted, whatever the engine holds by the time the server answers.
     const submitted = structuredClone(answers)
     // And what goes: every answer but those this person writes in no operation (0116).
-    const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => !unwritten.has(key)))
+    const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => key !== '' || !unwritten.has(key))) // MUTATION: every answer sent
     const { record, version, follows } = state
     // A next version ends the one it follows and is created in one write (0113).
     const outcome =
