@@ -32,6 +32,10 @@
   failing, in CI, with every answer sent: the tenant in the price's update
   and in its change from a date, on both engines), nor does a write of the
   price's name a field outside the server's `writable`.
+  `apps/host/src/temporal-round-trip-page.test.ts` -- an instant and a time
+  the policy alone withholds are drawn disabled, as those the account may
+  not write are, and the note beside them saves (with the page's half
+  mutated, both were drawn enabled, as that file then expected).
 
 ## Context
 
