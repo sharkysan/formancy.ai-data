@@ -152,10 +152,10 @@ function isVersions(value: unknown, operations: readonly unknown[]): value is Pu
 }
 
 /**
- * What each write accepts from this person (0116): on create `null` exactly
+ * What each write accepts from this person (0117): on create `null` exactly
  * when the form offers no create, on update exactly when it offers no
  * update, otherwise field keys. A reply that breaks that, or one without it
- * -- a server older than 0116 -- is no form this server sent, and a page
+ * -- a server older than 0117 -- is no form this server sent, and a page
  * that drew by it would offer, or withhold, an edit nobody decided.
  */
 function isWritable(value: unknown, operations: readonly unknown[]): value is PublishedForm['writable'] {

@@ -99,7 +99,7 @@ const priceControl = (name: string): HTMLInputElement => within(pricePaper()).ge
 /**
  * A price through the page, in React: created, its amount changed, and
  * changed from a date (0115) -- a form whose tenant is a column of its own,
- * which a renderer submits with every save (0116).
+ * which a renderer submits with every save (0117).
  */
 async function priceJourney(user: User, price: string): Promise<void> {
   await chooseForm(user, price)
@@ -220,9 +220,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // delete route removed before the page had a control: delete unused;
     // and with 0079's for the export removed before Download CSV: export
     // unused). A change from a date is sent from a price on the page's own
-    // origin, the tenant a column the page sends in no body since 0116
-    // (watched failing with 0115's exception removed before then: the
-    // tenant in every body of the price's). Through the demo's door it is
+    // origin, the tenant a column the page sends in no body since 0117
+    // (watched failing with every answer sent: the tenant in the price's
+    // update and in its change from a date). Through the demo's door it is
     // the one exception: the demo publishes no form over versions.
     const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
     expect(
@@ -259,7 +259,7 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     )
     expect(tenants).toEqual([])
     // Nor any field this person writes in no operation, by the server's own
-    // answer (0116): each write of the price's names only what one of its
+    // answer (0117): each write of the price's names only what one of its
     // writes accepts -- not the end, nor the note the clerk only reads.
     if (door === undefined) {
       const opened = await plane.clerk.form(price)

@@ -114,7 +114,7 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
   // What the clerk writes in no operation -- the pinned tenant, the end,
   // and the note the policy lets them read and not write -- is drawn as
   // nothing writes it, on a new price and an open one, and is in no body
-  // the page sends (0116). Watched failing with the unwritten fields left
+  // the page sends (0117). Watched failing with the unwritten fields left
   // out of the drawn form: the note was writable.
   test('draws what the clerk writes in no operation unwritable, and sends none of it', async () => {
     const record = await openVersion(engine)

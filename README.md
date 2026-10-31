@@ -323,6 +323,12 @@ until then the address is formancy.ai's 404
   copies the open record from its header, as stored, and says which values
   stayed behind
   ([0107](./docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+- **A form names what each write accepts from its person** -- never a
+  pinned tenant, a value the database writes or a field the policy keeps
+  from them -- and the host page draws a field no write accepts as
+  unwritable and sends it in no save, so no body it sends names a tenant,
+  whatever column holds it
+  ([0117](./docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
 - **A table of versions is changed from a date**: where each row of a
   product's prices is valid from one date until the next starts, a form
   generated with `validity: { from, to }` ends the open version where the
@@ -772,6 +778,11 @@ form ([0041](./docs/decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
 Of the host page's suites and checks, only that picture's check below holds
 the page to it, and on PostgreSQL alone
 ([0038](./docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
+
+A field its person may write in no operation -- a tenant pinned to the
+token, a field the policy lets them read and not write -- is drawn
+disabled and is in no save the page sends
+([0117](./docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
 
 What it does not do yet: no bulk delete and no undo, no file of a record
 and all its children at once, no copy of a record with its children; and on a loaded

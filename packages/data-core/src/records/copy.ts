@@ -11,7 +11,7 @@ import { columnsOf, prepare } from './prepare.js'
  * column of one of the root's keys, primary or unique.
  *
  * Whether a create accepts a field is the over-posting check's, asked one
- * field at a time through `writableFields` (0116), so a field the
+ * field at a time through `writableFields` (0117), so a field the
  * database generates, a pinned tenant, one the account may not INSERT and
  * one the policy does not let this person write are left out by the rule
  * that would refuse them, not by a second list of it. A key is left out

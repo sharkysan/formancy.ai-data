@@ -338,7 +338,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
     // Where a version may be changed from a date: it ends one and creates the next (0113).
     const versions = operations.includes('create') && operations.includes('update') ? versionFields(bundle.bindings) : null
-    // What each write offered accepts from this person, by the check that refuses the rest (0116).
+    // What each write offered accepts from this person, by the check that refuses the rest (0117).
     const writable = {
       create: operations.includes('create') ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
       update: operations.includes('update') ? writableFields(bundle.policy, actor, bundle.bindings, 'update') : null,

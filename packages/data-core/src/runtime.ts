@@ -131,7 +131,7 @@ export interface Deleting {
  * fields this person may give on each write, from `writableFields`: on
  * create `null` exactly when `operations` holds no `create`, on update
  * exactly when it holds no `update` -- so a page draws a field in neither
- * as one nothing writes, and sends it in no body (0116).
+ * as one nothing writes, and sends it in no body (0117).
  */
 export interface PublishedForm {
   form: FormSchema

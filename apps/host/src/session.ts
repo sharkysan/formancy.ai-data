@@ -159,7 +159,7 @@ function said(outcome: WriteOutcome, created: boolean): string {
 }
 
 /**
- * The fields this person may write in no write the form offers them (0116):
+ * The fields this person may write in no write the form offers them (0117):
  * a pinned tenant, a field the database writes, one the policy lets them
  * read and not write. A field written on create only is not one of them.
  */
@@ -171,11 +171,11 @@ function unwrittenFields({ form, writable }: PublishedForm): Set<string> {
 export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
   // What this person writes in no operation is drawn as nothing writes it
   // and sent in no body: a renderer submits a disabled field, and a body
-  // that echoed it would carry the tenant a token alone carries (0116).
+  // that echoed it would carry the tenant a token alone carries (0117).
   const unwritten = unwrittenFields(definition)
   // The host's copy of the form: the published one, with the fields the page
-  // fills in, and those, disabled.
-  const form = disableFields(definition.form, [...fixed, ...[...unwritten].filter(() => false)]) // MUTATION: nothing new drawn disabled
+  // fills in and the unwritten ones disabled.
+  const form = disableFields(definition.form, [...fixed, ...unwritten])
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).
@@ -300,8 +300,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
   async function send(engine: FormEngine, generation: number, answers: Record<string, unknown>): Promise<SaveResult> {
     // A copy: the answers as submitted, whatever the engine holds by the time the server answers.
     const submitted = structuredClone(answers)
-    // And what goes: every answer but those this person writes in no operation (0116).
-    const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => key !== '' || !unwritten.has(key))) // MUTATION: every answer sent
+    // And what goes: every answer but those this person writes in no operation (0117).
+    const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => !unwritten.has(key)))
     const { record, version, follows } = state
     // A next version ends the one it follows and is created in one write (0113).
     const outcome =

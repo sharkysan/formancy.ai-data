@@ -810,9 +810,9 @@ describe('a delete (0050)', () => {
 
   // `writable` names the fields each write accepts from this person, its
   // create `null` exactly when the form offers no create and its update
-  // exactly when it offers no update (0116): a reply that names a write the
+  // exactly when it offers no update (0117): a reply that names a write the
   // form does not offer, offers one without naming it, names something but
-  // field keys, or says nothing -- a server older than 0116 -- is no form
+  // field keys, or says nothing -- a server older than 0117 -- is no form
   // this server sent, and a page that drew by it would withhold or offer an
   // edit nobody decided. Watched failing with `writable` left unchecked.
   test("a form's writable names fields for exactly the writes it offers", async () => {

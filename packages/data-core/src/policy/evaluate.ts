@@ -204,7 +204,7 @@ export function checkSubmittedFields(
 /**
  * The field keys this actor may write with this operation, in the bindings'
  * order: each one the over-posting check accepts alone, so what a page may
- * offer and send is that check's answer and not a second list of it (0116).
+ * offer and send is that check's answer and not a second list of it (0117).
  * Empty when the operation is not this actor's or cannot be scoped.
  */
 export function writableFields(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, operation: 'create' | 'update'): string[] {
