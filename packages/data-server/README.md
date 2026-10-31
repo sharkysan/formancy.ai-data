@@ -384,6 +384,10 @@ existed would be documented and inert.
   `create`, it adds `copied`, the fields a copy of a record carries into a
   new one for this person, from `copiedFields`, and `null` otherwise
   ([0107](../../docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+  It names `writable: { create, update }`, the fields each write it lists
+  accepts from this person, from `writableFields`, and `null` for one it
+  does not list
+  ([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
   `routes/runtime-deletes.test.ts` holds the route over
   fake ports, and `e2e.integration.test.ts` and
   `e2e-lost-answer.integration.test.ts` on both engines.

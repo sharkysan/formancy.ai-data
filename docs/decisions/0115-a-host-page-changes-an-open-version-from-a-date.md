@@ -1,6 +1,6 @@
 # 0115 — A host page changes an open version from a date, its next version opened in every pane
 
-- **Status:** accepted; extends [0113](0113-a-form-over-versions-changes-the-open-one-from-a-date.md): `versions` also names the chain's key fields, which a next version takes from the one it follows; extends [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the record's header offers Change from a date on an open version, and the detail holds a next version as it holds a new record
+- **Status:** accepted; extends [0113](0113-a-form-over-versions-changes-the-open-one-from-a-date.md): `versions` also names the chain's key fields, which a next version takes from the one it follows; extends [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): the record's header offers Change from a date on an open version, and the detail holds a next version as it holds a new record; extended by [0117](0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md): the plane test's journey changes a price from a date on the page's own origin, its tenant in no body, and sends no change through the demo's door alone
 - **Date:** 2026-10-30
 - **Deciders:** Daniel Bacher
 - **Verified by:**

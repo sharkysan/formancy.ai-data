@@ -227,6 +227,10 @@ an echo it can prove harmless is removed from a submission
 or one the record moved since the version the person sent, which the
 guarded statement then answers stale
 ([0098](../decisions/0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md)).
+A form names what each write accepts from its person, by the same check,
+and the host page sends no field that no write accepts: the echo the
+server removes is another client's
+([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
 The same scoping reaches every operation: a lookup token is a reference,
 never a permission
 ([0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md));

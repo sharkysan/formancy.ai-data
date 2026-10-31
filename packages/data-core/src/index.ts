@@ -118,6 +118,7 @@ export {
   rowFilter,
   stateField,
   throughFilters,
+  writableFields,
 } from './policy/evaluate.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'

@@ -127,7 +127,11 @@ export interface Deleting {
  * this person may change the open one from a date -- `operations` holds
  * both `create` and `update` -- and `null` otherwise (0113); with `key`,
  * the fields of the chain's key, which a next version takes from the one
- * it follows, so a page draws them unwritable (0115).
+ * it follows, so a page draws them unwritable (0115). `writable` is the
+ * fields this person may give on each write, from `writableFields`: on
+ * create `null` exactly when `operations` holds no `create`, on update
+ * exactly when it holds no `update` -- so a page draws a field in neither
+ * as one nothing writes, and sends it in no body (0117).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -137,6 +141,7 @@ export interface PublishedForm {
   deleting: Deleting | null
   copied: string[] | null
   versions: { from: string; to: string; key: string[] } | null
+  writable: { create: string[] | null; update: string[] | null }
 }
 
 /**

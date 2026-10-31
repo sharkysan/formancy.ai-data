@@ -404,7 +404,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:045c191eb13859c5212013bef5d627eeb8c25c441e473f7ae936898eaba9202a",
+      "reviewed": "sha256:17b8c2aa634c62e011110f9cb549cce4529106f8e58c60b8f20e3e0c22ad061d",
       "limitations": [
         {
           "area": "writes",
@@ -599,7 +599,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:8c78955f57d16e6787a3900675377baa29497f4bd6d9954959c0463048b32d33",
+      "reviewed": "sha256:09ee2e05949f25fa601af960a742bc6cb2daae510e064bcf5442f333e3674749",
       "limitations": [
         {
           "area": "host",
@@ -3431,7 +3431,7 @@
       ]
     },
     "0115": {
-      "reviewed": "sha256:df209b5c11f489a99ee88a6648e8806ec646bc21fccff396352cb3a25a06af8b",
+      "reviewed": "sha256:777c640770796d7c415ba3c0e82d60d6fe24dd06b4b2f9fcdaa24616a7cef8da",
       "limitations": [
         {
           "area": "host",
@@ -3441,17 +3441,35 @@
         {
           "area": "host",
           "says": "Whether a version has ended is read from its end as the person reads it: one whose end they may not read is drawn writable, and its update is refused by the server."
-        },
-        {
-          "area": "testing",
-          "says": "The host's plane test sends no change from a date: its journey's forms carry the tenant in a lookup's token, and a form whose tenant is a column a renderer echoes would fail its rule that no body names a tenant; change.test.tsx sends the change through the page, and the live demo has no form over versions.",
-          "heldBy": "apps/host/src/plane.test.tsx"
         }
       ]
     },
     "0116": {
       "reviewed": "sha256:782f4cdd541d0d0533de43e833f1b835b6ad2d4ef093fa75820b727cbe72869d",
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
+    },
+    "0117": {
+      "reviewed": "sha256:0c60b96fc901c88a727cbdb2c73230c7649fc621179e885b961d7a5ba81cc6ae",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A field written on create only is still drawn writable on an opened record, and a change to it is refused after Save."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer, as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "Opening a form asks the policy once per field for each write it offers, as the copy and the echo removal already do."
+        },
+        {
+          "area": "testing",
+          "says": "Through the demo's door the host's plane test sends no change from a date: the live demo publishes no form over versions.",
+          "heldBy": "apps/host/src/plane.test.tsx"
+        }
+      ]
     }
   }
 }

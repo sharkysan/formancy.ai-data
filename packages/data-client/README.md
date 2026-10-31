@@ -38,7 +38,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
@@ -109,6 +109,13 @@ as read, and send them to `create`; it is `null` exactly when `operations`
 holds no `create`, and a reply that breaks that, or one from a server older
 than copies, which sends none, is `unexpected`
 ([0107](../../docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+A form's `writable` names, for `create` and for `update`, the fields that
+write accepts from this person -- by the check that refuses the rest, so
+never a pinned tenant -- or `null` for a write `operations` does not hold;
+a page leaves a field in neither out of what it draws writable and what it
+sends, and a reply that breaks that, or one from a server older than it,
+is `unexpected`
+([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.

@@ -158,10 +158,24 @@ function said(outcome: WriteOutcome, created: boolean): string {
   return outcome.value.record === null ? 'Created.' : `Created record ${outcome.value.record}.`
 }
 
+/**
+ * The fields this person may write in no write the form offers them (0117):
+ * a pinned tenant, a field the database writes, one the policy lets them
+ * read and not write. A field written on create only is not one of them.
+ */
+function unwrittenFields({ form, writable }: PublishedForm): Set<string> {
+  const written = new Set([...(writable.create ?? []), ...(writable.update ?? [])])
+  return new Set(form.model.fields.map((field) => field.key).filter((key) => !written.has(key)))
+}
+
 export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
+  // What this person writes in no operation is drawn as nothing writes it
+  // and sent in no body: a renderer submits a disabled field, and a body
+  // that echoed it would carry the tenant a token alone carries (0117).
+  const unwritten = unwrittenFields(definition)
   // The host's copy of the form: the published one, with the fields the page
-  // fills in disabled.
-  const form = disableFields(definition.form, fixed)
+  // fills in and the unwritten ones disabled.
+  const form = disableFields(definition.form, [...fixed, ...unwritten])
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).
@@ -224,14 +238,15 @@ export function createSession({ client, formId, definition, renderer, namespace,
   }
 
   /**
-   * What the server answered, applied to the engine it was asked for. `sent`
-   * is the answers as they went: a stored answer replaces only one still as
-   * it was sent, never one the person has changed since.
+   * What the server answered, applied to the engine it was asked for.
+   * `submitted` is the answers as the renderer handed them over, the
+   * unwritten ones included: a stored answer replaces only one still as it
+   * was submitted, never one the person has changed since.
    */
   function settle(
     engine: FormEngine,
     generation: number,
-    sent: Record<string, unknown>,
+    submitted: Record<string, unknown>,
     at: Pick<SessionState, 'record' | 'version'>,
     outcome: WriteOutcome,
     created: boolean,
@@ -266,13 +281,13 @@ export function createSession({ client, formId, definition, renderer, namespace,
     }
     const now = engine.value() as Record<string, unknown>
     let newer = false
-    // What the record now holds, as the form would show it: what was sent,
-    // in the stored spelling where the server says one.
-    const held: Record<string, unknown> = { ...sent }
+    // What the record now holds, as the form would show it: what was
+    // submitted, in the stored spelling where the server says one.
+    const held: Record<string, unknown> = { ...submitted }
     for (const [key, value] of Object.entries(outcome.value.answers)) {
       if (!keys.has(key)) continue
       held[key] = value
-      if (same(now[key], sent[key])) engine.setValue([key], value)
+      if (same(now[key], submitted[key])) engine.setValue([key], value)
       else newer = true
     }
     baseline = held
@@ -283,8 +298,10 @@ export function createSession({ client, formId, definition, renderer, namespace,
   }
 
   async function send(engine: FormEngine, generation: number, answers: Record<string, unknown>): Promise<SaveResult> {
-    // A copy: the answers as they went, whatever the engine holds by the time the server answers.
-    const sent = structuredClone(answers)
+    // A copy: the answers as submitted, whatever the engine holds by the time the server answers.
+    const submitted = structuredClone(answers)
+    // And what goes: every answer but those this person writes in no operation (0117).
+    const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => !unwritten.has(key)))
     const { record, version, follows } = state
     // A next version ends the one it follows and is created in one write (0113).
     const outcome =
@@ -296,7 +313,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     // Load or New replaced the form while this was in flight: the answer must
     // not move the new form's record, and is still said, as the old form's.
     if (current().generation !== generation) return { kind: 'replaced', message: `${REPLACED} ${said(outcome, record === undefined)}` }
-    return settle(engine, generation, sent, follows ?? { record, version }, outcome, record === undefined)
+    return settle(engine, generation, submitted, follows ?? { record, version }, outcome, record === undefined)
   }
 
   /** The record as this form was opened or last saved: its token, its version, and the answers as stored. */
