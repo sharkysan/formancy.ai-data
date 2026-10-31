@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { audit, unnamed } from './test-accessible.js'
-import { chooseForm, chooseRenderer, load, loaded, mount, pane, said, signIn } from './test-host.js'
+import { chooseForm, chooseRenderer, gridSection, load, loaded, mount, pane, said, signIn } from './test-host.js'
 import type { User } from './test-host.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -109,6 +109,28 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
     expect(ended.ok && ended.value.answers['valid_to']).toBe('2026-07-01')
     const started = await plane.clerk.read(engine.price, next)
     expect(started.ok && { from: started.value.answers['valid_from'], to: started.value.answers['valid_to'] }).toEqual({ from: '2026-07-01', to: null })
+  })
+
+  // What the clerk writes in no operation -- the pinned tenant, the end,
+  // and the note the policy lets them read and not write -- is drawn as
+  // nothing writes it, on a new price and an open one, and is in no body
+  // the page sends (0116). Watched failing with the unwritten fields left
+  // out of the drawn form: the note was writable.
+  test('draws what the clerk writes in no operation unwritable, and sends none of it', async () => {
+    const record = await openVersion(engine)
+    const user = await priceOpen(engine, record)
+    for (const name of ['Tenant id', 'Valid to', 'Note']) expect({ name, disabled: control(name).disabled }).toEqual({ name, disabled: true })
+    expect(control('Amount').disabled).toBe(false)
+    plane.sent.length = 0
+    await user.clear(control('Amount'))
+    await user.type(control('Amount'), '11')
+    await user.click(within(paper()).getByRole('button', { name: 'Save' }))
+    await said('React', /^Saved\.$/)
+    const update = plane.sent.find((request) => request.path === `/v1/forms/${engine.price}/records/update`)
+    expect(Object.keys((JSON.parse(update?.body ?? '{}') as { answers?: object }).answers ?? {}).sort()).toEqual(['amount', 'product_no', 'valid_from'])
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
+    await waitFor(() => expect(control('Note').value).toBe(''), ARRIVES_WITHIN)
+    expect(control('Note').disabled).toBe(true)
   })
 
   // A version that has ended is history: no change is offered from it. The

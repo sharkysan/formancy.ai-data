@@ -12,6 +12,7 @@ import {
   runtimeOperations,
   toFormAnswers,
   versionFields,
+  writableFields,
 } from '@formancy/data-core'
 import type {
   DescribedTable,
@@ -337,7 +338,12 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
     // Where a version may be changed from a date: it ends one and creates the next (0113).
     const versions = operations.includes('create') && operations.includes('update') ? versionFields(bundle.bindings) : null
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied, versions } satisfies PublishedForm
+    // What each write offered accepts from this person, by the check that refuses the rest (0116).
+    const writable = {
+      create: operations.includes('create') ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
+      update: operations.includes('update') ? writableFields(bundle.policy, actor, bundle.bindings, 'update') : null,
+    }
+    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied, versions, writable } satisfies PublishedForm
   })
 
   /**

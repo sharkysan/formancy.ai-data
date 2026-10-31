@@ -151,6 +151,18 @@ function isVersions(value: unknown, operations: readonly unknown[]): value is Pu
   )
 }
 
+/**
+ * What each write accepts from this person (0116): on create `null` exactly
+ * when the form offers no create, on update exactly when it offers no
+ * update, otherwise field keys. A reply that breaks that, or one without it
+ * -- a server older than 0116 -- is no form this server sent, and a page
+ * that drew by it would offer, or withhold, an edit nobody decided.
+ */
+function isWritable(value: unknown, operations: readonly unknown[]): value is PublishedForm['writable'] {
+  if (!isRecord(value)) return false
+  return (['create', 'update'] as const).every((operation) => (operations.includes(operation) ? isStrings(value[operation]) : value[operation] === null))
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -161,7 +173,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isListColumns(body['list']) &&
     isDeleting(body['deleting'], body['operations'] as unknown[]) &&
     isCopied(body['copied'], body['operations'] as unknown[]) &&
-    isVersions(body['versions'], body['operations'] as unknown[])
+    isVersions(body['versions'], body['operations'] as unknown[]) &&
+    isWritable(body['writable'], body['operations'] as unknown[])
   )
 }
 

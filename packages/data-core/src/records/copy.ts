@@ -1,6 +1,6 @@
 import type { FormBindings } from '../generate/types.js'
 import type { MetadataSnapshot } from '../metadata.js'
-import { checkSubmittedFields, readableFields } from '../policy/evaluate.js'
+import { readableFields, writableFields } from '../policy/evaluate.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { columnsOf, prepare } from './prepare.js'
 
@@ -11,7 +11,7 @@ import { columnsOf, prepare } from './prepare.js'
  * column of one of the root's keys, primary or unique.
  *
  * Whether a create accepts a field is the over-posting check's, asked one
- * field at a time as the runtime route asks it of an echo, so a field the
+ * field at a time through `writableFields` (0116), so a field the
  * database generates, a pinned tenant, one the account may not INSERT and
  * one the policy does not let this person write are left out by the rule
  * that would refuse them, not by a second list of it. A key is left out
@@ -31,11 +31,7 @@ export function copiedFields(snapshot: MetadataSnapshot, bindings: FormBindings,
   if (!readable.ok) return []
   const { root } = ready.prepared
   const keyed = new Set([...(root.primaryKey === null ? [] : [root.primaryKey]), ...root.uniqueKeys].flatMap((key) => key.columns))
-  const copied = new Set(
-    bindings.fields
-      .filter((binding) => !columnsOf(binding).some((column) => keyed.has(column)))
-      .filter((binding) => checkSubmittedFields(policy, context, bindings, 'create', [binding.field]).ok)
-      .map((binding) => binding.field),
-  )
+  const keys = new Set(bindings.fields.filter((binding) => columnsOf(binding).some((column) => keyed.has(column))).map((binding) => binding.field))
+  const copied = new Set(writableFields(policy, context, bindings, 'create').filter((field) => !keys.has(field)))
   return readable.fields.filter((field) => copied.has(field))
 }

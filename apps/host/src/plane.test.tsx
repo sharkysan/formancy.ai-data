@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { PREFIX } from '@formancy/data-live-demo/worker'
 import { ROUTE_OPERATIONS } from '@formancy/data-server'
 import { demoSession } from './demo.js'
@@ -28,7 +28,9 @@ import {
   signIn,
   signInAs,
   stamp,
+  statuses,
 } from './test-host.js'
+import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane, Sent } from './test-plane.js'
 
@@ -54,7 +56,7 @@ import type { Plane, Sent } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, demo: true })
+  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true })
 })
 
 afterAll(async () => {
@@ -90,6 +92,49 @@ function recordRows(): HTMLElement[] {
     .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
 }
 
+/** The price's React paper, and a control of it by its name: the shared helpers' paper is the order's. */
+const pricePaper = (): HTMLElement => within(screen.getByRole('region', { name: 'React' })).getByRole('form', { name: 'Price, React' })
+const priceControl = (name: string): HTMLInputElement => within(pricePaper()).getByLabelText<HTMLInputElement>(name, { exact: true })
+
+/**
+ * A price through the page, in React: created, its amount changed, and
+ * changed from a date (0115) -- a form whose tenant is a column of its own,
+ * which a renderer submits with every save (0116).
+ */
+async function priceJourney(user: User, price: string): Promise<void> {
+  await chooseForm(user, price)
+  await newRecord(user)
+  await waitFor(() => expect(priceControl('Product no')).toBeTruthy(), { timeout: 15_000 })
+  await user.type(priceControl('Product no'), String(8000 + Math.floor(Math.random() * 1000)))
+  fireEvent.change(priceControl('Valid from'), { target: { value: '2026-01-01' } })
+  await user.type(priceControl('Amount'), '9.5')
+  await user.click(within(pricePaper()).getByRole('button', { name: 'Save' }))
+  const record = (await said('React', /^Created record /)).slice('Created record '.length, -1)
+  await load(user, record)
+  await loaded(record, 'Price')
+  await user.clear(priceControl('Amount'))
+  await user.type(priceControl('Amount'), '10')
+  await user.click(within(pricePaper()).getByRole('button', { name: 'Save' }))
+  await said('React', /^Saved\.$/)
+  await user.click(screen.getByRole('button', { name: 'Change from a date' }))
+  await screen.findByRole('heading', { level: 3, name: `Next version of ${record}` }, { timeout: 15_000 })
+  fireEvent.change(priceControl('Valid from'), { target: { value: '2026-07-01' } })
+  await user.click(within(pricePaper()).getByRole('button', { name: 'Save' }))
+  // The next version is a record of its own: created, and what the detail shows.
+  let next = ''
+  await waitFor(
+    () => {
+      next =
+        statuses('React')
+          .flatMap((text) => /^Created record (.+)\.$/.exec(text)?.[1] ?? [])
+          .find((token) => token !== record) ?? ''
+      expect(next).not.toBe('')
+    },
+    { timeout: 15_000 },
+  )
+  await screen.findByRole('heading', { level: 3, name: `Price ${next}` }, { timeout: 15_000 })
+}
+
 /** The page's doors: its own origin on each engine, and the live demo's path, behind its Worker, signed in as tenant 1's clerk. */
 const JOURNEYS = [
   ...ENGINES.map((engine) => ({ ...engine, door: 'its own origin', demo: false })),
@@ -98,7 +143,7 @@ const JOURNEYS = [
   { ...ENGINES[0], door: "the demo's path", demo: true },
 ]
 
-describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, demo }) => {
+describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, price, demo }) => {
   test('only runtime routes under its base, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
     plane.sent.length = 0
     const words = stamp('plane')
@@ -144,6 +189,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy(), { timeout: 15_000 })
+    // And on its own origin a price, whose tenant is a column of its own:
+    // the demo publishes no form over versions.
+    if (door === undefined) await priceJourney(user, price)
 
     const page: Sent[] = door === undefined ? [...plane.sent] : [...door.sent]
     const token = door === undefined ? TOKENS.clerk : String(door.tokens[0])
@@ -171,12 +219,12 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused;
     // and with 0079's for the export removed before Download CSV: export
-    // unused). A change from a date is the one exception: the page sends it
-    // since 0115, from a form over versions, and this journey's forms are
-    // not one -- their tenant travels in a lookup's token, where a price's
-    // tenant is a column a renderer echoes, which the rule below refuses.
-    // change.test.tsx sends it, through the page, on both engines.
-    const UNSENT: ReadonlySet<string> = new Set(['supersede'])
+    // unused). A change from a date is sent from a price on the page's own
+    // origin, the tenant a column the page sends in no body since 0116
+    // (watched failing with 0115's exception removed before then: the
+    // tenant in every body of the price's). Through the demo's door it is
+    // the one exception: the demo publishes no form over versions.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,
@@ -210,6 +258,27 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
         .map((key) => `${line(request)}: ${key}`),
     )
     expect(tenants).toEqual([])
+    // Nor any field this person writes in no operation, by the server's own
+    // answer (0116): each write of the price's names only what one of its
+    // writes accepts -- not the end, nor the note the clerk only reads.
+    if (door === undefined) {
+      const opened = await plane.clerk.form(price)
+      const writable = opened.ok ? new Set([...(opened.value.writable.create ?? []), ...(opened.value.writable.update ?? [])]) : new Set<string>()
+      const writes = sent.filter(
+        (request) =>
+          request.path.startsWith(`/v1/forms/${price}/records/`) &&
+          request.method === 'POST' &&
+          !request.path.endsWith('/read') &&
+          !request.path.endsWith('/list'),
+      )
+      expect(writes.map((request) => request.path.slice(`/v1/forms/${price}/records/`.length))).toEqual(['create', 'update', 'supersede'])
+      const unwritten = writes.flatMap((request) =>
+        Object.keys((JSON.parse(request.body ?? '{}') as { answers?: object }).answers ?? {})
+          .filter((key) => !writable.has(key))
+          .map((key) => `${line(request)}: ${key}`),
+      )
+      expect({ writable: writable.size > 0, unwritten }).toEqual({ writable: true, unwritten: [] })
+    }
 
     // The filter travels as the search does (0104): in the body of the list
     // that answered it and of the file made after it, and its words in no

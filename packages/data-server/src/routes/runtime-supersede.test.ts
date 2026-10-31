@@ -249,6 +249,21 @@ describe('a change from a date (0113)', () => {
   })
 })
 
+describe('what a person may write of a form (0116)', () => {
+  // The fields each write accepts from this person, by the check that
+  // refuses the rest: on create the chain's key, its start and the amount --
+  // never the pinned tenant or the end the server writes; on update the
+  // amount alone, the key and the start written on create only. A reader is
+  // offered no write and named none. Watched failing with `writable` left
+  // out of the reply.
+  test('names the fields each write it offers accepts, and none to a reader', async () => {
+    const opened = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer clerk' } })
+    expect(opened.json().writable).toEqual({ create: ['product_no', 'valid_from', 'amount'], update: ['amount'] })
+    const read = await app.inject({ method: 'GET', url: '/v1/forms/price', headers: { authorization: 'Bearer auditor' } })
+    expect(read.json().writable).toEqual({ create: null, update: null })
+  })
+})
+
 describe('a form over versions (0113)', () => {
   // The form says where a version starts and ends to whoever may change
   // one, and nothing to a reader; a create starts a chain only where there

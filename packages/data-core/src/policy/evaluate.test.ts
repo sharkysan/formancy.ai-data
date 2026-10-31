@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'vitest'
 import type { FieldBinding, FieldWrites, FormBindings } from '../generate/types.js'
-import { authorizeOperation, checkSubmittedFields, forcedValues, lookupRowFilter, readableFields, rowFilter, throughFilters } from './evaluate.js'
+import {
+  authorizeOperation,
+  checkSubmittedFields,
+  forcedValues,
+  lookupRowFilter,
+  readableFields,
+  rowFilter,
+  throughFilters,
+  writableFields,
+} from './evaluate.js'
 import type { FormPolicy, PolicyContext } from './types.js'
 import { validatePolicy } from './validate.js'
 
@@ -447,6 +456,46 @@ describe('checkSubmittedFields', () => {
       code: 'over-posting',
       message: 'Z is not a field of this form; a is not a field of this form; b is not a field of this form',
     })
+  })
+})
+
+describe('writableFields', () => {
+  // What a page draws writable and sends (0116): each field the over-posting
+  // check accepts alone, in the bindings' order. The clerk creates and may
+  // not give the order's id, which nothing writes, the manager's amount, or
+  // created_by, which the policy names for nobody; the manager updates, and
+  // may not change the clerk's notes. Watched failing with every binding
+  // named.
+  test('names the fields the over-posting check accepts from this actor, operation by operation', () => {
+    expect(writableFields(ORDER_POLICY, CLERK, ORDER, 'create')).toEqual(['customer', 'order_date', 'notes'])
+    expect(writableFields(ORDER_POLICY, MANAGER, ORDER, 'update')).toEqual(['customer', 'order_date', 'amount'])
+  })
+
+  // A pinned tenant is the context's on both operations, so it is never one
+  // of them, though the bindings write the column: the tenant a page then
+  // neither offers nor sends (0011).
+  test('leaves out a pinned tenant on create and on update', () => {
+    for (const operation of ['create', 'update'] as const) {
+      expect(writableFields(CUSTOMER_POLICY, MANAGER, CUSTOMER, operation)).toEqual(['customer_no', 'name', 'country'])
+    }
+  })
+
+  // A field written on create only (0027) is writable on create and not on
+  // update, as the check answers an echo of it.
+  test('names a field written on create only on create alone', () => {
+    const createOnly = {
+      ...ORDER,
+      fields: ORDER.fields.map((binding) => (binding.field === 'order_date' ? column('order_date', { create: true, update: false }) : binding)),
+    }
+    expect(writableFields(ORDER_POLICY, CLERK, createOnly, 'create')).toContain('order_date')
+    expect(writableFields(ORDER_POLICY, MANAGER, createOnly, 'update')).not.toContain('order_date')
+  })
+
+  // An operation the actor is not granted, or one that cannot be scoped,
+  // writes nothing: no field is offered for a write the server refuses whole.
+  test('names nothing for an operation this actor may not perform', () => {
+    expect(writableFields(ORDER_POLICY, CLERK, ORDER, 'update')).toEqual([])
+    expect(writableFields(ORDER_POLICY, { ...CLERK, attributes: {} }, ORDER, 'create')).toEqual([])
   })
 })
 
