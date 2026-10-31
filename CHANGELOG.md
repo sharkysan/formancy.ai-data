@@ -298,6 +298,28 @@ later.
 
 ### Changed
 
+- **Generated forms are formancy's spec 5, and a field's help text is its
+  column's comment** (0118, superseding 0042). Why: spec 5 brought help
+  text under a question, read out with its control, and a database already
+  says what a column is for in its comment, which discovery has always
+  read. What you notice:
+  - **A host page whose renderer is older than `@formancy/*` 0.8.0 refuses
+    every form published from this release on**, at runtime. Move the
+    renderer first; forms published before keep opening until they are
+    published again.
+  - **The server serves spec 3 beside spec 5**: every version stored before
+    says spec 3 and is served and restored as it was. A deployment rolled
+    back to an earlier release refuses the versions published since, until
+    an earlier version is restored there.
+  - **A column with a comment gives its field help text**, trimmed, and the
+    field's note in the Generate step says so. A lookup over one column
+    takes that column's; one over several, a comment of whitespace and one
+    past 300 characters give none, the last said in a note. The studio
+    does not edit help text yet: change the comment and generate again. A
+    comment changed after publication is not drift.
+  - A studio session holding a form generated before the upgrade is
+    refused at publish until it generates again. data-core exports
+    `SERVED_SPEC_VERSIONS`.
 - **The host page draws a field its person may write in no operation as
   unwritable, and sends it in no save** (0117). Why: a renderer submits
   every field, so on a form whose tenant is a column of its own -- a

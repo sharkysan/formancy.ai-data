@@ -15,6 +15,8 @@ import {
   writesFor,
 } from './access.js'
 import { controlFor } from './controls.js'
+import { helpTextFor, tooLongNote } from './help.js'
+import type { HelpText } from './help.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
 import { sectionFor } from './section.js'
@@ -193,11 +195,13 @@ function planLookup(
   // `resolveLookups` refused a display column the target does not have.
   const searched = searchableDisplay(choice.display.map((name) => lookup.target.columns.find((column) => column.name === name) as ColumnMeta))
 
+  const help = helpTextFor(columns)
   notes.push({
     subject: key,
     kind: 'inferred',
-    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}, ${controlNote(searched)}; label from the table name.`,
+    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}, ${controlNote(searched)}; label from the table name${help.kind === 'comment' ? ", help text from its column's comment" : ''}.`,
   })
+  if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   const possible = !isView && columns.every((column) => column.generated === 'none')
   const writes = writesFor(columns, possible, key, notes)
   const required = writes.create && columns.every((column) => !column.nullable && !column.hasDefault)
@@ -208,6 +212,7 @@ function planLookup(
       key,
       type: 'select',
       label: labelFor(target.table.name),
+      ...described(help),
       optionsSource: source,
       ...(searched.length > 0 ? { widget: 'typeahead' as const } : {}),
       ...(required ? { required: true } : {}),
@@ -238,6 +243,11 @@ function planLookup(
 function controlNote(searched: readonly LookupSearchColumn[]): string {
   if (searched.length > 0) return `drawn as a typeahead searching ${searched.map((column) => column.name).join(', ')}`
   return 'as a plain list of its first page: a search matches only text and whole-number columns and it shows neither, so a row past that page cannot be chosen; show a text or whole-number column to make it searchable'
+}
+
+/** A field's `description`, where its help text is a comment (0118). */
+function described(help: HelpText): { description?: string } {
+  return help.kind === 'comment' ? { description: help.text } : {}
 }
 
 /**
@@ -311,7 +321,13 @@ function planColumn(
   const generated = column.generated !== 'none'
   const possible = !isView && !generated && !filled && !pinned && control.readOnly === undefined
 
-  notes.push({ subject: key, kind: 'inferred', message: `${sentence(control.describe)} from ${column.databaseType}; label from the column name.` })
+  const help = helpTextFor([column])
+  notes.push({
+    subject: key,
+    kind: 'inferred',
+    message: `${sentence(control.describe)} from ${column.databaseType}; label from the column name${help.kind === 'comment' ? ', help text from its comment' : ''}.`,
+  })
+  if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
   if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
   if (filled) notes.push({ subject: key, kind: 'read-only', message: FILLED_KEY })
@@ -328,7 +344,7 @@ function planColumn(
 
   return {
     ordinal: column.ordinal,
-    field: { key, label: labelFor(column.name), ...control.field, ...(required ? { required: true } : {}) },
+    field: { key, label: labelFor(column.name), ...described(help), ...control.field, ...(required ? { required: true } : {}) },
     binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writes },
     system: generated || filled,
     multiline: control.field.type === 'textarea',

@@ -48,11 +48,14 @@ browser.
   Managed Instance -- derived from `TESTED_SERVERS`, and the root README's
   *What it is tested on* row from it
   ([0073](../../docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
-- **Form generation**: `generateForm(snapshot, request)` returns a spec 3
+- **Form generation**: `generateForm(snapshot, request)` returns a spec 5
   formancy document, its `FormBindings`, and a note on every choice it made.
-  `GENERATED_SPEC_VERSION` is that `"3"`, which the data server also holds
-  every stored version to
-  ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
+  `GENERATED_SPEC_VERSION` is that `"5"`, and `SERVED_SPEC_VERSIONS` the
+  versions the data server holds every stored version to: it and `"3"`,
+  which every release before 0118 generated. A field's help text is its
+  column's comment, trimmed, from `helpTextFor`; none for a lookup over
+  several columns or a comment past 300 characters, which its note says
+  ([0118](../../docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
   A lookup is a select over its option source, with `widget: "typeahead"`
   when its display includes a text or whole-number column, which is what a
   search matches, and a plain select of its first page otherwise; its note

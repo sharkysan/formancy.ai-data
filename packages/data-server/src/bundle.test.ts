@@ -417,19 +417,19 @@ describe('validateBundle', () => {
     expect(validateBundle(invalid)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
   })
 
-  // A stored version is held to the spec version the generator writes, on
-  // every read as at publish (0042). @formancy/spec's validator accepts a
-  // spec 4 document from 0.4.0 on, and a host page whose renderer is at 0.3.0
-  // refuses one outright, so a version edited on the volume to spec 4 -- its
-  // base and form alike, which every other read check compares -- would be
-  // served to it; at 0.3.0 it was refused as corrupt. A spec 4 construct in a spec 3
-  // document is refused with this server's reason, not upstream's advice to
-  // change the document to "4", which this server would then refuse.
-  // Watched failing before the check: the first edit validated, the second
-  // was refused only as a form that is not its base, and the last two
-  // carried upstream's advice.
-  test('a form or base in a spec version other than the one the generator writes is refused', () => {
-    const only = 'and this server publishes and serves only spec "3", the version it generates (0042)'
+  // A stored version is held to a spec version this server serves (0118):
+  // spec 5, which the generator writes, and spec 3, which every release
+  // before 0118 wrote. @formancy/spec's validator accepts a spec 4 document
+  // too, which no release generated, so a version edited on the volume to
+  // spec 4 -- its base and form alike, which every other read check
+  // compares -- is refused as one nobody generated. A construct of a later
+  // version in a spec 3 document is refused with this server's reason, not
+  // upstream's advice to change the document's version. Watched failing
+  // before the check (0042): the first edit validated, the second was
+  // refused only as a form that is not its base, and the last two carried
+  // upstream's advice.
+  test('a form or base in a spec version this server does not serve is refused', () => {
+    const only = 'and this server serves only spec "5", the version it generates, and spec "3", which it generated before (0118)'
     const stepped = (form: FormSchema) => {
       const id = form.model.fields.find((field) => field.key === 'id')
       if (id !== undefined) id.step = 1
@@ -444,9 +444,13 @@ describe('validateBundle', () => {
     base.base.specVersion = '4'
     expect(validateBundle(base)).toEqual({ ok: false, problems: [`base: is spec "4", ${only}`] })
     const construct = copy(good())
-    for (const form of [construct.base, construct.form]) stepped(form)
+    for (const form of [construct.base, construct.form]) {
+      form.specVersion = '3'
+      stepped(form)
+    }
     expect(validateBundle(construct)).toEqual({ ok: false, problems: [`form: /model/fields/0/step needs spec "4", ${only}`] })
     const masked = copy(good())
+    for (const form of [masked.base, masked.form]) form.specVersion = '3'
     const name = masked.base.model.fields.find((field) => field.key === 'name')
     if (name !== undefined) name.mask = 'aaa'
     expect(validateBundle(masked)).toEqual({ ok: false, problems: [`base: /model/fields/2/mask needs spec "4", ${only}`] })
@@ -461,6 +465,35 @@ describe('validateBundle', () => {
     const absent = copy(good()) as unknown as { form: unknown }
     absent.form = null
     expect(validateBundle(absent)).toMatchObject({ ok: false, problems: [expect.stringMatching(/^form: /)] })
+  })
+
+  // The move to spec 5 keeps every version stored before it (0118): one a
+  // release before 0118 wrote says spec 3, and is served as it was stored,
+  // since a read never compares a base with what this release generates.
+  // A spec 5 one is served with its help text, and help text in a spec 3
+  // document is a later spec's construct, refused as one. Watched failing
+  // with spec 3 left out of the versions served: the version stored before
+  // was refused as spec "3".
+  test('a version stored at spec 3 before the move is served, and one at spec 5 with its help text', () => {
+    const stored = copy(good())
+    for (const form of [stored.base, stored.form]) form.specVersion = '3'
+    expect(validateBundle(stored)).toEqual({ ok: true, bundle: stored })
+    const described = good(
+      snapshot((columns) => {
+        const name = columns.find((column) => column.name === 'name')
+        if (name !== undefined) name.comment = 'What the employee is called.'
+      }),
+    )
+    expect(described.form.model.fields.find((field) => field.key === 'name')).toMatchObject({ description: 'What the employee is called.' })
+    expect(validateBundle(described)).toEqual({ ok: true, bundle: described })
+    const backdated = copy(described)
+    for (const form of [backdated.base, backdated.form]) form.specVersion = '3'
+    expect(validateBundle(backdated)).toEqual({
+      ok: false,
+      problems: [
+        'form: /model/fields/2/description needs spec "5", and this server serves only spec "5", the version it generates, and spec "3", which it generated before (0118)',
+      ],
+    })
   })
 
   // Shapes a hand edit or a bad client could produce, each refused with a reason.

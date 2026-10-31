@@ -30,7 +30,7 @@ export type {
 export { generateForm } from './generate/generate.js'
 export { deleteUnoffered, offers, versionProvesRecord } from './generate/offers.js'
 export type { OfferedOperation } from './generate/offers.js'
-export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION } from './generate/version.js'
+export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION, SERVED_SPEC_VERSIONS } from './generate/version.js'
 export type {
   ConcurrencyBinding,
   FieldBinding,
