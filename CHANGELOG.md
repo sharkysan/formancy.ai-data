@@ -310,7 +310,27 @@ later.
   `globals`, `eslint-plugin-react-hooks` and
   `@eslint-community/eslint-plugin-eslint-comments`, which the package
   brings.
-
+- **The host page draws a field its person may write in no operation as
+  unwritable, and sends it in no save** (0117). Why: a renderer submits
+  every field, so on a form whose tenant is a column of its own -- a
+  product's prices, a party -- the page sent the tenant in every update and
+  every change from a date, where the tenant is the token's alone; and a
+  field the policy lets a person read and not write was drawn writable, its
+  edit refused only after Save. The server removed the echo, so nothing was
+  wrongly written; the page now leaves it out. What you notice:
+  - **`GET /v1/forms/:id` gains `writable: { create, update }`**: for each
+    write the form offers this person, the fields it accepts from them, by
+    the check that refuses the rest -- never a pinned tenant, a value the
+    database writes, or a field the policy keeps from them -- and `null`
+    for a write it does not offer. data-core exports `writableFields`, and
+    `copiedFields` asks it. This release's `@formancy/data-client` reads a
+    form without `writable` as unexpected, so a host upgrades its server
+    before its client.
+  - **On the host page, a field in neither list is drawn disabled** and is
+    in no body the page sends. A field written on create only is drawn as
+    before, writable on an opened record, its change refused after Save.
+  - The server accepts what it accepted: a client that sends every field
+    still has its provable echo removed and any other value refused.
 - **Every `@formancy/*` dependency moves from 0.7.0 to 0.11.0, upstream's
   release of 2026-10-30, adopted the day it was published, and generated
   forms stay on spec 3** (0055, 0042). Why: 0.11.0 is upstream's newest

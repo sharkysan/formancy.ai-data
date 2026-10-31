@@ -202,6 +202,16 @@ export function checkSubmittedFields(
 }
 
 /**
+ * The field keys this actor may write with this operation, in the bindings'
+ * order: each one the over-posting check accepts alone, so what a page may
+ * offer and send is that check's answer and not a second list of it (0117).
+ * Empty when the operation is not this actor's or cannot be scoped.
+ */
+export function writableFields(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, operation: 'create' | 'update'): string[] {
+  return bindings.fields.filter((binding) => checkSubmittedFields(policy, context, bindings, operation, [binding.field]).ok).map((binding) => binding.field)
+}
+
+/**
  * The root table's filter for an operation this actor may perform: every
  * pinned column equal to the context's value. On read and update it is the
  * WHERE clause; on create, the values `forcedValues` writes.

@@ -212,8 +212,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
    searched and filtered by, and the published views this person could
-   have built from those (`listColumns`, 0105), or `null` -- `deleting`
-   and `copied`.
+   have built from those (`listColumns`, 0105), or `null` -- `deleting`,
+   `copied`, and `writable`, the fields each write it offers accepts from
+   this person, by the over-posting check
+   ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
@@ -295,7 +297,10 @@ are walked, never jumped to (0108); the rest is 0044's and 0061's, in
    ([0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)).
 2. A save in the host's session (`apps/host/src/session.ts`) sends the
    client's `create` or `update` with a new `formancy-write-id`
-   ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+   ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)),
+   less every answer of a field `writable` names for neither write, which
+   the session drew disabled
+   ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
    `routes/write-once.ts` lets a write run the first time its id arrives;
    a later arrival gets that answer, audited `repeated`.
 3. A create asks the policy, describes the root and removes the empty echo

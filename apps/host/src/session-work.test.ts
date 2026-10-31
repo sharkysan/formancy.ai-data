@@ -18,7 +18,10 @@ const client = createDataClient({
   },
 })
 
-function definition(operations: PublishedForm['operations']): PublishedForm {
+const FIELDS = ['order', 'line_no', 'notes']
+
+/** The form as the server sends it; each write it offers accepts every field unless `writable` says otherwise. */
+function definition(operations: PublishedForm['operations'], writable?: PublishedForm['writable']): PublishedForm {
   return {
     form: {
       specVersion: '3',
@@ -36,6 +39,7 @@ function definition(operations: PublishedForm['operations']): PublishedForm {
     readable: ['order', 'line_no', 'notes'],
     list: null,
     versions: null,
+    writable: writable ?? { create: operations.includes('create') ? FIELDS : null, update: operations.includes('update') ? FIELDS : null },
   } as unknown as PublishedForm
 }
 
@@ -101,5 +105,23 @@ describe("the host's copy of the form", () => {
     expect(disabled(reader)).toEqual(['order', 'line_no', 'notes'])
     reader.open()
     expect(disabled(reader)).toEqual([])
+  })
+
+  // A field no write accepts from this person -- the notes, read and not
+  // written -- is drawn disabled on a new record and on a saved one, as the
+  // generator draws a field nothing may write; one a create alone accepts
+  // is not (0117). Watched failing with the unwritten fields left out of
+  // the drawn form: nothing was disabled.
+  test('disables a field no write accepts from this person, and not one a create alone accepts', () => {
+    const session = createSession({
+      client,
+      formId: 'pg-order-line',
+      definition: definition(['read', 'create', 'update'], { create: ['order', 'line_no'], update: ['line_no'] }),
+      renderer: 'react',
+    })
+    session.open()
+    expect(disabled(session)).toEqual(['notes'])
+    session.open(RECORD)
+    expect(disabled(session)).toEqual(['notes'])
   })
 })

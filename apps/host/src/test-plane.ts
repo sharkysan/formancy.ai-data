@@ -262,7 +262,8 @@ function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pendi
  * `ENGINES` is published over `parity.party`, and `company` over
  * `parity.party_company` as a section of it, shown while its kind is
  * `company`. With `versions` (0113, 0115), `price` of `ENGINES` is
- * published over `parity.price`, a chain of versions.
+ * published over `parity.price`, a chain of versions, whose note the clerk
+ * reads and may not write (0117).
  */
 export async function startPlane(
   options: {
@@ -450,7 +451,8 @@ export async function startPlane(
     const policy: FormPolicy = {
       version: 1,
       operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
-      fields: { tenant_id: READS, product_no: CLERK_RW, valid_from: CLERK_RW, valid_to: READS, amount: CLERK_RW, note: CLERK_RW },
+      // The note the clerk reads and may not write, which the bindings write: the policy's, so the page learns it from `writable` (0117).
+      fields: { tenant_id: READS, product_no: CLERK_RW, valid_from: CLERK_RW, valid_to: READS, amount: CLERK_RW, note: READS },
       rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
       lookups: {},
     }

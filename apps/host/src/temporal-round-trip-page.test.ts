@@ -61,7 +61,8 @@ const verifyIdentity: IdentityVerifier = async (token) => {
  * an account that may read the table and UPDATE only the note (and
  * PostgreSQL's version column) and INSERT nothing, so the generator disables
  * both temporal fields. `policy`: the policy alone, over the owner's
- * connection, which leaves both fields enabled. `temporal`: the owner's
+ * connection, whose fields the generator leaves enabled and the page draws
+ * disabled from the server's `writable` (0117). `temporal`: the owner's
  * connection, with the note withheld by the policy, so the temporal fields
  * are the only ones the clerk writes.
  */
@@ -306,18 +307,20 @@ describe.each(['pg', 'ms'] as const)('%s, both temporal columns writable, throug
   }
 })
 
-// Columns the clerk may not write, by the account's privileges (the fields
-// disabled) and by the policy alone (enabled): 0022 removes the unchanged
-// echo. On main PostgreSQL's engine refused the faithful value first, so the
-// note could not be saved -- with the fields disabled, not even by editing
-// them.
+// Columns the clerk may not write, by the account's privileges and by the
+// policy alone, both drawn disabled -- the first by the generator, the
+// second by the page from the server's `writable`, and neither sent since
+// 0117; before it, 0022 removed the unchanged echo. On main PostgreSQL's
+// engine refused the faithful value first, so the note could not be saved --
+// with the fields disabled, not even by editing them. The policy's case
+// passed enabled with the page's half of 0117 mutated in CI.
 describe.each(['pg', 'ms'] as const)('%s, both temporal columns the clerk may not write, through the page', (engine) => {
   for (const account of ['writer', 'policy'] as const) {
     for (const renderer of RENDERERS) {
       test(`${ENGINE_NAME[engine]}, ${renderer}: withheld by ${account === 'writer' ? "the account's privileges" : 'the policy'}, the note edited`, async () => {
         const { record, before } = await insertDefaulted(engine)
         const user = await openRecord(formId(engine, account), record)
-        expect(control(renderer, 'Created at').disabled, 'disabled by the generator exactly when the account may not write it').toBe(account === 'writer')
+        expect(control(renderer, 'Created at').disabled, 'disabled whoever withholds it: the generator or the policy (0117)').toBe(true)
         await user.clear(control(renderer, 'Note'))
         await user.type(control(renderer, 'Note'), 'edited, withheld temporal')
         const result = await pressSave(user, renderer)
