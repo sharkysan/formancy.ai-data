@@ -18,3 +18,9 @@ export function labelOf(document: FormSchema, key: string): string {
   const label = document.model.fields.find((field) => field.key === key)?.label
   return typeof label === 'string' && label !== '' ? label : key
 }
+
+/** A field's help text as the session's document holds it, or `''` for none (0119). */
+export function helpTextOf(document: FormSchema, key: string): string {
+  const description = document.model.fields.find((field) => field.key === key)?.description
+  return typeof description === 'string' ? description : ''
+}

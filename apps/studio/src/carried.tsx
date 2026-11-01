@@ -73,6 +73,23 @@ export function CarriedPanel({
   const relabel = (key: string, label: Text) => report(session.setFieldProperty([key], 'label', label), `Labelled ${key} ${shown(label)}.`)
 
   function choice(conflict: PresentationConflict, at: number): ReactElement | null {
+    if (conflict.kind === 'both-changed' && conflict.property === 'description') {
+      // Help text the comment changed too (0119): the generator's is the column's comment as it is now.
+      return (
+        <button
+          type="button"
+          className="button"
+          onClick={() =>
+            report(
+              session.setFieldProperty([conflict.field], 'description', conflict.generator),
+              `Gave ${conflict.field} the help text ${shown(conflict.generator)}.`,
+            )
+          }
+        >
+          Use the generator&rsquo;s help text for {conflict.field}
+        </button>
+      )
+    }
     if (conflict.kind === 'both-changed') {
       return (
         <button type="button" className="button" onClick={() => relabel(conflict.field, conflict.generator)}>

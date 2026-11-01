@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:2f13441db58f2369c8174ed6f9e541aecf99ca4265cf8a23d9e2c8bfe7d8d9d4",
+      "reviewed": "sha256:623731749fa28b0aea27f294085a245816565d8198fd2d5eb28246145a0ca9b4",
       "limitations": [
         {
           "area": "studio",
@@ -656,7 +656,7 @@
         },
         {
           "area": "studio",
-          "says": "Anything outside the presentation edits is refused at publish: help text, translations, new sections and a numeric span."
+          "says": "Anything outside the presentation edits is refused at publish: translations, new sections and a numeric span."
         },
         {
           "area": "operations",
@@ -2524,10 +2524,6 @@
         {
           "area": "studio",
           "says": "The studio's Move to buttons name a section by its current label, so two sections a person labelled alike read alike."
-        },
-        {
-          "area": "studio",
-          "says": "The studio offers no edit of a field's help text: a generated form's help text is its column's comment (0118), changed in the database."
         }
       ]
     },
@@ -3458,7 +3454,7 @@
       ]
     },
     "0118": {
-      "reviewed": "sha256:1d8383d0740261615c4e5004471a9b5108465f77824830cc68688419e62048c7",
+      "reviewed": "sha256:7dec1d5e42e33e94ab76ec88af20e8420901baf851265cf1a68a999205437777",
       "limitations": [
         {
           "area": "host",
@@ -3471,7 +3467,7 @@
         },
         {
           "area": "forms",
-          "says": "A column's comment is the help text every person reads on its field, though it was written for whoever reads the catalog; the studio does not edit help text yet, so a comment is changed in the database and the form generated again.",
+          "says": "A column's comment is the help text every person reads on its field, though it was written for whoever reads the catalog, until the studio's Presentation step replaces or removes it (0119).",
           "heldBy": "packages/data-core/src/generate/generate.test.ts"
         },
         {
@@ -3492,6 +3488,24 @@
           "area": "operations",
           "says": "A deployment rolled back to a release before 0118 refuses every version published since, as spec \"5\", until an earlier version is restored there; versions published before the upgrade are served as they were.",
           "heldBy": "packages/data-server/src/bundle.test.ts"
+        }
+      ]
+    },
+    "0119": {
+      "reviewed": "sha256:0e2ebf52dc72e4dc1f552cbeae2299408bf54813384cb1c40c261e6c840a79dd",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A field's help text is one language, as its label is; translations stay outside the presentation."
+        },
+        {
+          "area": "studio",
+          "says": "A version stored before 0118 has a spec 3 base and takes help text only once it is generated again.",
+          "heldBy": "packages/data-core/src/presentation/help-text.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server of a release before this one refuses a version whose presentation sets help text, and every spec 5 version already, so a deployment rolled back serves it only once an earlier version is restored there."
         }
       ]
     }

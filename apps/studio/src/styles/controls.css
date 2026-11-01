@@ -52,7 +52,8 @@ button:where(:not(.sheet *)):disabled {
 }
 
 input:not([type='checkbox']):where(:not(.sheet *)),
-select:where(:not(.sheet *)) {
+select:where(:not(.sheet *)),
+textarea:where(:not(.sheet *)) {
   width: 100%;
   min-width: 0;
   min-height: 2.5rem;
@@ -66,13 +67,15 @@ select:where(:not(.sheet *)) {
 }
 
 input:not([type='checkbox']):where(:not(.sheet *)):focus-visible,
-select:where(:not(.sheet *)):focus-visible {
+select:where(:not(.sheet *)):focus-visible,
+textarea:where(:not(.sheet *)):focus-visible {
   outline: none;
   border-color: var(--client);
   box-shadow: 0 0 0 4px rgb(139 123 255 / 22%);
 }
 
-input[aria-invalid='true']:where(:not(.sheet *)) {
+input[aria-invalid='true']:where(:not(.sheet *)),
+textarea[aria-invalid='true']:where(:not(.sheet *)) {
   border-color: var(--invalid);
 }
 

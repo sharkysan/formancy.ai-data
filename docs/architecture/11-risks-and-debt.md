@@ -201,7 +201,8 @@ somebody confirms it, and generated labels are de-snaked column names
 A whole-number field accepts a fraction in the browser and only the
 server's codec refuses it: generated forms carry no `step`
 ([0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)). A field's help text is its column's comment, which drift
-review does not compare and the studio does not edit yet.
+review does not compare, until the studio's Presentation step replaces or
+removes it ([0119](../decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
 A client sends exact decimals as strings, and a value comes back
 canonicalised to its column's scale
 ([0008](../decisions/0008-exact-values-travel-as-strings.md)). An instant

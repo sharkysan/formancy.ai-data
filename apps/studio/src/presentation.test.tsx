@@ -54,6 +54,34 @@ describe('presentation', () => {
     expect(within(sheet).queryByLabelText('Order date')).toBeNull()
   })
 
+  // Help text typed here is what the people filling the form read under the
+  // question, and a screen reader says it with the control (0119): the
+  // preview draws the session's document. Past the 300 characters help
+  // text holds, the box says so and the field keeps what it had; emptied,
+  // the field has none. Watched failing with the box left out of the step:
+  // there was no Help text of notes.
+  test('gives a field help text, which the preview reads out with its control', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const presentation = await goTo(user, 'Presentation')
+    const box = within(presentation).getByLabelText('Help text of notes')
+    await user.type(box, 'Anything the courier should know.')
+    expect(box.getAttribute('aria-invalid')).toBe('false')
+    await user.click(box)
+    await user.paste('x'.repeat(300))
+    expect(box.getAttribute('aria-invalid')).toBe('true')
+    expect(computeAccessibleDescription(box)).toBe('Help text holds 300 characters, and this is 333. Until it fits, the field keeps the help text it had.')
+    await user.clear(box)
+    await user.type(box, 'Anything the courier should know.')
+    const preview = await goTo(user, 'Preview')
+    const sheet = within(preview).getByRole('form', { name: 'Order preview' })
+    expect(computeAccessibleDescription(within(sheet).getByLabelText('Notes'))).toContain('Anything the courier should know.')
+    const again = await goTo(user, 'Presentation')
+    await user.clear(within(again).getByLabelText('Help text of notes'))
+    const emptied = await goTo(user, 'Preview')
+    expect(computeAccessibleDescription(within(within(emptied).getByRole('form', { name: 'Order preview' })).getByLabelText('Notes'))).not.toContain('courier')
+  })
+
   // Moving is a button, so it is a keystroke. The field keeps focus as it
   // moves, and at the end of the list -- where the button just pressed is
   // disabled -- focus goes to its partner rather than falling to the page.
@@ -170,13 +198,14 @@ describe('presentation', () => {
         .filter((name) => name.startsWith('Move to '))
         .sort(),
     ).toEqual(offered.sort())
-    expect(named('textbox').filter((name) => !/^(Section label|Label) of .+$/.test(name))).toEqual([])
+    expect(named('textbox').filter((name) => !/^(Section label|Label|Help text) of .+$/.test(name))).toEqual([])
     expect(named('checkbox').filter((name) => !/^Full width for .+$/.test(name))).toEqual([])
     for (const role of ['combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
 
     await user.clear(within(presentation).getByLabelText('Label of notes'))
     await user.type(within(presentation).getByLabelText('Label of notes'), 'Remarks')
     await user.click(within(presentation).getByRole('checkbox', { name: 'Full width for Remarks' }))
+    await user.type(within(presentation).getByLabelText('Help text of notes'), 'Anything the courier should know.')
     await user.click(within(presentation).getByRole('button', { name: 'Move up Amount' }))
     await user.click(within(presentation).getByRole('button', { name: 'Move to Record Customer' }))
     await writeOrderPolicy(user)
@@ -216,7 +245,7 @@ describe('presentation', () => {
       version: 1,
       fields: [
         { field: 'customer', anchor: { kind: 'lookup', foreignKey: 'fk_order_customer' }, section: { label: 'Record', occurrence: 0 } },
-        { field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Remarks', span: 'one' },
+        { field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Remarks', span: 'one', description: 'Anything the courier should know.' },
       ],
       sections: [{ anchor: { label: 'Order', occurrence: 0 }, order: main }],
     })

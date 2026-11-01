@@ -32,6 +32,12 @@ export interface FieldPresentation {
   /** 'all': spans the grid's row where the base did not; 'one': one column where the base spanned. */
   span?: 'all' | 'one'
   /**
+   * Help text over the base's (0119): text that replaces or adds it, or
+   * `null` that removes the base's, which its column's comment gave it
+   * (0118). Present only where it differs from the base's.
+   */
+  description?: Text | null
+  /**
    * The generated section it is placed in, present only where that is not
    * the one the base places it in (0075). It lands after that section's own
    * fields unless the section's `order` says otherwise.
@@ -56,8 +62,8 @@ export interface SectionPresentation {
  *
  * Exactly the studio's edits — a field's label, a section's label, a
  * field's place within its section's grid and full width (0030), the
- * generated section a field is placed in (0075), and the views a list of
- * the form's records offers (0105). Each entry holds only what differs from
+ * generated section a field is placed in (0075), the views a list of the
+ * form's records offers (0105), and a field's help text (0119). Each entry holds only what differs from
  * the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
@@ -80,16 +86,20 @@ export type PresentationConflict =
       kind: 'field-gone'
       field: string
       anchor: FieldAnchor
-      property: 'label' | 'span' | 'section'
-      // A span's `all` or `one` is a string, which Text holds.
-      yours: Text | SectionAnchor
+      property: 'label' | 'span' | 'section' | 'description'
+      // A span's `all` or `one` is a string, which Text holds; a removed help text is null.
+      yours: Text | SectionAnchor | null
       resolution: 'dropped'
       message: string
     }
   /** `field` is the new key, `from` the old. */
   | { kind: 'field-rekeyed'; field: string; from: string; anchor: FieldAnchor; resolution: 'followed'; message: string }
-  /** Labels only: span has two values, so a span override is either still one or now the generator's. */
-  | { kind: 'both-changed'; field: string; property: 'label'; yours: Text; generator: Text; resolution: 'kept-yours'; message: string }
+  /**
+   * A label or help text the generator changed too: span has two values, so
+   * a span override is either still one or now the generator's. A removed
+   * help text is `null` in `yours`.
+   */
+  | { kind: 'both-changed'; field: string; property: 'label' | 'description'; yours: Text | null; generator: Text; resolution: 'kept-yours'; message: string }
   /** `from` and `to` are where the field is placed: the section the person moved it to, else the generator's. */
   | { kind: 'moved-section'; field: string; from: SectionAnchor; to: SectionAnchor; resolution: 'followed'; message: string }
   /**

@@ -138,8 +138,11 @@ until then the address is formancy.ai's 404
   ([0026](./docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md),
   [0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
   A field's help text is its column's comment, as the database holds it,
-  read out with the control; the form is formancy's spec 5, which a host's
-  renderer reads from `@formancy/*` 0.8.0 on
+  read out with the control, until the studio's Presentation step replaces
+  or removes it
+  ([0119](./docs/decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md));
+  the form is formancy's spec 5, which a host's renderer reads from
+  `@formancy/*` 0.8.0 on
   ([0118](./docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
@@ -171,10 +174,11 @@ until then the address is formancy.ai's 404
   default is not checked, and the form still offers every value
   ([0112](./docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
-  order, full width, and a field moved to another generated section --
-  carried through a regeneration by what each field stands for
+  help text, order, full width, and a field moved to another generated
+  section -- carried through a regeneration by what each field stands for
   ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md),
-  [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).
+  [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md),
+  [0119](./docs/decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
   A key that now names another column keeps its grants only once somebody
   confirms it in the publish over the version they were written in,
   whichever client publishes over a version the server still serves; grants
@@ -516,9 +520,9 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 *A form over `sales.order_line`, which has no tenant column, discovered as the fixture's owner because the order form's own account may not read the lines. Its Order list is filtered to the person's tenant; ticked, the box “Only rows of sales.order_line whose Order is one of these” makes another tenant's line not found on read and update, and “A row that names none is reached by nobody.” Unticked, the step notes that nothing scopes the rows; nothing requires the box ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).*
 
-<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each naming the column it is bound to and offering Move to Record.">
+<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each with an empty Help text box under its label, naming the column it is bound to and offering Move to Record.">
 
-**Step 5, Presentation.** *Labels, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).*
+**Step 5, Presentation.** *Labels, help text, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).*
 
 <img src="./docs/images/readme/studio-preview.webp" width="916" alt="The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with notes labelled Remarks at full width, Order date and Amount marked required, and Order date, Customer and Amount each saying required.">
 

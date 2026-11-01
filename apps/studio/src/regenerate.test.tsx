@@ -82,6 +82,15 @@ function customerRenamed(): MetadataSnapshot {
   return createSnapshot(contents)
 }
 
+/** The owner's snapshot with order.notes commented `comment`, which its field's help text comes from (0118). */
+function notesCommented(comment: string): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
+  const notes = contents.objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'notes')
+  if (notes === undefined) throw new Error('the snapshot has no order.notes')
+  notes.comment = comment
+  return createSnapshot(contents)
+}
+
 /** The draft published as version 2, with the Policy step's leftovers from the old form removed and every field granted again. */
 async function publishDraft(user: User, orphans: string[], strays: string[]): Promise<void> {
   const policy = await goTo(user, 'Policy')
@@ -217,6 +226,48 @@ describe('regenerating a published form', () => {
     expect(await audit()).toEqual([])
 
     await publishDraft(user, ['customer'], ['customer'])
+    const latest = await admin.latest('sales-order')
+    if (!latest.ok || latest.value.bundle.format !== 2) throw new Error('version 2 is not a format-2 bundle')
+    expect(latest.value.bundle.presentation).toEqual(EMPTY_PRESENTATION)
+  })
+
+  // Help text the person gave over a column's comment, and the comment
+  // changed in the database since (0119): the person's is kept, and the
+  // generator's -- the comment as it is now -- offered. Choosing it leaves
+  // nothing chosen over the base, and the published presentation says so.
+  // Watched failing with every both-changed offered as a label: the button
+  // was "Use the generator’s label for notes", and pressed it relabelled
+  // notes with the comment.
+  test('help text kept over a changed comment: the generator’s, chosen, publishes no override', async () => {
+    plane.databases.set('fixture', notesCommented('Free text.'))
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const first = await goTo(user, 'Presentation')
+    const box = within(first).getByLabelText<HTMLTextAreaElement>('Help text of notes')
+    expect(box.value).toBe('Free text.')
+    await user.clear(box)
+    await user.type(box, 'Anything the courier should know.')
+    await writeOrderPolicy(user)
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+
+    plane.databases.set('fixture', notesCommented('Free text, 4000 characters.'))
+    const regenerated = await regenerate(user)
+    const server = await admin.regenerate('sales-order')
+    if (!server.ok) throw new Error(server.message)
+    expect(server.value.conflicts).toEqual([expect.objectContaining({ kind: 'both-changed', field: 'notes', property: 'description' })])
+    await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
+    const presentation = await screen.findByRole('main', { name: 'Presentation' })
+    expect(within(presentation).getByLabelText<HTMLTextAreaElement>('Help text of notes').value).toBe('Anything the courier should know.')
+    const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
+    await pressEnter(user, within(carried).getByRole('button', { name: 'Use the generator’s help text for notes' }))
+    expect(within(presentation).getByLabelText<HTMLTextAreaElement>('Help text of notes').value).toBe('Free text, 4000 characters.')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of notes').value).toBe('Notes')
+    expect(focusedName()).toBe('Use the generator’s help text for notes')
+    expect(await audit()).toEqual([])
+
+    await publishDraft(user, [], [])
     const latest = await admin.latest('sales-order')
     if (!latest.ok || latest.value.bundle.format !== 2) throw new Error('version 2 is not a format-2 bundle')
     expect(latest.value.bundle.presentation).toEqual(EMPTY_PRESENTATION)
