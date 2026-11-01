@@ -137,6 +137,10 @@ until then the address is formancy.ai's 404
   tenant -- is shown and never written
   ([0026](./docs/decisions/0026-name-every-column-fact-the-engines-disagree-on.md),
   [0056](./docs/decisions/0056-a-key-the-database-fills-is-never-written-and-a-uuid-is-ordered-as-each-engine-orders-it.md)).
+  A field's help text is its column's comment, as the database holds it,
+  read out with the control; the form is formancy's spec 5, which a host's
+  renderer reads from `@formancy/*` 0.8.0 on
+  ([0118](./docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form
@@ -1073,14 +1077,15 @@ module needs — an exact-decimal field type, say, proposed as
 upstream through formancy's own contribution rules rather than being patched
 here.
 
-Generated forms stay on formancy's spec 3 after spec 4's release, and the
-server publishes and serves no other version
-([0042](./docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
-so a host whose renderer is still at 0.3.0 can keep reading them. That was
-measured once, on 2026-10-10, in a scratch check; nothing here runs a 0.3.0
-renderer, so nothing fails if it stops being true. A TypeScript host on that
-renderer casts the published form to its own `FormSchema`, because the newer
-type allows spec 4, or moves its renderer to 0.4.0 or later.
+Generated forms are formancy's spec 5, for a field's help text from its
+column's comment, and the server serves spec 3 beside it, which every version
+published before says
+([0118](./docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md),
+superseding [0042](./docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)).
+A host whose renderer is older than `@formancy/*` 0.8.0 refuses a spec 5
+form outright, so it moves its renderer before a form is published again;
+nothing here runs an older renderer. A TypeScript host on one casts the
+published form to its own `FormSchema`.
 
 ## Deploying
 

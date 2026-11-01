@@ -1130,22 +1130,8 @@
       ]
     },
     "0042": {
-      "reviewed": "sha256:11d9091935a344dd1895954ae9fcaabb757576df631fef9ff726a329781b29f9",
-      "limitations": [
-        {
-          "area": "forms",
-          "says": "A whole-number field accepts a fraction in the browser and only the server's codec refuses it, because generated forms stay on spec 3, which has no `step`.",
-          "heldBy": "packages/data-core/src/generate/generate.test.ts"
-        },
-        {
-          "area": "host",
-          "says": "A TypeScript host whose renderer is older than `@formancy/*` 0.8.0 casts `@formancy/data-client`'s published form to its own `FormSchema` or moves to 0.8.0 or later, because the client's types are `@formancy/spec` 0.11.0's, whose `specVersion` admits `\"5\"`."
-        },
-        {
-          "area": "testing",
-          "says": "That a host whose reader is at `@formancy/*` 0.3.0 reads the generated forms was measured by hand, in scratch checks over the forms each generated from the committed snapshots, on 2026-10-10 and again on 2026-10-16 once generated lookups carried a typeahead (0066); other forms were not generated, and nothing here runs a 0.3.0 renderer."
-        }
-      ]
+      "reviewed": "sha256:d6f5858ba5aae47c4c75dcf7ffd2145e55cc84525d43b67cd035efbebf5f3c4f",
+      "none": "Superseded by 0118: what generated forms are written in, and what an integrator's renderer must read, are that record's costs now, a whole-number field's fraction included."
     },
     "0043": {
       "reviewed": "sha256:e591046f44912a3c34c9a680d1fcded0d3a5c38b3838ee2414a0577876f87ce3",
@@ -2541,7 +2527,7 @@
         },
         {
           "area": "studio",
-          "says": "A field's help text is not offered: `description` is spec 5's, from `@formancy/spec` 0.8.0, and generated forms stay on spec 3 (0042)."
+          "says": "The studio offers no edit of a field's help text: a generated form's help text is its column's comment (0118), changed in the database."
         }
       ]
     },
@@ -3468,6 +3454,44 @@
           "area": "testing",
           "says": "Through the demo's door the host's plane test sends no change from a date: the live demo publishes no form over versions.",
           "heldBy": "apps/host/src/plane.test.tsx"
+        }
+      ]
+    },
+    "0118": {
+      "reviewed": "sha256:1d8383d0740261615c4e5004471a9b5108465f77824830cc68688419e62048c7",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A host page whose renderer is older than @formancy/* 0.8.0 refuses every form published from this release on, at runtime, as spec \"5\"; forms published before keep opening until they are published again, so a host moves its renderer first.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A TypeScript host whose renderer is older than @formancy/* 0.8.0 casts @formancy/data-client's published form to its own FormSchema, because the client's types are @formancy/spec 0.11.0's, whose specVersion admits \"5\"."
+        },
+        {
+          "area": "forms",
+          "says": "A column's comment is the help text every person reads on its field, though it was written for whoever reads the catalog; the studio does not edit help text yet, so a comment is changed in the database and the form generated again.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A comment changed after publication reaches the form only when it is generated again, and drift review does not name it."
+        },
+        {
+          "area": "forms",
+          "says": "A comment longer than 300 characters, and a lookup over several columns, give a field no help text.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A whole-number field accepts a fraction in the browser and only the server's codec refuses it: generated forms carry no step.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A deployment rolled back to a release before 0118 refuses every version published since, as spec \"5\", until an earlier version is restored there; versions published before the upgrade are served as they were.",
+          "heldBy": "packages/data-server/src/bundle.test.ts"
         }
       ]
     }

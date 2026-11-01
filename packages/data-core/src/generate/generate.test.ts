@@ -169,14 +169,14 @@ describe('generateForm', () => {
   // publish, after a person had reviewed it. Every root in the fixture, on both
   // engines, must produce a document the released validator accepts.
   //
-  // And one that says spec 3 (0042): a host's renderer pinned at @formancy/*
-  // 0.3.0 refuses a spec 4 document outright, so a generator that moved to 4
-  // would break every such page at its next publish. The version is what
-  // fails here -- validity does not, since the validator accepts spec 4 from
-  // 0.4.0 on -- and the validator refusing a spec 4 construct in a spec 3
-  // document is what keeps a valid one free of them. Watched failing with the
-  // generator's version set to "4": this case, and no other in this file.
-  test('every fixture object, on both engines, produces a spec 3 document formancy accepts', () => {
+  // And one that says spec 5 (0118, superseding 0042's spec 3): a field's
+  // help text is spec 5's, and a host's renderer older than @formancy/*
+  // 0.8.0 refuses such a document outright, which the record names as the
+  // move's cost. The version is what fails here -- validity does not, since
+  // the validator accepts spec 3 as well -- and the validator refusing a
+  // construct of a later spec is what keeps a valid document free of one.
+  // Watched failing with the generator's version left at "3".
+  test('every fixture object, on both engines, produces a spec 5 document formancy accepts', () => {
     for (const kind of ['postgres', 'sqlserver'] as const) {
       const snapshot = fixtureLike(kind)
       const requests = [
@@ -185,7 +185,7 @@ describe('generateForm', () => {
       ]
       for (const request of requests) {
         const result = generateForm(snapshot, request)
-        expect(result.form.specVersion).toBe('3')
+        expect(result.form.specVersion).toBe('5')
         valid(result)
       }
     }
@@ -302,10 +302,11 @@ describe('generateForm', () => {
     expect(form.model.fields.find((field) => field.key === 'created_by')).toMatchObject({ type: 'number', min: -2147483648, max: 2147483647 })
   })
 
-  // The one rule checked on one side only (0009, 0042): a whole-number field
-  // is a bounded number with no `step`, which spec 3 does not have, so the
-  // engine takes 1.5 in the browser and in the server's replay alike, and
-  // only the server's codec refuses it (codec.test.ts, "refuses fractions").
+  // The one rule checked on one side only (0009, 0042, 0118): a whole-number
+  // field is a bounded number with no `step` -- spec 5 has one, and the
+  // generator writes none yet -- so the engine takes 1.5 in the browser and
+  // in the server's replay alike, and only the server's codec refuses it
+  // (codec.test.ts, "refuses fractions").
   // A limitation the release report prints as held by this file, so it is
   // shown here rather than inferred from the absence of a property. Watched
   // failing with the generator writing `step: 1` at spec 4.
@@ -1246,5 +1247,62 @@ describe('pinned columns', () => {
     expect(() => generateForm(fixtureLike('postgres'), { ...ORDER, pinned: ['row_version'], versionColumn: 'row_version' })).toThrow(
       /cannot be a version column/,
     )
+  })
+})
+
+describe("a field's help text, from its column's comment (0118)", () => {
+  const field = (form: FormSchema, key: string) => form.model.fields.find((candidate) => candidate.key === key)
+  const commented = (comments: Record<string, string>) =>
+    fixtureLike('postgres', (objects) => {
+      for (const column of objects.find((object) => object.ref.name === 'order')?.columns ?? []) column.comment = comments[column.name] ?? null
+    })
+  const LOOKUPS = { ...ORDER, lookups: [...ORDER.lookups, { foreignKey: 'fk_order_created_by', display: ['name'] }] }
+
+  // What the catalog says a column is for is what the person filling the
+  // form in reads under its question, its surrounding whitespace trimmed;
+  // a column without a comment gives its field none, and the note says
+  // where the text came from. Watched failing with the comment left out of
+  // the field: no field had a description.
+  test("a column's comment is its field's description, trimmed, and the note says so", () => {
+    const result = generateForm(commented({ notes: '  What the clerk noted about the order.\n', order_date: 'The day the order was placed.' }), ORDER)
+    valid(result)
+    expect(field(result.form, 'notes')).toMatchObject({ description: 'What the clerk noted about the order.' })
+    expect(field(result.form, 'order_date')).toMatchObject({ description: 'The day the order was placed.' })
+    expect(field(result.form, 'amount')).not.toHaveProperty('description')
+    expect(result.notes.find((note) => note.subject === 'notes' && note.kind === 'inferred')?.message).toMatch(
+      /; label from the column name, help text from its comment\.$/,
+    )
+    expect(result.notes.find((note) => note.subject === 'amount' && note.kind === 'inferred')?.message).toMatch(/; label from the column name\.$/)
+  })
+
+  // A lookup stands for its foreign key's columns: over one, that column's
+  // comment is its help text; over two -- a customer by tenant and number
+  // -- the columns' comments say two things, and the field takes neither.
+  test("a lookup over one column takes that column's comment, and one over two takes none", () => {
+    const result = generateForm(commented({ created_by: 'Who entered the order.', tenant_id: 'The tenant.', customer_no: 'The buyer.' }), LOOKUPS)
+    valid(result)
+    expect(field(result.form, 'employee')).toMatchObject({ description: 'Who entered the order.' })
+    expect(field(result.form, 'customer')).not.toHaveProperty('description')
+    expect(result.notes.find((note) => note.subject === 'employee' && note.kind === 'inferred')?.message).toMatch(
+      /; label from the table name, help text from its column's comment\.$/,
+    )
+  })
+
+  // Help text is formancy's Text: one to 300 characters, counted as code
+  // points. A comment of only whitespace is none; one longer than 300 is
+  // left out and said, never cut, since a cut sentence can say the opposite
+  // of the whole one; 300 emoji, 600 UTF-16 units, still fit. Watched
+  // failing with the limit left out: the validator refused the long one.
+  test('a comment of whitespace is none, and one longer than help text holds is left out and said', () => {
+    const long = 'x'.repeat(301)
+    const emoji = '😀'.repeat(300)
+    const result = generateForm(commented({ notes: '   ', order_date: long, status: emoji }), ORDER)
+    valid(result)
+    expect(field(result.form, 'notes')).not.toHaveProperty('description')
+    expect(field(result.form, 'order_date')).not.toHaveProperty('description')
+    expect(field(result.form, 'status')).toMatchObject({ description: emoji })
+    expect(result.notes.filter((note) => note.subject === 'order_date' && note.message.includes('comment')).map((note) => note.message)).toEqual([
+      'Its column comment is 301 characters, more than the 300 a field’s help text holds, so the field has none.',
+    ])
   })
 })

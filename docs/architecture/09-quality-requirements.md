@@ -79,11 +79,11 @@ Formancy Data
   real server
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).
 - **Q6. The same snapshot and request are generated from twice.** The form,
-  its bindings and its notes are byte-identical, on spec 3, and the released
+  its bindings and its notes are byte-identical, on spec 5, and the released
   `@formancy/spec` validator accepts the form. Held by
   `packages/data-core/src/generate/generate.test.ts`
   ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md),
-  [0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md),
+  [0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md),
   [0066](../decisions/0066-a-lookup-a-person-can-search-is-generated-as-a-typeahead.md)).
 - **Q7. A table keyed by a uuid the database fills is listed and written
   to.** The key is never written by a generated form unless the person

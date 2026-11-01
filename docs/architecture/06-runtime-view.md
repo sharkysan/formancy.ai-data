@@ -71,8 +71,8 @@ without database VIEW DEFINITION reports row security `unknown` (0027).
    the rules a stored bundle's request is held to
    ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
 2. `generateForm` (`packages/data-core/src/generate/generate.ts`) returns
-   a spec 3 document
-   ([0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
+   a spec 5 document, a field's help text its column's comment
+   ([0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)),
    its `FormBindings` and its notes, with no model, clock or randomness
    ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
    `apps/examples` runs it in the browser, over a captured snapshot

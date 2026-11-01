@@ -339,11 +339,11 @@ to update asks under update's filter without a new application.
   not declare, read from the declarations on 2026-10-30. A host whose engine
   is that old meets what one at 0.3.0 met when the pin moved to spec `"4"`:
   TS2322 at `createFormEngine` in the React snippet above, measured with
-  TypeScript 6.0.3 and `skipLibCheck` off on 2026-10-10. The document itself
-  is spec 3
-  ([0042](../../docs/decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)),
-  so such a host casts it to its own `@formancy/spec`'s `FormSchema`, or
-  moves its renderer to 0.8.0 or later. Nothing here type-checks a host on
+  TypeScript 6.0.3 and `skipLibCheck` off on 2026-10-10. A form published
+  since 0118 is spec 5 itself, which such a renderer refuses at runtime, so
+  the host moves its renderer to 0.8.0 or later; a form published before
+  is spec 3, which it may cast to its own `@formancy/spec`'s `FormSchema`
+  ([0118](../../docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)). Nothing here type-checks a host on
   an older release.
 - **Records are addressed by token only.** The definition does not name the
   identity columns, so a host keeps the tokens that create, read and lookups

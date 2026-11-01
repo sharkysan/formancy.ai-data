@@ -1,6 +1,6 @@
 # 0042 — Generated forms stay on spec 3 after spec 4 is released
 
-- **Status:** accepted
+- **Status:** superseded by [0118](0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md): generated documents say spec 5, for a field's help text from its column's comment, and the server serves spec 3, which every version stored before says, beside it
 - **Date:** 2026-10-10
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/generate/generate.test.ts` — every
