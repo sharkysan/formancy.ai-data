@@ -473,7 +473,7 @@ jobs:
   # leg's image, for its fonts.
   pictures:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -505,8 +505,19 @@ jobs:
       - run: pnpm --filter @formancy/data-examples exec playwright install chromium
         timeout-minutes: 5
 
-      # Builds the pages first (turbo's `dependsOn`), then walks every scene.
-      - run: pnpm test:pictures
+      # TEMPORARY: retake every picture on this runner, the recorded look, and upload them.
+      - run: pnpm build
+      - run: pnpm pictures --all --review "$RUNNER_TEMP/review"
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: retaken-pictures
+          path: docs/images/readme/
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: retaken-review
+          path: ${{ runner.temp }}/review
 
       - name: Keep what this job found, for the report
         id: collect
