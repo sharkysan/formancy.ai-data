@@ -208,8 +208,9 @@ function actsOver(plane) {
       .getByRole('status')
       .filter({ hasText: `Loaded record ${RECORD} into both forms.` })
       .waitFor()
-    // Each pane names the loaded customer after asking the runtime plane, so after the detail's status.
-    const named = new RegExp(`combobox "${journey.order.customer.label}\\*?": ${journey.order.customer.choose}`)
+    // Each pane names the loaded customer after asking the runtime plane, so after the detail's status;
+    // disabled where the account may not UPDATE it (0122), which the snapshot says between name and value.
+    const named = new RegExp(`combobox "${journey.order.customer.label}\\*?"(?: \\[[a-z]+\\])*: ${journey.order.customer.choose}`)
     for (const name of ['React', 'Angular']) await untilSnapshot(pane(page, name), named, { within: WITHIN, what: `the ${name} pane's customer` })
   }
   const both = (page) => ({ React: pane(page, 'React'), Angular: pane(page, 'Angular') })
