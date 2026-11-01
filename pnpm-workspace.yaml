@@ -78,6 +78,7 @@ catalog:
 minimumReleaseAgeExclude:
   - '@formancy/angular@0.11.0'
   - '@formancy/builder-core@0.11.0'
+  - '@formancy/code-style@0.12.0'
   - '@formancy/conformance@0.11.0'
   - '@formancy/core@0.11.0'
   - '@formancy/expressions@0.11.0'

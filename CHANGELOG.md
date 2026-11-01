@@ -298,6 +298,18 @@ later.
 
 ### Changed
 
+- **The lint and format rules are `@formancy/code-style` 0.12.0, pinned
+  exactly as a root devDependency, instead of a copy** (0116, 0002). Why:
+  formancy 0.12.0 published the package the copy was written to become, and
+  a copy that nothing compared with its source could drift. No rule
+  changed: the package's module is byte-identical to the copy it replaces,
+  which is deleted, its test now running in formancy.ai's package suite.
+  What you notice: `pnpm install` brings the package with the other
+  devDependencies, `scripts/upstream-deps.mjs` refuses a range or a link
+  for it as for every upstream package, and the root no longer lists
+  `globals`, `eslint-plugin-react-hooks` and
+  `@eslint-community/eslint-plugin-eslint-comments`, which the package
+  brings.
 - **The host page draws a field its person may write in no operation as
   unwritable, and sends it in no save** (0117). Why: a renderer submits
   every field, so on a form whose tenant is a column of its own -- a

@@ -15,13 +15,11 @@ Three things follow, and each has a guard:
   refuses a range, a `workspace:` link or a path
   ([0002](docs/decisions/0002-depend-on-upstream-never-copy-it.md)). A generic
   improvement the module needs goes upstream through formancy's own
-  contribution rules, not into a patched copy here. One copy waits for its
-  release: the lint and format rules, `scripts/code-style/`, Formancy
-  Health's byte for byte, which is what formancy.ai will publish as
-  `@formancy/code-style`, called with this repository's paths by
-  `eslint.config.mjs`. A rule changes in Health's first and is copied here,
-  never changed here alone, and the copy goes when this repository pins the
-  package ([0116](docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+  contribution rules, not into a patched copy here. The lint and format
+  rules are such a dependency: `@formancy/code-style`, pinned exactly as a
+  root devDependency, which `scripts/upstream-deps.mjs` reads too, and
+  called with this repository's paths by `eslint.config.mjs`. A rule
+  changes in formancy.ai's package, never here ([0116](docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **Every package declares the source-available licence**, never Apache-2.0.
   `scripts/verify-licenses.mjs` refuses a manifest that says otherwise and a
   tarball without `LICENSE.md` and `NOTICE`. The realistic mistake is a

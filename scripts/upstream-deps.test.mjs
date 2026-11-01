@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, test } from 'vitest'
 import { lockedPackages, releaseAgeExemptionProblems, releaseAgeExemptions, upstreamDependencyProblems, workspaceManifests } from './upstream-deps.mjs'
 
@@ -28,6 +31,32 @@ describe('upstreamDependencyProblems', () => {
   // A pre-release is still a release somebody chose.
   test('accepts an exact pre-release', () => {
     expect(upstreamDependencyProblems([{ name: 'x', dependencies: { '@formancy/core': '0.4.0-rc.1' } }])).toEqual([])
+  })
+})
+
+describe('workspaceManifests', () => {
+  /** A repository of `package.json` files alone: the root's, and one package's. */
+  function repository(root) {
+    const dir = mkdtempSync(join(tmpdir(), 'upstream-deps-'))
+    writeFileSync(join(dir, 'package.json'), JSON.stringify(root))
+    mkdirSync(join(dir, 'packages', 'one'), { recursive: true })
+    writeFileSync(join(dir, 'packages', 'one', 'package.json'), JSON.stringify({ name: '@formancy/data-one' }))
+    return dir
+  }
+
+  // The lint and format rules are @formancy/code-style, a root devDependency
+  // (0116). Read only from packages/* and apps/*, the root's `^0.12.0` would
+  // let the rules move under this repository without a commit saying so, which
+  // is the range 0002 refuses everywhere else.
+  test('reads the root manifest, so a range or a link there is refused too', () => {
+    const dir = repository({ name: 'formancy-data', devDependencies: { '@formancy/code-style': '^0.12.0' } })
+    try {
+      const problems = upstreamDependencyProblems(workspaceManifests(dir))
+      expect(problems).toHaveLength(1)
+      expect(problems[0]).toMatch(/formancy-data: devDependencies @formancy\/code-style@\^0\.12\.0/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 

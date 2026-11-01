@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as prettier from 'prettier'
-import { EXTENSIONS } from './code-style/code-style.mjs'
+import { EXTENSIONS } from '@formancy/code-style'
 
 /**
  * A merge across the format (0116): git's merge, with every TypeScript and
