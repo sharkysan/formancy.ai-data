@@ -1,4 +1,4 @@
-import type { FormSchema } from '@formancy/spec'
+import type { FormSchema, Text } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
 import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
@@ -33,7 +33,7 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if (!isRecord(entry)) return [`${at} must be an object`]
   const problems: string[] = []
   for (const key of Object.keys(entry)) {
-    if (!['field', 'anchor', 'label', 'span', 'section'].includes(key)) problems.push(`${at}/${key} is not a property of a field presentation`)
+    if (!['field', 'anchor', 'label', 'span', 'section', 'description'].includes(key)) problems.push(`${at}/${key} is not a property of a field presentation`)
   }
   if (typeof entry['field'] !== 'string') problems.push(`${at}/field must be a field key`)
   else if (seen.has(entry['field'])) problems.push(`${at}: ${entry['field']} appears twice`)
@@ -42,6 +42,8 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if ('label' in entry && !isText(entry['label'])) problems.push(`${at}/label must be text`)
   if ('span' in entry && entry['span'] !== 'all' && entry['span'] !== 'one') problems.push(`${at}/span must be 'all' or 'one'`)
   if ('section' in entry && !isSectionAnchor(entry['section'])) problems.push(`${at}/section ${SECTION_ANCHOR}`)
+  if ('description' in entry && entry['description'] !== null && !isText(entry['description']))
+    problems.push(`${at}/description must be text, or null to remove the base’s`)
   return problems
 }
 
@@ -104,6 +106,24 @@ export function presentationShapeProblems(value: unknown): string[] {
 }
 
 type Node = { kind: 'field'; path: string; span?: 'all' }
+
+/**
+ * A field's help text set or removed by its entry (0119), or why not: help
+ * text equal to the base's, a removal where the base has none, or help text
+ * over a base older than spec 5, which holds none -- a version stored before
+ * 0118, generated again to take any.
+ */
+function describe(field: FormSchema['model']['fields'][number], description: Text | null, version: string, at: string): string[] {
+  if (description === null) {
+    if (field.description === undefined) return [`${at}/description: the base has no help text to remove; leave it out`]
+    delete field.description
+    return []
+  }
+  if (Number(version) < 5) return [`${at}/description: help text needs spec 5, and this base is spec ${JSON.stringify(version)}; generate the form again`]
+  if (same(description, field.description)) return [`${at}/description: equals the base's; leave it out`]
+  field.description = description
+  return []
+}
 type Section = { label: unknown; children: Array<{ children: Node[] }> }
 
 /**
@@ -155,11 +175,13 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
     }
     const own = fieldAnchor(bound)
     if (!same(entry.anchor, own)) problems.push(`${at}/anchor: ${entry.field} stands for ${describeAnchor(own)}, not ${describeAnchor(entry.anchor)}`)
-    if (entry.label === undefined && entry.span === undefined && entry.section === undefined) problems.push(`${at}: says nothing; leave the field out`)
+    if (entry.label === undefined && entry.span === undefined && entry.section === undefined && entry.description === undefined)
+      problems.push(`${at}: says nothing; leave the field out`)
     if (entry.label !== undefined) {
       if (same(entry.label, field.label)) problems.push(`${at}/label: equals the base's; leave it out`)
       else field.label = entry.label
     }
+    if (entry.description !== undefined) problems.push(...describe(field, entry.description, base.specVersion, at))
     if (entry.span !== undefined) {
       const node = nodeOf.get(entry.field) as Node
       if ((entry.span === 'all') === (node.span === 'all')) problems.push(`${at}/span: equals the base's; leave it out`)

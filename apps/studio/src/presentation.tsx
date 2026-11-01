@@ -6,7 +6,7 @@ import type { FormBindings, ListView } from '@formancy/data-core'
 import type { LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
-import { labelOf, useDocument } from './document.js'
+import { helpTextOf, labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { ListViewsPanel } from './list-views.js'
 
@@ -46,6 +46,64 @@ function LabelInput({ id, label, value, commit }: { id: string; label: ReactElem
           }
           const outcome = commit(text)
           setProblem(outcome.ok ? null : `${outcome.message} It stays “${value}”.`)
+        }}
+      />
+      {problem === null ? null : (
+        <p id={`${id}-problem`} className="field-problem">
+          {problem}
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** The most help text holds: formancy's `Text`, 300 characters, counted as code points (0119). */
+const HELP_TEXT_LIMIT = 300
+
+/**
+ * A field's help text as typed, committed through the session on every
+ * change (0119): empty removes it, which a label may not be. Past what help
+ * text holds it is refused here, in words, as a blank label is, and the
+ * document keeps what it had.
+ */
+function HelpTextInput({
+  id,
+  label,
+  value,
+  commit,
+}: {
+  id: string
+  label: ReactElement
+  value: string
+  commit: (text: string) => CommandOutcome
+}): ReactElement {
+  const [draft, setDraft] = useState(value)
+  const [problem, setProblem] = useState<string | null>(null)
+  useEffect(() => {
+    setDraft(value)
+    setProblem(null)
+  }, [value])
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <textarea
+        id={id}
+        rows={2}
+        value={draft}
+        aria-invalid={problem !== null}
+        aria-describedby={problem === null ? undefined : `${id}-problem`}
+        onChange={(event) => {
+          const text = event.target.value
+          setDraft(text)
+          const length = [...text].length
+          if (length > HELP_TEXT_LIMIT) {
+            setProblem(
+              `Help text holds ${String(HELP_TEXT_LIMIT)} characters, and this is ${String(length)}. Until it fits, the field keeps the help text it had.`,
+            )
+            return
+          }
+          const outcome = commit(text)
+          setProblem(outcome.ok ? null : `${outcome.message} The field keeps the help text it had.`)
         }}
       />
       {problem === null ? null : (
@@ -142,6 +200,20 @@ export function PresentationStep({
           }
           value={label}
           commit={(text) => report(session.setFieldProperty([key], 'label', text), `Labelled ${key} “${text}”.`)}
+        />
+        <HelpTextInput
+          id={`${id}-help`}
+          label={
+            <>
+              Help text <span className="visually-hidden">of {key}</span>
+            </>
+          }
+          value={helpTextOf(document, key)}
+          commit={(text) =>
+            text === ''
+              ? report(session.setFieldProperty([key], 'description', undefined), `Removed the help text of ${key}.`)
+              : report(session.setFieldProperty([key], 'description', text), `Gave ${key} the help text “${text}”.`)
+          }
         />
         <p className="bound">
           Bound field <code>{key}</code>

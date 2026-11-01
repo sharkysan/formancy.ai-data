@@ -70,8 +70,11 @@ interface Rebase {
   add: (subject: number, conflict: PresentationConflict) => void
 }
 
-/** A field's label and span, as carried to the new base. */
-type Overrides = Pick<FieldPresentation, 'label' | 'span'>
+/** A field's label, span and help text, as carried to the new base. */
+type Overrides = Pick<FieldPresentation, 'label' | 'span' | 'description'>
+
+/** What a field-gone conflict calls each property it drops. */
+const PROPERTY_WORDS = { label: 'label', span: 'span', section: 'section', description: 'help text' } as const
 
 function describeAnchor(anchor: FieldAnchor): string {
   return anchor.kind === 'column' ? `column ${anchor.column}` : `the lookup over ${anchor.foreignKey}`
@@ -175,11 +178,12 @@ function reportFollowed(rebase: Rebase, presentation: PresentationOverrides, mov
 }
 
 /**
- * Each field entry's label and span carried, by anchor, to the key the
- * field now has: a field that is gone takes its label, span and section
- * with it (`field-gone`); a label the generator also changed keeps the
- * person's (`both-changed`), and one the generator now writes itself goes;
- * a span goes when the new base agrees with it.
+ * Each field entry's label, span and help text carried, by anchor, to the
+ * key the field now has: a field that is gone takes its label, span,
+ * section and help text with it (`field-gone`); a label or help text the
+ * generator also changed keeps the person's (`both-changed`), and one the
+ * generator now writes itself goes, as does a removal of help text the new
+ * base no longer has (0119); a span goes when the new base agrees with it.
  */
 function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation[]): Map<string, Overrides> {
   const { after, oldFields, newFields, follow, subjectOf, add } = rebase
@@ -188,11 +192,17 @@ function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation
     const subject = subjectOf(entry.field)
     const now = follow(entry.field)
     if (now === undefined) {
-      for (const property of ['label', 'span', 'section'] as const) {
+      for (const property of ['label', 'span', 'section', 'description'] as const) {
         const yours = entry[property]
         if (yours === undefined) continue
         const shown =
-          property === 'label' ? describeText(yours as Text) : property === 'section' ? describeSection(yours as SectionAnchor) : `'${String(entry.span)}'`
+          property === 'section'
+            ? describeSection(yours as SectionAnchor)
+            : property === 'span'
+              ? `'${String(entry.span)}'`
+              : yours === null
+                ? 'removal'
+                : describeText(yours as Text)
         add(subject, {
           kind: 'field-gone',
           field: entry.field,
@@ -200,7 +210,7 @@ function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation
           property,
           yours,
           resolution: 'dropped',
-          message: `The ${property} ${shown} you chose for ${entry.field} was dropped: ${describeAnchor(entry.anchor)} is not in the regenerated form.`,
+          message: `The ${PROPERTY_WORDS[property]} ${shown} you chose for ${entry.field} was dropped: ${describeAnchor(entry.anchor)} is not in the regenerated form.`,
         })
       }
       continue
@@ -223,9 +233,37 @@ function carryFieldOverrides(rebase: Rebase, entries: readonly FieldPresentation
       }
     }
     if (entry.span !== undefined && (entry.span === 'all') !== (sectionOf(after, now)?.wide.has(now) ?? false)) kept.span = entry.span
-    if (kept.label !== undefined || kept.span !== undefined) carried.set(now, kept)
+    if (entry.description !== undefined) carryHelpText(rebase, entry, now, kept)
+    if (kept.label !== undefined || kept.span !== undefined || kept.description !== undefined) carried.set(now, kept)
   }
   return carried
+}
+
+/**
+ * A field's help text carried to the key it now has (0119): text stands
+ * while the generator writes other help text, a removal while there is help
+ * text to remove; either kept over help text the generator changed too is
+ * said (`both-changed`).
+ */
+function carryHelpText(rebase: Rebase, entry: FieldPresentation, now: string, kept: Overrides): void {
+  const yours = entry.description as Text | null
+  const generator = rebase.newFields.find((field) => field.key === now)?.description
+  if (yours === null ? generator === undefined : same(yours, generator)) return
+  kept.description = yours
+  const was = rebase.oldFields.find((field) => field.key === entry.field)?.description
+  if (same(was, generator) || generator === undefined) return
+  rebase.add(rebase.subjectOf(entry.field), {
+    kind: 'both-changed',
+    field: now,
+    property: 'description',
+    yours,
+    generator,
+    resolution: 'kept-yours',
+    message:
+      yours === null
+        ? `You removed ${now}'s help text, and the generator now gives it ${describeText(generator)}; yours is kept.`
+        : `You gave ${now} the help text ${describeText(yours)}, and the generator now gives it ${describeText(generator)}; yours is kept.`,
+  })
 }
 
 /**
@@ -365,7 +403,15 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     const to = moved.moves.get(binding.field)
     const section = to === undefined ? undefined : after.sections[to]?.anchor
     if (entry === undefined && section === undefined) continue
-    fields.push({ field: binding.field, anchor: fieldAnchor(binding), ...entry, ...(section === undefined ? {} : { section: { ...section } }) })
+    // In the order a derive writes them, so a carried presentation has the one spelling.
+    const { description, ...rest } = entry ?? {}
+    fields.push({
+      field: binding.field,
+      anchor: fieldAnchor(binding),
+      ...rest,
+      ...(section === undefined ? {} : { section: { ...section } }),
+      ...(description === undefined ? {} : { description }),
+    })
   }
   const position = (key: string) => newFields.findIndex((field) => field.key === key)
   fields.sort((left, right) => position(left.field) - position(right.field))

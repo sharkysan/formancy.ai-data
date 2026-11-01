@@ -12,6 +12,23 @@ later.
 
 ### Added
 
+- **The studio edits a field's help text** (0119), in the Presentation step,
+  in a Help text box under each field's label. Why: since 0118 a field's
+  help text is its column's comment, which was written for whoever reads
+  the catalog, and changing it meant changing the comment in the database.
+  What you notice:
+  - **Help text is presentation**: typed, it replaces the comment's or
+    adds one; emptied, the field has none. Past the 300 characters help
+    text holds, the box says so and the field keeps what it had. The
+    preview reads it out with the field's control.
+  - **A regeneration carries it by the column**, as a label: kept over a
+    comment that changed too, which the carried panel says, offering
+    "Use the generator's help text"; dropped where the comment now says
+    the same.
+  - A presentation's field entry may hold `description`, text or `null`; a
+    server of an earlier release refuses a version holding one, as it
+    refuses every spec 5 version.
+
 - **A browse role reads any table or view's rows, a page at a time, in the
   studio's new Browse step** (0099). Why: somebody setting up a form wants
   to look at the data first -- what a table holds, whether a view returns

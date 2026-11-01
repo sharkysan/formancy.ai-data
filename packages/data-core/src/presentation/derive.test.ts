@@ -120,10 +120,10 @@ describe('presentationOf', () => {
     field(edited, 'status')['maxLength'] = 4000
     field(edited, 'customer')['optionsSource'] = 'elsewhere'
     expect(problems(edited)).toEqual([
-      `/model/fields/${index('customer')}/optionsSource: changed, and only a field's label is presentation`,
-      `/model/fields/${index('order_date')}/required: changed, and only a field's label is presentation`,
-      `/model/fields/${index('status')}/maxLength: changed, and only a field's label is presentation`,
-      `/model/fields/${index('status')}/pattern: changed, and only a field's label is presentation`,
+      `/model/fields/${index('customer')}/optionsSource: changed, and only a field's label and help text are presentation`,
+      `/model/fields/${index('order_date')}/required: changed, and only a field's label and help text are presentation`,
+      `/model/fields/${index('status')}/maxLength: changed, and only a field's label and help text are presentation`,
+      `/model/fields/${index('status')}/pattern: changed, and only a field's label and help text are presentation`,
     ])
   })
 
@@ -231,9 +231,9 @@ describe('presentationOf', () => {
     edited.logic = { rules: [] }
     edited.i18n = { defaultLocale: 'en', messages: { en: {} } }
     expect(problems(edited)).toEqual([
-      "/title: changed, and only labels, order, a field's section and full width are presentation",
-      "/logic: changed, and only labels, order, a field's section and full width are presentation",
-      "/i18n: changed, and only labels, order, a field's section and full width are presentation",
+      "/title: changed, and only labels, help text, order, a field's section and full width are presentation",
+      "/logic: changed, and only labels, help text, order, a field's section and full width are presentation",
+      "/i18n: changed, and only labels, help text, order, a field's section and full width are presentation",
     ])
   })
 
@@ -312,7 +312,7 @@ describe('presentationOf', () => {
         },
       ],
       [
-        ["/model/extra: changed, and only labels, order, a field's section and full width are presentation"],
+        ["/model/extra: changed, and only labels, help text, order, a field's section and full width are presentation"],
         (form) => {
           ;(form.model as unknown as Record<string, unknown>)['extra'] = 1
         },
@@ -343,8 +343,8 @@ describe('presentationOf', () => {
       ],
       [
         [
-          "/layouts/0: changed, and only labels, order, a field's section and full width are presentation",
-          "/layouts/0/name: changed, and only labels, order, a field's section and full width are presentation",
+          "/layouts/0: changed, and only labels, help text, order, a field's section and full width are presentation",
+          "/layouts/0/name: changed, and only labels, help text, order, a field's section and full width are presentation",
         ],
         (form) => {
           ;(form.layouts as unknown as Array<Record<string, unknown>>)[0] = { name: 'web', nodes: form.layouts?.[0]?.nodes, label: 'x' }
@@ -369,7 +369,7 @@ describe('presentationOf', () => {
         },
       ],
       [
-        [`${grid0}/columns: changed, and only labels, order, a field's section and full width are presentation`],
+        [`${grid0}/columns: changed, and only labels, help text, order, a field's section and full width are presentation`],
         (form) => {
           grid(form, 0).columns = 3
         },
