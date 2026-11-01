@@ -17,7 +17,7 @@ const canceled = (error: unknown): boolean => typeof error === 'object' && error
  * answers, not measured on a real network.
  */
 const CANCEL_AGAIN_AFTER_MS = 250
-const CANCELS_AFTER_EXECUTE = 1
+const CANCELS_AFTER_EXECUTE = 4
 
 interface LookupStatement {
   readonly text: string
