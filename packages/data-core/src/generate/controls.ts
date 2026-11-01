@@ -92,11 +92,12 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
 
     case 'integer':
       if (isSafe(type.min) && isSafe(type.max)) {
-        // Whole numbers are checked by the server's codec. formancy's `step`
-        // would let the browser check it too; generated forms are on spec 5
-        // since 0118, which has it, and write none yet, since a host page
-        // would then refuse a fraction before Save -- a change of its own.
-        return { field: { type: 'number', min: Number(type.min), max: Number(type.max) }, describe: 'a whole number' }
+        // A whole number is checked in the browser as the server's codec
+        // checks it (0120): `step: 1`, which formancy's engine holds from the
+        // minimum -- a whole number itself -- so a fraction is refused before
+        // Save, with "Enter a value in steps of 1." Spec 4's, which a
+        // generated form can hold since it is spec 5 (0118).
+        return { field: { type: 'number', min: Number(type.min), max: Number(type.max), step: 1 }, describe: 'a whole number' }
       }
       return {
         field: { type: 'text', pattern: `^-?[0-9]{1,${String(type.max.replace('-', '').length)}}$` },

@@ -96,6 +96,15 @@ function before0030(): BundleV1 {
 
 const copy = <T extends PublishedBundle>(bundle: T): T => JSON.parse(JSON.stringify(bundle)) as T
 
+/**
+ * A generated form as a release before 0118 stored it: spec 3, which holds
+ * no `step` -- a whole number's since 0120 -- so the step goes with it.
+ */
+function asSpec3(form: FormSchema): void {
+  form.specVersion = '3'
+  for (const field of form.model.fields) delete field.step
+}
+
 describe('validateBundle', () => {
   // The baseline: a generated form, its bindings, a fitting policy and the
   // snapshot they came from are publishable. A validator that refused this
@@ -445,12 +454,12 @@ describe('validateBundle', () => {
     expect(validateBundle(base)).toEqual({ ok: false, problems: [`base: is spec "4", ${only}`] })
     const construct = copy(good())
     for (const form of [construct.base, construct.form]) {
-      form.specVersion = '3'
+      asSpec3(form)
       stepped(form)
     }
     expect(validateBundle(construct)).toEqual({ ok: false, problems: [`form: /model/fields/0/step needs spec "4", ${only}`] })
     const masked = copy(good())
-    for (const form of [masked.base, masked.form]) form.specVersion = '3'
+    for (const form of [masked.base, masked.form]) asSpec3(form)
     const name = masked.base.model.fields.find((field) => field.key === 'name')
     if (name !== undefined) name.mask = 'aaa'
     expect(validateBundle(masked)).toEqual({ ok: false, problems: [`base: /model/fields/2/mask needs spec "4", ${only}`] })
@@ -476,7 +485,7 @@ describe('validateBundle', () => {
   // was refused as spec "3".
   test('a version stored at spec 3 before the move is served, and one at spec 5 with its help text', () => {
     const stored = copy(good())
-    for (const form of [stored.base, stored.form]) form.specVersion = '3'
+    for (const form of [stored.base, stored.form]) asSpec3(form)
     expect(validateBundle(stored)).toEqual({ ok: true, bundle: stored })
     const described = good(
       snapshot((columns) => {
@@ -487,7 +496,7 @@ describe('validateBundle', () => {
     expect(described.form.model.fields.find((field) => field.key === 'name')).toMatchObject({ description: 'What the employee is called.' })
     expect(validateBundle(described)).toEqual({ ok: true, bundle: described })
     const backdated = copy(described)
-    for (const form of [backdated.base, backdated.form]) form.specVersion = '3'
+    for (const form of [backdated.base, backdated.form]) asSpec3(form)
     expect(validateBundle(backdated)).toEqual({
       ok: false,
       problems: [

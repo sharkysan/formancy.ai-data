@@ -315,6 +315,19 @@ later.
 
 ### Changed
 
+- **A whole-number field refuses a fraction in the browser** (0120). Why: a
+  whole-number column's field took `1.5` and only the server refused it,
+  after Save -- the one rule a generated form stated on one side. Spec 4's
+  `step` closes it, and since 0118 generated forms are spec 5, so it costs
+  a host's renderer nothing more. What you notice:
+  - Every bounded whole-number field carries `step: 1`, and a fraction is
+    refused beside the field with formancy's "Enter a value in steps of
+    1." The server's codec refuses one still, for any other client.
+  - A studio session holding a form generated before the upgrade is
+    refused at publish until it generates again. A version published
+    before keeps taking a fraction in the browser until it is published
+    again.
+
 - **Generated forms are formancy's spec 5, and a field's help text is its
   column's comment** (0118, superseding 0042). Why: spec 5 brought help
   text under a question, read out with its control, and a database already

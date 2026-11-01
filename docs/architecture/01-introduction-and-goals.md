@@ -166,11 +166,11 @@ places the order shows:
 - 0031 tells a person "it may have been saved" about some saves that were
   not, rather than "not saved" about one that was: goal 4 over a precise
   message.
-- [0042](../decisions/0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md)
-  keeps a whole-number field's whole-ness the server's, so a person who
-  types `1.5` learns it from the server's refusal after Save: the stored
-  value stays exact, and a host on an older renderer keeps reading the form,
-  at the cost of a check in the browser.
+- [0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)
+  moves generated forms to spec 5 for a field's help text, read out with
+  its control, so a host whose renderer is older than `@formancy/*` 0.8.0
+  refuses every form published since: goal 7 over an integrator's older
+  renderer.
 
 ## Scope
 
