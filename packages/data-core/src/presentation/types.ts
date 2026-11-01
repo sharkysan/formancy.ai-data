@@ -74,6 +74,8 @@ export interface PresentationOverrides {
   sections: SectionPresentation[]
   /** In the order a picker lists them; left out when there are none, never `[]` (`views.ts`). */
   views?: ListView[]
+  /** The fields the Filter panel does not offer, in the bindings' order; left out when there are none, never `[]` (`unfiltered.ts`, 0123). */
+  unfiltered?: string[]
 }
 
 export type PresentationCheck = { ok: true; presentation: PresentationOverrides } | { ok: false; problems: string[] }

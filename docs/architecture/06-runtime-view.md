@@ -221,7 +221,8 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    infinite row model, the search sent on Search or Enter, never per key
    (0047), and with every block the conditions its Filter panel applied
    (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
-   names) and the section's sort, each block after the last row of the
+   names, its Field menu over those `offered`, which the presentation's
+   `unfiltered` decides: [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
    block before: the datasource keeps every answered page's `next` by the
    row the page after it starts at
    ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));

@@ -127,12 +127,12 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
  * without that condition, which would show a wider list under the view's
  * name; and a default whose view is not offered leaves the list with none.
  */
-export function listColumns(bindings: FormBindings, fields: readonly string[], views: readonly ListView[]): ListColumns {
+export function listColumns(bindings: FormBindings, fields: readonly string[], views: readonly ListView[], unfiltered: readonly string[] = []): ListColumns {
   const columns = readableColumns(bindings, fields)
   const filterable: FilterableField[] = []
   for (const binding of columns) {
     const offer = filterOffer(binding)
-    if (offer !== null) filterable.push({ field: binding.field, ...offer })
+    if (offer !== null) filterable.push({ field: binding.field, offered: !unfiltered.includes(binding.field), ...offer })
   }
   const sortable = columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field)
   return {

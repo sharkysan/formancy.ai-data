@@ -4,6 +4,7 @@ import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor }
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { homeOf, placements } from './placement.js'
+import { unfilteredShapeProblems } from './unfiltered.js'
 import { viewShapeProblems } from './views.js'
 
 function isAnchor(value: unknown): value is FieldAnchor {
@@ -86,9 +87,10 @@ export function presentationShapeProblems(value: unknown): string[] {
   if (!isRecord(value)) return ['a presentation is an object']
   const problems: string[] = []
   for (const key of Object.keys(value)) {
-    if (!['version', 'fields', 'sections', 'views'].includes(key)) problems.push(`${key} is not a property of a presentation`)
+    if (!['version', 'fields', 'sections', 'views', 'unfiltered'].includes(key)) problems.push(`${key} is not a property of a presentation`)
   }
   if (Object.hasOwn(value, 'views')) problems.push(...viewShapeProblems(value['views']))
+  if (Object.hasOwn(value, 'unfiltered')) problems.push(...unfilteredShapeProblems(value['unfiltered']))
   if (value['version'] !== PRESENTATION_VERSION) problems.push(`version must be ${String(PRESENTATION_VERSION)}`)
   const fields = value['fields']
   const sections = value['sections']

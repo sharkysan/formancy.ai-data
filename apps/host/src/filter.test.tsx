@@ -415,4 +415,25 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     expect(screen.queryByRole('alert')).toBeNull()
     expect(await floor('a child section filtered')).toEqual(CLEAN('a child section filtered'))
   })
+
+  // A field the administrator left out of the Filter panel (0123) is not
+  // in its Field menu, against the real server that says so; the rest are,
+  // in the server's order. Last of its engine's cases, because it publishes
+  // the order form's version 2. Watched failing with the menu over every
+  // field the list is filtered by: Notes was offered.
+  test('offers no condition on a field its administrator left out of the panel', async () => {
+    const stored = (await plane.store.read(engine.formId, 1)) as { presentation: Record<string, unknown> }
+    stored.presentation = { ...stored.presentation, unfiltered: ['notes'] }
+    expect(await plane.store.publish(engine.formId, 1, stored)).toEqual({ ok: true, version: 2 })
+    const definition = await definitionOf(engine.formId)
+    expect(definition.list?.filterable.find((offer) => offer.field === 'notes')?.offered).toBe(false)
+    const user = await workspace(plane.fetch, engine.formId)
+    const section = await openFilter(user, 'Records')
+    const menu = within(section).getByRole('combobox', { name: 'Field' })
+    const labels = within(menu)
+      .getAllByRole('option')
+      .map((option) => option.textContent)
+    expect(labels).not.toContain('Notes')
+    expect(labels).toContain('Status')
+  })
 })

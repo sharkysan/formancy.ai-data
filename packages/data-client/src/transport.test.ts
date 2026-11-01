@@ -121,7 +121,10 @@ describe('when the data server is not what answers', () => {
   // older than views (0105), or with a view a picker could not send as a
   // list request: no name, a condition with no field or an operator
   // data-core does not name, a direction but ascending or descending, a
-  // default but `true`. Watched failing with `views` left unchecked.
+  // default but `true`. Watched failing with `views` left unchecked. So is
+  // a field filtered by that does not say whether the Filter panel offers
+  // it (0123), from a server older than that. Watched failing with
+  // `offered` left unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
     const FORM = {
       form: { model: {} },
@@ -140,7 +143,10 @@ describe('when the data server is not what answers', () => {
     const columns = { searchable: [], sortable: ['id'], views: [] }
     const VIEW = { name: 'Newest', filter: [{ field: 'id', op: 'range', from: '10', to: null }], sort: [{ field: 'id', direction: 'desc' }] }
     const viewed = (view: Record<string, unknown>) => ({ ...columns, filterable: [], views: [{ ...VIEW, ...view }] })
-    const offer = (operators: unknown, input: unknown, days: unknown = null) => ({ ...columns, filterable: [{ field: 'id', operators, input, days }] })
+    const offer = (operators: unknown, input: unknown, days: unknown = null, offered: unknown = true) => ({
+      ...columns,
+      filterable: [{ field: 'id', offered, operators, input, days }],
+    })
     for (const list of [
       undefined,
       'yes',
@@ -150,7 +156,10 @@ describe('when the data server is not what answers', () => {
       columns,
       { ...columns, filterable: {} },
       { ...columns, filterable: [{ operators: ['equals'], input: 'integer', days: null }] },
-      { ...columns, filterable: [{ field: 'id', operators: ['equals'], input: 'integer' }] },
+      { ...columns, filterable: [{ field: 'id', offered: true, operators: ['equals'], input: 'integer' }] },
+      // Whether the Filter panel offers it (0123): said, as a yes or a no.
+      { ...columns, filterable: [{ field: 'id', operators: ['equals'], input: 'integer', days: null }] },
+      offer(['equals'], 'integer', null, 'yes'),
       offer([], null),
       offer(['like'], 'text'),
       offer(['equals'], 'money'),
@@ -178,6 +187,7 @@ describe('when the data server is not what answers', () => {
       offer(['equals', 'contains', 'null', 'not-null'], 'text'),
       offer(['range'], 'date', 'utc'),
       offer(['range', 'null', 'not-null'], 'date', 'wall'),
+      offer(['equals', 'range'], 'integer', null, false),
       viewed({}),
       viewed({ default: true }),
     ]) {

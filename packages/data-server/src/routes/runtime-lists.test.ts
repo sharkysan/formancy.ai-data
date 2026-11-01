@@ -290,6 +290,7 @@ beforeEach(async () => {
   await store.publish('customer', null, bundle)
   const viewed: PublishedBundle = { ...bundle, format: 2, generation, base: customer.form, presentation: { ...EMPTY_PRESENTATION, views: [LARGE, MUSTER] } }
   await store.publish('viewed', null, viewed)
+  await store.publish('unfiltered', null, { ...viewed, presentation: { ...viewed.presentation, unfiltered: ['credit_limit'] } })
   await store.publish('viewed-hidden-limit', null, { ...viewed, policy: HIDDEN_LIMIT })
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
   await store.publish('hidden-limit', null, { ...bundle, policy: HIDDEN_LIMIT })
@@ -600,16 +601,32 @@ describe('the list route', () => {
       searchable: ['tenant_id', 'customer_no', 'name'],
       sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'],
       filterable: [
-        { field: 'tenant_id', operators: ['equals', 'range'], input: 'integer', days: null },
-        { field: 'customer_no', operators: ['equals', 'range'], input: 'integer', days: null },
-        { field: 'name', operators: ['equals', 'contains'], input: 'text', days: null },
-        { field: 'credit_limit', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
+        { field: 'tenant_id', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'customer_no', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null },
+        { field: 'credit_limit', offered: true, operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
       views: [],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
     expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name'])
     expect(LIST_PAGE_SIZE).toBeLessThanOrEqual(MAX_RESOLVE)
+  })
+
+  // The fields the administrator left out of the Filter panel (0123) are
+  // still filtered by -- "Large accounts" filters on credit_limit, and is
+  // offered -- and the form says the panel does not offer them. Watched
+  // failing with the presentation's choice not passed to the list: every
+  // field said offered.
+  test('the form says which fields its Filter panel offers, and keeps a view on one it does not', async () => {
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/unfiltered', headers: as('clerk') })).json()
+    expect(served.list.filterable.map((offer: { field: string; offered: boolean }) => `${offer.field}:${String(offer.offered)}`)).toEqual([
+      'tenant_id:true',
+      'customer_no:true',
+      'name:true',
+      'credit_limit:false',
+    ])
+    expect(served.list.views).toEqual([LARGE, MUSTER])
   })
 
   // A view is offered to a person only when they could have built it from

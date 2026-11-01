@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:53b43dcd9669786dbfc0c0a48dafe68cda41cabf88a8c66488164e173e79bd4b",
+      "reviewed": "sha256:0c730cf1d6d9e8c9ebfe905b310350bf1d1c42039c25e1fd027d519488614764",
       "limitations": [
         {
           "area": "forms",
@@ -3122,7 +3122,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:bf19869aa07758eeb88094dc27d77699121703cacdc9595f917d8fe4ac763a79",
+      "reviewed": "sha256:d61588a422e5af914789d5f77787415dafb1b837fea7eb9b1c47157f280980ee",
       "limitations": [
         {
           "area": "forms",
@@ -3539,6 +3539,25 @@
           "area": "host",
           "says": "On a record just created in the form, a field written on create only is drawn writable until the record is opened again, and the server refuses a changed one after Save.",
           "heldBy": "apps/host/src/session-work.test.ts"
+        }
+      ]
+    },
+    "0123": {
+      "reviewed": "sha256:e6e4553e35496c3ed41946654267898967fcf2b3d88f93ed2c004769522c458c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A field is offered in the Filter panel to every person who may filter by it, or to none: the choice is not per role."
+        },
+        {
+          "area": "forms",
+          "says": "A field left out of the Filter panel is still filtered by through the list route, so leaving it out hides nothing from a client of its own.",
+          "heldBy": "packages/data-server/src/routes/runtime-lists.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client reads a filterable field without offered as unexpected, so a host upgrades its server before its client; a server of an earlier release refuses a version whose presentation leaves a field out.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     }

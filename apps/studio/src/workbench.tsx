@@ -72,6 +72,8 @@ interface Generated {
   session: BuilderSession
   /** In the order a picker lists them; `[]` for none, which the publish leaves out. */
   views: ListView[]
+  /** The fields the Filter panel does not offer (0123), beside the views. */
+  unfiltered: string[]
   carried: Carried | null
 }
 
@@ -146,7 +148,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generate(request: ProposalRequest): Promise<Failure | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome
-    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], carried: null })
+    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], unfiltered: [], carried: null })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
     setCurrent('generate')
     return null
@@ -162,13 +164,17 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generateAgain(previous: Generated, request: ProposalRequest): Promise<string | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome.message
-    const carried = carryDraft({ proposal: previous.proposal, edited: previous.session.exportDocument(), views: previous.views }, outcome.value)
+    const carried = carryDraft(
+      { proposal: previous.proposal, edited: previous.session.exportDocument(), views: previous.views, unfiltered: previous.unfiltered },
+      outcome.value,
+    )
     if (!carried.ok) return carried.message
     setGenerated({
       request,
       proposal: outcome.value,
       session: createBuilderSession(carried.form),
       views: carried.views,
+      unfiltered: carried.unfiltered,
       carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
     })
     setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
@@ -207,6 +213,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       proposal: { form: base, bindings, notes, snapshot, generation },
       session: createBuilderSession(form),
       views: regeneration.presentation.views ?? [],
+      unfiltered: regeneration.presentation.unfiltered ?? [],
       carried: {
         from: `version ${String(version)}`,
         version,
@@ -229,6 +236,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   /** The list views saved, removed or moved in the Presentation step. */
   function viewed(views: ListView[]): void {
     setGenerated((previous) => (previous === null ? previous : { ...previous, views }))
+  }
+
+  /** The fields ticked or unticked under "The Filter panel offers" (0123). */
+  function unfilteredChosen(unfiltered: string[]): void {
+    setGenerated((previous) => (previous === null ? previous : { ...previous, unfiltered }))
   }
 
   /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
@@ -277,7 +289,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request, views, carried } = generated
+    const { proposal, session, request, views, unfiltered, carried } = generated
     const open = asked(carried, policy)
     switch (current) {
       case 'generate':
@@ -300,7 +312,17 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
           />
         )
       case 'presentation':
-        return <PresentationStep session={session} bindings={proposal.bindings} views={views} onViews={viewed} carried={carried} />
+        return (
+          <PresentationStep
+            session={session}
+            bindings={proposal.bindings}
+            views={views}
+            onViews={viewed}
+            unfiltered={unfiltered}
+            onUnfiltered={unfilteredChosen}
+            carried={carried}
+          />
+        )
       case 'preview':
         return <PreviewStep session={session} bindings={proposal.bindings} />
       case 'publish':
@@ -311,6 +333,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             proposal={proposal}
             session={session}
             views={views}
+            unfiltered={unfiltered}
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}

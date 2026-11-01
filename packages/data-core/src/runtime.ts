@@ -58,8 +58,13 @@ export interface FilterOffer {
   days: FilterDays | null
 }
 
-/** A field a list may be filtered by, and what it offers. */
-export type FilterableField = { field: string } & FilterOffer
+/**
+ * A field a list may be filtered by, and what it offers; `offered`, whether
+ * the form's Filter panel offers a condition on it, which its administrator
+ * may decide it does not (0123). A field not offered is still filtered by:
+ * a view may name it, and the panel says a condition on it.
+ */
+export type FilterableField = { field: string; offered: boolean } & FilterOffer
 
 /**
  * A view of a form's list its administrator named (0105): conditions and an

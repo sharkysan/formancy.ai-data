@@ -12,6 +12,20 @@ later.
 
 ### Added
 
+- **An administrator chooses the fields a form's Filter panel offers**
+  (0123). Why: every field a list is filtered by was offered to every
+  person, an internal code or a technical flag included. In the studio's
+  Presentation step, under List views, "The Filter panel offers" ticks each
+  field a list is filtered by; unticked, the host page's Field menu leaves
+  it out. It is presentation, not permission: a view may still filter on
+  it, the panel says such a condition with its Remove, and the list route
+  still answers one. What you notice: `list.filterable` gives each field
+  `offered`, which this release's `@formancy/data-client` requires, so a
+  host upgrades its server first; a presentation may hold `unfiltered`,
+  which a publish holds to fields a list is filtered by and a regeneration
+  carries by their columns; and a draft's reviewer reads the fields it
+  leaves out.
+
 - **The studio edits a field's help text** (0119), in the Presentation step,
   in a Help text box under each field's label. Why: since 0118 a field's
   help text is its column's comment, which was written for whoever reads

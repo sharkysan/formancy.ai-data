@@ -62,7 +62,7 @@ export function freshFields(before: FormBindings, after: FormBindings): string[]
 }
 
 export type CarriedDraft =
-  { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[] } | { ok: false; message: string }
+  { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[]; unfiltered: string[] } | { ok: false; message: string }
 
 /**
  * A draft's presentation carried to a new proposal of the same form: derived
@@ -76,11 +76,18 @@ export type CarriedDraft =
  * A draft that is not only presentation is refused, saying why, rather than
  * carried without what does not fit.
  */
-export function carryDraft(from: { proposal: Proposal; edited: FormSchema; views: readonly ListView[] }, to: Proposal): CarriedDraft {
+export function carryDraft(
+  from: { proposal: Proposal; edited: FormSchema; views: readonly ListView[]; unfiltered: readonly string[] },
+  to: Proposal,
+): CarriedDraft {
   const derived = presentationOf(from.proposal.form, from.edited, from.proposal.bindings)
   if (!derived.ok) return { ok: false, message: `the draft holds edits that are not presentation: ${derived.problems.join('; ')}` }
-  // No views is the property left out, as a publish sends it.
-  const presentation = from.views.length === 0 ? derived.presentation : { ...derived.presentation, views: [...from.views] }
+  // No views, and no field left out of the Filter panel (0123), are the properties left out, as a publish sends them.
+  const presentation = {
+    ...derived.presentation,
+    ...(from.views.length === 0 ? {} : { views: [...from.views] }),
+    ...(from.unfiltered.length === 0 ? {} : { unfiltered: [...from.unfiltered] }),
+  }
   // The rebase throws only for a base the generator did not write, which a
   // proposal never is and the derivation above has already read.
   const rebased = rebasePresentation({ base: from.proposal.form, presentation, bindings: from.proposal.bindings }, { base: to.form, bindings: to.bindings })
@@ -90,6 +97,7 @@ export function carryDraft(from: { proposal: Proposal; edited: FormSchema; views
     conflicts: rebased.conflicts,
     fresh: freshFields(from.proposal.bindings, to.bindings),
     views: rebased.presentation.views ?? [],
+    unfiltered: rebased.presentation.unfiltered ?? [],
   }
 }
 

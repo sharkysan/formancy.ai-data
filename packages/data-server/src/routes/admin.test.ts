@@ -432,6 +432,34 @@ describe('the administrator plane', () => {
     expect(served.bundle.presentation.views).toEqual(views)
   })
 
+  // The fields the Filter panel leaves out (0123) are stored for later as
+  // views are: a key no list of the form is filtered by is refused at the
+  // write, naming it, and nothing is written; one it is filtered by
+  // publishes and reads back as it was sent. Watched failing with the fit
+  // left out of `storable`: ghost was stored.
+  test('publishes the fields its Filter panel leaves out, and refuses one no list is filtered by', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const bundle = bundleOf(proposal)
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, presentation: { ...EMPTY_PRESENTATION, unfiltered: ['ghost'] } } },
+    })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: ['presentation: /unfiltered/0: ghost is not a field this list is filtered by.'] })
+    expect(await store.latest('employee')).toBeNull()
+    const published = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: { ...bundle, presentation: { ...EMPTY_PRESENTATION, unfiltered: ['name'] } } },
+    })
+    expect(published.statusCode, published.body).toBe(201)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+    expect(served.bundle.presentation.unfiltered).toEqual(['name'])
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

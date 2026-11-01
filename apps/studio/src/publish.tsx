@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { presentationOf, viewProblems } from '@formancy/data-core'
+import { presentationOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
 import type { DriftChange, DriftReport, FormPolicy, ListView, ReassignedKey } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
@@ -136,6 +136,7 @@ export function PublishStep({
   proposal,
   session,
   views = [],
+  unfiltered = [],
   policy,
   stale,
   regeneratedFrom = null,
@@ -152,6 +153,8 @@ export function PublishStep({
   session: BuilderSession
   /** The list views chosen in the Presentation step (0105), in their order. */
   views?: readonly ListView[]
+  /** The fields the Filter panel does not offer, chosen beside them (0123). */
+  unfiltered?: readonly string[]
   policy: FormPolicy
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
@@ -201,6 +204,7 @@ export function PublishStep({
     undecided.length === 0 ? null : `Grants for ${undecided.join(', ')} were written for another column or lookup: keep or remove them in the Policy step.`,
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
     ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
+    ...unfilteredProblems(unfiltered, proposal.bindings).map((problem) => `A field left out of the Filter panel the server refuses: ${problem}`),
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
   const next = (expected ?? 0) + 1
@@ -228,8 +232,12 @@ export function PublishStep({
     if (pending) return
     if (!derived.ok) return
     const { form, bindings, snapshot, generation } = proposal
-    // No views is the property left out: the server refuses `views: []`, a second spelling of none.
-    const presentation = views.length === 0 ? derived.presentation : { ...derived.presentation, views: [...views] }
+    // No views, and none left out of the Filter panel, are the properties left out: the server refuses `[]`, a second spelling of none.
+    const presentation = {
+      ...derived.presentation,
+      ...(views.length === 0 ? {} : { views: [...views] }),
+      ...(unfiltered.length === 0 ? {} : { unfiltered: [...unfiltered] }),
+    }
     const bundle: Bundle = { format: 2, connection, generation, base: form, presentation, form: session.exportDocument(), bindings, policy, snapshot }
     const sent: Published = { version: expected ?? 0, bundle }
     setPending(true)

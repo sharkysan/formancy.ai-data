@@ -1,4 +1,4 @@
-import { describeReassigned, diffSnapshots, viewProblems } from '@formancy/data-core'
+import { describeReassigned, diffSnapshots, unfilteredProblems, viewProblems } from '@formancy/data-core'
 import type { DriftChange, DriftReport, FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
 import type { FastifyBaseLogger } from 'fastify'
 import { generatedProblems } from './bundle-format2.js'
@@ -40,9 +40,11 @@ const INVALID = 'The bundle cannot be published.'
  * its base and bindings from its snapshot and request (0030) -- asked here,
  * at the write, and never on read, so a later generator cannot make a stored
  * version corrupt; and every list view its presentation names is one a list
- * of its bindings could run (`viewProblems`, 0105), asked here for the same
- * reason: a view a later release no longer runs is not offered, and the
- * version is still served.
+ * of its bindings could run (`viewProblems`, 0105), and every field its
+ * Filter panel leaves out one a list of them is filtered by
+ * (`unfilteredProblems`, 0123), asked here for the same reason: a view a
+ * later release no longer runs is not offered, and the version is still
+ * served.
  *
  * `unknown` is the sentence for a connection the allowlist does not know:
  * the import says why a name has to match across deployments.
@@ -67,7 +69,10 @@ export function storable(
   if (!allowlisted(bundle.connection)) return refused(unknown(bundle.connection))
   const generated = generatedProblems(bundle)
   if (generated.length > 0) return refused(INVALID, { problems: generated })
-  const views = viewProblems(bundle.presentation.views ?? [], bundle.bindings)
+  const views = [
+    ...viewProblems(bundle.presentation.views ?? [], bundle.bindings),
+    ...unfilteredProblems(bundle.presentation.unfiltered ?? [], bundle.bindings),
+  ]
   if (views.length > 0) return refused(INVALID, { problems: views.map((problem) => `presentation: ${problem}`) })
   return { ok: true, bundle }
 }
