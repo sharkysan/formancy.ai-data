@@ -1,6 +1,6 @@
 # 0118 — Generated forms move to spec 5 for a field's help text from its column's comment, and the server serves spec 3 beside it
 
-- **Status:** accepted; supersedes [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md): generated documents say spec 5, and the server serves spec 3, which every version stored before says, beside the version it generates; extended by [0119](0119-a-fields-help-text-is-presentation-the-studio-edits.md): help text from a column's comment is replaced or removed in the studio's Presentation step
+- **Status:** accepted; supersedes [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md): generated documents say spec 5, and the server serves spec 3, which every version stored before says, beside the version it generates; extended by [0119](0119-a-fields-help-text-is-presentation-the-studio-edits.md): help text from a column's comment is replaced or removed in the studio's Presentation step; narrowed by [0120](0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md): a whole-number field carries spec 4's `step: 1`, and refuses a fraction in the browser
 - **Date:** 2026-10-31
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -3454,7 +3454,7 @@
       ]
     },
     "0118": {
-      "reviewed": "sha256:7dec1d5e42e33e94ab76ec88af20e8420901baf851265cf1a68a999205437777",
+      "reviewed": "sha256:bb4a1c78ef8d9a2a3d588a443d04b843283069e1a5d12ebb6b615abfeee743b4",
       "limitations": [
         {
           "area": "host",
@@ -3480,11 +3480,6 @@
           "heldBy": "packages/data-core/src/generate/generate.test.ts"
         },
         {
-          "area": "forms",
-          "says": "A whole-number field accepts a fraction in the browser and only the server's codec refuses it: generated forms carry no step.",
-          "heldBy": "packages/data-core/src/generate/generate.test.ts"
-        },
-        {
           "area": "operations",
           "says": "A deployment rolled back to a release before 0118 refuses every version published since, as spec \"5\", until an earlier version is restored there; versions published before the upgrade are served as they were.",
           "heldBy": "packages/data-server/src/bundle.test.ts"
@@ -3506,6 +3501,20 @@
         {
           "area": "operations",
           "says": "A server of a release before this one refuses a version whose presentation sets help text, and every spec 5 version already, so a deployment rolled back serves it only once an earlier version is restored there."
+        }
+      ]
+    },
+    "0120": {
+      "reviewed": "sha256:e9f355f1a9ac87f4d2833c9d036b69e8aa87214d64d6f0969e8d1f8af5dc3b6e",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A fraction typed into a whole-number field is refused in the browser with formancy's \"Enter a value in steps of 1.\", not words about whole numbers.",
+          "heldBy": "packages/data-core/src/generate/generate.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A version stored before this release has no step on its whole-number fields, so its form takes a fraction in the browser, and only the server refuses it, until it is published again."
         }
       ]
     }

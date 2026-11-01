@@ -302,22 +302,34 @@ describe('generateForm', () => {
     expect(form.model.fields.find((field) => field.key === 'created_by')).toMatchObject({ type: 'number', min: -2147483648, max: 2147483647 })
   })
 
-  // The one rule checked on one side only (0009, 0042, 0118): a whole-number
-  // field is a bounded number with no `step` -- spec 5 has one, and the
-  // generator writes none yet -- so the engine takes 1.5 in the browser and
-  // in the server's replay alike, and only the server's codec refuses it
-  // (codec.test.ts, "refuses fractions").
-  // A limitation the release report prints as held by this file, so it is
-  // shown here rather than inferred from the absence of a property. Watched
-  // failing with the generator writing `step: 1` at spec 4.
-  test('a whole-number field takes a fraction in the engine, browser and server alike', () => {
+  // A whole number is checked in the browser as the server checks it
+  // (0120): a bounded number with `step: 1`, which the engine holds from
+  // the field's minimum, so 1.5 is refused with `step` in the browser's mode
+  // and the server's replay alike, and 2 is taken -- before the server's
+  // codec, which still refuses a fraction (codec.test.ts, "refuses
+  // fractions"). Watched failing with no `step` written: 1.5 was taken.
+  test('a whole-number field refuses a fraction in the engine, browser and server alike', () => {
     const { form } = generateForm(fixtureLike('postgres'), ORDER)
     const created = form.model.fields.find((field) => field.key === 'created_by')
-    expect(created).toMatchObject({ type: 'number', min: -2147483648, max: 2147483647 })
-    expect(created).not.toHaveProperty('step')
-    const changes = { customer: 'k', order_date: '2026-10-08', status: 'placed', amount: '1.5', created_by: 1.5 }
+    expect(created).toMatchObject({ type: 'number', min: -2147483648, max: 2147483647, step: 1 })
+    const answers = { customer: 'k', order_date: '2026-10-08', status: 'placed', amount: '1.5' }
+    expect(serverErrors(form, { ...answers, created_by: 1.5 })).toEqual({ created_by: ['step'] })
+    expect(serverErrors(form, { ...answers, created_by: 2 })).toEqual({})
     for (const mode of ['client', 'server'] as const) {
-      expect(runScenarios(form, [{ name: 'a fraction', changes, valid: true }], { mode }), mode).toEqual([{ name: 'a fraction', passed: true, failures: [] }])
+      expect(
+        runScenarios(
+          form,
+          [
+            { name: 'a fraction', changes: { ...answers, created_by: 1.5 }, valid: false, errors: { created_by: ['step'] } },
+            { name: 'a whole number', changes: { ...answers, created_by: -2147483648 }, valid: true },
+          ],
+          { mode },
+        ),
+        mode,
+      ).toEqual([
+        { name: 'a fraction', passed: true, failures: [] },
+        { name: 'a whole number', passed: true, failures: [] },
+      ])
     }
   })
 

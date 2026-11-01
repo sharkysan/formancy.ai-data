@@ -38,7 +38,9 @@ another part of it
 engine checks identically in the browser and in its server replay
 ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md));
 spec 5, which generated forms are in, brought no exact-decimal type either
-([0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
+([0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)). A whole number is a bounded `number` with `step: 1`, so a
+fraction is refused in the browser as the server's codec refuses it
+([0120](../decisions/0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md)).
 The adapters bind values from the text a codec returned and read them as
 text converted in SQL, never through the driver's number or date handling
 ([0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md),

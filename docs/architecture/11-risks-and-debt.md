@@ -198,9 +198,9 @@ design, not something measured here
 offered, a table with a version-looking column is create-only until
 somebody confirms it, and generated labels are de-snaked column names
 ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
-A whole-number field accepts a fraction in the browser and only the
-server's codec refuses it: generated forms carry no `step`
-([0118](../decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)). A field's help text is its column's comment, which drift
+A fraction in a whole-number field is refused with formancy's words for
+any step, "Enter a value in steps of 1."
+([0120](../decisions/0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md)). A field's help text is its column's comment, which drift
 review does not compare, until the studio's Presentation step replaces or
 removes it ([0119](../decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
 A client sends exact decimals as strings, and a value comes back
@@ -530,8 +530,7 @@ for upstream's contribution rules and its next release.
 **Forms on spec 5.** The cost of 0118, bought for a field's help text from
 its column's comment: a host whose renderer is older than `@formancy/*`
 0.8.0 refuses every form published since, and a deployment rolled back
-before 0118 refuses them too until an earlier version is restored. A
-whole-number field still has no `step` to refuse a fraction with.
+before 0118 refuses them too until an earlier version is restored.
 
 **Published configuration is files.** The cost of 0013 and 0062, bought
 for no lock, no daemon and no second database: one instance, and a version
