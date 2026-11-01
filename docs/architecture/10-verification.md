@@ -185,10 +185,11 @@ and each of these fails on the change that breaks what it holds:
   A path given from inside a package, or whose first directory is
   misspelled, is not read as one, a package named that the workspace does
   not have passes, and whether a sentence is still true is review's.
-- **The lint rules and the format.** `scripts/code-style/code-style.test.mjs`:
-  the rules the four repositories share, a copy of Formancy Health's, each
-  at error on the kind of file it is for and each path a repository passes
-  doing what it says, on a repository of real files it writes.
+- **The lint rules and the format.** `@formancy/code-style`, the rules the
+  four repositories share, is held by its own suite in formancy.ai
+  (formancy.ai 0225, the package's `code-style.test.mjs`): each at error on the
+  kind of file it is for and each path a repository passes doing what it
+  says, on a repository of real files it writes.
   `scripts/lint.test.mjs`: this repository's wiring -- every TypeScript and
   JavaScript file git holds linted by the rules its kind is held to and
   none at `warn`, `require-await` off in every file and a test's seven
@@ -481,9 +482,8 @@ and a number typed here would drift from the next run.
   that a merged branch is deleted, which a repository setting does
   ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md));
   and that the pull request bringing the format merges with a merge commit,
-  so that `.git-blame-ignore-revs` names commits on `main`, and that the
-  lint rules are Formancy Health's and those formancy.ai publishes, which
-  nothing compares ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
+  so that `.git-blame-ignore-revs` names commits on `main`
+  ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 - **"Tested on" is not "accepted by".** Nothing in the product refuses a
   server version no test ran but SQL Server discovery before 2019; a
   snapshot records the server it was read from, and the studio and drift

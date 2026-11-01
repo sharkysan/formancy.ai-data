@@ -474,20 +474,6 @@ apart by a space set in proportional type; and the studio's preview loses a
 field's required marker where the renderer cannot fill its options, which
 is upstream's renderer and themes.
 
-**The lint and format rules are a copy** until this repository pins
-`@formancy/code-style`: [`code-style.mjs`](../../scripts/code-style/code-style.mjs)
-and [`code-style.test.mjs`](../../scripts/code-style/code-style.test.mjs)
-are Formancy Health's, byte for byte, which
-[`eslint.config.mjs`](../../eslint.config.mjs) and
-[`prettier.config.mjs`](../../prettier.config.mjs) call with this
-repository's paths, and nothing compares them with Health's or with the
-package, so a rule changed in one reaches the others by hand alone. The
-swap pins the package exactly as a root devDependency, deletes the copy,
-has the two config files import the package, and extends
-[`upstream-deps.mjs`](../../scripts/upstream-deps.mjs) to the root
-manifest, which holds no `@formancy/*` dependency until then
-([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
-
 The README's *Status* paragraph names what is not there yet: figures for a
 page of records, the menu of forms and a delete; a host page on another
 origin run in a browser; a run through a real Cloudflare tunnel; anything

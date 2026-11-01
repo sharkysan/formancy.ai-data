@@ -33,9 +33,12 @@ const EXACT = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/
 
 const FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
 
-/** Every workspace manifest, read from disk. */
+/**
+ * Every workspace manifest, read from disk, and the root's first: the lint and
+ * format rules are @formancy/code-style, its devDependency (0116).
+ */
 export function workspaceManifests(repoRoot = root) {
-  const found = []
+  const found = [JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))]
   for (const group of ['packages', 'apps']) {
     if (!existsSync(join(repoRoot, group))) continue
     for (const name of readdirSync(join(repoRoot, group)).sort()) {

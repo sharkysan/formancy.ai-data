@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import * as prettier from 'prettier'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { prettierConfig } from './code-style/code-style.mjs'
+import { prettierConfig } from '@formancy/code-style'
 
 /**
  * The merge a branch begun before the format takes main through

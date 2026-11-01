@@ -1324,8 +1324,7 @@ pnpm format      # Prettier, over every TypeScript and JavaScript file, before c
 
 CI fails a TypeScript or JavaScript file that breaks a lint rule or that
 Prettier would write otherwise; the rules and the style are the four
-formancy repositories' shared ones, a copy until formancy.ai publishes
-them
+formancy repositories' shared ones, `@formancy/code-style`, pinned exactly
 ([0116](./docs/decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)).
 A branch begun before the format takes `main` through
 `scripts/prettier-merge.mjs`, as

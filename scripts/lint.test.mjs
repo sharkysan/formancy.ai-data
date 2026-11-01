@@ -10,7 +10,7 @@ import * as prettier from 'prettier'
 import ts from 'typescript'
 import tseslint from 'typescript-eslint'
 import { describe, expect, test } from 'vitest'
-import { FILES, prettierConfig } from './code-style/code-style.mjs'
+import { FILES, prettierConfig } from '@formancy/code-style'
 
 /**
  * The linter's and the formatter's wiring, as a gate: that every
@@ -18,9 +18,8 @@ import { FILES, prettierConfig } from './code-style/code-style.mjs'
  * with the paths eslint.config.mjs passes them, and formatted in
  * prettier.config.mjs's style.
  *
- * The rules themselves are scripts/code-style/code-style.mjs, the copy of
- * what formancy.ai will publish as a shared package for all four
- * repositories, and code-style.test.mjs beside it holds what each does.
+ * The rules themselves are @formancy/code-style, the package shared by all
+ * four repositories, and its own suite in formancy.ai holds what each does.
  * What is held here is derived from the files git holds, each known by the
  * language Prettier infers for it, and from the two recommended sets as
  * ESLint itself computes them, never from a list of this file's own: a
@@ -33,7 +32,7 @@ import { FILES, prettierConfig } from './code-style/code-style.mjs'
  * gives no findings the second time (Health's run 41083791693). A case
  * that edits a repository file's text, or lints one twice, would pass
  * there having checked nothing. What a rule does to a text is held in
- * code-style.test.mjs, in a repository of real files it writes.
+ * the package's suite, in a repository of real files it writes.
  *
  * What it cannot see: whether a rule's verdict is right. It holds that a
  * rule runs and fails the build, not that what it reports is a defect.
