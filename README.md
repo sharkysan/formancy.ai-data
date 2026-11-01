@@ -676,7 +676,10 @@ levels, one press each, to the form before
 ([0097](./docs/decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
 
 Filter, under the search and in each child section, opens the grid's own
-panel over the fields the server offers a filter on, by their labels: a
+panel over the fields the server offers a filter on, by their labels --
+less any the form's administrator left out of the panel in the studio's
+List views, though a view may still filter on one and the panel says it
+([0123](./docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) -- : a
 field, a condition it offers -- is, is between, contains, has no value,
 has a value -- and a value, or a range's From and To, as the field takes
 them; a timestamp's range is whole days, in UTC for an instant, as the grid

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { PublishedForm } from '@formancy/data-client'
-import { conditionOf, draftFor, draftHint, panelFields, summaryOf, withTerm } from './filter-terms.js'
+import { conditionOf, draftFor, draftHint, panelFields, panelShown, summaryOf, withTerm } from './filter-terms.js'
 import type { Draft, PanelField } from './filter-terms.js'
 
 /*
@@ -38,15 +38,15 @@ const definition = {
     searchable: ['carrier'],
     sortable: ['carrier'],
     filterable: [
-      { field: 'id', operators: ['equals'], input: 'uuid', days: null },
-      { field: 'carrier', operators: ['equals', 'contains'], input: 'text', days: null },
-      { field: 'shipped_at', operators: ['range', 'null', 'not-null'], input: 'date', days: 'utc' },
-      { field: 'dispatched_at', operators: ['range', 'null', 'not-null'], input: 'date', days: 'wall' },
-      { field: 'parcels', operators: ['equals', 'range'], input: 'integer', days: null },
-      { field: 'weight', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
-      { field: 'due', operators: ['equals', 'range'], input: 'date', days: null },
-      { field: 'insured', operators: ['equals'], input: 'boolean', days: null },
-      { field: 'notes', operators: ['equals', 'contains', 'null', 'not-null'], input: 'text', days: null },
+      { field: 'id', offered: true, operators: ['equals'], input: 'uuid', days: null },
+      { field: 'carrier', offered: true, operators: ['equals', 'contains'], input: 'text', days: null },
+      { field: 'shipped_at', offered: true, operators: ['range', 'null', 'not-null'], input: 'date', days: 'utc' },
+      { field: 'dispatched_at', offered: true, operators: ['range', 'null', 'not-null'], input: 'date', days: 'wall' },
+      { field: 'parcels', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
+      { field: 'weight', offered: true, operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
+      { field: 'due', offered: true, operators: ['equals', 'range'], input: 'date', days: null },
+      { field: 'insured', offered: true, operators: ['equals'], input: 'boolean', days: null },
+      { field: 'notes', offered: false, operators: ['equals', 'contains', 'null', 'not-null'], input: 'text', days: null },
     ],
   },
 } as unknown as PublishedForm
@@ -56,6 +56,19 @@ const field = (key: string): PanelField => fields.find((offered) => offered.fiel
 const draft = (key: string, rest: Partial<Draft>): Draft => ({ ...draftFor(field(key)), ...rest })
 
 describe('the fields a panel offers', () => {
+  // The panel is drawn for a field it offers, or for a condition applied
+  // -- a view's, on a field the administrator left out of the panel (0123)
+  // -- which it says; with neither, a grid has no panel to draw. Watched
+  // failing with the panel drawn for any field filtered by: a list whose
+  // every field was left out drew an empty panel.
+  test('is drawn for a field it offers, or for a condition applied on one it does not', () => {
+    const notes = [field('notes')]
+    expect(panelShown(fields, [])).toBe(true)
+    expect(panelShown(notes, [])).toBe(false)
+    expect(panelShown(notes, [{ field: 'notes', op: 'contains', text: 'x' }])).toBe(true)
+    expect(panelShown([], [{ field: 'notes', op: 'contains', text: 'x' }])).toBe(false)
+  })
+
   // The server's offers, in its order, each by the label the form gives it,
   // a timestamp's days on the clock the offer names -- UTC's for an instant,
   // the stored clock's for one in no zone -- whatever control the form draws

@@ -61,13 +61,17 @@ same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise
 says which fields a page may be searched, sorted and filtered by
 ([0044](../../docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md),
-[0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): `filterable` is one `{ field, operators, input, days }` per field a
+[0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): `filterable` is one `{ field, offered, operators, input, days }` per field a
 condition may name, the operators among `equals`, `range`, `contains`,
 `null` and `not-null`, and `input` what a value is typed as -- `text`,
 `integer`, `decimal`, `date`, `uuid` or `boolean`, a timestamp's range
 being days -- or `null` where only `null` and `not-null` are offered, and
 `days` whose clock a timestamp's days are on, `utc` for an instant and
-`wall` for one in no zone, `null` for any other field. `views` is the
+`wall` for one in no zone, `null` for any other field; `offered` is
+whether the form's Filter panel offers it, false where its administrator
+left it out, though a condition on it is still answered
+([0123](../../docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)), and a list whose field says nothing of
+it is `unexpected`. `views` is the
 published views this person could have built from the rest
 ([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
 each `{ name, filter, sort }` and `default: true` on the one a grid opens

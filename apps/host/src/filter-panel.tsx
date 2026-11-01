@@ -158,16 +158,21 @@ export function FilterPanel({
 }: {
   /** What every element id of the panel starts with: one panel per grid. */
   idBase: string
-  /** The fields the server offers a filter on, never empty. */
+  /**
+   * The fields the list is filtered by, never empty: the Field menu offers
+   * those the form's Filter panel offers (0123), and a condition on any of
+   * them -- a view's on one left out -- is said below it.
+   */
   fields: readonly PanelField[]
   /** The filter as applied: what the grid lists and a file holds. */
   filter: readonly ListFilterTerm[]
   onFilter: (next: ListFilterTerm[]) => void
 }): ReactElement {
   const byField = new Map(fields.map((field) => [field.field, field]))
+  const offered = fields.filter((candidate) => candidate.offered)
   const [open, setOpen] = useState(false)
-  // The panel is drawn only for a list with a field to filter by.
-  const first = fields[0] as PanelField
+  // The panel is drawn only for a list with a field to filter by; its form only where one is offered.
+  const first = (offered[0] ?? fields[0]) as PanelField
   const [draft, setDraft] = useState<Draft>(() => draftFor(first))
   /** Why the draft is not a condition yet, until it changes. */
   const [problem, setProblem] = useState('')
@@ -222,59 +227,70 @@ export function FilterPanel({
 
   return (
     <div className="filter-block">
-      <button
-        type="button"
-        className="button quiet disclosure"
-        ref={toggle}
-        aria-expanded={open}
-        aria-controls={`${idBase}-tool`}
-        onClick={() => setOpen(!open)}
-      >
-        <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
-          <path d={open ? 'M2 4l4 4 4-4' : 'M4 2l4 4-4 4'} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Filter
-      </button>
-      <div id={`${idBase}-tool`} hidden={!open}>
-        <form className="filter-form" noValidate onSubmit={apply}>
-          <Choice
-            id={`${idBase}-field`}
-            label="Field"
-            value={draft.field}
-            options={fields.map((offered) => ({ value: offered.field, label: offered.label }))}
-            onChange={chooseField}
-          />
-          <Choice
-            id={`${idBase}-op`}
-            label="Condition"
-            value={draft.op}
-            options={field.operators.map((op) => ({ value: op, label: OPERATOR_WORDS[op] }))}
-            onChange={(op) => edit({ ...draft, op: op as Draft['op'] })}
-          />
-          <Values idBase={idBase} field={field} draft={draft} describedBy={described} onDraft={edit} />
+      {offered.length === 0 ? null : (
+        <>
           <button
-            type="submit"
-            className="button"
-            id={`${idBase}-apply`}
-            aria-describedby={[described, `${idBase}-problem`].filter((id) => id !== undefined).join(' ')}
+            type="button"
+            className="button quiet disclosure"
+            ref={toggle}
+            aria-expanded={open}
+            aria-controls={`${idBase}-tool`}
+            onClick={() => setOpen(!open)}
           >
-            Apply
+            <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
+              <path
+                d={open ? 'M2 4l4 4 4-4' : 'M4 2l4 4-4 4'}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Filter
           </button>
-          {hint === null ? null : (
-            <p className="hint filter-hint" id={`${idBase}-hint`}>
-              {hint}
-            </p>
-          )}
-          {held ? (
-            <p className="hint filter-hint" id={`${idBase}-held`}>
-              Apply replaces the condition {field.label} has.
-            </p>
-          ) : null}
-          <p role="status" id={`${idBase}-problem`} className="status filter-problem" data-kind="refused" aria-labelledby={`${idBase}-apply`}>
-            {problem}
-          </p>
-        </form>
-      </div>
+          <div id={`${idBase}-tool`} hidden={!open}>
+            <form className="filter-form" noValidate onSubmit={apply}>
+              <Choice
+                id={`${idBase}-field`}
+                label="Field"
+                value={draft.field}
+                options={offered.map((choice) => ({ value: choice.field, label: choice.label }))}
+                onChange={chooseField}
+              />
+              <Choice
+                id={`${idBase}-op`}
+                label="Condition"
+                value={draft.op}
+                options={field.operators.map((op) => ({ value: op, label: OPERATOR_WORDS[op] }))}
+                onChange={(op) => edit({ ...draft, op: op as Draft['op'] })}
+              />
+              <Values idBase={idBase} field={field} draft={draft} describedBy={described} onDraft={edit} />
+              <button
+                type="submit"
+                className="button"
+                id={`${idBase}-apply`}
+                aria-describedby={[described, `${idBase}-problem`].filter((id) => id !== undefined).join(' ')}
+              >
+                Apply
+              </button>
+              {hint === null ? null : (
+                <p className="hint filter-hint" id={`${idBase}-hint`}>
+                  {hint}
+                </p>
+              )}
+              {held ? (
+                <p className="hint filter-hint" id={`${idBase}-held`}>
+                  Apply replaces the condition {field.label} has.
+                </p>
+              ) : null}
+              <p role="status" id={`${idBase}-problem`} className="status filter-problem" data-kind="refused" aria-labelledby={`${idBase}-apply`}>
+                {problem}
+              </p>
+            </form>
+          </div>
+        </>
+      )}
       <Applied idBase={idBase} byField={byField} filter={filter} removes={removes.current} onRemove={remove} onClear={clear} />
     </div>
   )

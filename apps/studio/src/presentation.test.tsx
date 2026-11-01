@@ -208,6 +208,8 @@ describe('presentation', () => {
     await user.type(within(presentation).getByLabelText('Help text of notes'), 'Anything the courier should know.')
     await user.click(within(presentation).getByRole('button', { name: 'Move up Amount' }))
     await user.click(within(presentation).getByRole('button', { name: 'Move to Record Customer' }))
+    // Left out of the Filter panel (0123): its checkbox, named by the field's label, in its own group.
+    await user.click(within(within(presentation).getByRole('group', { name: 'The Filter panel offers' })).getByRole('checkbox', { name: 'Remarks' }))
     await writeOrderPolicy(user)
     const publish = await goTo(user, 'Publish')
     await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
@@ -237,7 +239,9 @@ describe('presentation', () => {
         .at(-1),
     ).toBe('customer')
     // Since 0030 the edits are kept as what they are -- a label, a width, an
-    // order, and since 0075 a section -- beside the generated base, so a
+    // order, since 0075 a section and since 0123 a field left out of the
+    // Filter panel (watched failing with the choice left out of the publish:
+    // no unfiltered) -- beside the generated base, so a
     // regeneration can carry them. A studio that published the edited form
     // alone would have nothing to carry, and every label would be lost at
     // the next one.
@@ -248,6 +252,7 @@ describe('presentation', () => {
         { field: 'notes', anchor: { kind: 'column', column: 'notes' }, label: 'Remarks', span: 'one', description: 'Anything the courier should know.' },
       ],
       sections: [{ anchor: { label: 'Order', occurrence: 0 }, order: main }],
+      unfiltered: ['notes'],
     })
     expect(bundle.base.model.fields.find((field) => field.key === 'notes')?.label).toBe('Notes')
     expect(screen.queryByRole('alert')).toBeNull()

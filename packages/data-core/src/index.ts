@@ -53,6 +53,7 @@ export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
 export { viewShapeProblems } from './presentation/views.js'
+export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
 export type {
   FieldAnchor,
   FieldPresentation,

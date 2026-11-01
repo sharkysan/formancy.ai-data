@@ -6,6 +6,7 @@ import type { FormSchema } from '@formancy/spec'
 import { sayCondition } from './condition-draft.js'
 import { labelOf } from './document.js'
 import { useFocusAfterRender } from './focus.js'
+import { FilterChoice } from './filter-choice.js'
 import { draftOfView, EMPTY_VIEW, VIEW_NAME, VIEW_SAVE, ViewForm, viewOf } from './view-form.js'
 import type { ViewDraft } from './view-form.js'
 
@@ -65,11 +66,16 @@ export function ListViewsPanel({
   document,
   views,
   onViews,
+  unfiltered,
+  onUnfiltered,
 }: {
   bindings: FormBindings
   document: FormSchema
   views: readonly ListView[]
   onViews: (views: ListView[]) => void
+  /** The fields the Filter panel does not offer (0123). */
+  unfiltered: readonly string[]
+  onUnfiltered: (next: string[]) => void
 }): ReactElement {
   const columns = useMemo(
     () =>
@@ -204,6 +210,7 @@ export function ListViewsPanel({
         onDraft={setDraft}
         onSave={save}
       />
+      <FilterChoice offers={columns.filterable} label={label} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
     </section>
   )
 }

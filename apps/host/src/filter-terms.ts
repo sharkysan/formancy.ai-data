@@ -40,6 +40,15 @@ export function panelFields(definition: PublishedForm): PanelField[] {
   return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: headings.get(offer.field) ?? offer.field }))
 }
 
+/**
+ * Whether a grid draws its Filter panel: a field the panel offers, or a
+ * condition applied -- a view's, on a field the administrator left out of
+ * the panel (0123) -- which the panel says.
+ */
+export function panelShown(fields: readonly PanelField[], filter: readonly ListFilterTerm[]): boolean {
+  return fields.some((field) => field.offered) || (fields.length > 0 && filter.length > 0)
+}
+
 /** What a person has chosen and typed in the panel, kept as typed. */
 export interface Draft {
   field: string

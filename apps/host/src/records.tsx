@@ -4,7 +4,7 @@ import type { DataClient, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
 import { DownloadCsv } from './download.js'
 import { FilterPanel } from './filter-panel.js'
-import { panelFields } from './filter-terms.js'
+import { panelFields, panelShown } from './filter-terms.js'
 import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { RecordGrid } from './record-grid.js'
@@ -189,7 +189,7 @@ export function Records({
               {searchBlock}
               <ViewPicker idBase="records" views={views} filter={filter} sort={sort} onPick={state.pick} />
               <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
-              {filterable.length === 0 ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
+              {!panelShown(filterable, filter) ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
             </>
           }
           refit={refit}

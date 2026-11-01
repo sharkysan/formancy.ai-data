@@ -136,12 +136,17 @@ export function PresentationStep({
   bindings,
   views,
   onViews,
+  unfiltered,
+  onUnfiltered,
   carried = null,
 }: {
   session: BuilderSession
   bindings: FormBindings
   views: readonly ListView[]
   onViews: (views: ListView[]) => void
+  /** The fields the Filter panel does not offer (0123). */
+  unfiltered: readonly string[]
+  onUnfiltered: (next: string[]) => void
   carried?: Carried | null
 }): ReactElement {
   const document = useDocument(session)
@@ -324,7 +329,7 @@ export function PresentationStep({
         </p>
       </div>
       {layout === undefined ? <p className="none">The form has no arrangement to edit.</p> : nodes(layout.nodes, [], false)}
-      <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} />
+      <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
     </>
   )
 }

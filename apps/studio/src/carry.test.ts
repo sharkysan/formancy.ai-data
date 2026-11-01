@@ -67,7 +67,7 @@ describe('carrying a draft to a new proposal', () => {
     expect(session.setFieldProperty(['notes'], 'label', 'Delivery notes').ok).toBe(true)
     expect(session.setFieldProperty(['order_date'], 'label', 'Ordered on').ok).toBe(true)
     plane.databases.set('fixture', notesRenamed())
-    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [] }, await propose())
+    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [], unfiltered: [] }, await propose())
     if (!carried.ok) throw new Error(carried.message)
     expect(carried.form.model.fields.find((field) => field.key === 'order_date')?.label).toBe('Ordered on')
     expect(carried.conflicts.map((conflict) => [conflict.kind, 'field' in conflict ? conflict.field : null])).toEqual([['field-gone', 'notes']])
@@ -88,13 +88,16 @@ describe('carrying a draft to a new proposal', () => {
       filter: [{ field: 'status', op: 'equals', value: 'placed' }],
       sort: [{ field: 'order_date', direction: 'desc' }],
     }
-    const same = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
+    const same = carryDraft({ proposal: before, edited, views: [noted, placed], unfiltered: ['notes'] }, await propose())
     expect(same.ok && same.views).toEqual([noted, placed])
+    // The field left out of the Filter panel (0123) goes with its column, as the view on it does.
+    expect(same.ok && same.unfiltered).toEqual(['notes'])
     expect(same.ok && same.conflicts).toEqual([])
     plane.databases.set('fixture', withoutColumn(OWNER_SNAPSHOT, 'order', 'notes'))
-    const carried = carryDraft({ proposal: before, edited, views: [noted, placed] }, await propose())
+    const carried = carryDraft({ proposal: before, edited, views: [noted, placed], unfiltered: ['notes'] }, await propose())
     if (!carried.ok) throw new Error(carried.message)
     expect(carried.views).toEqual([placed])
+    expect(carried.unfiltered).toEqual([])
     expect(carried.conflicts).toEqual([
       {
         kind: 'view-dropped',
@@ -113,7 +116,7 @@ describe('carrying a draft to a new proposal', () => {
     const before = await propose()
     const session = createBuilderSession(before.form)
     expect(session.setFieldProperty(['notes'], 'required', true).ok).toBe(true)
-    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [] }, before)
+    const carried = carryDraft({ proposal: before, edited: session.exportDocument(), views: [], unfiltered: [] }, before)
     expect(carried.ok).toBe(false)
     expect(!carried.ok && carried.message).toMatch(/^the draft holds edits that are not presentation: \/model\/fields\/\d+\/required: /)
   })

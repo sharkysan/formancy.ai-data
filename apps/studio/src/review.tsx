@@ -274,6 +274,17 @@ function DraftView({
           </ol>
         </div>
       )}
+      {bundle.presentation.unfiltered === undefined ? null : (
+        // What a person's Filter panel does not offer (0123), by the fields' labels.
+        <div className="draft-views">
+          <h4 id="draft-unfiltered">Left out of the Filter panel</h4>
+          <ul aria-labelledby="draft-unfiltered">
+            {bundle.presentation.unfiltered.map((key) => (
+              <li key={key}>{labelOf(bundle.form, key)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!pending ? null : (
         <div className="decide">
           {draft.refuses.approve !== undefined && draft.refuses.reject !== undefined ? null : (

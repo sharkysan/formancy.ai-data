@@ -9,6 +9,7 @@ import { placements } from './placement.js'
 import type { CarriedMoves } from './rebase-moves.js'
 import { carryMoves } from './rebase-moves.js'
 import { carryViews } from './rebase-views.js'
+import { carryUnfiltered } from './unfiltered.js'
 import type {
   FieldAnchor,
   FieldPresentation,
@@ -421,7 +422,14 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     bindings: regenerated.bindings,
     report: (index, conflict) => rebase.add(oldFields.length + before.sections.length + index, conflict),
   })
-  const presentation: PresentationOverrides = { version: PRESENTATION_VERSION, fields, sections, ...(views.length === 0 ? {} : { views }) }
+  const unfiltered = carryUnfiltered(published.presentation.unfiltered ?? [], rebase.follow, regenerated.bindings)
+  const presentation: PresentationOverrides = {
+    version: PRESENTATION_VERSION,
+    fields,
+    sections,
+    ...(views.length === 0 ? {} : { views }),
+    ...(unfiltered.length === 0 ? {} : { unfiltered }),
+  }
 
   const applied = applyPresentation(regenerated.base, presentation, regenerated.bindings)
   if (!applied.ok) throw new Error(`the carried presentation does not apply to the regenerated base: ${applied.problems.join('; ')}`)

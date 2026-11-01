@@ -321,7 +321,8 @@ describe('what a draft shows its reviewer', () => {
   // as the form. Said in words beside the policy -- its conditions by the
   // fields' labels, its order, and which view opens the grid -- so what is
   // approved is what was read; a draft without views says nothing of them.
-  // Watched failing with the views left out of the draft's view.
+  // Watched failing with the views left out of the draft's view. So are the
+  // fields its Filter panel leaves out (0123), by their labels.
   test('shows the list views approving it would offer, in words', async () => {
     const bundle = await orderBundle(plane)
     if (bundle.format !== 2) throw new Error('the order bundle is not format 2')
@@ -329,7 +330,7 @@ describe('what a draft shows its reviewer', () => {
       { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }], default: true },
       { name: 'Large', filter: [{ field: 'amount', op: 'range', from: '1000', to: null }], sort: [] },
     ]
-    await submit(plane, TOKENS.admin, null, { ...bundle, presentation: { ...bundle.presentation, views } })
+    await submit(plane, TOKENS.admin, null, { ...bundle, presentation: { ...bundle.presentation, views, unfiltered: ['notes'] } })
     await submit(plane, TOKENS.admin, null, await orderBundle(plane, readOnly(['auditor'])))
     const { user, review } = await reviewAs(TOKENS.publisher)
 
@@ -338,9 +339,11 @@ describe('what a draft shows its reviewer', () => {
       'Placed: where Status = placed; sorted by Order date descending; opens the grid.',
       'Large: where Amount from 1000.',
     ])
+    expect(items(region, 'Left out of the Filter panel')).toEqual(['Notes'])
     expect(await audit()).toEqual([])
     const without = await open(user, review, 2)
     expect(within(without).queryByRole('list', { name: 'List views' })).toBeNull()
+    expect(within(without).queryByRole('list', { name: 'Left out of the Filter panel' })).toBeNull()
   })
 })
 

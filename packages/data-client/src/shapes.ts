@@ -63,7 +63,7 @@ const FILTER_DAYS: Readonly<Record<FilterDays, true>> = { utc: true, wall: true 
  * not draw is not the server's.
  */
 function isFilterableField(value: unknown): value is FilterableField {
-  if (!isRecord(value) || typeof value['field'] !== 'string' || !isStrings(value['operators'])) return false
+  if (!isRecord(value) || typeof value['field'] !== 'string' || typeof value['offered'] !== 'boolean' || !isStrings(value['operators'])) return false
   const operators = value['operators']
   if (operators.length === 0 || !operators.every((op) => Object.hasOwn(FILTER_OPERATORS, op))) return false
   const { input, days } = value

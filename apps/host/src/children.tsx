@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
 import { FilterPanel } from './filter-panel.js'
-import { panelFields } from './filter-terms.js'
+import { panelFields, panelShown } from './filter-terms.js'
 import { columnsOf } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
@@ -378,7 +378,9 @@ export function ChildSection({
                   onChoices={state.setChoices}
                   onReset={state.resetChoices}
                 />
-                {filterable.length === 0 ? null : <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={state.setFilter} />}
+                {!panelShown(filterable, filter) ? null : (
+                  <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={state.setFilter} />
+                )}
               </>
             }
             refit={refit}
