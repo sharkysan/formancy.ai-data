@@ -8,6 +8,17 @@ const QUERY_CANCELED = '57014'
 
 const canceled = (error: unknown): boolean => typeof error === 'object' && error !== null && (error as { code?: unknown }).code === QUERY_CANCELED
 
+/**
+ * How long a statement has to settle after a cancel request was delivered
+ * once its execute was written before it is sent another, and how many it
+ * is sent so at most (0121): past the 100 ms this package's lookups-limits
+ * suite holds every answer for, so a statement the cancel did stop has
+ * answered there before another is due. Chosen over the suite's held
+ * answers, not measured on a real network.
+ */
+const CANCEL_AGAIN_AFTER_MS = 250
+const CANCELS_AFTER_EXECUTE = 4
+
 interface LookupStatement {
   readonly text: string
   readonly params: readonly Param[]
@@ -48,7 +59,8 @@ export async function runLookup(sql: Sql, statement: LookupStatement, signal: Lo
 /**
  * One run of the statement, answered with its rows or, the moment `signal`
  * aborts, with `signal.reason`; the statement is then cancelled once the
- * driver has sent it, and again once it has sent its execute, and its late
+ * driver has sent it, and once it has sent its execute, again for as long as
+ * a delivered cancel leaves it running (`cancelUntilStopped`), and its late
  * answer or error goes nowhere. The pooled connection comes back when the
  * driver settles the statement, as it does for every other.
  */
@@ -57,14 +69,17 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
   const { query, rows } = start(sql, statement.text, statement.params)
   const cancel = cancellerOf(query)
   let settled = false
-  const unlessSettled = (): void => {
-    if (!settled) cancel()
-  }
+  /** A cancel request unless the statement has settled: whether it was delivered, or `null` where none was sent. */
+  const unlessSettled = (): Promise<boolean> | null => (settled ? null : cancel())
+  const once = (): void => void unlessSettled()
+  const persist = (): void => cancelUntilStopped(unlessSettled, CANCELS_AFTER_EXECUTE)
   return new Promise<TextResult>((resolve, reject) => {
     const stop = (): void => {
       reject(signal.reason)
-      whenSent(query, unlessSettled)
-      whenExecuteSent(query, unlessSettled)
+      // Past its execute, the cancel sent now is the one that has to land.
+      const written = executeWritten(query)
+      whenSent(query, written ? persist : once)
+      if (!written) whenExecuteSent(query, persist)
     }
     rows.then(
       (result) => {
@@ -84,7 +99,8 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
 
 /**
  * What sends `query` a cancel request, each time it is called, with the
- * request's own failure handled.
+ * request's own failure handled, and says whether it was delivered: the
+ * request's connection closed by the server, which has read it.
  *
  * postgres.js's `query.cancel()` sends one cancel request on a connection it
  * opens for it, and reports that connection's failure -- a database that
@@ -95,18 +111,47 @@ function untilAborted(sql: Sql, statement: LookupStatement, signal: LookupSignal
  * suite with the cancel's connection refused at the hop). So this calls the
  * canceller the query holds, which `cancel()` calls and then forgets, and
  * handles what it returns: a cancel that could not be delivered stopped
- * nothing, and the statement finishes as it would have. It may call it a
- * second time, where `cancel()` would not (`whenExecuteSent`). Like `state`
+ * nothing, and the statement finishes as it would have. It may call it
+ * again, where `cancel()` would not (`cancelUntilStopped`). Like `state`
  * below, `canceller` is the driver's own, not its API; a postgres.js that
  * renamed it fails the suite as the cases whose statement is never stopped.
  */
-function cancellerOf(query: object): () => void {
+function cancellerOf(query: object): () => Promise<boolean> {
   const internal = query as { canceller?: ((query: object) => Promise<unknown>) | null }
   const canceller = internal.canceller
   internal.canceller = null
-  return () => {
-    void canceller?.(query).catch(() => {})
-  }
+  return () =>
+    canceller === null || canceller === undefined
+      ? Promise.resolve(false)
+      : canceller(query).then(
+          () => true,
+          () => false,
+        )
+}
+
+/**
+ * Cancels the statement, and again while a delivered cancel leaves it
+ * running: `CANCEL_AGAIN_AFTER_MS` after each that was delivered, while it
+ * has not settled, `remaining` times in all (0121).
+ *
+ * A cancel request travels on a connection of its own, and nothing orders it
+ * after the execute it was sent after. On a loaded network it can reach
+ * PostgreSQL while the backend still waits for the execute, which drops it
+ * as it drops one during the first round trip, and the statement then runs
+ * to its end -- as this package's lookups-limits suite shows with the
+ * execute held at the hop until the cancel had crossed, and as a loaded CI
+ * runner did to its queued case twice on PostgreSQL 18. PostgreSQL gives
+ * the client no sign of when the execute has arrived, so a cancel delivered
+ * and not answered is sent again. One still in transit is not: it has not
+ * failed, and another would only add a late cancel to land on the next
+ * lookup on that backend, which runs once more for one (`runLookup`).
+ */
+function cancelUntilStopped(send: () => Promise<boolean> | null, remaining: number): void {
+  const sent = send()
+  if (sent === null || remaining <= 1) return
+  void sent.then((delivered) => {
+    if (delivered) setTimeout(() => cancelUntilStopped(send, remaining - 1), CANCEL_AGAIN_AFTER_MS).unref()
+  })
 }
 
 /**
@@ -169,20 +214,21 @@ function whenSent(query: object, cancel: () => void): void {
  * every answer held 5 or 20 ms, in the 2026-10-15 review, and in each of
  * two runs of this package's lookups-limits suite with answers held 100 ms,
  * the same day, without the second cancel. So a
- * statement still unsettled once its execute is written is sent a second
- * cancel request. A first one that stopped the parse ends the query before
- * the execute is written, so then there is no second; a first that arrives
- * during the execute stops it as well, and the second, arriving after the
- * statement ended, can stop the next lookup on that backend, which then runs
- * once more (`runLookup`).
+ * statement still unsettled once its execute is written is sent another
+ * cancel request, and again while a delivered one leaves it running
+ * (`cancelUntilStopped`, 0121). A first one that stopped the parse ends the
+ * query before the execute is written, so then there is no second; a first
+ * that arrives during the execute stops it as well, and the second, arriving
+ * after the statement ended, can stop the next lookup on that backend, which
+ * then runs once more (`runLookup`).
  *
  * `describeFirst` is the driver's flag for that first round trip, set when
  * the query is built and cleared right after the execute is written; like
  * `state`, it is not the driver's API.
  */
 function whenExecuteSent(query: object, cancel: () => void): void {
+  if (executeWritten(query)) return
   const internal = query as { describeFirst?: unknown }
-  if (internal.describeFirst !== undefined && !internal.describeFirst) return
   let describeFirst: unknown = internal.describeFirst
   Object.defineProperty(query, 'describeFirst', {
     configurable: true,
@@ -194,4 +240,10 @@ function whenExecuteSent(query: object, cancel: () => void): void {
       if (waited && !value) setImmediate(cancel)
     },
   })
+}
+
+/** Whether postgres.js has written the execute of `query`: its `describeFirst`, set when it is built, cleared once the execute is out. */
+function executeWritten(query: object): boolean {
+  const { describeFirst } = query as { describeFirst?: unknown }
+  return describeFirst !== undefined && !describeFirst
 }

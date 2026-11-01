@@ -665,6 +665,32 @@ describe('held connections', () => {
     await fromClient(later, text('flows at once'))
   })
 
+  // The other way round (0121): what a connection already open sends is
+  // held, and a connection opened afterwards -- a cancel request's own --
+  // flows, so a test can make a cancel reach PostgreSQL before the execute
+  // it was sent after, as a loaded network can. A gate that held the new
+  // connection too would hold the cancel with the execute, and prove
+  // nothing; one that let the open connection through would hold nothing.
+  // Watched failing with the gate holding new connections as before: the
+  // later connection's bytes never arrived.
+  test('holds what a connection already open sends, in order, until release; later connections flow', async () => {
+    const { hop, connect } = await setUp()
+    const open = await connect()
+    const gate = hop.holdOpenConnections()
+    open.client.write(text('bind '))
+    open.client.write(text('execute'))
+    const later = await connect()
+    await fromClient(later, text('cancel request'))
+    await fromServer(open, text('answers still reach it'))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(open.atServer().length).toBe(0)
+    expect(gate.held()).toBe(1)
+    gate.release()
+    await until(() => open.atServer().toString('latin1') === 'bind execute', 'the held bytes arrived, in order')
+    await fromClient(open, text(' and after'))
+    expect(open.atServer().toString('latin1')).toBe('bind execute and after')
+  })
+
   // A client that sends its request and closes its half -- as a cancel
   // request's sender may -- must not have the close overtake the bytes held
   // before it: the server would see an empty connection and cancel nothing.

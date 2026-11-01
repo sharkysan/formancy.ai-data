@@ -590,6 +590,21 @@ later.
 
 ### Fixed
 
+- **An abandoned PostgreSQL lookup is stopped when its cancel overtakes its
+  execute** (0121). Why: the cancel sent after a lookup's execute travels
+  on a connection of its own, so on a loaded network it can reach
+  PostgreSQL first, while the backend still waits for the execute, and be
+  dropped; the statement then ran to its end -- the load a lookup deadline
+  is meant to shed -- and the suite's queued case failed so twice on
+  PostgreSQL 18 in CI. A cancel delivered after the execute was written
+  that has not stopped the statement 250 ms later is now sent again, four
+  in all; one still on its way is never followed, so a late cancel stays
+  one. What you notice: up to three more cancel requests for such a
+  lookup, and, where a stopped statement takes longer than 250 ms to say
+  so, one more late cancel that can stop the next lookup on its backend,
+  which runs once more. SQL Server is unchanged. The fixtures' TCP hop can
+  hold what an open connection sends (`holdOpenConnections`).
+
 - **`createSnapshot` names what it refuses as it was given** (0068,
   0049). A server fact, or an inbound key's referenced column, given as an
   object was refused as "[object Object]"; it is now written as JSON, a
