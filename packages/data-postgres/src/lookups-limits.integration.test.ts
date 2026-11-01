@@ -543,6 +543,41 @@ describe('an abort before PostgreSQL has described the statement', () => {
     expect(await ask(sql, 'search', AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
   })
 
+  // The cancel sent after the execute travels on a connection of its own,
+  // and nothing orders it after the execute: on a loaded network it can
+  // reach PostgreSQL while the backend still waits for the execute, which
+  // drops it, and the statement then runs to its end (0121). Here the
+  // execute is held at the hop until both cancels -- the one sent when the
+  // statement was, and the one after its execute -- have crossed and the
+  // backend has had them, as a loaded runner did to this file's queued case
+  // twice on PostgreSQL 18. A cancel sent again while the statement has not
+  // settled stops the sleep once it starts. Watched failing with one cancel
+  // after the execute, as before: the sleep ran on past the wait.
+  test('a cancel that overtakes the execute it followed is sent again, and stops the statement', async () => {
+    const application = 'limits-overtaken'
+    const sql = lookupClient(application)
+    const expected = await ask(sql, 'search', NEVER)
+    hop.delayAnswers(100)
+    const sent = hop.countSent(Buffer.from('limits_overtaken'))
+    // A cancel request's code, 80877102, as it crosses: on no other message.
+    const cancels = hop.countSent(Buffer.from([0x04, 0xd2, 0x16, 0x2e]))
+    const controller = new AbortController()
+    const pending = failure(runLookup(sql, sleeping('limits_overtaken'), controller.signal))
+    await until(async () => sent() === 1, 'the statement was sent')
+    const execute = hop.holdOpenConnections()
+    gates.push(execute)
+    const reason = new Error('typed on')
+    controller.abort(reason)
+    expect(await pending).toBe(reason)
+    await until(async () => cancels() === 2, 'the cancel sent with the statement and the one after its execute crossed the hop')
+    // The cancel reached the backend and was dropped there, since it still
+    // waits for the execute; this is the time it has to.
+    await new Promise((resolve) => setTimeout(resolve, 250))
+    execute.release()
+    await until(() => finished(application, 'limits_overtaken'), 'the sleep that started after its cancels was stopped')
+    expect(await ask(sql, 'search', AbortSignal.timeout(ANSWERS_WITHIN))).toEqual(expected)
+  })
+
   test('an abort during the first round trip stops the statement once its execute is sent', async () => {
     const application = 'limits-first-trip-latency'
     const sql = lookupClient(application)

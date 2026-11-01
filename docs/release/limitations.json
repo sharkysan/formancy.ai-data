@@ -1873,7 +1873,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:9c7e0014ec4d19b34cbe55d3db710f105a1704b825934947f030b07589b6b70a",
+      "reviewed": "sha256:902b0d06d513c2a894d2ddde01f5e3c3bf8969c64d83a8e6b5bc7f5e83bf97b0",
       "limitations": [
         {
           "area": "server",
@@ -3515,6 +3515,24 @@
         {
           "area": "forms",
           "says": "A version stored before this release has no step on its whole-number fields, so its form takes a fraction in the browser, and only the server refuses it, until it is published again."
+        }
+      ]
+    },
+    "0121": {
+      "reviewed": "sha256:9fa314591d155fca0e488780f54d66dec05422695d0ea9b50f40dc6763a1bcb6",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "On PostgreSQL an abandoned lookup whose statement a delivered cancel did not stop within 250 ms is sent up to three more cancel requests, each a connection the server opens and closes.",
+          "heldBy": "packages/data-postgres/src/lookups-limits.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a statement slower than 250 ms to answer a cancel that did stop it is sent another, which can stop the next lookup on that backend: it runs once more, and a second such stop refuses it."
+        },
+        {
+          "area": "databases",
+          "says": "250 ms and four cancels are chosen over the 100 ms the suite holds answers for, not measured on a real network."
         }
       ]
     }

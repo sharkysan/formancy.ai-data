@@ -437,7 +437,10 @@ default is not what the figures derive; and each adapter's
 What it costs: a search still reads every row its filter admits, so the
 deadline caps how long and not how much; that a proxy passes the abort on
 is held by no test; the PostgreSQL adapter reads and patches three private
-properties of postgres.js, which an upgrade can move (0061). A cancel that
+properties of postgres.js, which an upgrade can move (0061), and sends a
+cancel again while a delivered one leaves the statement running, since a
+cancel can reach PostgreSQL before the execute it followed and be dropped
+([0121](../decisions/0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md)). A cancel that
 lands while a statement's rows are on their way ends it part-way, which
 postgres.js 3.4.9 answered by placing the next statement's rows on that
 connection after empty slots; the adapter collects each statement's rows

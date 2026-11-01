@@ -103,6 +103,15 @@ export interface TcpHop {
    */
   holdNewConnections(): { release(): void; held(): number }
   /**
+   * Holds every byte a client sends from this call on, on the connections
+   * open at the call, until `release()`, then forwards them in the order
+   * they came, a close after them. Connections opened after the call flow --
+   * a cancel request's own, which can then reach the server before the
+   * statement it was sent after (0121) -- and the server's answers to a held
+   * client flow too. `held()` is how many connections this call holds.
+   */
+  holdOpenConnections(): { release(): void; held(): number }
+  /**
    * Resets every connection a client opens after this call, before it
    * reaches the database, until `release()`: the client sees ECONNRESET.
    * Connections opened before the call flow as before. `refused()` is how
@@ -218,6 +227,8 @@ interface Pair {
 interface Gate {
   released: boolean
   pairs: Set<Pair>
+  /** Whether it takes in the connections opened after it (`holdNewConnections`), or only those open when it was made (`holdOpenConnections`). */
+  takesNew: boolean
 }
 
 interface Arm {
@@ -375,7 +386,7 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
     upstream.setNoDelay(true)
     accepted += 1
     clock += 1
-    const holding = [...gates]
+    const holding = [...gates].filter((gate) => gate.takesNew)
     const pair: Pair = {
       client,
       upstream,
@@ -417,6 +428,20 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
 
+  /** A gate in force until its release, which sends on what each connection it held has said, unless another gate holds it still. */
+  function hold(gate: Gate): { release(): void; held(): number } {
+    gates.add(gate)
+    return {
+      release: () => {
+        if (gate.released) return
+        gate.released = true
+        gates.delete(gate)
+        for (const pair of gate.pairs) unhold(pair)
+      },
+      held: () => gate.pairs.size,
+    }
+  }
+
   const cutAll = (): void => {
     arms.clear()
     for (const pair of [...pairs]) destroy(pair)
@@ -457,17 +482,16 @@ export async function startTcpHop(target: { kind: HopKind; host: string; port: n
       delay = { ms, schedule }
     },
     holdNewConnections() {
-      const gate: Gate = { released: false, pairs: new Set() }
-      gates.add(gate)
-      return {
-        release: () => {
-          if (gate.released) return
-          gate.released = true
-          gates.delete(gate)
-          for (const pair of gate.pairs) unhold(pair)
-        },
-        held: () => gate.pairs.size,
+      return hold({ released: false, pairs: new Set(), takesNew: true })
+    },
+    holdOpenConnections() {
+      const gate: Gate = { released: false, pairs: new Set(), takesNew: false }
+      for (const pair of pairs) {
+        if (!pair.open) continue
+        gate.pairs.add(pair)
+        pair.sending ??= []
       }
+      return hold(gate)
     },
     refuseNewConnections() {
       const refusal = { count: 0 }

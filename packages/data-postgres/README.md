@@ -425,6 +425,18 @@ with it, in `lookups/cancel.ts`:
   backend, which then runs once more (below); and when both arrive after
   the statement ended, the first stops the next lookup and the second its
   one run more, and that lookup is refused.
+- **And again while a delivered cancel leaves it running.** A cancel sent
+  after the execute is not ordered after it: on its own connection it can
+  reach PostgreSQL while the backend still waits for the execute, and is
+  dropped, and the statement runs to its end. postgres.js reports nothing
+  of when the execute has started, and does report when a cancel request
+  was delivered, so a cancel delivered after the execute was written that
+  has not stopped the statement 250 ms later is sent again, four after the
+  execute in all; one not yet delivered is never followed, so a cancel late
+  on a slow path stays one late cancel. The cost: a statement slower than
+  250 ms to answer a cancel that did stop it is sent another, which can
+  stop the next lookup on that backend as a late one does
+  ([0121](../../docs/decisions/0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md)).
 - **A cancel request that fails stops nothing, and is not an error.**
   postgres.js reports a cancel's own connection failing -- a database that
   stopped accepting while its open sessions still answer -- on a promise
