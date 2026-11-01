@@ -9,7 +9,7 @@ import { presentationShapeProblems } from './apply.js'
 import { rebasePresentation } from './rebase.js'
 import { EMPTY_PRESENTATION } from './types.js'
 import type { PresentationOverrides } from './types.js'
-import { viewShapeProblems } from './views.js'
+import { viewShapeProblems, viewsFor } from './views.js'
 
 /*
  * A form's list views (0105): their shape, read on every read of a version;
@@ -100,12 +100,26 @@ describe('viewShapeProblems', () => {
     expect(viewShapeProblems([OPEN, view({ name: 'Ascending', sort: [{ field: 'order_date', direction: 'asc' }] })])).toEqual([])
   })
 
-  // Two defaults would leave the grid to pick one, and each page might pick
-  // another.
-  test('refuses more than one default', () => {
+  // Two defaults offered to everyone would leave the grid to pick one, and
+  // each page might pick another.
+  test('refuses more than one default offered to everyone', () => {
     expect(viewShapeProblems([view({ default: true }), view({ name: 'Other', sort: [], default: true })])).toEqual([
-      '/views: more than one view is the default',
+      '/views: more than one view offered to everyone is the default',
     ])
+  })
+
+  // A view may name the roles it is offered to (0124): a list of roles,
+  // each once, never empty -- a view for nobody is a view left out. A
+  // default holds for the roles its view is offered to, so views for other
+  // roles may each be one. Watched failing with roles read as an unknown
+  // property: the views were refused.
+  test('reads the roles a view is offered to, and a default per role', () => {
+    expect(viewShapeProblems([view({ roles: ['clerk'], default: true }), view({ name: 'Other', sort: [], roles: ['manager'], default: true })])).toEqual([])
+    expect(viewShapeProblems([view({ default: true }), view({ name: 'Other', sort: [], roles: ['manager'], default: true })])).toEqual([])
+    expect(viewShapeProblems([view({ roles: [] })])).toEqual(['/views/0/roles: offered to nobody; name a role, or leave roles out for everyone'])
+    expect(viewShapeProblems([view({ roles: ['clerk', 'clerk'] })])).toEqual(['/views/0/roles: clerk is named twice'])
+    expect(viewShapeProblems([view({ roles: 'clerk' })])).toEqual(['/views/0/roles must be a list of roles'])
+    expect(viewShapeProblems([view({ roles: [''] })])).toEqual(['/views/0/roles must be a list of roles'])
   })
 
   // Shape is read on every read of a version, and what a contains may find
@@ -176,6 +190,23 @@ describe('listColumns offers views', () => {
     expect(listColumns(PG_ORDER, CLERK_FIELDS, [OPEN, ON_AMOUNT]).views).toEqual([OPEN, ON_AMOUNT])
   })
 
+  // A person is offered the views for one of their roles and those for
+  // everyone, without the roles -- which are the administrator's, not the
+  // person's -- and a grid opens on the first default among them: a person
+  // holding two roles a default each is for opens on the first in the
+  // published order (0124). Watched failing with every view offered
+  // whatever its roles: the manager's view reached the clerk.
+  test('offers a person the views for their roles, and opens their grid on the first default', () => {
+    const FOR_CLERKS: ListView = { ...OPEN, name: 'For clerks', roles: ['clerk'], default: true }
+    const FOR_MANAGERS: ListView = { ...OPEN, name: 'For managers', sort: [], roles: ['manager'], default: true }
+    const { roles: _clerks, ...clerks } = FOR_CLERKS
+    const { roles: _managers, ...managers } = FOR_MANAGERS
+    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS, ON_AMOUNT], ['clerk'])).toEqual([clerks, ON_AMOUNT])
+    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS], ['auditor'])).toEqual([])
+    const both = listColumns(PG_ORDER, CLERK_FIELDS, viewsFor([FOR_CLERKS, FOR_MANAGERS], ['clerk', 'manager'])).views
+    expect(both).toEqual([clerks, { name: managers.name, filter: managers.filter, sort: managers.sort }])
+  })
+
   // A stored view a later rule refuses -- here a contains past the search's
   // limit, which the shape lets through -- is not offered, and nothing else
   // about the list changes.
@@ -224,6 +255,14 @@ describe('rebasePresentation carries views', () => {
     const rebased = regenerate(publish([DATED, UNPAID]))
     expect(rebased.conflicts).toEqual([])
     expect(rebased.presentation.views).toEqual([DATED, UNPAID])
+  })
+
+  // A view's roles go with it (0124): carried without them, a view for the
+  // managers would be offered to everyone. Watched failing with the roles
+  // left out of the carried view.
+  test('a view keeps the roles it is offered to', () => {
+    const forManagers: ListView = { ...DATED, roles: ['manager'] }
+    expect(regenerate(publish([forManagers, UNPAID])).presentation.views).toEqual([forManagers, UNPAID])
   })
 
   // Two columns sanitise to order_date; dropping the first renumbers the

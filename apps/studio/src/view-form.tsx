@@ -2,6 +2,7 @@ import type { FormEvent, ReactElement } from 'react'
 import type { FilterableField, FilterOp, ListSortTerm, ListView } from '@formancy/data-core'
 import { chosenOp, ConditionValues, conditionOf, draftOf, EMPTY_VALUES, hintOf, OPS } from './condition-draft.js'
 import type { ValueDraft } from './condition-draft.js'
+import { RolesInput } from './roles-input.js'
 
 /*
  * The form that makes a list view or edits one (0105): what is typed, and
@@ -26,9 +27,11 @@ export interface ViewDraft {
   filter: TermDraft[]
   sort: ListSortTerm[]
   opens: boolean
+  /** The roles it is offered to (0124); none, everyone. */
+  roles: string[]
 }
 
-export const EMPTY_VIEW: ViewDraft = { name: '', filter: [], sort: [], opens: false }
+export const EMPTY_VIEW: ViewDraft = { name: '', filter: [], sort: [], opens: false, roles: [] }
 
 /** A saved view back in the form, to be edited: each condition in the boxes `conditionOf` reads. */
 export function draftOfView(view: ListView): ViewDraft {
@@ -37,6 +40,7 @@ export function draftOfView(view: ListView): ViewDraft {
     filter: view.filter.map((term) => ({ ...draftOf(term), field: term.field })),
     sort: view.sort.map((term) => ({ ...term })),
     opens: view.default === true,
+    roles: [...(view.roles ?? [])],
   }
 }
 
@@ -51,7 +55,13 @@ export function viewOf(draft: ViewDraft, offers: readonly FilterableField[]): Li
     const offer = offers.find((entry) => entry.field === row.field)
     return { field: row.field, ...conditionOf(offer === undefined ? (row.op ?? 'equals') : chosenOp(offer, row.op), offer?.input ?? null, row) }
   })
-  return { name: draft.name.trim(), filter, sort: draft.sort.map((term) => ({ ...term })), ...(draft.opens ? { default: true as const } : {}) }
+  return {
+    name: draft.name.trim(),
+    filter,
+    sort: draft.sort.map((term) => ({ ...term })),
+    ...(draft.opens ? { default: true as const } : {}),
+    ...(draft.roles.length === 0 ? {} : { roles: [...draft.roles] }),
+  }
 }
 
 /** The fields the rows of `rows` other than the one at `except` name: a list request names each field once. */
@@ -277,6 +287,7 @@ export function ViewForm({ heading, draft, offers, sortable, label, refused, foc
         <input type="checkbox" id="view-default" checked={draft.opens} onChange={(event) => onDraft({ ...draft, opens: event.target.checked })} />
         <label htmlFor="view-default">The grid opens on this view</label>
       </div>
+      <RolesInput id="view-roles" label="Offered to roles, empty for everyone" roles={draft.roles} onRoles={(roles) => onDraft({ ...draft, roles })} />
       {refused.length === 0 ? null : (
         <div role="alert" className="problem-box">
           <p>The view was not saved:</p>

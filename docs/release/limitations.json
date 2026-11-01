@@ -3122,7 +3122,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:d61588a422e5af914789d5f77787415dafb1b837fea7eb9b1c47157f280980ee",
+      "reviewed": "sha256:d5e7e38227e26c0737b3d74aa08f4f2e5d545ab8481c193351d26f4b2e66fd98",
       "limitations": [
         {
           "area": "forms",
@@ -3558,6 +3558,28 @@
           "area": "server",
           "says": "@formancy/data-client reads a filterable field without offered as unexpected, so a host upgrades its server before its client; a server of an earlier release refuses a version whose presentation leaves a field out.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0124": {
+      "reviewed": "sha256:c2380bf918b4c400cfc898d17e35dec3ad74a586a320015108b23a8723e9a710",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A list view is offered by role, not by person: a view relative to whoever is signed in is not yet offered."
+        },
+        {
+          "area": "host",
+          "says": "A person who holds two roles with a default view each opens on the first in the published order; nothing else decides between them.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A view's roles are names the host's token carries: a role misspelt offers the view to nobody, and nothing checks it against the policy's roles."
+        },
+        {
+          "area": "operations",
+          "says": "A server of an earlier release refuses a version whose list views name roles."
         }
       ]
     }

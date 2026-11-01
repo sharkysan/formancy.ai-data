@@ -25,6 +25,17 @@ later.
   which a publish holds to fields a list is filtered by and a regeneration
   carries by their columns; and a draft's reviewer reads the fields it
   leaves out.
+- **A list view may be offered to some roles, and open their grids**
+  (0124). Why: a form's clerks and managers were offered the same views
+  and opened on the same one, though their work starts from different
+  records. In the studio's view form, "Offered to roles, empty for
+  everyone" names them; the view's words end "for clerk, manager". A person
+  is offered the views for one of their roles and those for everyone, and
+  a default holds for its view's roles: at most one may be everyone's, and
+  a person offered two opens on the first in the published order. What you
+  notice: a view may hold `roles`, which a server of an earlier release
+  refuses; the server sends a person their views without the roles, so the
+  page and `@formancy/data-client` read them as before.
 
 - **The studio edits a field's help text** (0119), in the Presentation step,
   in a Help text box under each field's label. Why: since 0118 a field's

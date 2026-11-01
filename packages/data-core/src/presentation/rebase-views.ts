@@ -47,6 +47,7 @@ export function carryViews({ views, follow, bindings, report }: ViewCarry): List
       filter: view.filter.map((term) => ({ ...term, field: follow(term.field) as string })),
       sort: view.sort.map((term) => ({ ...term, field: follow(term.field) as string })),
       ...(view.default === true ? { default: true } : {}),
+      ...(view.roles === undefined ? {} : { roles: [...view.roles] }),
     }
     const why = viewFit(moved, bindings, columns)
     if (why !== null) {

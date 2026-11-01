@@ -291,6 +291,16 @@ beforeEach(async () => {
   const viewed: PublishedBundle = { ...bundle, format: 2, generation, base: customer.form, presentation: { ...EMPTY_PRESENTATION, views: [LARGE, MUSTER] } }
   await store.publish('viewed', null, viewed)
   await store.publish('unfiltered', null, { ...viewed, presentation: { ...viewed.presentation, unfiltered: ['credit_limit'] } })
+  await store.publish('roled', null, {
+    ...viewed,
+    presentation: {
+      ...viewed.presentation,
+      views: [
+        { ...LARGE, roles: ['manager'], default: true },
+        { ...MUSTER, roles: ['clerk', 'auditor'], default: true },
+      ],
+    },
+  })
   await store.publish('viewed-hidden-limit', null, { ...viewed, policy: HIDDEN_LIMIT })
   await store.publish('hidden', null, { ...bundle, policy: HIDDEN_KEY })
   await store.publish('hidden-limit', null, { ...bundle, policy: HIDDEN_LIMIT })
@@ -627,6 +637,15 @@ describe('the list route', () => {
       'credit_limit:false',
     ])
     expect(served.list.views).toEqual([LARGE, MUSTER])
+  })
+
+  // A view for some roles is offered to a person of one of them (0124), and
+  // to nobody else, without its roles; a grid opens on the first default
+  // offered. Watched failing with the published views offered whatever
+  // their roles: the managers' view reached the clerk.
+  test('the form offers the views for this person’s roles, without the roles', async () => {
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/roled', headers: as('clerk') })).json()
+    expect(served.list.views).toEqual([{ ...MUSTER, default: true }])
   })
 
   // A view is offered to a person only when they could have built it from

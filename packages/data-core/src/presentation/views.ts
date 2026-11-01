@@ -27,7 +27,16 @@ import type { ListColumns, ListView } from '../runtime.js'
 const CONTROL = /\p{Cc}/u
 const LONE_SURROGATE = /\p{Cs}/u
 
-const PROPERTIES: readonly string[] = ['name', 'filter', 'sort', 'default']
+const PROPERTIES: readonly string[] = ['name', 'filter', 'sort', 'default', 'roles']
+
+/** Why a view's roles are not a list it may be offered to (0124), or `null`: roles, each once, never none. */
+function rolesProblem(roles: unknown, at: string): string | null {
+  if (!Array.isArray(roles) || !roles.every((role) => typeof role === 'string' && role !== '')) return `${at}/roles must be a list of roles`
+  const named = roles as string[]
+  if (named.length === 0) return `${at}/roles: offered to nobody; name a role, or leave roles out for everyone`
+  const twice = named.find((role, index) => named.indexOf(role) !== index)
+  return twice === undefined ? null : `${at}/roles: ${twice} is named twice`
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -95,13 +104,17 @@ function viewShape(view: unknown, at: string): { problems: string[]; name: strin
   else if (!sort.ok) problems.push(`${at}/sort: ${sort.message}`)
   const isDefault = Object.hasOwn(view, 'default')
   if (isDefault && view['default'] !== true) problems.push(`${at}/default must be true, or left out`)
+  const roled = Object.hasOwn(view, 'roles')
+  const roles = roled ? rolesProblem(view['roles'], at) : null
+  if (roles !== null) problems.push(roles)
   const shaped = filter.length === 0 && sort?.ok === true
   if (shaped && (view['filter'] as unknown[]).length === 0 && (view['sort'] as unknown[]).length === 0) problems.push(`${at}: says nothing; leave the view out`)
   return {
     problems,
     name: named === null ? (view['name'] as string) : null,
     asks: shaped ? asked(view['filter'] as unknown[], view['sort'] as unknown[]) : null,
-    isDefault: isDefault && view['default'] === true,
+    // A default for some roles is theirs alone (0124); one for everyone is everyone's.
+    isDefault: isDefault && view['default'] === true && !roled,
   }
 }
 
@@ -139,7 +152,7 @@ export function viewShapeProblems(value: unknown): string[] {
     }
     if (shape.isDefault) defaults += 1
   }
-  if (defaults > 1) problems.push('/views: more than one view is the default')
+  if (defaults > 1) problems.push('/views: more than one view offered to everyone is the default')
   return problems
 }
 
@@ -166,4 +179,15 @@ export function viewFit(view: ListView, bindings: FormBindings, columns: Pick<Li
   }
   for (const term of view.sort) if (!columns.sortable.includes(term.field)) return `${term.field} is not a field this list is sorted by.`
   return null
+}
+
+/**
+ * The views offered to a person of `roles` (0124): those for one of their
+ * roles and those for everyone, in their published order, each without its
+ * roles -- the administrator's, not the person's. Whether each still fits
+ * what their list offers, and which default opens their grid, is
+ * `listColumns`'.
+ */
+export function viewsFor(views: readonly ListView[], roles: readonly string[]): ListView[] {
+  return views.filter((view) => view.roles === undefined || view.roles.some((role) => roles.includes(role))).map(({ roles: _roles, ...view }) => view)
 }

@@ -118,6 +118,29 @@ describe('making a view', () => {
     expect(savedViews()).toEqual(['Placed, newest first: where Status = placed; sorted by Order date descending; opens the grid.'])
   })
 
+  // A view for some roles (0124): typed into its roles, said in its words,
+  // and published with them, which the server offers to those roles alone.
+  // Watched failing with the roles left out of the saved view: it said no
+  // one, and version 1 held none.
+  test('a view offered to some roles says them, and publishes with them', async () => {
+    const user = await toViews()
+    await nameView(user, 'Placed')
+    await addCondition(user, 'Status', 'equals', { Value: 'placed' })
+    await user.type(within(viewForm()).getByRole('textbox', { name: 'Offered to roles, empty for everyone' }), 'manager, auditor')
+    expect(await audit()).toEqual([])
+    await pressSave(user)
+    expect(savedViews()).toEqual(['Placed: where Status = placed; for manager, auditor.'])
+    await writeOrderPolicy(user)
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+    const stored = (await plane.store.read('sales-order', 1)) as Bundle
+    if (stored.format !== 2) throw new Error('version 1 is not a format-2 bundle')
+    expect(stored.presentation.views).toEqual([
+      { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [], roles: ['manager', 'auditor'] },
+    ])
+  })
+
   // What a view may be built from is what the form's list offers anybody:
   // a lookup holds a token, not its label, and offers neither; each field
   // is named as the form labels it now, a label edited above included; and

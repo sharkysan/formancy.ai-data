@@ -139,8 +139,22 @@ export function listColumns(bindings: FormBindings, fields: readonly string[], v
     searchable: columns.filter((binding) => SEARCHABLE_KINDS.has(binding.type.kind)).map((binding) => binding.field),
     sortable,
     filterable,
-    views: views.filter((view) => viewFit(view, bindings, { filterable, sortable }) === null),
+    views: firstDefault(views.filter((view) => viewFit(view, bindings, { filterable, sortable }) === null)),
   }
+}
+
+/** `views` with `default` kept on the first that has it: a person offered two -- one for each of two roles they hold (0124) -- opens on the first. */
+function firstDefault(views: readonly ListView[]): ListView[] {
+  let opened = false
+  return views.map((view) => {
+    if (view.default !== true) return view
+    if (!opened) {
+      opened = true
+      return view
+    }
+    const { default: _default, ...rest } = view
+    return rest
+  })
 }
 
 /**
