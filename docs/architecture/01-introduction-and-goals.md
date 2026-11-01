@@ -206,9 +206,10 @@ development before it
 **Not built, and said so** in the README, `CHANGELOG.md`'s known gaps or the
 record that left it out:
 
-- A host page that draws a field an update may not write as read-only: the
-  host page draws it editable, and the server refuses a changed value, which
-  [`docs/images/README.md`](../images/README.md) files.
+- A host page that draws a field written on create only as read-only on a
+  record just created: it stays editable until the record is opened again,
+  and the server refuses a changed value
+  ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
 - A bulk delete, and an undo of anything written.
 - A host page on another origin, run in a browser; the server's suites test
   the origins it answers

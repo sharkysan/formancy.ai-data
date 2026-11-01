@@ -122,6 +122,24 @@ describe("the host's copy of the form", () => {
     session.open()
     expect(disabled(session)).toEqual(['notes'])
     session.open(RECORD)
+    expect(disabled(session)).toContain('notes')
+  })
+
+  // Each write as it accepts (0122): a field written on create only -- the
+  // order, here -- is drawn writable on a new record and disabled on a
+  // saved one, which an update would refuse it on; a field neither write
+  // accepts is disabled on both. Watched failing with one drawing for both
+  // writes, as 0117 drew them: the saved record's order was writable.
+  test('draws a field written on create only writable on a new record and disabled on a saved one', () => {
+    const session = createSession({
+      client,
+      formId: 'pg-order-line',
+      definition: definition(['read', 'create', 'update'], { create: ['order', 'line_no'], update: ['line_no'] }),
+      renderer: 'react',
+    })
+    session.open()
     expect(disabled(session)).toEqual(['notes'])
+    session.open(RECORD)
+    expect(disabled(session).sort()).toEqual(['notes', 'order'])
   })
 })

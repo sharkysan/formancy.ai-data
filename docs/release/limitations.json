@@ -3431,12 +3431,8 @@
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
     },
     "0117": {
-      "reviewed": "sha256:0c60b96fc901c88a727cbdb2c73230c7649fc621179e885b961d7a5ba81cc6ae",
+      "reviewed": "sha256:da0547788159c4c2d91b344da53d03cae7fdc63b5db299c22e6ca21ff46f66b0",
       "limitations": [
-        {
-          "area": "host",
-          "says": "A field written on create only is still drawn writable on an opened record, and a change to it is refused after Save."
-        },
         {
           "area": "server",
           "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer, as unexpected, so a host upgrades its server before its client.",
@@ -3533,6 +3529,16 @@
         {
           "area": "databases",
           "says": "250 ms and four cancels are chosen over the 100 ms the suite holds answers for, not measured on a real network."
+        }
+      ]
+    },
+    "0122": {
+      "reviewed": "sha256:9da3868a71f93187da45540171ea7fbb011d80a49f8672f7b94365490f5346e8",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "On a record just created in the form, a field written on create only is drawn writable until the record is opened again, and the server refuses a changed one after Save.",
+          "heldBy": "apps/host/src/session-work.test.ts"
         }
       ]
     }

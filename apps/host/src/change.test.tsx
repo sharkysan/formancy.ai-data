@@ -133,6 +133,20 @@ describe.each(ENGINES)('a change from a date on $engine', (engine) => {
     expect(control('Note').disabled).toBe(true)
   })
 
+  // Each write as it accepts (0122): a price's product and start are
+  // written on create only, so an open price draws them disabled -- an
+  // update would refuse a change -- and a new price draws them writable;
+  // its amount is writable on both. Watched failing with one drawing for
+  // both writes, as 0117 drew them: the open price's product was writable.
+  test('draws what an update does not accept disabled on an open price, and writable on a new one', async () => {
+    const user = await priceOpen(engine, await openVersion(engine))
+    for (const name of ['Product no', 'Valid from']) expect({ name, disabled: control(name).disabled }).toEqual({ name, disabled: true })
+    expect(control('Amount').disabled).toBe(false)
+    await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
+    await waitFor(() => expect(control('Product no').value).toBe(''), ARRIVES_WITHIN)
+    for (const name of ['Product no', 'Valid from', 'Amount']) expect({ name, disabled: control(name).disabled }).toEqual({ name, disabled: false })
+  })
+
   // A version that has ended is history: no change is offered from it. The
   // open one after it offers the change. Watched failing with the button
   // offered on every version: the ended one had it.

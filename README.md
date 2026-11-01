@@ -45,10 +45,7 @@ Every picture in this README is taken by `pnpm pictures` from the built pages an
 > describes 0.1.0
 > ([0084](./docs/decisions/0084-a-release-does-not-wait-for-the-performance-figures-to-be-measured-again.md))
 > -- and any for a page of records, a file of them, the menu of forms or a
-> delete; a host page that draws a field an update may not write as
-> read-only
-> ([filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong));
-> a host page on another origin run in a browser; a run through a real
+> delete; a host page on another origin run in a browser; a run through a real
 > Cloudflare tunnel; anything that reads what Cloudflare sends at the
 > examples page's address, which was read by hand once, on 2026-10-16, or
 > a sign-in to the live demo on Cloudflare, which was read by hand on
@@ -791,13 +788,16 @@ A field its person may write in no operation -- a tenant pinned to the
 token, a field the policy lets them read and not write -- is drawn
 disabled and is in no save the page sends
 ([0117](./docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
+A loaded record is drawn for its update: a field written on create only
+-- Customer, Order date, Amount and Created by for the order form's own
+account -- is disabled there, and writable on a new record
+([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
 
 What it does not do yet: no bulk delete and no undo, no file of a record
-and all its children at once, no copy of a record with its children; and on a loaded
-record it draws the fields an update may not write --
-Customer, Order date, Amount and Created by for the order form's own
-account -- as editable, and the server refuses a changed one, which is
-[filed](./docs/images/README.md#what-the-pictures-show-that-is-wrong).
+and all its children at once, no copy of a record with its children; and
+on a record just created in the form, a field written on create only stays
+writable until the record is opened again, and the server refuses a
+changed one.
 
 In a real host the application's own session supplies the token; the page asks
 for one because it has none, holds it in memory only, and forgets it on a

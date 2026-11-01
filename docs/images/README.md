@@ -201,13 +201,6 @@ first review on github.com to say, with the window width and the date.
 
 Filed, not hidden, because a picture is the product as it is:
 
-- **Fields read-only on update are drawn editable on a loaded record.** The
-  generator says Customer, Order date, Amount and Created by are "Read-only on
-  update" for the order form's own account, and the server refuses a changed
-  one on update; the host page draws them as ordinary fields once a record is
-  loaded, which the hero shows. The runtime plane does not tell the page which
-  fields an update may write, so the fix is the server's and the page's, not
-  this page's.
 - **A restore's help line names the version after the one it made.** Once
   version 1 is restored as version 4, the Versions panel's help line above
   it already says a restore publishes "as version 5", which the restored

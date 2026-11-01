@@ -416,7 +416,7 @@ else ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-i
 `src/session.ts` is one pane's session — engine, record, version, what a
 save's answer does — framework-neutral, so both renderers show one decision
 (0029); it draws disabled, and sends in no save, a field its person may
-write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)). `src/forms-nav.tsx` draws the menu (0045); `src/record-grid.tsx`,
+write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)), and draws a saved record for its update and a new one for its create ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)). `src/forms-nav.tsx` draws the menu (0045); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
 at a time in AG Grid Community (0044), its sort the section's, held beside
 its filter, which its headers show and a press on one tells back;
