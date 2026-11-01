@@ -168,14 +168,30 @@ function unwrittenFields({ form, writable }: PublishedForm): Set<string> {
   return new Set(form.model.fields.map((field) => field.key).filter((key) => !written.has(key)))
 }
 
+/**
+ * The fields one write does not accept from this person (0122): those its
+ * list leaves out, or -- a write the form does not offer them -- those no
+ * write accepts, since such a form is drawn for the other write or read-only.
+ */
+function notAcceptedOn({ form, writable }: PublishedForm, operation: 'create' | 'update', unwritten: ReadonlySet<string>): string[] {
+  const accepted = writable[operation]
+  if (accepted === null) return [...unwritten]
+  return form.model.fields.map((field) => field.key).filter((key) => !accepted.includes(key))
+}
+
 export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
   // What this person writes in no operation is drawn as nothing writes it
   // and sent in no body: a renderer submits a disabled field, and a body
   // that echoed it would carry the tenant a token alone carries (0117).
   const unwritten = unwrittenFields(definition)
-  // The host's copy of the form: the published one, with the fields the page
-  // fills in and the unwritten ones disabled.
-  const form = disableFields(definition.form, [...fixed, ...unwritten])
+  // The host's copies of the form, one for each write: the published one,
+  // with the fields the page fills in and those that write does not accept
+  // from this person disabled -- on a saved record a field written on create
+  // only, which an update would refuse (0122). A new record keeps its copy
+  // through the updates after its create, since the engine is kept (0029).
+  const forCreate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'create', unwritten)])
+  const forUpdate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'update', unwritten)])
+  const form = definition.form
   // A saved record this person may not update is drawn with every field
   // disabled, as the generator draws a field nothing may write: presentation
   // only, the server refuses the update (UX-SPEC D19).
@@ -210,7 +226,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   const sources = lookupSources(client, formId, form, () => state.operation)
 
   /** The fields a next version takes from the one it follows, and its end: never the person's (0115). */
-  const following = disableFields(form, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
+  const following = disableFields(forCreate, definition.versions === null ? [] : [...definition.versions.key, definition.versions.to])
   /** Whether `record` is a version that has ended: history, drawn as nothing to write (0113). */
   const ended = (record: FormRecord | undefined): boolean =>
     definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
@@ -218,7 +234,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
     const token = record?.record ?? undefined
     const engine = createFormEngine({
-      schema: follows !== undefined ? following : token !== undefined && (!allows('update') || ended(record)) ? readOnly : form,
+      schema: follows !== undefined ? following : token === undefined ? forCreate : !allows('update') || ended(record) ? readOnly : forUpdate,
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
       formId: `${ids}-${renderer}`,

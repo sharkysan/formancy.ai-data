@@ -315,6 +315,15 @@ later.
 
 ### Changed
 
+- **The host page draws a loaded record for its update** (0122). Why: a
+  field written on create only -- a key, a chain's start, a column the
+  account may not UPDATE -- was drawn editable on a saved record, and a
+  change to it was refused only after Save; the README's hero showed it.
+  What you notice: on a loaded record such a field is disabled, as the
+  form's `writable.update` says (0117), and on a new record it is writable.
+  A record just created in the form keeps the create's drawing until it is
+  opened again. What a save sends is unchanged.
+
 - **A whole-number field refuses a fraction in the browser** (0120). Why: a
   whole-number column's field took `1.5` and only the server refused it,
   after Save -- the one rule a generated form stated on one side. Spec 4's
