@@ -391,8 +391,12 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     expect(stored.join(' ')).not.toContain('Small, mine')
     expect(await floor('a view of your own, saved')).toEqual(CLEAN('a view of your own, saved'))
 
-    // Opened again, the server offers it under "Your views", and Show view lists by it.
+    // Opened again in a browser that kept nothing -- another device -- the
+    // server offers it under "Your views", and Show view lists by it. This
+    // browser kept the view's sort alone, as a filter of the person's own
+    // (0106), which would open the grid on that sort.
     cleanup()
+    localStorage.clear()
     const again = mount(plane.fetch, { save: keeping().save })
     await signIn(again, TOKENS.keeper)
     await chooseForm(again, engine.formId)
