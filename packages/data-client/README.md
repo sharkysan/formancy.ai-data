@@ -49,11 +49,13 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
+| `saveView(formId, { name, filter, sort })` | `POST /v1/forms/:id/views/save` → `{ own }`, the person's views (0126) |
+| `removeView(formId, name)` | `POST /v1/forms/:id/views/remove` → `{ own }` |
 
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
-`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`,
+`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`,
 `LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
 `EXPORT_MAX_BYTES`, `exportFileName` and `fieldHeading` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the

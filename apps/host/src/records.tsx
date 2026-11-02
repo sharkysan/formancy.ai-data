@@ -13,6 +13,7 @@ import type { GridSection } from './prefs.js'
 import { RecordTree } from './record-tree.js'
 import { Segmented } from './segmented.js'
 import { useGridState } from './use-grid-state.js'
+import { useOwnViews } from './use-own-views.js'
 import { ViewPicker } from './view-picker.js'
 
 /**
@@ -90,6 +91,7 @@ export function Records({
   const [typed, setTyped] = useState(search)
   const [shape, setShape] = useState<'grid' | 'tree'>('grid')
   const views = definition.list?.views ?? []
+  const mine = useOwnViews(client, formId, definition.list?.own ?? [])
   /** The filter as applied, the sort and the columns: the grid's, and the file's but for the columns, for this form, which mounts the panel again (form-view.tsx). */
   const state = useGridState({ formId, section: RECORDS, columns, list: definition.list })
   const { filter, sort } = state
@@ -187,7 +189,16 @@ export function Records({
           toolbarStart={
             <>
               {searchBlock}
-              <ViewPicker idBase="records" views={views} filter={filter} sort={sort} onPick={state.pick} />
+              <ViewPicker
+                idBase="records"
+                views={views}
+                own={mine.own}
+                filter={filter}
+                sort={sort}
+                onPick={state.pick}
+                onSave={(name) => mine.save({ name, filter, sort })}
+                onRemove={mine.remove}
+              />
               <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
               {!panelShown(filterable, filter) ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
             </>

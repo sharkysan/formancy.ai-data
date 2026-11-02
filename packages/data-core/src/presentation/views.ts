@@ -46,7 +46,7 @@ function rolesProblem(roles: unknown, at: string): string | null {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
 /** Why a view's name is not one a picker can show, or `null`: words, with no space around them, no control character and no lone surrogate. */
-function nameProblem(name: unknown): string | null {
+export function nameProblem(name: unknown): string | null {
   if (typeof name !== 'string') return 'must be text'
   if (name.trim() === '') return 'needs words a person can read'
   if (name.trim() !== name) return 'cannot start or end with a space'
@@ -90,7 +90,7 @@ function filterShape(filter: unknown, at: string): string[] {
  * it runs. Two views that ask the same are one choice a picker cannot tell
  * apart: the host shows the first for both.
  */
-function asked(filter: readonly unknown[], sort: readonly unknown[]): string {
+export function asked(filter: readonly unknown[], sort: readonly unknown[]): string {
   const byField = [...filter].sort((left, right) => {
     const [a, b] = [(left as { field: string }).field, (right as { field: string }).field]
     return a < b ? -1 : a > b ? 1 : 0

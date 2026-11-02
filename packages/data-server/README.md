@@ -17,7 +17,10 @@ existed would be documented and inert.
   ([0039](../../docs/decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md)).
   Its `drafts()` is the store a deployment under review keeps its drafts
   in, `<root>/.drafts`, which `list()` never reports as a form
-  ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).
+  ([0065](../../docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)),
+  and its `people(person)` the store of one person's own list views,
+  `<root>/.people/<person>`, which keeps each form's newest version alone
+  ([0126](../../docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
 - **`createIdentityVerifier(options)`** — the host application's JWT, verified
   offline with a pinned algorithm, becomes an actor, roles and attributes such
   as the tenant ([0014](../../docs/decisions/0014-host-identity-is-verified-offline.md)).
@@ -322,6 +325,23 @@ existed would be documented and inert.
   read is left out whole, and so is its default; so is a stored view this
   release would not run. A page sends a picked view's `filter` and `sort`
   in a list's body, and the planner decides them as a person's own.
+
+  `list.own` is the person's own views
+  ([0126](../../docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)),
+  those their list could still run, in the order they saved them, each
+  `{ name, filter, sort }`. `POST /v1/forms/:id/views/save` keeps one,
+  `{ name, filter, sort }` and nothing else, in place of theirs named alike
+  but for case, and `POST /v1/forms/:id/views/remove` lets one go,
+  `{ name }`; each answers `{ own }`, or 400 `invalid-view` with a sentence
+  for the person -- a view their list could not run, one asking what a view
+  the form offers them or another of theirs asks, one past twenty -- or a
+  list's refusal to a person who may not list the form, and 409 `conflict`
+  when another page of theirs saved first three times over. They are kept
+  in the store's `people(person)`, `person` the SHA-256 of the token's
+  subject, by its compare-and-swap; a file that does not read as written is
+  a 500, on `GET` too, and nothing is written over it. Audited as
+  `view-save` and `view-remove`, never with the view.
+  `routes/runtime-lists.test.ts` holds the routes over fake ports.
 
   `POST /v1/forms/:id/records/export` answers one CSV file of every record
   the list would page through for the same `search`, `sort`, `parent` and

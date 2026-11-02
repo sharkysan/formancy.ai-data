@@ -305,6 +305,7 @@ describe('planList', () => {
         { field: 'paid', offered: true, operators: ['equals', ...NULLS], input: 'boolean', days: null },
       ],
       views: [],
+      own: [],
     })
     expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'], [])).toMatchObject({ searchable: ['id', 'status'], sortable: ['id', 'order_date', 'status'] })
     for (const field of ['amount', 'customer', 'employee', 'nothing']) {

@@ -1,6 +1,6 @@
 # 0106 — A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser
 
-- **Status:** accepted; extends [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): a person chooses which readable fields a grid shows and in what order, through a panel of the page's own, and nothing is moved or resized by hand still; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): a grid opens on the view its viewer last picked before the default
+- **Status:** accepted; extends [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md): a person chooses which readable fields a grid shows and in what order, through a panel of the page's own, and nothing is moved or resized by hand still; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): a grid opens on the view its viewer last picked before the default; extended by [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md): a filter of a person's own is kept as a view of theirs on the server, and the browser keeps of it its sort alone
 - **Date:** 2026-10-28
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/host/src/columns.test.ts` -- a choice fitted

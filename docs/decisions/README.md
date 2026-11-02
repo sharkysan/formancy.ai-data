@@ -67,7 +67,7 @@ only enforcement is "we remember" says so plainly.
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068, 0111 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050, 0112 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
-| [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065; narrowed by 0062 |
+| [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065, 0126; narrowed by 0062 |
 | [0014](0014-host-identity-is-verified-offline.md) | Host identity is a token verified offline, with a pinned algorithm | accepted; extended by 0059; narrowed by 0101 |
 | [0015](0015-a-record-operation-is-one-guarded-statement.md) | A record operation is one guarded statement, canonical in and out, never retried | accepted; narrowed by 0041; extended by 0031, 0043, 0044, 0050, 0079, 0113 |
 | [0016](0016-postgres-operations.md) | PostgreSQL operations: canonical text in and out, every name from pg_catalog | accepted; narrowed by 0028, 0040, 0041; extended by 0031, 0043, 0044, 0050, 0051, 0061, 0078 |
@@ -159,8 +159,8 @@ only enforcement is "we remember" says so plainly.
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
 | [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106 |
-| [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125 |
-| [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted |
+| [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126 |
+| [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted; extended by 0126 |
 | [0107](0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md) | A record is duplicated into a new one, of the fields the server names, without its key | accepted |
 | [0108](0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md) | A form's list pages after the last row it showed, found again by its key, not by an offset | accepted |
 | [0109](0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md) | A form whose key is its foreign key onto its parent's is shown under the parent's record as one section, while the record holds the value its generation names | accepted |
@@ -180,3 +180,4 @@ only enforcement is "we remember" says so plainly.
 | [0123](0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md) | An administrator chooses the fields a form's Filter panel offers | accepted |
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
+| [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted |

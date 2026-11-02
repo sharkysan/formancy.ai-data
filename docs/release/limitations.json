@@ -204,7 +204,7 @@
       ]
     },
     "0013": {
-      "reviewed": "sha256:c028a8d532bea17de48435d36c4fb6942ec020a8646ad789ada5d4c9717290d7",
+      "reviewed": "sha256:0144bb4fc548b8a82cf5284612cad399477c732ee7314b465d5ca05031c57fc6",
       "limitations": [
         {
           "area": "operations",
@@ -3122,7 +3122,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:8b0143b55ddb93bf014e1c53fed1c5e2f2e93bd6fa10c16424d87c59a766ed9a",
+      "reviewed": "sha256:e97d02e9acfdf5f72f6bdfaa877325f458f3c1d43f20f2473aa7e30c1e1b66a0",
       "limitations": [
         {
           "area": "forms",
@@ -3169,7 +3169,7 @@
       ]
     },
     "0106": {
-      "reviewed": "sha256:9463f163468eb403809aed9ec8350a883c37c44ebdeb6ed36e54b9b14ef24631",
+      "reviewed": "sha256:3693200ba00a742a58e2a0b37c3a01774a3dc195bd3c835b7b0a8cf642f85ae0",
       "limitations": [
         {
           "area": "host",
@@ -3603,6 +3603,38 @@
         {
           "area": "operations",
           "says": "A server of an earlier release refuses a version whose list views hold a value relative to today or to the person."
+        }
+      ]
+    },
+    "0126": {
+      "reviewed": "sha256:9372c0d06ce4824c3d1d9a1de8d0f46427b53f016707e3bfc3e012ef9ece5ab6",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A person's own list views are kept in the configuration store, so a backup or a copy of it holds them, and nothing removes a person's views but the person, one the host no longer knows included."
+        },
+        {
+          "area": "operations",
+          "says": "A person's views are kept under a hash of their token's subject, which is not a secret, and a host that changes how it names a person leaves their views behind.",
+          "heldBy": "packages/data-server/src/routes/runtime-lists.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A view a person saves in one grid of a form is offered in another grid of that form, or another page, only once that one opens the form again."
+        },
+        {
+          "area": "host",
+          "says": "A reload does not open a grid on a person's own view: the browser keeps no view of theirs by name, only its sort."
+        },
+        {
+          "area": "host",
+          "says": "A person keeps at most twenty views of a form, each named in at most eighty characters: choices, not measurements.",
+          "heldBy": "packages/data-core/src/records/own-views.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "This release's @formancy/data-client requires a form's list to say the person's own views, so it refuses a form from a server of an earlier release as unexpected.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     }

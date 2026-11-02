@@ -153,8 +153,9 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     const user = door === undefined ? mount(plane.fetch, { save: keep }) : mount(door.fetch, { base, session: demoSession(door.fetch, base), save: keep })
     // The whole journey: the menu, a form and its list, a create through a
     // lookup's search, an update, a search for what the create typed, a
-    // filter on the same words (0104), the file of what they found, and its
-    // row opened -- its lines listed, a label resolved -- and deleted.
+    // filter on the same words (0104), kept as a view of the person's own
+    // and removed (0126), the file of what they found, and its row opened --
+    // its lines listed, a label resolved -- and deleted.
     if (door === undefined) await signIn(user, TOKENS.clerk)
     else await signInAs(user, 'Clara')
     await chooseForm(user, formId)
@@ -179,6 +180,13 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     await applyCondition(user, 'Records', { field: 'Notes', condition: 'contains', value: words })
     await listsApplied('Records', [`Notes contains “${words}”`])
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–1. Filtered by Notes.'), { timeout: 15_000 })
+    // That filter kept as the person's own view and let go again (0126), named by the words, which no other run's view holds.
+    const records = gridSection('Records')
+    await user.type(within(records).getByRole('textbox', { name: 'Name of your view' }), words)
+    await user.click(within(records).getByRole('button', { name: 'Save your view' }))
+    await within(records).findByText(`Saved your view “${words}”.`, {}, { timeout: 15_000 })
+    await user.click(within(records).getByRole('button', { name: 'Remove your view' }))
+    await within(records).findByText(`Removed your view “${words}”.`, {}, { timeout: 15_000 })
     await user.click(exportButton('Records'))
     await waitFor(() => expect(exportLine('Records').textContent).toBe(`Made ${formId}.csv; your browser saves it.`), { timeout: 15_000 })
     expect(saved.map((file) => file.name)).toEqual([`${formId}.csv`])

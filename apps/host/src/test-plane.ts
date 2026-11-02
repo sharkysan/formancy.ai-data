@@ -37,6 +37,8 @@ export const TOKENS = {
   clerk: 'host-test-clerk-tenant-1',
   otherClerk: 'host-test-clerk-tenant-2',
   thirdClerk: 'host-test-clerk-tenant-3',
+  /** Tenant 1's clerk who keeps views of their own (0126), so no other case meets them. */
+  keeper: 'host-test-clerk-tenant-1-keeper',
 } as const
 
 const verifyIdentity: IdentityVerifier = async (token) => {
@@ -44,6 +46,7 @@ const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.clerk) return { ok: true, identity: { actor: { id: 'clerk-1', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
   if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
+  if (token === TOKENS.keeper) return { ok: true, identity: { actor: { id: 'clerk-1-keeper', roles: ['clerk'] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
 

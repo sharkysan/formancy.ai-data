@@ -215,7 +215,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    have built from those (`listColumns`, 0105), those for one of their
    roles (0124), each value relative to today or to them resolved for them
    (`viewsFor`,
-   [0125](../decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)), or `null` -- `deleting`,
+   [0125](../decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)),
+   and their own views that still fit, read from the store's `.people`
+   ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)), or `null` -- `deleting`,
    `copied`, and `writable`, the fields each write it offers accepts from
    this person, by the over-posting check
    ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
@@ -241,6 +243,16 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    on the view marked `default`, when it is offered (0105), with the
    columns that browser kept shown and in its order
    ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+   The picker offers the person's own views, `list.own`, under "Your
+   views"; while the filter and the sort are their own, Save your view
+   sends them, named, in `POST /v1/forms/:id/views/save`, and while one of
+   theirs is shown Remove your view sends `POST /v1/forms/:id/views/remove`
+   (`routes/runtime-own-views.ts`): each reads the person's views from the
+   store, changes the one it names as `records/own-views.ts` decides --
+   fitted to what their list offers them, as a view is -- and writes them
+   by the store's compare-and-swap, reading again when another page of
+   theirs wrote first, and answers their views as `list.own` would
+   ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through
@@ -274,10 +286,13 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
 Held by each adapter's `list.integration.test.ts`, its shared cases in
 `LIST_PARITY` and `COLUMN_FILTER_PARITY`; `routes/runtime-lists.test.ts`;
 `plan-list.test.ts` and `filter.test.ts` in
-`packages/data-core/src/records`, and `views.test.ts` in
-`packages/data-core/src/presentation`; `lists.integration.test.ts` in
+`packages/data-core/src/records`, with `own-views.test.ts`, and
+`views.test.ts` in `packages/data-core/src/presentation`;
+`config-store.test.ts` in `packages/data-server/src`;
+`lists.integration.test.ts` and `transport.test.ts` in
 `packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
 `filter.test.tsx`, `views.test.ts`, `view-picker.test.tsx`,
+`view-save.test.tsx`,
 `columns.test.ts`, `columns-panel.test.tsx`, `remembered.test.tsx` and
 `workspace.test.tsx`; and the rows a deep page reads by both adapters'
 `lookups-sized.integration.test.ts`.

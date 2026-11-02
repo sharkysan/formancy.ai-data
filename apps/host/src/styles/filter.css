@@ -10,8 +10,11 @@
 
 /* View beside its select and Show view after it, as Search is beside its
    box and its button: in the search's row where it fits, and on a row of
-   its own where it does not, Show view under the select on the narrowest. */
-.view-picker {
+   its own where it does not, Show view under the select on the narrowest.
+   The name of a person's own view and Save your view the same, after it,
+   or Remove your view (0126); the picker's line under them all. */
+.view-picker,
+.view-choose {
   display: flex;
   flex: 0 1 auto;
   flex-wrap: wrap;
@@ -23,6 +26,28 @@
 .view-picker label,
 .view-picker .button {
   flex: none;
+}
+
+.view-picker input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  font-size: 1rem;
+}
+
+.view-said {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
+/* Empty, the line is out of the row and still in the accessibility tree,
+   so what a save or a remove answers is announced, as Download's is. */
+.view-said:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .filter-block {

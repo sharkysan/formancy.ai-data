@@ -53,6 +53,7 @@ export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
 export { storedViewFit, viewShapeProblems, viewsFor } from './presentation/views.js'
+export { OWN_VIEW_NAME_LIMIT, OWN_VIEWS_LIMIT, ownViewsOffered, ownViewsProblems, readOwnView, removedOwnView, savedOwnView } from './records/own-views.js'
 export { todayOf } from './presentation/view-values.js'
 export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
 export type {
@@ -251,6 +252,7 @@ export type {
   ListFilterTerm,
   ListSortTerm,
   ListView,
+  OwnViews,
   StoredListView,
   ViewCondition,
   ViewFilterTerm,

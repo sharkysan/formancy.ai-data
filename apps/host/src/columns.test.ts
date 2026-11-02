@@ -29,7 +29,7 @@ const LARGE: ListView = {
   filter: [{ field: 'amount', op: 'range', from: '1000', to: null }],
   sort: [{ field: 'amount', direction: 'desc' }],
 }
-const LIST: ListColumns = { searchable: ['notes'], sortable: ['id', 'order_date', 'amount', 'notes'], filterable: [], views: [NEWEST, LARGE] }
+const LIST: ListColumns = { searchable: ['notes'], sortable: ['id', 'order_date', 'amount', 'notes'], filterable: [], views: [NEWEST, LARGE], own: [] }
 
 describe('a kept arrangement over the columns a form offers now', () => {
   // The form changes under what was kept: a column dropped from the policy

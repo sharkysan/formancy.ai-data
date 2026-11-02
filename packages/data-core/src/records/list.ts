@@ -8,6 +8,7 @@ import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { storedViewFit, viewFit } from '../presentation/views.js'
 import type { FilterableField, ListColumns, ListView, RecordList, RecordListQuery, StoredListView } from '../runtime.js'
 import { lookupAnswer, toFormAnswers } from './answers.js'
+import { ownViewsOffered } from './own-views.js'
 import { decodeListCursor, listCursor } from './cursor.js'
 import { columnFilter, filterOffer } from './filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
@@ -126,8 +127,15 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
  * naming a field they may not read is not offered at all, never offered
  * without that condition, which would show a wider list under the view's
  * name; and a default whose view is not offered leaves the list with none.
+ * Own: those of `own`, the person's saved ones (0126), fitted alike.
  */
-export function listColumns(bindings: FormBindings, fields: readonly string[], views: readonly ListView[], unfiltered: readonly string[] = []): ListColumns {
+export function listColumns(
+  bindings: FormBindings,
+  fields: readonly string[],
+  views: readonly ListView[],
+  unfiltered: readonly string[] = [],
+  own: readonly ListView[] = [],
+): ListColumns {
   const columns = readableColumns(bindings, fields)
   const filterable: FilterableField[] = []
   for (const binding of columns) {
@@ -140,6 +148,7 @@ export function listColumns(bindings: FormBindings, fields: readonly string[], v
     sortable,
     filterable,
     views: firstDefault(views.filter((view) => viewFit(view, bindings, { filterable, sortable }) === null)),
+    own: ownViewsOffered(own, bindings, { filterable, sortable }),
   }
 }
 

@@ -76,6 +76,9 @@ One path runs through the packages, and most changes touch one step of it.
    (`routes/runtime-menu.ts`), names the forms a person may read and their
    children, each bundle read alone by `menuForm` and compared by `formMenu`
    (`records/menu.ts`, `records/children.ts`), asking no database (0045).
+   A person's own list views are saved and removed through
+   `routes/runtime-own-views.ts`, fitted by `records/own-views.ts` and kept
+   in the store's `.people`, one file per person and form (0126).
 6. **Review drift.** `diffSnapshots` (`drift/`) classifies a fresh snapshot
    against what a published form's bindings and lookups rest on (0010).
 

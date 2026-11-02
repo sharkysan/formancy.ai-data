@@ -124,7 +124,10 @@ describe('when the data server is not what answers', () => {
   // default but `true`. Watched failing with `views` left unchecked. So is
   // a field filtered by that does not say whether the Filter panel offers
   // it (0123), from a server older than that. Watched failing with
-  // `offered` left unchecked.
+  // `offered` left unchecked. So is one without `own`, from a server older
+  // than a person's own views (0126), or with one of them a default, which
+  // only an administrator's view may be. Watched failing with `own` left
+  // unchecked.
   test("a form without the server's list is unexpected, and a list of null or columns is the server's", async () => {
     const FORM = {
       form: { model: {} },
@@ -140,7 +143,7 @@ describe('when the data server is not what answers', () => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
     })
     const client = createDataClient({ token: () => 't', base })
-    const columns = { searchable: [], sortable: ['id'], views: [] }
+    const columns = { searchable: [], sortable: ['id'], views: [], own: [] }
     const VIEW = { name: 'Newest', filter: [{ field: 'id', op: 'range', from: '10', to: null }], sort: [{ field: 'id', direction: 'desc' }] }
     const viewed = (view: Record<string, unknown>) => ({ ...columns, filterable: [], views: [{ ...VIEW, ...view }] })
     const offer = (operators: unknown, input: unknown, days: unknown = null, offered: unknown = true) => ({
@@ -175,6 +178,9 @@ describe('when the data server is not what answers', () => {
       viewed({ sort: [{ field: 'id', direction: 'up' }] }),
       viewed({ sort: {} }),
       viewed({ default: false }),
+      { searchable: [], sortable: ['id'], filterable: [], views: [] },
+      { ...columns, filterable: [], own: [{ ...VIEW, default: true }] },
+      { ...columns, filterable: [], own: [{ ...VIEW, name: null }] },
     ]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
@@ -190,6 +196,7 @@ describe('when the data server is not what answers', () => {
       offer(['equals', 'range'], 'integer', null, false),
       viewed({}),
       viewed({ default: true }),
+      { ...columns, filterable: [], own: [VIEW] },
     ]) {
       body = { ...FORM, list }
       expect(await client.form('pg-order'), JSON.stringify(list)).toEqual({ ok: true, value: body })
@@ -427,6 +434,8 @@ describe('across origins (0060)', () => {
       reconcile: () => client.reconcile('pg-order', lost),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
       resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
+      saveView: () => client.saveView('pg-order', { name: 'Mine', filter: [], sort: [{ field: 'id', direction: 'desc' }] }),
+      removeView: () => client.removeView('pg-order', 'Mine'),
     }
     for (const [name, run] of Object.entries(calls)) {
       call = name
@@ -958,5 +967,37 @@ describe('a file of records (0079)', () => {
     await expect(createDataClient({ token: () => 't', base: slow }).exportRecords('pg-order', {}, controller.signal)).rejects.toMatchObject({
       name: 'AbortError',
     })
+  })
+})
+
+describe('a person’s own views (0126)', () => {
+  const VIEW = { name: 'Newest', filter: [{ field: 'id', op: 'range' as const, from: '10', to: null }], sort: [{ field: 'id', direction: 'desc' as const }] }
+
+  // A save is a POST of exactly the view's three keys, so no condition is
+  // in a URL and nothing else the page holds reaches the server; a remove
+  // of the name alone. Each is taken only in the server's shape: a person's
+  // views, none a default. Watched failing with the view sent whole: its
+  // default reached the server.
+  test('saves and removes with exactly their keys, and takes only a person’s views back', async () => {
+    const seen: Array<{ url: string; body: string; id: unknown }> = []
+    let answer: unknown = { own: [VIEW] }
+    const { base } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push({ url: request.url ?? '', body, id: request.headers[WRITE_ID_HEADER] })
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer))
+      })
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.saveView('pg-order', { ...VIEW, default: true } as typeof VIEW)).toEqual({ ok: true, value: { own: [VIEW] } })
+    answer = { own: [] }
+    expect(await client.removeView('pg-order', 'Newest')).toEqual({ ok: true, value: { own: [] } })
+    expect(seen).toEqual([
+      { url: '/v1/forms/pg-order/views/save', body: JSON.stringify(VIEW), id: undefined },
+      { url: '/v1/forms/pg-order/views/remove', body: JSON.stringify({ name: 'Newest' }), id: undefined },
+    ])
+    for (const unexpected of [{}, { own: {} }, { own: [{ ...VIEW, default: true }] }, [VIEW]]) {
+      answer = unexpected
+      expect(await client.saveView('pg-order', VIEW), JSON.stringify(unexpected)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
   })
 })

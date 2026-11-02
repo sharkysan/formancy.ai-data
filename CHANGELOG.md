@@ -36,6 +36,22 @@ later.
   notice: a view may hold `roles`, which a server of an earlier release
   refuses; the server sends a person their views without the roles, so the
   page and `@formancy/data-client` read them as before.
+- **A person keeps their own list views** (0126). Why: 0106 kept a grid's
+  sort and the view it showed in the browser, but never a person's own
+  conditions, whose values would outlast them on a shared machine, so a
+  filter a person built every morning had to be built again. In the host's
+  View picker, while the filter and the sort are their own, "Name of your
+  view" and Save your view keep them, on the server, for that person alone;
+  the picker then names it under "Your views", and Remove your view lets
+  it go. A view of theirs is what their own list could run, never one the
+  form already offers, at most twenty per form. What you notice: two
+  routes, `POST /v1/forms/:id/views/save` and `/views/remove`, audited as
+  `view-save` and `view-remove` and forwarded by the Cloudflare edge's
+  runtime door and the live demo; `list.own` in `GET /v1/forms/:id`, which
+  this release's `@formancy/data-client` requires, beside its `saveView`
+  and `removeView`; and `.people` in the configuration store, one file per
+  person and form under a hash of the token's subject, which a backup of
+  the store now holds.
 - **A list view may count days from today and compare with the signed-in
   person's attribute** (0125). Why: a view's values were typed when it was
   made, so "placed last week" stopped being last week a week later, and

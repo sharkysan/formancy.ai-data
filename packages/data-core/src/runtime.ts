@@ -129,6 +129,8 @@ export interface ListColumns {
   sortable: string[]
   filterable: FilterableField[]
   views: ListView[]
+  /** The person's own views of this form (0126), those their list could run now, in the order they saved them. */
+  own: ListView[]
 }
 
 /**
@@ -349,6 +351,11 @@ export interface RecordList {
  * named a column the form binds; a refusal without it is about the record or
  * the request as a whole.
  */
+/** `POST /v1/forms/:id/views/save` and `/views/remove` (0126): the person's own views as the form now offers them, as `list.own` says them. */
+export interface OwnViews {
+  own: ListView[]
+}
+
 export interface RuntimeRefusal {
   code: string
   message: string
