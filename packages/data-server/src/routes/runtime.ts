@@ -351,7 +351,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // What `planList` will accept, from the function it asks, and what a page
     // over this description would be decided as, so the page never offers a
     // grid it would be refused (0044).
-    const listed = personColumns(bundle, actor, (await ownViewsOf(store, actor, request.params.id)).views.slice(0, 0))
+    const listed = personColumns(bundle, actor, (await ownViewsOf(store, actor, request.params.id)).views)
     const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listed.columns : null
     // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null

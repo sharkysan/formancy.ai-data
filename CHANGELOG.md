@@ -46,7 +46,8 @@ later.
   it go. A view of theirs is what their own list could run, never one the
   form already offers, at most twenty per form. What you notice: two
   routes, `POST /v1/forms/:id/views/save` and `/views/remove`, audited as
-  `view-save` and `view-remove`; `list.own` in `GET /v1/forms/:id`, which
+  `view-save` and `view-remove` and forwarded by the Cloudflare edge's
+  runtime door and the live demo; `list.own` in `GET /v1/forms/:id`, which
   this release's `@formancy/data-client` requires, beside its `saveView`
   and `removeView`; and `.people` in the configuration store, one file per
   person and form under a hash of the token's subject, which a backup of

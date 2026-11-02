@@ -35,7 +35,11 @@
   the form's are (read by place among the form's).
   `packages/data-client/src/lists.integration.test.ts` and
   `apps/host/src/view-picker.test.tsx`, on both engines against the real
-  server, and `apps/host/scripts/browser/viewing.mjs`, in each browser.
+  server -- a saved view offered when the form is opened again (watched
+  failing in CI with the form's own views left unread: none was offered
+  after the save); `apps/host/src/plane.test.tsx`, whose journey saves and
+  removes one, as it uses every route of the runtime plane; and
+  `apps/host/scripts/browser/viewing.mjs`, in each browser.
 
 ## Context
 
