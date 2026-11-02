@@ -47,6 +47,15 @@ export interface ConfigurationStore {
    * versions, whose numbers their bases name.
    */
   drafts(): ConfigurationStore
+  /**
+   * The store one person's own list views are kept in (0126), beside this
+   * one and never inside a form's versions: `person` is a configuration id
+   * -- the server names a person by a hash of who their token says they
+   * are -- and its ids are form ids. Each publish there keeps only the
+   * newest version, so a person's views of a form are one file however
+   * often they save; a read of the version it replaced finds nothing.
+   */
+  people(person: string): ConfigurationStore
 }
 
 /** What `read` throws for a version that exists and does not parse. Its message names the file. */
@@ -69,6 +78,8 @@ export const CONFIGURATION_ID = new RegExp(`^[a-z0-9][a-z0-9._-]{0,${String(CONF
 const VERSION_FILE = /^([1-9][0-9]*)\.json$/
 /** Where a store keeps its drafts (0065): a name `CONFIGURATION_ID` refuses, so no form can be called it. */
 const DRAFTS = '.drafts'
+/** Where it keeps each person's own views (0126), for the same reason. */
+const PEOPLE = '.people'
 
 function assertId(id: string): void {
   if (!CONFIGURATION_ID.test(id)) throw new Error(`${JSON.stringify(id)} is not a configuration id`)
@@ -83,7 +94,9 @@ function isCode(error: unknown, code: string): boolean {
  *
  * Layout: `<root>/<id>/<version>.json`, pretty-printed, one file per version,
  * so an export is a copy of the directory and a review is a diff. Drafts,
- * under review, are `<root>/.drafts/<id>/<entry>.json` (0065).
+ * under review, are `<root>/.drafts/<id>/<entry>.json` (0065), and a person's
+ * own views of a form `<root>/.people/<person>/<id>/<n>.json`, the newest
+ * alone (0126).
  *
  * **Compare-and-swap without a lock.** A version is written to a temporary file,
  * flushed, and then hard-linked to its final name. `link` fails if the name
@@ -96,7 +109,7 @@ function isCode(error: unknown, code: string): boolean {
  * atomic on the server but the error a client sees after a retransmission can
  * be wrong, which is why the plan limits this store to a single-instance pilot.
  */
-export function createFileConfigurationStore(root: string): ConfigurationStore {
+export function createFileConfigurationStore(root: string, keep: 'every' | 'newest' = 'every'): ConfigurationStore {
   /**
    * Whether the root does not exist yet — a fresh volume, an empty store — and
    * a loud failure if it exists and is not a directory.
@@ -183,13 +196,15 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
 
       try {
         await link(temporary, join(directory, `${String(next)}.json`))
-        return { ok: true, version: next }
       } catch (error) {
         if (isCode(error, 'EEXIST')) return { ok: false, reason: 'conflict', current: await latest(id) }
         throw error
       } finally {
         await rm(temporary, { force: true })
       }
+      // Only once the next has its name, so a crash between leaves two and never none.
+      if (keep === 'newest') for (const earlier of await versions(id)) if (earlier < next) await rm(join(directory, `${String(earlier)}.json`), { force: true })
+      return { ok: true, version: next }
     },
 
     async list() {
@@ -206,6 +221,12 @@ export function createFileConfigurationStore(root: string): ConfigurationStore {
     // directory and `list` never reports it (0065).
     drafts() {
       return createFileConfigurationStore(join(root, DRAFTS))
+    },
+
+    // `.people` is never a form's directory either; each person's is a configuration id, checked as a form's is.
+    people(person) {
+      assertId(person)
+      return createFileConfigurationStore(join(root, PEOPLE, person), 'newest')
     },
   }
 }

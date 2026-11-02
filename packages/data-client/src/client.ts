@@ -3,8 +3,10 @@ import type {
   FieldError,
   FormMenu,
   FormRecord,
+  ListView,
   LookupResult,
   LookupRow,
+  OwnViews,
   PublishedForm,
   RecordExportQuery,
   RecordList,
@@ -12,7 +14,7 @@ import type {
 } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
-import { isFormMenu, isFormRecord, isLookupResult, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
+import { isFormMenu, isFormRecord, isLookupResult, isOwnViews, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
 import { writeOutcome } from './writes.js'
 import type { DeleteOutcome, UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
 
@@ -386,6 +388,34 @@ export function createDataClient(options: DataClientOptions) {
       const answer = await sendWrite(formId, intent, { record: removal.record, version: removal.version })
       return 'sent' in answer ? invalidName : writeOutcome(answer, intent)
     },
+
+    /**
+     * `POST …/views/save` (0126): a view of the person's own, kept by the
+     * server for them alone, in place of theirs of the same name, case
+     * aside; the answer is their views as the form now offers them, as
+     * `list.own` says them. Refused `invalid-view` with a sentence for the
+     * person -- a view their list could not run, one the form already
+     * offers, one past the limit -- or as a list would be. Exactly the
+     * three keys are sent, in a POST body, so no condition is in a URL.
+     */
+    saveView: (formId: string, view: Pick<ListView, 'name' | 'filter' | 'sort'>): Promise<Outcome<OwnViews>> =>
+      call({
+        method: 'POST',
+        names: [formId],
+        route: ([form]) => `/v1/forms/${String(form)}/views/save`,
+        body: { name: view.name, filter: view.filter, sort: view.sort },
+        read: (body) => (isOwnViews(body) ? body : undefined),
+      }),
+
+    /** `POST …/views/remove` (0126): the person's view of that name, case aside, no longer kept; their views as the form now offers them, the same where none was. */
+    removeView: (formId: string, name: string): Promise<Outcome<OwnViews>> =>
+      call({
+        method: 'POST',
+        names: [formId],
+        route: ([form]) => `/v1/forms/${String(form)}/views/remove`,
+        body: { name },
+        read: (body) => (isOwnViews(body) ? body : undefined),
+      }),
 
     /** Reads what an unknown write addressed and says what that shows; never sends the write again (0031). */
     reconcile: (formId: string, unknown: UnknownWrite): Promise<Reconciliation> => reconcile(read, formId, unknown),

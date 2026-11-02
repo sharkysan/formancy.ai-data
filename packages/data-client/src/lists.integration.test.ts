@@ -127,6 +127,22 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
     expect(notes(kept)).toEqual(['paged 15', 'paged 16', 'paged 17', 'paged 18', 'paged 19'])
   })
 
+  // A view a person saves (0126) is kept by the real server for them alone,
+  // offered back by the form, and lists what its conditions hold for when
+  // the page sends it as a list request; removed, it is offered no more.
+  // Watched failing with the form's own views left unread: the form offered
+  // the clerk none after the save.
+  test('a person’s saved view is offered to them alone, and lists by its conditions', async () => {
+    const view = { name: 'Mine', filter: [{ field: 'id', op: 'equals' as const, value: TENANT_ONES_ORDER.slice('k1:'.length) }], sort: [] }
+    expect(expectOk(await plane.client().saveView(formId, view))).toEqual({ own: [view] })
+    expect(expectOk(await plane.client().form(formId)).list?.own).toEqual([view])
+    expect(expectOk(await plane.client(plane.tokens.otherClerk).form(formId)).list?.own).toEqual([])
+    const listed = expectOk(await plane.client().list(formId, { filter: view.filter, sort: view.sort }))
+    expect(listed.rows.map((row) => row.record)).toEqual([TENANT_ONES_ORDER])
+    expect(expectOk(await plane.client().removeView(formId, 'mine'))).toEqual({ own: [] })
+    expect(expectOk(await plane.client().form(formId)).list?.own).toEqual([])
+  })
+
   // A grid's next page aborts the one it no longer shows; the abort reaches
   // the page as the AbortError it raised, never as a refusal it would show.
   test('an abort rejects with the AbortError', async () => {

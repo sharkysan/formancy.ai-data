@@ -9,7 +9,9 @@
 // staying on Show view and the headers showing its two sorted columns; a
 // header the person sorts by makes the picker say "Your own filter and
 // sort", in one request, and a step off it in the select and back keeps
-// that sort; and "All records" asks one first page with neither. Each state
+// that sort; that sort kept as the person's own view and removed again
+// (0126), each said on the picker's line; and "All records" asks one first
+// page with neither. Each state
 // is measured by the gate's `measured` on the way: the picker's colours and
 // target sizes, the sorted headers' text decided on the pixels, and no
 // sideways scroll, down to 320 px.
@@ -181,6 +183,35 @@ export function viewJourney(_plane, { check }) {
         })
         check('a sort of your own: a step off it and back sends nothing', stepped === 0 ? null : `${String(stepped)} list requests were sent`)
         check('a sort of your own: and keeps it', same([await sortOf(page, 'Order date'), (await choices(page)).shown], ['ascending', OWN]))
+      },
+    ],
+    [
+      'A view of your own saved (Records)',
+      async (page) => {
+        // The sort of their own kept as their view (0126), by the keyboard: named, then Enter on Save your view.
+        await records(page).getByRole('textbox', { name: 'Name of your view', exact: true }).fill('By date')
+        await records(page).getByRole('button', { name: 'Save your view', exact: true }).focus()
+        await page.keyboard.press('Enter')
+        const said = records(page).getByRole('status', { name: 'Your views', exact: true })
+        await until(async () => (await said.textContent()) === 'Saved your view “By date”.', 'the picker never said the view was saved')
+        check(
+          'a view of your own saved: the picker names it under your views',
+          same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name, 'By date'], shown: 'By date' }),
+        )
+        check('a view of your own saved: the keyboard is on View', await focusedOn(page, picker(page)))
+      },
+    ],
+    [
+      'A view of your own removed (Records)',
+      async (page) => {
+        await records(page).getByRole('button', { name: 'Remove your view', exact: true }).focus()
+        await page.keyboard.press('Enter')
+        const said = records(page).getByRole('status', { name: 'Your views', exact: true })
+        await until(async () => (await said.textContent()) === 'Removed your view “By date”.', 'the picker never said the view was removed')
+        check(
+          'a view of your own removed: the sort is yours again',
+          same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name, OWN], shown: OWN }),
+        )
       },
     ],
     [

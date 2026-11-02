@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, CURSOR_GONE, describedOf, EMPTY_PRESENTATION, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
@@ -25,7 +25,9 @@ import { createDataServer } from '../app.js'
 import type { AuditSink, RuntimeAuditEvent } from '../audit.js'
 import type { PublishedBundle } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
+import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry } from '../connections.js'
+import { personOf } from './runtime-own-views.js'
 import { MAX_RESOLVE } from './runtime.js'
 
 /*
@@ -173,11 +175,13 @@ const TAG_POLICY: FormPolicy = { version: 1, operations: { read: ['clerk'], crea
 const verifyIdentity: IdentityVerifier = async (token) =>
   token === 'clerk'
     ? { ok: true, identity: { actor: { id: 'c', roles: ['clerk'] }, attributes: { tenant: '1' } } }
-    : token === 'stranger'
-      ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
-      : token === 'clerk-untenanted'
-        ? { ok: true, identity: { actor: { id: 'u', roles: ['clerk'] }, attributes: {} } }
-        : { ok: false, reason: 'bad' }
+    : token === 'other-clerk'
+      ? { ok: true, identity: { actor: { id: 'o', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+      : token === 'stranger'
+        ? { ok: true, identity: { actor: { id: 's', roles: [] }, attributes: { tenant: '1' } } }
+        : token === 'clerk-untenanted'
+          ? { ok: true, identity: { actor: { id: 'u', roles: ['clerk'] }, attributes: {} } }
+          : { ok: false, reason: 'bad' }
 
 const VERSION = '00000000000007d1'
 const STORED = { values: { tenant_id: '1', customer_no: '7', name: 'Muster AG', country_code: 'CH', credit_limit: null }, version: VERSION }
@@ -624,6 +628,7 @@ describe('the list route', () => {
         { field: 'credit_limit', offered: true, operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
       views: [],
+      own: [],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
     expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name'])
@@ -865,5 +870,127 @@ describe('the list route', () => {
     expect(answers.map((answer) => answer.statusCode)).toEqual([200, 400, 400])
     expect(written.filter((line) => line.includes('"operation":"list"'))).toHaveLength(3)
     expect(written.filter((line) => /filter-marker|31337|98765/.test(line))).toEqual([])
+  })
+})
+
+describe('a person’s own views', () => {
+  const NAMED: ListView = { name: 'Muster, by name', filter: [{ field: 'name', op: 'contains', text: FILTERED }], sort: [{ field: 'name', direction: 'asc' }] }
+  const save = (form: string, payload: unknown, token = 'clerk') =>
+    app.inject({ method: 'POST', url: `/v1/forms/${form}/views/save`, headers: as(token), payload: payload as Record<string, unknown> })
+  const remove = (form: string, payload: unknown, token = 'clerk') =>
+    app.inject({ method: 'POST', url: `/v1/forms/${form}/views/remove`, headers: as(token), payload: payload as Record<string, unknown> })
+  const own = async (form: string, token = 'clerk') => (await app.inject({ method: 'GET', url: `/v1/forms/${form}`, headers: as(token) })).json().list.own
+
+  // A view a person saves is theirs (0126): offered back to them by the
+  // form, and to no other person, and kept on the server under a hash of
+  // who they are, never their name. Watched failing with every person's
+  // views kept under one name: the other clerk was offered the clerk's.
+  test('a person saves a view, and the form offers it to them alone', async () => {
+    const saved = await save('customer', NAMED)
+    expect(saved.statusCode).toBe(200)
+    expect(saved.json()).toEqual({ own: [NAMED] })
+    expect(await own('customer')).toEqual([NAMED])
+    expect(await own('customer', 'other-clerk')).toEqual([])
+    expect(await readdir(join(root, '.people'))).toEqual([personOf({ actor: { id: 'c', roles: [] }, attributes: {} })])
+    expect(lists).toEqual([])
+  })
+
+  // Saved again under its name, case aside, it takes its place; removed,
+  // it is gone, and a remove sent again answers alike. A page sends what a
+  // request reads, so a contains is kept trimmed. Watched failing with the
+  // remove answering the views as they were.
+  test('saves a view in place, and removes it once however often it is asked', async () => {
+    await save('customer', NAMED)
+    const large = { name: 'Large', filter: [{ field: 'credit_limit', op: 'range', from: '1000.00', to: null }], sort: [] }
+    await save('customer', large)
+    const renamed = { ...NAMED, name: 'MUSTER, BY NAME', filter: [{ field: 'name', op: 'contains', text: ' Muster ' }] }
+    expect((await save('customer', renamed)).json()).toEqual({ own: [{ ...renamed, filter: [{ field: 'name', op: 'contains', text: 'Muster' }] }, large] })
+    expect((await remove('customer', { name: 'muster, by name' })).json()).toEqual({ own: [large] })
+    expect((await remove('customer', { name: 'muster, by name' })).json()).toEqual({ own: [large] })
+    expect(await own('customer')).toEqual([large])
+  })
+
+  // What a person may save is what their own list could run, and not what
+  // a view the form offers them already asks, refused invalid-view in a
+  // sentence for them, with nothing written. Watched failing with the save
+  // unfitted: the clerk kept a view on a credit limit they may not read.
+  test('refuses a view their list could not run, or one the form already offers, and keeps nothing', async () => {
+    const limit = await save('viewed-hidden-limit', { name: 'Large', filter: LARGE.filter, sort: [] })
+    expect(limit.statusCode).toBe(400)
+    expect(limit.json()).toEqual({ code: 'invalid-view', message: 'credit_limit is not a field this list is filtered by.' })
+    expect((await save('viewed', { name: 'Mine', filter: LARGE.filter, sort: [] })).json()).toEqual({
+      code: 'invalid-view',
+      message: 'It asks what the view “Large accounts” asks: pick that one.',
+    })
+    expect((await save('customer', { name: 'Everything', filter: [], sort: [] })).statusCode).toBe(400)
+    expect((await save('customer', { name: 'Odd' })).json()).toEqual({ code: 'invalid-view', message: 'The filter is a list of { field, op, … }.' })
+    expect((await remove('customer', { name: 'Odd', also: true })).json()).toEqual({ code: 'invalid-view', message: 'Expected { name }.' })
+    await expect(readdir(join(root, '.people'))).rejects.toThrow('ENOENT')
+  })
+
+  // Only a person the form lets list may keep views of it, refused as a
+  // list would be; without a token, nothing is read at all.
+  test('refuses a person who may not list the form, as a list would', async () => {
+    expect((await save('customer', NAMED, 'stranger')).statusCode).toBe(403)
+    expect((await save('hidden', NAMED)).json()).toMatchObject({ code: 'field-denied' })
+    expect((await app.inject({ method: 'POST', url: '/v1/forms/customer/views/save', payload: NAMED })).statusCode).toBe(401)
+    expect((await save('nothing-here', NAMED)).statusCode).toBe(404)
+  })
+
+  // Two pages of one person saving at once: the store's compare-and-swap
+  // lets one write, and the other reads again and saves over what the
+  // first wrote, so neither view is lost. Watched failing with no second
+  // read: the second page was answered 409 and its view was not kept.
+  test('saves over what another page of theirs saved first', async () => {
+    const store = createFileConfigurationStore(root)
+    const other = { name: 'Other page', filter: [], sort: [{ field: 'name', direction: 'desc' }] }
+    let raced = false
+    const racing: ConfigurationStore = {
+      ...store,
+      people: (person) => {
+        const mine = store.people(person)
+        return {
+          ...mine,
+          publish: async (id, base, value) => {
+            if (!raced) {
+              raced = true
+              await mine.publish(id, base, { views: [other] })
+            }
+            return mine.publish(id, base, value)
+          },
+        }
+      },
+    }
+    const raced2 = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store: racing } })
+    const answer = await raced2.inject({ method: 'POST', url: '/v1/forms/customer/views/save', headers: as('clerk'), payload: NAMED })
+    expect(answer.json()).toEqual({ own: [other, NAMED] })
+  })
+
+  // A person's file is the server's own: one that does not read as it
+  // writes them is damage, so nothing is offered from it and nothing is
+  // written over it -- the form and a save are a 500 until it is mended.
+  // Watched failing with the file read unchecked: the form offered a
+  // person's view as the one the grid opens on.
+  test('offers nothing from a damaged file, and writes nothing over it', async () => {
+    await save('customer', NAMED)
+    const file = join(root, '.people', personOf({ actor: { id: 'c', roles: [] }, attributes: {} }), 'customer', '1.json')
+    await writeFile(file, `${JSON.stringify({ views: [{ ...NAMED, default: true }] })}\n`)
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).statusCode).toBe(500)
+    expect((await save('customer', NAMED)).statusCode).toBe(500)
+    expect(await readdir(join(root, '.people', personOf({ actor: { id: 'c', roles: [] }, attributes: {} }), 'customer'))).toEqual(['1.json'])
+  })
+
+  // One event per save or remove, named for it, and nothing the view held:
+  // a view's name and its conditions are what the person typed (0023).
+  test('is audited as view-save and view-remove, with nothing the view held', async () => {
+    await save('customer', NAMED)
+    await remove('customer', { name: NAMED.name })
+    await save('customer', NAMED, 'stranger')
+    expect(events.map((event) => [event.operation, event.actor, event.form, event.status, event.outcome, event.record])).toEqual([
+      ['view-save', 'c', 'customer', 200, 'ok', null],
+      ['view-remove', 'c', 'customer', 200, 'ok', null],
+      ['view-save', 's', 'customer', 403, 'operation-denied', null],
+    ])
+    expect(JSON.stringify(events)).not.toMatch(/Muster|filter-marker/)
   })
 })

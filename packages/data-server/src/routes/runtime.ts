@@ -19,6 +19,8 @@ import {
 import type {
   DescribedTable,
   DriftChange,
+  ListColumns,
+  ListView,
   PlanRefusal,
   PolicyContext,
   PolicyOperation,
@@ -38,6 +40,7 @@ import { registerDeleteRoute } from './runtime-deletes.js'
 import { NOT_FOUND, planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
+import { ownViewsOf, registerOwnViewRoutes } from './runtime-own-views.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
 import { registerMenuRoute } from './runtime-menu.js'
 import { registerSupersedeRoute } from './runtime-supersede.js'
@@ -92,6 +95,8 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
+  'POST /v1/forms/:id/views/save': 'view-save',
+  'POST /v1/forms/:id/views/remove': 'view-remove',
 }
 
 export { MAX_RESOLVE } from './runtime-lookups.js'
@@ -295,6 +300,25 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return refused === undefined ? undefined : refusal(request, operation, refused)
   }
 
+  /**
+   * What this person's list of `bundle` offers them, or the refusal a list
+   * would be answered with: the views for their roles (0124), resolved for
+   * them today (0125), that they could have built (0105), the fields the
+   * Filter panel leaves out (0123) -- a version published before 0030 has
+   * neither -- and their own views that still fit (0126).
+   */
+  function personColumns(
+    bundle: PublishedBundle,
+    actor: PolicyContext,
+    own: readonly ListView[],
+  ): { ok: true; columns: ListColumns } | { ok: false; answer: WriteAnswer } {
+    const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
+    if (!listed.ok) return { ok: false, answer: planRefusal(listed.code, listed.message) }
+    const presentation = bundle.format === 2 ? bundle.presentation : { views: [], unfiltered: [] }
+    const views = viewsFor(presentation.views ?? [], actor, todayOf(Date.now()))
+    return { ok: true, columns: listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [], own) }
+  }
+
   // The forms this person may read (0045): from the published bundles and the policy, asking no database.
   registerMenuRoute(app, { store, connections: () => registry.ids(), context })
 
@@ -327,14 +351,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // What `planList` will accept, from the function it asks, and what a page
     // over this description would be decided as, so the page never offers a
     // grid it would be refused (0044).
-    const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
-    // The views for this person's roles (0124), resolved for them today (0125), that they could have built (0105), and the fields the Filter panel leaves out (0123); a version published before 0030 has neither.
-    const presentation = bundle.format === 2 ? bundle.presentation : { views: [], unfiltered: [] }
-    const views = viewsFor(presentation.views ?? [], actor, todayOf(Date.now()))
-    const list =
-      listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined
-        ? listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [])
-        : null
+    const listed = personColumns(bundle, actor, (await ownViewsOf(store, actor, request.params.id)).views)
+    const list = listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined ? listed.columns : null
     // What a delete also does, for a page to word its confirmation by: only where one is offered (0050).
     const deleting = operations.includes('delete') ? deleteEffects(bundle.snapshot, bundle.bindings.root, bundle.policy) : null
     // What a copy of a record carries into a new one: only where a create is offered (0107).
@@ -379,6 +397,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // A page of records is a read of many (0044): its steps are the read's, and so is every decision between them.
   registerListRoute(app, { published, connection, context, unread, undecided, answered })
+  registerOwnViewRoutes(app, { store, published, context, columns: personColumns, answered })
 
   // A file of every page a list would show (0079): the list's steps, page after page, and a lookup's for the labels.
   registerExportRoute(app, { published, connection, context, unread, undecided, answered, lookupDeadlineMs: options.lookupDeadlineMs })

@@ -9,6 +9,7 @@ import type {
   ListView,
   LookupResult,
   LookupRow,
+  OwnViews,
   PublishedForm,
   RecordDeleted,
   RecordList,
@@ -89,12 +90,16 @@ function isListView(value: unknown): value is ListView {
   return !Object.hasOwn(value, 'default') || value['default'] === true
 }
 
+/** A person's own view (0126): a view, and never a default, which is how an administrator offers one to others. */
+const isOwnView = (value: unknown): value is ListView => isListView(value) && !Object.hasOwn(value, 'default')
+
 /**
  * What a form's list may be searched, sorted and filtered by, or `null` for
  * no list (0044): a reply without one is from no server that has lists, one
  * without `filterable` from no server that has filters (0104), whose page
- * would offer conditions the server cannot apply, and one without `views`
- * from no server that has views (0105).
+ * would offer conditions the server cannot apply, one without `views`
+ * from no server that has views (0105), and one without `own` from no
+ * server that keeps a person's views (0126).
  */
 function isListColumns(value: unknown): value is PublishedForm['list'] {
   if (value === null) return true
@@ -105,8 +110,15 @@ function isListColumns(value: unknown): value is PublishedForm['list'] {
     Array.isArray(value['filterable']) &&
     value['filterable'].every(isFilterableField) &&
     Array.isArray(value['views']) &&
-    value['views'].every(isListView)
+    value['views'].every(isListView) &&
+    Array.isArray(value['own']) &&
+    value['own'].every(isOwnView)
   )
+}
+
+/** A save's or a remove's answer (0126): the person's views as the form now offers them. */
+export function isOwnViews(body: unknown): body is OwnViews {
+  return isRecord(body) && Array.isArray(body['own']) && body['own'].every(isOwnView)
 }
 
 /**

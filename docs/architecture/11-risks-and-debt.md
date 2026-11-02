@@ -257,6 +257,13 @@ browser shares them, every child section of one form under one field
 shares one arrangement, and a person's own filter conditions are never kept; a
 hidden column is still read, and its width is still its content's
 ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+A person's own views are kept by the server, in the configuration store,
+so a backup of it holds them and nothing removes them but the person, one
+the host no longer knows included; under a hash of the token's subject,
+which is no secret, and lost to a host that changes how it names a person;
+held by each grid apart, so a view saved in one is offered in another of
+the same form once that one opens again; and twenty a form
+([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
 Duplicate record copies a record alone, never its child rows, and is
 offered on the record and not on a child row or a level below it; every
 column of a key is left out of a copy, a part a person would keep

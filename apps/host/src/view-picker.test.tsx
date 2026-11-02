@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { createDataClient } from '@formancy/data-client'
 import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm, RecordExportQuery, RecordListQuery } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, applyCondition, listsApplied, listsSent } from './test-filter.js'
@@ -355,6 +356,61 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     )
     expect([sortOf('Records', 'Order date'), sortOf('Records', 'Id')]).toEqual(['descending', null])
     expect(asked(plane.sent, engine.formId).at(-1)).toEqual(firstPage({ filter: LARGE.filter, sort: byDate }))
+  })
+
+  // A filter of the person's own kept as their view (0126): named and saved
+  // in one request of exactly the view's keys, said on the picker's line,
+  // and named by the picker under "Your views"; kept by the server and not
+  // by this browser, so the form opened again offers it, and Show view
+  // lists by it; removed, it is offered no more. Every state is held to axe
+  // and to a name on every control.
+  test('a filter of the person’s own is kept as their view, offered when the form opens again, and removed', async () => {
+    await freshOrders(engine, `${VIEWED} ${stamp('kept')}`, ['3', '30'])
+    const user = mount(plane.fetch, { save: keeping().save })
+    await signIn(user, TOKENS.keeper)
+    await chooseForm(user, engine.formId)
+    await waitFor(() => expect(shown('Records')).toBe(NEWEST.name), ARRIVES)
+    await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between', from: '1', to: '9' })
+    await waitFor(() => expect(shown('Records')).toBe(OWN), ARRIVES)
+    const records = gridSection('Records')
+    expect(await floor('a filter of your own, to keep')).toEqual(CLEAN('a filter of your own, to keep'))
+
+    plane.sent.length = 0
+    await user.type(within(records).getByRole('textbox', { name: 'Name of your view' }), 'Small, mine')
+    await user.click(within(records).getByRole('button', { name: 'Save your view' }))
+    await within(records).findByText('Saved your view “Small, mine”.', {}, ARRIVES)
+    const kept: ListView = {
+      name: 'Small, mine',
+      filter: [NEWEST.filter[0] as ListFilterTerm, { field: 'amount', op: 'range', from: '1', to: '9' }],
+      sort: NEWEST.sort,
+    }
+    expect(plane.sent.filter((sent) => sent.path.endsWith('/views/save')).map((sent) => JSON.parse(sent.body ?? '{}') as unknown)).toEqual([kept])
+    expect(shown('Records')).toBe('Small, mine')
+    expect(focusedName()).toBe('View')
+    const stored = Array.from({ length: localStorage.length }, (_, at) => localStorage.getItem(localStorage.key(at) ?? '') ?? '')
+    expect(stored.join(' ')).not.toContain('Small, mine')
+    expect(await floor('a view of your own, saved')).toEqual(CLEAN('a view of your own, saved'))
+
+    // Opened again, the server offers it under "Your views", and Show view lists by it.
+    cleanup()
+    const again = mount(plane.fetch, { save: keeping().save })
+    await signIn(again, TOKENS.keeper)
+    await chooseForm(again, engine.formId)
+    await waitFor(() => expect(choices('Records')).toEqual(['All records', NEWEST.name, LARGE.name, 'Small, mine']), ARRIVES)
+    expect(
+      within(within(gridSection('Records')).getByRole('group', { name: 'Your views' }))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Small, mine'])
+    await pick(again, 'Records', 'Small, mine')
+    await waitFor(() => expect(shown('Records')).toBe('Small, mine'), ARRIVES)
+
+    await again.click(within(gridSection('Records')).getByRole('button', { name: 'Remove your view' }))
+    await within(gridSection('Records')).findByText('Removed your view “Small, mine”.', {}, ARRIVES)
+    expect(choices('Records')).toEqual(['All records', NEWEST.name, LARGE.name, OWN])
+    const opened = await createDataClient({ token: () => TOKENS.keeper, fetch: plane.fetch }).form(engine.formId)
+    expect(opened.ok && opened.value.list?.own).toEqual([])
+    expect(await floor('a view of your own, removed')).toEqual(CLEAN('a view of your own, removed'))
   })
 
   // "All records" sets both the filter and the sort to nothing, in one

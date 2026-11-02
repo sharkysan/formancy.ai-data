@@ -308,6 +308,12 @@ until then the address is formancy.ai's 404
   person's attribute, which the server resolves for each person when it
   offers the view, today being its UTC date
   ([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
+- **A person keeps their own list views**: the filter and the sort a grid
+  shows, saved under a name, kept by the server for them alone in the
+  configuration store, and offered back beside the form's views wherever
+  they open it, only while their list could still run them; the browser
+  keeps none of them
+  ([0126](./docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
 - **A person can download the records a list would show them as one CSV
   file**, for the same search, sort, parent and filter and under the same
   read policy, with no right of its own, through the runtime plane and
@@ -720,6 +726,16 @@ form, and one that is yours compares with what your sign-in carries
 ([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
 No view is kept in the address
 ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+
+While the filter and the sort are your own, "Name of your view" and Save
+your view keep them as a view of yours, which View then names under "Your
+views" in every grid of that form you open from then on, on any device you
+sign in from; while one of yours is shown, Remove your view lets it go. The
+server keeps them for you alone, and only what your own list could run: a
+view the form already offers, or one you already keep, is refused in a
+sentence on the picker's line, and you keep at most twenty of a form.
+Your browser keeps none of them
+([0126](./docs/decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
 
 Columns, beside View and Filter, lists the grid's columns: Show one or not,
 move it up or down, all by keyboard, or Reset columns for the form's

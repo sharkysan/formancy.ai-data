@@ -136,6 +136,27 @@ describe('the file configuration store', () => {
     expect(await store.read('sales-order', 1)).toEqual({ title: 'one' })
   })
 
+  // A person's own views (0126) are kept beside the versions as drafts are,
+  // one store per person, and only the newest of each form: a person who
+  // saves all day leaves one file, not one a save. Compare-and-swap still
+  // holds, so two pages saving from one base cannot both win; a read of
+  // the version replaced finds nothing, as one never published does.
+  // Watched failing with every version kept: 1.json and 2.json were there.
+  test('keeps a person’s views beside the versions, the newest alone', async () => {
+    await store.publish('sales-order', null, { title: 'one' })
+    const mine = store.people('a1b2')
+    expect(await mine.publish('sales-order', null, { views: [] })).toEqual({ ok: true, version: 1 })
+    expect(await mine.publish('sales-order', 1, { views: ['x'] })).toEqual({ ok: true, version: 2 })
+    expect(await mine.publish('sales-order', 1, { views: ['y'] })).toEqual({ ok: false, reason: 'conflict', current: 2 })
+    expect(await mine.versions('sales-order')).toEqual([2])
+    expect(await mine.read('sales-order', 1)).toBeUndefined()
+    expect(await mine.read('sales-order', 2)).toEqual({ views: ['x'] })
+    expect(await store.people('c3d4').latest('sales-order')).toBeNull()
+    expect(await store.list()).toEqual(['sales-order'])
+    expect((await readdir(root)).sort()).toEqual(['.people', 'sales-order'])
+    expect(() => store.people('../a1b2')).toThrow('"../a1b2" is not a configuration id')
+  })
+
   // An empty store, or one whose directory does not exist yet, lists nothing
   // rather than failing — a fresh volume is the first state every deployment has.
   test('lists ids in codepoint order, and nothing for a store that does not exist yet', async () => {
