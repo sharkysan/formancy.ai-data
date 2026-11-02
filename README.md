@@ -695,7 +695,9 @@ conditions you typed
 
 Where the form's administrator named list views, View, after the search
 and first in a child section, offers All records and each view the server
-offers you by its name. Choosing one sends nothing; Show view sets the
+offers you by its name -- those for one of your roles and those for
+everyone, which the administrator decides per view in the studio
+([0124](./docs/decisions/0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md)). Choosing one sends nothing; Show view sets the
 grid's filter and sort at once, in one request, and keeps the keyboard on
 the button: the Filter panel lists its conditions and the headers show its
 order. Any condition you add or header you press makes it

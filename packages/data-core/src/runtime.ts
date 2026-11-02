@@ -78,6 +78,12 @@ export interface ListView {
   filter: ListFilterTerm[]
   sort: ListSortTerm[]
   default?: true
+  /**
+   * The roles it is offered to (0124), each once; left out, it is offered
+   * to everyone who could build it. Never sent to a person: the server
+   * offers it or does not.
+   */
+  roles?: string[]
 }
 
 /**

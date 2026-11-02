@@ -35,7 +35,8 @@ export function sayView(view: ListView, label: (key: string) => string): string 
     view.sort.length === 0
       ? []
       : [`sorted by ${view.sort.map((term) => `${label(term.field)} ${term.direction === 'asc' ? 'ascending' : 'descending'}`).join(', then ')}`]
-  return [where, ...sorted, ...(view.default === true ? ['opens the grid'] : [])].join('; ')
+  const offered = view.roles === undefined ? [] : [`for ${view.roles.join(', ')}`]
+  return [where, ...sorted, ...(view.default === true ? ['opens the grid'] : []), ...offered].join('; ')
 }
 
 /** A view as a list says it: its name, then its words. */
