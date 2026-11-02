@@ -162,6 +162,7 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { inspect } from 'node:util'
 import { startTcpHop } from '@formancy/data-fixtures'
 import {
   afterEveryPass,
@@ -190,6 +191,22 @@ import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
 import { viewJourney } from './browser/viewing.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
+
+/**
+ * What the gate is doing, for a promise rejected with nobody waiting on it
+ * to say. A socket reset has failed WebKit's leg after its last check
+ * passed (on 2026-10-31, 2026-11-01 and 2026-11-02, each passing when run
+ * again), as `Error: read ECONNRESET` with a stack that names no caller.
+ * So the rejection is said with the step that was running, what the error
+ * carries beyond its stack, and what the process still had open -- then
+ * thrown, failing the run as Node would have.
+ */
+let stage = 'starting'
+process.on('unhandledRejection', (reason) => {
+  console.error(`An unhandled rejection while ${stage}: ${inspect(reason, { showHidden: true, depth: 4 })}`)
+  console.error(`Still open: ${process.getActiveResourcesInfo().join(', ')}`)
+  throw reason
+})
 
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
 async function load() {
@@ -239,6 +256,7 @@ async function run(gate, browser) {
     check(`${state}: the browser refused nothing under the page’s policy`, await policyRefused(page))
   }
 
+  stage = `starting the plane for ${browser.browserType().name()}`
   const started = Date.now()
   const plane = await startPlane()
   const { http, port } = await serve(plane)
@@ -254,6 +272,7 @@ async function run(gate, browser) {
     for (const { label, width, refuseFonts = false } of list) {
       pass += 1
       gate.pass({ label, width })
+      stage = `measuring the pass ${label}`
       const page = await browser.newPage({ viewport: { width, height: 900 } })
       // Every request to another origin refused and named at the end of the
       // pass, and in the refusing pass every font file (0072). The page is
@@ -326,6 +345,7 @@ async function run(gate, browser) {
         await page.close()
       }
     }
+    stage = 'checking what the passes measured, and the policy’s allowance'
     // Every pass held the row its lost create reached; the run, the row the
     // browser takes when it can choose, which for Chromium and Firefox is
     // the resend 0031 rests on.
@@ -344,9 +364,14 @@ async function run(gate, browser) {
       await allowanceProblem(browser, `http://127.0.0.1:${String(port)}`),
     )
   } finally {
+    stage = 'closing the hop'
     await hop.close()
+    stage = "closing the page's server"
     http.close()
-    await plane.close()
+    await plane.close((step) => {
+      stage = step
+    })
+    stage = `past ${browser.browserType().name()}'s run, its browser closing or the next starting`
   }
 
   console.log('')
