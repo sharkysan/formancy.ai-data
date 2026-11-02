@@ -221,11 +221,16 @@ export async function startPlane() {
     refuseNext: () => {
       refusing = 1
     },
-    close: async () => {
+    /** Each step named to `step` before it runs, for the gate to say which one a late error came in. */
+    close: async (step = () => {}) => {
+      step('closing the server')
       await server.close()
+      step('closing the connection registry')
       await real.close()
+      step("ending the plane's own database client")
       await sql.end()
       rmSync(root, { recursive: true, force: true })
+      step('stopping the database')
       await fixture.stop()
     },
   }
