@@ -166,7 +166,7 @@ only enforcement is "we remember" says so plainly.
 | [0109](0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md) | A form whose key is its foreign key onto its parent's is shown under the parent's record as one section, while the record holds the value its generation names | accepted |
 | [0110](0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md) | A form that is its own child is shown as a tree of its records: its roots, and under each record those naming it | accepted |
 | [0111](0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md) | A deploy pipeline checks drift with a command the image ships, which fails on a blocking change and never passes a form it could not check | accepted |
-| [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md) | A policy holds a state field to the moves it lists, each for named roles, checked from the record as read | accepted |
+| [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md) | A policy holds a state field to the moves it lists, each for named roles, checked from the record as read | accepted; amended by 0127 |
 | [0113](0113-a-form-over-versions-changes-the-open-one-from-a-date.md) | A form over a table of versions changes the open version from a date, ending it and starting the next in one write | accepted; extended by 0114, 0115 |
 | [0114](0114-the-studio-names-a-chain-of-versions-in-the-choose-step.md) | The studio names a chain of versions in the Choose step, and keeps it through a regeneration | accepted |
 | [0115](0115-a-host-page-changes-an-open-version-from-a-date.md) | A host page changes an open version from a date, its next version opened in every pane | accepted; extended by 0117 |
@@ -176,8 +176,9 @@ only enforcement is "we remember" says so plainly.
 | [0119](0119-a-fields-help-text-is-presentation-the-studio-edits.md) | A field's help text is presentation the studio edits, carried by its column through a regeneration | accepted |
 | [0120](0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md) | A whole-number field refuses a fraction in the browser, as the server does | accepted |
 | [0121](0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md) | A PostgreSQL lookup's cancel is sent again while a delivered one leaves its statement running | accepted |
-| [0122](0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md) | A host page draws a saved record for the update it may send, and a new one for the create | accepted |
+| [0122](0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md) | A host page draws a saved record for the update it may send, and a new one for the create | accepted; extended by 0127 |
 | [0123](0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md) | An administrator chooses the fields a form's Filter panel offers | accepted |
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted |
+| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted |

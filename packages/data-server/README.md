@@ -408,7 +408,10 @@ existed would be documented and inert.
   It names `writable: { create, update }`, the fields each write it lists
   accepts from this person, from `writableFields`, and `null` for one it
   does not list
-  ([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
+  ([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)),
+  and `moves`, the state field the policy holds to moves and those this
+  person may make, from `stateMoves`, or `null`
+  ([0127](../../docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
   `routes/runtime-deletes.test.ts` holds the route over
   fake ports, and `e2e.integration.test.ts` and
   `e2e-lost-answer.integration.test.ts` on both engines.

@@ -172,7 +172,10 @@ export interface Deleting {
  * fields this person may give on each write, from `writableFields`: on
  * create `null` exactly when `operations` holds no `create`, on update
  * exactly when it holds no `update` -- so a page draws a field in neither
- * as one nothing writes, and sends it in no body (0117).
+ * as one nothing writes, and sends it in no body (0117). `moves` is the
+ * state field the policy holds to its moves and those this person may make
+ * (`stateMoves`), or `null` where the policy names none or `operations`
+ * holds neither `create` nor `update` (0127).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -183,6 +186,7 @@ export interface PublishedForm {
   copied: string[] | null
   versions: { from: string; to: string; key: string[] } | null
   writable: { create: string[] | null; update: string[] | null }
+  moves: StateMoves | null
 }
 
 /**
@@ -351,6 +355,17 @@ export interface RecordList {
  * named a column the form binds; a refusal without it is about the record or
  * the request as a whole.
  */
+/**
+ * A form's state field and the moves this person may make between its
+ * states (0127): each from a state, or from nothing on a create, to another,
+ * spelled as the column holds them. What `checkTransition` lets through for
+ * them, and nothing else, so a page draws the field as those moves.
+ */
+export interface StateMoves {
+  field: string
+  moves: Array<{ from: string | null; to: string }>
+}
+
 /** `POST /v1/forms/:id/views/save` and `/views/remove` (0126): the person's own views as the form now offers them, as `list.own` says them. */
 export interface OwnViews {
   own: ListView[]

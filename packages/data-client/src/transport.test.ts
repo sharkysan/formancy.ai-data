@@ -137,6 +137,7 @@ describe('when the data server is not what answers', () => {
       copied: null,
       versions: null,
       writable: { create: null, update: null },
+      moves: null,
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -726,7 +727,7 @@ describe('a delete (0050)', () => {
   // all, is no form this server sent, as a form without `list` is not
   // (watched failing with `deleting` left unchecked).
   test("a form's deleting is null exactly when it offers no delete", async () => {
-    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null, versions: null, writable: { create: null, update: null } }
+    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null, versions: null, writable: { create: null, update: null }, moves: null }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -759,7 +760,7 @@ describe('a delete (0050)', () => {
   // copy nobody decided -- as one from a server older than 0107, which
   // sends nothing, would.
   test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -796,7 +797,7 @@ describe('a delete (0050)', () => {
   // a server older than 0113 -- is no form this server sent, and a page
   // that offered a change from it would offer one nobody decided.
   test("a form's versions are null, or the start and end where it offers create and update", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [] }
+    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [], moves: null }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
       update: operations.includes('update') ? [] : null,
@@ -835,7 +836,7 @@ describe('a delete (0050)', () => {
   // this server sent, and a page that drew by it would withhold or offer an
   // edit nobody decided. Watched failing with `writable` left unchecked.
   test("a form's writable names fields for exactly the writes it offers", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -859,6 +860,52 @@ describe('a delete (0050)', () => {
       [['read', 'update'], { create: null, update: ['note'] }],
     ] as const) {
       body = { ...FORM, operations, copied: (operations as readonly string[]).includes('create') ? [] : null, writable }
+      expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // `moves` is the state field and the moves this person may make (0127),
+  // or `null`: a reply without it is from a server older than 0127, and a
+  // move with no state to go to, or a state that is not text, is none a
+  // page could draw. Watched failing with `moves` left unchecked.
+  test("a form's moves are null, or a field and moves between states", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read', 'update'],
+      readable: ['id'],
+      list: null,
+      deleting: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: [] },
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const moves of [
+      undefined,
+      'status',
+      { field: 'status' },
+      { field: 'status', moves: [{ from: 'open' }] },
+      { field: 'status', moves: [{ from: 1, to: 'closed' }] },
+    ]) {
+      body = { ...FORM, moves }
+      expect(await client.form('pg-ticket'), JSON.stringify(moves)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const moves of [
+      null,
+      { field: 'status', moves: [] },
+      {
+        field: 'status',
+        moves: [
+          { from: null, to: 'open' },
+          { from: 'open', to: 'closed' },
+        ],
+      },
+    ]) {
+      body = { ...FORM, moves }
       expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
     }
   })

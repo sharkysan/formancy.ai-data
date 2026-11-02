@@ -3322,17 +3322,12 @@
       ]
     },
     "0112": {
-      "reviewed": "sha256:a553eb6be2b4f3c88ddbea42d6b45b6b06332b3d2e1e35295f7a6e39a5314224",
+      "reviewed": "sha256:7fc0cb7b67c4a192229d6ca74ceb81f16f68f726298cd305dbac6ee27e352add",
       "limitations": [
         {
           "area": "access",
           "says": "A policy holds one field of a form to its moves, each a pair of values for named roles: no condition on another field, on time or on the person, and no move from any state.",
           "heldBy": "packages/data-core/src/records/transition.test.ts"
-        },
-        {
-          "area": "host",
-          "says": "A form offers every value its state field accepts; a move the person may not make is refused after Save with the policy's sentence, not withheld from the field's choices.",
-          "heldBy": "packages/data-server/src/routes/runtime-transitions.test.ts"
         },
         {
           "area": "access",
@@ -3533,7 +3528,7 @@
       ]
     },
     "0122": {
-      "reviewed": "sha256:9da3868a71f93187da45540171ea7fbb011d80a49f8672f7b94365490f5346e8",
+      "reviewed": "sha256:b6f9b819aaf27d032017e5a98343ff79efc3bed35049a8e836be31947a33e331",
       "limitations": [
         {
           "area": "host",
@@ -3634,6 +3629,33 @@
         {
           "area": "server",
           "says": "This release's @formancy/data-client requires a form's list to say the person's own views, so it refuses a form from a server of an earlier release as unexpected.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0127": {
+      "reviewed": "sha256:695811ad643aba7ba05bb7bb214b35f9bf821f82e1785bc20368e11342890d2f",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A state is labelled as its column spells it, not with a label of the administrator's."
+        },
+        {
+          "area": "host",
+          "says": "A state field's choice is drawn when the record is opened: after a save the form keeps that choice, and the next move is offered once the record is opened again."
+        },
+        {
+          "area": "host",
+          "says": "A whole number held to moves keeps its number box, which accepts any value until Save; it is only drawn disabled where the person may move it nowhere.",
+          "heldBy": "apps/host/src/session-work.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A person who may not read the state field is drawn it as published, since the page does not know where the record is."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client reads a form without moves as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]

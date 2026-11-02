@@ -38,7 +38,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable, moves }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
@@ -55,7 +55,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
-`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`,
+`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`, `StateMoves`,
 `LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
 `EXPORT_MAX_BYTES`, `exportFileName` and `fieldHeading` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
@@ -122,6 +122,11 @@ a page leaves a field in neither out of what it draws writable and what it
 sends, and a reply that breaks that, or one from a server older than it,
 is `unexpected`
 ([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
+A form's `moves` is the state field its policy holds to moves and those
+this person may make, each `{ from, to }` with `from` `null` for a
+create, or `null` where it holds none or the person writes neither; a
+reply without it is `unexpected`
+([0127](../../docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.

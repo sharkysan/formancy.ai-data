@@ -7,7 +7,8 @@ import { applied, applyCondition, filterBox, listsApplied, listsSent, openFilter
 import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, recordKeys, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
-import type { Engine, Plane, Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
+import type { Engine, Plane } from './test-plane.js'
 
 /*
  * A grid's filter panel on the host page (0104), on both engines, against

@@ -10,6 +10,7 @@ import {
   READ_REFUSED,
   readableFields,
   runtimeOperations,
+  stateMoves,
   toFormAnswers,
   todayOf,
   versionFields,
@@ -364,7 +365,19 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       create: operations.includes('create') ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
       update: operations.includes('update') ? writableFields(bundle.policy, actor, bundle.bindings, 'update') : null,
     }
-    return { form: bundle.form, operations, readable: readable.ok ? readable.fields : [], list, deleting, copied, versions, writable } satisfies PublishedForm
+    // The moves this person may make of the state field, where they may write at all (0127).
+    const moves = writable.create !== null || writable.update !== null ? stateMoves(bundle.policy, actor, bundle.bindings) : null
+    return {
+      form: bundle.form,
+      operations,
+      readable: readable.ok ? readable.fields : [],
+      list,
+      deleting,
+      copied,
+      versions,
+      writable,
+      moves,
+    } satisfies PublishedForm
   })
 
   /**

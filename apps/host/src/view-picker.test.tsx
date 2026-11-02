@@ -8,7 +8,8 @@ import { DELIVERY_VIEWS, ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
-import type { Engine, Plane, Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
+import type { Engine, Plane } from './test-plane.js'
 
 /*
  * A form's list views on the host page (0105), on both engines, against

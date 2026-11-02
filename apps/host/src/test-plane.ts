@@ -13,8 +13,10 @@ import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
-import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
+import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
+import { injectingFetch } from './test-fetch.js'
+import type { Sent } from './test-fetch.js'
 
 /*
  * One suite file's server: the real data server over the run's two databases,
@@ -104,6 +106,7 @@ export const ENGINES = [
     removable: 'pg-removable',
     read: 'pg-order-read',
     withheld: 'pg-order-withheld',
+    moves: 'pg-order-moves',
     party: 'pg-party',
     company: 'pg-party-company',
     price: 'pg-price',
@@ -121,6 +124,7 @@ export const ENGINES = [
     removable: 'ms-removable',
     read: 'ms-order-read',
     withheld: 'ms-order-withheld',
+    moves: 'ms-order-moves',
     party: 'ms-party',
     company: 'ms-party-company',
     price: 'ms-price',
@@ -128,19 +132,6 @@ export const ENGINES = [
 ] as const
 
 export type Engine = (typeof ENGINES)[number]
-
-/** One request as the page sent it: what the server, and anybody on the wire, would see. */
-export interface Sent {
-  method: string
-  /** The URL as the page wrote it, query string included. */
-  url: string
-  path: string
-  headers: Record<string, string>
-  body: string | undefined
-  /** The server's status once it answered, and an error's `code`: what a failing test can say it was told. */
-  status?: number
-  code?: string | undefined
-}
 
 export interface Plane {
   /** The `fetch` the page is given: every call is answered by the real server. */
@@ -198,54 +189,6 @@ export interface Plane {
   close(): Promise<void>
 }
 
-/** An error answer's `code`, or undefined when its body is not JSON that names one. */
-function codeOf(body: string): string | undefined {
-  try {
-    const { code } = JSON.parse(body) as { code?: unknown }
-    return typeof code === 'string' ? code : undefined
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * `app.inject` as a `fetch`, recording what was asked into `sent` when given a
- * list. Every request still being answered is in `pending`: a renderer that
- * abandons a search rejects its fetch, and the server goes on asking the
- * database, so closing the plane waits for those rather than pulling the
- * connections out from under them.
- */
-function injectingFetch(app: Awaited<ReturnType<typeof createDataServer>>, pending: Set<Promise<unknown>>, sent?: Sent[]): typeof fetch {
-  return async (input, init) => {
-    const href = input instanceof Request ? input.url : String(input)
-    const url = new URL(href, 'http://host.test')
-    const method = (init?.method ?? 'GET').toUpperCase()
-    const headers = Object.fromEntries(new Headers(init?.headers).entries())
-    const body = typeof init?.body === 'string' ? init.body : undefined
-    const entry: Sent = { method, url: href, path: url.pathname, headers, body }
-    sent?.push(entry)
-    // A renderer abandons a search when the next keystroke arrives; the
-    // browser's fetch then rejects with the signal's reason, and so does this.
-    const signal = init?.signal ?? undefined
-    signal?.throwIfAborted()
-    const answering = Promise.resolve(
-      app.inject({ method: method as 'GET' | 'POST', url: `${url.pathname}${url.search}`, headers, ...(body === undefined ? {} : { payload: body }) }),
-    )
-    pending.add(answering)
-    void answering.finally(() => pending.delete(answering)).catch(() => {})
-    const reply = await answering
-    entry.status = reply.statusCode
-    if (reply.statusCode >= 400) entry.code = codeOf(reply.body)
-    signal?.throwIfAborted()
-    const answered = new Headers()
-    for (const [name, value] of Object.entries(reply.headers)) {
-      if (value !== undefined) answered.set(name, Array.isArray(value) ? value.join(', ') : String(value))
-    }
-    // The bytes as the server sent them: a file is compared byte for byte (0080).
-    return new Response(reply.statusCode === 204 ? null : new Uint8Array(reply.rawPayload), { status: reply.statusCode, headers: answered })
-  }
-}
-
 /**
  * Starts the server and publishes `pg-order` and `ms-order` through the
  * administrator's plane -- with `children`, each engine's child forms of
@@ -278,6 +221,8 @@ export async function startPlane(
     sections?: boolean
     versions?: boolean
     views?: boolean
+    /** An order form whose status the clerk moves from draft to placed to shipped, and never back (0112, 0127). */
+    moves?: boolean
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -337,8 +282,8 @@ export async function startPlane(
     return reply.json<Record<string, unknown>>()
   }
   const views = options.views === true
-  for (const { connection, formId: order, versionColumn, read, withheld } of ENGINES) {
-    for (const formId of [order, ...(options.paged === true ? [read] : []), ...(views ? [withheld] : [])]) {
+  for (const { connection, formId: order, versionColumn, read, withheld, moves } of ENGINES) {
+    for (const formId of [order, ...(options.paged === true ? [read] : []), ...(views ? [withheld] : []), ...(options.moves === true ? [moves] : [])]) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection,
         root: { schema: 'sales', name: 'order' },
@@ -356,9 +301,11 @@ export async function startPlane(
           ? readOnly
           : formId === withheld
             ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } }
-            : deletes
-              ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
-              : base
+            : formId === moves
+              ? { ...base, transitions: ORDER_MOVES }
+              : deletes
+                ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
+                : base
       // A presentation of views alone: the form is its base (0030, 0105).
       const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
       const presentation: PresentationOverrides = named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }

@@ -12,6 +12,17 @@ later.
 
 ### Added
 
+- **A host page draws a state field as the moves its person may make**
+  (0127). Why: a policy held a status to its moves (0112), but the form
+  still offered every value, so a clerk typed a state and read the refusal
+  after Save. On a saved record the host draws the field as a choice of the
+  state it holds and each the person may move it to, disabled where there
+  is none; on a new record, the states a create may start it in. The server
+  still checks every move. What you notice: `GET /v1/forms/:id` sends
+  `moves`, the state field and the person's moves without their roles,
+  which this release's `@formancy/data-client` requires; a state is
+  labelled as its column spells it, and a whole number held to moves keeps
+  its number box.
 - **An administrator chooses the fields a form's Filter panel offers**
   (0123). Why: every field a list is filtered by was offered to every
   person, an internal code or a technical flag included. In the studio's

@@ -1,4 +1,5 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { StateMoves } from '../runtime.js'
 import { byCodepoint, OPERATIONS, type ParsedFieldPolicy, type ParsedPolicy, readContext, readPolicy, type TrustedContext } from './inputs.js'
 import type {
   FormPolicy,
@@ -306,6 +307,20 @@ export function forcedValues(policy: FormPolicy, context: PolicyContext): Forced
 export function stateField(policy: FormPolicy): string | null {
   const read = readPolicy(policy)
   return read.parsed?.transitions?.field ?? null
+}
+
+/**
+ * The state field a policy holds to its moves, and the moves this actor's
+ * roles may make (0127), in the policy's order and without their roles --
+ * the moves `checkTransition` lets through and no other, read the same way;
+ * `null` where the policy names no state field or cannot be read for this
+ * context, which every route refuses before it would offer one.
+ */
+export function stateMoves(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): StateMoves | null {
+  const prepared = prepare(policy, context, bindings)
+  if (!prepared.ok || prepared.policy.transitions === null) return null
+  const { field, moves } = prepared.policy.transitions
+  return { field, moves: moves.filter((move) => holds(move.roles, prepared.actor)).map(({ from, to }) => ({ from, to })) }
 }
 
 /**

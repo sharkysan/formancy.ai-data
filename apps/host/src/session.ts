@@ -3,6 +3,7 @@ import type { FormEngine } from '@formancy/core'
 import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
 import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
 import type { Work } from './leave.js'
+import { withMoves } from './moves.js'
 import { disableFields } from './widgets.js'
 
 /*
@@ -231,10 +232,33 @@ export function createSession({ client, formId, definition, renderer, namespace,
   const ended = (record: FormRecord | undefined): boolean =>
     definition.versions !== null && record !== undefined && (record.answers[definition.versions.to] ?? null) !== null
 
+  /**
+   * The state a record holds, as the policy spells its states (0127): text,
+   * a whole number as its digits, `null` for none; `undefined` where the
+   * person may not read the field, whose choice is then left as it is.
+   */
+  function stateOf(record: FormRecord): string | null | undefined {
+    const held = definition.moves === null ? undefined : record.answers[definition.moves.field]
+    return held === null ? null : typeof held === 'string' || typeof held === 'number' ? String(held) : undefined
+  }
+
+  /** The copy a saved record this person may update is drawn with: its state field as the moves from the state it holds (0127). */
+  function forUpdateOf(record: FormRecord | undefined): typeof forUpdate {
+    const from = record === undefined ? undefined : stateOf(record)
+    return from === undefined ? forUpdate : withMoves(forUpdate, definition.moves, from)
+  }
+
   function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
     const token = record?.record ?? undefined
     const engine = createFormEngine({
-      schema: follows !== undefined ? following : token === undefined ? forCreate : !allows('update') || ended(record) ? readOnly : forUpdate,
+      schema:
+        follows !== undefined
+          ? following
+          : token === undefined
+            ? withMoves(forCreate, definition.moves, null)
+            : !allows('update') || ended(record)
+              ? readOnly
+              : forUpdateOf(record),
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
       formId: `${ids}-${renderer}`,

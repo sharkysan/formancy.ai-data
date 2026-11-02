@@ -120,6 +120,7 @@ export {
   readableFields,
   rowFilter,
   stateField,
+  stateMoves,
   throughFilters,
   writableFields,
 } from './policy/evaluate.js'
@@ -253,6 +254,7 @@ export type {
   ListSortTerm,
   ListView,
   OwnViews,
+  StateMoves,
   StoredListView,
   ViewCondition,
   ViewFilterTerm,

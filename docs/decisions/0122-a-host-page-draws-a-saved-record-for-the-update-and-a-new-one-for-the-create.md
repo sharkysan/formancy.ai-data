@@ -1,6 +1,6 @@
 # 0122 — A host page draws a saved record for the update it may send, and a new one for the create
 
-- **Status:** accepted; narrows [0117](0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md): a field written on create only is drawn disabled on a record opened for update, no longer writable on every record
+- **Status:** accepted; narrows [0117](0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md): a field written on create only is drawn disabled on a record opened for update, no longer writable on every record; extended by [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md): a saved record's copy is drawn from the state it holds, its state field as the moves from there
 - **Date:** 2026-11-01
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/host/src/session-work.test.ts`, without a server --

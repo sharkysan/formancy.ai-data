@@ -41,5 +41,6 @@ export type {
   RecordExportQuery,
   RecordList,
   RecordListQuery,
+  StateMoves,
 } from '@formancy/data-core'
 export { EXPORT_MAX_BYTES, exportFileName, fieldHeading, LIST_PAGE_SIZE } from '@formancy/data-core'
