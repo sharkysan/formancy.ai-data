@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, waitFor, within } from '@testing-library/react'
 import { audit, unnamed } from './test-accessible.js'
-import { load, loaded, openForm, paper, RENDERERS, said, save } from './test-host.js'
+import { control, load, loaded, openForm, paper, RENDERERS, said, save } from './test-host.js'
 import type { RendererName } from './test-host.js'
 import { ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -79,8 +79,14 @@ describe.each(ENGINES)('a state field drawn as its moves on $engine', (engine) =
 
     await load(user, record)
     await loaded(record)
+    // Nowhere to go, the field is the published one, disabled: found by its label, as a text box has no combobox role.
     await waitFor(() => {
-      for (const renderer of RENDERERS) expect(status(renderer).disabled, renderer).toBe(true)
+      for (const renderer of RENDERERS)
+        expect({ renderer, disabled: control(renderer, 'Status').disabled, value: control(renderer, 'Status').value }).toEqual({
+          renderer,
+          disabled: true,
+          value: 'shipped',
+        })
     }, ARRIVES)
     expect(await audit()).toEqual([])
   })
