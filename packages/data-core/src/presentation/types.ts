@@ -1,6 +1,6 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import type { FieldBinding } from '../generate/types.js'
-import type { ListView } from '../runtime.js'
+import type { StoredListView } from '../runtime.js'
 
 /**
  * The version of `PresentationOverrides` this release writes and reads. A
@@ -73,7 +73,7 @@ export interface PresentationOverrides {
   /** In the base's section order. */
   sections: SectionPresentation[]
   /** In the order a picker lists them; left out when there are none, never `[]` (`views.ts`). */
-  views?: ListView[]
+  views?: StoredListView[]
   /** The fields the Filter panel does not offer, in the bindings' order; left out when there are none, never `[]` (`unfiltered.ts`, 0123). */
   unfiltered?: string[]
 }

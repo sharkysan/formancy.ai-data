@@ -3,12 +3,13 @@ import { dropColumn, ORDER, retype, snapshot } from '../drift/fixture.js'
 import { generateForm } from '../generate/generate.js'
 import type { ObjectMeta } from '../metadata.js'
 import { listColumns, planList, viewProblems } from '../records/list.js'
-import { AUDITOR, CLERK, CLERK_FIELDS, ORDER_POLICY, PG, PG_ORDER } from '../records/test-support.js'
-import type { ListView, RecordListQuery } from '../runtime.js'
+import { actor, AUDITOR, CLERK, CLERK_FIELDS, ORDER_POLICY, PG, PG_ORDER } from '../records/test-support.js'
+import type { ListView, RecordListQuery, StoredListView } from '../runtime.js'
 import { presentationShapeProblems } from './apply.js'
 import { rebasePresentation } from './rebase.js'
 import { EMPTY_PRESENTATION } from './types.js'
 import type { PresentationOverrides } from './types.js'
+import { todayOf } from './view-values.js'
 import { viewShapeProblems, viewsFor } from './views.js'
 
 /*
@@ -23,6 +24,8 @@ import { viewShapeProblems, viewsFor } from './views.js'
 const OPEN: ListView = { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }] }
 const view = (change: Record<string, unknown>): Record<string, unknown> => ({ ...OPEN, ...change })
 const FIRST: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
+/** The day views are offered on, in these cases: a date, as a server's clock gives it (`todayOf`). */
+const DAY = '2026-11-01'
 
 describe('viewShapeProblems', () => {
   // The views a studio writes must read back: a filter and a sort exactly as
@@ -197,13 +200,13 @@ describe('listColumns offers views', () => {
   // published order (0124). Watched failing with every view offered
   // whatever its roles: the manager's view reached the clerk.
   test('offers a person the views for their roles, and opens their grid on the first default', () => {
-    const FOR_CLERKS: ListView = { ...OPEN, name: 'For clerks', roles: ['clerk'], default: true }
-    const FOR_MANAGERS: ListView = { ...OPEN, name: 'For managers', sort: [], roles: ['manager'], default: true }
+    const FOR_CLERKS: StoredListView = { ...OPEN, name: 'For clerks', roles: ['clerk'], default: true }
+    const FOR_MANAGERS: StoredListView = { ...OPEN, name: 'For managers', sort: [], roles: ['manager'], default: true }
     const { roles: _clerks, ...clerks } = FOR_CLERKS
     const { roles: _managers, ...managers } = FOR_MANAGERS
-    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS, ON_AMOUNT], ['clerk'])).toEqual([clerks, ON_AMOUNT])
-    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS], ['auditor'])).toEqual([])
-    const both = listColumns(PG_ORDER, CLERK_FIELDS, viewsFor([FOR_CLERKS, FOR_MANAGERS], ['clerk', 'manager'])).views
+    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS, ON_AMOUNT], actor(['clerk']), DAY)).toEqual([clerks, ON_AMOUNT])
+    expect(viewsFor([FOR_CLERKS, FOR_MANAGERS], actor(['auditor']), DAY)).toEqual([])
+    const both = listColumns(PG_ORDER, CLERK_FIELDS, viewsFor([FOR_CLERKS, FOR_MANAGERS], actor(['clerk', 'manager']), DAY)).views
     expect(both).toEqual([clerks, { name: managers.name, filter: managers.filter, sort: managers.sort }])
   })
 
@@ -233,7 +236,7 @@ describe('listColumns offers views', () => {
 
 describe('rebasePresentation carries views', () => {
   /** The drift fixture's order form, published with `views` over its base. */
-  function publish(views: ListView[], before: (objects: ObjectMeta[]) => void = () => {}) {
+  function publish(views: StoredListView[], before: (objects: ObjectMeta[]) => void = () => {}) {
     const { form, bindings } = generateForm(snapshot(before), ORDER)
     const presentation: PresentationOverrides = { ...EMPTY_PRESENTATION, views }
     return { base: form, presentation, bindings }
@@ -261,7 +264,7 @@ describe('rebasePresentation carries views', () => {
   // managers would be offered to everyone. Watched failing with the roles
   // left out of the carried view.
   test('a view keeps the roles it is offered to', () => {
-    const forManagers: ListView = { ...DATED, roles: ['manager'] }
+    const forManagers: StoredListView = { ...DATED, roles: ['manager'] }
     expect(regenerate(publish([forManagers, UNPAID])).presentation.views).toEqual([forManagers, UNPAID])
   })
 
@@ -351,5 +354,72 @@ describe('rebasePresentation carries views', () => {
         message: 'View “Edited” names nothing, which is not in the regenerated form, so it was dropped.',
       },
     ])
+  })
+})
+
+describe('views relative to today and to the person (0125)', () => {
+  const LAST_WEEK: StoredListView = { name: 'Last week', filter: [{ field: 'order_date', op: 'range', from: { today: -7 }, to: { today: 0 } }], sort: [] }
+  const MINE: StoredListView = { name: 'Mine to approve', filter: [{ field: 'approved_by', op: 'equals', value: { attribute: 'employee' } }], sort: [] }
+  const stored = (filter: unknown): unknown => [{ name: 'Relative', filter: [filter], sort: [] }]
+
+  // A relative value is whole days from today, or an attribute's name, and
+  // nothing else; the rest of the condition is read as a request's. Watched
+  // failing with relative values read as a request's: every one was refused.
+  test('reads whole days from today and an attribute, and refuses anything else there', () => {
+    expect(viewShapeProblems([LAST_WEEK, MINE])).toEqual([])
+    expect(viewShapeProblems(stored({ field: 'order_date', op: 'equals', value: { today: 1.5 } }))).toEqual([
+      '/views/0/filter/0/value/today must be whole days, at most 36500 either way',
+    ])
+    expect(viewShapeProblems(stored({ field: 'order_date', op: 'range', from: { today: 0, attribute: 'x' }, to: null }))).toEqual([
+      '/views/0/filter/0/from must be text, { today: whole days } or { attribute: a name }',
+    ])
+    expect(viewShapeProblems(stored({ field: 'approved_by', op: 'equals', value: { attribute: '' } }))).toEqual([
+      '/views/0/filter/0/value/attribute must name an attribute',
+    ])
+  })
+
+  // At a write, a day only where the field holds dates, and an attribute --
+  // text -- only in an equality on text, a whole number or a uuid. Watched
+  // failing with the stand-in left out: a day on status was stored.
+  test('is stored only on a field that can hold it', () => {
+    expect(viewProblems([LAST_WEEK, MINE], PG_ORDER)).toEqual([])
+    expect(viewProblems(stored({ field: 'status', op: 'equals', value: { today: 0 } }) as StoredListView[], PG_ORDER)).toEqual([
+      '/views/0 (“Relative”): status holds no dates, so it cannot be compared with a day from today.',
+    ])
+    expect(viewProblems(stored({ field: 'approved_by', op: 'range', from: { attribute: 'employee' }, to: null }) as StoredListView[], PG_ORDER)).toEqual([
+      "/views/0 (“Relative”): approved_by cannot be compared with a person's attribute: an attribute is text, compared for equality with text, a whole number or a uuid.",
+    ])
+    expect(viewProblems(stored({ field: 'paid', op: 'equals', value: { attribute: 'employee' } }) as StoredListView[], PG_ORDER)).toEqual([
+      "/views/0 (“Relative”): paid cannot be compared with a person's attribute: an attribute is text, compared for equality with text, a whole number or a uuid.",
+    ])
+  })
+
+  // Offered, a view is resolved for the person on the day: a week back from
+  // the day it is offered, and the person's own employee. A person whose
+  // token carries no employee is not offered "Mine", as a row filter is
+  // closed on a missing attribute; one whose employee the column cannot
+  // hold is not offered it either. Watched failing with the values sent as
+  // stored: the page was handed { today: -7 }.
+  test('is offered resolved for the person and the day, and not to one without the attribute', () => {
+    const me = actor(['clerk'], { tenant: '1', employee: '7' })
+    expect(viewsFor([LAST_WEEK, MINE], me, DAY)).toEqual([
+      { name: 'Last week', filter: [{ field: 'order_date', op: 'range', from: '2026-10-25', to: '2026-11-01' }], sort: [] },
+      { name: 'Mine to approve', filter: [{ field: 'approved_by', op: 'equals', value: '7' }], sort: [] },
+    ])
+    expect(viewsFor([LAST_WEEK, MINE], actor(['clerk']), DAY).map((view) => view.name)).toEqual(['Last week'])
+    const odd = viewsFor([MINE], actor(['clerk'], { tenant: '1', employee: 'ada' }), DAY)
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, odd).views).toEqual([])
+    expect(viewsFor([{ ...LAST_WEEK, filter: [{ field: 'order_date', op: 'equals', value: { today: -1 } }] }], me, '2026-03-01')[0]?.filter).toEqual([
+      { field: 'order_date', op: 'equals', value: '2026-02-28' },
+    ])
+  })
+
+  // The day is UTC's, whatever the server's zone: a minute before
+  // midnight in UTC is still that day, and a minute after is the next.
+  // Watched failing with the day read in the local zone, in Europe/Zurich:
+  // 23:59 UTC was already the next day.
+  test('counts days from the day UTC is on', () => {
+    expect(todayOf(Date.UTC(2026, 10, 1, 23, 59))).toBe('2026-11-01')
+    expect(todayOf(Date.UTC(2026, 10, 2, 0, 1))).toBe('2026-11-02')
   })
 })

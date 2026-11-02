@@ -1,7 +1,18 @@
 import type { FormEvent, ReactElement } from 'react'
-import type { FilterableField, FilterOp, ListSortTerm, ListView } from '@formancy/data-core'
-import { chosenOp, ConditionValues, conditionOf, draftOf, EMPTY_VALUES, hintOf, OPS } from './condition-draft.js'
+import type {
+  FilterableField,
+  FilterCondition,
+  FilterInput,
+  FilterOp,
+  ListSortTerm,
+  StoredListView,
+  ViewCondition,
+  ViewFilterTerm,
+  ViewValue,
+} from '@formancy/data-core'
+import { Box, chosenOp, ConditionValues, conditionOf, draftOf, EMPTY_VALUES, hintOf, OPS, sayCondition } from './condition-draft.js'
 import type { ValueDraft } from './condition-draft.js'
+import { sayValue } from './related.js'
 import { RolesInput } from './roles-input.js'
 
 /*
@@ -16,9 +27,35 @@ export const VIEW_SAVE = 'view-save'
 const ADD_CONDITION = 'view-add-condition'
 const ADD_SORT = 'view-add-sort'
 
-/** One condition row as typed: its field, and its values as the Browse step's boxes hold them. */
+/**
+ * One condition row as typed: its field, and its values as the Browse step's
+ * boxes hold them -- or, `relative` (0125), whole days from today in them,
+ * or the name of the signed-in person's attribute in `value`.
+ */
 interface TermDraft extends ValueDraft {
   field: string
+  relative?: 'today' | 'attribute'
+}
+
+/** The inputs an attribute -- text -- may be compared with for equality (0125). */
+const ATTRIBUTE_INPUTS: ReadonlySet<FilterInput> = new Set(['text', 'integer', 'uuid'])
+
+/** A row's relative value as it is stored: whole days from today, a bound left empty none; or an attribute's name. */
+function relativeOf(row: TermDraft, typed: string): ViewValue | null {
+  if (typed.trim() === '') return null
+  return row.relative === 'attribute' ? { attribute: typed.trim() } : { today: Number(typed.trim()) }
+}
+
+/** A stored condition back in its boxes: a relative value as the row types it. */
+function rowOf(term: ViewFilterTerm): TermDraft {
+  const typed = (value: ViewValue | null): string =>
+    value === null ? '' : typeof value === 'string' ? value : 'today' in value ? String(value.today) : value.attribute
+  const relative = (value: ViewValue | null) => value !== null && typeof value !== 'string'
+  if (term.op === 'equals' && typeof term.value !== 'string')
+    return { ...EMPTY_VALUES, field: term.field, op: 'equals', value: typed(term.value), relative: 'today' in term.value ? 'today' : 'attribute' }
+  if (term.op === 'range' && (relative(term.from) || relative(term.to)))
+    return { ...EMPTY_VALUES, field: term.field, op: 'range', from: typed(term.from), to: typed(term.to), relative: 'today' }
+  return { ...draftOf(term as FilterCondition), field: term.field }
 }
 
 /** A view as the form holds it until it is saved. */
@@ -34,10 +71,10 @@ export interface ViewDraft {
 export const EMPTY_VIEW: ViewDraft = { name: '', filter: [], sort: [], opens: false, roles: [] }
 
 /** A saved view back in the form, to be edited: each condition in the boxes `conditionOf` reads. */
-export function draftOfView(view: ListView): ViewDraft {
+export function draftOfView(view: StoredListView): ViewDraft {
   return {
     name: view.name,
-    filter: view.filter.map((term) => ({ ...draftOf(term), field: term.field })),
+    filter: view.filter.map(rowOf),
     sort: view.sort.map((term) => ({ ...term })),
     opens: view.default === true,
     roles: [...(view.roles ?? [])],
@@ -50,10 +87,13 @@ export function draftOfView(view: ListView): ViewDraft {
  * row on a field the list does not offer is kept as typed, for the fit to
  * refuse in its words: left out, it would save a wider view than was asked.
  */
-export function viewOf(draft: ViewDraft, offers: readonly FilterableField[]): ListView {
-  const filter = draft.filter.map((row) => {
+export function viewOf(draft: ViewDraft, offers: readonly FilterableField[]): StoredListView {
+  const filter = draft.filter.map((row): ViewFilterTerm => {
     const offer = offers.find((entry) => entry.field === row.field)
-    return { field: row.field, ...conditionOf(offer === undefined ? (row.op ?? 'equals') : chosenOp(offer, row.op), offer?.input ?? null, row) }
+    const op = offer === undefined ? (row.op ?? 'equals') : chosenOp(offer, row.op)
+    if (row.relative !== undefined && op === 'equals') return { field: row.field, op, value: relativeOf(row, row.value) ?? '' }
+    if (row.relative === 'today' && op === 'range') return { field: row.field, op, from: relativeOf(row, row.from), to: relativeOf(row, row.to) }
+    return { field: row.field, ...conditionOf(op, offer?.input ?? null, row) }
   })
   return {
     name: draft.name.trim(),
@@ -62,6 +102,27 @@ export function viewOf(draft: ViewDraft, offers: readonly FilterableField[]): Li
     ...(draft.opens ? { default: true as const } : {}),
     ...(draft.roles.length === 0 ? {} : { roles: [...draft.roles] }),
   }
+}
+
+/** A relative value in words (0125): a day counted from today, or the signed-in person's attribute. */
+function sayRelative(value: Exclude<ViewValue, string>): string {
+  if ('attribute' in value) return `your ${value.attribute}`
+  const days = value.today
+  if (days === 0) return 'today'
+  if (days === -1) return 'yesterday'
+  if (days === 1) return 'tomorrow'
+  return days < 0 ? `${String(-days)} days before today` : `${String(days)} days after today`
+}
+
+/** A view's condition in words, as `sayCondition` says a typed one, a relative value by what it stands for. */
+export function sayViewCondition(subject: string, condition: ViewCondition): string {
+  const say = (value: ViewValue): string => (typeof value === 'string' ? sayValue(value) : sayRelative(value))
+  if (condition.op === 'equals' && typeof condition.value !== 'string') return `${subject} = ${say(condition.value)}`
+  if (condition.op === 'range' && [condition.from, condition.to].some((bound) => bound !== null && typeof bound !== 'string')) {
+    if (condition.from !== null && condition.to !== null) return `${subject} from ${say(condition.from)} to ${say(condition.to)}`
+    return condition.from !== null ? `${subject} from ${say(condition.from)}` : `${subject} up to ${say(condition.to ?? '')}`
+  }
+  return sayCondition(subject, condition as FilterCondition)
 }
 
 /** The fields the rows of `rows` other than the one at `except` name: a list request names each field once. */
@@ -77,11 +138,66 @@ interface ConditionRowProps {
   onRemove: () => void
 }
 
-/** One condition: a field by its label, an operator it offers, and the Browse step's boxes and hint for them. */
+/**
+ * The boxes of a relative value (0125): whole days from today, a bound each
+ * for a range; or the name of an attribute. Typed as text, and read when the
+ * view is saved, where the server's own shape check says what is wrong.
+ */
+function RelativeValues({
+  prefix,
+  op,
+  relative,
+  row,
+  onRow,
+}: {
+  prefix: string
+  op: FilterOp
+  relative: 'today' | 'attribute'
+  row: TermDraft
+  onRow: (row: TermDraft) => void
+}): ReactElement {
+  const hint = `${prefix}-hint`
+  return (
+    <>
+      {op === 'range' ? (
+        <div className="pair">
+          <Box id={`${prefix}-from`} label="From, days from today" input="text" value={row.from} hint={hint} onChange={(from) => onRow({ ...row, from })} />
+          <Box id={`${prefix}-to`} label="To, days from today" input="text" value={row.to} hint={hint} onChange={(to) => onRow({ ...row, to })} />
+        </div>
+      ) : (
+        <Box
+          id={`${prefix}-value`}
+          label={relative === 'today' ? 'Days from today' : 'Attribute'}
+          input="text"
+          value={row.value}
+          hint={hint}
+          onChange={(value) => onRow({ ...row, value })}
+        />
+      )}
+      <p id={hint} className="hint">
+        {relative === 'today'
+          ? 'Whole days from the day a person is offered the view: -7 a week before, 0 that day. Either bound may be left empty.'
+          : "The attribute's name, as the host's token carries it -- employee, say: each person is compared with their own value."}
+      </p>
+    </>
+  )
+}
+
+/** One condition: a field by its label, an operator it offers, and the Browse step's boxes and hint for them -- or a relative value's (0125). */
 function ConditionRow({ index, row, offers, label, onRow, onRemove }: ConditionRowProps): ReactElement {
   const id = `view-condition-${String(index)}`
   const offer = offers.find((entry) => entry.field === row.field)
   const op = offer === undefined ? (row.op ?? 'equals') : chosenOp(offer, row.op)
+  const input = offer?.input ?? null
+  // What the field and the operator let a value be relative to: a day where its values are dates, the person where an equality reads text.
+  const mayCount = input === 'date' && (op === 'equals' || op === 'range')
+  const mayAttribute = op === 'equals' && input !== null && ATTRIBUTE_INPUTS.has(input)
+  const relative = (row.relative === 'today' && mayCount) || (row.relative === 'attribute' && mayAttribute) ? row.relative : undefined
+  /** Values typed for one kind mean nothing to another: switching empties them. */
+  const toggle = (kind: 'today' | 'attribute', on: boolean): void => {
+    const { relative: _relative, ...rest } = row
+    onRow({ ...rest, value: '', from: '', to: '', ...(on ? { relative: kind } : {}) })
+  }
   return (
     <fieldset className="view-term">
       <legend>Condition {index + 1}</legend>
@@ -108,14 +224,30 @@ function ConditionRow({ index, row, offers, label, onRow, onRemove }: ConditionR
           </select>
         </div>
       </div>
-      <ConditionValues
-        prefix={id}
-        op={op}
-        input={offer?.input ?? null}
-        draft={row}
-        hint={offer === undefined ? null : hintOf(label(row.field), offer, op)}
-        onChange={(values) => onRow({ ...row, ...values })}
-      />
+      {relative === undefined ? (
+        <ConditionValues
+          prefix={id}
+          op={op}
+          input={input}
+          draft={row}
+          hint={offer === undefined ? null : hintOf(label(row.field), offer, op)}
+          onChange={(values) => onRow({ ...row, ...values })}
+        />
+      ) : (
+        <RelativeValues prefix={id} op={op} relative={relative} row={row} onRow={onRow} />
+      )}
+      {mayCount ? (
+        <div className="check">
+          <input type="checkbox" id={`${id}-today`} checked={relative === 'today'} onChange={(event) => toggle('today', event.target.checked)} />
+          <label htmlFor={`${id}-today`}>Count in days from today</label>
+        </div>
+      ) : null}
+      {mayAttribute ? (
+        <div className="check">
+          <input type="checkbox" id={`${id}-attribute`} checked={relative === 'attribute'} onChange={(event) => toggle('attribute', event.target.checked)} />
+          <label htmlFor={`${id}-attribute`}>Equals the signed-in person’s attribute</label>
+        </div>
+      ) : null}
       <p className="actions">
         <button type="button" id={`${id}-remove`} className="button" onClick={onRemove}>
           Remove <span className="visually-hidden">condition {index + 1}</span>

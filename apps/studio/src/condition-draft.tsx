@@ -105,7 +105,8 @@ export function hintOf(subject: string, offer: FilterOffer, op: FilterOp): strin
 }
 
 /** One box, typed as its input asks: a day as a date, anything else as text, a boolean chosen. */
-function Box({
+/** One box of a condition, by its label, typed as its input reads -- a yes/no a select -- with the hint that describes it. */
+export function Box({
   id,
   label,
   input,

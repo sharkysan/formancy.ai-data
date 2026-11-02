@@ -1,5 +1,5 @@
 import { fieldAnchor, grantsOnKey, presentationOf, rebasePresentation } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, ListView, PresentationConflict, ReassignedKey } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, StoredListView, PresentationConflict, ReassignedKey } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FormSchema } from '@formancy/spec'
 import type { Proposal } from './api.js'
@@ -62,7 +62,8 @@ export function freshFields(before: FormBindings, after: FormBindings): string[]
 }
 
 export type CarriedDraft =
-  { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: ListView[]; unfiltered: string[] } | { ok: false; message: string }
+  | { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: StoredListView[]; unfiltered: string[] }
+  | { ok: false; message: string }
 
 /**
  * A draft's presentation carried to a new proposal of the same form: derived
@@ -77,7 +78,7 @@ export type CarriedDraft =
  * carried without what does not fit.
  */
 export function carryDraft(
-  from: { proposal: Proposal; edited: FormSchema; views: readonly ListView[]; unfiltered: readonly string[] },
+  from: { proposal: Proposal; edited: FormSchema; views: readonly StoredListView[]; unfiltered: readonly string[] },
   to: Proposal,
 ): CarriedDraft {
   const derived = presentationOf(from.proposal.form, from.edited, from.proposal.bindings)

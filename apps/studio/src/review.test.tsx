@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { describeReassigned } from '@formancy/data-core'
-import type { FormPolicy, ListView } from '@formancy/data-core'
+import type { FormPolicy, StoredListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import { ReviewStep } from './review.js'
 import { audit, findStatus, focusedName, goTo, mount, paragraphs, pressEnter, servedDocument, signIn, statuses, unnamed } from './test-studio.js'
@@ -326,7 +326,7 @@ describe('what a draft shows its reviewer', () => {
   test('shows the list views approving it would offer, in words', async () => {
     const bundle = await orderBundle(plane)
     if (bundle.format !== 2) throw new Error('the order bundle is not format 2')
-    const views: ListView[] = [
+    const views: StoredListView[] = [
       { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [{ field: 'order_date', direction: 'desc' }], default: true },
       { name: 'Large', filter: [{ field: 'amount', op: 'range', from: '1000', to: null }], sort: [] },
     ]

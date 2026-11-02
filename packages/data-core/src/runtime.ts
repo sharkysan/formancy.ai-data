@@ -67,22 +67,50 @@ export interface FilterOffer {
 export type FilterableField = { field: string; offered: boolean } & FilterOffer
 
 /**
- * A view of a form's list its administrator named (0105): conditions and an
- * order a person picks together, each term exactly what a list request
- * carries (`ListFilterTerm`, `ListSortTerm`), so a picked view is a list
- * request and nothing else. `default` is `true` on the one view a grid opens
- * on, and absent on every other.
+ * A view of a form's list its administrator named (0105), as a person is
+ * offered it: conditions and an order a person picks together, each term
+ * exactly what a list request carries (`ListFilterTerm`, `ListSortTerm`),
+ * so a picked view is a list request and nothing else. `default` is `true`
+ * on the one view a grid opens on, and absent on every other.
  */
 export interface ListView {
   name: string
   filter: ListFilterTerm[]
   sort: ListSortTerm[]
   default?: true
-  /**
-   * The roles it is offered to (0124), each once; left out, it is offered
-   * to everyone who could build it. Never sent to a person: the server
-   * offers it or does not.
-   */
+}
+
+/**
+ * A value a stored view's condition compares with (0125): typed, or
+ * relative to whom and when it is offered -- `today`, whole days from the
+ * day it is offered, or `attribute`, the signed-in person's attribute of
+ * that name, as their token carries it.
+ */
+export type ViewValue = string | { today: number } | { attribute: string }
+
+/** A stored view's condition: a request's, with a value or a bound that may be relative (0125). */
+export type ViewCondition =
+  | { op: 'equals'; value: ViewValue }
+  | { op: 'range'; from: ViewValue | null; to: ViewValue | null }
+  | { op: 'contains'; text: string }
+  | { op: 'null' }
+  | { op: 'not-null' }
+
+/** One condition of a stored view, on a field. */
+export type ViewFilterTerm = { field: string } & ViewCondition
+
+/**
+ * A list view as a form's presentation keeps it (0105): what a person is
+ * offered once its values are resolved for them (`viewsFor`), and `roles`,
+ * the roles it is offered to (0124), each once -- left out, it is offered
+ * to everyone who could build it. Neither the roles nor a relative value
+ * is sent to a person: the server offers the view, resolved, or does not.
+ */
+export interface StoredListView {
+  name: string
+  filter: ViewFilterTerm[]
+  sort: ListSortTerm[]
+  default?: true
   roles?: string[]
 }
 

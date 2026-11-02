@@ -2,7 +2,9 @@ import { canonicalize } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
 import { columnFilter, readFilter } from '../records/filter.js'
 import { readSort } from '../records/list-query.js'
-import type { ListColumns, ListView } from '../runtime.js'
+import type { PolicyContext } from '../policy/types.js'
+import type { ListColumns, ListFilterTerm, ListView, StoredListView } from '../runtime.js'
+import { relativeShape, resolveTerm, standIn } from './view-values.js'
 
 /*
  * A form's list views (0105): conditions and an order an administrator
@@ -22,6 +24,9 @@ import type { ListColumns, ListView } from '../runtime.js'
  *
  * Pure and isomorphic, as the presentation is.
  */
+
+/** The day a relative day stands in for when a view is fitted at a write. */
+const STAND_IN_DAY = '2000-01-01'
 
 /** C0, DEL and C1, and a surrogate with no partner: in `u` mode, so each reads code points. */
 const CONTROL = /\p{Cc}/u
@@ -64,7 +69,10 @@ function filterShape(filter: unknown, at: string): string[] {
   const problems: string[] = []
   const fields = new Set<string>()
   for (const [index, term] of filter.entries()) {
-    const read = readFilter([term], 'field')
+    // A relative value (0125) is read for its own shape, and the rest of the condition as a request's.
+    const relative: { problems: string[]; read: unknown } = isRecord(term) ? relativeShape(term, `${at}/filter/${String(index)}`) : { problems: [], read: term }
+    problems.push(...relative.problems)
+    const read = readFilter([relative.read], 'field')
     if (!read.ok && read.code === 'malformed') {
       problems.push(`${at}/filter/${String(index)}: ${read.message}`)
       continue
@@ -182,12 +190,40 @@ export function viewFit(view: ListView, bindings: FormBindings, columns: Pick<Li
 }
 
 /**
- * The views offered to a person of `roles` (0124): those for one of their
- * roles and those for everyone, in their published order, each without its
- * roles -- the administrator's, not the person's. Whether each still fits
- * what their list offers, and which default opens their grid, is
- * `listColumns`'.
+ * Why a stored `view` is not one a list offering `columns` could run, or
+ * `null`: each relative value (0125) on a field that can hold one, stood in
+ * for by a day -- any day stands for every other, since a date's codec
+ * reads them all -- or a value of the field's input, and the view then
+ * fitted as a person's would be (`viewFit`). What a write and a regeneration
+ * fit, with no clock; what one person is offered is fitted once it is
+ * resolved for them.
  */
-export function viewsFor(views: readonly ListView[], roles: readonly string[]): ListView[] {
-  return views.filter((view) => view.roles === undefined || view.roles.some((role) => roles.includes(role))).map(({ roles: _roles, ...view }) => view)
+export function storedViewFit(view: StoredListView, bindings: FormBindings, columns: Pick<ListColumns, 'filterable' | 'sortable'>): string | null {
+  const filter: ListFilterTerm[] = []
+  for (const term of view.filter) {
+    const offer = columns.filterable.find((offered) => offered.field === term.field)
+    const stood = standIn(term, offer?.input ?? null, STAND_IN_DAY)
+    if (!stood.ok) return stood.message
+    filter.push(stood.term)
+  }
+  return viewFit({ name: view.name, filter, sort: view.sort }, bindings, columns)
+}
+
+/**
+ * The views offered to a person of `context` on `today` (0124, 0125): those
+ * for one of their roles and those for everyone, in their published order,
+ * each without its roles -- the administrator's, not the person's -- and
+ * with its relative values resolved for them; a view naming an attribute
+ * they do not carry is not offered. Whether each still fits what their list
+ * offers, and which default opens their grid, is `listColumns`'.
+ */
+export function viewsFor(views: readonly StoredListView[], context: PolicyContext, today: string): ListView[] {
+  const offered: ListView[] = []
+  for (const { roles, ...view } of views) {
+    if (roles !== undefined && !roles.some((role) => context.actor.roles.includes(role))) continue
+    const filter = view.filter.map((term) => resolveTerm(term, today, context))
+    if (filter.some((term) => term === null)) continue
+    offered.push({ ...view, filter: filter as ListFilterTerm[] })
+  }
+  return offered
 }

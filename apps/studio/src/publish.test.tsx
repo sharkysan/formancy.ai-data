@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { createBuilderSession } from '@formancy/builder-core'
 import { applyPresentation, presentationOf } from '@formancy/data-core'
-import type { FormPolicy, ListView, PresentationOverrides } from '@formancy/data-core'
+import type { FormPolicy, StoredListView, PresentationOverrides } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Bundle, Proposal } from './api.js'
 import { PublishStep } from './publish.js'
@@ -296,7 +296,7 @@ describe('publishing', () => {
   test('holds back a list view the bindings cannot run, in the fit’s words', async () => {
     servedDocument()
     const generated = await proposal()
-    const long: ListView = { name: 'Long', filter: [{ field: 'notes', op: 'contains', text: 'x'.repeat(201) }], sort: [] }
+    const long: StoredListView = { name: 'Long', filter: [{ field: 'notes', op: 'contains', text: 'x'.repeat(201) }], sort: [] }
     render(
       <main aria-label="Publish">
         <PublishStep

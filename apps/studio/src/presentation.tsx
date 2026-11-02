@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import type { FormBindings, ListView } from '@formancy/data-core'
+import type { FormBindings, StoredListView } from '@formancy/data-core'
 import type { LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
@@ -142,8 +142,8 @@ export function PresentationStep({
 }: {
   session: BuilderSession
   bindings: FormBindings
-  views: readonly ListView[]
-  onViews: (views: ListView[]) => void
+  views: readonly StoredListView[]
+  onViews: (views: StoredListView[]) => void
   /** The fields the Filter panel does not offer (0123). */
   unfiltered: readonly string[]
   onUnfiltered: (next: string[]) => void

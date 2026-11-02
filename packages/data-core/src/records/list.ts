@@ -5,8 +5,8 @@ import type { ColumnMeta, MetadataSnapshot, NormalizedTypeKind } from '../metada
 import { readableFields } from '../policy/evaluate.js'
 import { unscopedLookups } from '../policy/through.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
-import { viewFit } from '../presentation/views.js'
-import type { FilterableField, ListColumns, ListView, RecordList, RecordListQuery } from '../runtime.js'
+import { storedViewFit, viewFit } from '../presentation/views.js'
+import type { FilterableField, ListColumns, ListView, RecordList, RecordListQuery, StoredListView } from '../runtime.js'
 import { lookupAnswer, toFormAnswers } from './answers.js'
 import { decodeListCursor, listCursor } from './cursor.js'
 import { columnFilter, filterOffer } from './filter.js'
@@ -163,14 +163,14 @@ function firstDefault(views: readonly ListView[]): ListView[] {
  * fitted against every field the bindings hold, so one only a few may read
  * is stored, and offered to those few.
  */
-export function viewProblems(views: readonly ListView[], bindings: FormBindings): string[] {
+export function viewProblems(views: readonly StoredListView[], bindings: FormBindings): string[] {
   const all = listColumns(
     bindings,
     bindings.fields.map((binding) => binding.field),
     [],
   )
   return views.flatMap((view, index) => {
-    const why = viewFit(view, bindings, all)
+    const why = storedViewFit(view, bindings, all)
     return why === null ? [] : [`/views/${String(index)} (“${view.name}”): ${why}`]
   })
 }

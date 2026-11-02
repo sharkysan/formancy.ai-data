@@ -243,9 +243,11 @@ than its column holds is refused, not rounded; and what a filter costs on
 a large table is not measured
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
 A list view an administrator named is only what a person could have built,
-so no view is relative to the day or the person; it is the same for every
-person who may read its fields and kept to no role, and the host keeps a
-picked one in the viewer's browser alone (0106). A person who may not read a field a view
+its days counted from the server's UTC date when a person opens the form,
+so a page left open past midnight keeps yesterday's views, and its
+attribute a name nothing checks against the host's token
+([0125](../decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)); the host keeps a picked one in the viewer's browser alone
+(0106). A person who may not read a field a view
 names is not offered it; a stored view a later release no longer runs is
 not offered either, and nothing says so until a publish refuses it
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
-import type { FormBindings, ListView } from '@formancy/data-core'
+import type { FormBindings, StoredListView } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
-import { sayCondition } from './condition-draft.js'
+
 import { labelOf } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { FilterChoice } from './filter-choice.js'
-import { draftOfView, EMPTY_VIEW, VIEW_NAME, VIEW_SAVE, ViewForm, viewOf } from './view-form.js'
+import { draftOfView, EMPTY_VIEW, sayViewCondition, VIEW_NAME, VIEW_SAVE, ViewForm, viewOf } from './view-form.js'
 import type { ViewDraft } from './view-form.js'
 
 /*
@@ -29,8 +29,8 @@ import type { ViewDraft } from './view-form.js'
 const HEADING = 'views-heading'
 
 /** A view in words, its fields by the form's labels: `where Status = placed; sorted by Order date descending; opens the grid`. */
-export function sayView(view: ListView, label: (key: string) => string): string {
-  const where = view.filter.length === 0 ? 'every record' : `where ${view.filter.map((term) => sayCondition(label(term.field), term)).join(' and ')}`
+export function sayView(view: StoredListView, label: (key: string) => string): string {
+  const where = view.filter.length === 0 ? 'every record' : `where ${view.filter.map((term) => sayViewCondition(label(term.field), term)).join(' and ')}`
   const sorted =
     view.sort.length === 0
       ? []
@@ -40,7 +40,7 @@ export function sayView(view: ListView, label: (key: string) => string): string 
 }
 
 /** A view as a list says it: its name, then its words. */
-export function SavedView({ view, label }: { view: ListView; label: (key: string) => string }): ReactElement {
+export function SavedView({ view, label }: { view: StoredListView; label: (key: string) => string }): ReactElement {
   return (
     <p>
       <strong>{view.name}</strong>: {sayView(view, label)}.
@@ -72,8 +72,8 @@ export function ListViewsPanel({
 }: {
   bindings: FormBindings
   document: FormSchema
-  views: readonly ListView[]
-  onViews: (views: ListView[]) => void
+  views: readonly StoredListView[]
+  onViews: (views: StoredListView[]) => void
   /** The fields the Filter panel does not offer (0123). */
   unfiltered: readonly string[]
   onUnfiltered: (next: string[]) => void
@@ -108,7 +108,7 @@ export function ListViewsPanel({
     const at = editingAt === -1 ? views.length : editingAt
     // One view opens the grid: saved as the default, this one takes it from the one that had it.
     const took = view.default === true ? views.find((other, index) => index !== at && other.default === true) : undefined
-    const others = views.map((other): ListView => (other === took ? { name: other.name, filter: other.filter, sort: other.sort } : other))
+    const others = views.map((other): StoredListView => (other === took ? { name: other.name, filter: other.filter, sort: other.sort } : other))
     const next = at === views.length ? [...others, view] : others.map((other, index) => (index === at ? view : other))
     // The fit reads what the shape lets through, so a malformed condition is said once.
     const shape = viewShapeProblems(next)

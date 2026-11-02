@@ -52,7 +52,8 @@ export { applyPresentation, presentationShapeProblems } from './presentation/app
 export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
-export { viewShapeProblems, viewsFor } from './presentation/views.js'
+export { storedViewFit, viewShapeProblems, viewsFor } from './presentation/views.js'
+export { todayOf } from './presentation/view-values.js'
 export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
 export type {
   FieldAnchor,
@@ -250,6 +251,10 @@ export type {
   ListFilterTerm,
   ListSortTerm,
   ListView,
+  StoredListView,
+  ViewCondition,
+  ViewFilterTerm,
+  ViewValue,
   PublishedForm,
   RecordDeleted,
   RecordExportQuery,
