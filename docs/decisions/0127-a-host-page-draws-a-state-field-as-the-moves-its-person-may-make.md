@@ -21,7 +21,8 @@
   whole number's box kept (watched failing with the session drawing the
   form as published: a text box on every record).
   `apps/host/src/moves.test.tsx`, on both engines against the real server,
-  in both renderers.
+  in both renderers (watched failing in CI with the session drawing the
+  form as published: no Status choice was drawn).
 
 ## Context
 

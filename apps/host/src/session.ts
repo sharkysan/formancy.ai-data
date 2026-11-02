@@ -255,10 +255,10 @@ export function createSession({ client, formId, definition, renderer, namespace,
         follows !== undefined
           ? following
           : token === undefined
-            ? forCreate
+            ? withMoves(forCreate, definition.moves, null)
             : !allows('update') || ended(record)
               ? readOnly
-              : forUpdate,
+              : forUpdateOf(record),
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
       formId: `${ids}-${renderer}`,
