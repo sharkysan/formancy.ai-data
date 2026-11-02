@@ -203,7 +203,7 @@ export function journey(plane, check) {
         const dated = form.getByRole('group', { name: 'Condition 2' })
         await dated.getByRole('combobox', { name: 'Field' }).selectOption({ label: 'Order date' })
         await dated.getByRole('combobox', { name: 'Condition' }).selectOption({ label: 'is in a range' })
-        await dated.getByLabel('From').fill('2026-01-01')
+        await dated.getByLabel('From', { exact: true }).fill('2026-01-01')
         await add.click()
         const third = form.getByRole('group', { name: 'Condition 3' })
         const remove = third.getByRole('button', { name: 'Remove condition 3' })
