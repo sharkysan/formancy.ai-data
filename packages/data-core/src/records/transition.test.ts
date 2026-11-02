@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { checkTransition, stateField } from '../policy/evaluate.js'
+import { checkTransition, stateField, stateMoves } from '../policy/evaluate.js'
 import type { FormPolicy } from '../policy/types.js'
 import { validatePolicy } from '../policy/validate.js'
 import { planCreate, planUpdate } from './plan.js'
@@ -101,6 +101,32 @@ describe('a policy’s moves', () => {
     expect(JSON.stringify(checkTransition(MOVES, CLERK, PG_ORDER, 'shipped', 'delivered'))).not.toMatch(/shipped|delivered/)
     expect(stateField(ORDER_POLICY)).toBeNull()
     expect(checkTransition(ORDER_POLICY, CLERK, PG_ORDER, 'placed', 'delivered')).toEqual({ ok: true })
+  })
+
+  // What a page is told it may move (0127) is what the check lets through
+  // for this person and nothing else: the moves for one of their roles, in
+  // the policy's order, without the roles -- every pair of states asked of
+  // the check answers as the offer says. Watched failing with every move
+  // offered whatever its roles: the clerk was offered shipped to delivered.
+  test('offer a person the moves the check lets them make, and only those', () => {
+    expect(stateMoves(MOVES, CLERK, PG_ORDER)).toEqual({
+      field: 'status',
+      moves: [
+        { from: null, to: 'placed' },
+        { from: 'placed', to: 'shipped' },
+      ],
+    })
+    const states = [null, 'placed', 'shipped', 'delivered']
+    for (const who of [CLERK, DISPATCHER, actor(['auditor'])]) {
+      const offered = stateMoves(MOVES, who, PG_ORDER)?.moves ?? []
+      for (const from of states)
+        for (const to of states.filter((state): state is string => state !== null && state !== from))
+          expect(
+            offered.some((move) => move.from === from && move.to === to),
+            `${who.actor.roles.join(',')}: ${String(from)} to ${to}`,
+          ).toBe(checkTransition(MOVES, who, PG_ORDER, from, to).ok)
+    }
+    expect(stateMoves(ORDER_POLICY, CLERK, PG_ORDER)).toBeNull()
   })
 })
 

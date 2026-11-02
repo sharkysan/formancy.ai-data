@@ -32,7 +32,8 @@ import {
 } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
-import type { Plane, Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
+import type { Plane } from './test-plane.js'
 
 /*
  * What the page sends, read off the wire after a whole journey through the

@@ -221,7 +221,10 @@ that does not fit its form. A field holding a record's state can be held to
 the moves the policy lists, each a pair of values for named roles, any
 other change refused from the record as read and the move guarded by the
 version its person read
-([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
+([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md));
+the form tells each person the moves their roles may make, read as the
+check reads them, so a page draws the field as those and nothing else
+([0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
 
 **The policy is asked on every request**, nothing cached per actor, and only
 an echo it can prove harmless is removed from a submission

@@ -23,7 +23,8 @@ import {
 import type { User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
-import type { Engine, Plane, Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
+import type { Engine, Plane } from './test-plane.js'
 import { fieldHeading } from '@formancy/data-client'
 
 /*

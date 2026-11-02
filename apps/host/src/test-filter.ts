@@ -3,7 +3,7 @@ import { waitFor, within } from '@testing-library/react'
 import type { RecordListQuery } from '@formancy/data-client'
 import { gridSection } from './test-host.js'
 import type { User } from './test-host.js'
-import type { Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
 
 /*
  * How the suites drive a grid's filter panel (0104), as a person does: by

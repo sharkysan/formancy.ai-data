@@ -1,6 +1,7 @@
 import { claimsFor, COOKIE_NAME, handle, mintToken, notRunning, personaById, PREFIX } from '@formancy/data-live-demo/worker'
 import type { DemoInstance } from '@formancy/data-live-demo/worker'
-import type { Plane, Sent } from './test-plane.js'
+import type { Sent } from './test-fetch.js'
+import type { Plane } from './test-plane.js'
 
 /*
  * The live demo's page in a test (0070): the host page as it is built for

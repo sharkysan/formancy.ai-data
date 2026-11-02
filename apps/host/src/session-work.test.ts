@@ -21,7 +21,7 @@ const client = createDataClient({
 const FIELDS = ['order', 'line_no', 'notes']
 
 /** The form as the server sends it; each write it offers accepts every field unless `writable` says otherwise. */
-function definition(operations: PublishedForm['operations'], writable?: PublishedForm['writable']): PublishedForm {
+function definition(operations: PublishedForm['operations'], writable?: PublishedForm['writable'], moves: PublishedForm['moves'] = null): PublishedForm {
   return {
     form: {
       specVersion: '3',
@@ -40,6 +40,7 @@ function definition(operations: PublishedForm['operations'], writable?: Publishe
     list: null,
     versions: null,
     writable: writable ?? { create: operations.includes('create') ? FIELDS : null, update: operations.includes('update') ? FIELDS : null },
+    moves,
   } as unknown as PublishedForm
 }
 
@@ -141,5 +142,69 @@ describe("the host's copy of the form", () => {
     expect(disabled(session)).toEqual(['notes'])
     session.open(RECORD)
     expect(disabled(session).sort()).toEqual(['notes', 'order'])
+  })
+})
+
+describe('a state field drawn as its moves (0127)', () => {
+  /** The notes held to moves, as a ticket's state is: a clerk opens one and closes it, nobody reopens it. */
+  const MOVES: PublishedForm['moves'] = {
+    field: 'notes',
+    moves: [
+      { from: null, to: 'open' },
+      { from: 'open', to: 'closed' },
+    ],
+  }
+  const session = (moves: PublishedForm['moves']) =>
+    createSession({ client, formId: 'pg-order-line', definition: definition(['read', 'create', 'update'], undefined, moves), renderer: 'react' })
+  const notes = (drawn: ReturnType<typeof createSession>) =>
+    drawn
+      .opened()
+      .engine.schema()
+      .model.fields.find((field) => field.key === 'notes')
+  const at = (state: string | null) => ({ ...RECORD, answers: { ...RECORD.answers, notes: state } })
+
+  // A saved record's state is a choice of where it is and where this
+  // person may move it, its label kept; one it may move nowhere from is
+  // drawn disabled; a new record a choice of where a create may start it.
+  // Watched failing with the session drawing the form as published: the
+  // notes stayed a text box on every record.
+  test('draws the state as the moves from where the record is, and disabled where there are none', () => {
+    const drawn = session(MOVES)
+    drawn.open(at('open'))
+    expect(notes(drawn)).toEqual({
+      key: 'notes',
+      type: 'select',
+      label: 'Notes',
+      options: [
+        { value: 'open', label: 'open' },
+        { value: 'closed', label: 'closed' },
+      ],
+    })
+    expect(disabled(drawn)).toEqual([])
+    drawn.open(at('closed'))
+    expect(notes(drawn)?.type).toBe('text')
+    expect(disabled(drawn)).toEqual(['notes'])
+    drawn.open()
+    expect(notes(drawn)?.options).toEqual([{ value: 'open', label: 'open' }])
+  })
+
+  // No moves, the published field; a whole number held to moves keeps its
+  // box, which a choice's text would not fit, and is disabled where it may
+  // go nowhere.
+  test('leaves a field no moves hold, and keeps a whole number’s box', () => {
+    const plain = session(null)
+    plain.open(at('open'))
+    expect(notes(plain)?.type).toBe('text')
+    const numbered = session({ field: 'line_no', moves: [{ from: '1', to: '2' }] })
+    numbered.open(RECORD)
+    expect(
+      numbered
+        .opened()
+        .engine.schema()
+        .model.fields.find((field) => field.key === 'line_no')?.type,
+    ).toBe('number')
+    expect(disabled(numbered)).toEqual([])
+    numbered.open({ ...RECORD, answers: { ...RECORD.answers, line_no: 2 } })
+    expect(disabled(numbered)).toEqual(['line_no'])
   })
 })

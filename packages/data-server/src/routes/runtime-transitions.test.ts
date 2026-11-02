@@ -184,6 +184,23 @@ const create = (answers: Record<string, unknown>) => post('clerk', '/v1/forms/ti
 const trail = () => events.map(({ operation, status: code, outcome, moved }) => ({ operation, status: code, outcome, moved }))
 
 describe('a state field’s moves on the runtime plane (0112)', () => {
+  // The form tells each person the moves they may make (0127), and only
+  // theirs: the clerk starts a ticket and closes it, the manager archives
+  // a closed one, and neither is told the other's. Watched failing with
+  // the moves left out of the form: the page was told nothing.
+  test('the form names the moves this person may make, and no other', async () => {
+    const opened = async (who: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/forms/ticket', headers: { authorization: `Bearer ${who}` } })).json().moves
+    expect(await opened('clerk')).toEqual({
+      field: 'status',
+      moves: [
+        { from: null, to: 'open' },
+        { from: 'open', to: 'closed' },
+      ],
+    })
+    expect(await opened('manager')).toEqual({ field: 'status', moves: [{ from: 'closed', to: 'archived' }] })
+  })
+
   // A listed move for one of the actor's roles is sent as the update the
   // person asked for, and the trail says a move was made -- never from
   // where or to where. Watched failing with the plan's move left off the

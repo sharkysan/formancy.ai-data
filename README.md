@@ -168,8 +168,11 @@ until then the address is formancy.ai's 404
   change of it is refused before a statement, checked from the record as
   read and guarded by its version, and the audit says that a record moved,
   never from where or to where. A create that leaves the field to its
-  default is not checked, and the form still offers every value
+  default is not checked
   ([0112](./docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
+  The host page draws the field as the moves its person may make from
+  where the record is, and disabled where there is none
+  ([0127](./docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
   help text, order, full width, and a field moved to another generated
   section -- carried through a regeneration by what each field stands for

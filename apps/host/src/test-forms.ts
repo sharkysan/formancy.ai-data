@@ -194,3 +194,13 @@ export function childForms(
       : []),
   ]
 }
+
+/** The order's status as the clerk moves it (0112): a new order starts as a draft, which is placed, then shipped, and nothing moves back. */
+export const ORDER_MOVES: NonNullable<FormPolicy['transitions']> = {
+  field: 'status',
+  moves: [
+    { from: null, to: 'draft', roles: ['clerk'] },
+    { from: 'draft', to: 'placed', roles: ['clerk'] },
+    { from: 'placed', to: 'shipped', roles: ['clerk'] },
+  ],
+}
