@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { viewProblems } from '@formancy/data-core'
-import type { ListView } from '@formancy/data-core'
+import type { StoredListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Bundle, ProposalRequest } from './api.js'
 import { audit, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
-import { addCondition, addSort, nameView, opensTheGrid, pressSave, rows, savedViews, saveView, viewForm, viewsPanel } from './test-views.js'
+import { addCondition, addSort, fill, nameView, opensTheGrid, pressSave, rows, savedViews, saveView, viewForm, viewsPanel } from './test-views.js'
 
 /**
  * A form's list views (0105), made in the Presentation step: named
@@ -106,7 +106,7 @@ describe('making a view', () => {
     await within(publish).findByText('Published version 1 of sales-order.')
     const stored = (await plane.store.read('sales-order', 1)) as Bundle
     if (stored.format !== 2) throw new Error('version 1 is not a format-2 bundle')
-    const placed: ListView = {
+    const placed: StoredListView = {
       name: 'Placed, newest first',
       filter: [{ field: 'status', op: 'equals', value: 'placed' }],
       sort: [{ field: 'order_date', direction: 'desc' }],
@@ -138,6 +138,54 @@ describe('making a view', () => {
     if (stored.format !== 2) throw new Error('version 1 is not a format-2 bundle')
     expect(stored.presentation.views).toEqual([
       { name: 'Placed', filter: [{ field: 'status', op: 'equals', value: 'placed' }], sort: [], roles: ['manager', 'auditor'] },
+    ])
+  })
+
+  // A view relative to when and to whom it is offered (0125): a date's
+  // bounds counted in days from today, and an equality with the signed-in
+  // person's attribute, each a box the row offers only where the field can
+  // hold it, said in words and published as the relative values the server
+  // resolves for each person. Watched failing with the relative values
+  // read as typed ones: -7 is no date, and nothing was saved.
+  test('a view relative to today and to the person says so, and publishes the relative values', async () => {
+    const user = await toViews()
+    await nameView(user, 'My last week')
+    const dated = await addCondition(user, 'Order date', 'is in a range')
+    await user.click(within(dated).getByRole('checkbox', { name: 'Count in days from today' }))
+    expect(within(dated).queryByRole('checkbox', { name: 'Equals the signed-in person’s attribute' })).toBeNull()
+    await fill(user, dated, { 'From, days from today': '-7', 'To, days from today': '0' })
+    const mine = await addCondition(user, 'Approved by', 'equals')
+    expect(within(mine).queryByRole('checkbox', { name: 'Count in days from today' })).toBeNull()
+    await user.click(within(mine).getByRole('checkbox', { name: 'Equals the signed-in person’s attribute' }))
+    await fill(user, mine, { Attribute: 'employee' })
+    expect(await audit()).toEqual([])
+    expect(unnamed()).toEqual([])
+    await pressSave(user)
+    expect(savedViews()).toEqual(['My last week: where Order date from 7 days before today to today and Approved by = your employee.'])
+
+    // Edited, each box is as it was saved.
+    await pressEnter(user, within(viewsPanel()).getByRole('button', { name: 'Edit view 1' }))
+    const [again] = rows('Condition')
+    if (again === undefined) throw new Error('the edited view has no condition row')
+    expect(within(again).getByRole('checkbox', { name: 'Count in days from today' })).toHaveProperty('checked', true)
+    expect(within(again).getByLabelText('From, days from today')).toHaveProperty('value', '-7')
+    await pressSave(user)
+
+    await writeOrderPolicy(user)
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+    const stored = (await plane.store.read('sales-order', 1)) as Bundle
+    if (stored.format !== 2) throw new Error('version 1 is not a format-2 bundle')
+    expect(stored.presentation.views).toEqual([
+      {
+        name: 'My last week',
+        filter: [
+          { field: 'order_date', op: 'range', from: { today: -7 }, to: { today: 0 } },
+          { field: 'approved_by', op: 'equals', value: { attribute: 'employee' } },
+        ],
+        sort: [],
+      },
     ])
   })
 
@@ -194,7 +242,7 @@ describe('a view refused', () => {
     await nameView(user, 'Large')
     const row = await addCondition(user, 'Amount', 'equals', { Value: '1.23456' })
     await pressSave(user)
-    const large: ListView = { name: 'Large', filter: [{ field: 'amount', op: 'equals', value: '1.23456' }], sort: [] }
+    const large: StoredListView = { name: 'Large', filter: [{ field: 'amount', op: 'equals', value: '1.23456' }], sort: [] }
     const [problem] = viewProblems([large], await bindingsSent())
     expect(problem).toMatch(/^\/views\/0 \(“Large”\): .*amount/)
     expect(refusal()).toEqual(['The view was not saved:', problem])

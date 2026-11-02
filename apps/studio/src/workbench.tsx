@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
-import type { FormPolicy, ListView, MetadataSnapshot } from '@formancy/data-core'
+import type { FormPolicy, StoredListView, MetadataSnapshot } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
 import { BrowseStep } from './browse.js'
@@ -71,7 +71,7 @@ interface Generated {
   proposal: Proposal
   session: BuilderSession
   /** In the order a picker lists them; `[]` for none, which the publish leaves out. */
-  views: ListView[]
+  views: StoredListView[]
   /** The fields the Filter panel does not offer (0123), beside the views. */
   unfiltered: string[]
   carried: Carried | null
@@ -234,7 +234,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   }
 
   /** The list views saved, removed or moved in the Presentation step. */
-  function viewed(views: ListView[]): void {
+  function viewed(views: StoredListView[]): void {
     setGenerated((previous) => (previous === null ? previous : { ...previous, views }))
   }
 

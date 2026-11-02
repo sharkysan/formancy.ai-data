@@ -212,7 +212,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
    searched and filtered by, and the published views this person could
-   have built from those (`listColumns`, 0105), or `null` -- `deleting`,
+   have built from those (`listColumns`, 0105), those for one of their
+   roles (0124), each value relative to today or to them resolved for them
+   (`viewsFor`,
+   [0125](../decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)), or `null` -- `deleting`,
    `copied`, and `writable`, the fields each write it offers accepts from
    this person, by the over-posting check
    ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).

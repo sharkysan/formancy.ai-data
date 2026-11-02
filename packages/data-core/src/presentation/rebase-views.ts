@@ -1,12 +1,12 @@
 import type { FormBindings } from '../generate/types.js'
 import { listColumns } from '../records/list.js'
-import type { ListView } from '../runtime.js'
+import type { StoredListView } from '../runtime.js'
 import type { PresentationConflict } from './types.js'
-import { viewFit } from './views.js'
+import { storedViewFit } from './views.js'
 
 /** What `carryViews` reads: the published views, how an old key is followed, the new bindings, and where a dropped view is said. */
 export interface ViewCarry {
-  views: readonly ListView[]
+  views: readonly StoredListView[]
   /** An old key's new key, followed by what it stands for, or `undefined` when it is gone (`rebase.ts`). */
   follow: (key: string) => string | undefined
   bindings: FormBindings
@@ -24,13 +24,13 @@ export interface ViewCarry {
  * the condition it would show a wider list under the same name. A default
  * goes with its view.
  */
-export function carryViews({ views, follow, bindings, report }: ViewCarry): ListView[] {
+export function carryViews({ views, follow, bindings, report }: ViewCarry): StoredListView[] {
   const columns = listColumns(
     bindings,
     bindings.fields.map((binding) => binding.field),
     [],
   )
-  const carried: ListView[] = []
+  const carried: StoredListView[] = []
   for (const [index, view] of views.entries()) {
     const gone = [...view.filter, ...view.sort].find((term) => follow(term.field) === undefined)
     if (gone !== undefined) {
@@ -42,14 +42,14 @@ export function carryViews({ views, follow, bindings, report }: ViewCarry): List
       })
       continue
     }
-    const moved: ListView = {
+    const moved: StoredListView = {
       name: view.name,
       filter: view.filter.map((term) => ({ ...term, field: follow(term.field) as string })),
       sort: view.sort.map((term) => ({ ...term, field: follow(term.field) as string })),
       ...(view.default === true ? { default: true } : {}),
       ...(view.roles === undefined ? {} : { roles: [...view.roles] }),
     }
-    const why = viewFit(moved, bindings, columns)
+    const why = storedViewFit(moved, bindings, columns)
     if (why !== null) {
       report(index, { kind: 'view-dropped', view: view.name, resolution: 'dropped', message: `View “${view.name}” was dropped: ${why}` })
       continue

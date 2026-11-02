@@ -4,7 +4,7 @@
 // proposal to the next, with proposals the real server generated.
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { createBuilderSession } from '@formancy/builder-core'
-import type { FormBindings, FormPolicy, ListView, PresentationConflict } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, StoredListView, PresentationConflict } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { AdminClient, Proposal, ProposalRequest } from './api.js'
 import { asked, carriedAgain, carryDraft, freshFields } from './carry.js'
@@ -82,8 +82,8 @@ describe('carrying a draft to a new proposal', () => {
   test('carries the draft’s list views, and drops and reports one whose column is gone', async () => {
     const before = await propose()
     const edited = createBuilderSession(before.form).exportDocument()
-    const noted: ListView = { name: 'Noted', filter: [{ field: 'notes', op: 'not-null' }], sort: [], default: true }
-    const placed: ListView = {
+    const noted: StoredListView = { name: 'Noted', filter: [{ field: 'notes', op: 'not-null' }], sort: [], default: true }
+    const placed: StoredListView = {
       name: 'Placed',
       filter: [{ field: 'status', op: 'equals', value: 'placed' }],
       sort: [{ field: 'order_date', direction: 'desc' }],

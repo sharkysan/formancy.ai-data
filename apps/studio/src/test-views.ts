@@ -37,7 +37,7 @@ export function rows(kind: 'Condition' | 'Sort'): HTMLElement[] {
 }
 
 /** Each of `values` typed into the box of that name in `row`, or chosen where it is a select. */
-async function fill(user: User, row: HTMLElement, values: Record<string, string>): Promise<void> {
+export async function fill(user: User, row: HTMLElement, values: Record<string, string>): Promise<void> {
   for (const [name, value] of Object.entries(values)) {
     const control = within(row).getByLabelText(name)
     if (control instanceof HTMLSelectElement) {

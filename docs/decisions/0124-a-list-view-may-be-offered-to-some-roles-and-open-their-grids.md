@@ -1,6 +1,6 @@
 # 0124 — A list view may be offered to some roles, and open their grids
 
-- **Status:** accepted; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): a view may name the roles it is offered to, a default holds for those roles, and a person is offered only the views for one of theirs and those for everyone
+- **Status:** accepted; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): a view may name the roles it is offered to, a default holds for those roles, and a person is offered only the views for one of theirs and those for everyone; amended by [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md): a view relative to whoever is signed in is offered
 - **Date:** 2026-11-01
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/presentation/views.test.ts` --

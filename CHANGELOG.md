@@ -36,6 +36,20 @@ later.
   notice: a view may hold `roles`, which a server of an earlier release
   refuses; the server sends a person their views without the roles, so the
   page and `@formancy/data-client` read them as before.
+- **A list view may count days from today and compare with the signed-in
+  person's attribute** (0125). Why: a view's values were typed when it was
+  made, so "placed last week" stopped being last week a week later, and
+  "mine" was one view per person. In the studio's view form, "Count in days
+  from today" on a date's condition and "Equals the signed-in person’s
+  attribute" on an equality say so, and the view's words read "from 7 days
+  before today to today" and "= your employee". The server resolves them
+  for each person when it offers the views: today is its UTC date, and a
+  view naming an attribute the person's token does not carry is not
+  offered to them. What you notice: a view's value may be `{ today: n }`
+  or `{ attribute: name }`, which a server of an earlier release refuses;
+  a page is sent the resolved values, so it and `@formancy/data-client`
+  read the list as before, and a page left open past midnight keeps
+  yesterday's views until it is opened again.
 
 - **The studio edits a field's help text** (0119), in the Presentation step,
   in a Help text box under each field's label. Why: since 0118 a field's

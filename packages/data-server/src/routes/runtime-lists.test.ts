@@ -291,6 +291,13 @@ beforeEach(async () => {
   const viewed: PublishedBundle = { ...bundle, format: 2, generation, base: customer.form, presentation: { ...EMPTY_PRESENTATION, views: [LARGE, MUSTER] } }
   await store.publish('viewed', null, viewed)
   await store.publish('unfiltered', null, { ...viewed, presentation: { ...viewed.presentation, unfiltered: ['credit_limit'] } })
+  await store.publish('relative', null, {
+    ...viewed,
+    presentation: {
+      ...viewed.presentation,
+      views: [{ name: 'My tenant', filter: [{ field: 'tenant_id', op: 'equals', value: { attribute: 'tenant' } }], sort: [] }],
+    },
+  })
   await store.publish('roled', null, {
     ...viewed,
     presentation: {
@@ -646,6 +653,15 @@ describe('the list route', () => {
   test('the form offers the views for this person’s roles, without the roles', async () => {
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/roled', headers: as('clerk') })).json()
     expect(served.list.views).toEqual([{ ...MUSTER, default: true }])
+  })
+
+  // A view relative to the person (0125) is offered resolved: "My tenant"
+  // compares the tenant with the clerk's own, which their token carries,
+  // and the page is never sent the attribute's name. Watched failing with
+  // the views offered as stored: the clerk was sent { attribute: 'tenant' }.
+  test('the form offers a view relative to the person, resolved for them', async () => {
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/relative', headers: as('clerk') })).json()
+    expect(served.list.views).toEqual([{ name: 'My tenant', filter: [{ field: 'tenant_id', op: 'equals', value: '1' }], sort: [] }])
   })
 
   // A view is offered to a person only when they could have built it from

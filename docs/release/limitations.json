@@ -3122,7 +3122,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:d5e7e38227e26c0737b3d74aa08f4f2e5d545ab8481c193351d26f4b2e66fd98",
+      "reviewed": "sha256:8b0143b55ddb93bf014e1c53fed1c5e2f2e93bd6fa10c16424d87c59a766ed9a",
       "limitations": [
         {
           "area": "forms",
@@ -3562,12 +3562,8 @@
       ]
     },
     "0124": {
-      "reviewed": "sha256:c2380bf918b4c400cfc898d17e35dec3ad74a586a320015108b23a8723e9a710",
+      "reviewed": "sha256:d3cf7aaf44a2e281bad5be33b7e5b8ad36f3194467bee5f051dfb13531da6a66",
       "limitations": [
-        {
-          "area": "host",
-          "says": "A list view is offered by role, not by person: a view relative to whoever is signed in is not yet offered."
-        },
         {
           "area": "host",
           "says": "A person who holds two roles with a default view each opens on the first in the published order; nothing else decides between them.",
@@ -3580,6 +3576,33 @@
         {
           "area": "operations",
           "says": "A server of an earlier release refuses a version whose list views name roles."
+        }
+      ]
+    },
+    "0125": {
+      "reviewed": "sha256:bd9ca4a07ed2c078ce4764839eec2a2c21b8d1b4125c79532be595dddcc7f204",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A list view's days from today are counted when a person opens the form: a page left open past midnight keeps yesterday's views until it is opened again."
+        },
+        {
+          "area": "host",
+          "says": "A list view's today is the server's UTC date, not the person's: near midnight a person east or west of UTC is offered the next or the previous day's view.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A list view's attribute is a name the host's token carries: a name misspelt offers the view to nobody, and nothing checks it against the token."
+        },
+        {
+          "area": "studio",
+          "says": "A list view compares a person's attribute for equality only, and only with text, a whole number or a uuid.",
+          "heldBy": "packages/data-core/src/presentation/views.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server of an earlier release refuses a version whose list views hold a value relative to today or to the person."
         }
       ]
     }

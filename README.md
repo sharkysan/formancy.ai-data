@@ -301,10 +301,13 @@ until then the address is formancy.ai's 404
   one above the grid and may then change it, and is offered only the views
   they could have built themselves: one naming a field they may not read
   is not offered to them at all. A view is sent as the person's own filter
-  and sort, so it narrows and never permits; it holds no value relative to
-  the day or the person, and a regeneration that removes a field a view
-  names drops that view and says so
+  and sort, so it narrows and never permits, and a regeneration that
+  removes a field a view names drops that view and says so
   ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+  A view may count a date's days from today or compare with the signed-in
+  person's attribute, which the server resolves for each person when it
+  offers the view, today being its UTC date
+  ([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
 - **A person can download the records a list would show them as one CSV
   file**, for the same search, sort, parent and filter and under the same
   read policy, with no right of its own, through the runtime plane and
@@ -600,8 +603,16 @@ was typed kept; each saved view is said in words, and edited, removed and
 moved by keyboard. Generate again and a regeneration carry the views by
 the columns they name, and list one they had to drop; the Publish step
 sends them in the presentation, and a reviewer sees them under the draft's
-policy. Saving, removing and moving a view are not on Undo and Redo, and
-the step says nothing of which roles will be offered which view
+policy. "Offered to roles, empty for everyone" names the roles a view is
+offered to, and the view's words end with them
+([0124](./docs/decisions/0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md)).
+A date's condition may "Count in days from today", its bounds then whole
+days, and an equality on text, a whole number or a uuid may be "Equals the
+signed-in person’s attribute", its box then the attribute's name; the
+view's words say "from 7 days before today to today" and "= your
+employee"
+([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
+Saving, removing and moving a view are not on Undo and Redo
 ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
@@ -704,7 +715,10 @@ order. Any condition you add or header you press makes it
 Your own filter and sort, and the view's own conditions and order show the
 view again. A grid opens on the view marked to open it, and on every record
 where that view names a field you may not read, which is then not offered
-to you at all. No view is kept in the address
+to you at all. A view counted from today is today's when you open the
+form, and one that is yours compares with what your sign-in carries
+([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
+No view is kept in the address
 ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
 
 Columns, beside View and Filter, lists the grid's columns: Show one or not,

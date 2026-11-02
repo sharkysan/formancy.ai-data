@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { presentationOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
-import type { DriftChange, DriftReport, FormPolicy, ListView, ReassignedKey } from '@formancy/data-core'
+import type { DriftChange, DriftReport, FormPolicy, StoredListView, ReassignedKey } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
@@ -152,7 +152,7 @@ export function PublishStep({
   proposal: Proposal
   session: BuilderSession
   /** The list views chosen in the Presentation step (0105), in their order. */
-  views?: readonly ListView[]
+  views?: readonly StoredListView[]
   /** The fields the Filter panel does not offer, chosen beside them (0123). */
   unfiltered?: readonly string[]
   policy: FormPolicy

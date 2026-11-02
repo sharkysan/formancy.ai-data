@@ -11,6 +11,7 @@ import {
   readableFields,
   runtimeOperations,
   toFormAnswers,
+  todayOf,
   versionFields,
   viewsFor,
   writableFields,
@@ -327,9 +328,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // over this description would be decided as, so the page never offers a
     // grid it would be refused (0044).
     const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
-    // The views for this person's roles (0124) they could have built (0105), and the fields the Filter panel leaves out (0123); a version published before 0030 has neither.
+    // The views for this person's roles (0124), resolved for them today (0125), that they could have built (0105), and the fields the Filter panel leaves out (0123); a version published before 0030 has neither.
     const presentation = bundle.format === 2 ? bundle.presentation : { views: [], unfiltered: [] }
-    const views = viewsFor(presentation.views ?? [], actor.actor.roles)
+    const views = viewsFor(presentation.views ?? [], actor, todayOf(Date.now()))
     const list =
       listed.ok && driftRefusal(bundle.snapshot, bundle.bindings, bundle.policy, root.described, 'list') === undefined
         ? listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [])
