@@ -34,7 +34,8 @@ export function withMoves(form: FormSchema, moves: PublishedForm['moves'], from:
     ...(field.label === undefined ? {} : { label: field.label }),
     ...(field.description === undefined ? {} : { description: field.description }),
     ...(field.required === undefined ? {} : { required: field.required }),
-    options: states.map((state) => ({ value: state, label: state })),
+    // Each by its label where the administrator gave one (0129), else as its column spells it.
+    options: states.map((state) => ({ value: state, label: moves.labels.find((entry) => entry.state === state)?.label ?? state })),
   }
   return { ...form, model: { ...form.model, fields: form.model.fields.map((candidate) => (candidate === field ? choice : candidate)) } }
 }

@@ -867,7 +867,9 @@ describe('a delete (0050)', () => {
   // `moves` is the state field and the moves this person may make (0127),
   // or `null`: a reply without it is from a server older than 0127, and a
   // move with no state to go to, or a state that is not text, is none a
-  // page could draw. Watched failing with `moves` left unchecked.
+  // page could draw. Watched failing with `moves` left unchecked. So is one
+  // without its states' labels (0129), or with a label that is not text.
+  // Watched failing with `labels` left unchecked.
   test("a form's moves are null, or a field and moves between states", async () => {
     const FORM = {
       form: { model: {} },
@@ -888,21 +890,25 @@ describe('a delete (0050)', () => {
       undefined,
       'status',
       { field: 'status' },
-      { field: 'status', moves: [{ from: 'open' }] },
-      { field: 'status', moves: [{ from: 1, to: 'closed' }] },
+      { field: 'status', moves: [{ from: 'open' }], labels: [] },
+      { field: 'status', moves: [{ from: 1, to: 'closed' }], labels: [] },
+      // Without its states' labels (0129), from a server older than them, or with a label that is not text.
+      { field: 'status', moves: [] },
+      { field: 'status', moves: [], labels: [{ state: 'open', label: 7 }] },
     ]) {
       body = { ...FORM, moves }
       expect(await client.form('pg-ticket'), JSON.stringify(moves)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
     }
     for (const moves of [
       null,
-      { field: 'status', moves: [] },
+      { field: 'status', moves: [], labels: [] },
       {
         field: 'status',
         moves: [
           { from: null, to: 'open' },
           { from: 'open', to: 'closed' },
         ],
+        labels: [{ state: 'open', label: 'Open' }],
       },
     ]) {
       body = { ...FORM, moves }

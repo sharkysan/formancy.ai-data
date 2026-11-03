@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:623731749fa28b0aea27f294085a245816565d8198fd2d5eb28246145a0ca9b4",
+      "reviewed": "sha256:b5eb0ae0ecc4ec2cdf38ea2f7f8fcc45eba03a75b55bc4f952a122328211755d",
       "limitations": [
         {
           "area": "studio",
@@ -3630,12 +3630,8 @@
       ]
     },
     "0127": {
-      "reviewed": "sha256:7c5eee0a7824cf0180fd61be43491dae6da5a0b47834ea058f26400bca618e83",
+      "reviewed": "sha256:6914d651b338e59aa073627b222a59888619890dcac4c656f1de383e6403cfcb",
       "limitations": [
-        {
-          "area": "host",
-          "says": "A state is labelled as its column spells it, not with a label of the administrator's."
-        },
         {
           "area": "host",
           "says": "A state field's choice is drawn when the record is opened: after a save the form keeps that choice, and the next move is offered once the record is opened again."
@@ -3662,6 +3658,25 @@
         {
           "area": "host",
           "says": "A view a person saves or removes in another page is offered, or no longer offered, on this page once the form is opened again here."
+        }
+      ]
+    },
+    "0129": {
+      "reviewed": "sha256:55d990c71bf4d75e7f8f56a68cb6fda783c37ca69f67658565b084aa2f577c8d",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A state's label is one text, not one for each language a form is shown in."
+        },
+        {
+          "area": "studio",
+          "says": "A state is labelled only where the policy holds its field to moves, and only for the states the moves name: changing the moves after the labels may leave a state unlabelled, and a label of a state they no longer name is dropped from the next publish.",
+          "heldBy": "apps/studio/src/state-labels.test.tsx"
+        },
+        {
+          "area": "server",
+          "says": "A server of an earlier release refuses a version whose presentation labels states, and @formancy/data-client reads a form whose moves carry no labels as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
         }
       ]
     }

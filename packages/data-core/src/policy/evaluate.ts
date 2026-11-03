@@ -1,4 +1,5 @@
 import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { StateLabel } from '../presentation/types.js'
 import type { StateMoves } from '../runtime.js'
 import { byCodepoint, OPERATIONS, type ParsedFieldPolicy, type ParsedPolicy, readContext, readPolicy, type TrustedContext } from './inputs.js'
 import type {
@@ -311,16 +312,20 @@ export function stateField(policy: FormPolicy): string | null {
 
 /**
  * The state field a policy holds to its moves, and the moves this actor's
- * roles may make (0127), in the policy's order and without their roles --
+ * roles may make (0127), with the labels of the states they name (0129),
+ * in the policy's order and without their roles --
  * the moves `checkTransition` lets through and no other, read the same way;
  * `null` where the policy names no state field or cannot be read for this
  * context, which every route refuses before it would offer one.
  */
-export function stateMoves(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): StateMoves | null {
+export function stateMoves(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, labels: readonly StateLabel[] = []): StateMoves | null {
   const prepared = prepare(policy, context, bindings)
   if (!prepared.ok || prepared.policy.transitions === null) return null
   const { field, moves } = prepared.policy.transitions
-  return { field, moves: moves.filter((move) => holds(move.roles, prepared.actor)).map(({ from, to }) => ({ from, to })) }
+  const theirs = moves.filter((move) => holds(move.roles, prepared.actor)).map(({ from, to }) => ({ from, to }))
+  // The labels of the states their moves name and no other (0129): a state only others move to stays the policy's.
+  const named = new Set(theirs.flatMap((move) => (move.from === null ? [move.to] : [move.from, move.to])))
+  return { field, moves: theirs, labels: labels.filter((entry) => named.has(entry.state)).map(({ state, label }) => ({ state, label })) }
 }
 
 /**

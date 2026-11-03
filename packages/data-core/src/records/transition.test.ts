@@ -115,6 +115,7 @@ describe('a policy’s moves', () => {
         { from: null, to: 'placed' },
         { from: 'placed', to: 'shipped' },
       ],
+      labels: [],
     })
     const states = [null, 'placed', 'shipped', 'delivered']
     for (const who of [CLERK, DISPATCHER, actor(['auditor'])]) {

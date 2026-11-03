@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
+import { createSnapshot, describedOf, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
 import type {
   ColumnMeta,
   DatabaseAdapter,
@@ -166,6 +166,29 @@ beforeEach(async () => {
   })
   const bundle: PublishedBundle = { format: 1, connection: 'erp', form, bindings, policy: POLICY, snapshot: SNAPSHOT }
   await store.publish('ticket', null, bundle)
+  const labelled = generateForm(SNAPSHOT, {
+    connection: 'erp',
+    root: { schema: 'sales', name: 'ticket' },
+    formId: 'labelled',
+    title: 'Ticket',
+    lookups: [],
+    pinned: ['tenant_id'],
+  })
+  await store.publish('labelled', null, {
+    ...bundle,
+    format: 2,
+    form: labelled.form,
+    bindings: labelled.bindings,
+    generation: { connection: 'erp', root: { schema: 'sales', name: 'ticket' }, formId: 'labelled', title: 'Ticket', lookups: [], pinned: ['tenant_id'] },
+    base: labelled.form,
+    presentation: {
+      ...EMPTY_PRESENTATION,
+      states: [
+        { state: 'open', label: 'Open' },
+        { state: 'archived', label: 'Archived' },
+      ],
+    },
+  })
   const sink: AuditSink = (event) => {
     if (event.plane === 'runtime') events.push(event)
   }
@@ -197,8 +220,20 @@ describe('a state field’s moves on the runtime plane (0112)', () => {
         { from: null, to: 'open' },
         { from: 'open', to: 'closed' },
       ],
+      labels: [],
     })
-    expect(await opened('manager')).toEqual({ field: 'status', moves: [{ from: 'closed', to: 'archived' }] })
+    expect(await opened('manager')).toEqual({ field: 'status', moves: [{ from: 'closed', to: 'archived' }], labels: [] })
+  })
+
+  // With labels in the presentation (0129), each person is told the labels
+  // of the states their own moves name, and not of a state only another
+  // role moves to. Watched failing with the presentation's labels left out
+  // of the form: the clerk was told none.
+  test('the form names the labels of the states this person’s moves name', async () => {
+    const opened = async (who: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/forms/labelled', headers: { authorization: `Bearer ${who}` } })).json().moves.labels
+    expect(await opened('clerk')).toEqual([{ state: 'open', label: 'Open' }])
+    expect(await opened('manager')).toEqual([{ state: 'archived', label: 'Archived' }])
   })
 
   // A listed move for one of the actor's roles is sent as the update the

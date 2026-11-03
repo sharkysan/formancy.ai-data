@@ -326,8 +326,9 @@ are walked, never jumped to (0108); the rest is 0044's and 0061's, in
    Where the form names `moves`, the session drew the state field as a
    choice of the state the record holds and each the person may move it
    to -- on a new record, where a create may start it -- or disabled where
-   there is none (`apps/host/src/moves.ts`, from data-core's `stateMoves`,
-   which reads the policy as the check below does;
+   there is none, each state by the label the presentation gives it
+   ([0129](../decisions/0129-an-administrator-labels-a-state-fields-states.md)) (`apps/host/src/moves.ts`, from data-core's
+   `stateMoves`, which reads the policy as the check below does;
    [0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
    `routes/write-once.ts` lets a write run the first time its id arrives;
    a later arrival gets that answer, audited `repeated`.

@@ -153,6 +153,7 @@ describe('a state field drawn as its moves (0127)', () => {
       { from: null, to: 'open' },
       { from: 'open', to: 'closed' },
     ],
+    labels: [],
   }
   const session = (moves: PublishedForm['moves']) =>
     createSession({ client, formId: 'pg-order-line', definition: definition(['read', 'create', 'update'], undefined, moves), renderer: 'react' })
@@ -188,6 +189,18 @@ describe('a state field drawn as its moves (0127)', () => {
     expect(notes(drawn)?.options).toEqual([{ value: 'open', label: 'open' }])
   })
 
+  // A state the administrator labelled (0129) is offered by its label, its
+  // value the state as the column holds it; one without a label by its
+  // spelling. Watched failing with the labels left unread: Open was "open".
+  test('offers each state by its label where it has one', () => {
+    const drawn = session({ ...MOVES, labels: [{ state: 'open', label: 'Open' }] })
+    drawn.open(at('open'))
+    expect(notes(drawn)?.options).toEqual([
+      { value: 'open', label: 'Open' },
+      { value: 'closed', label: 'closed' },
+    ])
+  })
+
   // No moves, the published field; a whole number held to moves keeps its
   // box, which a choice's text would not fit, and is disabled where it may
   // go nowhere.
@@ -195,7 +208,7 @@ describe('a state field drawn as its moves (0127)', () => {
     const plain = session(null)
     plain.open(at('open'))
     expect(notes(plain)?.type).toBe('text')
-    const numbered = session({ field: 'line_no', moves: [{ from: '1', to: '2' }] })
+    const numbered = session({ field: 'line_no', moves: [{ from: '1', to: '2' }], labels: [] })
     numbered.open(RECORD)
     expect(
       numbered

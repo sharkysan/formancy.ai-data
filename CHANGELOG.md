@@ -12,6 +12,15 @@ later.
 
 ### Added
 
+- **An administrator labels a state field's states** (0129). Why: the host
+  offered each state as its column spells it -- `placed`, `in_transit` --
+  since nothing gave them words for a person. In the studio's Presentation
+  step, State labels gives each state the Policy step's moves name a label,
+  which the host page offers the state by, its value still the state. What
+  you notice: a presentation may hold `states`, which a server of an earlier
+  release refuses, and `GET /v1/forms/:id`'s `moves` carries `labels`, the
+  labels of the person's states, which this release's `@formancy/data-client`
+  requires.
 - **The grids of an open form share a person's own views** (0128). Why: one
   form is often listed in more than one grid at once -- its Records panel,
   a child section, a level of Drill down -- and a view saved in one was
