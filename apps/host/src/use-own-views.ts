@@ -59,7 +59,7 @@ export interface OwnViewsHeld {
 export function useOwnViews(client: DataClient, formId: string, definition: PublishedForm): OwnViewsHeld {
   const shared = useContext(HeardContext)
   const [alone] = useState(createHeard)
-  const heard = shared ?? alone
+  const heard = shared === null ? alone : alone
   const answered = useSyncExternalStore(heard.subscribe, () => heard.get(formId))
   const own = answered ?? definition.list?.own ?? []
 
