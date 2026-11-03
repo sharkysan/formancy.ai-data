@@ -14,7 +14,9 @@
   `apps/host/src/view-picker.test.tsx`, on both engines against the real
   server -- a view saved in the employee form's Records panel is offered
   at once in the Employee section under an employee, the form as its own
-  child, and removed there is offered in the Records panel no more.
+  child, and removed there is offered in the Records panel no more
+  (watched failing in CI with each grid keeping its own: the Employee
+  section offered no view).
 
 ## Context
 
