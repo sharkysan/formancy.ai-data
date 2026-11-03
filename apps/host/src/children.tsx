@@ -167,7 +167,7 @@ export function ChildSection({
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
   const filterable = useMemo(() => panelFields(definition), [definition])
   const views = definition.list?.views ?? []
-  const mine = useOwnViews(client, child.form, definition.list?.own ?? [])
+  const mine = useOwnViews(client, child.form, definition)
   const state = useGridState({ formId: child.form, section: { kind: 'child', field: child.field }, columns, list: definition.list })
   const { filter, sort } = state
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null

@@ -426,8 +426,9 @@ its filter, which its headers show and a press on one tells back;
 `src/view-picker.tsx` is a grid's View picker and `src/views.ts` which view
 a filter and a sort are, if any, and which one a grid opens on
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
-and `src/use-own-views.ts` a grid's own views, which the picker saves and
-removes ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md));
+and `src/use-own-views.ts` a person's own views, which the picker saves and
+removes and the open form's grids share (`OwnViewsScope`,
+[0128](../decisions/0128-the-grids-of-an-open-form-share-a-persons-own-views.md)) ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md));
 `src/columns-panel.tsx` is a grid's Columns panel, `src/columns.ts` a
 grid's columns as arranged and what a browser keeps of a grid, and
 `src/use-grid-state.ts` where a section holds its filter, sort and columns

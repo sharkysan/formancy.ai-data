@@ -14,6 +14,7 @@ import { browserStorage, readRenderer, readSplit, writeRenderer, writeSplit } fr
 import type { RendererChoice } from './prefs.js'
 import type { SignedIn } from './sign-in.js'
 import { UnsavedNotice } from './unsaved-notice.js'
+import { OwnViewsScope } from './use-own-views.js'
 
 /** Whether the window matches `query`, as it changes; false where there is no `matchMedia` (jsdom). */
 function useMedia(query: string): boolean {
@@ -181,29 +182,32 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
           </section>
         ) : opened.state === 'open' ? (
           <GuardContext.Provider value={guard}>
-            <FormView
-              key={opened.entry.id}
-              client={client}
-              entry={opened.entry}
-              definition={opened.definition}
-              childForms={opened.children}
-              layout={place.layout}
-              view={place.view}
-              level={place.level}
-              historyView={historyView}
-              narrow={narrow}
-              phone={phone}
-              renderer={renderer}
-              split={split}
-              notice={guard.pending === null ? null : <UnsavedNotice pending={guard.pending} onKeep={guard.keep} onDiscard={guard.discard} />}
-              headingRef={formHeading}
-              onLayout={changeLayout}
-              onView={changeView}
-              onRenderer={chooseRenderer}
-              onSplit={setSplit}
-              onSplitSettled={(share) => writeSplit(storage, share)}
-              childFormsOf={childrenFor}
-            />
+            {/* A person's own views, shared by the open form's grids and heard afresh for each form opened (0128). */}
+            <OwnViewsScope key={opened.entry.id}>
+              <FormView
+                key={opened.entry.id}
+                client={client}
+                entry={opened.entry}
+                definition={opened.definition}
+                childForms={opened.children}
+                layout={place.layout}
+                view={place.view}
+                level={place.level}
+                historyView={historyView}
+                narrow={narrow}
+                phone={phone}
+                renderer={renderer}
+                split={split}
+                notice={guard.pending === null ? null : <UnsavedNotice pending={guard.pending} onKeep={guard.keep} onDiscard={guard.discard} />}
+                headingRef={formHeading}
+                onLayout={changeLayout}
+                onView={changeView}
+                onRenderer={chooseRenderer}
+                onSplit={setSplit}
+                onSplitSettled={(share) => writeSplit(storage, share)}
+                childFormsOf={childrenFor}
+              />
+            </OwnViewsScope>
           </GuardContext.Provider>
         ) : (
           <section className="panel nothing" aria-labelledby="form-heading">

@@ -3602,7 +3602,7 @@
       ]
     },
     "0126": {
-      "reviewed": "sha256:9372c0d06ce4824c3d1d9a1de8d0f46427b53f016707e3bfc3e012ef9ece5ab6",
+      "reviewed": "sha256:c5d85f9dcb7c49ca55bf567898b509208d6d0914c14913af20042da7d5c8c951",
       "limitations": [
         {
           "area": "operations",
@@ -3612,10 +3612,6 @@
           "area": "operations",
           "says": "A person's views are kept under a hash of their token's subject, which is not a secret, and a host that changes how it names a person leaves their views behind.",
           "heldBy": "packages/data-server/src/routes/runtime-lists.test.ts"
-        },
-        {
-          "area": "host",
-          "says": "A view a person saves in one grid of a form is offered in another grid of that form, or another page, only once that one opens the form again."
         },
         {
           "area": "host",
@@ -3657,6 +3653,15 @@
           "area": "server",
           "says": "@formancy/data-client reads a form without moves as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0128": {
+      "reviewed": "sha256:13c48fb6edc8ce5a11d3971af16647c0e0f7c708ef16340b36602362cc1c4cbb",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A view a person saves or removes in another page is offered, or no longer offered, on this page once the form is opened again here."
         }
       ]
     }
