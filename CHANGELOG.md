@@ -12,6 +12,13 @@ later.
 
 ### Added
 
+- **The grids of an open form share a person's own views** (0128). Why: one
+  form is often listed in more than one grid at once -- its Records panel,
+  a child section, a level of Drill down -- and a view saved in one was
+  missing from the others until the form was opened again, while one
+  removed there was still offered. Now what the server answers a save or a
+  remove with is shown by every grid of that form on the page at once,
+  even a child section drawn from a definition read before the save.
 - **A host page draws a state field as the moves its person may make**
   (0127). Why: a policy held a status to its moves (0112), but the form
   still offered every value, so a clerk typed a state and read the refusal

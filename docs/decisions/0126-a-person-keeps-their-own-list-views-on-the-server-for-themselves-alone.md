@@ -1,6 +1,6 @@
 # 0126 — A person keeps their own list views, on the server, for themselves alone
 
-- **Status:** accepted; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): beside the views a form's administrator named, a person's own, offered to them alone; extends [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md): a filter of a person's own is kept as a view of theirs, on the server and never in their browser, the alternative 0106 left to a decision of its own; extends [0013](0013-published-configuration-is-files-with-link-based-swap.md): the store keeps each person's views beside the versions, the newest alone
+- **Status:** accepted; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): beside the views a form's administrator named, a person's own, offered to them alone; extends [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md): a filter of a person's own is kept as a view of theirs, on the server and never in their browser, the alternative 0106 left to a decision of its own; extends [0013](0013-published-configuration-is-files-with-link-based-swap.md): the store keeps each person's views beside the versions, the newest alone; amended by [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md): the grids of the open form share the person's views, a save or a remove in one shown in every one at once
 - **Date:** 2026-11-02
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/own-views.test.ts` --

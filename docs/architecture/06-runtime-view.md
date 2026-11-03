@@ -252,7 +252,10 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    fitted to what their list offers them, as a view is -- and writes them
    by the store's compare-and-swap, reading again when another page of
    theirs wrote first, and answers their views as `list.own` would
-   ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)).
+   ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)),
+   which every grid of the open form then shows
+   (`apps/host/src/use-own-views.ts`,
+   [0128](../decisions/0128-the-grids-of-an-open-form-share-a-persons-own-views.md)).
 3. `routes/runtime-lists.ts` checks the body and asks `planList`
    (`packages/data-core/src/records/list.ts`) before any statement:
    `listable` puts the read policy first -- its filter, every through

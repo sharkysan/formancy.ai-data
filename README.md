@@ -732,8 +732,10 @@ No view is kept in the address
 
 While the filter and the sort are your own, "Name of your view" and Save
 your view keep them as a view of yours, which View then names under "Your
-views" in every grid of that form you open from then on, on any device you
-sign in from; while one of yours is shown, Remove your view lets it go. The
+views" at once in every grid of that form on the page
+([0128](./docs/decisions/0128-the-grids-of-an-open-form-share-a-persons-own-views.md)), and in every one you open from then on, on
+any device you sign in from; while one of yours is shown, Remove your view
+lets it go, from every grid of the form. The
 server keeps them for you alone, and only what your own list could run: a
 view the form already offers, or one you already keep, is refused in a
 sentence on the picker's line, and you keep at most twenty of a form.

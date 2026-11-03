@@ -91,7 +91,7 @@ export function Records({
   const [typed, setTyped] = useState(search)
   const [shape, setShape] = useState<'grid' | 'tree'>('grid')
   const views = definition.list?.views ?? []
-  const mine = useOwnViews(client, formId, definition.list?.own ?? [])
+  const mine = useOwnViews(client, formId, definition)
   /** The filter as applied, the sort and the columns: the grid's, and the file's but for the columns, for this form, which mounts the panel again (form-view.tsx). */
   const state = useGridState({ formId, section: RECORDS, columns, list: definition.list })
   const { filter, sort } = state

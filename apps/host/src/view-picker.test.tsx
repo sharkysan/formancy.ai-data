@@ -524,6 +524,41 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     expect(shown('Records')).toBe(NEWEST.name)
     expect(await floor('a child section’s view picked')).toEqual(CLEAN('a child section’s view picked'))
   })
+
+  // A view of the person's own saved in one grid of a form is offered at
+  // once in the form's other grids (0128): the employee form's Records
+  // panel, and the Employee section under an employee -- the form as its
+  // own child, drawn from a definition read when the form was opened,
+  // before the save. Removed there, the Records panel offers it no more.
+  test('a view saved in one grid of a form is offered at once in its other grids, and removed there', async () => {
+    const user = mount(plane.fetch, { save: keeping().save })
+    await signIn(user, TOKENS.keeper)
+    await chooseForm(user, engine.employees)
+    await applyCondition(user, 'Records', { field: 'Id', condition: 'is between', from: '1', to: '3' })
+    const records = gridSection('Records')
+    await user.type(await within(records).findByRole('textbox', { name: 'Name of your view' }, ARRIVES), 'First three')
+    await user.click(within(records).getByRole('button', { name: 'Save your view' }))
+    await within(records).findByText('Saved your view “First three”.', {}, ARRIVES)
+
+    await waitFor(() => expect(firstCells('Records')).toContain('1'), ARRIVES)
+    const row = within(within(records).getByRole('grid', { name: 'Records' }))
+      .getAllByRole('row')
+      .find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === '1') as HTMLElement
+    await user.click(within(row).getAllByRole('gridcell')[0] as HTMLElement)
+    await waitFor(() => expect(picker('Employee')).not.toBeNull(), ARRIVES)
+    expect(
+      within(within(gridSection('Employee')).getByRole('group', { name: 'Your views' }))
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['First three'])
+
+    await pick(user, 'Employee', 'First three')
+    await waitFor(() => expect(shown('Employee')).toBe('First three'), ARRIVES)
+    await user.click(within(gridSection('Employee')).getByRole('button', { name: 'Remove your view' }))
+    await within(gridSection('Employee')).findByText('Removed your view “First three”.', {}, ARRIVES)
+    expect(within(gridSection('Records')).queryByRole('option', { name: 'First three' })).toBeNull()
+    expect(await floor('a view of your own across grids')).toEqual(CLEAN('a view of your own across grids'))
+  })
 })
 
 describe('a form whose list offers no views', () => {
