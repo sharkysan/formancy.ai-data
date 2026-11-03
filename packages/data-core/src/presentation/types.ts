@@ -45,6 +45,12 @@ export interface FieldPresentation {
   section?: SectionAnchor
 }
 
+/** A state's label (0129): a value the policy holds the state field to, as its column holds it, and the words a person picks it by. */
+export interface StateLabel {
+  state: string
+  label: string
+}
+
 export interface SectionPresentation {
   anchor: SectionAnchor
   label?: Text
@@ -63,7 +69,9 @@ export interface SectionPresentation {
  * Exactly the studio's edits — a field's label, a section's label, a
  * field's place within its section's grid and full width (0030), the
  * generated section a field is placed in (0075), the views a list of the
- * form's records offers (0105), and a field's help text (0119). Each entry holds only what differs from
+ * form's records offers (0105), a field's help text (0119), the fields the
+ * Filter panel leaves out (0123) and the labels of a state field's states
+ * (0129). Each entry holds only what differs from
  * the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
@@ -76,6 +84,8 @@ export interface PresentationOverrides {
   views?: StoredListView[]
   /** The fields the Filter panel does not offer, in the bindings' order; left out when there are none, never `[]` (`unfiltered.ts`, 0123). */
   unfiltered?: string[]
+  /** The labels of the state field's states, in the order the policy's moves name them; left out when there are none, never `[]` (`state-labels.ts`, 0129). */
+  states?: StateLabel[]
 }
 
 export type PresentationCheck = { ok: true; presentation: PresentationOverrides } | { ok: false; problems: string[] }

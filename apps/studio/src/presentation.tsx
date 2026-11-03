@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import type { FormBindings, StoredListView } from '@formancy/data-core'
+import type { FormBindings, FormPolicy, StateLabel, StoredListView } from '@formancy/data-core'
 import type { LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
 import { helpTextOf, labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { ListViewsPanel } from './list-views.js'
+import { StateLabelsPanel } from './state-labels.js'
 
 type Said = { ok: boolean; message: string }
 
@@ -138,6 +139,9 @@ export function PresentationStep({
   onViews,
   unfiltered,
   onUnfiltered,
+  policy,
+  states,
+  onStates,
   carried = null,
 }: {
   session: BuilderSession
@@ -147,6 +151,10 @@ export function PresentationStep({
   /** The fields the Filter panel does not offer (0123). */
   unfiltered: readonly string[]
   onUnfiltered: (next: string[]) => void
+  /** The policy the Policy step drew, whose moves name the states a label is given to (0129). */
+  policy: FormPolicy
+  states: readonly StateLabel[]
+  onStates: (states: StateLabel[]) => void
   carried?: Carried | null
 }): ReactElement {
   const document = useDocument(session)
@@ -330,6 +338,7 @@ export function PresentationStep({
       </div>
       {layout === undefined ? <p className="none">The form has no arrangement to edit.</p> : nodes(layout.nodes, [], false)}
       <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
+      <StateLabelsPanel policy={policy} labels={states} onLabels={onStates} />
     </>
   )
 }

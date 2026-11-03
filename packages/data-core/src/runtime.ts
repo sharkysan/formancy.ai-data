@@ -364,6 +364,8 @@ export interface RecordList {
 export interface StateMoves {
   field: string
   moves: Array<{ from: string | null; to: string }>
+  /** The labels an administrator gave the states these moves name (0129), in the presentation's order; a state without one is shown as it is spelled. */
+  labels: Array<{ state: string; label: string }>
 }
 
 /** `POST /v1/forms/:id/views/save` and `/views/remove` (0126): the person's own views as the form now offers them, as `list.own` says them. */

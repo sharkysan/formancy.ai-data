@@ -285,6 +285,19 @@ function DraftView({
           </ul>
         </div>
       )}
+      {bundle.presentation.states === undefined ? null : (
+        // How the state field's states are offered (0129): each as its column spells it, then its label.
+        <div className="draft-views">
+          <h4 id="draft-states">State labels</h4>
+          <ul aria-labelledby="draft-states">
+            {bundle.presentation.states.map((entry) => (
+              <li key={entry.state}>
+                {entry.state}: {entry.label}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {!pending ? null : (
         <div className="decide">
           {draft.refuses.approve !== undefined && draft.refuses.reject !== undefined ? null : (

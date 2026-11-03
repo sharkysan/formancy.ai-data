@@ -178,14 +178,18 @@ function isWritable(value: unknown, operations: readonly unknown[]): value is Pu
 /**
  * The moves this person may make of the form's state field (0127): `null`,
  * or the field and each move from a state -- or from nothing, `null` -- to
- * another, every state text as the column holds it. A reply without it is
+ * another, every state text as the column holds it, and the labels of
+ * those states an administrator gave (0129), each a state and its words. A reply without it is
  * from a server older than 0127, whose page would draw a state field the
  * person may set to anything and be refused on Save.
  */
 function isMoves(value: unknown): value is PublishedForm['moves'] {
   if (value === null) return true
-  if (!isRecord(value) || typeof value['field'] !== 'string' || !Array.isArray(value['moves'])) return false
-  return value['moves'].every((move) => isRecord(move) && (move['from'] === null || typeof move['from'] === 'string') && typeof move['to'] === 'string')
+  if (!isRecord(value) || typeof value['field'] !== 'string' || !Array.isArray(value['moves']) || !Array.isArray(value['labels'])) return false
+  return (
+    value['moves'].every((move) => isRecord(move) && (move['from'] === null || typeof move['from'] === 'string') && typeof move['to'] === 'string') &&
+    value['labels'].every((entry) => isRecord(entry) && typeof entry['state'] === 'string' && typeof entry['label'] === 'string')
+  )
 }
 
 export function isPublishedForm(body: unknown): body is PublishedForm {

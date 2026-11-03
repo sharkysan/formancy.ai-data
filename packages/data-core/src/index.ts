@@ -56,6 +56,7 @@ export { storedViewFit, viewShapeProblems, viewsFor } from './presentation/views
 export { OWN_VIEW_NAME_LIMIT, OWN_VIEWS_LIMIT, ownViewsOffered, ownViewsProblems, readOwnView, removedOwnView, savedOwnView } from './records/own-views.js'
 export { todayOf } from './presentation/view-values.js'
 export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
+export { stateLabelProblems, stateLabelShapeProblems, statesOf } from './presentation/state-labels.js'
 export type {
   FieldAnchor,
   FieldPresentation,
@@ -67,6 +68,7 @@ export type {
   RebasedPresentation,
   SectionAnchor,
   SectionPresentation,
+  StateLabel,
 } from './presentation/types.js'
 
 export { decodeKeyToken, encodeKeyToken, KEY_TOKEN_MAX_LENGTH } from './lookup/token.js'

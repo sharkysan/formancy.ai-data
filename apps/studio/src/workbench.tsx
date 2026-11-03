@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
-import type { FormPolicy, StoredListView, MetadataSnapshot } from '@formancy/data-core'
+import type { FormPolicy, MetadataSnapshot, StateLabel, StoredListView } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
 import { BrowseStep } from './browse.js'
@@ -74,6 +74,8 @@ interface Generated {
   views: StoredListView[]
   /** The fields the Filter panel does not offer (0123), beside the views. */
   unfiltered: string[]
+  /** The labels of the state field's states (0129); `[]` for none, which the publish leaves out. */
+  states: StateLabel[]
   carried: Carried | null
 }
 
@@ -148,7 +150,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generate(request: ProposalRequest): Promise<Failure | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome
-    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], unfiltered: [], carried: null })
+    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], unfiltered: [], states: [], carried: null })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
     setCurrent('generate')
     return null
@@ -175,6 +177,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       session: createBuilderSession(carried.form),
       views: carried.views,
       unfiltered: carried.unfiltered,
+      // A state is a value, not a field key: its label is carried as it is (0129).
+      states: previous.states,
       carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
     })
     setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
@@ -214,6 +218,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       session: createBuilderSession(form),
       views: regeneration.presentation.views ?? [],
       unfiltered: regeneration.presentation.unfiltered ?? [],
+      states: regeneration.presentation.states ?? [],
       carried: {
         from: `version ${String(version)}`,
         version,
@@ -241,6 +246,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   /** The fields ticked or unticked under "The Filter panel offers" (0123). */
   function unfilteredChosen(unfiltered: string[]): void {
     setGenerated((previous) => (previous === null ? previous : { ...previous, unfiltered }))
+  }
+
+  /** The labels typed under State labels (0129). */
+  function statesChosen(states: StateLabel[]): void {
+    setGenerated((previous) => (previous === null ? previous : { ...previous, states }))
   }
 
   /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
@@ -289,7 +299,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request, views, unfiltered, carried } = generated
+    const { proposal, session, request, views, unfiltered, states, carried } = generated
     const open = asked(carried, policy)
     switch (current) {
       case 'generate':
@@ -320,6 +330,9 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             onViews={viewed}
             unfiltered={unfiltered}
             onUnfiltered={unfilteredChosen}
+            policy={policy}
+            states={states}
+            onStates={statesChosen}
             carried={carried}
           />
         )
@@ -334,6 +347,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             session={session}
             views={views}
             unfiltered={unfiltered}
+            states={states}
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}

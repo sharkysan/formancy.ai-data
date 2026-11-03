@@ -172,7 +172,10 @@ until then the address is formancy.ai's 404
   ([0112](./docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
   The host page draws the field as the moves its person may make from
   where the record is, and disabled where there is none
-  ([0127](./docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
+  ([0127](./docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)),
+  each state by the label the Presentation step's State labels gives it,
+  else as its column spells it
+  ([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
   help text, order, full width, and a field moved to another generated
   section -- carried through a regeneration by what each field stands for
@@ -623,6 +626,11 @@ employee"
 ([0125](./docs/decisions/0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md)).
 Saving, removing and moving a view are not on Undo and Redo
 ([0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
+Where the Policy step holds a field to moves, State labels, after the
+views, gives each state its moves name a label, "Label of placed", which
+the host page offers it by; a label of a state the moves no longer name is
+left out of the publish
+([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every

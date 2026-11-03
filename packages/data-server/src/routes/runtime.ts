@@ -365,8 +365,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       create: operations.includes('create') ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
       update: operations.includes('update') ? writableFields(bundle.policy, actor, bundle.bindings, 'update') : null,
     }
-    // The moves this person may make of the state field, where they may write at all (0127).
-    const moves = writable.create !== null || writable.update !== null ? stateMoves(bundle.policy, actor, bundle.bindings) : null
+    // The moves this person may make of the state field, where they may write at all (0127), with their states' labels (0129).
+    const labels = bundle.format === 2 ? (bundle.presentation.states ?? []) : []
+    const moves = writable.create !== null || writable.update !== null ? stateMoves(bundle.policy, actor, bundle.bindings, labels) : null
     return {
       form: bundle.form,
       operations,

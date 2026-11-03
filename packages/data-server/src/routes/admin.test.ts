@@ -460,6 +460,36 @@ describe('the administrator plane', () => {
     expect(served.bundle.presentation.unfiltered).toEqual(['name'])
   })
 
+  // The labels of a state field's states (0129) are stored as the policy's
+  // states are named: a label for a state no move names is refused at the
+  // write, naming it, and nothing is written; one it names publishes and
+  // reads back. Watched failing with the fit left out of `storable`: lost
+  // was stored.
+  test('publishes the labels of the states its policy names, and refuses one no move names', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const moved = { ...POLICY, transitions: { field: 'name', moves: [{ from: 'new', to: 'known', roles: ['clerk'] }] } }
+    const labelled = (states: unknown) => ({ ...bundleOf(proposal, moved), presentation: { ...EMPTY_PRESENTATION, states } })
+    const refused = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: labelled([{ state: 'lost', label: 'Lost' }]) },
+    })
+    expect(refused.statusCode).toBe(422)
+    expect(refused.json()).toMatchObject({ code: 'invalid-bundle', problems: ["presentation: /states/0: lost is no state the policy's moves name."] })
+    expect(await store.latest('employee')).toBeNull()
+    const states = [{ state: 'known', label: 'Known to us' }]
+    const published = await app.inject({
+      method: 'POST',
+      url: '/v1/forms/employee/versions',
+      headers: as('admin'),
+      payload: { expectedBase: null, bundle: labelled(states) },
+    })
+    expect(published.statusCode, published.body).toBe(201)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+    expect(served.bundle.presentation.states).toEqual(states)
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

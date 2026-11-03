@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { presentationOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
-import type { DriftChange, DriftReport, FormPolicy, StoredListView, ReassignedKey } from '@formancy/data-core'
+import { presentationOf, statesOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
+import type { DriftChange, DriftReport, FormPolicy, ReassignedKey, StateLabel, StoredListView } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
@@ -137,6 +137,7 @@ export function PublishStep({
   session,
   views = [],
   unfiltered = [],
+  states = [],
   policy,
   stale,
   regeneratedFrom = null,
@@ -155,6 +156,8 @@ export function PublishStep({
   views?: readonly StoredListView[]
   /** The fields the Filter panel does not offer, chosen beside them (0123). */
   unfiltered?: readonly string[]
+  /** The labels of the state field's states (0129): those of states the policy still names are published. */
+  states?: readonly StateLabel[]
   policy: FormPolicy
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
@@ -233,10 +236,14 @@ export function PublishStep({
     if (!derived.ok) return
     const { form, bindings, snapshot, generation } = proposal
     // No views, and none left out of the Filter panel, are the properties left out: the server refuses `[]`, a second spelling of none.
+    // So are no labels; and a label of a state the policy no longer names is left out, as the panel no longer shows it (0129).
+    const named = statesOf(policy)
+    const labelled = states.filter((entry) => named.includes(entry.state)).map((entry) => ({ ...entry }))
     const presentation = {
       ...derived.presentation,
       ...(views.length === 0 ? {} : { views: [...views] }),
       ...(unfiltered.length === 0 ? {} : { unfiltered: [...unfiltered] }),
+      ...(labelled.length === 0 ? {} : { states: labelled }),
     }
     const bundle: Bundle = { format: 2, connection, generation, base: form, presentation, form: session.exportDocument(), bindings, policy, snapshot }
     const sent: Published = { version: expected ?? 0, bundle }

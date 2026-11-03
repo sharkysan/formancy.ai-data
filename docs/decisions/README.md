@@ -84,7 +84,7 @@ only enforcement is "we remember" says so plainly.
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067; extended by 0079 |
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058, 0117 |
-| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075, 0105, 0119 |
+| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075, 0105, 0119, 0129 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058, 0113 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071, 0102; narrowed by 0072, 0083 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065, 0099 |
@@ -181,5 +181,6 @@ only enforcement is "we remember" says so plainly.
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted; amended by 0128 |
-| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted |
+| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129 |
 | [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md) | The grids of an open form share a person's own views | accepted |
+| [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |

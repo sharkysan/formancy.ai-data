@@ -429,6 +429,8 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     sections,
     ...(views.length === 0 ? {} : { views }),
     ...(unfiltered.length === 0 ? {} : { unfiltered }),
+    // A state is a value its column holds, not a field key: its label is carried as it is (0129).
+    ...(published.presentation.states === undefined ? {} : { states: published.presentation.states }),
   }
 
   const applied = applyPresentation(regenerated.base, presentation, regenerated.bindings)

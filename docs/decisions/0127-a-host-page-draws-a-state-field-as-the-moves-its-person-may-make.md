@@ -1,6 +1,6 @@
 # 0127 — A host page draws a state field as the moves its person may make
 
-- **Status:** accepted; amends [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md): the form names a person's moves, and the host draws the state field as them, where 0112 left every value offered; extends [0122](0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md): the host's copy of a saved record is drawn from the state it holds too
+- **Status:** accepted; amends [0112](0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md): the form names a person's moves, and the host draws the state field as them, where 0112 left every value offered; extends [0122](0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md): the host's copy of a saved record is drawn from the state it holds too; amended by [0129](0129-an-administrator-labels-a-state-fields-states.md): a state is offered by the label its administrator gave it
 - **Date:** 2026-11-02
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/transition.test.ts` --
