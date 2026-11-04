@@ -909,8 +909,9 @@ describe('a timestamp or a date, in the language the composition root chose', ()
     test('holds the instants in its days in UTC, in any session', async () => {
       const { field, entries } = COLUMN_FILTER_PARITY.instant
       for (const [session, adapter] of sessions()) {
-        for (const { from, to, keys } of entries) {
-          expect(numbers(await customersWhere([{ field, op: 'range', from, to }], {}, adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(keys)
+        // Each entry's bounds pass through as they are, an exclusive one (0130) included.
+        for (const { keys, ...bounds } of entries) {
+          expect(numbers(await customersWhere([{ field, op: 'range', ...bounds }], {}, adapter)), `${session}: ${JSON.stringify(bounds)}`).toEqual(keys)
         }
       }
     })
@@ -922,8 +923,8 @@ describe('a timestamp or a date, in the language the composition root chose', ()
     test('holds the timestamps in its days on their own clock, in any session', async () => {
       const { field, entries } = COLUMN_FILTER_PARITY.zoneless
       for (const [session, adapter] of sessions()) {
-        for (const { from, to, references: expected } of entries) {
-          expect(references(await shipmentsWhere([{ field, op: 'range', from, to }], adapter)), `${session}: ${String(from)}..${String(to)}`).toEqual(expected)
+        for (const { references: expected, ...bounds } of entries) {
+          expect(references(await shipmentsWhere([{ field, op: 'range', ...bounds }], adapter)), `${session}: ${JSON.stringify(bounds)}`).toEqual(expected)
         }
       }
     })
