@@ -16,9 +16,19 @@ const DAY = 24 * 60 * 60 * 1000
 /** The midnight starting `day` on a clock read as UTC, in milliseconds. */
 const midnight = (day: string): number => Date.parse(`${day}T00:00:00Z`)
 
-/** Whether `at` is in the whole days from `from` to `to`, either end left open by `null`. */
-const within = (at: number, from: string | null, to: string | null): boolean =>
-  (from === null || at >= midnight(from)) && (to === null || at < midnight(to) + DAY)
+/** Which bounds of a range leave out their own value (0130), as the cases write it. */
+type Exclusive = 'from' | 'to' | 'both' | undefined
+
+/** Whether a range's `side` leaves out its own value. */
+const leaves = (exclusive: Exclusive, side: 'from' | 'to'): boolean => exclusive === side || exclusive === 'both'
+
+/**
+ * Whether `at` is in the whole days from `from` to `to`, either end left
+ * open by `null`: after an exclusive `from`'s day, before an exclusive
+ * `to`'s.
+ */
+const within = (at: number, from: string | null, to: string | null, exclusive: Exclusive): boolean =>
+  (from === null || at >= midnight(from) + (leaves(exclusive, 'from') ? DAY : 0)) && (to === null || at < midnight(to) + (leaves(exclusive, 'to') ? 0 : DAY))
 
 /** Tenant 1's customers as the list suites leave them: the fixture's 1001, LIST_ROWS', each made active or not by COLUMN_FILTER_ROWS. */
 const CUSTOMERS = [
@@ -40,14 +50,15 @@ interface Condition {
   readonly value?: string
   readonly from?: string | null
   readonly to?: string | null
+  readonly exclusive?: Exclusive
   readonly text?: string
 }
 
 /**
  * Whether `condition` holds for `customer`, worked out here as the cases
  * mean it: numbers compared as numbers, so `50` equals `50.00`, bounds
- * inclusive, a contains case folded, and NULL in no range and equal to
- * nothing.
+ * inclusive unless `exclusive` names them, a contains case folded, and
+ * NULL in no range and equal to nothing.
  */
 function holds(customer: Customer, condition: Condition): boolean {
   const value = customer[condition.field as keyof Customer]
@@ -60,8 +71,11 @@ function holds(customer: Customer, condition: Condition): boolean {
       return value.toLowerCase().includes(String(condition.text).toLowerCase())
     case 'equals':
       return condition.field === 'active' ? value === condition.value : Number(value) === Number(condition.value)
-    case 'range':
-      return (condition.from == null || Number(value) >= Number(condition.from)) && (condition.to == null || Number(value) <= Number(condition.to))
+    case 'range': {
+      const [number, from, to] = [Number(value), Number(condition.from), Number(condition.to)]
+      const above = condition.from == null || (leaves(condition.exclusive, 'from') ? number > from : number >= from)
+      return above && (condition.to == null || (leaves(condition.exclusive, 'to') ? number < to : number <= to))
+    }
     default:
       throw new Error(`no ${condition.op} here`)
   }
@@ -97,18 +111,24 @@ describe('COLUMN_FILTER_PARITY', () => {
   // The instants are written in three offsets: the day each is in is UTC's,
   // which Date.parse reads them in, never the day their own clock shows.
   test('instant: each range holds the customers whose instant is in its days in UTC', () => {
-    for (const { from, to, keys } of COLUMN_FILTER_PARITY.instant.entries) {
-      const inside = COLUMN_FILTER_ROWS.customers.filter(([, at]) => within(Date.parse(at), from, to)).map(([number]) => number)
-      expect(inside, `${String(from)}..${String(to)}`).toEqual(keys)
+    for (const entry of COLUMN_FILTER_PARITY.instant.entries) {
+      const { from, to, keys } = entry
+      const exclusive = 'exclusive' in entry ? entry.exclusive : undefined
+      const inside = COLUMN_FILTER_ROWS.customers.filter(([, at]) => within(Date.parse(at), from, to, exclusive)).map(([number]) => number)
+      expect(inside, `${String(from)}..${String(to)} ${String(exclusive)}`).toEqual(keys)
     }
   })
 
   // A zoneless timestamp is compared on its own clock: read as UTC here,
   // which moves nothing, and NULL in no range.
   test('zoneless: each range holds the shipments dispatched in its days on their own clock', () => {
-    for (const { from, to, references } of COLUMN_FILTER_PARITY.zoneless.entries) {
-      const inside = COLUMN_FILTER_ROWS.shipments.filter(([, , at]) => at !== null && within(Date.parse(`${at}Z`), from, to)).map(([reference]) => reference)
-      expect(inside, `${String(from)}..${String(to)}`).toEqual(references)
+    for (const entry of COLUMN_FILTER_PARITY.zoneless.entries) {
+      const { from, to, references } = entry
+      const exclusive = 'exclusive' in entry ? entry.exclusive : undefined
+      const inside = COLUMN_FILTER_ROWS.shipments
+        .filter(([, , at]) => at !== null && within(Date.parse(`${at}Z`), from, to, exclusive))
+        .map(([reference]) => reference)
+      expect(inside, `${String(from)}..${String(to)} ${String(exclusive)}`).toEqual(references)
     }
   })
 

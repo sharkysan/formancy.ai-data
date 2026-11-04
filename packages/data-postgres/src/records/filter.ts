@@ -19,7 +19,8 @@ import { sqlTypeOf } from '../sql/types.js'
  *   collation -- so `ag` is not `AG` under a case-insensitive one, and
  *   `AG ` is not `AG`. On a boolean, the column's equality with `true` or
  *   `false` as `bool`.
- * - `range`: at least `from`, at most `to`, below `before`, each bound cast
+ * - `range`: at least `from`, above `above`, at most `to`, below `before`
+ *   (0130), each bound cast
  *   to the column's own type, so the comparison is that type's own
  *   operator, the one a btree index on the column is ordered by -- never
  *   the column converted to the bound's type. No plan of it is measured.
@@ -52,6 +53,7 @@ export function recordFilterSql(statement: Statement, row: string, filter: Recor
       const type = sqlTypeOf(filter.type)
       const bounds: string[] = []
       if (filter.from !== null) bounds.push(`${column} ${op('>=')} ${statement.as(filter.from, type)}`)
+      if (filter.above !== null) bounds.push(`${column} ${op('>')} ${statement.as(filter.above, type)}`)
       if (filter.to !== null) bounds.push(`${column} ${op('<=')} ${statement.as(filter.to, type)}`)
       if (filter.before !== null) bounds.push(`${column} ${op('<')} ${statement.as(filter.before, type)}`)
       // listTerms refuses a range with no bound, so this is never empty.

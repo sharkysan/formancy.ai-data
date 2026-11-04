@@ -53,8 +53,8 @@ function boundOf(parameters: Parameters, type: Extract<RecordFilter, { op: 'rang
  *   the fixture's case-insensitive collation `ag` is not `AG`, and `AG ` is
  *   not `AG` though `=` ignores trailing spaces. On a boolean, bit
  *   equality.
- * - `range`: at least `from`, at most `to`, below `before`, each bound
- *   typed as its column (`boundOf`). An instant's bound ends in `Z` and is
+ * - `range`: at least `from`, above `above`, at most `to`, below `before`
+ *   (0130), each bound typed as its column (`boundOf`). An instant's bound ends in `Z` and is
  *   a datetimeoffset in UTC; datetimeoffset compares instants, whatever
  *   offset each row was written in, as PostgreSQL's timestamptz does. A
  *   zoneless one is `zonelessBound`'s: SQL Server has three zoneless
@@ -75,6 +75,7 @@ export function recordFilterPredicate(parameters: Parameters, row: string, filte
     case 'range': {
       const bounds: string[] = []
       if (filter.from !== null) bounds.push(`${column} >= ${boundOf(parameters, filter.type, filter.from)}`)
+      if (filter.above !== null) bounds.push(`${column} > ${boundOf(parameters, filter.type, filter.above)}`)
       if (filter.to !== null) bounds.push(`${column} <= ${boundOf(parameters, filter.type, filter.to)}`)
       if (filter.before !== null) bounds.push(`${column} < ${boundOf(parameters, filter.type, filter.before)}`)
       // listTerms refuses a range with no bound, so this is never empty.

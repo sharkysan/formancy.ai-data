@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:0c730cf1d6d9e8c9ebfe905b310350bf1d1c42039c25e1fd027d519488614764",
+      "reviewed": "sha256:7b2eb4039e128ce6283720d0e1f8729c05be0591490aff079e38eeb4b6ddbbd6",
       "limitations": [
         {
           "area": "forms",
@@ -3677,6 +3677,20 @@
           "area": "server",
           "says": "A server of an earlier release refuses a version whose presentation labels states, and @formancy/data-client reads a form whose moves carry no labels as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0130": {
+      "reviewed": "sha256:5ec728cee296de099ae56ca547af7fcd317c4ba1800202d341fc5354e22f6efc",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A server of an earlier release refuses a filter or a stored view whose range says which bounds are exclusive, so a host that sends one upgrades its server first."
+        },
+        {
+          "area": "forms",
+          "says": "A timestamp's bounds are still whole days: after a day means from the next midnight on and before a day below its own, and nothing comes after 9999-12-31, which is refused in a sentence.",
+          "heldBy": "packages/data-core/src/records/filter.test.ts"
         }
       ]
     }

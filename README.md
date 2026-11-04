@@ -300,6 +300,9 @@ until then the address is formancy.ai's 404
   equals exactly on both engines, whatever the collation; and a
   timestamp's range is whole days, in UTC for an instant
   ([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+  Either end of a range may leave out its own value -- above 1000, before
+  1 November -- compared strictly on both engines
+  ([0130](./docs/decisions/0130-a-filters-range-may-leave-out-either-bounds-own-value.md)).
 - **An administrator names a form's list views**, each a filter and a sort,
   one of them perhaps the view the grid opens on, in the studio's
   Presentation step; they are published, reviewed, restored and carried

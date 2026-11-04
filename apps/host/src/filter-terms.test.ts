@@ -167,6 +167,21 @@ describe('what a panel says', () => {
     expect(summaryOf({ field: 'weight', op: 'not-null' }, field('weight'))).toBe('Weight has a value')
   })
 
+  // A bound that leaves out its own value (0130) is named for it, a
+  // number's over or under and a day's after or before; named as an
+  // inclusive one, "at least 1000" would list 1000 among rows it holds
+  // none of (watched failing with every lower bound named "at least").
+  test('names an exclusive bound for what it leaves out', () => {
+    expect(summaryOf({ field: 'weight', op: 'range', from: '1000', to: null, exclusive: 'from' }, field('weight'))).toBe('Weight is over 1000')
+    expect(summaryOf({ field: 'parcels', op: 'range', from: null, to: '9', exclusive: 'to' }, field('parcels'))).toBe('Parcels is under 9')
+    expect(summaryOf({ field: 'parcels', op: 'range', from: '1', to: '9', exclusive: 'both' }, field('parcels'))).toBe('Parcels is over 1 and under 9')
+    expect(summaryOf({ field: 'parcels', op: 'range', from: '1', to: '9', exclusive: 'to' }, field('parcels'))).toBe('Parcels is at least 1 and under 9')
+    expect(summaryOf({ field: 'due', op: 'range', from: '2026-10-01', to: null, exclusive: 'from' }, field('due'))).toBe('Due is after 2026-10-01')
+    expect(summaryOf({ field: 'shipped_at', op: 'range', from: '2026-10-01', to: '2026-11-01', exclusive: 'to' }, field('shipped_at'))).toBe(
+      'Shipped at is on or after 2026-10-01 and before 2026-11-01',
+    )
+  })
+
   // Under a draft, what its condition means where it is not obvious: a
   // timestamp's range is whole days, on the clock the grid shows it in; a
   // date's or a number's bounds are included; contains matches as Search
