@@ -10,6 +10,12 @@ later.
 
 ## Unreleased
 
+**The legal notice and the privacy review are answered, and are no longer drafts.** The operator
+has no commercial register entry or VAT number, and the privacy review says what was read from the
+live demonstration at `/data/examples/` on 2026-11-04: no cookie, no browser storage, no analytics, and
+nothing sent anywhere. formancy.ai's legal and privacy notices, which these point at, were finished
+the same day (formancy.ai 0232).
+
 ### Added
 
 - **An administrator labels a state field's states** (0129). Why: the host
