@@ -121,12 +121,13 @@ function filterTerm(entry: unknown): RecordFilter {
       const type = rangeType(entry['type'])
       if (type === undefined) throw refuse(`ranges over ${column} as an integer, a decimal, a date or a timestamp`)
       const from = boundOf(type, entry['from'], column)
+      const above = boundOf(type, entry['above'], column)
       const to = boundOf(type, entry['to'], column)
       const before = boundOf(type, entry['before'], column)
-      if (type.kind === 'timestamp' ? to !== null : before !== null)
-        throw refuse(`bounds ${column} at most a value when it is a number or a date, and below a midnight when it is a timestamp`)
-      if (from === null && to === null && before === null) throw refuse(`ranges over ${column} with at least one bound`)
-      return { op: 'range', column, type, from, to, before }
+      if (type.kind === 'timestamp' && (to !== null || above !== null)) throw refuse(`bounds ${column} at least and below a midnight, since it is a timestamp`)
+      if ((from !== null && above !== null) || (to !== null && before !== null)) throw refuse(`bounds ${column} once from below and once from above`)
+      if (from === null && above === null && to === null && before === null) throw refuse(`ranges over ${column} with at least one bound`)
+      return { op: 'range', column, type, from, above, to, before }
     }
     default:
       throw refuse('filters by equals, range, contains, null or not-null')

@@ -256,7 +256,7 @@ describe('planBrowse, filtered by a person (0104)', () => {
       ],
     })
     expect(plan.request.filter).toEqual([
-      { op: 'range', column: 'customer_no', type: INT32, from: '1000', to: '1999', before: null },
+      { op: 'range', column: 'customer_no', type: INT32, from: '1000', above: null, to: '1999', before: null },
       { op: 'null', column: 'name' },
     ])
     expect(listTerms(plan.request).filter).toEqual(plan.request.filter)

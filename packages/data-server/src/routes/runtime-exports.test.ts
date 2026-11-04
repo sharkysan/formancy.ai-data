@@ -432,7 +432,7 @@ describe('the export route', () => {
         equal: [{ name: 'country_code', value: 'CH' }],
         filter: [
           { op: 'null', column: 'notes' },
-          { op: 'range', column: 'customer_no', type: INT32, from: '1', to: '200', before: null },
+          { op: 'range', column: 'customer_no', type: INT32, from: '1', above: null, to: '200', before: null },
         ],
         filters: { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] },
       })

@@ -87,7 +87,7 @@ export function resolveTerm(term: ViewFilterTerm, today: string, context: Policy
       const from = term.from === null ? null : resolveValue(term.from, today, context)
       const to = term.to === null ? null : resolveValue(term.to, today, context)
       if ((term.from !== null && from === null) || (term.to !== null && to === null)) return null
-      return { field: term.field, op: 'range', from, to }
+      return { field: term.field, op: 'range', from, to, ...(term.exclusive === undefined ? {} : { exclusive: term.exclusive }) }
     }
     default:
       return term
@@ -122,7 +122,13 @@ export function standIn(term: ViewFilterTerm, input: FilterInput | null, today: 
   if (term.op === 'range')
     return {
       ok: true,
-      term: { field: term.field, op: 'range', from: term.from === null ? null : stood(term.from), to: term.to === null ? null : stood(term.to) },
+      term: {
+        field: term.field,
+        op: 'range',
+        from: term.from === null ? null : stood(term.from),
+        to: term.to === null ? null : stood(term.to),
+        ...(term.exclusive === undefined ? {} : { exclusive: term.exclusive }),
+      },
     }
   return { ok: true, term }
 }

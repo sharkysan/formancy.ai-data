@@ -22,15 +22,23 @@ import type { FieldError, FormRecord } from './records/plan-types.js'
 export type FilterOp = 'equals' | 'range' | 'contains' | 'null' | 'not-null'
 
 /**
+ * Which bounds of a range leave out their own value (0130): `from` is
+ * above it rather than at least it, `to` below it rather than at most it.
+ */
+export type RangeExclusive = 'from' | 'to' | 'both'
+
+/**
  * One condition on one column, as a request carries it (0104): values as
  * the text a person typed, which the planner checks and spells as the
  * column holds them (`records/filter.ts`). A range has a `from`, a `to` or
- * both, each inclusive; a timestamp's are dates, and its range whole days.
- * `null` is the column holding NULL, and text of no characters is a value.
+ * both, each inclusive unless `exclusive` names it (0130), and `exclusive`
+ * is left out where neither is; a timestamp's bounds are dates, and its
+ * range whole days. `null` is the column holding NULL, and text of no
+ * characters is a value.
  */
 export type FilterCondition =
   | { op: 'equals'; value: string }
-  | { op: 'range'; from: string | null; to: string | null }
+  | { op: 'range'; from: string | null; to: string | null; exclusive?: RangeExclusive }
   | { op: 'contains'; text: string }
   | { op: 'null' }
   | { op: 'not-null' }
@@ -91,7 +99,7 @@ export type ViewValue = string | { today: number } | { attribute: string }
 /** A stored view's condition: a request's, with a value or a bound that may be relative (0125). */
 export type ViewCondition =
   | { op: 'equals'; value: ViewValue }
-  | { op: 'range'; from: ViewValue | null; to: ViewValue | null }
+  | { op: 'range'; from: ViewValue | null; to: ViewValue | null; exclusive?: RangeExclusive }
   | { op: 'contains'; text: string }
   | { op: 'null' }
   | { op: 'not-null' }
