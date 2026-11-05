@@ -68,6 +68,8 @@ describe('headerCondition', () => {
     expect(read('contains 5', AMOUNT)).toEqual({ ok: false, message: 'Amount offers =, >, >=, <, <=, is empty and is not empty, not contains.' })
     expect(read('> 1 and > 2', AMOUNT)).toEqual({ ok: false, message: 'Amount has two lower bounds: keep one.' })
     expect(read('>', AMOUNT)).toEqual({ ok: false, message: 'Amount > needs a value.' })
+    expect(read('""', NOTES)).toEqual({ ok: false, message: 'Notes contains needs text to find.' })
+    expect(read('contains "  "', NOTES)).toEqual({ ok: false, message: 'Notes contains needs text to find.' })
   })
 })
 

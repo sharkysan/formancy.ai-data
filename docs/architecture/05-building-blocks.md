@@ -444,10 +444,11 @@ with Undo and the way out of a list nothing matches
 ([0132](../decisions/0132-each-column-header-filters-its-column.md)),
 `src/cell-example.tsx` a cell's value kept as its column's condition
 ([0133](../decisions/0133-a-cell-filters-by-its-value.md)),
-and `src/filter-panel.tsx` Build a condition's panel, with
-`src/filter-terms.ts` what they offer, send and say
+with `src/filter-terms.ts` what they offer and say
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)),
-its Field menu over the fields offered ([0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md));
+over the fields offered ([0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md));
+the panel that built one condition from menus is retired
+([0134](../decisions/0134-the-build-a-condition-panel-is-retired.md));
 `src/duplicate.ts` is Duplicate record's copy of a record and what its
 line says, the record read through `src/opening.ts`
 ([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)),

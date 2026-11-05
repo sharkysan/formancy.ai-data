@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:2d070ec89a46a8ff79601634afa6ab17d45380176dd4a6cbc903d6935b28547b",
+      "reviewed": "sha256:47f573d19ac377104f863909dba7ff80a41bc07dfb725e6c1341c49d36806e79",
       "limitations": [
         {
           "area": "forms",
@@ -3538,7 +3538,7 @@
       ]
     },
     "0123": {
-      "reviewed": "sha256:e6e4553e35496c3ed41946654267898967fcf2b3d88f93ed2c004769522c458c",
+      "reviewed": "sha256:123a3a8c7585a7f22138d12afb149aa125a88d3f2b52bd663ad1f1c7c1a1f261",
       "limitations": [
         {
           "area": "host",
@@ -3699,7 +3699,7 @@
       ]
     },
     "0131": {
-      "reviewed": "sha256:db094b4c009b27cb47b74cf463282555ee2e91bdb4d19b354263590208a76ae2",
+      "reviewed": "sha256:b18b9150a1df9ae66819d66d53c464d6d3f5f2ed6e900ffe8a6be6016d2f1876",
       "limitations": [
         {
           "area": "host",
@@ -3721,7 +3721,7 @@
         },
         {
           "area": "host",
-          "says": "An operator the server comes to offer is the Build a condition panel's alone until the line's reader learns to write it."
+          "says": "An operator the server comes to offer is offered by no control of the host until the line's reader learns to write it, since the Build a condition panel is retired (0134)."
         },
         {
           "area": "host",
@@ -3764,6 +3764,27 @@
         {
           "area": "host",
           "says": "A timestamp's cell offers an example only when it is empty, and a lookup's never: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
+        }
+      ]
+    },
+    "0134": {
+      "reviewed": "sha256:3e8719051faa18c7340d42912ab0bd62117c6d180d0d0fd5f3add7b6316fd27b",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A grid's condition is typed in its filter line or a shown column's header box, or taken from a cell; a field not shown as a column is named only in the line, whose completion lists the fields offered."
+        },
+        {
+          "area": "host",
+          "says": "No control says any longer that contains finds text anywhere in the field, as Search does, or that text of no characters is a value, which is empty does not find; a chip says what a condition finds, a timestamp's range included as whole days in UTC or as stored."
+        },
+        {
+          "area": "host",
+          "says": "A date is typed as YYYY-MM-DD and a number with a point, in the filter line or a header box: the Build a condition panel's date picker and numeric keypads are gone, so a phone shows its letters' keyboard."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's Presentation step still says \"The Filter panel offers\" of the fields the host's filter line and header boxes may name."
         }
       ]
     }

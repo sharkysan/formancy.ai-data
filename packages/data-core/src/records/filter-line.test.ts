@@ -153,6 +153,11 @@ describe('parseFilterLine', () => {
     expect(parsed('status = placed rush = yes')).toEqual({ ok: false, at: 16, length: 4, message: 'Join conditions with and.' })
     expect(parsed('status')).toEqual({ ok: false, at: 0, length: 6, message: 'After status comes =, contains, is empty or is not empty.' })
     expect(parsed('amount >')).toEqual({ ok: false, at: 7, length: 1, message: 'Amount > needs a value.' })
+    // Text that is only spaces finds nothing the server would look for: it
+    // refuses it, so the line does first (watched failing with the empty
+    // text read, sent, and refused in the server's words by the field's key).
+    expect(parsed('notes contains ""')).toEqual({ ok: false, at: 15, length: 2, message: 'Notes contains needs text to find.' })
+    expect(parsed('notes contains "  "')).toEqual({ ok: false, at: 15, length: 4, message: 'Notes contains needs text to find.' })
     expect(parsed('status is full')).toEqual({ ok: false, at: 10, length: 4, message: 'After is comes empty or not empty.' })
     expect(parsed('rush = maybe')).toEqual({ ok: false, at: 7, length: 5, message: 'Rush is yes or no.' })
   })

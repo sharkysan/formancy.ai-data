@@ -8,7 +8,7 @@ import { GridFilter } from './grid-filter.js'
 import type { PanelField } from './filter-terms.js'
 
 /*
- * A grid's filter -- its line, its chips and its condition builder --
+ * A grid's filter -- its line, its hint and its chips --
  * without a server: what each offers, what each sends to the one filter,
  * and how each shows it whatever changed it. What the server lists for a
  * filter, and that the terms reach it in the body alone, is the page's
@@ -76,28 +76,28 @@ const chips = () =>
     .getAllByRole('listitem')
     .map((item) => item.textContent)
 
-describe('the condition builder over fields left out of it (0123)', () => {
-  // Its Field menu offers what the panel offers, and not a field the
-  // administrator left out. Watched failing with the menu over every field
-  // filtered by: Notes was offered.
-  test('offers in its Field menu only the fields it offers', async () => {
+describe('the filter over fields left out of it (0123)', () => {
+  // The line's completion offers what the filter offers, and not a field
+  // the administrator left out (watched failing with every field the list
+  // is filtered by offered: Notes was an option).
+  test('offers in the line only the fields it offers', async () => {
     render(<Section fields={[STATUS, NOTES]} sent={[]} />)
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Build a condition' }))
-    const menu = screen.getByRole('combobox', { name: 'Field' })
+    const user = userEvent.setup()
+    await user.click(line())
+    await user.keyboard('{ArrowDown}')
     expect(
-      within(menu)
+      within(screen.getByRole('listbox', { name: 'What may come next' }))
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Status'])
+    ).toEqual(['statusStatus'])
   })
 
-  // With nothing to offer, there is no line and no builder, and a
-  // condition applied on a field left out -- a view's -- is still a chip,
-  // with its Remove. Watched failing with the toggle drawn over no field:
-  // a button opened an empty form.
+  // With nothing to offer, there is no line, and a condition applied on a
+  // field left out -- a view's -- is still a chip, with its Remove.
+  // Watched failing with every field the list is filtered by offered: the
+  // line was drawn over Notes.
   test('says a condition on a field it does not offer, and offers nothing where it offers none', () => {
     render(<Section fields={[NOTES]} start={[{ field: 'notes', op: 'contains', text: 'urgent' }]} sent={[]} />)
-    expect(screen.queryByRole('button', { name: 'Build a condition' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Filter' })).toBeNull()
     expect(chips()).toEqual(['Notes contains “urgent”'])
     expect(screen.getByRole('button', { name: 'Remove Notes contains “urgent”' })).toBeTruthy()
@@ -208,7 +208,7 @@ describe('the chips', () => {
 })
 
 describe('the line and the filter it shows', () => {
-  // A filter changed elsewhere -- a view picked, a header, the panel -- is
+  // A filter changed elsewhere -- a view picked, a chip, a header's box -- is
   // what the line shows once the person has left it, an edit they did not
   // apply dropped: kept, the line would say one filter and the chips
   // another, and Enter would put back what the view had replaced (watched

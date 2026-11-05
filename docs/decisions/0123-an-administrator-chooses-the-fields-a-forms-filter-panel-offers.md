@@ -1,6 +1,6 @@
 # 0123 — An administrator chooses the fields a form's Filter panel offers
 
-- **Status:** accepted; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): each field a list is filtered by says whether the form's Filter panel offers it; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): the presentation keeps, beside the list views, the fields the panel does not offer, carried by a regeneration by their columns
+- **Status:** accepted; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): each field a list is filtered by says whether the form's Filter panel offers it; extends [0105](0105-a-forms-list-offers-views-its-administrator-named.md): the presentation keeps, beside the list views, the fields the panel does not offer, carried by a regeneration by their columns; amended by [0134](0134-the-build-a-condition-panel-is-retired.md): the Filter panel is retired, and the fields it offered are those the line and the header boxes may name
 - **Date:** 2026-11-01
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -18,7 +18,7 @@ import type { Engine, Plane } from './test-plane.js'
  * opening on the default, or on every record when the default is not
  * offered; a choice in the select sending nothing until Show view; a view
  * shown asking for exactly one first page, carrying both its filter and
- * its sort, which the Filter panel lists and the headers show; the picker
+ * its sort, which the chips list and the headers show; the picker
  * saying "Your own filter and sort" for anything else and the view again
  * once the conditions are the view's; "All records" clearing both; a file
  * of the view's records; a child section's views of its own; and no view
@@ -175,15 +175,15 @@ async function lists(heading: string, formId: string, query: Partial<RecordListQ
 describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // The grid opens on the view the server offered as the default, with one
   // first page asked for in its filter and its sort -- never a page of
-  // every record before it -- the picker naming it, the panel listing its
+  // every record before it -- the picker naming it, a chip saying its
   // condition and the Id header sorted descending; and the picker and Show
   // view sit between Search and Filter in the keyboard's order, Columns
   // after them (0106) (watched failing with
   // the grid opening on nothing: every record listed, by key ascending; with
   // the datasource asking for whatever block AG Grid asks for: two first
   // pages, one asked before the headers showed the view's sort; and with
-  // the picker after the Filter panel: Tab from Search reached Filter; and
-  // with Columns after the Filter panel: Tab from Show view reached Filter).
+  // the picker after the filter: Tab from Search reached Filter; and
+  // with Columns after the filter: Tab from Show view reached Filter).
   test('opens the grid on the default view, with one first page in its filter and its sort', async () => {
     await freshOrders(engine, `${VIEWED} ${stamp('opened')}`, ['5', '7'])
     const user = mount(plane.fetch)
@@ -250,7 +250,7 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // (watched failing with the datasource asking for whatever block AG Grid
   // asks for: two first pages for one pick, one asked before the headers
   // showed the view's sort -- whether it sent the view's sort or AG Grid's).
-  test('picks a view: one first page with its filter and its sort, listed in the panel and shown on the headers', async () => {
+  test('picks a view: one first page with its filter and its sort, said by the chips and shown on the headers', async () => {
     await freshOrders(engine, `${VIEWED} ${stamp('picked')}`, ['150', '20', '300'])
     const user = await workspace(engine.formId)
     await lists('Records', engine.formId, NEWEST, `Rows 1–${String((await serverLists(engine.formId, NEWEST)).length)}. Filtered by Notes.`)
@@ -386,7 +386,10 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     }
     expect(plane.sent.filter((sent) => sent.path.endsWith('/views/save')).map((sent) => JSON.parse(sent.body ?? '{}') as unknown)).toEqual([kept])
     expect(shown('Records')).toBe('Small, mine')
-    expect(focusedName()).toBe('View')
+    // The keyboard moves to the picker in an effect after the render that
+    // says the view was saved (after-render.ts), so it is waited for: read
+    // at once, a slow runner found it still on the page (CI, main, after #161).
+    await waitFor(() => expect(focusedName()).toBe('View'), ARRIVES)
     const stored = Array.from({ length: localStorage.length }, (_, at) => localStorage.getItem(localStorage.key(at) ?? '') ?? '')
     expect(stored.join(' ')).not.toContain('Small, mine')
     expect(await floor('a view of your own, saved')).toEqual(CLEAN('a view of your own, saved'))
@@ -571,7 +574,7 @@ describe('a form whose list offers no views', () => {
     await signIn(user, TOKENS.clerk)
     await chooseForm(user, engine.lines)
     expect((await definitionOf(engine.lines)).list?.views).toEqual([])
-    expect(within(gridSection('Records')).getByRole('button', { name: 'Build a condition' })).toBeTruthy()
+    expect(within(gridSection('Records')).getByRole('combobox', { name: 'Filter' })).toBeTruthy()
     expect(picker('Records')).toBeNull()
   })
 })

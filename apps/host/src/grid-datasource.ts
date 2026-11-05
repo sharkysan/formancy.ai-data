@@ -41,7 +41,7 @@ export const CANNOT_OPEN = 'This row cannot be opened: its key does not fit in a
 /**
  * What the line adds under the server's sentence when it refuses a filter
  * (`not-filterable`, 0104): asking again would be refused again, so the
- * recovery is the condition, which the panel still holds as typed.
+ * recovery is the condition, which its chip and its box still hold.
  */
 export const REFUSED_FILTER_HELP = 'Change the condition in Filter and press Enter, or remove it.'
 

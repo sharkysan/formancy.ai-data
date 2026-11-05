@@ -230,10 +230,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    [0131](../decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)),
    typed in a column header's box (`apps/host/src/header-filter.tsx`:
    [0132](../decisions/0132-each-column-header-filters-its-column.md)),
-   taken from a cell's value (`apps/host/src/cell-example.tsx`:
-   [0133](../decisions/0133-a-cell-filters-by-its-value.md)),
-   or built in its panel (`apps/host/src/filter-panel.tsx`), over the
-   fields `list.filterable` names, the line and the panel over those
+   or taken from a cell's value (`apps/host/src/cell-example.tsx`:
+   [0133](../decisions/0133-a-cell-filters-by-its-value.md)), over the
+   fields `list.filterable` names, the line and the boxes over those
    `offered`, which the presentation's `unfiltered` decides:
    [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
    block before: the datasource keeps every answered page's `next` by the

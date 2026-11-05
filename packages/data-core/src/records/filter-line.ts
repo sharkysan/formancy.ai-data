@@ -4,7 +4,7 @@ import type { FilterInput, FilterOp, ListFilterTerm, RangeExclusive } from '../r
  * A grid's filter as a line a person types: `status = placed and amount >
  * 1000`. The line is read here, in the browser, into the terms a list
  * request carries (0104), and written back from them; the server never
- * sees it, so it can say nothing the Filter panel could not.
+ * sees it, so it can say nothing the terms could not.
  *
  *   line      := condition ("and" condition)*
  *   condition := name ("=" | ">" | ">=" | "<" | "<=" | "contains") value
@@ -292,6 +292,8 @@ function valued(state: Extract<LineState, { want: 'value' }>, token: LineToken, 
     case '=':
       return added(context, field, name, { op: 'equals', value }, span)
     case 'contains':
+      // The server finds no text in spaces alone, and refuses it.
+      if (value.trim() === '') return refuse(token, `${field.label} ${operator.text} needs text to find.`)
       return added(context, field, name, { op: 'contains', text: value }, span)
     case '>':
     case '>=':
