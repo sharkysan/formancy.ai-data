@@ -119,14 +119,14 @@ export function FilterChips({
         </>
       )}
       {undo === null ? null : (
-        <button type="button" className="button quiet" ref={undoRef} onClick={putBack}>
+        <button type="button" className="button quiet filter-wraps" ref={undoRef} onClick={putBack}>
           Undo {undo.words}
         </button>
       )}
       {empty && last !== undefined ? (
         <p className="filter-dead-end">
           No rows match all of these.{' '}
-          <button type="button" className="button" onClick={() => remove(filter.length - 1)}>
+          <button type="button" className="button filter-wraps" onClick={() => remove(filter.length - 1)}>
             Try without {words(last)}
           </button>
         </p>

@@ -40,11 +40,13 @@ function Section({
   own: kept = [],
   filter: start = NOTED,
   answer = () => Promise.resolve(null),
+  named,
 }: {
   views?: ListView[]
   own?: ListView[]
   filter?: ListFilterTerm[]
   answer?: () => Promise<string | null>
+  named?: string
 }): ReactElement {
   const [filter, setFilter] = useState(start)
   const [sort, setSort] = useState<ListSortTerm[]>([])
@@ -53,6 +55,7 @@ function Section({
     <main>
       <ViewPicker
         idBase="records"
+        {...(named === undefined ? {} : { named })}
         views={views}
         own={own}
         filter={filter}
@@ -109,6 +112,23 @@ describe('a person’s own views in the View picker (0126)', () => {
     expect(screen.queryByRole('textbox', { name: 'Name of your view' })).toBeNull()
     expect(screen.getByRole('button', { name: 'Remove your view' })).toBeTruthy()
     expect(await audit()).toEqual([])
+  })
+
+  // A view needs no name typed: the box offers the conditions in words, as
+  // the chips say them, and Save keeps the view under them while the box is
+  // empty; a name typed replaces them rather than being appended to them.
+  // Watched failing with the box holding them as its value: the name typed
+  // was "Notes contains “rush”Mine".
+  test('offers the conditions in words as the name, and saves under them', async () => {
+    asked = []
+    const user = userEvent.setup()
+    render(<Section named="Notes contains “rush”" />)
+    const box = screen.getByRole<HTMLInputElement>('textbox', { name: 'Name of your view' })
+    expect([box.value, box.placeholder]).toEqual(['', 'Notes contains “rush”'])
+    expect(await audit()).toEqual([])
+    await user.click(screen.getByRole('button', { name: 'Save your view' }))
+    await waitFor(() => expect(line()).toBe('Saved your view “Notes contains “rush””.'))
+    expect(asked).toEqual(['save Notes contains “rush”'])
   })
 
   // A refusal is the server's sentence on the picker's line, the name as

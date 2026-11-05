@@ -71,7 +71,7 @@ export function ViewPicker({
   onSave: (name: string) => Promise<string | null>
   /** The person's view of this name let go: null once gone, else the sentence it was refused with. */
   onRemove: (name: string) => Promise<string | null>
-  /** What the name box holds until the person types in it: the conditions in words. */
+  /** What the name box offers while it is empty, and Save keeps the view under: the conditions in words. */
   named?: string
 }): ReactElement | null {
   const offered = viewMatching(views, filter, sort)
@@ -88,9 +88,7 @@ export function ViewPicker({
     setFollowed(current)
     setDraft(current)
   }
-  /** The name typed; null until the person types one, while the box holds `named`. */
-  const [typedName, setName] = useState<string | null>(null)
-  const name = typedName ?? named
+  const [name, setName] = useState('')
   const [said, setSaid] = useState<Said | null>(null)
   const sending = useRef(false)
   const [busy, setBusy] = useState(false)
@@ -124,7 +122,7 @@ export function ViewPicker({
       return
     }
     setSaid({ kind: 'answer', text: done })
-    setName(null)
+    setName('')
     after(() => (selectRef.current ?? nameRef.current)?.focus())
   }
 
@@ -161,8 +159,9 @@ export function ViewPicker({
           className="view-choose"
           onSubmit={(event) => {
             event.preventDefault()
-            const named = name.trim()
-            void answer(() => onSave(named), `Saved your view “${named}”.`)
+            // An empty box is the conditions in words, which it offers.
+            const given = name.trim() === '' ? named.trim() : name.trim()
+            void answer(() => onSave(given), `Saved your view “${given}”.`)
           }}
         >
           <label htmlFor={`${idBase}-name`}>Name of your view</label>
@@ -173,6 +172,7 @@ export function ViewPicker({
             autoComplete="off"
             spellCheck={false}
             aria-describedby={`${idBase}-said`}
+            placeholder={named === '' ? undefined : named}
             value={name}
             onChange={(event) => setName(event.target.value)}
           />

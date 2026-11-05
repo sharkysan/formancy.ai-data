@@ -277,7 +277,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     await reopen(engine.formId)
     await headed('Records', labels)
     expect(shown('Records')).toBe(NEWEST.name)
-    expect(applied('Records')).toEqual([`Notes contains “${VIEWED}”Remove`])
+    expect(applied('Records')).toEqual([`Notes contains “${VIEWED}”`])
   })
 
   // Reset columns where no list was ever chosen leaves nothing to keep:

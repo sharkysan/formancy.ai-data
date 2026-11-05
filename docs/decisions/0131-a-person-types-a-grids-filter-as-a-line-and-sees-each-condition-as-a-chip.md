@@ -89,8 +89,10 @@ on a timer (WCAG 2.2.1). A list nothing matches offers to try it without
 its last condition. The panel stays, as Build a condition, until each
 column's header filters its column.
 
-A person's view's name box starts as the conditions in words, until they
-type a name.
+A person's view's name box offers the conditions in words while it is
+empty, and Save keeps the view under them; a name typed replaces them
+(`apps/host/src/view-save.test.tsx`, watched failing with the words as
+the box's value, which a typed name was appended to).
 
 ## Consequences
 

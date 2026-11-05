@@ -124,18 +124,18 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     expect(await floor('a line refused')).toEqual(CLEAN('a line refused'))
   })
 
-  // A line the page reads and the server refuses -- more fraction digits
-  // than the column holds -- is said on the grid's line in the server's
-  // words, with what to do instead, and the line still shows it to
-  // correct.
+  // A line the page reads and the server refuses -- a value the column
+  // cannot hold -- is said on the grid's line in the server's words, with
+  // what to do instead, and the line still shows it to correct.
   test('says a refusal of the server’s on the grid’s line, the line kept', async () => {
     const user = await workspace(engine.formId)
-    const refused = await plane.clerk.list(engine.formId, { filter: [{ field: 'amount', op: 'range', from: '1.001', to: null, exclusive: 'from' }] })
-    if (refused.ok) throw new Error('the server took 1.001 for an amount')
-    await typeFilter(user, 'Records', 'amount > 1.001')
+    const refused = await plane.clerk.list(engine.formId, { filter: [{ field: 'id', op: 'equals', value: '12x' }] })
+    if (refused.ok) throw new Error('the server took 12x for an id')
+    await typeFilter(user, 'Records', 'id = 12x')
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(refused.message), ARRIVES)
     expect(within(gridSection('Records')).getByText(REFUSED_FILTER_HELP)).toBeTruthy()
-    expect(filterLine('Records').value).toBe('amount > 1.001')
+    expect(filterLine('Records').value).toBe('id = 12x')
+    expect(await floor('a line the server refused')).toEqual(CLEAN('a line the server refused'))
   })
 
   // A chip removed lists what the rest hold for, the keyboard on the next

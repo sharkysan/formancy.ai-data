@@ -397,7 +397,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     within(gridSection('Delivery')).getByRole('button', { name: 'Remove Shipped at has no value' }).focus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(firstCells('Delivery')).toEqual([deliveries[1]]), ARRIVES)
-    expect(focusedName()).toBe(`Remove Id is ${String(deliveries[1]).toUpperCase()}`)
+    expect(focusedName()).toBe(`Remove Id is “${String(deliveries[1]).toUpperCase()}”`)
 
     plane.sent.length = 0
     await user.click(exportButton('Delivery'))

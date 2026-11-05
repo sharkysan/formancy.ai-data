@@ -283,6 +283,18 @@
   color: inherit;
 }
 
+/* Undo and the way out of a list nothing matches say a condition in full,
+   which may be long: they wrap inside the row rather than widening it,
+   after the rule above that keeps the row's other buttons whole. */
+.filter-active .filter-wraps {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding-block: 0.25rem;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
 /* A list nothing matches: the way out beside the chips. */
 .filter-dead-end {
   display: flex;

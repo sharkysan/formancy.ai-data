@@ -321,7 +321,8 @@ export async function decide(page, undecided) {
         continue
       }
       if (!/pseudo element|overlapped by another element/.test(node.reason)) {
-        left.push(node.html)
+        // With axe's reason, so a run says why rather than only which.
+        left.push(`${node.html} (${node.reason})`)
         continue
       }
       await page.evaluate((at) => {
