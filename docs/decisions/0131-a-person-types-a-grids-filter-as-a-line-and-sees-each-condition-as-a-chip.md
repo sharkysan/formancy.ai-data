@@ -103,15 +103,14 @@ other way, never on a timer (WCAG 2.2.1). A list nothing matches offers to
 try it without its last condition, except where a search matched nothing,
 whose way out is Clear search.
 
-**The host's gate asks axe again inside the window.** A fourth decision
-of the gate's own, beside 0047's three: a text outside a grid that axe
-left undecided while it lay outside the window is brought into it by the
-window's scroll alone and asked again, and stays undecided otherwise
-(`apps/host/scripts/browser/measure.mjs`'s `inWindow`). Axe reads a
-background at a text's place in the window, and a place outside it has
-none: the search box, scrolled above the window once the line made the
-filter's block taller, was "Element has no value", which axe says only of
-a contrast that failed. The panel stays, as Build a condition, until each
+**The host's gate shows an empty box its pane cuts whole.** Axe says
+"Element has no value" of an empty box whose contrast failed, and it fails
+one the edge of its scrolling pane cuts, for want of the background the
+pane hid; the gate shows it whole in that pane and asks axe again, as it
+already did a text axe called partially obscured, and fails it otherwise
+(`apps/host/scripts/browser/measure.mjs`'s `decide`). Seen with the
+search box at the Records panel's top, once the line made the panel
+taller. The panel stays, as Build a condition, until each
 column's header filters its column.
 
 A person's view's name box offers the conditions in words, in the room's

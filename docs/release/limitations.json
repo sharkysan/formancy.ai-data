@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:663d13b7ab989bde93b9448beedf8dec982cdea77b8b35a4bf6ecdd129371301",
+      "reviewed": "sha256:61f45ce97dfe435e3d9e2e3c6f1e32c3fd6b64fcfd6df3bd56142437ee31687f",
       "limitations": [
         {
           "area": "host",
@@ -3699,7 +3699,7 @@
       ]
     },
     "0131": {
-      "reviewed": "sha256:1796c1c06cf4186df9e0a02601ef4c7da7788f0701b636476c21123e1b47cb71",
+      "reviewed": "sha256:b3b2aee5d1a048f2043e6fa6c4d787df59b5bcbe38eae1920dffee58fc68b678",
       "limitations": [
         {
           "area": "host",
@@ -3729,7 +3729,7 @@
         },
         {
           "area": "testing",
-          "says": "The host's browser gate asks axe again, inside the window, about a text outside a grid it left undecided outside the window: a fourth decision of the gate's own beside 0047's three, which a text a pane cuts is not."
+          "says": "The host's browser gate shows an empty box its scrolling pane cuts whole in that pane and asks axe again, as it does a text axe calls partially obscured; an empty box no pane cuts that axe still finds no value in fails the gate."
         }
       ]
     }
