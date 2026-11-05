@@ -235,6 +235,20 @@ export const LIST_PARITY = {
       [{ op: 'equals', value: 'Alpha' }, ['2']],
       [{ op: 'contains', text: 'et' }, []],
     ],
+    /** Two conditions through the lookup, held together: Gamma's child, not Alpha's, which holds the first alone. */
+    together: {
+      conditions: [
+        { op: 'contains', text: 'a' },
+        { op: 'contains', text: 'm' },
+      ],
+      found: ['1'],
+    },
+    /**
+     * A page of one under `first` -- Gamma's child -- and the page after it
+     * under `then`, which Gamma does not hold: Alpha's child, since the
+     * conditions narrow a page and never the row it continues after.
+     */
+    after: { first: { op: 'contains', text: 'a' }, page: ['1'], then: { op: 'equals', value: 'Alpha' }, next: ['2'] },
   },
   key: {
     /** `code`, `label`, inserted in this order. */

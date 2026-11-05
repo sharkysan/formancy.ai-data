@@ -21,6 +21,7 @@ import type {
   BrowseFilterTerm,
   BrowseQuery,
   BrowseRelation,
+  FilterCondition,
   FormBindings,
   FormPolicy,
   FormRecord,
@@ -602,6 +603,23 @@ describe('conditions through a lookup', covers('postgres', listCase('related')),
       const filter = [{ field: `${field}.name`, ...condition } as RecordListQuery['filter'][number]]
       expect(ids(await page({ filter })), JSON.stringify(condition)).toEqual(expected)
     }
+  })
+
+  // Every condition through one lookup holds of the one parent, in one
+  // EXISTS: Alpha holds `a` and not `m`, so its child is not found. And the
+  // conditions narrow the page, never the row it continues after: asked of
+  // that row too, the page after Gamma's child under a condition Gamma
+  // does not hold would find no row to continue after, and hold none.
+  // Watched failing with the conditions through a lookup asked of the
+  // anchor.
+  test('holds every condition on one parent, and continues after a row they do not hold', async () => {
+    const { field, page } = await labelForm()
+    const through = (condition: FilterCondition): ListFilterTerm => ({ field: `${field}.name`, ...condition })
+    const { together, after } = LIST_PARITY.related
+    expect(ids(await page({ filter: together.conditions.map(through) }))).toEqual(together.found)
+    const first = await page({ filter: [through(after.first)], limit: 1 })
+    expect(ids(first)).toEqual(after.page)
+    expect(ids(await page({ filter: [through(after.then)], after: first.next }))).toEqual(after.next)
   })
 })
 

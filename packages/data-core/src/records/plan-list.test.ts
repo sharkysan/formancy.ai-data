@@ -504,7 +504,10 @@ describe('planList', () => {
     ).toEqual(['customer.name:false', 'employee.name:true'])
     const refusals: Array<[RecordListQuery['filter'][number], string]> = [
       [{ field: 'customer.credit_limit', op: 'null' }, 'customer.credit_limit is not a field you may filter this list by.'],
-      [{ field: 'customer.name', op: 'null' }, 'customer.name offers no null condition.'],
+      [
+        { field: 'customer.name', op: 'null' },
+        'customer.name offers no empty condition: a row with no customer shows it empty too, and no condition through customer finds that row.',
+      ],
       [{ field: 'approved_by.name', op: 'equals', value: 'Ada' }, 'approved_by.name is not a field you may filter this list by.'],
     ]
     for (const [term, message] of refusals) {

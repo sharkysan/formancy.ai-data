@@ -14,7 +14,7 @@ import { columnFilter, filterOffer } from './filter.js'
 import { lookupFilter, lookupFilterOffer } from './lookup-filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
 import { columnsOf, keyOrderProblem, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
-import { type RelatedField, relatedFilters } from './related-filter.js'
+import { type RelatedField, relatedFilters, relatedOffer } from './related-filter.js'
 import { filtersFor, reachedLookups, readColumns, relatedFieldsOf, sortLabelsOf, throughFor } from './scope.js'
 import type { ListOutcome, ListRequest, ListSort, RecordFilter, RecordRead, RecordSort, RecordValue, SortLabel, Through } from './types.js'
 
@@ -182,7 +182,7 @@ export function listColumns(bindings: FormBindings, fields: readonly string[], v
     if (offer !== null) filterable.push({ field: binding.field, offered, ...offer })
     for (const through of related) {
       if (through.lookup !== binding.field) continue
-      const by = filterOffer(through.column)
+      const by = relatedOffer(through.column)
       if (by !== null) filterable.push({ field: through.field, offered, ...by, related: { lookup: binding.field, column: through.label } })
     }
   }

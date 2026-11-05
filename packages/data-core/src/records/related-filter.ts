@@ -1,8 +1,8 @@
 import { createKeyAllocator, fieldKeyFor } from '../generate/names.js'
 import type { FieldBinding } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
-import type { FilterCondition } from '../runtime.js'
-import { columnFilter } from './filter.js'
+import type { FilterCondition, FilterOffer } from '../runtime.js'
+import { columnFilter, filterOffer } from './filter.js'
 import type { RecordFilter, RelatedFilter } from './types.js'
 
 /*
@@ -18,7 +18,7 @@ import type { RecordFilter, RelatedFilter } from './types.js'
 /**
  * A field a person may filter a list by through a lookup: its key, the
  * lookup's, the display column as the target holds it, what a page calls
- * it, and the way to the target as the label's (`sortLabelsFor`).
+ * it, and the way to the target as the label's (`sortLabelsOf`).
  */
 export interface RelatedField {
   field: string
@@ -26,6 +26,19 @@ export interface RelatedField {
   column: ColumnMeta
   label: string
   reach: Omit<RelatedFilter, 'filter'>
+}
+
+/**
+ * What a field through a lookup offers: what its column offers, but `null`.
+ * A row with no target row, or one the lookup's filter hides, shows the
+ * column empty as a target row holding NULL does, and no condition through
+ * the lookup finds it; `not-null` finds exactly the rows a page shows a
+ * value for. `null` when nothing is left.
+ */
+export function relatedOffer(column: Pick<ColumnMeta, 'type' | 'nullable'>): FilterOffer | null {
+  const offer = filterOffer(column)
+  const operators = offer?.operators.filter((op) => op !== 'null') ?? []
+  return offer === null || operators.length === 0 ? null : { ...offer, operators }
 }
 
 /** Each display column of `binding` with its key through the lookup: `<lookup>.<the column's field key>`, a second column whose key is taken getting `_2` as a field would. */
@@ -37,7 +50,8 @@ export function relatedKeys(binding: Pick<Extract<FieldBinding, { kind: 'lookup'
 /**
  * The person's conditions through lookups, planned: one entry per lookup,
  * in the order its first condition came, each condition planned on its
- * column as a column of the list's own is (`columnFilter`) -- or why not.
+ * column as a column of the list's own is (`columnFilter`), `null` never
+ * (`relatedOffer`) -- or why not.
  * `terms` are the conditions on a field of `offered`; the caller sends
  * each other condition its own way.
  */
@@ -50,6 +64,12 @@ export function relatedFilters(
   for (const term of terms) {
     const via = byField.get(term.field)
     if (via === undefined) return { ok: false, message: `${term.field} is not a field you may filter this list by.` }
+    if (term.op === 'null') {
+      return {
+        ok: false,
+        message: `${term.field} offers no empty condition: a row with no ${via.lookup} shows it empty too, and no condition through ${via.lookup} finds that row.`,
+      }
+    }
     const planned = columnFilter(via.column, term, term.field)
     if (!planned.ok) return planned
     const entry = byLookup.get(via.lookup) ?? { reach: via.reach, filter: [] }
