@@ -140,7 +140,7 @@ function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias:
     const target = `${alias}.${quoteName(pair.references)}`
     const root = `${row}.${quoteName(pair.column)}`
     return pair.type.kind === 'text'
-      ? `${target} = ${root} and ${exactText(`convert(nvarchar(max), ${target})`, `convert(nvarchar(max), ${root})`)}`
+      ? `${target} = ${root} and ${exactText(`convert(nvarchar(max), ${target})`, `convert(nvarchar(max), ${target})`)}`
       : `${target} = ${root}`
   })
   const terms = label.terms.map((term) => filterPredicate(parameters, `${alias}.${quoteName(term.column)}`, term))
