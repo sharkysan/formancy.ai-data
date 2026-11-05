@@ -783,6 +783,16 @@ the same day (formancy.ai 0232).
 
 ### Fixed
 
+- **A PostgreSQL connection fetches no array types.** Why: postgres.js
+  fetches them on each new connection without awaiting the answer, so a
+  connection still opening when its pool ended or the database stopped
+  rejected that fetch where nothing listened -- an unhandled rejection,
+  which ends a Node process by default, and which failed the host's
+  browser gate in WebKit at its database's stop several times. The
+  adapters read every value as text converted in SQL (0016), so nothing
+  read those types. What you notice: one query fewer as each connection
+  opens.
+
 - **An abandoned PostgreSQL lookup is stopped when its cancel overtakes its
   execute** (0121). Why: the cancel sent after a lookup's execute travels
   on a connection of its own, so on a loaded network it can reach

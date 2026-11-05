@@ -37,6 +37,11 @@ export function connectPostgres(options: PostgresConnectOptions): Sql {
     // The adapters read every value as text converted in SQL (0016); notices
     // are the server talking to a console nobody reads.
     onnotice: () => {},
+    // Nor are array types read: postgres.js fetches them on each new
+    // connection without awaiting the answer, so a connection still opening
+    // when its pool ends or the database stops rejects that fetch where
+    // nothing listens, an unhandled rejection that ends a Node process.
+    fetch_types: false,
     ...(options.applicationName === undefined ? {} : { connection: { application_name: options.applicationName } }),
   })
 }

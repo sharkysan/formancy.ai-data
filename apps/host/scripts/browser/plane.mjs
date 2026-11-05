@@ -182,7 +182,8 @@ export async function startPlane() {
       }),
   })
   const source = form.model.fields.find((field) => field.key === 'customer').optionsSource
-  const sql = postgres(fixture.admin, { onnotice: () => {} })
+  // No array types, as the adapter's own connections fetch none: postgres.js fetches them unawaited on each new connection, and one still opening at the database's stop was an unhandled rejection at the gate's end (#159, #166).
+  const sql = postgres(fixture.admin, { onnotice: () => {}, fetch_types: false })
   return {
     server,
     /** A fresh order of tenant 1's with `lines` lines, for one width's run, made the way the page would make it; `notes` finds it, and `customer` is searched for its customer. */

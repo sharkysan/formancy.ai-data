@@ -1,6 +1,7 @@
 import { serverStanding } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
 import { postgresServer } from './server.js'
+import { connectPostgres } from './connect.js'
 
 /**
  * What a PostgreSQL server's answer is translated into (0068): pure, over
@@ -76,5 +77,29 @@ describe('postgresServer', () => {
     )
     expect(elsewhere).toEqual({ kind: 'postgres', version: '16.4', product: 'postgresql', major: 16 })
     expect(serverStanding('postgres', elsewhere).tested).toBe(true)
+  })
+})
+
+describe('a connection the adapter opens', () => {
+  // postgres.js fetches the server's array types on each new connection,
+  // and does not wait for the answer: a connection still opening when its
+  // pool ends, or the database stops, rejects that fetch where nothing
+  // listens -- an unhandled rejection, which ends a Node process by
+  // default, and which the host's browser gate met at its database's stop
+  // on CI. The adapters read every value as text converted in SQL (0016)
+  // and pass their lists as parameters PostgreSQL types from the
+  // statement, so nothing reads an array type (watched failing with the
+  // driver's default).
+  test('fetches no array types', async () => {
+    const sql = connectPostgres({
+      host: '127.0.0.1',
+      port: 5432,
+      database: 'none',
+      user: 'none',
+      password: 'none',
+      tls: { enabled: false, rejectUnauthorized: true },
+    })
+    expect(sql.options.fetch_types).toBe(false)
+    await sql.end()
   })
 })
