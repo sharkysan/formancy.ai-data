@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
 import { AngularForm } from './angular-mount.js'
+import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
 import type { SaveResult, Session, Submitted } from './session.js'
 import { UnknownNotice } from './unknown-notice.js'
@@ -42,6 +43,12 @@ type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: numbe
  * one that says the draft was discarded, or what a replaced form's save
  * answered, must be there before it speaks. What it said is kept with the
  * generation it was said for, so a new form starts with an empty line.
+ *
+ * Given an `offer`, each lookup the server names forms for offers Open
+ * under its field, in the paper (0141). The renderers are handed one offer
+ * for the session's life -- its forms, which are the definition's, and a
+ * press read through a ref -- so neither redraws a field for a render of
+ * the page, nor Angular starts again.
  */
 export function Pane({
   session,
@@ -51,6 +58,7 @@ export function Pane({
   namedBy,
   onAnswer,
   onLoaded,
+  offer,
 }: {
   session: Session
   title: string
@@ -64,8 +72,19 @@ export function Pane({
   onAnswer?: (result: SaveResult) => void
   /** The stored record replaced the draft, by "Load the saved record": the workspace shows what is stored, as after a save. */
   onLoaded?: () => void
+  /** Open under each lookup of the record (0141); none under a child row's rail. */
+  offer?: LookupOffer
 }): ReactElement {
   const { engine, generation } = useSyncExternalStore(session.subscribe, session.opened)
+  const pressed = useRef(offer)
+  useEffect(() => {
+    pressed.current = offer
+  })
+  const opens = offer?.opens
+  const steady = useMemo<LookupOffer | undefined>(
+    () => (opens === undefined ? undefined : { opens, open: (field, choice, button) => pressed.current?.open(field, choice, button) }),
+    [opens],
+  )
   const name = NAMES[session.renderer]
   const headingId = `pane-${idBase}-${session.renderer}`
   const Heading = level === 4 ? 'h4' : 'h6'
@@ -109,6 +128,7 @@ export function Pane({
         named={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}
         noticeLevel={level}
         say={say}
+        offer={steady}
         onAnswer={onAnswer}
         onReload={async () => {
           const problem = await session.reload()
@@ -133,6 +153,7 @@ function PaneBody({
   named,
   noticeLevel,
   say,
+  offer,
   onAnswer,
   onReload,
   onLoad,
@@ -146,6 +167,7 @@ function PaneBody({
   named: string
   noticeLevel: 4 | 6
   say: (text: string, kind?: Kind) => void
+  offer: LookupOffer | undefined
   onAnswer: ((result: SaveResult) => void) | undefined
   onReload: () => Promise<string | null>
   onLoad: (record: FormRecord) => void
@@ -245,9 +267,9 @@ function PaneBody({
         ref={setSheet}
       >
         {session.renderer === 'react' ? (
-          <ReactForm engine={engine} sources={session.sources} onSubmit={(outcome) => void submit(outcome)} />
+          <ReactForm engine={engine} sources={session.sources} offer={offer} onSubmit={(outcome) => void submit(outcome)} />
         ) : (
-          <AngularForm sheet={sheet} engine={engine} sources={session.sources} onSubmit={(outcome) => void submit(outcome)} />
+          <AngularForm sheet={sheet} engine={engine} sources={session.sources} offer={offer} onSubmit={(outcome) => void submit(outcome)} />
         )}
       </form>
     </>

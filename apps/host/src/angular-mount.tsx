@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { OptionsSources, SubmitOutcome } from '@formancy/angular'
 import type { FormEngine } from '@formancy/core'
+import type { LookupOffer } from './lookup-opens.js'
 
 /**
  * The Angular renderer's half of a pane, as a React component: the examples
@@ -15,17 +16,23 @@ import type { FormEngine } from '@formancy/core'
  * engine.
  *
  * The save is read through a ref, so the application started for this engine
- * always calls the pane's current handler without being started again.
+ * always calls the pane's current handler without being started again. The
+ * lookups' offer (0141) is read through one too, as each application starts:
+ * the pane keeps one offer for the session's life, so a new one never starts
+ * an application again.
  */
 export function AngularForm({
   sheet,
   engine,
   sources,
+  offer,
   onSubmit,
 }: {
   sheet: HTMLFormElement | null
   engine: FormEngine
   sources: OptionsSources
+  /** Open under each lookup it names (0141); none where the pane offers none. */
+  offer?: LookupOffer | undefined
   onSubmit: (outcome: SubmitOutcome) => void
 }): ReactElement | null {
   const [problem, setProblem] = useState<string | undefined>(undefined)
@@ -33,6 +40,10 @@ export function AngularForm({
   useEffect(() => {
     submit.current = onSubmit
   }, [onSubmit])
+  const offered = useRef(offer)
+  useEffect(() => {
+    offered.current = offer
+  }, [offer])
 
   useEffect(() => {
     if (sheet === null) return undefined
@@ -43,7 +54,7 @@ export function AngularForm({
     // React half paints without waiting, and the bundle splits where the two
     // frameworks meet.
     import('./angular-bootstrap.js')
-      .then(({ mountAngularForm }) => mountAngularForm(sheet, engine, sources, (outcome) => submit.current(outcome)))
+      .then(({ mountAngularForm }) => mountAngularForm(sheet, engine, sources, (outcome) => submit.current(outcome), offered.current ?? null))
       .then((teardown) => {
         if (cancelled) teardown()
         else unmount = teardown
