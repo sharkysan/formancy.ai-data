@@ -473,7 +473,7 @@ jobs:
   # leg's image, for its fonts.
   pictures:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -504,16 +504,6 @@ jobs:
 
       - run: pnpm --filter @formancy/data-examples exec playwright install chromium
         timeout-minutes: 5
-
-      # TEMPORARY: capture the studio's snapshots on this runner, with Docker, and upload them.
-      - run: pnpm build
-      - run: pnpm --filter @formancy/data-studio snapshot
-        timeout-minutes: 20
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: captured-snapshots
-          path: apps/studio/src/fixtures/
 
       # Builds the pages first (turbo's `dependsOn`), then walks every scene.
       - run: pnpm test:pictures
