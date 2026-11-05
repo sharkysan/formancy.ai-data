@@ -467,6 +467,17 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [arranged, removeNoun, boxedKeys],
   )
 
+  // The header's height changes after the well is fitted -- its row of
+  // boxes laid out (0132), a label wrapping -- and a well fitted to the
+  // header as it was leaves less than a row under it: fitted again each time.
+  useEffect(() => {
+    const header = well.current?.querySelector('.ag-header')
+    if (header === null || header === undefined || typeof ResizeObserver !== 'function') return undefined
+    const observer = new ResizeObserver(() => fit())
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [fit, boxedKeys])
+
   // A column shown that was hidden when the page was sized: sized now, to
   // the rows shown, and the well fitted to a header the change may have
   // made taller or shorter. Shown while a page loads, or over a page with no
