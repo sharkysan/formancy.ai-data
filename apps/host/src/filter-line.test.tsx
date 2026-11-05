@@ -243,6 +243,21 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     await waitFor(() => expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(''), ARRIVES)
   })
 
+  // A box the line would refuse sends nothing, is said on the grid's line
+  // -- where the grid speaks, through its handle -- and keeps what was
+  // typed. Unwired, the refusal would be said nowhere, and a person would
+  // not know why the grid did not change.
+  test('says a header box’s refusal on the grid’s line, keeping what was typed', async () => {
+    const user = await workspace(engine.formId)
+    plane.sent.length = 0
+    const amount = within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' })
+    await user.type(amount, '1000,50{Enter}')
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Write numbers with a point and no separators: 1000.50.'), ARRIVES)
+    expect(amount.value).toBe('1000,50')
+    expect(listsSent(plane.sent, engine.formId)).toEqual([])
+    expect(await floor('a header box refused')).toEqual(CLEAN('a header box refused'))
+  })
+
   // A list nothing matches is no dead end: the page offers to try it
   // without the last condition, which Undo puts back like any other
   // removal -- but not where a search is what matched nothing, whose way

@@ -1,5 +1,5 @@
-import { createContext, useContext, useState } from 'react'
-import type { ReactElement } from 'react'
+import { createContext, useContext, useRef, useState } from 'react'
+import type { KeyboardEvent, ReactElement } from 'react'
 import { headerCondition, headerText } from '@formancy/data-client'
 import type { LineField, ListFilterTerm } from '@formancy/data-client'
 import type { IFilterComp, IFloatingFilterParams, SuppressHeaderKeyboardEventParams } from 'ag-grid-community'
@@ -17,8 +17,10 @@ import { withTerm } from './filter-terms.js'
  * select instead. A column the line cannot name has no box.
  *
  * The keyboard reaches a box as AG Grid's header keys do: Down from a
- * header to its box's cell, Enter into the box, Esc back to the cell; Tab
- * still leaves the grid. Inside the box its keys are the box's own.
+ * header to its box's cell and Enter into the box; Esc gives up an edit
+ * and goes back to the cell; Tab goes on to the next column's box, and
+ * from the last out of the grid, Shift+Tab back. Inside the box its keys
+ * are the box's own, and while an input method composes a word, its.
  *
  * Nothing of the page's stylesheet reaches into a grid, whose look is its
  * theme's (grid-theme.ts): a text box wears the theme's input style through
@@ -69,10 +71,14 @@ export class NeverFilter implements IFilterComp {
   }
 }
 
-/** Whether AG Grid keeps its hands off a key pressed in a box: every key but the Esc and Tab that take the keyboard out of it. */
+/** Whether an input method is composing a word, whose Enter and Esc are its own; 229 is what Safari reports for the last key of one. */
+const composing = (event: globalThis.KeyboardEvent): boolean => event.isComposing || event.keyCode === 229
+
+/** Whether AG Grid keeps its hands off a key pressed in a box: every key but the Esc and Tab that take the keyboard out of it, and those too while an input method composes. */
 export function boxKeys(params: SuppressHeaderKeyboardEventParams): boolean {
   const target = params.event.target
-  return target instanceof HTMLElement && target.closest('.header-box') !== null && params.event.key !== 'Escape' && params.event.key !== 'Tab'
+  if (!(target instanceof HTMLElement) || target.closest('.header-box') === null) return false
+  return composing(params.event) || (params.event.key !== 'Escape' && params.event.key !== 'Tab')
 }
 
 /** The box AG Grid draws under a column's header: the page's, for the field the column shows. */
@@ -95,21 +101,29 @@ function TextBox({ field, headers }: { field: LineField; headers: HeaderFilters 
   /** What the person typed since the box last showed its column's condition; null while it shows it. */
   const [draft, setDraft] = useState<string | null>(null)
   const [focused, setFocused] = useState(false)
-  // A condition applied elsewhere while the person is not in the box is
-  // what it shows, an edit left there dropped. Followed while rendering.
-  const [followed, setFollowed] = useState(shown)
-  if (followed !== shown) {
-    setFollowed(shown)
+  // Any change of the filter while the person is not in the box -- Clear
+  // filter, a view, the line -- drops an edit left there, as the line's is.
+  // Followed while rendering.
+  const now = JSON.stringify(headers.filter)
+  const [followed, setFollowed] = useState(now)
+  if (followed !== now) {
+    setFollowed(now)
     if (!focused) setDraft(null)
   }
+  /** Esc pressed: AG Grid blurs the box before the box hears the key, and the blur must not apply what Esc gives up. */
+  const givingUp = useRef(false)
+  /** The text last refused, so leaving the box does not say the same refusal again. */
+  const refusedText = useRef<string | null>(null)
 
   function apply(): void {
     if (draft === null) return
     const read = headerCondition(draft, field)
     if (!read.ok) {
-      headers.refused(read.message)
+      if (refusedText.current !== draft) headers.refused(read.message)
+      refusedText.current = draft
       return
     }
+    refusedText.current = null
     setDraft(null)
     const next = withCondition(headers.filter, field.field, read.term)
     if (JSON.stringify(next) !== JSON.stringify(headers.filter)) headers.onFilter(next)
@@ -127,13 +141,19 @@ function TextBox({ field, headers }: { field: LineField; headers: HeaderFilters 
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false)
-        apply()
+        if (givingUp.current) givingUp.current = false
+        else apply()
+      }}
+      // Before AG Grid's own listener on the cell, which hears Esc first and blurs the box.
+      onKeyDownCapture={(event: KeyboardEvent<HTMLInputElement>) => {
+        if (composing(event.nativeEvent) || event.key !== 'Escape') return
+        givingUp.current = true
+        setDraft(null)
       }}
       onKeyDown={(event) => {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          apply()
-        } else if (event.key === 'Escape') setDraft(null)
+        if (composing(event.nativeEvent) || event.key !== 'Enter') return
+        event.preventDefault()
+        apply()
       }}
     />
   )

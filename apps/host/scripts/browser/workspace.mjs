@@ -9,7 +9,7 @@
 // separator is let go, and no host rule reaching into a grid.
 
 import { FORM, LINES, TOKENS } from './plane.mjs'
-import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
+import { contrast, dataRows, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -142,15 +142,7 @@ export function workspaceJourney(plane, { check }, run) {
         const headers = async () => (await grid(page, 'Records').getByRole('columnheader').allTextContents()).map((text) => text.trim())
         const order = await headers()
         // A data row's cell, then up through the row of the header boxes (0132) to its header.
-        await grid(page, 'Records')
-          .getByRole('row')
-          .filter({ has: page.getByRole('gridcell') })
-          .filter({ hasNot: page.getByRole('textbox', { name: /^Filter / }) })
-          .filter({ hasNot: page.getByRole('combobox', { name: /^Filter / }) })
-          .first()
-          .getByRole('gridcell')
-          .nth(1)
-          .focus()
+        await dataRows(grid(page, 'Records'), page).first().getByRole('gridcell').nth(1).focus()
         await page.keyboard.press('ArrowUp')
         await page.keyboard.press('ArrowUp')
         const onHeader = await page.evaluate(() => document.activeElement?.getAttribute('role') === 'columnheader')
@@ -327,12 +319,7 @@ export function workspaceJourney(plane, { check }, run) {
       async (page) => {
         const lines = page.getByRole('region', { name: 'Order line', exact: true })
         // The first data row's cell: the row of the header boxes (0132) holds cells too.
-        await lines
-          .getByRole('grid', { name: 'Order line' })
-          .getByRole('row')
-          .filter({ has: page.getByRole('gridcell') })
-          .filter({ hasNot: page.getByRole('textbox', { name: /^Filter / }) })
-          .filter({ hasNot: page.getByRole('combobox', { name: /^Filter / }) })
+        await dataRows(lines.getByRole('grid', { name: 'Order line' }), page)
           .first()
           .getByRole('gridcell')
           .first()

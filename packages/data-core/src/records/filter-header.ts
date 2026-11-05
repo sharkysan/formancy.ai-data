@@ -12,9 +12,19 @@ import type { LineField, LineToken } from './filter-line.js'
  * contains, and equal to anything else.
  */
 
-/** Whether a token starts a condition's operator: `=`, `>` and the rest, `contains`, or `is` before `empty`. */
-const startsOperator = (token: LineToken | undefined): boolean =>
-  token !== undefined && (token.kind === 'operator' || (token.kind === 'word' && ['contains', 'is'].includes(token.value.toLowerCase())))
+/**
+ * Whether the token at `index` starts a condition's operator: `=`, `>` and
+ * the rest, `contains`, or `is` before `empty` or `not` -- a note that
+ * starts with the word "is" is a note.
+ */
+function startsOperator(found: readonly LineToken[], index: number): boolean {
+  const token = found[index]
+  if (token === undefined) return false
+  if (token.kind === 'operator') return true
+  const word = token.kind === 'word' ? token.value.toLowerCase() : null
+  const next = found[index + 1]
+  return word === 'contains' || (word === 'is' && next?.kind === 'word' && ['empty', 'not'].includes(next.value.toLowerCase()))
+}
 
 /** What a bare value means in a box on `field`. */
 const bare = (field: LineField): string => (field.input === 'text' && field.operators.includes('contains') ? 'contains' : '=')
@@ -28,13 +38,13 @@ export function headerCondition(text: string, field: LineField): { ok: true; ter
   const [first] = found
   if (first === undefined) return { ok: true, term: null }
   let line: string
-  if (startsOperator(first)) {
+  if (startsOperator(found, 0)) {
     // The key in front, and again after each `and` a second bound starts with.
     line = `${field.field} `
     let from = 0
     for (const [index, token] of found.entries()) {
       const before = found[index - 1]
-      if (before?.kind !== 'word' || before.value.toLowerCase() !== 'and' || !startsOperator(token)) continue
+      if (before?.kind !== 'word' || before.value.toLowerCase() !== 'and' || !startsOperator(found, index)) continue
       line += `${text.slice(from, token.at)}${field.field} `
       from = token.at
     }
@@ -58,7 +68,7 @@ export function headerText(term: ListFilterTerm | undefined, field: LineField): 
   if (term === undefined) return ''
   const value = term.op === 'contains' && bare(field) === 'contains' ? term.text : term.op === 'equals' && bare(field) === '=' ? term.value : null
   if (value !== null) {
-    const plain = value !== '' && value === value.trim() && !value.startsWith('"') && !startsOperator(lineTokens(value)[0])
+    const plain = value !== '' && value === value.trim() && !value.startsWith('"') && !startsOperator(lineTokens(value), 0)
     return plain ? value : quoted(value)
   }
   return conditionsOf(term, '', field)

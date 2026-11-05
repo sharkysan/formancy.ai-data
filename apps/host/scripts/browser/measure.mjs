@@ -9,6 +9,17 @@ import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 /** How long Angular may take to arrive, and the server to answer: generous, for a loaded runner. */
 export const WITHIN = { timeout: 20_000 }
 
+/**
+ * A grid's data rows: the rows with cells, less the row of its header
+ * boxes (0132), whose cells hold controls named Filter and a column.
+ */
+export const dataRows = (grid, page) =>
+  grid
+    .getByRole('row')
+    .filter({ has: page.getByRole('gridcell') })
+    .filter({ hasNot: page.getByRole('textbox', { name: /^Filter / }) })
+    .filter({ hasNot: page.getByRole('combobox', { name: /^Filter / }) })
+
 /** Wait until `condition` holds, or fail with `problem`. */
 export async function until(condition, problem) {
   const deadline = Date.now() + WITHIN.timeout

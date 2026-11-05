@@ -168,6 +168,14 @@ export function filterJourney(plane, { check }) {
           same(JSON.parse(request.postData() ?? '{}').filter, [{ field: 'amount', op: 'range', from: '0', to: null, exclusive: 'from' }]),
         )
         check('a header box applied: the line says it', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
+        // Tab goes on to the next column's box, as AG Grid's floating row walks.
+        await page.keyboard.press('Tab')
+        check('a header box: Tab reaches the next column’s box', await focusedOn(page, control(page, 'textbox', 'Filter Notes')))
+        // Esc gives an edit up: the box shows its column's condition again, and the filter is as it was.
+        await page.keyboard.type('given up')
+        await page.keyboard.press('Escape')
+        check('a header box: Esc gives up what was typed', same(await control(page, 'textbox', 'Filter Notes').inputValue(), ''))
+        check('a header box: and the filter is as it was', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
       },
     ],
     [

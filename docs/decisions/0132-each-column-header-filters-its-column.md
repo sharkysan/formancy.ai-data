@@ -17,14 +17,19 @@
   it applies it, a select for a column whose field has values; a refusal
   sends nothing, is said where the grid speaks and keeps what was typed;
   and a box shows the condition its column has however it was applied
-  (each watched failing with the boxes never offered).
+  (each watched failing with the boxes never offered); Esc gives an edit
+  up and sends nothing, Enter and Esc are an input method's while it
+  composes, an edit left in a box is dropped when the filter changes
+  elsewhere and refused once, and no row of boxes is drawn when no boxed
+  column is shown (each watched failing: Esc applied the edit).
   `apps/host/src/filter-line.test.tsx`, on both engines against the real
   server -- a box's condition in the list's body, the line and the chips
-  saying it, a chip removed emptying it, and axe and a name on every
-  control. `apps/host/scripts/browser/filtering.mjs`, in Chromium,
+  saying it, a chip removed emptying it, a refusal said on the grid's
+  line with the text kept, and axe and a name on every control. `apps/host/scripts/browser/filtering.mjs`, in Chromium,
   Firefox and WebKit -- the keyboard from a header, Down to its box and
-  Enter into it, the condition applied with Enter, and the states measured
-  down to 320 px.
+  Enter into it, the condition applied with Enter, Tab on to the next
+  column's box, Esc giving an edit up, and the states measured down to
+  320 px.
 
 ## Context
 
@@ -40,7 +45,8 @@ component: it holds the page's own `<input>` in a `gridcell` of a header
 `row`, AG Grid's "Open Filter Menu" button hidden and `aria-hidden` once
 `suppressFloatingFilterButton` is set; Down from a header reaches the
 box's cell, Enter puts the keyboard in the box, Esc gives it back to the
-cell, and Tab still leaves the grid. jsdom cannot answer the keyboard
+cell, and Tab from a header leaves the grid -- from a box it goes on to
+the next column's box, and from the last out. jsdom cannot answer the keyboard
 part: without layout, AG Grid finds nothing to focus in the cell.
 
 ## Decision
@@ -62,9 +68,11 @@ words without the name; a box that starts with no operator holds one
 value -- found anywhere in text that offers contains, equal to anything
 else. `headerText` writes the column's condition back as the box shows
 it. Enter, or leaving the box, applies it in place of the column's
-condition; a refusal is the line's, said on the grid's line, the text
-kept. While the keyboard is not in a box, it shows its column's condition
-however it was applied.
+condition; a refusal is the line's, said once on the grid's line, the
+text kept; Esc gives an edit up, and Enter and Esc are an input method's
+while it composes. While the keyboard is not in a box, it shows its
+column's condition however it was applied, an edit left there dropped
+when the filter changes elsewhere. Only a column that is shown has a box.
 
 ## Consequences
 

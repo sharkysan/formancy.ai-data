@@ -32,6 +32,7 @@ import { ACCESSIBILITY_TAGS } from '@formancy/conformance'
 import { contentSecurityPolicy, POLICY } from '../../../../scripts/demo-headers.mjs'
 import { foreignProblem, guardRequests } from '../../../../scripts/browser-gate.mjs'
 import { LIVE_POLICY } from '../../../../scripts/live-demo-headers.mjs'
+import { dataRows } from './measure.mjs'
 
 /** A visitor's first start is the container's own start, then the menu: 4.8-11.6 s were measured on 2026-10-16 and 2026-10-17 at basic's share. */
 const STARTED = { timeout: 60_000 }
@@ -163,8 +164,9 @@ export async function demoPass({ origin, prefix, check, timed }) {
     await search.getByRole('textbox', { name: 'Search' }).fill('dock')
     await search.getByRole('button', { name: 'Search' }).click()
     await says(records(page), /^Rows 1–\d+\.$/)
-    const found = await grid(records(page), 'Records').getByRole('row').count()
-    check('a search narrows the orders to one page', found > 1 && found <= 51 ? null : `the grid has ${String(found)} rows`)
+    // Data rows alone: the header's rows, the columns' and the boxes' (0132), are not orders.
+    const found = await dataRows(grid(records(page), 'Records'), page).count()
+    check('a search narrows the orders to one page', found >= 1 && found <= 50 ? null : `the grid has ${String(found)} rows`)
     await search.getByRole('textbox', { name: 'Search' }).fill('')
     await search.getByRole('button', { name: 'Search' }).click()
     await says(records(page), /^Rows 1–50; more follow\.$/)
@@ -176,7 +178,7 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const lines = first.getByRole('region', { name: 'Order line', exact: true })
     await says(lines, /^Order line rows 1–\d+\.$/)
     await says(first.getByRole('region', { name: 'Delivery', exact: true }), /^Delivery rows 1–\d+\.$/)
-    const lineRows = (await grid(lines, 'Order line').getByRole('row').count()) - 1
+    const lineRows = await dataRows(grid(lines, 'Order line'), page).count()
     check('an order opens with its lines in the linked grid', lineRows > 0 ? null : 'its lines grid has no row')
     const open = await audit(page)
     check('axe finds no violation with an order open', open.violations.length === 0 ? null : open.violations.join('; '))

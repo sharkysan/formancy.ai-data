@@ -212,7 +212,8 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
     maxWidth: 320,
     ...(column.key === first ? { cellRenderer: OpenCell } : {}),
     // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
-    ...(boxed.has(column.key)
+    // Shown only: a hidden column's box would keep a row of empty cells under the headers.
+    ...(boxed.has(column.key) && column.shown
       ? {
           filter: NeverFilter,
           floatingFilter: true,

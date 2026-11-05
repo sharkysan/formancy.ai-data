@@ -39,6 +39,10 @@ describe('headerCondition', () => {
     expect(term('salt and pepper', NOTES)).toEqual({ field: 'notes', op: 'contains', text: 'salt and pepper' })
     expect(term('"= x"', NOTES)).toEqual({ field: 'notes', op: 'contains', text: '= x' })
     expect(term('1000', AMOUNT)).toEqual({ field: 'amount', op: 'equals', value: '1000' })
+    // `is` starts an operator only before `empty` or `not`: a note that
+    // starts with the word is a note (watched failing with "Is this urgent"
+    // refused as "After is comes empty or not empty.").
+    expect(term('Is this urgent', NOTES)).toEqual({ field: 'notes', op: 'contains', text: 'Is this urgent' })
   })
 
   // An operator in front says the condition as the line does, a range's
@@ -77,6 +81,8 @@ describe('headerText', () => {
       [{ field: 'notes', op: 'contains', text: 'salt and pepper' }, NOTES, 'salt and pepper'],
       [{ field: 'notes', op: 'contains', text: '= x' }, NOTES, '"= x"'],
       [{ field: 'notes', op: 'contains', text: ' padded ' }, NOTES, '" padded "'],
+      [{ field: 'notes', op: 'contains', text: 'is this urgent' }, NOTES, 'is this urgent'],
+      [{ field: 'notes', op: 'contains', text: 'is empty' }, NOTES, '"is empty"'],
       [{ field: 'notes', op: 'equals', value: 'rush' }, NOTES, '= rush'],
       [{ field: 'notes', op: 'null' }, NOTES, 'is empty'],
       [{ field: 'notes', op: 'not-null' }, NOTES, 'is not empty'],

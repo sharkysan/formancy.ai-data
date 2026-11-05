@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { AgGridReact } from 'ag-grid-react'
 import { useState } from 'react'
@@ -34,11 +34,13 @@ function Grid({
   sent,
   refusals = [],
   elsewhere = [],
+  columns = COLUMNS,
 }: {
   start?: ListFilterTerm[]
   sent: ListFilterTerm[][]
   refusals?: string[]
   elsewhere?: ListFilterTerm[]
+  columns?: ArrangedColumn[]
 }): ReactElement {
   const [filter, setFilter] = useState(start)
   const onFilter = (next: ListFilterTerm[]): void => {
@@ -51,7 +53,7 @@ function Grid({
         Elsewhere
       </button>
       <div style={{ width: 800, height: 300 }}>
-        <AgGridReact rowModelType="infinite" columnDefs={columnDefsOf(COLUMNS, undefined, new Set(FIELDS.map((field) => field.field)))} />
+        <AgGridReact rowModelType="infinite" columnDefs={columnDefsOf(columns, undefined, new Set(FIELDS.map((field) => field.field)))} />
       </div>
     </HeaderFilterContext.Provider>
   )
@@ -119,5 +121,60 @@ describe('a column header’s filter box', () => {
     await userEvent.setup().click(screen.getByRole('button', { name: 'Elsewhere' }))
     await waitFor(async () => expect((await box('Filter Amount')).value).toBe('> 1 and < 9'))
     expect((await box('Filter Notes')).value).toBe('')
+  })
+
+  // Esc gives up an edit: the box shows its column's condition again and
+  // nothing is sent. AG Grid takes the keyboard back to the cell on Esc,
+  // which blurs the box before the box hears the key (watched failing:
+  // "urgent" then Esc sent contains urgent).
+  test('gives up an edit on Esc, sending nothing', async () => {
+    const sent: ListFilterTerm[][] = []
+    const refusals: string[] = []
+    render(<Grid sent={sent} refusals={refusals} />)
+    const user = userEvent.setup()
+    await user.type(await box('Filter Notes'), 'urgent')
+    await user.keyboard('{Escape}')
+    await user.type(await box('Filter Amount'), '1000,50')
+    await user.keyboard('{Escape}')
+    expect(sent).toEqual([])
+    expect(refusals).toEqual([])
+    expect([(await box('Filter Notes')).value, (await box('Filter Amount')).value]).toEqual(['', ''])
+  })
+
+  // While an input method composes a word, Enter and Esc are its: half a
+  // word is never applied (watched failing with Enter applying "ur").
+  test('leaves Enter and Esc to an input method while it composes', async () => {
+    const sent: ListFilterTerm[][] = []
+    render(<Grid sent={sent} />)
+    await userEvent.setup().type(await box('Filter Notes'), 'ur')
+    fireEvent.keyDown(await box('Filter Notes'), { key: 'Enter', isComposing: true, keyCode: 229 })
+    fireEvent.keyDown(await box('Filter Notes'), { key: 'Escape', isComposing: true, keyCode: 229 })
+    expect(sent).toEqual([])
+    expect((await box('Filter Notes')).value).toBe('ur')
+  })
+
+  // An edit left unapplied in a box is dropped when the filter changes
+  // elsewhere -- Clear filter, a view -- as the line's is: kept, the box
+  // would say a condition the line and the chips do not; and a refusal is
+  // said once, not again when the box is left (watched failing with
+  // "1000,50" still in the box after the filter was cleared).
+  test('drops an edit left in it when the filter changes elsewhere, and refuses it once', async () => {
+    const refusals: string[] = []
+    render(<Grid sent={[]} refusals={refusals} start={[{ field: 'notes', op: 'contains', text: 'x' }]} />)
+    const user = userEvent.setup()
+    await user.type(await box('Filter Amount'), '1000,50{Enter}')
+    await user.tab()
+    expect(refusals).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }))
+    await waitFor(async () => expect((await box('Filter Amount')).value).toBe(''))
+  })
+
+  // Only a column that is shown has a box: with every boxed column hidden,
+  // the row of boxes is not drawn, rather than drawn empty (watched
+  // failing with an empty row of cells under the headers).
+  test('draws no row of boxes when no boxed column is shown', async () => {
+    render(<Grid sent={[]} columns={COLUMNS.map((each) => ({ ...each, shown: each.key === 'customer' }))} />)
+    await screen.findByRole('columnheader', { name: 'Customer' })
+    expect(screen.queryAllByRole('gridcell')).toEqual([])
   })
 })

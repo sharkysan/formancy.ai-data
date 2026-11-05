@@ -3734,7 +3734,7 @@
       ]
     },
     "0132": {
-      "reviewed": "sha256:274220b082170ccf68db50589b068dc4dec3a66474240d1ddd79714a8b9b2754",
+      "reviewed": "sha256:97906df533ef72b5d6d4918dbe3766f0ed0f930be64b6b08c75c2bdf4c7ab322",
       "limitations": [
         {
           "area": "host",
@@ -3742,7 +3742,7 @@
         },
         {
           "area": "host",
-          "says": "The header boxes ride on AG Grid's floating filter row and its keys -- Down from a header to the box's cell, Enter into the box, Esc out -- which an AG Grid upgrade could change; the host's browser gate holds the path."
+          "says": "The header boxes ride on AG Grid's floating filter row and its keys -- Down from a header to the box's cell, Enter into the box, Esc out, Tab on to the next column's box -- which an AG Grid upgrade could change; the host's browser gate holds the path."
         },
         {
           "area": "host",
