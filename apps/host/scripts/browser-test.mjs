@@ -75,18 +75,18 @@
 //     server answers for the request the page sent, with no anchor of it
 //     left in the document -- the Records' file and an order's lines' --
 //     and a refusal is the server's sentence on the button's line;
-//   - a grid's filter (0104): Enter on Build a condition opens the panel and
-//     keeps the keyboard there, the next Tab reaches Field, and Enter in a
-//     condition's box applies it, the keyboard staying in the box; the grid
-//     then says it is filtered and the condition is a chip, whose request
-//     carries it in the body and its words in no URL; a value the server
-//     refuses is its sentence on the grid's line, the value still in its box
-//     and no Ask again; Clear filter puts the keyboard on its Undo; and the
-//     filter line completes the field begun in a listbox over the grid,
-//     applies what it reads with Enter, in the body and in no URL, a chip
-//     removed gives the keyboard to its Undo, and a column header's box is
-//     reached from its header with Down and Enter and applies its
-//     condition (0132);
+//   - a grid's filter (0104): Enter in a column header's box applies its
+//     condition, the keyboard staying in the box; the grid then says it is
+//     filtered and the condition is a chip, whose request carries it in the
+//     body and its words in no URL; a value the server refuses is its
+//     sentence on the grid's line, the value still in its box and no Ask
+//     again; Clear filter puts the keyboard on its Undo; the filter line
+//     completes the field begun in a listbox over the grid and applies what
+//     it reads with Enter, in the body and in no URL, and a chip removed
+//     gives the keyboard to its Undo; a header's box is reached from its
+//     header with Down and Enter, Tab goes on to the next and Esc gives an
+//     edit up (0132); and = on a cell keeps its value, the keyboard back on
+//     a cell after (0133);
 //   - a form's list views (0105): the View picker and Show view between
 //     Search and Filter in the keyboard's order; a choice in the select,
 //     the change an arrow fires on a closed select, sends nothing; Show

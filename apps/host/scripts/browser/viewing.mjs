@@ -1,5 +1,5 @@
 // A form's list views in the browser (0105), on the workspace the filter's
-// states left: every record, no condition, the panel closed. The order form
+// states left: every record, no condition. The order form
 // offers two views and opens on neither (plane.mjs). The View picker and
 // Show view are reached by Tab between Search and Filter, Columns after
 // them (0106); a choice in the select sends nothing and changes nothing, as
@@ -16,10 +16,10 @@
 // target sizes, the sorted headers' text decided on the pixels, and no
 // sideways scroll, down to 320 px.
 //
-// A select is chosen with Playwright's selectOption, not its keys, for the
-// reason filtering.mjs gives: how a closed select answers an arrow differs
-// by browser and platform, and is the browser's own control, not the page's.
-// selectOption fires the change those arrows fire where they fire one.
+// A select is chosen with Playwright's selectOption, not its keys: how a
+// closed select answers an arrow differs by browser and platform, and is
+// the browser's own control, not the page's. selectOption fires the change
+// those arrows fire where they fire one.
 
 import { FORM, ORDER_VIEWS } from './plane.mjs'
 import { focusedOn, until } from './measure.mjs'

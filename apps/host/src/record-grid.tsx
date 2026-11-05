@@ -41,7 +41,7 @@ export { DELETE_COLUMN } from './grid-options.js'
  * the page before it.
  *
  * What it lists is its section's: the search submitted, the parent, the
- * filter its panel applied (filter-panel.tsx, 0104), whose fields its line
+ * filter its section applied (grid-filter.tsx, 0104), whose fields its line
  * names, and the sort. A filter the server refuses is said in the server's
  * sentence with what to do instead of Ask again, which would be refused the
  * same.

@@ -65,14 +65,14 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * detail's header or from its row, after a confirmation in place, as the
  * record is (0053); then the keyboard goes to this section's heading.
  *
- * Under a saved parent its grid has a filter panel of its own, over the
+ * Under a saved parent its grid has a filter of its own, over the
  * fields the child form offers (0104), and its head offers Download CSV
  * (0080): the child form's file of that parent's rows, under the section's
  * filter, in the grid's sort, the parent's column kept, so the file says
  * whose rows they are. A new parent has no rows to give. The filter is the
  * section's, so another parent's section starts with none -- or, where the
  * server offers the child form's views, with its default view's filter and
- * sort, which its View picker before the filter panel sets as the Records
+ * sort, which its View picker before the filter sets as the Records
  * panel's does (0105). Its Columns orders and hides its grid's columns,
  * never offering the parent's (0106). Its columns and its list are kept in
  * this browser for the child form, one value every section of it shares,

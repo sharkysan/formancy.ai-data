@@ -7,7 +7,7 @@ import { viewMatching } from './views.js'
 /*
  * A grid's View picker (0105): the views the server offered this person for
  * the form's list, by their names, in a native select labelled View, and
- * Show view, before the Filter panel; under "Your views", the person's own
+ * Show view, before the filter; under "Your views", the person's own
  * (0126). Not drawn when the server offered none and the person keeps
  * none.
  *

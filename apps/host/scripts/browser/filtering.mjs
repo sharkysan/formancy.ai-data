@@ -1,20 +1,16 @@
 // A grid's filter in the browser (0104), on the workspace Download CSV's
-// states left open: Build a condition opened from the keyboard and the next
-// Tab on Field; a condition chosen and applied with Enter in its box, the
-// grid narrowed and its line saying so, the request carrying the condition
-// in its body and its words in no URL, and the condition a chip; a value
-// the server refuses said on the grid's line, with what was typed still in
-// its box and no Ask again; Clear filter giving the keyboard to its Undo;
-// the filter line -- its completion open over the grid, a line typed and
-// applied with Enter, and a chip removed; and a column header's box,
-// reached from its header by the keyboard and applied with Enter. Each state is measured by
-// the gate's `measured` on the way: the colours and target sizes, the
-// chips wrapping inside their row, the completion inside the page, and no
-// sideways scroll, down to 320 px.
-//
-// A select is chosen with Playwright's selectOption, not its keys: how a
-// closed select answers an arrow differs by browser and platform, and is
-// the browser's own control, not the page's.
+// states left open: a condition typed in a column header's box and applied
+// with Enter, the grid narrowed and its line saying so, the request
+// carrying the condition in its body and its words in no URL, and the
+// condition a chip; a value the server refuses said on the grid's line,
+// with what was typed still in its box and no Ask again; Clear filter
+// giving the keyboard to its Undo; the filter line -- its completion open
+// over the grid, a line typed and applied with Enter, and a chip removed; a
+// column header's box, reached from its header by the keyboard, Tab on to
+// the next box and Esc giving an edit up; and = on a cell. Each state is
+// measured by the gate's `measured` on the way: the colours and target
+// sizes, the chips wrapping inside their row, the completion inside the
+// page, and no sideways scroll, down to 320 px.
 
 import { FORM, TOKENS } from './plane.mjs'
 import { dataRows, focusedOn, until, WITHIN } from './measure.mjs'
@@ -25,7 +21,6 @@ const records = (page) => page.getByRole('region', { name: 'Records', exact: tru
 const gridLine = (region) => region.getByRole('status', { name: /^$/ }).first()
 const lineOf = async (page) => (await gridLine(records(page)).textContent()) ?? ''
 const control = (page, role, name) => records(page).getByRole(role, { name, exact: true })
-const box = (page, label) => records(page).getByLabel(label, { exact: true })
 
 /** Null when `got` is `want`, otherwise both. */
 const same = (got, want) => (JSON.stringify(got) === JSON.stringify(want) ? null : `it is ${JSON.stringify(got)}, not ${JSON.stringify(want)}`)
@@ -39,7 +34,7 @@ export function filterJourney(plane, { check }) {
   const contains = { field: 'notes', op: 'contains', text: words.toUpperCase() }
   return [
     [
-      'A filter, open (Records)',
+      'A filter applied (Records)',
       async (page) => {
         await plane.order(0, words)
         await plane.order(0, words)
@@ -47,30 +42,16 @@ export function filterJourney(plane, { check }) {
         await control(page, 'textbox', 'Search').fill('')
         await control(page, 'button', 'Search').click()
         await until(async () => /^Rows 1–/.test(await lineOf(page)), 'the records were never listed unsearched')
-        const filter = control(page, 'button', 'Build a condition')
-        await filter.focus()
-        await page.keyboard.press('Enter')
-        check('Enter on Build a condition opens the panel', same(await filter.getAttribute('aria-expanded'), 'true'))
-        check('and leaves the keyboard on Build a condition', await focusedOn(page, filter))
-        await page.keyboard.press('Tab')
-        check('the next Tab reaches Field', await focusedOn(page, control(page, 'combobox', 'Field')))
-        await control(page, 'combobox', 'Field').selectOption({ label: 'Notes' })
-        await control(page, 'combobox', 'Condition').selectOption({ label: 'contains' })
         // In another case than the orders' notes: contains finds them in any case.
-        await box(page, 'Text').fill(words.toUpperCase())
-      },
-    ],
-    [
-      'A filter applied (Records)',
-      async (page) => {
+        const box = control(page, 'textbox', 'Filter Notes')
+        await box.fill(`contains ${words.toUpperCase()}`)
         const sent = nextList(page)
-        await box(page, 'Text').focus()
-        await page.keyboard.press('Enter')
+        await box.press('Enter')
         const request = await sent
         check('a filter applied: the condition is in the list request’s body', same(JSON.parse(request.postData() ?? '{}').filter, [contains]))
         check('a filter applied: its words are in no URL', request.url().toLowerCase().includes(words) ? `the URL is ${request.url()}` : null)
         await until(async () => (await lineOf(page)) === 'Rows 1–2. Filtered by Notes.', 'the grid never said it listed the two orders, filtered')
-        check('a filter applied: the keyboard stays in Text', await focusedOn(page, box(page, 'Text')))
+        check('a filter applied: the keyboard stays in its box', await focusedOn(page, box))
         const listed = await control(page, 'list', 'Filtered by').getByRole('listitem').allTextContents()
         check('a filter applied: it is a chip', same(listed, [`Notes contains “${words.toUpperCase()}”`]))
       },
@@ -87,12 +68,11 @@ export function filterJourney(plane, { check }) {
         })
         check('the server refuses 12x for an id as not-filterable', same([reply.statusCode, reply.json().code], [400, 'not-filterable']))
         const sentence = reply.json().message
-        await control(page, 'combobox', 'Field').selectOption({ label: 'Id' })
-        await control(page, 'combobox', 'Condition').selectOption({ label: 'is' })
-        await box(page, 'Value').fill('12x')
-        await box(page, 'Value').press('Enter')
+        const box = control(page, 'textbox', 'Filter Id')
+        await box.fill('12x')
+        await box.press('Enter')
         await until(async () => (await lineOf(page)) === sentence, `the grid never said the server's sentence "${sentence}"`)
-        check('a filter refused: what was typed is still in Value', same(await box(page, 'Value').inputValue(), '12x'))
+        check('a filter refused: what was typed is still in its box', same(await box.inputValue(), '12x'))
         check('a filter refused: nothing offers to ask again', (await control(page, 'button', 'Ask again').count()) === 0 ? null : 'Ask again is there')
       },
     ],
@@ -104,11 +84,6 @@ export function filterJourney(plane, { check }) {
         await page.keyboard.press('Enter')
         await until(async () => /^Rows 1–\d+(; more follow)?\.$/.test(await lineOf(page)), 'the grid never listed the records unfiltered')
         check('a filter cleared: the keyboard is on its Undo', await focusedOn(page, control(page, 'button', 'Undo clearing the filter')))
-        // Closed again, as the journeys after this one found the panel.
-        const filter = control(page, 'button', 'Build a condition')
-        await filter.focus()
-        await page.keyboard.press('Enter')
-        check('a filter cleared: Enter on Build a condition closes the panel', same(await filter.getAttribute('aria-expanded'), 'false'))
       },
     ],
     [

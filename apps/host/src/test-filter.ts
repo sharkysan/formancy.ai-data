@@ -7,7 +7,7 @@ import type { Sent } from './test-fetch.js'
 
 /*
  * How the suites drive a grid's filter (0104) -- its line, its chips and
- * the panel that builds a condition -- as a person does: by role and
+ * its columns' header boxes (0132) -- as a person does: by role and
  * accessible name (formancy.ai 0034), inside the section whose heading
  * names the grid -- the Records panel, or a child section, each with a
  * filter of its own.
@@ -17,49 +17,63 @@ import type { Sent } from './test-fetch.js'
 export interface Asked {
   field: string
   condition: 'is' | 'is between' | 'contains' | 'has no value' | 'has a value'
-  /** What Value or Text is given: typed, or for a yes-or-no field chosen. */
+  /** The value the condition holds: typed into the box, or for a field with values chosen. */
   value?: string
   from?: string
   to?: string
 }
 
-/** The panel of the grid `heading` names, open: Build a condition pressed when it is not expanded. */
-export async function openFilter(user: User, heading: string): Promise<HTMLElement> {
-  const section = gridSection(heading)
-  const button = within(section).getByRole('button', { name: 'Build a condition' })
-  if (button.getAttribute('aria-expanded') !== 'true') await user.click(button)
-  return section
+/** A value quoted as the line writes one that must be: one value whatever it holds. */
+const quoted = (value: string): string => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+
+/** What a column's header box is typed with for `asked`: the line's condition without the field's name. */
+function boxText(asked: Asked): string {
+  switch (asked.condition) {
+    case 'is':
+      return `= ${quoted(asked.value ?? '')}`
+    case 'contains':
+      return `contains ${quoted(asked.value ?? '')}`
+    case 'has no value':
+      return 'is empty'
+    case 'has a value':
+      return 'is not empty'
+    case 'is between':
+      return [
+        asked.from === undefined || asked.from === '' ? null : `>= ${quoted(asked.from)}`,
+        asked.to === undefined || asked.to === '' ? null : `<= ${quoted(asked.to)}`,
+      ]
+        .filter((part) => part !== null)
+        .join(' and ')
+  }
 }
 
 /**
- * A box of the open panel, by its label. By label rather than role, because
- * a date input has none in ARIA ("no corresponding role" in HTML-AAM), as
- * test-host.ts's `control` says.
+ * Set a condition on the grid's column `asked.field` names, in place of
+ * the one it had, as a person does in its header box (0132): typed and
+ * Enter, or a value chosen where the box is a select. Nothing is waited
+ * for.
  */
-export function filterBox(heading: string, label: 'Value' | 'Text' | 'From' | 'To'): HTMLInputElement {
-  return within(gridSection(heading)).getByLabelText<HTMLInputElement>(label, { exact: true })
-}
-
-/** Clear a box and type into it, where there is something to type. */
-async function typeInto(user: User, box: HTMLInputElement, text: string): Promise<void> {
-  await user.clear(box)
-  if (text !== '') await user.type(box, text)
-}
-
-/** Set a condition in the grid's panel -- the field, the condition, then each box -- and press Apply. Nothing is waited for. */
 export async function applyCondition(user: User, heading: string, asked: Asked): Promise<void> {
-  const section = await openFilter(user, heading)
-  await user.selectOptions(within(section).getByRole('combobox', { name: 'Field' }), asked.field)
-  await user.selectOptions(within(section).getByRole('combobox', { name: 'Condition' }), asked.condition)
-  if (asked.condition === 'is between') {
-    await typeInto(user, filterBox(heading, 'From'), asked.from ?? '')
-    await typeInto(user, filterBox(heading, 'To'), asked.to ?? '')
-  } else if (asked.value !== undefined) {
-    const choice = within(section).queryByRole('combobox', { name: 'Value' })
-    if (choice !== null) await user.selectOptions(choice, asked.value)
-    else await typeInto(user, filterBox(heading, asked.condition === 'contains' ? 'Text' : 'Value'), asked.value)
+  const section = gridSection(heading)
+  const choice = within(section).queryByRole('combobox', { name: `Filter ${asked.field}` })
+  if (choice !== null && asked.condition === 'is' && asked.value !== undefined) {
+    const wanted = asked.value.toLowerCase()
+    const option = within(choice)
+      .getAllByRole('option')
+      .find((each) => each.textContent?.toLowerCase() === wanted || (each as HTMLOptionElement).value === asked.value)
+    if (option === undefined) throw new Error(`Filter ${asked.field} offers no ${asked.value}`)
+    await user.selectOptions(choice, option)
+    return
   }
-  await user.click(within(section).getByRole('button', { name: 'Apply' }))
+  const box = within(section).getByRole<HTMLInputElement>('textbox', { name: `Filter ${asked.field}` })
+  await user.clear(box)
+  await user.type(box, boxText(asked))
+  await user.keyboard('{Enter}')
+}
+
+/** The header box of the grid `heading` names over the column labelled `field`. */
+export function headerBox(heading: string, field: string): HTMLInputElement {
+  return within(gridSection(heading)).getByRole<HTMLInputElement>('textbox', { name: `Filter ${field}` })
 }
 
 /** The filter line of the grid `heading` names: a combobox, its accessible name the line's label. */

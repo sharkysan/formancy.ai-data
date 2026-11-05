@@ -25,7 +25,7 @@ import { ViewPicker } from './view-picker.js'
  * search is submitted with the Search button or Enter, never per keystroke,
  * and the hint names the fields it looks in -- the server's
  * `list.searchable`, by their labels. No search form when nothing is
- * searchable, and no filter panel when nothing is filterable (0104). The
+ * searchable, and no filter when nothing is filterable (0104). The
  * View picker before the filter, where the server offers views (0105): the
  * filter and the sort start as the default view's, or empty, and a view
  * picked sets both. Columns between them (0106), where the person orders

@@ -12,7 +12,7 @@ import type { Engine, Plane } from './test-plane.js'
 /*
  * A grid's filter typed as a line (`notes contains x and amount > 1`), on
  * both engines, against the real server: that the line becomes exactly the
- * terms the panel would have sent, in the list's body and in no URL; that
+ * terms a list request carries (0104), in the list's body and in no URL; that
  * each condition applied is a chip in plain words, removable on its own and
  * put back by Undo; that a line the page cannot read is said where it
  * fails and sends nothing, and one the server refuses is said on the
@@ -84,7 +84,7 @@ async function workspace(formId: string): Promise<User> {
 const filtersSent = (formId: string): ListFilterTerm[][] => listsSent(plane.sent, formId).map(({ body }) => body.filter)
 
 describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
-  // The line is read in the browser into the terms the panel sends: a
+  // The line is read in the browser into the terms a list request carries: a
   // contains as typed, `>` a range that leaves out its bound (0130). Its
   // words reach the server in the body only, and each condition applied
   // is a chip in plain words (watched failing with no line: no combobox

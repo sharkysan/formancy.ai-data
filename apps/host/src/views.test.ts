@@ -30,7 +30,7 @@ const PLACED: ListView = {
 const VIEWS = [LARGE, PLACED]
 
 describe('the view a filter and a sort are', () => {
-  // A filter is a set of conditions, one per field (0104): the panel lists
+  // A filter is a set of conditions, one per field (0104): the chips list
   // them in the order they were applied, so a person who applies a view's
   // conditions in another order has built that view (watched failing with
   // the filters compared as lists: null for the reordered conditions).
@@ -41,7 +41,7 @@ describe('the view a filter and a sort are', () => {
   })
 
   // A condition is the whole term: another bound, another operator, a
-  // contains in another case or with a space the panel sends as typed is
+  // contains in another case or with a space kept in quotes is
   // another request, so "Your own filter and sort" and not the view, whose
   // list could differ (watched failing with the terms compared by field and
   // operator alone: LARGE for a range from 999).

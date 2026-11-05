@@ -1,11 +1,11 @@
 /* ------------------------------------------------------------- the filter
  *
- * A grid's filter panel (0104, filter-panel.tsx): a row of its own in the
- * grid's toolbar, under the search -- Filter, the conditions applied, and
- * when open the panel's controls -- and the View picker before it, where the
- * server offers views (0105, view-picker.tsx). Room variables and
- * color-mix() of them only; every rule names a class of the panel's or the
- * picker's own, so nothing here selects inside .sheet or .grid-bench.
+ * A grid's filter (0104, grid-filter.tsx): a row of its own in the grid's
+ * toolbar, under the search -- the filter line and the conditions applied
+ * as chips (0131) -- and the View picker before it, where the server offers
+ * views (0105, view-picker.tsx). Room variables and color-mix() of them
+ * only; every rule names a class of the filter's or the picker's own, so
+ * nothing here selects inside .sheet or .grid-bench.
  */
 
 /* View beside its select and Show view after it, as Search is beside its
@@ -65,31 +65,8 @@
   min-width: 0;
 }
 
-.filter-block > .disclosure {
-  justify-self: start;
-}
-
-/* Field, Condition and the value side by side where they fit, each down to
-   its own row on a phone, and Apply after them. An outlined group: glass is
-   never nested in glass. */
-.filter-form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.25rem 0.75rem;
-  padding: 0.75rem;
-  border: 1px solid var(--edge);
-  border-radius: 12px;
-}
-
-.filter-form .field {
-  flex: 1 1 10rem;
-  margin: 0;
-}
-
-/* As the page's inputs are drawn (controls.css), and 1rem, so a phone does
-   not zoom on focus. The picker's as the panel's. */
-.filter-form select,
+/* The picker's select as the page's inputs are drawn (controls.css), and
+   1rem, so a phone does not zoom on focus. */
 .view-picker select {
   width: 100%;
   min-width: 0;
@@ -103,7 +80,6 @@
   font-size: 1rem;
 }
 
-.filter-form select:focus-visible,
 .view-picker select:focus-visible {
   outline: 2px solid var(--server);
   outline-offset: 2px;
@@ -118,21 +94,13 @@
   max-width: 100%;
 }
 
-.filter-form input {
-  font-size: 1rem;
-}
-
-.filter-form .button {
-  flex: none;
-}
-
 .filter-hint,
 .filter-problem {
   flex: 1 0 100%;
   margin: 0;
 }
 
-/* Why a draft is no condition yet: there before it speaks, out of the flow
+/* Why a line cannot be read: there before it speaks, out of the flow
    while it says nothing, as Download CSV's line is (records.css). */
 .filter-problem:empty {
   position: absolute;

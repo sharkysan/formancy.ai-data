@@ -9,7 +9,7 @@
 
 import { CUSTOMERS } from './plane.mjs'
 import { carryOn } from './workspace.mjs'
-import { describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
+import { dataRows, describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
 const trail = (page) => page.getByRole('navigation', { name: 'Breadcrumb', exact: true })
@@ -43,6 +43,27 @@ const recordsSize = (page) =>
     return { panel: of(panel, ['maxHeight', 'overflowY', 'position']), well: of(well, ['maxHeight', 'flexGrow', 'flexShrink', 'flexBasis', 'minHeight']) }
   })
 
+/**
+ * The Records panel's size once it holds still: three reads in a row the
+ * same, the grid's first row drawn. A layout draws the grid again, and its
+ * well's least height is its header's and a row's (record-grid.tsx's
+ * `fit`): a first page measures a header whose labels still wrap in
+ * columns not yet sized to their rows, and measures it again once they
+ * are. Read at once, the two layouts differed by that wrap, 135 and 139
+ * pixels, in Chromium and Firefox on CI.
+ */
+async function settledSize(page) {
+  await dataRows(records(page).getByRole('grid', { name: 'Records', exact: true }), page)
+    .first()
+    .waitFor(WITHIN)
+  const reads = []
+  await until(async () => {
+    reads.push(JSON.stringify(await recordsSize(page)))
+    return reads.length >= 3 && reads.slice(-3).every((read) => read === reads.at(-1))
+  }, 'the Records panel never held still').catch(() => null)
+  return recordsSize(page)
+}
+
 /** Enter on the first cell of a row, as a person at the keyboard opens one. */
 async function enterOn(page, locator) {
   const cell = locator.getByRole('gridcell').first()
@@ -60,9 +81,9 @@ async function aCustomer(page, at) {
   await records(page).getByRole('grid', { name: 'Records', exact: true }).waitFor(WITHIN)
   // Level 0 is Separate views' records view, sized as it is at this width: the panel and the grid's well.
   await page.getByRole('radio', { name: 'Separate views', exact: true }).check()
-  const separate = await recordsSize(page)
+  const separate = await settledSize(page)
   await page.getByRole('radio', { name: 'Drill down', exact: true }).check()
-  check("Drill down: its records are sized as Separate views' records", same(await recordsSize(page), separate))
+  check("Drill down: its records are sized as Separate views' records", same(await settledSize(page), separate))
   await enterOn(page, row(page, 'Records', at.name))
   await heading(page, `Customer k1:1,${String(at.no)}`).waitFor(WITHIN)
   check('Drill down: a customer is named in the trail by its name', same(await crumbs(page), ['Records', `Customer ${at.name}`]))
