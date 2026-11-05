@@ -38,7 +38,7 @@ export function filterByExample(headers: HeaderFilters | null, row: GridRow | un
 }
 
 /**
- * The button a focused cell shows: "=", titled for what it keeps. Its own
+ * The button a focused cell shows: an equals sign, drawn, titled for what it keeps. Its own
  * style attribute, in room variables, because no rule of host.css reaches
  * into a grid (0047), as a row's Delete is; 24 pixels a side, WCAG 2.5.8's
  * least. A pointer's way alone, out of the Tab order and out of the
@@ -47,19 +47,24 @@ export function filterByExample(headers: HeaderFilters | null, row: GridRow | un
  * cell, is the one the filter line's hint says.
  */
 const EXAMPLE_LOOK: CSSProperties = {
-  display: 'inline-grid',
+  // Out of the cell's flow, at its end: the cell is sized to its value,
+  // and a button in its line would wrap or push the value -- and the open
+  // row's bar -- once it appears.
+  position: 'absolute',
+  insetInlineEnd: 4,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  display: 'grid',
   placeItems: 'center',
   width: 24,
   height: 24,
-  marginInlineStart: 8,
   padding: 0,
   border: '1px solid var(--client)',
   borderRadius: 6,
-  background: 'transparent',
+  background: 'var(--ground)',
   color: 'var(--text)',
   font: 'inherit',
   lineHeight: 1,
-  verticalAlign: 'middle',
   cursor: 'pointer',
 }
 
@@ -90,7 +95,10 @@ export function ExampleButton({ cell, row, colId }: { cell: HTMLElement; row: Gr
       title={`Only rows where ${summaryOf(term, field)}`}
       onClick={() => filterByExample(headers, row, colId)}
     >
-      =
+      {/* Drawn, not written: a character here would be read into the cell's text. */}
+      <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
+        <path d="M2 4.5h8M2 7.5h8" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
     </button>
   )
 }

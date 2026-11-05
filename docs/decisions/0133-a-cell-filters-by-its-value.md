@@ -37,9 +37,12 @@ column offers that. Only a column the filter line may name offers one,
 and only where the line could say it: a timestamp offers no equality, and
 a lookup's cell shows a label whose value it is not.
 
-**A cell that has the keyboard shows a button.** "=", titled "Only rows
-where Status is “placed”", in the cell's own style attribute as a row's
-Delete is (no rule of host.css reaches into a grid), 24 pixels a side: a
+**A cell that has the keyboard shows a button.** An equals sign, drawn
+rather than written so nothing of it is in the cell's text, titled "Only
+rows where Status is “placed”", in its own style attribute as a row's
+Delete is (no rule of host.css reaches into a grid), placed over the
+cell's end out of its flow, so the cell sized to its value neither wraps
+nor grows when it appears, 24 pixels a side: a
 pointer's way to the same thing, out of the Tab order and out of the
 accessibility tree, since inside the cell its name would be read with the
 cell's every time the keyboard reached it. A click on it is the button's,
