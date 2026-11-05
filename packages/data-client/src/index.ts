@@ -23,6 +23,7 @@ export type {
   FilterCondition,
   FilterDays,
   FilterInput,
+  FilterLineRead,
   FilterOffer,
   FilterOp,
   FormMenu,
@@ -33,6 +34,10 @@ export type {
   ListFilterTerm,
   ListSortTerm,
   ListView,
+  LineCompletion,
+  LineField,
+  LineOption,
+  LineRefusal,
   LookupResult,
   LookupRow,
   OwnViews,
@@ -44,4 +49,13 @@ export type {
   RecordListQuery,
   StateMoves,
 } from '@formancy/data-core'
-export { EXPORT_MAX_BYTES, exportFileName, fieldHeading, LIST_PAGE_SIZE } from '@formancy/data-core'
+export {
+  completeFilterLine,
+  EXPORT_MAX_BYTES,
+  exportFileName,
+  fieldHeading,
+  lineNames,
+  LIST_PAGE_SIZE,
+  parseFilterLine,
+  printFilterLine,
+} from '@formancy/data-core'
