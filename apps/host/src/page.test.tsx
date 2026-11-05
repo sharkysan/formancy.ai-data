@@ -28,7 +28,9 @@ import {
   RENDERERS,
   said,
   save,
+  showChild,
   shows,
+  showTab,
   signIn,
   statuses,
   unknownNotice,
@@ -190,6 +192,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
 
     await load(user, EDGES.seededOrder)
     await shows('Angular', 'Customer', 'Muster AG')
+    // The order's lines, a tab beside it (0142): the row of tabs and the panel shown held to the floor.
+    await showChild(user, 'Order line')
     await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
     expect(await floor('a record and its lines')).toEqual(CLEAN('a record and its lines'))
 
@@ -203,6 +207,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     )
     expect(await floor('a line open')).toEqual(CLEAN('a line open'))
 
+    await showTab(user, `Order ${EDGES.seededOrder}`)
     await answer(user, 'React', 'Notes', 'a draft on the floor')
     await newRecord(user)
     await waitFor(() => expect(unsavedNotice()).not.toBeNull())
@@ -275,6 +280,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await keep(`Delete Order ${other}?`)
 
     if (connection === 'ms') {
+      await showChild(user, 'Order line')
       const line = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
       await waitFor(() => expect(dataRows(line).length).toBeGreaterThan(0), { timeout: 15_000 })
       await user.click(dataCell(line))
@@ -306,6 +312,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await screen.findByRole('region', { name: 'Not deleted' }, { timeout: 15_000 })
     expect(await floor('not deleted')).toEqual(CLEAN('not deleted'))
     await user.click(within(screen.getByRole('region', { name: 'Not deleted' })).getByRole('button', { name: 'Load the saved record' }))
+    // On SQL Server the lines' tab was shown last; the record loaded again opens on its own (0142).
+    await showTab(user, `Order ${kept}`)
     await shows('Angular', 'Notes', `${notes} moved`)
 
     lose = true
@@ -354,6 +362,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(await floor('a file refused')).toEqual(CLEAN('a file refused'))
 
     await load(user, EDGES.seededOrder)
+    await showChild(user, 'Order line')
     await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), { timeout: 15_000 })
     await user.click(exportButton('Order line'))
     await waitFor(() => expect(exportLine('Order line').textContent).toBe(`Made ${lines}.csv; your browser saves it.`), { timeout: 15_000 })

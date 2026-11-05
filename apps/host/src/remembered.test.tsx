@@ -5,7 +5,7 @@ import { gridKey } from './prefs.js'
 import { audit, unnamed } from './test-accessible.js'
 import { applied, applyCondition, listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, gridSection, gridStatus, load, loaded, mount, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, gridSection, gridStatus, load, loaded, mount, showChild, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -347,6 +347,8 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
     const orderLabels = await labelsOf(engine.formId)
     const user = await workspace(engine.formId)
     await load(user, String(records[0]))
+    // No record was open: the first Delivery tab is the loaded order's (0142).
+    await showChild(user, 'Delivery')
     await waitFor(() => expect(within(gridSection('Delivery')).queryByRole('grid', { name: 'Delivery' })).not.toBeNull(), ARRIVES)
     await answeredOnce('Delivery')
     await openColumns(user, 'Delivery')
@@ -358,6 +360,7 @@ describe.each(ENGINES)('a grid remembered on $engine', (engine) => {
 
     await load(user, String(records[1]))
     await loaded(String(records[1]))
+    await showChild(user, 'Delivery')
     await answeredOnce('Delivery')
     await headed('Delivery', arranged)
     await openColumns(user, 'Delivery')

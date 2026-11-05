@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
-import { answeredOnce, chooseForm, dataCell, dataRows, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
+import { answeredOnce, chooseForm, dataCell, dataRows, gridSection, mount, searchRecords, showChild, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -15,7 +15,9 @@ import type { Engine, Plane } from './test-plane.js'
  * buttons back to each level above. On both engines, against the real
  * server, through the child forms `startPlane({ children: true,
  * deliveries: true })` publishes: an order's lines and deliveries, and an
- * employee's employees and the orders it created.
+ * employee's employees and the orders it created. A level's child sections
+ * are tabs beside its record (0142), each pressed before its section is
+ * used (`showChild`).
  *
  * Found by role and accessible name. What the accessibility tree cannot
  * answer is read off the DOM, each where it is made: `location.hash`, which
@@ -163,6 +165,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     expect(screen.queryByRole('region', { name: 'Records' })).toBeNull()
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=record&level=1`)
 
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
@@ -195,6 +198,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(line), ARRIVES)
@@ -230,6 +234,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), ' ')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await user.click(within(await rowOf('Order line', '1')).getAllByRole('gridcell')[0] as HTMLElement)
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
@@ -245,6 +250,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId, held.fetch)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
@@ -267,6 +273,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId, held.fetch)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
@@ -304,6 +311,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
       within(await waitFor(() => screen.getByRole('region', { name: `Delete Order ${order}?` }), ARRIVES)).getByRole('button', { name: 'Delete it' }),
     )
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[0] ?? ''}`), ARRIVES)
@@ -359,6 +367,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Delivery')
     await enterRowWith(user, 'Delivery', `${words} Post`)
     await waitFor(() => expect(trail()).toEqual(['Records', `Order ${order}`, `Delivery ${words} Post`]), ARRIVES)
 
@@ -429,6 +438,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '2', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${lines[1] ?? ''}`), ARRIVES)
@@ -448,6 +458,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     // The order deleted beside the page, its lines with it: the line form
     // offers no delete of its own on PostgreSQL (0050), the order's does.
@@ -482,6 +493,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     const user = await drilling(engine.formId, held.fetch)
     await searchRecords(user, words, [order.slice(3)])
     await pressOn(user, 'Records', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
@@ -539,9 +551,11 @@ async function field(heading: string, label: RegExp): Promise<HTMLInputElement> 
 /** Down from employee 1 to the approved order's line: level 3, with the keyboard on its heading. */
 async function toLine(user: User, order: string, line: string): Promise<void> {
   await pressOn(user, 'Records', '1', '{Enter}')
+  await showChild(user, 'Order, Approved by')
   await answeredOnce('Order, Approved by')
   await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
   await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await pressOn(user, 'Order line', '1', '{Enter}')
   await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
@@ -594,9 +608,12 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     const third = await employeeUnder(engine, 'k1:2', stamp('third'))
     const user = await drilling(engine.employees)
     await pressOn(user, 'Records', '1', '{Enter}')
+    await showChild(user, 'Employee')
     await answeredOnce('Employee')
     await pressOn(user, 'Employee', '2', '{Enter}')
     await waitFor(() => expect(trail()).toHaveLength(3), ARRIVES)
+    // The level's own tabs, as the record's (0142): its Employee section is drawn once its tab is shown.
+    await showChild(user, 'Employee')
     const cell = await waitFor(() => {
       const found = screen
         .getAllByRole('grid', { name: 'Employee' })
@@ -700,8 +717,10 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     const { order } = await approvedOrder(engine)
     const user = await drilling(engine.employees)
     await pressOn(user, 'Records', '1', '{Enter}')
+    await showChild(user, 'Order, Approved by')
     await answeredOnce('Order, Approved by')
     await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
     await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
@@ -736,6 +755,7 @@ describe.each(ENGINES)('Drill down, deep, on $engine', (engine) => {
     const name = await firstEmployee(engine)
     const user = await drilling(engine.employees)
     await pressOn(user, 'Records', '1', '{Enter}')
+    await showChild(user, 'Employee')
     await answeredOnce('Employee')
     await user.click(within(gridSection('Employee')).getByRole('button', { name: 'New Employee' }))
     await waitFor(() => expect(trail()).toEqual(['Records', `Employee ${name}`, 'New Employee']), ARRIVES)
@@ -814,6 +834,7 @@ function confirmation(noun: string, record: string): HTMLElement {
 async function toOrderLine(user: User, words: string, order: string, line: string, no = '1'): Promise<void> {
   await searchRecords(user, words, [order.slice(3)])
   await pressOn(user, 'Records', order.slice(3), '{Enter}')
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await pressOn(user, 'Order line', no, '{Enter}')
   await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
@@ -955,6 +976,7 @@ describe.each(ENGINES.filter((engine) => engine.connection === 'ms'))('Drill dow
     await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
     await user.type(quantity, '6')
     await user.click(screen.getByRole('radio', { name: 'Side by side' }))
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await user.click(within(gridSection('Order line')).getByRole('button', { name: `Delete Order line ${line}` }))
     const asked = await waitFor(() => confirmation('Order line', line), ARRIVES)
@@ -1003,11 +1025,16 @@ describe.each(ENGINES)('Drill down on a phone, and the floor, on $engine', (engi
     await floor(0)
     await pressOn(user, 'Records', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
-    for (const section of ['Employee', 'Order, Created by', 'Order, Approved by']) await answeredOnce(section)
+    // Each section in its tab (0142), drawn once the tab is shown; the floor read with the last one shown.
+    for (const section of ['Employee', 'Order, Created by', 'Order, Approved by']) {
+      await showChild(user, section)
+      await answeredOnce(section)
+    }
     await floor(1)
     await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
-    // A level's sections are drawn once its form's children are known, a moment after the level.
+    // A level's tabs are drawn once its form's children are known, a moment after the level.
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await floor(2)
     await pressOn(user, 'Order line', '1', '{Enter}')

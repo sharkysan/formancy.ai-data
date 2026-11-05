@@ -93,8 +93,11 @@ async function aCustomer(page, at) {
 
 async function anOrderLine(page, at) {
   const { check } = at
+  // Each level's child forms are tabs beside its record (0142), a section drawn once its tab is shown.
+  await page.getByRole('tab', { name: 'Order', exact: true }).click(WITHIN)
   await enterOn(page, row(page, 'Order', at.order.slice(3)))
   await heading(page, `Order ${at.order}`).waitFor(WITHIN)
+  await page.getByRole('tab', { name: 'Order line', exact: true }).click(WITHIN)
   await enterOn(page, row(page, 'Order line', '1'))
   await heading(page, `Order line ${at.line}`).waitFor(WITHIN)
   const all = ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]

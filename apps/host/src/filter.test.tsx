@@ -16,6 +16,7 @@ import {
   load,
   mount,
   recordKeys,
+  showChild,
   signIn,
   stamp,
 } from './test-host.js'
@@ -339,6 +340,8 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const kept = keeping()
     const user = await workspace(plane.fetch, engine.formId, kept.save)
     await load(user, record)
+    // No record was open: the first Delivery tab is the loaded order's (0142).
+    await showChild(user, 'Delivery')
     await waitFor(() => expect(within(gridSection('Delivery')).queryByRole('grid', { name: 'Delivery' })).not.toBeNull(), ARRIVES)
     await answeredOnce('Delivery')
     plane.sent.length = 0

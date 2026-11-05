@@ -254,9 +254,11 @@ export function workspaceJourney(plane, { check }, run) {
         check('Enter on a row: the keyboard is on the record', await focusedOn(page, page.getByRole('heading', { level: 3, name: `Order ${run.record}` })))
         // Both renderers from here on: the gate walks with Both, so 0029's promise is measured in each.
         await page.getByRole('radio', { name: 'Both', exact: true }).check()
-        await answered(page.getByRole('region', { name: 'Order line', exact: true }), /^Order line rows 1–2\./)
         for (const name of ['React', 'Angular'])
           await page.getByRole('region', { name, exact: true }).getByRole('combobox', { name: 'Customer' }).waitFor(WITHIN)
+        // Its lines are a tab beside it (0142), listed once the tab is shown: this state is the lines' tab.
+        await page.getByRole('tab', { name: 'Order line', exact: true }).click()
+        await answered(page.getByRole('region', { name: 'Order line', exact: true }), /^Order line rows 1–2\./)
 
         // One Tab stop: from Next rows into the grid, on the open row, then out to the separator.
         const next = records(page).getByRole('button', { name: 'Next rows' })

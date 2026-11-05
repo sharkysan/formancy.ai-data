@@ -19,8 +19,9 @@ export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: strin
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
  * to its row, Duplicate record where the form offers a copy (0107), Delete
  * record where it offers delete and its confirmation in place (0053), a
- * status line, the renderer switch, opening by token, the
- * record's form in the renderers chosen, and the child sections below.
+ * status line, the renderer switch, opening by token; then the record's
+ * form in the renderers chosen, which `body` places among the tabs of its
+ * child sections (0142).
  *
  * Only the chosen renderer's form is mounted (the person's decision of
  * 2026-10-10); "Both" draws them side by side where there is room for two
@@ -60,7 +61,7 @@ export function Detail({
   onDelete,
   deleteRegion,
   offer,
-  children,
+  body,
 }: {
   formTitle: string
   formId: string
@@ -100,7 +101,8 @@ export function Detail({
   deleteRegion: ReactNode
   /** Open under each lookup of the record (0141). */
   offer: LookupOffer
-  children: ReactNode
+  /** What follows the header: the record's panes, given, in the record's tab beside its child sections' (record-tabs.tsx), and the heading that names that tab. */
+  body: (panes: ReactElement, heading: Said) => ReactNode
 }): ReactElement {
   const separate = layout === 'separate'
   const shown = renderersOf(renderer)
@@ -177,22 +179,24 @@ export function Detail({
           <RecordBar open={tokenOpen} onToggle={onTokenToggle} refusal={loadRefusal} loadRef={loadRef} onLoad={onLoad} />
         </div>
       </div>
-      <div className="panes" data-count={shown.length} hidden={open === null}>
-        {sessions
-          .filter((session) => shown.includes(session.renderer))
-          .map((session) => (
-            <Pane
-              key={session.renderer}
-              session={session}
-              title={formTitle}
-              idBase={formId}
-              onAnswer={(result) => onAnswer(result, session)}
-              onLoaded={() => onLoaded(session)}
-              offer={offer}
-            />
-          ))}
-      </div>
-      {children}
+      {body(
+        <div className="panes" data-count={shown.length} hidden={open === null}>
+          {sessions
+            .filter((session) => shown.includes(session.renderer))
+            .map((session) => (
+              <Pane
+                key={session.renderer}
+                session={session}
+                title={formTitle}
+                idBase={formId}
+                onAnswer={(result) => onAnswer(result, session)}
+                onLoaded={() => onLoaded(session)}
+                offer={offer}
+              />
+            ))}
+        </div>,
+        heading,
+      )}
     </section>
   )
 }

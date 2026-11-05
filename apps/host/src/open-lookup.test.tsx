@@ -15,6 +15,7 @@ import {
   newRecord,
   RENDERERS,
   searchRecords,
+  showChild,
   signIn,
   stamp,
   unsavedNotice,
@@ -332,6 +333,7 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     await searchRecords(user, words, [order.slice(3)])
     await enterRow(user, 'Records', order.slice(3))
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await enterRow(user, 'Order line', '1')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)

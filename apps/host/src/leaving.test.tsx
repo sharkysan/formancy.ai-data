@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answer, dataCell, formLink, gridSection, gridStatus, load, newRecord, openForm, shows, unsavedNotice } from './test-host.js'
+import { answer, dataCell, formLink, gridSection, gridStatus, load, loaded, newRecord, openForm, showChild, shows, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -155,7 +155,9 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
   test("a child row's draft is asked about before another line replaces it", async () => {
     const user = await openForm(plane, engine.formId)
     await load(user, EDGES.seededOrder)
-    // The lines of the loaded order: the section is drawn again for each parent, so it is found again.
+    // The lines of the loaded order, in their tab once the order has opened: the new record's stands until then (0142).
+    await loaded(EDGES.seededOrder)
+    await showChild(user, 'Order line')
     await waitFor(() => expect(gridStatus('Order line')?.textContent).toMatch(/^Order line rows 1–/), ARRIVES)
     const lines = gridSection('Order line')
     await user.click(within(lines).getByRole('button', { name: 'New Order line' }))

@@ -13,6 +13,7 @@ import {
   mount,
   rendered,
   searchRecords,
+  showChild,
   signIn,
   stamp,
   unsavedNotice,
@@ -389,7 +390,7 @@ test("a child grid's row Delete asks under that grid, and the keyboard goes to i
   const user = await workspace(engine.formId)
   await searchRecords(user, notes, [record.slice(3)])
   await user.click(within(row('Records', record.slice(3))).getAllByRole('gridcell')[0] as HTMLElement)
-  await screen.findByRole('region', { name: 'Order line' }, ARRIVES)
+  await showChild(user, 'Order line')
   expect(await answeredOnce('Order line')).toBe('Order line rows 1–2.')
   await user.click(within(row('Order line', '2')).getByRole('button', { name: `Delete Order line ${record},2` }))
   await waitFor(() => expect(focusedName()).toBe(`Delete Order line ${record},2?`))

@@ -4,7 +4,7 @@ import type { ListView, PublishedForm, RecordListQuery } from '@formancy/data-cl
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, dataCell, gridSection, gridStatus, load, mount, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, dataCell, gridSection, gridStatus, load, mount, showChild, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -293,6 +293,8 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     if (!made.ok) throw new Error(made.message)
     const user = await workspace(engine.formId)
     await load(user, String(record))
+    // No record was open: the first Delivery tab is the loaded order's (0142).
+    await showChild(user, 'Delivery')
     await waitFor(() => expect(within(gridSection('Delivery')).queryByRole('grid', { name: 'Delivery' })).not.toBeNull(), ARRIVES)
     await answeredOnce('Delivery')
     const labels = await labelsOf(engine.deliveries, 'order')
