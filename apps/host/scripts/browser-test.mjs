@@ -83,8 +83,10 @@
 //     refuses is its sentence on the grid's line, the value still in its box
 //     and no Ask again; Clear filter puts the keyboard on its Undo; and the
 //     filter line completes the field begun in a listbox over the grid,
-//     applies what it reads with Enter, in the body and in no URL, and a
-//     chip removed gives the keyboard to its Undo;
+//     applies what it reads with Enter, in the body and in no URL, a chip
+//     removed gives the keyboard to its Undo, and a column header's box is
+//     reached from its header with Down and Enter and applies its
+//     condition (0132);
 //   - a form's list views (0105): the View picker and Show view between
 //     Search and Filter in the keyboard's order; a choice in the select,
 //     the change an arrow fires on a closed select, sends nothing; Show

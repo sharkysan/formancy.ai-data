@@ -217,6 +217,34 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     expect(document.activeElement?.getAttribute('role')).toBe('gridcell')
   })
 
+  // A column's header box is the line's condition on that column: typed
+  // there it is applied as the line would send it, and the line and the
+  // chips say it; a chip removed empties the box (watched failing with no
+  // box under the headers).
+  test('filters a column from its header’s box, the line and the chips saying it', async () => {
+    const notes = stamp('box')
+    const orders = await freshOrders(engine, notes, ['1', '2'])
+    const user = await workspace(engine.formId)
+    await typeFilter(user, 'Records', `notes contains ${notes}`)
+    await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
+    plane.sent.length = 0
+    const amount = within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' })
+    await user.type(amount, '> 1{Enter}')
+    await waitFor(() => expect(recordKeys()).toEqual(orders.slice(1)), ARRIVES)
+    expect(filtersSent(engine.formId)).toEqual([
+      [
+        { field: 'notes', op: 'contains', text: notes },
+        { field: 'amount', op: 'range', from: '1', to: null, exclusive: 'from' },
+      ],
+    ])
+    expect(filterLine('Records').value).toBe(`notes contains ${notes} and amount > 1`)
+    await listsApplied('Records', [`Notes contains “${notes}”`, 'Amount is over 1'])
+    expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Notes' }).value).toBe(notes)
+    expect(await floor('a header box applied')).toEqual(CLEAN('a header box applied'))
+    await user.click(chipRemove('Records', 'Amount is over 1'))
+    await waitFor(() => expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(''), ARRIVES)
+  })
+
   // A list nothing matches is no dead end: the page offers to try it
   // without the last condition, which Undo puts back like any other
   // removal -- but not where a search is what matched nothing, whose way

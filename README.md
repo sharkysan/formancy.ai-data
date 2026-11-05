@@ -722,6 +722,12 @@ edit you leave unapplied is dropped when the filter changes elsewhere. `/`
 puts the keyboard on the Records line, and Esc twice gives it back to the
 grid
 ([0131](./docs/decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)).
+Under each column's header a box takes the line's condition on that
+column without its name -- `> 1000`, or a bare value, found anywhere in
+text and equal to anything else -- applied with Enter or on leaving it,
+and a select of its values for a state or a yes-or-no column; the
+keyboard reaches it from the header with Down and Enter
+([0132](./docs/decisions/0132-each-column-header-filters-its-column.md)).
 Each condition applied is a chip in words -- "Amount is over 1000" -- with
 its own Remove, and Clear filter removes them all; either offers Undo
 until the filter changes some other way, and a list nothing matches

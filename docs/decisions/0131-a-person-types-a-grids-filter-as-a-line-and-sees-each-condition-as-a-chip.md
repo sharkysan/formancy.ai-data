@@ -1,6 +1,6 @@
 # 0131 — A person types a grid's filter as a line, and sees each condition as a chip
 
-- **Status:** accepted; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): the panel stays, as Build a condition, and the conditions it listed are chips
+- **Status:** accepted; extends [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md): the panel stays, as Build a condition, and the conditions it listed are chips; extended by [0132](0132-each-column-header-filters-its-column.md): a box under each column's header is the line's condition on that column
 - **Date:** 2026-11-05
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/filter-line.test.ts` --

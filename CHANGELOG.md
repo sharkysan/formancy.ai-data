@@ -18,6 +18,15 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **Each column header filters its column** (0132). Why: the place a
+  person looks for "only the amounts over 1000" is the Amount column. A
+  box under each header the line may name takes the line's condition on
+  that column without its name (`> 1000`, or a bare value), applied with
+  Enter or on leaving it; a state or a yes-or-no column offers its values
+  in a select. The line, the chips and the boxes are one filter. What you
+  notice: a row of boxes under the headers, reached from a header with
+  Down and Enter, and `@formancy/data-client` exports `headerCondition`
+  and `headerText`.
 - **A person types a grid's filter as a line, and sees each condition as a
   chip** (0131). Why: a person who knows they want the placed orders over
   1000 had four choices and Apply to make for each condition, and asked for
