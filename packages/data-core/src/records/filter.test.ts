@@ -130,7 +130,7 @@ describe('columnFilter', () => {
   test('plans a range of numbers or dates, inclusive', () => {
     expect(planned(AMOUNT, { op: 'range', from: '10', to: null })).toEqual({
       ok: true,
-      filter: { op: 'range', column: 'c', type: AMOUNT, from: '10.0000', to: null, before: null },
+      filter: { op: 'range', column: 'c', type: AMOUNT, from: '10.0000', above: null, to: null, before: null },
     })
     expect(planned(DATE, { op: 'range', from: '2026-01-01', to: '2026-01-31' })).toMatchObject({
       ok: true,
@@ -147,7 +147,7 @@ describe('columnFilter', () => {
   test('plans a range of timestamps as whole days', () => {
     expect(planned(INSTANT, { op: 'range', from: '2026-10-01', to: '2026-10-31' })).toEqual({
       ok: true,
-      filter: { op: 'range', column: 'c', type: INSTANT, from: '2026-10-01T00:00:00Z', to: null, before: '2026-11-01T00:00:00Z' },
+      filter: { op: 'range', column: 'c', type: INSTANT, from: '2026-10-01T00:00:00Z', above: null, to: null, before: '2026-11-01T00:00:00Z' },
     })
     expect(planned(WALL_CLOCK, { op: 'range', from: null, to: '2024-02-28' })).toMatchObject({
       ok: true,
@@ -157,6 +157,73 @@ describe('columnFilter', () => {
       ok: false,
       message: 'A value given for c is not one it can hold.',
     })
+  })
+
+  // `>` and `<` in a filter line (0130): an exclusive bound is the column's
+  // own strict comparison, never an inclusive bound moved by one, which a
+  // decimal of a scale the page does not know could not be, and which
+  // would print back as something the person never typed.
+  test('plans an exclusive bound of a number or a date as a strict comparison', () => {
+    expect(planned(INT32, { op: 'range', from: '1000', to: null, exclusive: 'from' })).toEqual({
+      ok: true,
+      filter: { op: 'range', column: 'c', type: INT32, from: null, above: '1000', to: null, before: null },
+    })
+    expect(planned(INT32, { op: 'range', from: '1', to: '9', exclusive: 'both' })).toMatchObject({
+      ok: true,
+      filter: { from: null, above: '1', to: null, before: '9' },
+    })
+    expect(planned(AMOUNT, { op: 'range', from: '0', to: '10', exclusive: 'from' })).toMatchObject({
+      ok: true,
+      filter: { from: null, above: '0.0000', to: '10.0000', before: null },
+    })
+    expect(planned(DATE, { op: 'range', from: null, to: '2026-11-01', exclusive: 'to' })).toMatchObject({
+      ok: true,
+      filter: { from: null, above: null, to: null, before: '2026-11-01' },
+    })
+    expect(planned(INT32, { op: 'range', from: '1.5', to: null, exclusive: 'from' })).toEqual({
+      ok: false,
+      message: 'A value given for c is not one it can hold.',
+    })
+  })
+
+  // A timestamp's bounds are days: after a day is from the next midnight
+  // on, and before a day is below its own midnight, so a row late on the
+  // day named is outside either way.
+  test('plans an exclusive day of a timestamp from the midnight it means', () => {
+    expect(planned(INSTANT, { op: 'range', from: '2026-10-01', to: null, exclusive: 'from' })).toEqual({
+      ok: true,
+      filter: { op: 'range', column: 'c', type: INSTANT, from: '2026-10-02T00:00:00Z', above: null, to: null, before: null },
+    })
+    expect(planned(INSTANT, { op: 'range', from: null, to: '2026-10-31', exclusive: 'to' })).toMatchObject({
+      ok: true,
+      filter: { from: null, above: null, before: '2026-10-31T00:00:00Z' },
+    })
+    expect(planned(WALL_CLOCK, { op: 'range', from: '2026-10-01', to: '2026-10-03', exclusive: 'both' })).toMatchObject({
+      ok: true,
+      filter: { from: '2026-10-02T00:00:00', above: null, to: null, before: '2026-10-03T00:00:00' },
+    })
+    // Before the first day is a real range, below a midnight both engines
+    // store: nothing on SQL Server, and on PostgreSQL its days before the
+    // common era and -infinity, which a refusal would leave out of reach.
+    expect(planned(INSTANT, { op: 'range', from: null, to: '0001-01-01', exclusive: 'to' })).toMatchObject({
+      ok: true,
+      filter: { from: null, before: '0001-01-01T00:00:00Z' },
+    })
+  })
+
+  // After the last day SQL Server stores there is no midnight to compare
+  // with: said in a sentence rather than planned as a range that holds
+  // every value, which is what a missing lower end would mean. The
+  // sentence never says nothing comes after it, which PostgreSQL's later
+  // years and infinity would make false, and names the range that finds
+  // them, on an instant and a wall-clock timestamp alike.
+  test('says where a range after the last day SQL Server stores may start', () => {
+    for (const column of [INSTANT, WALL_CLOCK])
+      expect(planned(column, { op: 'range', from: '9999-12-31', to: null, exclusive: 'from' })).toEqual({
+        ok: false,
+        message:
+          'A range on c cannot start after 9999-12-31, since the next midnight is past what SQL Server stores. From 9999-12-31 on finds that day and anything later.',
+      })
   })
 
   // 9999-12-31 has no next midnight SQL Server stores, so a range to it has
@@ -206,6 +273,37 @@ describe('readFilter', () => {
       ],
     })
     expect(readFilter([{ column: 'notes', op: 'null' }], 'column')).toEqual({ ok: true, filter: [{ column: 'notes', op: 'null' }] })
+  })
+
+  // A range may leave out its bounds' own values (0130), and says which:
+  // `exclusive` is read as given and never filled in, so a body without it
+  // means what it always meant.
+  test('reads which of a range’s bounds are exclusive', () => {
+    const range = { field: 'amount', op: 'range', from: '1000', to: null, exclusive: 'from' }
+    expect(readFilter([range], 'field')).toEqual({ ok: true, filter: [range] })
+    const both = { column: 'n', op: 'range', from: '1', to: '9', exclusive: 'both' }
+    expect(readFilter([both], 'column')).toEqual({ ok: true, filter: [both] })
+  })
+
+  // An exclusive bound that is not there would be read as no bound at all,
+  // and a word other than the three would be a property half-read.
+  test('refuses an exclusive bound the range does not have', () => {
+    expect(readFilter([{ field: 'amount', op: 'range', from: '1', to: null, exclusive: 'to' }], 'field')).toEqual({
+      ok: false,
+      code: 'malformed',
+      message: 'An exclusive to on amount needs a to.',
+    })
+    expect(readFilter([{ field: 'amount', op: 'range', from: null, to: '1', exclusive: 'both' }], 'field')).toEqual({
+      ok: false,
+      code: 'malformed',
+      message: 'An exclusive from on amount needs a from.',
+    })
+    for (const exclusive of ['neither', true, null, 'From'])
+      expect(readFilter([{ field: 'amount', op: 'range', from: '1', to: '2', exclusive }], 'field'), String(exclusive)).toMatchObject({
+        ok: false,
+        code: 'malformed',
+      })
+    expect(readFilter([{ field: 'amount', op: 'equals', value: '1', exclusive: 'from' }], 'field')).toMatchObject({ ok: false, code: 'malformed' })
   })
 
   // Anything else would be half-read, and a property ignored today is one

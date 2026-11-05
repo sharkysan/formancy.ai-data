@@ -414,6 +414,26 @@ describe('views relative to today and to the person (0125)', () => {
     ])
   })
 
+  // A view keeps which bounds leave out their own value (0130) through
+  // being read, fitted at a write and resolved for a person: rebuilt
+  // without it, "since last week" would turn into "from last week on" on
+  // the way to the page.
+  test('keeps an exclusive bound through being stored and offered', () => {
+    const since: StoredListView = {
+      name: 'Since last week',
+      filter: [{ field: 'order_date', op: 'range', from: { today: -7 }, to: null, exclusive: 'from' }],
+      sort: [],
+    }
+    expect(viewShapeProblems([since])).toEqual([])
+    expect(viewProblems([since], PG_ORDER)).toEqual([])
+    expect(viewsFor([since], actor(['clerk'], { tenant: '1' }), DAY)[0]?.filter).toEqual([
+      { field: 'order_date', op: 'range', from: '2026-10-25', to: null, exclusive: 'from' },
+    ])
+    expect(viewShapeProblems(stored({ field: 'order_date', op: 'range', from: null, to: { today: 0 }, exclusive: 'from' }))).toEqual([
+      '/views/0/filter/0: An exclusive from on order_date needs a from.',
+    ])
+  })
+
   // The day is UTC's, whatever the server's zone: a minute before
   // midnight in UTC is still that day, and a minute after is the next.
   // Watched failing with the day read in the local zone, in Europe/Zurich:

@@ -284,8 +284,12 @@ existed would be documented and inert.
   A list's `filter` is the person's own conditions on its fields
   ([0104](../../docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)): a
   list of `{ field, op, … }`, each field once, every condition holding --
-  `{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
-  `null` and not both, each inclusive, `{ op: 'contains', text }`, and
+  `{ op: 'equals', value }`, `{ op: 'range', from, to, exclusive? }` with
+  either bound `null` and not both, each inclusive unless `exclusive` --
+  `from`, `to` or `both` -- leaves it out
+  ([0130](../../docs/decisions/0130-a-filters-range-may-leave-out-either-bounds-own-value.md)),
+  a timestamp's still whole days, after a day from the next midnight on and
+  before a day below its own, `{ op: 'contains', text }`, and
   `{ op: 'null' }` or `{ op: 'not-null' }`, every value as text. What each
   field offers is `list.filterable`, one `{ field, operators, input, days }` per
   readable column field, from data-core's `filterOffer`: equals and

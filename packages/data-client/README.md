@@ -55,7 +55,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
-`FilterOp`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`, `StateMoves`,
+`FilterOp`, `RangeExclusive`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`, `StateMoves`,
 `LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
 `EXPORT_MAX_BYTES`, `exportFileName` and `fieldHeading` are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
@@ -94,8 +94,9 @@ page after it is asked for as `after` (0108); a page without one, from a
 server older than that, is `unexpected`, and a page after a row that is
 gone is refused `cursor-gone`, the first page being where to start again. `filter` is a
 list of `{ field, op, … }`, each field once, every condition holding:
-`{ op: 'equals', value }`, `{ op: 'range', from, to }` with either bound
-`null`, `{ op: 'contains', text }`, `{ op: 'null' }` or
+`{ op: 'equals', value }`, `{ op: 'range', from, to, exclusive? }` with
+either bound `null`, each inclusive unless `exclusive` -- `from`, `to` or
+`both` -- leaves it out (0130), `{ op: 'contains', text }`, `{ op: 'null' }` or
 `{ op: 'not-null' }`, every value as the text a person typed. The server
 spells it as the column holds it, and refuses a condition `filterable`
 does not offer, or a value its column cannot hold, 400 `not-filterable`

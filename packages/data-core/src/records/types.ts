@@ -112,9 +112,10 @@ export type RangeFilterType = Extract<NormalizedType, { kind: 'integer' | 'decim
  * - `equals`: the column's canonical value is exactly `value`, as a row
  *   filter compares it (0028) -- text unit for unit, whatever the column's
  *   collation -- or the boolean `true` or `false`.
- * - `range`: at least `from`, at most `to`, below `before`; a bound that is
- *   `null` is not there. An integer, a decimal or a date has `from` and
- *   `to`, values its column can hold. A timestamp has `from` and `before`,
+ * - `range`: at least `from`, above `above`, at most `to`, below `before`;
+ *   a bound that is `null` is not there, and a range has at most one lower
+ *   and one upper bound. An integer, a decimal or a date has any of them,
+ *   values its column can hold (0130). A timestamp has `from` and `before`,
  *   midnights spelled `YYYY-MM-DDT00:00:00`, with `Z` for an instant: its
  *   range is whole days, compared with the stored value, never with the
  *   value cut to the second a page shows.
@@ -124,7 +125,7 @@ export type RangeFilterType = Extract<NormalizedType, { kind: 'integer' | 'decim
  */
 export type RecordFilter =
   | { op: 'equals'; column: string; type: EqualsFilterType; value: string }
-  | { op: 'range'; column: string; type: RangeFilterType; from: string | null; to: string | null; before: string | null }
+  | { op: 'range'; column: string; type: RangeFilterType; from: string | null; above: string | null; to: string | null; before: string | null }
   | { op: 'contains'; column: string; type: Extract<LookupSearchType, { kind: 'text' }>; text: string }
   | { op: 'null' | 'not-null'; column: string }
 

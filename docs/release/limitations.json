@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:0c730cf1d6d9e8c9ebfe905b310350bf1d1c42039c25e1fd027d519488614764",
+      "reviewed": "sha256:7b2eb4039e128ce6283720d0e1f8729c05be0591490aff079e38eeb4b6ddbbd6",
       "limitations": [
         {
           "area": "forms",
@@ -3677,6 +3677,24 @@
           "area": "server",
           "says": "A server of an earlier release refuses a version whose presentation labels states, and @formancy/data-client reads a form whose moves carry no labels as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
+        }
+      ]
+    },
+    "0130": {
+      "reviewed": "sha256:126d46df0bb2b617e7e8b6adef2f9ad96b56a618fd5affa35c1be0f6049a44db",
+      "limitations": [
+        {
+          "area": "server",
+          "says": "A server of an earlier release refuses a filter or a stored view whose range says which bounds are exclusive, so a host that sends one upgrades its server first."
+        },
+        {
+          "area": "operations",
+          "says": "A server rolled back past this release refuses, on every read, a published version holding a view whose range says which bounds are exclusive, so that form is not served, and a person's views file holding one, so their own views are not offered."
+        },
+        {
+          "area": "forms",
+          "says": "A timestamp's bounds are still whole days: after a day means from the next midnight on and before a day below its own. After 9999-12-31 is refused in a sentence that offers from 9999-12-31 on instead, which on PostgreSQL also finds later years and infinity; before 0001-01-01 finds nothing on SQL Server and, on PostgreSQL, days before the common era and -infinity.",
+          "heldBy": "packages/data-core/src/records/filter.test.ts"
         }
       ]
     }

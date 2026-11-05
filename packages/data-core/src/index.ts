@@ -256,6 +256,7 @@ export type {
   ListSortTerm,
   ListView,
   OwnViews,
+  RangeExclusive,
   StateMoves,
   StoredListView,
   ViewCondition,

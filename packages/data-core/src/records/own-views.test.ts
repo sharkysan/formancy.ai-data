@@ -121,6 +121,31 @@ describe('listColumns, own', () => {
   })
 })
 
+describe('an own view whose range leaves out a bound', () => {
+  // A person's view of what is over 1000 is read, saved and offered again
+  // as over 1000 (0130): one that dropped `exclusive` would offer them a
+  // wider view. Watched failing with the range read as { op, from, to }.
+  test('keeps it through being read, saved and offered', () => {
+    const over: ListView = { name: 'Over', filter: [{ field: 'amount', op: 'range', from: '1000', to: null, exclusive: 'from' }], sort: [] }
+    const read = readOwnView(JSON.parse(JSON.stringify(over)))
+    expect(read).toEqual({ ok: true, view: over })
+    if (!read.ok) throw new Error(read.message)
+    expect(savedOwnView([PLACED], read.view, PG_ORDER, COLUMNS)).toEqual({ ok: true, views: [PLACED, over] })
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], [], [PLACED, over]).own).toEqual([PLACED, over])
+  })
+
+  // The file as this release writes it, byte for byte, reads back. It is
+  // compared with what reading it gives, key order included, so a later
+  // reading that built the range in another order would turn every file
+  // holding one into damage, and the person's views would stop being
+  // offered. Watched failing with the range built as
+  // { op, exclusive, from, to }.
+  test('reads back from the file this release writes', () => {
+    const file = '{"views":[{"name":"Over","filter":[{"field":"amount","op":"range","from":"1000","to":null,"exclusive":"from"}],"sort":[]}]}'
+    expect(ownViewsProblems(JSON.parse(file))).toEqual([])
+  })
+})
+
 describe('ownViewsProblems', () => {
   // The file is the server's own, written from what these functions
   // return: read back, anything else is damage, and nothing is offered

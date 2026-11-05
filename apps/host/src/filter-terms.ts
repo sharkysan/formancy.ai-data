@@ -103,10 +103,10 @@ function quoted(value: string, input: FilterInput | null): string {
   return input === 'text' || input === 'uuid' ? `“${value}”` : value
 }
 
-/** One bound of a range, worded for what it bounds: a day, or a number. */
-function bound(side: 'from' | 'to', input: FilterInput | null): string {
-  if (input === 'date') return side === 'from' ? 'on or after' : 'on or before'
-  return side === 'from' ? 'at least' : 'at most'
+/** One bound of a range, worded for what it bounds -- a day, or a number -- and for whether it leaves out its own value (0130). */
+function bound(side: 'from' | 'to', input: FilterInput | null, exclusive: boolean): string {
+  if (input === 'date') return side === 'from' ? (exclusive ? 'after' : 'on or after') : exclusive ? 'before' : 'on or before'
+  return side === 'from' ? (exclusive ? 'over' : 'at least') : exclusive ? 'under' : 'at most'
 }
 
 /** A condition as a sentence, by its field's label: what the panel lists and a removal names. */
@@ -116,9 +116,15 @@ export function summaryOf(term: ListFilterTerm, field: Pick<PanelField, 'label' 
   switch (term.op) {
     case 'equals':
       return `${label} is ${quoted(term.value, input)}`
-    case 'range':
-      if (term.from !== null && term.to !== null) return `${label} is between ${term.from} and ${term.to}`
-      return term.from !== null ? `${label} is ${bound('from', input)} ${term.from}` : `${label} is ${bound('to', input)} ${String(term.to)}`
+    case 'range': {
+      if (term.from !== null && term.to !== null && term.exclusive === undefined) return `${label} is between ${term.from} and ${term.to}`
+      const leaves = (side: 'from' | 'to'): boolean => term.exclusive === side || term.exclusive === 'both'
+      const bounds = [
+        ...(term.from === null ? [] : [`${bound('from', input, leaves('from'))} ${term.from}`]),
+        ...(term.to === null ? [] : [`${bound('to', input, leaves('to'))} ${term.to}`]),
+      ]
+      return `${label} is ${bounds.join(' and ')}`
+    }
     case 'contains':
       return `${label} contains ${quoted(term.text, 'text')}`
     case 'null':

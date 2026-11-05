@@ -489,7 +489,7 @@ describe('the list route', () => {
     expect(lists[0]?.filter).toEqual([
       { op: 'contains', column: 'name', type: NAME, text: 'Muster' },
       { op: 'equals', column: 'customer_no', type: INT32, value: '7' },
-      { op: 'range', column: 'credit_limit', type: { kind: 'decimal', precision: 14, scale: 2 }, from: '-1.50', to: null, before: null },
+      { op: 'range', column: 'credit_limit', type: { kind: 'decimal', precision: 14, scale: 2 }, from: '-1.50', above: null, to: null, before: null },
     ])
     expect((await list('customer', { filter: [{ field: 'credit_limit', op: 'null' }] })).statusCode).toBe(200)
     expect(lists[1]?.filter).toEqual([{ op: 'null', column: 'credit_limit' }])

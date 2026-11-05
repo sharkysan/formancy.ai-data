@@ -84,25 +84,31 @@ export const COLUMN_FILTER_TENANT = '3'
  *   collation, which ignores trailing spaces, calls all three equal.
  * - `integer`: a customer number equals 1001, which finds tenant 1's
  *   customer and not tenant 2's of the same number, since a filter narrows
- *   and never permits; and a range from 2002 to 2004 holds both ends.
+ *   and never permits; and a range from 2002 to 2004 holds both ends, and
+ *   with both exclusive (0130) neither.
  * - `decimal`: a credit limit equals `50`, which the planner spells `50.00`
  *   for the numeric(14, 2) column; a range from `-1` to `0.01` holds both
- *   ends.
+ *   ends; above 0 and below 50 holds 0.01 alone, and above 50 the one
+ *   limit past it.
  * - `boolean`: whether a customer is active.
  * - `uuid`: a shipment's tracking number, given in upper case, which the
  *   planner spells in lower case as a uuid reads.
  * - `date`: an order's date in a browse of sales.order, every tenant's:
  *   equal to a day, a range of one day holding the order on both its ends,
- *   and a range with a from alone.
+ *   and a range with a from alone; after a day and before one, which leave
+ *   out the orders of the day named.
  * - `instant`: a customer's `created_at`, an instant, in a range of whole
  *   days in UTC: from the first midnight, inclusive, to the last instant of
  *   the last day, below the next midnight -- whatever offset the instant was
  *   written in, and whatever TimeZone or language the session has. Then
- *   ranges with one end alone.
+ *   ranges with one end alone; after a day, from the next midnight on, and
+ *   before a day, below its own midnight, so the last instant of the day
+ *   named is outside either way.
  * - `zoneless`: a shipment's `dispatched_at`, a timestamp in no zone,
  *   compared on its own clock, in whole days as `instant` is: 23:59:59.999
  *   of the last day is inside, 00:00:00.000 of the next outside and of the
- *   first inside, and NULL is in no range.
+ *   first inside, and NULL is in no range; after one day and before
+ *   another, the one day between.
  * - `contains`: a name holds the text as the list's search matches it: `%`,
  *   `_` and `[x]` match themselves, and case is folded.
  * - `nulls`: a credit limit is NULL, or is not.
@@ -141,6 +147,7 @@ export const COLUMN_FILTER_PARITY = {
     entries: [
       { condition: { op: 'equals', value: '1001' }, keys: ['1001'] },
       { condition: { op: 'range', from: '2002', to: '2004' }, keys: ['2002', '2003', '2004'] },
+      { condition: { op: 'range', from: '2002', to: '2004', exclusive: 'both' }, keys: ['2003'] },
     ],
   },
   decimal: {
@@ -148,6 +155,8 @@ export const COLUMN_FILTER_PARITY = {
     entries: [
       { condition: { op: 'equals', value: '50' }, keys: ['2001', '2003'] },
       { condition: { op: 'range', from: '-1', to: '0.01' }, keys: ['2004', '2006'] },
+      { condition: { op: 'range', from: '0', to: '50', exclusive: 'both' }, keys: ['2006'] },
+      { condition: { op: 'range', from: '50', to: null, exclusive: 'from' }, keys: ['1001'] },
     ],
   },
   boolean: {
@@ -169,6 +178,8 @@ export const COLUMN_FILTER_PARITY = {
       { condition: { op: 'equals', value: '2026-10-09' }, ids: [THEIRS, SECOND] },
       { condition: { op: 'range', from: '2026-10-08', to: '2026-10-08' }, ids: [OURS] },
       { condition: { op: 'range', from: '2026-10-09', to: null }, ids: [THEIRS, SECOND] },
+      { condition: { op: 'range', from: '2026-10-08', to: null, exclusive: 'from' }, ids: [THEIRS, SECOND] },
+      { condition: { op: 'range', from: null, to: '2026-10-09', exclusive: 'to' }, ids: [OURS] },
     ],
   },
   instant: {
@@ -177,6 +188,8 @@ export const COLUMN_FILTER_PARITY = {
       { from: '2026-03-01', to: '2026-03-02', keys: ['2001', '2002', '2003', '2005'] },
       { from: '2026-03-03', to: null, keys: ['2004', '2006'] },
       { from: null, to: '2026-03-02', keys: ['1001', '2001', '2002', '2003', '2005'] },
+      { from: '2026-03-01', to: null, exclusive: 'from', keys: ['2003', '2004', '2005', '2006'] },
+      { from: null, to: '2026-03-03', exclusive: 'to', keys: ['1001', '2001', '2002', '2003', '2005'] },
     ],
   },
   zoneless: {
@@ -185,6 +198,8 @@ export const COLUMN_FILTER_PARITY = {
       { from: '2026-03-01', to: '2026-03-02', references: ['AG ', 'ag'] },
       { from: '2026-03-01', to: null, references: ['AG ', 'ag', 'next'] },
       { from: null, to: '2026-03-02', references: ['AG', 'AG ', 'ag'] },
+      { from: '2026-02-28', to: null, exclusive: 'from', references: ['AG ', 'ag', 'next'] },
+      { from: '2026-03-01', to: '2026-03-03', exclusive: 'both', references: ['ag'] },
     ],
   },
   contains: {

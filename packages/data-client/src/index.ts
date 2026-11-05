@@ -37,6 +37,7 @@ export type {
   LookupRow,
   OwnViews,
   PublishedForm,
+  RangeExclusive,
   RecordDeleted,
   RecordExportQuery,
   RecordList,

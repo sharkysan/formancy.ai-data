@@ -128,8 +128,9 @@ describe('listTerms', () => {
     const filter = [
       { op: 'equals', column: 'paid', type: { kind: 'boolean' }, value: 'true' },
       { op: 'equals', column: 'status', type: text(20), value: ' placed ' },
-      { op: 'range', column: 'amount', type: { kind: 'decimal', precision: 18, scale: 4 }, from: '10.0000', to: null, before: null },
-      { op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00Z', to: null, before: '2026-11-01T00:00:00Z' },
+      { op: 'range', column: 'amount', type: { kind: 'decimal', precision: 18, scale: 4 }, from: '10.0000', above: null, to: null, before: null },
+      { op: 'range', column: 'total', type: { kind: 'decimal', precision: 18, scale: 4 }, from: null, above: '0.0000', to: null, before: '9.5000' },
+      { op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00Z', above: null, to: null, before: '2026-11-01T00:00:00Z' },
       { op: 'contains', column: 'notes', type: text(null), text: 'urgent' },
       { op: 'null', column: 'approved_by' },
       { op: 'not-null', column: 'group' },
@@ -153,8 +154,10 @@ describe('listTerms', () => {
   // Each is what columnFilter never writes: an operator outside the set, a
   // value one engine would convert and the other refuse, a contains on a
   // number each spells apart, a timestamp's upper bound that is not the
-  // next midnight, a range that bounds nothing. Watched failing with the
-  // to-or-before check removed.
+  // next midnight, a range that bounds nothing, two lower or two upper
+  // bounds, an exclusive lower bound on a timestamp, whose bounds are
+  // midnights at least and below (0130). Watched failing with the
+  // to-or-before check removed, and with the two-bounds check removed.
   test('refuses a filter condition the planner would not plan', () => {
     const INSTANT = { kind: 'timestamp', withTimeZone: true, precision: 6 }
     const WALL_CLOCK = { kind: 'timestamp', withTimeZone: false, precision: 3 }
@@ -169,16 +172,20 @@ describe('listTerms', () => {
       [{ op: 'contains', column: 'customer_no', type: INT32, text: '7' }],
       [{ op: 'contains', column: 'notes', type: text(null), text: ' urgent' }],
       [{ op: 'contains', column: 'notes', type: text(null), text: '' }],
-      [{ op: 'range', column: 'status', type: text(20), from: 'a', to: null, before: null }],
-      [{ op: 'range', column: 'amount', type: AMOUNT, from: '10', to: null, before: null }],
-      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, to: null, before: null }],
-      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, to: null, before: '10.0000' }],
-      [{ op: 'range', column: 'created_at', type: INSTANT, from: null, to: '2026-10-31T00:00:00Z', before: null }],
-      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00', to: null, before: null }],
-      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T12:00:00Z', to: null, before: null }],
-      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-02-30T00:00:00Z', to: null, before: null }],
-      [{ op: 'range', column: 'dispatched_at', type: WALL_CLOCK, from: '2026-10-01T00:00:00Z', to: null, before: null }],
-      [{ op: 'range', column: 'dispatched_at', type: { ...WALL_CLOCK, precision: -1 }, from: '2026-10-01T00:00:00', to: null, before: null }],
+      [{ op: 'range', column: 'status', type: text(20), from: 'a', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: '10', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, above: null, to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: '10.0000', to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: '1.0000', above: '1.0000', to: null, before: null }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, above: null, to: '9.0000', before: '9.0000' }],
+      [{ op: 'range', column: 'amount', type: AMOUNT, from: null, above: '1', to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: null, above: null, to: '2026-10-31T00:00:00Z', before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: null, above: '2026-10-01T00:00:00Z', to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T00:00:00', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-10-01T12:00:00Z', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'created_at', type: INSTANT, from: '2026-02-30T00:00:00Z', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'dispatched_at', type: WALL_CLOCK, from: '2026-10-01T00:00:00Z', above: null, to: null, before: null }],
+      [{ op: 'range', column: 'dispatched_at', type: { ...WALL_CLOCK, precision: -1 }, from: '2026-10-01T00:00:00', above: null, to: null, before: null }],
     ]) {
       expect(() => listTerms(altered({ filter })), JSON.stringify(filter)).toThrow(/A list request/)
     }

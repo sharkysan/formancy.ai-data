@@ -170,26 +170,48 @@ const unheld = (label: string): FilterPlanning => ({ ok: false, message: `A valu
 
 /**
  * A range on a column. A number's or a date's bounds are values the column
- * can hold, inclusive. A timestamp's are dates: from the start of `from`
- * to the end of `to`, compared as at least `from`'s midnight and below the
- * next midnight after `to` -- in UTC for an instant, which a page shows in
- * UTC, and on the wall clock for a timestamp in no zone. A range to
- * 9999-12-31 has no next midnight both engines store, so it has no upper
- * end; with no `from` either it holds every value, and is `not-null`.
+ * can hold, inclusive, or strictly above and below where `exclusive` names
+ * them (0130). A timestamp's are dates: from the start of `from` to the end
+ * of `to`, compared as at least `from`'s midnight and below the next
+ * midnight after `to` -- in UTC for an instant, which a page shows in UTC,
+ * and on the wall clock for a timestamp in no zone. After a day is from the
+ * next midnight on, and before a day below its own midnight, so a row late
+ * on the day named is outside either way. A range to 9999-12-31 has no next
+ * midnight both engines store, so it has no upper end; with no `from`
+ * either it holds every value, and is `not-null`. After 9999-12-31 has no
+ * midnight to start from at all, and is said rather than planned as no
+ * lower end, which would hold every value.
  */
-function rangeOf(column: Pick<ColumnMeta, 'name'> & { type: RangeFilterType }, from: string | null, to: string | null, label: string): FilterPlanning {
+function rangeOf(
+  column: Pick<ColumnMeta, 'name'> & { type: RangeFilterType },
+  condition: Extract<FilterCondition, { op: 'range' }>,
+  label: string,
+): FilterPlanning {
   const { name, type } = column
+  const { from, to, exclusive } = condition
   if (from === null && to === null) return { ok: false, message: `A range on ${label} has a from, a to or both.` }
   const spell = (given: string): string | null => (type.kind === 'timestamp' ? valueOf({ kind: 'date' }, given) : valueOf(type, given))
   const low = from === null ? null : spell(from)
   const high = to === null ? null : spell(to)
   if ((from !== null && low === null) || (to !== null && high === null)) return unheld(label)
-  if (type.kind !== 'timestamp') return { ok: true, filter: { op: 'range', column: name, type, from: low, to: high, before: null } }
+  const above = exclusive === 'from' || exclusive === 'both'
+  const below = exclusive === 'to' || exclusive === 'both'
+  if (type.kind !== 'timestamp')
+    return {
+      ok: true,
+      filter: { op: 'range', column: name, type, from: above ? null : low, above: above ? low : null, to: below ? null : high, before: below ? high : null },
+    }
   const zone = type.withTimeZone ? 'Z' : ''
-  const next = high === null ? null : dayAfter(high)
-  if (low === null && next === null) return { ok: true, filter: { op: 'not-null', column: name } }
+  const start = low === null || !above ? low : dayAfter(low)
+  if (low !== null && start === null)
+    return {
+      ok: false,
+      message: `A range on ${label} cannot start after ${low}, since the next midnight is past what SQL Server stores. From ${low} on finds that day and anything later.`,
+    }
+  const end = high === null || below ? high : dayAfter(high)
+  if (start === null && end === null) return { ok: true, filter: { op: 'not-null', column: name } }
   const midnight = (day: string | null): string | null => (day === null ? null : `${day}T00:00:00${zone}`)
-  return { ok: true, filter: { op: 'range', column: name, type, from: midnight(low), to: null, before: midnight(next) } }
+  return { ok: true, filter: { op: 'range', column: name, type, from: midnight(start), above: null, to: null, before: midnight(end) } }
 }
 
 /**
@@ -219,7 +241,7 @@ export function columnFilter(column: Pick<ColumnMeta, 'name' | 'type' | 'nullabl
     }
     case 'range':
       // filterOffer offers a range on these kinds alone.
-      return rangeOf({ name, type: type as RangeFilterType }, condition.from, condition.to, label)
+      return rangeOf({ name, type: type as RangeFilterType }, condition, label)
   }
 }
 
@@ -284,7 +306,12 @@ function conditionOf(
       if ((typeof from !== 'string' && from !== null) || (typeof to !== 'string' && to !== null))
         return malformed(`A range on ${name} has bounds of text, or null.`)
       if (from === null && to === null) return malformed(`A range on ${name} has a from, a to or both.`)
-      return { ok: true, condition: { op, from, to } }
+      if (!Object.hasOwn(entry, 'exclusive')) return { ok: true, condition: { op, from, to } }
+      const exclusive = entry['exclusive']
+      if (exclusive !== 'from' && exclusive !== 'to' && exclusive !== 'both') return malformed(`A range on ${name} leaves out its from, its to or both.`)
+      if (exclusive !== 'to' && from === null) return malformed(`An exclusive from on ${name} needs a from.`)
+      if (exclusive !== 'from' && to === null) return malformed(`An exclusive to on ${name} needs a to.`)
+      return { ok: true, condition: { op, from, to, exclusive } }
     }
     case 'contains': {
       const given = entry['text']
@@ -302,7 +329,8 @@ function conditionOf(
 /**
  * A filter from a request's body: a list of conditions, each
  * `{ <key>, op, … }` with exactly the properties its operator has -- a
- * `value` to equal, a `from` and a `to` of a range, the `text` a column
+ * `value` to equal, a `from` and a `to` of a range and, where one leaves
+ * out its own value, `exclusive` naming it (0130), the `text` a column
  * contains, nothing more for `null` and `not-null` -- and each `key` named
  * once. Left out, it is `[]`. What `contains` finds is read as a search is
  * (`checkSearch`), trimmed; a value or a bound is read as text and checked
@@ -321,7 +349,8 @@ export function readFilter(given: unknown, key: 'field' | 'column'): FilterRead<
     const op = entry['op']
     if (typeof name !== 'string' || name === '') return malformed(`A filter condition names a ${key}.`)
     if (typeof op !== 'string' || !Object.hasOwn(SHAPES, op)) return malformed(`${name} is filtered by equals, range, contains, null or not-null.`)
-    const shape = [key, 'op', ...SHAPES[op as FilterOp]]
+    // A range's `exclusive` is there only where a bound leaves out its own value (0130).
+    const shape = [key, 'op', ...SHAPES[op as FilterOp], ...(op === 'range' && Object.hasOwn(entry, 'exclusive') ? ['exclusive'] : [])]
     if (!hasExactly(entry, shape)) return malformed(`A ${op} condition on ${name} is { ${shape.join(', ')} } and nothing else.`)
     if (seen.has(name)) return malformed(`${name} is named twice in the filter.`)
     seen.add(name)

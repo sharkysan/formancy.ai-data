@@ -257,7 +257,7 @@ describe('a page', () => {
     expect(response.statusCode, response.body).toBe(200)
     expect(requests[0]?.filter).toEqual([
       { op: 'contains', column: 'name', type: TEXT, text: 'Ad' },
-      { op: 'range', column: 'id', type: INT32, from: '2', to: '10', before: null },
+      { op: 'range', column: 'id', type: INT32, from: '2', above: null, to: '10', before: null },
     ])
     expect(requests[0]?.filters).toEqual({ kind: 'unrestricted' })
   })

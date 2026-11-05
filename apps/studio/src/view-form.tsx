@@ -10,7 +10,7 @@ import type {
   ViewFilterTerm,
   ViewValue,
 } from '@formancy/data-core'
-import { Box, chosenOp, ConditionValues, conditionOf, draftOf, EMPTY_VALUES, hintOf, OPS, sayCondition } from './condition-draft.js'
+import { Box, chosenOp, ConditionValues, conditionOf, draftOf, EMPTY_VALUES, hintOf, keptExclusive, OPS, sayCondition, sayRange } from './condition-draft.js'
 import type { ValueDraft } from './condition-draft.js'
 import { sayValue } from './related.js'
 import { RolesInput } from './roles-input.js'
@@ -53,8 +53,10 @@ function rowOf(term: ViewFilterTerm): TermDraft {
   const relative = (value: ViewValue | null) => value !== null && typeof value !== 'string'
   if (term.op === 'equals' && typeof term.value !== 'string')
     return { ...EMPTY_VALUES, field: term.field, op: 'equals', value: typed(term.value), relative: 'today' in term.value ? 'today' : 'attribute' }
-  if (term.op === 'range' && (relative(term.from) || relative(term.to)))
-    return { ...EMPTY_VALUES, field: term.field, op: 'range', from: typed(term.from), to: typed(term.to), relative: 'today' }
+  if (term.op === 'range' && (relative(term.from) || relative(term.to))) {
+    const exclusive = term.exclusive === undefined ? {} : { exclusive: term.exclusive }
+    return { ...EMPTY_VALUES, field: term.field, op: 'range', from: typed(term.from), to: typed(term.to), ...exclusive, relative: 'today' }
+  }
   return { ...draftOf(term as FilterCondition), field: term.field }
 }
 
@@ -92,7 +94,11 @@ export function viewOf(draft: ViewDraft, offers: readonly FilterableField[]): St
     const offer = offers.find((entry) => entry.field === row.field)
     const op = offer === undefined ? (row.op ?? 'equals') : chosenOp(offer, row.op)
     if (row.relative !== undefined && op === 'equals') return { field: row.field, op, value: relativeOf(row, row.value) ?? '' }
-    if (row.relative === 'today' && op === 'range') return { field: row.field, op, from: relativeOf(row, row.from), to: relativeOf(row, row.to) }
+    if (row.relative === 'today' && op === 'range') {
+      const [from, to] = [relativeOf(row, row.from), relativeOf(row, row.to)]
+      const exclusive = keptExclusive(row.exclusive, from, to)
+      return { field: row.field, op, from, to, ...(exclusive === undefined ? {} : { exclusive }) }
+    }
     return { field: row.field, ...conditionOf(op, offer?.input ?? null, row) }
   })
   return {
@@ -118,10 +124,8 @@ function sayRelative(value: Exclude<ViewValue, string>): string {
 export function sayViewCondition(subject: string, condition: ViewCondition): string {
   const say = (value: ViewValue): string => (typeof value === 'string' ? sayValue(value) : sayRelative(value))
   if (condition.op === 'equals' && typeof condition.value !== 'string') return `${subject} = ${say(condition.value)}`
-  if (condition.op === 'range' && [condition.from, condition.to].some((bound) => bound !== null && typeof bound !== 'string')) {
-    if (condition.from !== null && condition.to !== null) return `${subject} from ${say(condition.from)} to ${say(condition.to)}`
-    return condition.from !== null ? `${subject} from ${say(condition.from)}` : `${subject} up to ${say(condition.to ?? '')}`
-  }
+  if (condition.op === 'range' && [condition.from, condition.to].some((bound) => bound !== null && typeof bound !== 'string'))
+    return sayRange(subject, condition.from, condition.to, condition.exclusive, say)
   return sayCondition(subject, condition as FilterCondition)
 }
 
@@ -230,7 +234,7 @@ function ConditionRow({ index, row, offers, label, onRow, onRemove }: ConditionR
           op={op}
           input={input}
           draft={row}
-          hint={offer === undefined ? null : hintOf(label(row.field), offer, op)}
+          hint={offer === undefined ? null : hintOf(label(row.field), offer, op, row.exclusive)}
           onChange={(values) => onRow({ ...row, ...values })}
         />
       ) : (

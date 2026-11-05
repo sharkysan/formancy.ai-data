@@ -18,6 +18,20 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A filter's range may leave out either bound's own value** (0130). Why:
+  a grid's filter is becoming a line a person types, and a line has `<` and
+  `>`, which an inclusive range could say only by moving the bound, which a
+  decimal of an unknown scale cannot be. A range condition, in a list's,
+  an export's or a browse's filter and in a stored view, may carry
+  `exclusive`: `from`, `to` or `both`; both engines compare it strictly.
+  A timestamp's bounds are still whole days: after a day is from the next
+  midnight on, and before a day is below its own midnight.
+  What you notice: a server of an earlier release refuses a filter or a view
+  holding `exclusive` as malformed, so a host that sends one upgrades its
+  server first, and a server rolled back past it refuses a published version
+  or a person's views file that holds one on every read; the host page names
+  such a condition "over", "under", "after" or "before", and the studio says
+  a view holding one with `>` and `<` and keeps it through an edit.
 - **An administrator labels a state field's states** (0129). Why: the host
   offered each state as its column spells it -- `placed`, `in_transit` --
   since nothing gave them words for a person. In the studio's Presentation

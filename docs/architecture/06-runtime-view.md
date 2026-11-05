@@ -264,8 +264,11 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    `listOrder` ends the order with every key column, so it is total
    ([0044](../decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md));
    `columnFilter` plans each of the person's conditions on a readable
-   column field, its values spelled as the column holds them, or refuses it
-   400 `not-filterable`
+   column field, its values spelled as the column holds them -- a range's
+   exclusive bounds as the column's strict comparison, a timestamp's as the
+   midnight they mean
+   ([0130](../decisions/0130-a-filters-range-may-leave-out-either-bounds-own-value.md))
+   -- or refuses it 400 `not-filterable`
    ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
    `decodeListCursor` (`records/cursor.ts`) reads the key a page continues
    after from `after`, or refuses it 400 `invalid-cursor` (0108).
