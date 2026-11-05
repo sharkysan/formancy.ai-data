@@ -4,7 +4,7 @@ import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessi
 import { createAdminClient } from './api.js'
 import type { Proposal, ProposalRequest } from './api.js'
 import { NOTE_KINDS } from './generate.js'
-import { audit, chooseOrder, discover, generateOrder, paragraphs, signIn, step } from './test-studio.js'
+import { audit, chooseOrder, discover, generateOrder, goTo, offerOnly, paragraphs, signIn, step } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -52,6 +52,35 @@ function list(container: HTMLElement, name: string): string[] {
 }
 
 describe('choosing', () => {
+  // Every foreign key the studio can offer is offered by default (part 3 of
+  // the finding-records design, 0138), each with the column it suggests --
+  // a lookup filters and sorts by what it shows (0135, 0136), so a key left
+  // a bare number loses nothing by it -- and the administrator unticks what
+  // they do not want, and one unticked stays so when the step is left and
+  // come back to; one the connection cannot offer stays unticked (the test
+  // below). Watched failing with nothing ticked.
+  test('offers every lookup it can by default, each with its suggested column', async () => {
+    const user = await signIn(plane)
+    const choose = await toChoose(user)
+    await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    const offered = (name: string) => within(choose).getByRole<HTMLInputElement>('checkbox', { name: `Offer ${name} as a lookup` })
+    expect(['fk_order_customer', 'fk_order_created_by', 'fk_order_approved_by'].map((name) => offered(name).checked)).toEqual([true, true, true])
+    const shown = (name: string) =>
+      within(within(choose).getByRole('group', { name: `Columns to show for ${name}` }))
+        .getAllByRole<HTMLInputElement>('checkbox')
+        .filter((box) => box.checked)
+        .map((box) => computeAccessibleName(box))
+    expect(shown('fk_order_customer')).toEqual(['name'])
+    expect(shown('fk_order_created_by')).toEqual(['name'])
+    expect(shown('fk_order_approved_by')).toEqual(['name'])
+    await user.click(offered('fk_order_approved_by'))
+    expect(offered('fk_order_approved_by').checked).toBe(false)
+    expect(await audit()).toEqual([])
+    await goTo(user, 'Connect')
+    const again = await goTo(user, 'Choose')
+    expect(within(again).getByRole<HTMLInputElement>('checkbox', { name: 'Offer fk_order_approved_by as a lookup' }).checked).toBe(false)
+  })
+
   // A relationship whose target this connection cannot see is listed and
   // disabled with the reason. Left out, it would read as a table with no
   // relationship to customers, which is the one wrong answer. SQL Server's
@@ -63,6 +92,8 @@ describe('choosing', () => {
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     const customer = within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' })
     expect(customer).toHaveProperty('disabled', true)
+    // Not offered by default either (0138): a lookup the connection cannot offer is no default.
+    expect(customer).toHaveProperty('checked', false)
     expect(customer.getAttribute('aria-describedby')).not.toBeNull()
     expect(paragraphs(choose)).toContain(
       'tenant_id, customer_no → an unknown target. This connection can see that the key exists but not what it references, so it cannot be offered.',
@@ -97,7 +128,7 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user, 'fixture-writer')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_customer'])
     await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     const generated = await screen.findByRole('main', { name: 'Generate' })
@@ -115,7 +146,7 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user, 'fixture-writer')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_customer'])
     const shown = within(within(choose).getByRole('group', { name: 'Columns to show for fk_order_customer' })).getAllByRole('checkbox')
     const state = shown.map(
       (box) =>
@@ -146,7 +177,7 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_country as a lookup' }))
+    await offerOnly(user, choose, ['fk_customer_country'])
     const group = within(choose).getByRole('group', { name: 'Columns to show for fk_customer_country' })
     const state = within(group)
       .getAllByRole('checkbox')
@@ -198,6 +229,8 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+    // No lookup, so tenant_id is a field of its own rather than the customer's.
+    await offerOnly(user, choose, [])
     await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
     expect(within(choose).getByLabelText<HTMLInputElement>('Attribute tenant_id is pinned to').value).toBe('tenant')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
@@ -386,7 +419,7 @@ describe('choosing', () => {
     const user = await signIn(plane)
     const choose = await toChoose(user, 'fixture-sections')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer_company')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_company_customer as a lookup' }))
+    await offerOnly(user, choose, ['fk_customer_company_customer'])
     await user.click(within(choose).getByRole('checkbox', { name: 'Show it under each customer as one form' }))
     await user.selectOptions(within(choose).getByLabelText('Shown while'), 'kind')
     await user.type(within(choose).getByLabelText('holds'), 'company')
@@ -402,7 +435,7 @@ describe('choosing', () => {
 
     await goToChoose(user)
     await user.selectOptions(within(step('Choose')).getByLabelText('Root table or view'), 'sales.order')
-    await user.click(within(step('Choose')).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await offerOnly(user, step('Choose'), ['fk_order_customer'])
     expect(within(step('Choose')).queryByRole('checkbox', { name: /^Show it under each/ })).toBeNull()
   })
 })

@@ -72,6 +72,22 @@ export async function discover(user: User, connection = 'fixture'): Promise<void
 }
 
 /**
+ * The lookups offered, by their foreign keys' names, and no other: each
+ * named one ticked, every other one the step offers unticked. The step
+ * offers every lookup it can by default (0138); a case that means one
+ * lookup says so, rather than clicking a box that is already ticked.
+ */
+export async function offerOnly(user: User, choose: HTMLElement, foreignKeys: readonly string[]): Promise<void> {
+  for (const box of within(choose).queryAllByRole<HTMLInputElement>('checkbox', { name: /^Offer .+ as a lookup$/ })) {
+    if (box.disabled) continue
+    const name = /^Offer (.+) as a lookup$/.exec(computeAccessibleName(box))?.[1] ?? ''
+    if (box.checked !== foreignKeys.includes(name)) await user.click(box)
+  }
+  // A key named and not offered -- misspelt, or one the step cannot offer -- is the case's mistake, not a lookup left out.
+  for (const name of foreignKeys) expect(within(choose).getByRole<HTMLInputElement>('checkbox', { name: `Offer ${name} as a lookup` }).checked, name).toBe(true)
+}
+
+/**
  * The order form the journey builds, from the Connect step: the fixture
  * discovered, the customer lookup, the tenant pinned, and the version column
  * confirmed, so create and update are both offered.
@@ -81,7 +97,7 @@ export async function chooseOrder(user: User): Promise<HTMLElement> {
   await user.click(screen.getByRole('button', { name: 'Choose a root' }))
   const choose = step('Choose')
   await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
-  await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+  await offerOnly(user, choose, ['fk_order_customer'])
   await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
   await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
   return choose

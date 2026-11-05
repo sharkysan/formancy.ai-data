@@ -23,6 +23,7 @@ import reader from './fixtures/postgres-reader.json'
 import writer from './fixtures/postgres-writer.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
+import sqlserverWriter from './fixtures/sqlserver-writer.json'
 
 /**
  * The real data server, behind a fake `fetch`, for the studio's suite.
@@ -70,6 +71,8 @@ export const READER_SNAPSHOT = readSnapshot(reader)
 export const WRITER_SNAPSHOT = readSnapshot(writer)
 export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
 export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
+/** SQL Server as the order form's own account, which reads no employee: what the getting-started guide's `ms` connection sees (0138). */
+export const SQLSERVER_WRITER_SNAPSHOT = readSnapshot(sqlserverWriter)
 
 /**
  * The owner's snapshot with a customer's `kind` and its company details: a
@@ -228,7 +231,7 @@ export interface TestPlane {
 }
 
 /** The connections the registry allows, in the order the server lists them. */
-export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'] as const
+export const CONNECTIONS = ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-sqlserver-writer', 'fixture-writer'] as const
 
 /** Two exact numbers, integers or decimals, spelled as columns hold them, in order: each scaled to the longer fraction, so nothing passes through a double. */
 function numberOrder(left: string, right: string): number {
@@ -309,6 +312,7 @@ export async function startPlane(
     ['fixture-sqlserver', SQLSERVER_SNAPSHOT],
     ['fixture-sqlserver-reader', SQLSERVER_READER_SNAPSHOT],
     ['fixture-writer', WRITER_SNAPSHOT],
+    ['fixture-sqlserver-writer', SQLSERVER_WRITER_SNAPSHOT],
     ...(options.sections === true ? [['fixture-sections', SECTIONS_SNAPSHOT] as const] : []),
     ...(options.versions === true ? [['fixture-versions', VERSIONS_SNAPSHOT] as const] : []),
   ])

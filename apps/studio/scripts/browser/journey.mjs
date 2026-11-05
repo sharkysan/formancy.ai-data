@@ -29,6 +29,9 @@ export async function chooseOrder(page) {
   const choose = step(page, 'Choose')
   await choose.getByLabel('Root table or view').selectOption({ label: 'sales.order' })
   await choose.getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }).check()
+  // Every lookup is offered by default (0138): the order shows its customer alone.
+  for (const foreignKey of ['fk_order_created_by', 'fk_order_approved_by'])
+    await choose.getByRole('checkbox', { name: `Offer ${foreignKey} as a lookup` }).uncheck()
   await choose.getByRole('checkbox', { name: 'Pin tenant_id' }).check()
   await choose.getByLabel('Version column').selectOption('row_version')
 }

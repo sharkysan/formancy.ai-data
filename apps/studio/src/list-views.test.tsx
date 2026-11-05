@@ -5,7 +5,7 @@ import { viewProblems } from '@formancy/data-core'
 import type { StoredListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Bundle, ProposalRequest } from './api.js'
-import { audit, chooseOrder, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
+import { audit, chooseOrder, focusedName, generateOrder, goTo, offerOnly, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -203,7 +203,7 @@ describe('making a view', () => {
   test('offers a lookup by whether it refers to a record, and a key of two columns not at all', async () => {
     const user = await signIn(plane)
     const choose = await chooseOrder(user)
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_approved_by as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_customer', 'fk_order_approved_by'])
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await goTo(user, 'Presentation')
     // The generator names the lookup over approved_by for the table it refers to.

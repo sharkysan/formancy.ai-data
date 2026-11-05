@@ -478,6 +478,13 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The studio offers every lookup it can by default** (0138). Why: a
+  lookup now filters by its record and sorts by what it shows (0135,
+  0136), so a foreign key left a bare number lost what its lookup gives
+  and gained nothing. The Choose step ticks every foreign key it can
+  offer, each with the column it suggests; the administrator unticks what
+  they do not want. What you notice: each lookup needs its rows decided
+  in the Policy step before the form publishes, as any lookup does.
 - **Two lookups into one table are told apart by their columns** (0137).
   Why: an order's `created_by` and `approved_by` both refer to employees,
   and both lookups read "Employee", so a person could not tell who

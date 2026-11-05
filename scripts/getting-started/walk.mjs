@@ -63,8 +63,10 @@ export const stepTitle = (step) => step.replace(/^\d+\.\s+/, '')
  *   that step, `says` what the step says after it;
  * - `select` and `type`: choose `value` in a select box, or type it into a
  *   text box, cleared first;
- * - `tick`: tick a checkbox; `keep` names a group under it whose `ticked`
- *   boxes stay ticked, `holds` a text box that says `value`;
+ * - `tick`: tick a checkbox -- `already` where the studio ticks it by
+ *   default (0138), so the guide says to keep it -- `keep` names a group
+ *   under it whose `ticked` boxes stay ticked, `holds` a text box that says
+ *   `value`;
  * - `none`: there is no control of that name, and the step reads `reads`;
  * - `rules`: a group of row-filter rules that hold `rules`, `from` saying
  *   where they came from;
@@ -86,7 +88,7 @@ export function studioWalk(journey, form) {
     { control: 'Title', action: { kind: 'type', value: form.title } },
     ...form.lookups.map((lookup) => ({
       control: `Offer ${lookup.foreignKey} as a lookup`,
-      action: { kind: 'tick', keep: { group: `Columns to show for ${lookup.foreignKey}`, ticked: lookup.display } },
+      action: { kind: 'tick', already: true, keep: { group: `Columns to show for ${lookup.foreignKey}`, ticked: lookup.display } },
     })),
     ...form.pinned.map((column) => ({
       control: `Pin ${column}`,
