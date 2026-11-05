@@ -3734,7 +3734,7 @@
       ]
     },
     "0132": {
-      "reviewed": "sha256:97906df533ef72b5d6d4918dbe3766f0ed0f930be64b6b08c75c2bdf4c7ab322",
+      "reviewed": "sha256:7be217b166382fb0a69418f2e30f6d17f098388be44775625de69a69be4b4be3",
       "limitations": [
         {
           "area": "host",
@@ -3747,6 +3747,19 @@
         {
           "area": "host",
           "says": "A lookup column has no box, as the filter line names no lookup field."
+        }
+      ]
+    },
+    "0133": {
+      "reviewed": "sha256:86a42d1827a049602fa442fe02a49a88420fc257426d69c7fca4446de946fe4c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A cell's button that keeps the rows with its value shows only while the cell has the keyboard: a pointer clicks the cell, which opens its row, then the button; the keyboard's way is = on the cell, which the filter line's hint says."
+        },
+        {
+          "area": "host",
+          "says": "A timestamp's cell, and a lookup's, offer no example: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
         }
       ]
     }

@@ -214,7 +214,9 @@ export function FilterLine({
         </ul>
       </div>
       <p className="hint filter-hint" id={`${idBase}-hint`}>
-        {pending ? 'Not applied yet: Enter applies it, Esc puts back the filter.' : 'Conditions joined by and, applied with Enter.'}
+        {pending
+          ? 'Not applied yet: Enter applies it, Esc puts back the filter.'
+          : 'Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.'}
       </p>
       <p role="status" id={`${idBase}-problem`} className="status filter-problem" data-kind="refused" aria-labelledby={`${idBase}-label`}>
         {refusal === null ? '' : refusal.message}

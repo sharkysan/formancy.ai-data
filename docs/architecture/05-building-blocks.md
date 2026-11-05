@@ -442,6 +442,8 @@ with Undo and the way out of a list nothing matches
 ([0131](../decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)),
 `src/header-filter.tsx` each column header's box in AG Grid's floating row
 ([0132](../decisions/0132-each-column-header-filters-its-column.md)),
+`src/cell-example.tsx` a cell's value kept as its column's condition
+([0133](../decisions/0133-a-cell-filters-by-its-value.md)),
 and `src/filter-panel.tsx` Build a condition's panel, with
 `src/filter-terms.ts` what they offer, send and say
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)),

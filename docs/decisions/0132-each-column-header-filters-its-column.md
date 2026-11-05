@@ -1,6 +1,6 @@
 # 0132 — Each column header filters its column
 
-- **Status:** accepted; extends [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md): the filter is seen a third way, a box under each column's header
+- **Status:** accepted; extends [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md): the filter is seen a third way, a box under each column's header; extended by [0133](0133-a-cell-filters-by-its-value.md): a column's condition can be taken from one of its cells
 - **Date:** 2026-11-05
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/filter-header.test.ts` --

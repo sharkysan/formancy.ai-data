@@ -11,6 +11,7 @@ import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
+import { filterByExample } from './cell-example.js'
 import { HeaderFilterContext } from './header-filter.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
@@ -432,7 +433,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   // A row's Delete reads the page's handler when pressed: the column is made once per noun.
   const removeNoun = props.remove?.noun
   // A box under each header the section's filter line may name (0132), the keys as one string so the columns are made again only when they change.
-  const boxedKeys = (useContext(HeaderFilterContext)?.fields ?? []).map((field) => field.field).join('\n')
+  const headerFilters = useContext(HeaderFilterContext)
+  const headersNow = useRef(headerFilters)
+  headersNow.current = headerFilters
+  const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
   const columnDefs = useMemo(
     () =>
       columnDefsOf(
@@ -497,6 +501,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
           drilling: () => latest.current.drilling === true,
+          example: (row, colId) => filterByExample(headersNow.current, row, colId),
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest` and `firstShown`.

@@ -186,4 +186,5 @@ only enforcement is "we remember" says so plainly.
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
 | [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md) | A person types a grid's filter as a line, and sees each condition as a chip | accepted; extended by 0132 |
-| [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted |
+| [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133 |
+| [0133](0133-a-cell-filters-by-its-value.md) | A cell filters by its value | accepted |

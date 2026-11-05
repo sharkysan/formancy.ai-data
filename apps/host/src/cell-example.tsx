@@ -1,0 +1,90 @@
+import { useContext, useEffect, useState } from 'react'
+import type { CSSProperties, ReactElement } from 'react'
+import type { LineField, ListFilterTerm } from '@formancy/data-client'
+import { summaryOf, withTerm } from './filter-terms.js'
+import type { GridRow } from './grid-datasource.js'
+import { HeaderFilterContext } from './header-filter.js'
+import type { HeaderFilters } from './header-filter.js'
+
+/*
+ * Filter by example (0133): a cell's value, as its row holds it, made the
+ * condition on its column -- "only rows where Status is placed" -- in place
+ * of the condition the column had. A person points at what they see before
+ * they ever type: `=` on a focused cell, or the button a focused cell
+ * shows. Only where the filter line may name the column, and only a value
+ * the line could say: equal to it, or empty where the column offers that;
+ * a lookup shows a label, not its value, and offers none.
+ */
+
+/** The condition a row's value puts on `field`, or null where it can say none. */
+export function exampleTerm(row: GridRow | undefined, field: LineField): ListFilterTerm | null {
+  if (row === undefined || row.labels[field.field] !== undefined) return null
+  const value = row.answers[field.field]
+  if (value === null || value === undefined) return field.operators.includes('null') ? { field: field.field, op: 'null' } : null
+  if (!field.operators.includes('equals') || typeof value === 'object') return null
+  return { field: field.field, op: 'equals', value: typeof value === 'string' ? value : String(value) }
+}
+
+/** `row`'s value in column `colId` applied as its condition; false where the column offers none. */
+export function filterByExample(headers: HeaderFilters | null, row: GridRow | undefined, colId: string): boolean {
+  const field = headers?.fields.find((entry) => entry.field === colId)
+  const term = field === undefined ? null : exampleTerm(row, field)
+  if (headers === null || term === null) return false
+  const next = withTerm(headers.filter, term)
+  if (JSON.stringify(next) !== JSON.stringify(headers.filter)) headers.onFilter(next)
+  return true
+}
+
+/**
+ * The button a focused cell shows: "=", named for what it keeps. Its own
+ * style attribute, in room variables, because no rule of host.css reaches
+ * into a grid (0047), as a row's Delete is; 24 pixels a side, WCAG 2.5.8's
+ * least. Out of the Tab order: the keyboard's way is `=` on the cell.
+ */
+const EXAMPLE_LOOK: CSSProperties = {
+  display: 'inline-grid',
+  placeItems: 'center',
+  width: 24,
+  height: 24,
+  marginInlineStart: 8,
+  padding: 0,
+  border: '1px solid var(--client)',
+  borderRadius: 6,
+  background: 'transparent',
+  color: 'var(--text)',
+  font: 'inherit',
+  lineHeight: 1,
+  verticalAlign: 'middle',
+  cursor: 'pointer',
+}
+
+export function ExampleButton({ cell, row, colId }: { cell: HTMLElement; row: GridRow | undefined; colId: string }): ReactElement | null {
+  const headers = useContext(HeaderFilterContext)
+  const [focused, setFocused] = useState(() => cell.contains(document.activeElement))
+  useEffect(() => {
+    const into = (): void => setFocused(true)
+    const out = (event: FocusEvent): void => {
+      if (!(event.relatedTarget instanceof Node) || !cell.contains(event.relatedTarget)) setFocused(false)
+    }
+    cell.addEventListener('focusin', into)
+    cell.addEventListener('focusout', out)
+    return () => {
+      cell.removeEventListener('focusin', into)
+      cell.removeEventListener('focusout', out)
+    }
+  }, [cell])
+  const field = headers?.fields.find((entry) => entry.field === colId)
+  const term = field === undefined ? null : exampleTerm(row, field)
+  if (!focused || headers === null || field === undefined || term === null) return null
+  return (
+    <button
+      type="button"
+      tabIndex={-1}
+      style={EXAMPLE_LOOK}
+      aria-label={`Only rows where ${summaryOf(term, field)}`}
+      onClick={() => filterByExample(headers, row, colId)}
+    >
+      =
+    </button>
+  )
+}

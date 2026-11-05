@@ -4,7 +4,7 @@ import type { ListFilterTerm, PublishedForm } from '@formancy/data-client'
 import { REFUSED_FILTER_HELP } from './grid-datasource.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, chipRemove, filterLine, listsApplied, listsSent, typeFilter } from './test-filter.js'
-import { chooseForm, dataCell, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
+import { chooseForm, dataCell, dataRows, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -256,6 +256,36 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     expect(amount.value).toBe('1000,50')
     expect(listsSent(plane.sent, engine.formId)).toEqual([])
     expect(await floor('a header box refused')).toEqual(CLEAN('a header box refused'))
+  })
+
+  // A cell's value is its column's condition on `=` (0133): the list
+  // asked for with it in the body, and the chip and the box saying it.
+  // Without the key a person would retype what they are looking at.
+  test('keeps the rows with a cell’s value on =', async () => {
+    const notes = stamp('example')
+    const orders = await freshOrders(engine, notes, ['1', '2'])
+    const user = await workspace(engine.formId)
+    await typeFilter(user, 'Records', `notes contains ${notes}`)
+    await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
+    plane.sent.length = 0
+    const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+    const amount = within(grid)
+      .getByRole('columnheader', { name: /^Amount/ })
+      .getAttribute('aria-colindex')
+    const second = dataRows(grid).find((row) => within(row).getAllByRole('gridcell')[0]?.textContent === orders[1])
+    const cell = within(second as HTMLElement)
+      .getAllByRole('gridcell')
+      .find((each) => each.getAttribute('aria-colindex') === amount) as HTMLElement
+    cell.focus()
+    await user.keyboard('=')
+    await waitFor(() => expect(recordKeys()).toEqual(orders.slice(1)), ARRIVES)
+    expect(filtersSent(engine.formId)).toEqual([
+      [
+        { field: 'notes', op: 'contains', text: notes },
+        { field: 'amount', op: 'equals', value: cell.textContent ?? '' },
+      ],
+    ])
+    expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(cell.textContent)
   })
 
   // A list nothing matches is no dead end: the page offers to try it

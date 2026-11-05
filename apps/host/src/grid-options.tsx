@@ -19,6 +19,7 @@ import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
+import { ExampleButton } from './cell-example.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 
 /*
@@ -102,7 +103,7 @@ function EmptyCell(): null {
  * no CSS rule: nothing inside the grid is styled by the host. Hidden from
  * the accessibility tree, where `aria-selected` says it.
  */
-function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
+function OpenCell(params: ICellRendererParams<GridRow> & { example?: boolean }): ReactElement {
   const open = params.node.isSelected() === true
   return (
     <>
@@ -110,6 +111,17 @@ function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
         {open ? <rect x="0" y="0" width="4" height="15" rx="2" fill="var(--client)" /> : null}
       </svg>
       {String(params.value ?? '')}
+      {params.example === true ? <ExampleButton cell={params.eGridCell} row={params.data} colId={params.column?.getColId() ?? ''} /> : null}
+    </>
+  )
+}
+
+/** A cell of a column the filter line may name: its value, and while it has the keyboard the button that keeps rows with it (0133). */
+function ExampleCell(params: ICellRendererParams<GridRow>): ReactElement {
+  return (
+    <>
+      {String(params.value ?? '')}
+      <ExampleButton cell={params.eGridCell} row={params.data} colId={params.column?.getColId() ?? ''} />
     </>
   )
 }
@@ -210,7 +222,11 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
     hide: !column.shown,
     minWidth: headerMinWidth(column.label, column.sortable),
     maxWidth: 320,
-    ...(column.key === first ? { cellRenderer: OpenCell } : {}),
+    ...(column.key === first
+      ? { cellRenderer: OpenCell, cellRendererParams: { example: boxed.has(column.key) } }
+      : boxed.has(column.key)
+        ? { cellRenderer: ExampleCell }
+        : {}),
     // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
     // Shown only: a hidden column's box would keep a row of empty cells under the headers.
     ...(boxed.has(column.key) && column.shown
@@ -253,6 +269,8 @@ export interface GridCallbacks {
   drilling(): boolean
   /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
   sorted(): void
+  /** `=` on a cell: its value kept as its column's condition (0133); false where the column offers none. */
+  example(row: GridRow | undefined, colId: string): boolean
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
@@ -317,6 +335,11 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
       const key = (event.event as KeyboardEvent | null | undefined)?.key ?? ''
+      // `=` keeps the rows with the cell's value, where its column offers that (0133).
+      if (key === '=' && on.example(event.data, event.column.getColId())) {
+        event.event?.preventDefault()
+        return
+      }
       // Space and Enter on a row's Delete are its button's: the browser presses it.
       if (!SPACE_OR_ENTER(key) || event.column.getColId() === DELETE_COLUMN) return
       event.event?.preventDefault()

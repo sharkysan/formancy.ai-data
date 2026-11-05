@@ -18,6 +18,12 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A cell filters by its value** (0133). Why: a person filters by
+  pointing at what they see before they ever type. `=` on a focused cell
+  keeps the rows with its value, in place of its column's condition, and a
+  cell that has the keyboard shows a button that does the same; a
+  timestamp's or a lookup's cell offers none. What you notice: the filter
+  line's hint says the key.
 - **Each column header filters its column** (0132). Why: the place a
   person looks for "only the amounts over 1000" is the Amount column. A
   box under each header the line may name takes the line's condition on
