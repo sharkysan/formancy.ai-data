@@ -10,6 +10,9 @@
   each display column is offered after its lookup, a column no label
   shows is no field, and a lookup whose filter this person does not
   resolve offers none (watched failing with every dotted field refused);
+  `related-filter.test.ts` -- `is empty` is neither offered nor planned
+  through a lookup, and `is not empty` is (watched failing with the
+  column's own offer used through the lookup);
   `list-terms.test.ts` -- an adapter reads the conditions fresh and
   refuses an entry shaped otherwise or with no condition (watched failing
   with the empty-condition check removed); `own-views.test.ts` -- a
@@ -22,7 +25,12 @@
   `list: related` over the label case's tables: a condition on the
   parent's name finds the children whose parent, found as the label is,
   holds it -- never the child naming `c` that a case-insensitive key
-  relates to `C`, and nothing through a parent the lookup's filter hides.
+  relates to `C`, and nothing through a parent the lookup's filter hides
+  (watched failing on PostgreSQL with the key matched by the database's
+  own equality, on SQL Server with the lookup's filter left out, and on
+  both with the conditions dropped by the planner); two conditions hold
+  of one parent together, and a page continues after a row they do not
+  hold (watched failing on both with the conditions asked of that row).
   `packages/data-server/src/routes/runtime-lists.test.ts` -- the form
   offers `country.name` with its lookup and column, a condition on it
   reaches the port as a related entry, and a person saves a view holding
@@ -52,11 +60,15 @@ display column of a lookup is a field a list may be filtered by, keyed
 `<lookup>.<the column's field key>` -- `customer.name` -- which no field
 of a form can be, since a formancy key holds no dot
 (`packages/data-core/src/records/related-filter.ts`'s `relatedKeys`). It
-offers what its column offers (`filterOffer`), after its lookup, with
-`related: { lookup, column }` naming the lookup and what the column is
-called; it is left out of the filter with its lookup (0123). A column of
-the target no label shows is no field: a condition on it would answer
-questions about values the form never shows the person.
+offers what its column offers (`filterOffer`) but `is empty`
+(`relatedOffer`), after its lookup, with `related: { lookup, column }`
+naming the lookup and what the column is called; it is left out of the
+filter with its lookup (0123). A column of the target no label shows is
+no field: a condition on it would answer questions about values the form
+never shows the person. `is empty` is not asked: a row with no target
+row, or one the lookup hides, shows the column empty as a target holding
+NULL does, and a condition through the lookup finds the last alone; the
+lookup's own `is empty` (0135) finds the rows with no target row.
 
 **Only among the rows the lookup may offer this person.** The field is
 offered, and planned, only where the lookup's own read filter resolves
@@ -87,7 +99,7 @@ chip. A person's own view (0126) keeps it, fitted on its column.
 
 **What it buys.** Every order of a customer whose name holds "Muster",
 typed as `customer.name contains Muster`, on both engines, among the
-customers the person may pick.
+customers the lookup may show the person.
 
 **What it costs.**
 - Only the display columns: a column of the target the form does not
@@ -100,14 +112,20 @@ customers the person may pick.
 - A grid has no column, and so no header box, for a field through a
   lookup: the line, its completion and the chips alone name one, and a
   cell offers no condition on one by example.
-- Under a case-insensitive collation, a row whose key is spelled in
-  another case than its target's is found by no condition through the
-  lookup, as its page shows it no label.
+- Under a collation that folds what the key holds -- case, accents, or
+  the trailing spaces SQL Server's `=` ignores -- a row whose foreign key
+  differs from its target's key only by what the collation folds is
+  found by no condition through the lookup, as its page shows it no
+  label, while the lookup's own condition (0135) finds it.
+- `is empty` is not asked through a lookup, so a row whose target holds
+  NULL in the column is found by none; `is not empty` is.
 - A lookup whose filter names an attribute the person does not carry
   offers them no field through it.
 - No plan of the EXISTS is measured on either engine, against IN or
   otherwise: a target's key is its primary or a unique key, which each
-  engine can seek by, and that is all that is known.
+  engine can seek by, and that is all that is known. On PostgreSQL a
+  text key is compared under the database's default collation, which an
+  index on a key declared under a nondeterministic one does not serve.
 
 **What it forecloses.** Nothing: the browser names a field and an
 operator, the planner decides the rest, as for every condition.

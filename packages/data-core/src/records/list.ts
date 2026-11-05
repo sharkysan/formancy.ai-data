@@ -305,9 +305,12 @@ function parentEqual(
  * -- or why not.
  *
  * Checks, in this order: everything `listable` checks; that every sort field
- * is one `listColumns` calls sortable (`not-sortable`); that every filter
- * condition is on a readable column field, one its column offers, with
- * values it can hold (`not-filterable`, 0104); that a search has a field to
+ * is one `listColumns` calls sortable (`not-sortable`); that every
+ * condition through a lookup is on a field `relatedFieldsOf` gave this
+ * person, one its column offers but `null` (`relatedFilters`, 0139); that
+ * every other filter condition is on a readable column field, one its
+ * column offers, with values it can hold (`not-filterable`, 0104); that a
+ * search has a field to
  * match (`not-searchable`); the parent; and that a cursor names a key of
  * this form (`invalid-cursor`, 0108), which says nothing of whether the row
  * is there: the page's own statement looks for it. Each row the adapter

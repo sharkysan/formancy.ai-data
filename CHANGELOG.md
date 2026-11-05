@@ -27,7 +27,9 @@ the same day (formancy.ai 0232).
   person, on both engines: one EXISTS per lookup, so a row is listed
   once. What you notice: `list.filterable` offers each display column of
   a lookup as `<lookup>.<column>` after the lookup, with `related`
-  naming the lookup and the column; a chip says it as `Customer › Name`;
+  naming the lookup and the column, and never `is empty`, which would
+  leave out the rows with no customer the page shows empty too; a chip
+  says it as `Customer › Name`;
   a person's own view keeps one, and a published view cannot name one
   yet. For integrators: `ListRequest` carries `related`, `[]` for none,
   and `listColumns` takes what it offers besides the readable fields and

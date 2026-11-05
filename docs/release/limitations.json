@@ -3861,7 +3861,7 @@
       ]
     },
     "0139": {
-      "reviewed": "sha256:cd5642e357ef13cd762db5fec1419dffff2ea66cc6bd8893971b608fb755373f",
+      "reviewed": "sha256:d3c813843c5484848a92231fb4a8706ffb81775e58231a903e6010d65d9e53b4",
       "limitations": [
         {
           "area": "forms",
@@ -3872,12 +3872,16 @@
           "says": "A published view cannot name a field through a lookup; a person's own view can."
         },
         {
+          "area": "forms",
+          "says": "A condition through a lookup cannot ask that a column is empty: a row with no target row would show it empty too and not be found. The lookup's own is empty finds the rows with no target row."
+        },
+        {
           "area": "host",
           "says": "A field through a lookup has no grid column and so no header box: the filter line and its chips alone name one, and no cell offers a condition on one by example."
         },
         {
           "area": "databases",
-          "says": "Under a case-insensitive collation, a row whose foreign key is spelled in another case than its target's key is found by no condition through the lookup, as its page shows it no label."
+          "says": "Under a collation that folds case, accents or trailing spaces, a row whose foreign key differs from its target's key only by what the collation folds is found by no condition through the lookup, as its page shows it no label."
         },
         {
           "area": "access",
