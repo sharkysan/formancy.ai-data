@@ -21,8 +21,10 @@ export function exampleTerm(row: GridRow | undefined, field: LineField): ListFil
   if (row === undefined || row.labels[field.field] !== undefined) return null
   const value = row.answers[field.field]
   if (value === null || value === undefined) return field.operators.includes('null') ? { field: field.field, op: 'null' } : null
-  if (!field.operators.includes('equals') || typeof value === 'object') return null
-  return { field: field.field, op: 'equals', value: typeof value === 'string' ? value : String(value) }
+  if (!field.operators.includes('equals')) return null
+  if (typeof value === 'string') return { field: field.field, op: 'equals', value }
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return { field: field.field, op: 'equals', value: String(value) }
+  return null
 }
 
 /** `row`'s value in column `colId` applied as its condition; false where the column offers none. */
