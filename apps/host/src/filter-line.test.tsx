@@ -109,7 +109,7 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
   })
 
   // A line the page cannot read is said under it, the characters it is
-  // about selected in the box, every character typed kept, and nothing
+  // about marked, every character typed and the caret kept, and nothing
   // sent: the grid stays on its last filter.
   test('says where a line it cannot read fails, keeps it and sends nothing', async () => {
     const user = await workspace(engine.formId)
@@ -119,7 +119,7 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     expect(within(gridSection('Records')).getByRole('status', { name: 'Filter' }).textContent).toContain('Write numbers with a point and no separators: 1000.')
     expect(line.value).toBe("amount > 1'000")
     expect(line.getAttribute('aria-invalid')).toBe('true')
-    expect([line.selectionStart, line.selectionEnd]).toEqual([9, 14])
+    expect([line.selectionStart, line.selectionEnd]).toEqual([14, 14])
     expect(listsSent(plane.sent, engine.formId)).toEqual([])
     expect(await floor('a line refused')).toEqual(CLEAN('a line refused'))
   })
@@ -219,7 +219,9 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
 
   // A list nothing matches is no dead end: the page offers to try it
   // without the last condition, which Undo puts back like any other
-  // removal.
+  // removal -- but not where a search is what matched nothing, whose way
+  // out is the grid line's Clear search (watched failing with the offer
+  // there too: each press dropped a condition and the list stayed empty).
   test('offers to try without the last condition when nothing matches', async () => {
     const notes = stamp('dead')
     const orders = await freshOrders(engine, notes, ['1', '2'])
@@ -231,6 +233,11 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
     await listsApplied('Records', [`Notes contains “${notes}”`])
     expect(within(gridSection('Records')).getByRole('button', { name: 'Undo removing Amount is over 100' })).toBeTruthy()
+
+    const search = within(gridSection('Records')).getByRole('textbox', { name: 'Search' })
+    await user.type(search, `${notes}-nowhere{Enter}`)
+    await within(gridSection('Records')).findByRole('button', { name: 'Clear search' }, ARRIVES)
+    expect(within(gridSection('Records')).queryByRole('button', { name: /^Try without/ })).toBeNull()
   })
 
   // A condition on a field the line does not offer -- left out of the

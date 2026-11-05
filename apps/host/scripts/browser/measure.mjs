@@ -265,14 +265,51 @@ async function reveal(page, at) {
 }
 
 /**
+ * A text outside a grid that axe left undecided while it lay outside the
+ * window -- above it, where the keyboard's last focus scrolled the page --
+ * brought into the window by the window's scroll alone, asked of axe
+ * again, and the window put back: `passes`, a `violation` with axe's
+ * ratio, `left` with why, or `in the window`, for `decide` to go on with.
+ * Axe reads a background at the text's place in the window, and a place
+ * outside it has none; for an empty box it then says "Element has no
+ * value", which it says only of a contrast that failed. Seen 2026-11-05:
+ * the search box, empty and above the window at one width of three, once
+ * the filter line made the filter's block taller and focusing the panel's
+ * Value scrolled the page.
+ */
+async function inWindow(page, at) {
+  return page.evaluate(async (index) => {
+    const element = window.formancyGateUndecided?.[index]
+    if (element === undefined || !element.isConnected) return { verdict: 'left', why: 'gone from the page' }
+    if (element.closest('.grid-bench') !== null) return { verdict: 'in the window' }
+    const box = element.getBoundingClientRect()
+    if (box.bottom > 0 && box.top < window.innerHeight) return { verdict: 'in the window' }
+    const [x, y] = [window.scrollX, window.scrollY]
+    try {
+      window.scrollBy(0, box.top + box.height / 2 - window.innerHeight / 2)
+      const shown = element.getBoundingClientRect()
+      if (shown.top < 0 || shown.bottom > window.innerHeight) return { verdict: 'left', why: 'outside the window, and the window’s scroll cannot bring it in' }
+      const results = await window.axe.run(element, { runOnly: { type: 'rule', values: ['color-contrast'] } })
+      const ratio = (outcome) => outcome[0]?.nodes[0]?.any[0]?.data?.contrastRatio
+      if (results.violations.length > 0) return { verdict: 'violation', ratio: ratio(results.violations) }
+      if (results.incomplete.length > 0)
+        return { verdict: 'left', why: `brought into the window, and still undecided: ${results.incomplete[0]?.nodes[0]?.any[0]?.message ?? ''}` }
+      return results.passes.length > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'brought into the window, and axe measured nothing' }
+    } finally {
+      window.scrollTo(x, y)
+    }
+  }, at)
+}
+
+/**
  * Decides what axe left undecided inside a grid -- a header or a cell whose
  * background axe "could not determine due to a pseudo element" (UX-SPEC F1),
  * or because "it is overlapped by another element" -- by the text's computed
  * colour against the background the browser painted in that cell's padding,
- * at 4.5:1 or more. An empty box -- axe's "Element has no value" -- has no
- * text to decide, and is returned as `empty`, said and not counted.
- * Anything else axe left undecided outside a grid, or for another reason,
- * stays undecided: the gate fails it. Overlapped is what axe
+ * at 4.5:1 or more. A text outside a grid that lies outside the window is
+ * first asked of axe again inside it (`inWindow`). Anything else axe left
+ * undecided outside a grid, or for another reason, stays undecided: the
+ * gate fails it. Overlapped is what axe
  * says of a row the grid keeps drawn above its scroller's top, where the
  * page's own toolbar lies over it: the same text scrolled out of view as
  * below, found `hidden` the same way (seen 2026-10-28, when a grid's Filter
@@ -313,16 +350,13 @@ export async function decide(page, undecided) {
   const left = []
   const decided = []
   const hidden = []
-  const empty = []
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
     for (const node of undecided) {
-      // An empty box has no text to read in this state, which is what axe
-      // says of it; a box's text is measured in the states that type in it
-      // (workspace.mjs's search). Seen 2026-11-05, the search box emptied
-      // by the filter's states, in one window width of three.
-      if (/has no value/.test(node.reason)) {
-        empty.push(node.html)
+      const placed = await inWindow(page, node.at)
+      if (placed.verdict === 'passes') continue
+      if (placed.verdict !== 'in the window') {
+        left.push(`${node.html} (${placed.verdict === 'violation' ? `brought into the window, at ${String(placed.ratio)}:1` : placed.why})`)
         continue
       }
       if (/partially obscured/.test(node.reason)) {
@@ -418,7 +452,7 @@ export async function decide(page, undecided) {
   } finally {
     await page.evaluate(([x, y]) => window.scrollTo(x, y), scrolled)
   }
-  return { left, decided, hidden, empty, failing: decided.filter((entry) => entry.ratio < 4.5) }
+  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5) }
 }
 
 /** What has the keyboard's focus, said so that a failure names it. */

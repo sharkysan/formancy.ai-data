@@ -46,6 +46,16 @@ describe('lineNames', () => {
     expect([...names.values()]).toEqual(['order_date', 'größe_cm', 'e_mail', 'order'])
   })
 
+  // Letters that carry their marks -- Devanagari, Thai, a decomposed é --
+  // are one letter with them, so a label in any script is a name a person
+  // can type. Watched failing with marks taken for separators: "नाम" was
+  // "न_म" and "Café" typed decomposed lost its accent.
+  test('keeps a letter whole with its marks, however it was typed', () => {
+    const names = lineNames([named('नाम', 'a'), named('ชื่อ', 'b'), named('Cafe\u0301', 'c')])
+    expect([...names.values()]).toEqual(['नाम', 'ชื่อ', 'café'])
+    expect(parseFilterLine('cafe\u0301 = x', [named('Café', 'c')])).toEqual({ ok: true, filter: [{ field: 'c', op: 'equals', value: 'x' }] })
+  })
+
   // A name must say one field. Two labels that give one name, a label with
   // no letter or digit in it, or a name that is another field's key, would
   // each leave a person typing one thing and the line reading another, so
@@ -151,6 +161,16 @@ describe('parseFilterLine', () => {
   // space in quotes -- and is told the name the line knows it by, rather
   // than handed the list of every field to find it in.
   test('tells a person who types a label another way what its name is', () => {
+    // The likeliest other spelling is the label itself, its space and all:
+    // told the name, not handed every field (watched failing with "No field
+    // is called order. Fields: …").
+    expect(parsed('order date >= 2026-10-01')).toEqual({
+      ok: false,
+      at: 0,
+      length: 10,
+      message: 'No field is called order date: it is order_date in the line.',
+    })
+    expect(parsed('Approved by is empty')).toEqual({ ok: false, at: 0, length: 11, message: 'No field is called Approved by: it is approved_by in the line.' })
     expect(parsed('order-date >= 2026-10-01')).toEqual({
       ok: false,
       at: 0,

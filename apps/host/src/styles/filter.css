@@ -34,6 +34,14 @@
   font-size: 1rem;
 }
 
+/* The name a view would be saved under, offered while the box is empty:
+   the room's muted ink, which its hints are read at, rather than whatever
+   grey a browser picks (axe measures no placeholder). */
+.view-picker input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
 .view-said {
   flex: 1 0 100%;
   margin: 0;

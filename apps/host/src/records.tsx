@@ -210,7 +210,8 @@ export function Records({
                   moves={definition.moves}
                   filter={filter}
                   onFilter={state.setFilter}
-                  empty={unmatched}
+                  // Nothing matched a search: the search is the way out, which the grid's line offers.
+                  empty={unmatched && search.trim() === ''}
                   slash
                   onLeave={() => grid.current?.focusFirst()}
                 />

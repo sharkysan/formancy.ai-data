@@ -18,43 +18,77 @@ import type { PanelField } from './filter-terms.js'
  * condition it put back.
  */
 
-/** What Undo puts back: the filter before a removal, while the filter is still what the removal left. */
-interface Undoing {
+/** What Undo puts back: the filter before a removal, and what Undo says. */
+export interface Undoing {
   before: ListFilterTerm[]
+  /** The filter the removal left, as JSON: Undo lasts while the filter is that. */
   left: string
   words: string
 }
 
+/** A grid's Undo, which the chips and the line share: what it puts back, a removal that offers it, and putting back. */
+export interface UndoState {
+  undo: Undoing | null
+  /** `next` applied in place of the filter, Undo offered for it in `words`. */
+  removing: (next: ListFilterTerm[], words: string) => void
+  /** The filter before the removal applied again; the condition it put back first, for the keyboard. */
+  putBack: () => ListFilterTerm | undefined
+}
+
 const same = (a: readonly ListFilterTerm[], b: readonly ListFilterTerm[]): boolean => JSON.stringify(a) === JSON.stringify(b)
+
+/**
+ * The Undo of a grid's filter. It is forgotten as soon as the filter
+ * changes in any way but the removal it undoes -- followed while
+ * rendering, React's way to follow a value -- so it never comes back when
+ * the filter later returns to what the removal left.
+ */
+export function useUndo(filter: readonly ListFilterTerm[], onFilter: (next: ListFilterTerm[]) => void): UndoState {
+  const [undoing, setUndoing] = useState<Undoing | null>(null)
+  const now = JSON.stringify(filter)
+  const [seen, setSeen] = useState(now)
+  if (seen !== now) {
+    setSeen(now)
+    if (undoing !== null && undoing.left !== now) setUndoing(null)
+  }
+  const undo = undoing !== null && undoing.left === now ? undoing : null
+  return {
+    undo,
+    removing: (next, words) => {
+      setUndoing({ before: [...filter], left: JSON.stringify(next), words })
+      onFilter(next)
+    },
+    putBack: () => {
+      if (undo === null) return undefined
+      setUndoing(null)
+      onFilter(undo.before)
+      return undo.before.find((term) => !filter.some((given) => same([given], [term]))) ?? undo.before[0]
+    },
+  }
+}
 
 export function FilterChips({
   idBase,
   fields,
   filter,
-  onFilter,
+  undoing,
   empty,
 }: {
   idBase: string
   /** The fields the list is filtered by, offered or not, for their labels. */
   fields: readonly PanelField[]
   filter: readonly ListFilterTerm[]
-  onFilter: (next: ListFilterTerm[]) => void
-  /** Whether the grid's first page under this filter came back with no rows. */
+  /** The grid's Undo, shared with its line. */
+  undoing: UndoState
+  /** Whether the grid's first page under this filter, searched for nothing, came back with no rows. */
   empty: boolean
 }): ReactElement | null {
   const byField = new Map(fields.map((field) => [field.field, field]))
-  const [undoing, setUndoing] = useState<Undoing | null>(null)
+  const { undo, removing } = undoing
   const removes = useRef(new Map<string, HTMLButtonElement>())
   const undoRef = useRef<HTMLButtonElement>(null)
   const after = useAfterRender()
-  const undo = undoing !== null && undoing.left === JSON.stringify(filter) ? undoing : null
   const words = (term: ListFilterTerm): string => summaryOf(term, byField.get(term.field))
-
-  /** `next` applied in place of `filter`, Undo offered for it in `said`. */
-  function removing(next: ListFilterTerm[], said: string): void {
-    setUndoing({ before: [...filter], left: JSON.stringify(next), words: said })
-    onFilter(next)
-  }
 
   function remove(index: number): void {
     const term = filter[index]
@@ -74,10 +108,7 @@ export function FilterChips({
   }
 
   function putBack(): void {
-    if (undo === null) return
-    const back = undo.before.find((term) => !filter.some((given) => same([given], [term]))) ?? undo.before[0]
-    setUndoing(null)
-    onFilter(undo.before)
+    const back = undoing.putBack()
     after(() => {
       if (back !== undefined) removes.current.get(back.field)?.focus()
     })

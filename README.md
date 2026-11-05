@@ -717,7 +717,8 @@ field are one range. As you type, a list under the line offers what may
 come next: the fields with their labels, a field's operators, a state's
 labels, yes or no. Enter applies the line and lists the grid again from
 its first row, and a line the page cannot read keeps what you typed,
-selects what it is about and says why -- `1'000` is written `1000`. `/`
+marks what it is about and says why -- `1'000` is written `1000`; an
+edit you leave unapplied is dropped when the filter changes elsewhere. `/`
 puts the keyboard on the Records line, and Esc twice gives it back to the
 grid
 ([0131](./docs/decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)).

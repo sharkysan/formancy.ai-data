@@ -13,8 +13,9 @@ import { useAfterRender } from './after-render.js'
  * An ARIA 1.2 combobox: what may come next at the caret is a listbox under
  * it, which typing opens, ArrowDown and ArrowUp move through, Enter takes
  * the option moved to, and Esc closes. Enter with no option moved to
- * applies the line; a line that cannot be read keeps every character,
- * selects the ones it is about and says why under it, and sends nothing. A
+ * applies the line; a line that cannot be read keeps every character and
+ * the caret, marks the ones it is about and says why under it, and sends
+ * nothing. A
  * second Esc puts back what is applied and gives the keyboard to the grid.
  *
  * What the line shows, while the person is not editing it, is the filter
@@ -29,6 +30,7 @@ export function FilterLine({
   fields,
   filter,
   onFilter,
+  onClear,
   slash = false,
   onLeave,
 }: {
@@ -39,6 +41,8 @@ export function FilterLine({
   /** The filter as applied: what the grid lists and a file holds. */
   filter: readonly ListFilterTerm[]
   onFilter: (next: ListFilterTerm[]) => void
+  /** Every condition removed by a line cleared and applied: the grid's Undo offers them back. */
+  onClear?: () => void
   /** Whether `/`, pressed outside a text box, puts the keyboard on this line: the Records grid's. */
   slash?: boolean
   /** Where the keyboard goes when Esc leaves the line: the grid. */
@@ -52,6 +56,20 @@ export function FilterLine({
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
   const [refusal, setRefusal] = useState<LineRefusal | null>(null)
+  const [focused, setFocused] = useState(false)
+  // A filter changed elsewhere -- a view, a chip, the panel -- while the
+  // person is not in the line is what the line shows: an edit they left
+  // unapplied is dropped, or the line and the chips would say two filters.
+  // Followed while rendering, React's way to follow a value.
+  const [followed, setFollowed] = useState(applied)
+  if (followed !== applied) {
+    setFollowed(applied)
+    if (!focused) {
+      setDraft(null)
+      setRefusal(null)
+    }
+  }
+  const pending = draft !== null && draft !== applied
   const box = useRef<HTMLInputElement>(null)
   const after = useAfterRender()
   const completion = completeFilterLine(text, caret, fields)
@@ -95,19 +113,27 @@ export function FilterLine({
   function apply(): void {
     const read = parseFilterLine(text, fields)
     setOpen(false)
+    // What is refused is marked under the line, and the caret stays where
+    // it is: selected, the marked characters were the next key's to replace,
+    // and a line not finished yet lost what was typed on.
     if (!read.ok) {
       setRefusal(read)
-      box.current?.setSelectionRange(read.at, read.at + read.length)
       return
     }
     setRefusal(null)
     setDraft(null)
     const kept = filter.filter((term) => !fields.some((field) => field.field === term.field))
     const next = [...kept, ...read.filter]
-    if (JSON.stringify(next) !== JSON.stringify(filter)) onFilter(next)
+    if (JSON.stringify(next) === JSON.stringify(filter)) return
+    if (next.length === 0 && onClear !== undefined) onClear()
+    else onFilter(next)
   }
 
   function keyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    // An input method composing a word owns Enter and Esc until it is done;
+    // 229 is the key a browser reports for them, Safari's after the
+    // composition has already ended.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return
     const count = completion.options.length
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       if (count === 0) return
@@ -154,9 +180,19 @@ export function FilterLine({
           spellCheck={false}
           value={text}
           onChange={(event) => typed(event.target.value, event.target.selectionStart ?? event.target.value.length)}
-          onSelect={(event) => setCaret(event.currentTarget.selectionStart ?? 0)}
+          onSelect={(event) => {
+            // A caret moved offers other options: none of them is the one moved to.
+            const at = event.currentTarget.selectionStart ?? 0
+            if (at === caret) return
+            setCaret(at)
+            setActive(-1)
+          }}
           onKeyDown={keyDown}
-          onBlur={() => setOpen(false)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false)
+            setOpen(false)
+          }}
         />
         <ul id={`${idBase}-options`} className="filter-options" role="listbox" aria-label="What may come next" hidden={!shown}>
           {completion.options.map((option, index) => (
@@ -178,7 +214,7 @@ export function FilterLine({
         </ul>
       </div>
       <p className="hint filter-hint" id={`${idBase}-hint`}>
-        Conditions joined by and, applied with Enter.
+        {pending ? 'Not applied yet: Enter applies it, Esc puts back the filter.' : 'Conditions joined by and, applied with Enter.'}
       </p>
       <p role="status" id={`${idBase}-problem`} className="status filter-problem" data-kind="refused" aria-labelledby={`${idBase}-label`}>
         {refusal === null ? '' : refusal.message}

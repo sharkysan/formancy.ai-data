@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import type { ReactElement } from 'react'
 import type { ListFilterTerm, StateMoves } from '@formancy/data-client'
-import { FilterChips } from './filter-chips.js'
+import { FilterChips, useUndo } from './filter-chips.js'
 import { FilterLine } from './filter-line.js'
 import { FilterPanel } from './filter-panel.js'
 import { lineFields } from './filter-terms.js'
@@ -41,12 +41,21 @@ export function GridFilter({
 }): ReactElement {
   const line = useMemo(() => lineFields(fields, moves), [fields, moves])
   const offered = fields.filter((field) => field.offered)
+  const undoing = useUndo(filter, onFilter)
   return (
     <div className="filter-block">
       {line.length === 0 ? null : (
-        <FilterLine idBase={`${idBase}-line`} fields={line} filter={filter} onFilter={onFilter} slash={slash} {...(onLeave === undefined ? {} : { onLeave })} />
+        <FilterLine
+          idBase={`${idBase}-line`}
+          fields={line}
+          filter={filter}
+          onFilter={onFilter}
+          onClear={() => undoing.removing([], 'clearing the filter')}
+          slash={slash}
+          {...(onLeave === undefined ? {} : { onLeave })}
+        />
       )}
-      <FilterChips idBase={idBase} fields={fields} filter={filter} onFilter={onFilter} empty={empty} />
+      <FilterChips idBase={idBase} fields={fields} filter={filter} undoing={undoing} empty={empty} />
       {offered.length === 0 ? null : <FilterPanel idBase={idBase} fields={offered} filter={filter} onFilter={onFilter} />}
     </div>
   )

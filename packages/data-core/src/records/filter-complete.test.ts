@@ -78,7 +78,9 @@ describe('completeFilterLine', () => {
     expect(labels('amount > ')).toEqual([])
   })
 
-  // After a whole condition comes `and`; inside a quote, anything may.
+  // After a whole condition comes `and`; inside a quote, anything may, and
+  // an option offered there would break the value the person is typing
+  // (watched failing with a quote read as a word: names were offered).
   test('offers and after a condition, and nothing inside a quote', () => {
     expect(at('status = placed ').options).toEqual([{ insert: 'and ', label: 'and', hint: 'and another condition that holds too' }])
     expect(labels('notes contains "salt a')).toEqual([])

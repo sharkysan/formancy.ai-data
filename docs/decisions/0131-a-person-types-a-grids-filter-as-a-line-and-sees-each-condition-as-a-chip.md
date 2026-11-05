@@ -24,16 +24,27 @@
   `apps/host/src/grid-filter.test.tsx`, without a server -- Enter sends
   what the line reads after a condition on a field it does not offer,
   which it keeps (watched failing with that condition dropped); a line it
-  cannot read sends nothing, keeps every character and selects the ones
-  it is about; completion is moved through and taken by the keyboard; a
-  chip removed, or Clear filter, is put back by Undo until the filter
-  changes otherwise (watched failing with Undo never offered); a list
-  nothing matches offers to try it without the last condition; the
-  builder offers only the fields offered (0123).
+  cannot read sends nothing and keeps every character and the caret, so a
+  line not finished yet is typed on (watched failing with the marked
+  characters selected: "amount >" became "amount  5"); an edit left
+  unapplied is dropped when the filter changes elsewhere, and said while
+  it is pending (watched failing with the line and the chips saying two
+  filters); Enter and Esc are an input method's while it composes
+  (watched failing with half a word applied); completion is moved through
+  and taken by the keyboard, and points at no option once the caret moves
+  (watched failing with `aria-activedescendant` naming one gone); a chip
+  removed, Clear filter or the line cleared is put back by Undo, which is
+  forgotten once the filter changes otherwise (watched failing with Undo
+  never offered, and again with it offered back); a list nothing matches
+  offers to try it without the last condition; the builder offers only
+  the fields offered (0123). `packages/data-core/src/records/filter-line.test.ts`
+  also holds a letter with its marks one letter, and a label typed with
+  its space told its name (each watched failing).
   `apps/host/src/filter-line.test.tsx`, on both engines against the real
   server -- the same in a page: the terms in the list's body and in no
   URL, a refusal of the server's said on the grid's line with the line
-  kept, `/` and Esc, and axe and a name on every control in each state.
+  kept, no way out offered where a search matched nothing, `/` and Esc,
+  and axe and a name on every control in each state.
   `apps/host/scripts/browser/filtering.mjs`, in Chromium, Firefox and
   WebKit -- the completion open over the grid, a line applied and a chip
   removed, each measured for contrast, target size and no sideways scroll
@@ -73,9 +84,12 @@ could not.
 
 **The host page draws the line above each grid.** An ARIA 1.2 combobox
 named Filter: completion is a listbox under it, Enter applies what the
-line reads, and a line it cannot read keeps every character, selects the
-ones it is about and says why, sending nothing. While the person is not
-editing it, the line shows the filter applied, however it was applied. A
+line reads, and a line it cannot read keeps every character and the
+caret, marks the ones it is about and says why, sending nothing. Enter
+and Esc are an input method's while it composes. While the person is not
+in it, the line shows the filter applied, however it was applied: an edit
+left unapplied there is dropped when the filter changes elsewhere, and
+said as not applied yet while it is pending. A
 condition on a field the line does not offer -- one an administrator left
 out of the panel (0123), set by a view -- is not in the line, and
 applying the line keeps it. `/` outside a text box puts the keyboard on
@@ -83,14 +97,25 @@ the Records grid's line, Esc closes its completion, and a second Esc puts
 back what is applied and gives the keyboard to the grid.
 
 **Each condition is a chip.** Its words are the panel's sentence --
-"Amount is over 1000" -- and its Remove is named for them. A removal, or
-Clear filter, offers Undo until the filter changes some other way, never
-on a timer (WCAG 2.2.1). A list nothing matches offers to try it without
-its last condition. The panel stays, as Build a condition, until each
+"Amount is over 1000" -- and its Remove is named for them. A removal,
+Clear filter or the line cleared offers Undo until the filter changes some
+other way, never on a timer (WCAG 2.2.1). A list nothing matches offers to
+try it without its last condition, except where a search matched nothing,
+whose way out is Clear search.
+
+**The host's gate asks axe again inside the window.** A fourth decision
+of the gate's own, beside 0047's three: a text outside a grid that axe
+left undecided while it lay outside the window is brought into it by the
+window's scroll alone and asked again, and stays undecided otherwise
+(`apps/host/scripts/browser/measure.mjs`'s `inWindow`). Axe reads a
+background at a text's place in the window, and a place outside it has
+none: the search box, scrolled above the window once the line made the
+filter's block taller, was "Element has no value", which axe says only of
+a contrast that failed. The panel stays, as Build a condition, until each
 column's header filters its column.
 
-A person's view's name box offers the conditions in words while it is
-empty, and Save keeps the view under them; a name typed replaces them
+A person's view's name box offers the conditions in words, in the room's
+muted ink, while it is empty, and Save keeps the view under them; a name typed replaces them
 (`apps/host/src/view-save.test.tsx`, watched failing with the words as
 the box's value, which a typed name was appended to).
 

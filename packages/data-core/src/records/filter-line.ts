@@ -97,7 +97,11 @@ export const offerWords = (field: LineField): string[] => field.operators.flatMa
  */
 function slug(label: string): string {
   // Every run is one `_` by now, so at most one is at either end: trimmed without a second pattern over the label.
-  const joined = label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '_')
+  // A letter keeps its marks (\p{M}), and a label typed decomposed reads as one composed.
+  const joined = label
+    .normalize('NFC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, '_')
   const start = joined.startsWith('_') ? 1 : 0
   const end = joined.length > start && joined.endsWith('_') ? joined.length - 1 : joined.length
   return joined.slice(start, end)
@@ -173,7 +177,7 @@ interface Context {
 
 /** The field a word names: by its name in the line, or by its key. */
 function fieldNamed(word: string, context: Context): LineField | undefined {
-  const lower = word.toLowerCase()
+  const lower = word.normalize('NFC').toLowerCase()
   return (
     context.fields.find((field) => context.names.get(field.field)?.toLowerCase() === lower) ??
     context.fields.find((field) => field.field.toLowerCase() === lower)
@@ -191,24 +195,55 @@ export function readLine(
 ): { ok: true; state: LineState; entries: readonly LineEntry[] } | LineRefusal {
   const context: Context = { fields, names: lineNames(fields), entries: [] }
   let state: LineState = { want: 'name', after: null }
-  for (const token of found) {
+  for (const [index, token] of found.entries()) {
     if (token.open === true) return refuse(token, 'This quote is not closed.')
-    const next = step(state, token, context)
+    const next = step(state, token, context, found.slice(index + 1))
     if ('ok' in next) return next
     state = next
   }
   return { ok: true, state, entries: context.entries }
 }
 
-function step(state: LineState, token: LineToken, context: Context): LineState | LineRefusal {
+/**
+ * The field a person meant by a name the line does not know: the name, or
+ * it and the words after it up to an operator, written as a label is --
+ * `order-date`, `"Order date"`, `order date` -- and the characters that
+ * said it. Undefined where they say no field.
+ */
+function meantBy(token: LineToken, rest: readonly LineToken[], context: Context): { field: LineField; end: number } | undefined {
+  if (token.kind === 'operator') return undefined
+  const following = rest.findIndex((next) => next.kind !== 'word')
+  const words = [token, ...(following === -1 ? rest : rest.slice(0, following))]
+  for (let count = words.length; count > 0; count -= 1) {
+    const field = fieldNamed(
+      slug(
+        words
+          .slice(0, count)
+          .map((word) => word.value)
+          .join(' '),
+      ),
+      context,
+    )
+    if (field !== undefined) return { field, end: words[count - 1]?.end ?? token.end }
+  }
+  return undefined
+}
+
+function step(state: LineState, token: LineToken, context: Context, rest: readonly LineToken[]): LineState | LineRefusal {
   const word = token.kind === 'word' ? token.value.toLowerCase() : null
   switch (state.want) {
     case 'name': {
       const field = word === null ? undefined : fieldNamed(token.value, context)
       if (field !== undefined) return { want: 'operator', field, name: token }
       if (word === 'and') return refuse(token, state.after === null ? 'A condition comes before and.' : 'A condition comes after and.')
-      const meant = token.kind === 'operator' ? undefined : fieldNamed(slug(token.value), context)
-      if (meant !== undefined) return refuse(token, `No field is called ${token.text}: it is ${context.names.get(meant.field) ?? meant.field} in the line.`)
+      const meant = meantBy(token, rest, context)
+      if (meant !== undefined) {
+        const said = [token, ...rest.filter((next) => next.end <= meant.end)].map((next) => next.text).join(' ')
+        return refuse(
+          { at: token.at, end: meant.end },
+          `No field is called ${said}: it is ${context.names.get(meant.field.field) ?? meant.field.field} in the line.`,
+        )
+      }
       const names = [...context.names.values()]
       const shown = names.length > 12 ? `${names.slice(0, 12).join(', ')}, …` : names.join(', ')
       return refuse(token, `No field is called ${token.text}. Fields: ${shown}.`)

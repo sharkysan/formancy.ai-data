@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:fd7780c6e329153518348154a373834e825ac31c0b9308d8050d721b175ce6a6",
+      "reviewed": "sha256:663d13b7ab989bde93b9448beedf8dec982cdea77b8b35a4bf6ecdd129371301",
       "limitations": [
         {
           "area": "host",
@@ -3699,7 +3699,7 @@
       ]
     },
     "0131": {
-      "reviewed": "sha256:5397543163506594cb7a1baa1384d77046173b714fe9831eb410a9ac99a6d907",
+      "reviewed": "sha256:1796c1c06cf4186df9e0a02601ef4c7da7788f0701b636476c21123e1b47cb71",
       "limitations": [
         {
           "area": "host",
@@ -3722,6 +3722,14 @@
         {
           "area": "host",
           "says": "An operator the server comes to offer is the Build a condition panel's alone until the line's reader learns to write it."
+        },
+        {
+          "area": "host",
+          "says": "An edit typed in the filter line and left unapplied is dropped when the filter changes elsewhere -- a view picked, a chip removed -- while the keyboard is not in the line; the line says such an edit is not applied yet while it is pending."
+        },
+        {
+          "area": "testing",
+          "says": "The host's browser gate asks axe again, inside the window, about a text outside a grid it left undecided outside the window: a fourth decision of the gate's own beside 0047's three, which a text a pane cuts is not."
         }
       ]
     }

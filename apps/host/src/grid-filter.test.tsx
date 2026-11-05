@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'vitest'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
 import { useState } from 'react'
 import type { ReactElement } from 'react'
@@ -29,31 +29,44 @@ const MOVES: StateMoves = {
   labels: [{ state: 'on_hold', label: 'On hold' }],
 }
 
-/** The filter held as a section holds it, every change it is sent kept in `sent`. */
+/**
+ * The filter held as a section holds it, every change it is sent kept in
+ * `sent`; each of `elsewhere` a button that sets the filter as a view or
+ * a header would, "Elsewhere 1" and on.
+ */
 function Section({
   fields,
   start = [],
   empty = false,
   sent,
+  elsewhere = [],
 }: {
   fields: PanelField[]
   start?: ListFilterTerm[]
   empty?: boolean
   sent: ListFilterTerm[][]
+  elsewhere?: ListFilterTerm[][]
 }): ReactElement {
   const [filter, setFilter] = useState<ListFilterTerm[]>(start)
   return (
-    <GridFilter
-      idBase="grid"
-      fields={fields}
-      moves={MOVES}
-      filter={filter}
-      empty={empty}
-      onFilter={(next) => {
-        sent.push(next)
-        setFilter(next)
-      }}
-    />
+    <>
+      {elsewhere.map((other, index) => (
+        <button key={String(index)} type="button" onClick={() => setFilter(other)}>
+          Elsewhere {index + 1}
+        </button>
+      ))}
+      <GridFilter
+        idBase="grid"
+        fields={fields}
+        moves={MOVES}
+        filter={filter}
+        empty={empty}
+        onFilter={(next) => {
+          sent.push(next)
+          setFilter(next)
+        }}
+      />
+    </>
   )
 }
 
@@ -112,8 +125,9 @@ describe('the filter line', () => {
     expect(chips()).toEqual(['Notes contains “urgent”', 'Status is “on_hold”', 'Amount is over 1000'])
   })
 
-  // A line it cannot read sends nothing, keeps every character, selects
-  // the ones it is about and says why, until the person types again.
+  // A line it cannot read sends nothing, keeps every character and the
+  // caret, marks the ones it is about and says why, until the person types
+  // again: a line sent half-read would filter by what nobody asked for.
   test('says why it cannot read a line, and sends nothing', async () => {
     const sent: ListFilterTerm[][] = []
     render(<Section fields={[STATUS, AMOUNT]} sent={sent} />)
@@ -122,7 +136,8 @@ describe('the filter line', () => {
     expect(sent).toEqual([])
     expect(line().value).toBe('amount > 1000,50')
     expect(line().getAttribute('aria-invalid')).toBe('true')
-    expect([line().selectionStart, line().selectionEnd]).toEqual([9, 16])
+    expect([line().selectionStart, line().selectionEnd]).toEqual([16, 16])
+    expect(screen.getByRole('status', { name: 'Filter' }).querySelector('mark')?.textContent).toBe('1000,50')
     expect(screen.getByRole('status', { name: 'Filter' }).textContent).toContain('Write numbers with a point and no separators: 1000.50.')
     await user.type(line(), 'x')
     expect(line().getAttribute('aria-invalid')).toBeNull()
@@ -131,6 +146,9 @@ describe('the filter line', () => {
   // What may come next is a listbox the keyboard moves through and takes
   // from: a state by its label, inserted as its value, the states an
   // administrator labelled first, in their order, then the rest as spelled.
+  // A listbox the keyboard could not reach, or one that inserted a label,
+  // would offer a value the server never stores (watched failing with the
+  // moves' order: "placed" came first).
   test('completes from the keyboard', async () => {
     render(<Section fields={[STATUS, AMOUNT]} sent={[]} />)
     const user = userEvent.setup()
@@ -148,7 +166,9 @@ describe('the filter line', () => {
 
 describe('the chips', () => {
   // A chip removed is Undo's to put back, in its place, until the filter
-  // changes some other way; Clear filter likewise.
+  // changes some other way; Clear filter likewise. Without it a slip of
+  // the pointer loses a condition the person may have typed with care
+  // (watched failing with Undo never offered).
   test('remove a condition, and Undo puts it back', async () => {
     const sent: ListFilterTerm[][] = []
     const start: ListFilterTerm[] = [
@@ -172,7 +192,9 @@ describe('the chips', () => {
     expect(screen.queryByRole('button', { name: /^Undo/ })).toBeNull()
   })
 
-  // A list nothing matches offers to try it without the last condition.
+  // A list nothing matches offers to try it without the last condition, so
+  // an empty grid is never a dead end the person must reason their way out
+  // of (watched failing with the offer on the first condition).
   test('offer a way out of a list nothing matches', async () => {
     const sent: ListFilterTerm[][] = []
     const start: ListFilterTerm[] = [
@@ -182,5 +204,101 @@ describe('the chips', () => {
     render(<Section fields={[STATUS, AMOUNT]} start={start} empty sent={sent} />)
     await userEvent.setup().click(screen.getByRole('button', { name: 'Try without Amount is over 100' }))
     expect(sent).toEqual([start.slice(0, 1)])
+  })
+})
+
+describe('the line and the filter it shows', () => {
+  // A filter changed elsewhere -- a view picked, a header, the panel -- is
+  // what the line shows once the person has left it, an edit they did not
+  // apply dropped: kept, the line would say one filter and the chips
+  // another, and Enter would put back what the view had replaced (watched
+  // failing with the draft kept until Enter).
+  test('shows a filter changed elsewhere, and says an edit is not applied yet', async () => {
+    const sent: ListFilterTerm[][] = []
+    const view: ListFilterTerm[] = [{ field: 'status', op: 'equals', value: 'on_hold' }]
+    render(<Section fields={[STATUS, AMOUNT]} start={[{ field: 'status', op: 'equals', value: 'placed' }]} sent={sent} elsewhere={[view]} />)
+    const user = userEvent.setup()
+    await user.type(line(), ' and amount > 5')
+    expect(screen.getByText('Not applied yet: Enter applies it, Esc puts back the filter.')).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Elsewhere 1' }))
+    expect(line().value).toBe('status = on_hold')
+    expect(chips()).toEqual(['Status is “on_hold”'])
+    expect(screen.queryByText(/^Not applied yet/)).toBeNull()
+    expect(sent).toEqual([])
+  })
+
+  // A refusal for a line not finished yet leaves the caret where it was,
+  // so the person goes on typing: selected, the marked characters were
+  // replaced by the next key, and "amount >" became "amount  5" (watched
+  // failing that way).
+  test('lets a person go on typing after a refusal', async () => {
+    const sent: ListFilterTerm[][] = []
+    render(<Section fields={[STATUS, AMOUNT]} sent={sent} />)
+    const user = userEvent.setup()
+    await user.type(line(), 'amount >{Enter}')
+    expect(screen.getByRole('status', { name: 'Filter' }).textContent).toContain('Amount > needs a value.')
+    // Typed on from where the keyboard is, without a click to place the caret.
+    await user.keyboard(' 5{Enter}')
+    expect(sent).toEqual([[{ field: 'amount', op: 'range', from: '5', to: null, exclusive: 'from' }]])
+  })
+
+  // While an input method composes a word, Enter and Esc are its: Enter
+  // takes the word it composed, and must not apply half a line; Esc ends
+  // the composition, and must not throw the line away (watched failing
+  // with Enter applying "status = pla").
+  test('leaves Enter and Esc to an input method while it composes', async () => {
+    const sent: ListFilterTerm[][] = []
+    render(<Section fields={[STATUS, AMOUNT]} sent={sent} />)
+    await userEvent.setup().type(line(), 'status = pla')
+    fireEvent.keyDown(line(), { key: 'Enter', isComposing: true, keyCode: 229 })
+    fireEvent.keyDown(line(), { key: 'Escape', isComposing: true, keyCode: 229 })
+    expect(sent).toEqual([])
+    expect(line().value).toBe('status = pla')
+  })
+
+  // Clearing the line and pressing Enter removes every condition, which
+  // Undo puts back like a chip's removal (watched failing with no Undo:
+  // the filter was gone for good).
+  test('offers Undo when the line is cleared and applied', async () => {
+    const sent: ListFilterTerm[][] = []
+    const start: ListFilterTerm[] = [{ field: 'status', op: 'equals', value: 'placed' }]
+    render(<Section fields={[STATUS, AMOUNT]} start={start} sent={sent} />)
+    const user = userEvent.setup()
+    await user.clear(line())
+    await user.keyboard('{Enter}')
+    expect(sent).toEqual([[]])
+    await user.click(screen.getByRole('button', { name: 'Undo clearing the filter' }))
+    expect(sent.at(-1)).toEqual(start)
+  })
+
+  // The option the keyboard moved to is one the listbox shows: a caret
+  // moved elsewhere offers other options, and the line must not point at
+  // one that is gone (watched failing with aria-activedescendant naming
+  // an option no longer drawn).
+  test('points at no option once the caret moves', async () => {
+    render(<Section fields={[STATUS, AMOUNT]} sent={[]} />)
+    const user = userEvent.setup()
+    await user.type(line(), 'st')
+    await user.keyboard('{ArrowDown}')
+    expect(line().getAttribute('aria-activedescendant')).not.toBeNull()
+    await user.keyboard('{ArrowLeft}')
+    expect(line().getAttribute('aria-activedescendant')).toBeNull()
+  })
+
+  // Undo is for the removal just made: once the filter changes some other
+  // way it is gone, and does not come back if the filter later returns to
+  // what the removal left (watched failing with Undo offered again).
+  test('forgets Undo once the filter changes some other way', async () => {
+    const start: ListFilterTerm[] = [
+      { field: 'status', op: 'equals', value: 'placed' },
+      { field: 'amount', op: 'equals', value: '5' },
+    ]
+    render(<Section fields={[STATUS, AMOUNT]} start={start} sent={[]} elsewhere={[[], start.slice(1)]} />)
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Remove Status is “placed”' }))
+    expect(screen.getByRole('button', { name: 'Undo removing Status is “placed”' })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Elsewhere 1' }))
+    await user.click(screen.getByRole('button', { name: 'Elsewhere 2' }))
+    expect(screen.queryByRole('button', { name: /^Undo/ })).toBeNull()
   })
 })
