@@ -193,7 +193,10 @@ export interface Deleting {
  * as one nothing writes, and sends it in no body (0117). `moves` is the
  * state field the policy holds to its moves and those this person may make
  * (`stateMoves`), or `null` where the policy names none or `operations`
- * holds neither `create` nor `update` (0127).
+ * holds neither `create` nor `update` (0127). `opens` is each lookup field
+ * this person may read with the published forms they may read its record
+ * in (`lookupOpens`), read from every bundle as the menu reads them, asking
+ * no database of any other form; `[]` where none (0140).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -205,6 +208,7 @@ export interface PublishedForm {
   versions: { from: string; to: string; key: string[] } | null
   writable: { create: string[] | null; update: string[] | null }
   moves: StateMoves | null
+  opens: LookupOpen[]
 }
 
 /**
@@ -245,6 +249,17 @@ export interface FormMenuEntry {
   title: string
   operations: PolicyOperation[]
   children: FormMenuChild[]
+}
+
+/**
+ * A lookup field this person may read, and the published forms they may
+ * read its record in (0140): each over the lookup's target, keyed by what
+ * its foreign key references, so the lookup's value is a record token of
+ * each. In codepoint order of their ids.
+ */
+export interface LookupOpen {
+  field: string
+  forms: Array<{ id: string; title: string }>
 }
 
 /**

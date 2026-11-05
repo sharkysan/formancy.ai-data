@@ -194,6 +194,25 @@ function isMoves(value: unknown): value is PublishedForm['moves'] {
   )
 }
 
+/**
+ * The forms each lookup's record opens in (0140): a list, each a lookup
+ * field and the forms, each with its id and title. A reply without it is
+ * from a server older than 0140, whose page would offer no lookup's record
+ * to open.
+ */
+function isOpens(value: unknown): value is PublishedForm['opens'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry['field'] === 'string' &&
+        Array.isArray(entry['forms']) &&
+        entry['forms'].every((form) => isRecord(form) && typeof form['id'] === 'string' && typeof form['title'] === 'string'),
+    )
+  )
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -206,7 +225,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isCopied(body['copied'], body['operations'] as unknown[]) &&
     isVersions(body['versions'], body['operations'] as unknown[]) &&
     isWritable(body['writable'], body['operations'] as unknown[]) &&
-    isMoves(body['moves'])
+    isMoves(body['moves']) &&
+    isOpens(body['opens'])
   )
 }
 

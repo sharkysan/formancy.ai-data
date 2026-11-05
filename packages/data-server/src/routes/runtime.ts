@@ -3,6 +3,7 @@ import {
   deleteEffects,
   driftRefusal,
   grantedOperations,
+  lookupOpens,
   listable,
   listColumns,
   NOTHING_LEFT,
@@ -44,7 +45,7 @@ import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { ownViewsOf, registerOwnViewRoutes } from './runtime-own-views.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
-import { registerMenuRoute } from './runtime-menu.js'
+import { menuForms, registerMenuRoute } from './runtime-menu.js'
 import { registerSupersedeRoute } from './runtime-supersede.js'
 import { memberships, readForWrite, registerWriteRoutes, withoutEchoes } from './runtime-writes.js'
 import { createWriteOnce } from './write-once.js'
@@ -331,7 +332,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   // The forms this person may read (0045): from the published bundles and the policy, asking no database.
-  registerMenuRoute(app, { store, connections: () => registry.ids(), context })
+  const menu = { store, connections: () => registry.ids(), context }
+  registerMenuRoute(app, menu)
 
   /**
    * The form, what this person may do with it now, and which fields they may
@@ -378,6 +380,23 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     // The moves this person may make of the state field, where they may write at all (0127), with their states' labels (0129).
     const labels = bundle.format === 2 ? (bundle.presentation.states ?? []) : []
     const moves = writable.create !== null || writable.update !== null ? stateMoves(bundle.policy, actor, bundle.bindings, labels) : null
+    // The forms each lookup's record opens in, from every bundle as the menu reads them; none when the store cannot list them (0140).
+    const forms = await menuForms(menu, request)
+    const opens =
+      forms === null
+        ? []
+        : lookupOpens(
+            {
+              id: request.params.id,
+              title: bundle.form.title,
+              connection: bundle.connection,
+              snapshot: bundle.snapshot,
+              bindings: bundle.bindings,
+              policy: bundle.policy,
+            },
+            actor,
+            forms,
+          )
     return {
       form: bundle.form,
       operations,
@@ -388,6 +407,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       versions,
       writable,
       moves,
+      opens,
     } satisfies PublishedForm
   })
 

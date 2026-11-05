@@ -190,6 +190,11 @@ moment can both succeed, and nothing deletes a draft (0065).
    ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
    and Forms (`apps/host/src/forms-nav.tsx`) draws the menu
    ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+   Opening a form reads every bundle the same way (`menuForms`), and
+   `lookupOpens` names under each lookup the person may read the forms its
+   record opens in: those over its target keyed by what its foreign key
+   references, the child rule read the other way
+   ([0140](../decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
 
 Held by data-identity's `identity.test.ts`, `identity-keys.test.ts` and
 `identity-file.test.ts` and the server's `identity-settings.test.ts`, a real

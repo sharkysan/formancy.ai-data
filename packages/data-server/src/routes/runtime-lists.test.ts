@@ -700,6 +700,68 @@ describe('the list route', () => {
     expect(served.list.views).toEqual([LARGE, MUSTER])
   })
 
+  // A lookup names the forms this person may read its record in (0140),
+  // read from every published bundle as the menu reads them: a line's
+  // order opens in a form over the orders, keyed by the id its foreign key
+  // references, and in none the person may not read. The customer's
+  // country references the country's iso code, and the form over the
+  // countries is keyed by their id, so it opens nowhere. Watched failing
+  // with the route answering no opens, and with the key's columns left
+  // out of the match.
+  test('the form names the forms a lookup opens its record in', async () => {
+    const order = generateForm(SNAPSHOT, { connection: 'erp', root: ref('order'), formId: 'order', title: 'Order', lookups: [] })
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: { id: RW, tenant_id: { read: ['clerk'], write: [] }, placed: RW },
+      rowFilters: TENANT,
+      lookups: {},
+    }
+    const published: PublishedBundle = { format: 1, connection: 'erp', form: order.form, bindings: order.bindings, policy, snapshot: SNAPSHOT }
+    const store = createFileConfigurationStore(root)
+    await store.publish('order', null, published)
+    await store.publish('order-managers', null, { ...published, policy: { ...policy, operations: { read: ['manager'], create: [], update: [] } } })
+    const country = generateForm(SNAPSHOT, { connection: 'erp', root: ref('country'), formId: 'country', title: 'Country', lookups: [] })
+    await store.publish('country', null, {
+      ...published,
+      form: country.form,
+      bindings: country.bindings,
+      policy: { ...policy, fields: { id: { read: ['clerk'], write: [] }, iso_code: RW, name: RW }, rowFilters: [] },
+    })
+    const line = await app.inject({ method: 'GET', url: '/v1/forms/line', headers: as('clerk') })
+    expect(line.json().opens, line.body).toEqual([{ field: 'order', forms: [{ id: 'order', title: 'Order' }] }])
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json().opens).toEqual([])
+    expect((await app.inject({ method: 'GET', url: '/v1/forms/country', headers: as('clerk') })).statusCode).toBe(200)
+  })
+
+  // A store that cannot list its forms says nothing of where a lookup's
+  // record opens, and the form still opens: the menu's trouble is not the
+  // form's, and naming nothing offers nothing the person would be refused.
+  // The log says why. Watched failing with the failure answered 500.
+  test('a form whose store cannot list its forms opens, naming no forms a lookup opens in', async () => {
+    const lines: Array<Record<string, unknown>> = []
+    const store = createFileConfigurationStore(root)
+    const failing: ConfigurationStore = {
+      ...store,
+      list: async () => {
+        throw Object.assign(new Error(`EACCES: permission denied, scandir '${root}'`), { code: 'EACCES' })
+      },
+    }
+    const server = await createDataServer({
+      verifyIdentity,
+      logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } },
+      runtime: { registry: registry(), store: failing },
+    })
+    try {
+      const answer = await server.inject({ method: 'GET', url: '/v1/forms/line', headers: as('clerk') })
+      expect(answer.statusCode, answer.body).toBe(200)
+      expect(answer.json().opens).toEqual([])
+      expect(lines).toContainEqual(expect.objectContaining({ msg: 'the configuration store cannot list its forms' }))
+    } finally {
+      await server.close()
+    }
+  })
+
   // A view for some roles is offered to a person of one of them (0124), and
   // to nobody else, without its roles; a grid opens on the first default
   // offered. Watched failing with the published views offered whatever

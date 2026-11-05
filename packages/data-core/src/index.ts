@@ -200,7 +200,7 @@ export type { RelatedField } from './records/related-filter.js'
 export { decodeListCursor, listCursor } from './records/cursor.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
-export { formMenu, grantedOperations, menuForm } from './records/menu.js'
+export { formMenu, grantedOperations, lookupOpens, menuForm } from './records/menu.js'
 export type { MenuBundle, MenuForm } from './records/menu.js'
 export type { Listable } from './records/list.js'
 export { readSort, validateExportQuery, validateListQuery } from './records/list-query.js'
@@ -268,6 +268,7 @@ export type {
   ListFilterTerm,
   ListSortTerm,
   ListView,
+  LookupOpen,
   OwnViews,
   RangeExclusive,
   StateMoves,

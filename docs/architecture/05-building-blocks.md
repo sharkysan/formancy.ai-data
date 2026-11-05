@@ -263,7 +263,7 @@ The routes, one plane per file prefix:
 | `routes/admin-audit.ts` | administrator | `ADMIN_OPERATIONS`, every route's audit name (0033) |
 | `routes/runtime.ts` | runtime | a form and a record's read; `ROUTE_OPERATIONS`; registers the files below ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md)) |
 | `routes/runtime-writes.ts` | runtime | a create and an update, each once per sending of its write id (0031), an echo of a field the person may not write removed first (0022, 0098) and each selection checked against its lookup within the lookup deadline (0061) |
-| `routes/runtime-menu.ts` | runtime | `GET /v1/forms`, each bundle read alone (0045) |
+| `routes/runtime-menu.ts` | runtime | `GET /v1/forms`, each bundle read alone (0045); `menuForms`, which `GET /v1/forms/:id` reads too for the forms each lookup's record opens in ([0140](../decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)) |
 | `routes/runtime-lists.ts` | runtime | a page of records (0044) |
 | `routes/runtime-own-views.ts` | runtime | a person's own views saved and removed, read and written by the store's compare-and-swap under a hash of who they are, and read for `GET`'s `list.own` ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)) |
 | `routes/runtime-exports.ts` | runtime | a file of every page, made whole or refused, one export per connection at a time, its labels through `lookupScope` (0079) |
