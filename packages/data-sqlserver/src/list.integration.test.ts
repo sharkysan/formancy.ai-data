@@ -539,6 +539,82 @@ describe('a parent over a text foreign key', covers('sqlserver', listCase('text-
   })
 })
 
+describe('an order by a lookup’s label', covers('sqlserver', listCase('label')), () => {
+  // A lookup sorts by what it shows (0136): its parent's name, read under
+  // the lookup's own filter, so tenant 2's parent shows no name to tenant
+  // 1's clerk and its child sorts with the one that names no parent --
+  // after every name, both ways, by its key -- and every page after a row
+  // continues the same order, the label read in an apply of its own rather
+  // than in the window's order. The key is text, matched exactly: a child
+  // naming `c`, which the fixture's case-insensitive key relates to `C`,
+  // shows no label and sorts among the NULLs (watched failing with the key
+  // compared by the column's collation alone: it sorted as Gamma).
+  test('orders by the label each row shows, NULLs and a hidden parent last, page after page', async () => {
+    const { parents, children, folded } = LIST_PARITY.label
+    const { asc, desc } = folded
+    await owner
+      .request()
+      .batch(
+        'create table sales.label_parent (code varchar(10) not null primary key, name nvarchar(40) not null, tenant_id int not null); ' +
+          'create table sales.label_child (id int not null primary key, tenant_id int not null, parent_code varchar(10) null constraint fk_label_child_parent references sales.label_parent (code))',
+      )
+    for (const [code, name, tenant] of parents) {
+      await owner
+        .request()
+        .input('code', mssql.VarChar(10), code)
+        .input('name', mssql.NVarChar(40), name)
+        .input('tenant', mssql.Int, Number(tenant))
+        .query('insert into sales.label_parent (code, name, tenant_id) values (@code, @name, @tenant)')
+    }
+    for (const [id, parent] of [...children, folded.child]) {
+      await owner
+        .request()
+        .input('id', mssql.Int, Number(id))
+        .input('parent', mssql.VarChar(10), parent)
+        .query('insert into sales.label_child (id, tenant_id, parent_code) values (@id, 1, @parent)')
+    }
+    const labelled = await discoverSqlServer(owner, FIXTURE_SCOPE)
+    const bindings = generateForm(labelled, {
+      connection: 'test',
+      root: { schema: 'sales', name: 'label_child' },
+      formId: 'label-child',
+      title: 'Child',
+      lookups: [{ foreignKey: 'fk_label_child_parent', display: ['name'] }],
+    }).bindings
+    const field = bindings.fields.find((binding) => binding.kind === 'lookup')?.field as string
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, READ])),
+      rowFilters: TENANT,
+      lookups: { [field]: TENANT },
+    }
+    const page = async (change: Partial<RecordListQuery>): Promise<RecordList> => {
+      const plan = planList(labelled, bindings, policy, CLARA, { ...EVERY, ...change })
+      if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+      const outcome = await records.list(plan.request)
+      if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
+      return recordPage(bindings, plan, outcome.rows)
+    }
+    const ids = (listed: RecordList): string[] => listed.rows.map((row) => String(row.answers['id']))
+    for (const [direction, expected] of [
+      ['asc', asc],
+      ['desc', desc],
+    ] as const) {
+      const sort = [{ field, direction }]
+      expect(ids(await page({ sort })), direction).toEqual(expected)
+      const walked: string[] = []
+      let after: string | null = null
+      do {
+        const one = await page({ sort, limit: 1, after })
+        walked.push(...ids(one))
+        after = one.hasMore ? one.next : null
+      } while (after !== null)
+      expect(walked, `${direction}, page after page`).toEqual(expected)
+    }
+  })
+})
+
 describe('a key the table no longer holds', covers('sqlserver', listCase('key')), () => {
   // A page continues after a row by its key, which needs the order total:
   // the key unique and NOT NULL. The snapshot says it is; a page decided

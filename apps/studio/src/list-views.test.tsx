@@ -240,7 +240,8 @@ describe('making a view', () => {
     await user.selectOptions(within(second).getByRole('combobox', { name: 'Condition' }), 'equals')
     expect(paragraphs(second)).toContain('The whole value, exactly: case and spaces count.')
     const sort = await addSort(user, 'State', 'Descending')
-    expect(options(sort, 'Sort by')).toEqual(['Id', 'Order date', 'State', 'Amount', 'Notes', 'Group', 'Created by', 'Approved by'])
+    // A lookup sorts by what it shows (0136): Customer by its name (watched failing with no lookup offered).
+    expect(options(sort, 'Sort by')).toEqual(['Id', 'Customer', 'Order date', 'State', 'Amount', 'Notes', 'Group', 'Created by', 'Approved by'])
     expect(options(sort, 'Direction')).toEqual(['Ascending', 'Descending'])
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])

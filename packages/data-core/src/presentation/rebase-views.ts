@@ -1,5 +1,5 @@
 import type { FormBindings } from '../generate/types.js'
-import { listColumns } from '../records/list.js'
+import { displayedLookups, listColumns } from '../records/list.js'
 import type { StoredListView } from '../runtime.js'
 import type { PresentationConflict } from './types.js'
 import { storedViewFit } from './views.js'
@@ -29,6 +29,9 @@ export function carryViews({ views, follow, bindings, report }: ViewCarry): Stor
     bindings,
     bindings.fields.map((binding) => binding.field),
     [],
+    [],
+    [],
+    displayedLookups(bindings),
   )
   const carried: StoredListView[] = []
   for (const [index, view] of views.entries()) {

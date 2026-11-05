@@ -268,9 +268,10 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await waitFor(() => expect(date.getAttribute('aria-sort')).toBe('ascending'), { timeout: 15_000 })
     const last = () => JSON.parse(plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)?.body ?? '{}') as unknown
     await waitFor(() => expect(last()).toMatchObject({ sort: [{ field: 'order_date', direction: 'asc' }] }), { timeout: 15_000 })
-    // A lookup's label is not the server's to sort by: its header has no sort.
+    // A lookup sorts by what it shows (0136): its header offers a sort, unsorted.
     const customer = within(records()).getByRole('columnheader', { name: /Customer/ })
-    expect(customer.getAttribute('aria-sort')).toBeNull()
+    expect(sortable.has('customer')).toBe(true)
+    expect(customer.getAttribute('aria-sort')).toBe('none')
   })
 
   // Pages of LIST_PAGE_SIZE: Next asks for the page after the last row

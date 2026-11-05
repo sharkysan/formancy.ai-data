@@ -130,10 +130,12 @@ export interface StoredListView {
  * What a list of a form's records may be searched, sorted and filtered by,
  * for one person (0044): field keys in the bindings' order, from
  * `listColumns`. `sortable` holds the readable column fields whose kind has
- * canonical text, `searchable` those of kind text or integer, matched as a
- * lookup's search matches, and `filterable` those `filterOffer` offers a
- * condition on (0104). A lookup field is none of them: a list holds its
- * token, not its label. `views` holds the published views this person
+ * canonical text and the lookups this person may sort by their labels
+ * (0136), `searchable` the column fields of kind text or integer, matched
+ * as a lookup's search matches, and `filterable` those `filterOffer` offers
+ * a condition on (0104) and every readable lookup, by the record it refers
+ * to (0135); a list holds a lookup's token, not its label, so no search
+ * matches one. `views` holds the published views this person
  * could have built from the rest, in their published order (0105).
  */
 export interface ListColumns {

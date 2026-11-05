@@ -3,13 +3,13 @@ import { buildLookupConfig } from '../lookup/config.js'
 import { scopeRowFilters } from '../lookup/filters.js'
 import type { RowFilters } from '../lookup/types.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
-import { rowFilter, throughFilters } from '../policy/evaluate.js'
+import { lookupRowFilter, rowFilter, throughFilters } from '../policy/evaluate.js'
 import { throughProblems } from '../policy/through.js'
 import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import type { PlanRefusal } from './plan-types.js'
 import { columnsOf, inCatalogOrder, type Prepared, refuse } from './prepare.js'
-import type { RecordColumn, Through } from './types.js'
+import type { RecordColumn, SortLabel, Through } from './types.js'
 
 /*
  * Which rows of the root a request reaches, and which of their columns: the
@@ -84,6 +84,51 @@ export function throughFor(
     })
   }
   return { ok: true, through }
+}
+
+/**
+ * The lookup fields of `fields` a list may be ordered by their labels
+ * (0136), each with what the adapter orders by: the target's first display
+ * column, read under the lookup's own read filter as its label is
+ * (`lookupRowFilter`, as the server's lookup routes ask it), with the
+ * root's foreign-key columns typed from the snapshot. A lookup whose
+ * filter this person does not resolve -- the policy says nothing of it, an
+ * attribute it names is missing -- or that does not configure, or shows no
+ * display column, is not one: its label is no order this person reads.
+ */
+export function sortLabelsFor(
+  snapshot: MetadataSnapshot,
+  bindings: FormBindings,
+  prepared: Prepared,
+  policy: FormPolicy,
+  context: PolicyContext,
+  fields: readonly string[],
+): Map<string, SortLabel> {
+  const labels = new Map<string, SortLabel>()
+  for (const binding of bindings.fields) {
+    if (binding.kind !== 'lookup' || !fields.includes(binding.field)) continue
+    const filter = lookupRowFilter(policy, context, bindings, 'read', binding.field)
+    if (!filter.ok) continue
+    let config: ReturnType<typeof buildLookupConfig>
+    try {
+      config = buildLookupConfig(bindings, binding.field, { snapshot })
+    } catch {
+      continue
+    }
+    const display = config.display[0]
+    const target = findObject(snapshot, config.target)
+    if (display === undefined || target === undefined) continue
+    const scoped = scopeRowFilters(target, filter.filter, `lookups.${binding.field}`)
+    if (!scoped.ok) continue
+    labels.set(binding.field, {
+      columns: binding.columns.map((name): RecordColumn => ({ name, type: (prepared.columns.get(name) as ColumnMeta).type })),
+      target: config.target,
+      targetColumns: config.targetColumns,
+      filters: scoped.filters,
+      display,
+    })
+  }
+  return labels
 }
 
 /**

@@ -236,7 +236,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    its token, which the server plans as each foreign-key column compared
    by the database's own equality ([0135](../decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)) -- the line and the boxes over those
    `offered`, which the presentation's `unfiltered` decides:
-   [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
+   [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort -- a lookup's by its first display column, read
+   in a lateral join of its own under the lookup's read filter
+   ([0136](../decisions/0136-a-lookup-field-sorts-by-what-it-shows.md)) -- each block after the last row of the
    block before: the datasource keeps every answered page's `next` by the
    row the page after it starts at
    ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));

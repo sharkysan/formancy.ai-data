@@ -227,6 +227,68 @@ describe('listTerms', () => {
     expect(listTerms(altered({ offset: 0 })).after).toBeNull()
   })
 
+  // A lookup's label (0136) reaches the adapter fresh, as a through does:
+  // the target, each root column paired with the key column it references
+  // and that column's type, the target's filter terms -- none where the
+  // lookup filters nothing -- and the display column's name; its NULLs
+  // last whatever the key. The scope never holds it to one value, so a page
+  // after a row compares it. Watched failing with a label refused as an
+  // order by no named column.
+  test('reads a lookup’s label in the order, fresh, and keeps it in the seek', () => {
+    const label = {
+      columns: [{ name: 'created_by', type: INT32 }],
+      target: { schema: 'sales', name: 'employee' },
+      targetColumns: [{ name: 'id', type: INT32 }],
+      filters: TENANT_ONE,
+      display: { name: 'name', type: text(200) },
+    }
+    const sort = [
+      { label, direction: 'desc', nulls: 'last' },
+      { column: 'id', direction: 'asc', nulls: null },
+    ]
+    const read = listTerms(altered({ sort, offset: 0, after: [{ name: 'id', type: INT64, value: '5' }] }))
+    expect(read.sort[0]).toEqual({
+      label: {
+        target: { schema: 'sales', name: 'employee' },
+        pairs: [{ column: 'created_by', references: 'id', type: INT32 }],
+        terms: [{ column: 'tenant_id', type: INT32, value: '1' }],
+        display: 'name',
+      },
+      direction: 'desc',
+      nulls: 'last',
+    })
+    expect(read.after?.seek).toEqual(read.sort)
+    const everyRow = { ...label, filters: { kind: 'unrestricted' } }
+    expect(listTerms(altered({ sort: [{ label: everyRow, direction: 'asc', nulls: 'last' }, sort[1]] })).sort[0]).toMatchObject({ label: { terms: [] } })
+  })
+
+  // Each is what the planner never writes for a label: NULLs placed
+  // otherwise, a key whose two sides differ in length, a side of no key
+  // kind, a display column with no name or a property more, a target by
+  // name alone, a label with a property more, a filter that says nothing.
+  test('refuses a lookup’s label the planner would not write', () => {
+    const label = {
+      columns: [{ name: 'created_by', type: INT32 }],
+      target: { schema: 'sales', name: 'employee' },
+      targetColumns: [{ name: 'id', type: INT32 }],
+      filters: TENANT_ONE,
+      display: { name: 'name', type: text(200) },
+    }
+    const id = { column: 'id', direction: 'asc', nulls: null }
+    for (const term of [
+      { label, direction: 'asc', nulls: null },
+      { label: { ...label, targetColumns: [] }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, columns: [{ name: 'created_by', type: { kind: 'boolean' } }] }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, display: { type: text(200) } }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, display: { name: 'name', type: text(200), extra: true } }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, target: { name: 'employee' } }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, extra: true }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, filters: { kind: 'restricted', equal: [] } }, direction: 'asc', nulls: 'last' },
+    ]) {
+      expect(() => listTerms(altered({ sort: [term, id] })), JSON.stringify(term)).toThrow(/A list request/)
+    }
+  })
+
   // The key is bound as its column's type and compared with that row's own;
   // one not of the identity, or spelled otherwise, would find another row on
   // one engine and fail on the other. An offset beside it would skip rows

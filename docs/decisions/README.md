@@ -98,7 +98,7 @@ only enforcement is "we remember" says so plainly.
 | [0041](0041-the-runtime-refuses-what-drift-blocks.md) | The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it | accepted; extended by 0044, 0050, 0051 |
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | superseded by 0118 |
 | [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted; extended by 0044, 0050, 0079 |
-| [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110 |
+| [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110, 0136 |
 | [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050, 0109 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
 | [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131 |
@@ -159,7 +159,7 @@ only enforcement is "we remember" says so plainly.
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
 | [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134, 0135 |
-| [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126 |
+| [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126, 0136 |
 | [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted; extended by 0126 |
 | [0107](0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md) | A record is duplicated into a new one, of the fields the server names, without its key | accepted |
 | [0108](0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md) | A form's list pages after the last row it showed, found again by its key, not by an offset | accepted |
@@ -189,4 +189,5 @@ only enforcement is "we remember" says so plainly.
 | [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133; amended by 0135 |
 | [0133](0133-a-cell-filters-by-its-value.md) | A cell filters by its value | accepted; amended by 0135 |
 | [0134](0134-the-build-a-condition-panel-is-retired.md) | The Build a condition panel is retired | accepted |
-| [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted |
+| [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136 |
+| [0136](0136-a-lookup-field-sorts-by-what-it-shows.md) | A lookup field sorts by what it shows | accepted |

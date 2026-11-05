@@ -738,7 +738,9 @@ offers to try it without its last condition. A lookup's column searches
 its lookup in its box, and the line names a record by the label the grid
 shows (`approved_by = grace`) or by whether there is one (`approved_by is
 empty`); `=` on a lookup's cell takes its record
-([0135](./docs/decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)).
+([0135](./docs/decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)),
+and its header sorts by what it shows, its first display column
+([0136](./docs/decisions/0136-a-lookup-field-sorts-by-what-it-shows.md)).
 The line and the boxes offer
 every field the server offers a filter on, less any the form's
 administrator left out in the studio's List views, though a view may

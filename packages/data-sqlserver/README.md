@@ -623,7 +623,9 @@ its caller goes (0061), records, a page of them, a page narrowed by a
 person's filter -- each case `COLUMN_FILTER_PARITY`'s, and this engine's
 own `datetime`, `smalldatetime` and `datetime2` at midnight -- and a file
 of the shipments written by data-core (`list.integration.test.ts`, 0044,
-0079, 0104, and paging after a row, 0108),
+0079, 0104, paging after a row, 0108, and an order by a lookup's label,
+its key matched exactly under this engine's case-insensitive collation,
+0136),
 the ways a record operation fails, a write whose answer is lost on the way back, and a
 uuid key end to end (`uuid.integration.test.ts`, 0056: discovered, generated
 read-only, its token in lower case, created, updated, listed in this

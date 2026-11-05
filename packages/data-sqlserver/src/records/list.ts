@@ -1,6 +1,8 @@
-import type { ListRequest, ListTerms } from '@formancy/data-core'
+import type { LabelTerms, ListRequest, ListTerms, SortTerm } from '@formancy/data-core'
 import mssql from 'mssql'
+import { exactText, filterPredicate } from '../sql/filters.js'
 import { after, orderBy } from '../sql/order.js'
+import type { OrderTerm } from '../sql/order.js'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { searchPredicate } from '../sql/search.js'
 import { Parameters } from '../sql/statement.js'
@@ -64,9 +66,25 @@ export function listStatement(request: ListRequest, terms: ListTerms): Statement
     ...terms.filter.map((entry) => recordFilterPredicate(parameters, ROW, entry)),
   ]
   if (terms.search !== null) where.push(searchPredicate(parameters, ROW, terms.search.columns, terms.search.text))
+  // Each lookup's label in the order (0136), read once per row, in an apply of its own: never a subquery in the window's order.
+  const labels = new Map<SortTerm, string>()
+  const applied: string[] = []
+  for (const term of terms.sort) {
+    if (!('label' in term)) continue
+    const at = String(applied.length)
+    applied.push(`cross apply (select ${labelSql(parameters, ROW, term.label, `[t${at}]`)} as [v]) as [l${at}]`)
+    labels.set(term, `[l${at}].[v]`)
+  }
+  const ordered = (term: SortTerm): OrderTerm => {
+    if (!('label' in term)) return term
+    // Every term of the seek is one of the order's; a label read in no join would order by a root column of its name.
+    const value = labels.get(term)
+    if (value === undefined) throw new Error(`The label of ${term.label.display} was read in no join to order by.`)
+    return { column: term.label.display, direction: term.direction, nulls: 'last', value }
+  }
   const anchor = terms.after === null ? null : anchorSql(parameters, request.target.table, terms, terms.after)
-  if (terms.after !== null) where.push(after(ROW, (index) => `${ANCHOR}.${seekName(index)}`, terms.after.seek))
-  const order = orderBy(ROW, terms.sort)
+  if (terms.after !== null) where.push(after(ROW, (index) => `${ANCHOR}.${seekName(index)}`, terms.after.seek.map(ordered)))
+  const order = orderBy(ROW, terms.sort.map(ordered))
   const offset = parameters.add(mssql.BigInt, terms.offset)
   const fetch = parameters.add(mssql.Int, terms.limit + 1)
   const first = parameters.add(mssql.BigInt, terms.offset + 1)
@@ -76,6 +94,7 @@ export function listStatement(request: ListRequest, terms: ListTerms): Statement
   ]
   const page = [
     `select ${select.join(', ')} from ${quoteTable(request.target.table)} as ${ROW}`,
+    ...applied,
     where.length > 0 ? `where ${where.join(' and ')}` : '',
     `order by ${order} offset ${offset} rows fetch next ${fetch} rows only`,
   ]
@@ -93,6 +112,37 @@ const seekName = (index: number): string => `[s${String(index)}]`
 
 /** The row a page continues after (0108), by its key, under the filters and every through, as a read finds it: whether it is there, and its value of each term the page compares by. */
 function anchorSql(parameters: Parameters, table: ListRequest['target']['table'], terms: ListTerms, anchor: NonNullable<ListTerms['after']>): string {
-  const select = ['1 as [found]', ...anchor.seek.map((term, index) => `${ROW}.${quoteName(term.column)} as ${seekName(index)}`)]
+  const select = [
+    '1 as [found]',
+    ...anchor.seek.map(
+      (term, index) =>
+        `${'label' in term ? labelSql(parameters, ROW, term.label, `[t${String(index)}]`) : `${ROW}.${quoteName(term.column)}`} as ${seekName(index)}`,
+    ),
+  ]
   return `select ${select.join(', ')} from ${quoteTable(table)} as ${ROW} where ${located(parameters, anchor.key, terms.terms, terms.through).join(' and ')}`
+}
+
+/**
+ * A lookup's label a list is ordered by (0136): the target's display
+ * column for `row`'s foreign key, under the lookup's filters on the target,
+ * as the page reads the label -- NULL where the target holds no such row or
+ * the filters hide it. The key is matched exactly, as PostgreSQL's is: a
+ * text key by the columns' own equality, which a foreign key holds to one
+ * collation and the target's index serves, and again as nvarchar, byte for
+ * byte (`exactText`), so a row sorts by the label its page shows, which a
+ * token resolves to only on an exact match -- under the fixture's
+ * case-insensitive collation a child naming `c` sorts with the rows that
+ * show no label. A scalar subquery: one value per row, so it multiplies
+ * none; a target key that stopped being unique fails the statement (512).
+ */
+function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias: string): string {
+  const pairs = label.pairs.map((pair) => {
+    const target = `${alias}.${quoteName(pair.references)}`
+    const root = `${row}.${quoteName(pair.column)}`
+    return pair.type.kind === 'text'
+      ? `${target} = ${root} and ${exactText(`convert(nvarchar(max), ${target})`, `convert(nvarchar(max), ${root})`)}`
+      : `${target} = ${root}`
+  })
+  const terms = label.terms.map((term) => filterPredicate(parameters, `${alias}.${quoteName(term.column)}`, term))
+  return `(select ${alias}.${quoteName(label.display)} from ${quoteTable(label.target)} as ${alias} where ${[...pairs, ...terms].join(' and ')})`
 }

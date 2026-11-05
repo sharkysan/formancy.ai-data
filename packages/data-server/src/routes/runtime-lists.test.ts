@@ -499,6 +499,19 @@ describe('the list route', () => {
     expect(lists[2]?.filter).toMatchObject([{ op: 'refers', column: 'country_code', value: 'CH' }])
     expect((await list('customer', { filter: [{ field: 'country', op: 'null' }] })).statusCode).toBe(200)
     expect(lists[3]?.filter).toEqual([{ op: 'null', column: 'country_code' }])
+    // A lookup sorted by what it shows (0136): its target's display column under its own filter, NULLs last.
+    expect((await list('customer', { sort: [{ field: 'country', direction: 'desc' }] })).statusCode).toBe(200)
+    expect(lists[4]?.sort[0]).toMatchObject({
+      label: {
+        columns: [{ name: 'country_code' }],
+        target: { name: 'country' },
+        targetColumns: [{ name: 'iso_code' }],
+        filters: { kind: 'unrestricted' },
+        display: { name: 'name' },
+      },
+      direction: 'desc',
+      nulls: 'last',
+    })
   })
 
   // A condition the form does not offer is refused before any statement,
@@ -571,7 +584,7 @@ describe('the list route', () => {
       [{ offset: -1 }, 'customer', 'malformed'],
       [{ after: 'c1:1,x' }, 'customer', 'invalid-cursor'],
       [{ limit: LIST_PAGE_SIZE + 1 }, 'customer', 'limit-out-of-range'],
-      [{ sort: [{ field: 'country', direction: 'asc' }] }, 'customer', 'not-sortable'],
+      [{ sort: [{ field: 'nothing', direction: 'asc' }] }, 'customer', 'not-sortable'],
       [{ search: 'x' }, 'tag', 'not-searchable'],
       [{ parent: { field: 'name', record: 'k1:7' } }, 'customer', 'invalid-request'],
       [{ parent: { field: 'order', record: 'k1:007' } }, 'line', 'invalid-record-token'],
@@ -618,17 +631,17 @@ describe('the list route', () => {
   // sent with the form, so a grid offers exactly the headers, search and
   // conditions the server accepts (0104): each readable column field with
   // its kind's operators, `null` and `not-null` only where the column holds
-  // NULLs, a lookup by the record it refers to (0135), and never a field
-  // the person may not read -- a
+  // NULLs, a lookup by the record it refers to (0135) and sorted by what
+  // it shows (0136), and never a field the person may not read -- a
   // filter on one would tell them its values a condition at a time. And
   // one page's tokens for one lookup fit one resolve. Watched failing with
   // `GET` sending the list with `filterable` emptied.
   test('the form says what its list may search, sort and filter by, in the planner’s words', async () => {
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json()
-    expect(served.list).toEqual(listColumns(customers, served.readable, []))
+    expect(served.list).toEqual(listColumns(customers, served.readable, [], [], [], ['country']))
     expect(served.list).toEqual({
       searchable: ['tenant_id', 'customer_no', 'name'],
-      sortable: ['tenant_id', 'customer_no', 'name', 'credit_limit'],
+      sortable: ['tenant_id', 'customer_no', 'name', 'country', 'credit_limit'],
       filterable: [
         { field: 'tenant_id', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
         { field: 'customer_no', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },

@@ -29,7 +29,12 @@ export interface OrderTerm {
   column: string
   direction: 'asc' | 'desc'
   nulls: 'first' | 'last' | null
+  /** What is ordered by in place of `row`'s column: a lookup's label, a column of the lateral join it is read in (0136). */
+  value?: string
 }
+
+/** What a term orders by: its expression, or `row`'s column. */
+const valueOf = (row: string, term: OrderTerm): string => term.value ?? `${row}.${quoteIdentifier(term.column)}`
 
 /** Maps, not object literals: `constructor` is a property of every object and of no Map. */
 const DIRECTION: ReadonlyMap<unknown, string> = new Map([
@@ -50,7 +55,7 @@ export function orderBy(row: string, terms: readonly OrderTerm[]): string {
       const direction = DIRECTION.get(term.direction)
       const nulls = NULLS.get(term.nulls)
       if (direction === undefined || nulls === undefined) throw new Error(`${term.column} has no order this adapter can spell.`)
-      return `${row}.${quoteIdentifier(term.column)} ${direction}${nulls}`
+      return `${valueOf(row, term)} ${direction}${nulls}`
     })
     .join(', ')
 }
@@ -83,7 +88,7 @@ export function after(row: string, anchor: (index: number) => string, terms: rea
     const term = terms[index] as OrderTerm
     const past = PAST.get(term.direction)
     if (past === undefined || (term.nulls !== null && term.nulls !== 'last')) throw new Error(`${term.column} has no place after a row this adapter can spell.`)
-    const column = `${row}.${quoteIdentifier(term.column)}`
+    const column = valueOf(row, term)
     const value = anchor(index)
     const beyond =
       term.nulls === null ? `(${column} ${op(past)} ${value})` : `((${column} ${op(past)} ${value}) or (${column} is null and ${value} is not null))`

@@ -1184,7 +1184,7 @@
       ]
     },
     "0044": {
-      "reviewed": "sha256:6c61dd7d45394dcf7fccac08e124df097104b7add5de740f9523b9843b8b71ef",
+      "reviewed": "sha256:c0beef86edd80418f045b6fa5ab548632d797b72801a2f6169093666b2bb90e1",
       "limitations": [
         {
           "area": "forms",
@@ -3122,7 +3122,7 @@
       ]
     },
     "0105": {
-      "reviewed": "sha256:e97d02e9acfdf5f72f6bdfaa877325f458f3c1d43f20f2473aa7e30c1e1b66a0",
+      "reviewed": "sha256:9ce119d350dcea111d0ac96eef2e96c14860e52a5967197cf2f400737290e00b",
       "limitations": [
         {
           "area": "forms",
@@ -3785,11 +3785,11 @@
       ]
     },
     "0135": {
-      "reviewed": "sha256:880fdd8622744481aba66d259d7b0172467bbbe5a4fcf9ccbc40b8a5a0ad9ee7",
+      "reviewed": "sha256:13e57112d583421c503af354b8e817f564c0ed319797334245b683ea1d51d70f",
       "limitations": [
         {
           "area": "forms",
-          "says": "A lookup field filters but does not sort: its token orders nothing a person reads."
+          "says": "A lookup field sorts by its first display column (0136), not by its whole label."
         },
         {
           "area": "forms",
@@ -3814,6 +3814,31 @@
         {
           "area": "forms",
           "says": "A published view's record on a lookup is checked to be a token of the key's size; whether each value fits its column is said when the list is asked for."
+        }
+      ]
+    },
+    "0136": {
+      "reviewed": "sha256:976eaa1ebbc6066a9a8ddb85f16438da4315f16b8fc315abb90125de6867b581",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A lookup sorts by its first display column alone, not by every column of its label."
+        },
+        {
+          "area": "databases",
+          "says": "Under a case-insensitive collation -- SQL Server's default, or a nondeterministic one on PostgreSQL -- a foreign key spelled in another case than its target's key sorts with the rows that show no label, as the grid shows it unlabelled."
+        },
+        {
+          "area": "databases",
+          "says": "A list sorted by a lookup fails when the lookup's target key has stopped being unique since the form was published: a list describes its root, not a lookup's target."
+        },
+        {
+          "area": "access",
+          "says": "A lookup whose filter names an attribute a person does not carry is not offered to them as sortable."
+        },
+        {
+          "area": "operations",
+          "says": "A sort by a lookup reads the label for every row in scope, and no index serves that order, so each page reads and sorts the whole scope; what it costs is not measured."
         }
       ]
     }

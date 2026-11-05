@@ -174,7 +174,9 @@ describe('viewProblems', () => {
       '/views/0 (“Placed”): A record given for customer is not one it can refer to.',
     ])
     expect(named({ filter: [{ field: 'nothing', op: 'null' }] })).toEqual(['/views/0 (“Placed”): nothing is not a field this list is filtered by.'])
-    expect(named({ sort: [{ field: 'customer', direction: 'asc' }] })).toEqual(['/views/0 (“Placed”): customer is not a field this list is sorted by.'])
+    expect(named({ sort: [{ field: 'nothing', direction: 'asc' }] })).toEqual(['/views/0 (“Placed”): nothing is not a field this list is sorted by.'])
+    // A lookup sorts by what it shows (0136), for whoever may read it.
+    expect(named({ sort: [{ field: 'customer', direction: 'asc' }] })).toEqual([])
   })
 
   // Stored untrimmed, the view would send what the server trims, and a
@@ -270,6 +272,16 @@ describe('rebasePresentation carries views', () => {
     const rebased = regenerate(publish([DATED, UNPAID]))
     expect(rebased.conflicts).toEqual([])
     expect(rebased.presentation.views).toEqual([DATED, UNPAID])
+  })
+
+  // A view ordered by a lookup's label (0136) is one the regenerated list
+  // still offers, and is carried as it was (watched failing with the
+  // regenerated list offering no lookup's order: the view was dropped).
+  test('a view ordered by a lookup is carried', () => {
+    const byCustomer: StoredListView = { name: 'By customer', filter: [], sort: [{ field: 'customer', direction: 'asc' }] }
+    const rebased = regenerate(publish([byCustomer]))
+    expect(rebased.conflicts).toEqual([])
+    expect(rebased.presentation.views).toEqual([byCustomer])
   })
 
   // A view's roles go with it (0124): carried without them, a view for the

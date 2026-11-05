@@ -4,6 +4,8 @@ import type { LookupSearchColumn, RowFilterTerm } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { NormalizedType } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
+import { readLabelSort } from './sort-label.js'
+import type { LabelSortTerm } from './sort-label.js'
 import { throughTerms } from './through.js'
 import type { ThroughTerms } from './through.js'
 import type { EqualsFilterType, ListRequest, RangeFilterType, RecordColumn, RecordFilter, RecordSort, RecordValue } from './types.js'
@@ -25,11 +27,14 @@ export interface ListTerms {
   equal: RecordValue[]
   filter: RecordFilter[]
   search: { text: string; columns: LookupSearchColumn[] } | null
-  sort: RecordSort[]
-  after: { key: RecordValue[]; seek: RecordSort[] } | null
+  sort: SortTerm[]
+  after: { key: RecordValue[]; seek: SortTerm[] } | null
   offset: number
   limit: number
 }
+
+/** One term of the order an adapter is handed: a column's, or a lookup's label (0136), told apart by `'label' in term`. */
+export type SortTerm = RecordSort | LabelSortTerm
 
 const refuse = (why: string) => new Error(`A list request ${why}; refusing rather than listing something else than the planner decided.`)
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -167,13 +172,15 @@ function searchOf(given: unknown): ListTerms['search'] {
 
 /**
  * The order: each column once, ascending or descending, NULLs last or not
- * spelled, and every identity column named, so the order is total and a
- * page boundary never falls between two rows that sort equal.
+ * spelled, a lookup's label as `readLabelSort` reads it (0136), and every
+ * identity column named, so the order is total and a page boundary never
+ * falls between two rows that sort equal.
  */
-function sortOf(given: unknown, identity: readonly string[]): RecordSort[] {
+function sortOf(given: unknown, identity: readonly string[]): SortTerm[] {
   if (!Array.isArray(given) || given.length === 0) throw refuse('is ordered by at least one column')
   const seen = new Set<string>()
-  const sort = (given as unknown[]).map((entry): RecordSort => {
+  const sort = (given as unknown[]).map((entry): SortTerm => {
+    if (isRecord(entry) && 'label' in entry) return readLabelSort(entry, refuse)
     if (!isRecord(entry) || !isName(entry['column'])) throw refuse('orders by named columns')
     const { column, direction, nulls } = entry
     if ((direction !== 'asc' && direction !== 'desc') || (nulls !== 'last' && nulls !== null))
@@ -212,13 +219,14 @@ function afterKey(given: unknown, identity: readonly RecordColumn[]): RecordValu
  * index seeks by, where the column after it alone is a range of the key's
  * index.
  */
-function seekOf(sort: readonly RecordSort[], terms: readonly RowFilterTerm[], equal: readonly RecordValue[], filter: readonly RecordFilter[]): RecordSort[] {
+function seekOf(sort: readonly SortTerm[], terms: readonly RowFilterTerm[], equal: readonly RecordValue[], filter: readonly RecordFilter[]): SortTerm[] {
   const held = new Set([
     ...terms.map((term) => term.column),
     ...equal.map((value) => value.name),
     ...filter.filter((term) => term.op === 'equals').map((term) => term.column),
   ])
-  return sort.filter((term) => !held.has(term.column))
+  // A lookup's label is never held: the scope holds a column, never what a label shows (0136).
+  return sort.filter((term) => 'label' in term || !held.has(term.column))
 }
 
 /**
