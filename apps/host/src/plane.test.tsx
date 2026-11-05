@@ -11,6 +11,7 @@ import {
   chooseCustomer,
   chooseForm,
   chooseRenderer,
+  dataRows,
   exportButton,
   exportLine,
   gridSection,
@@ -88,9 +89,7 @@ function keys(value: unknown): string[] {
 /** The data rows of the Records grid, each as its cells' text. */
 function recordRows(): HTMLElement[] {
   const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-  return within(grid)
-    .getAllByRole('row')
-    .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
+  return dataRows(grid)
 }
 
 /** The price's React paper, and a control of it by its name: the shared helpers' paper is the order's. */

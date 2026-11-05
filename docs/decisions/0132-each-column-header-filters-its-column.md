@@ -80,6 +80,13 @@ is, in the words the line uses, and the three views stay one filter.
   what notices.
 - A box applies when it is left, so a person who types into one and
   clicks away has filtered.
+- Nothing of the page's stylesheet may reach into a grid (the host's
+  browser gate fails a rule that does), so a text box wears the theme's
+  input style through AG Grid's own input classes, and a select is the
+  browser's in the theme's dark scheme: an AG Grid upgrade that renamed
+  the classes would leave the boxes unstyled, which the gate's contrast
+  and target-size checks would notice. A box's text is the theme's 14
+  pixels, so a phone may zoom on focus.
 
 **What it forecloses.** Nothing on the server.
 

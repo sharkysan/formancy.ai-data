@@ -19,7 +19,15 @@ import { withTerm } from './filter-terms.js'
  * The keyboard reaches a box as AG Grid's header keys do: Down from a
  * header to its box's cell, Enter into the box, Esc back to the cell; Tab
  * still leaves the grid. Inside the box its keys are the box's own.
+ *
+ * Nothing of the page's stylesheet reaches into a grid, whose look is its
+ * theme's (grid-theme.ts): a text box wears the theme's input style through
+ * AG Grid's own input classes, and a select is the browser's, in the
+ * theme's dark scheme.
  */
+
+/** A text box's classes: the page's, which AG Grid's keys are held from, and AG Grid's input style. */
+const TEXT_BOX = 'header-box ag-input-field-input ag-text-field-input'
 
 /** What a grid's boxes read and change: the fields the line may name, the filter, and where a refusal is said. */
 export interface HeaderFilters {
@@ -110,7 +118,7 @@ function TextBox({ field, headers }: { field: LineField; headers: HeaderFilters 
   return (
     <input
       type="text"
-      className="header-box"
+      className={TEXT_BOX}
       aria-label={`Filter ${field.label}`}
       autoComplete="off"
       spellCheck={false}

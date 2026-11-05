@@ -4,7 +4,7 @@ import type { ListFilterTerm, PublishedForm } from '@formancy/data-client'
 import { REFUSED_FILTER_HELP } from './grid-datasource.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, chipRemove, filterLine, listsApplied, listsSent, typeFilter } from './test-filter.js'
-import { chooseForm, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
+import { chooseForm, dataCell, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -202,9 +202,7 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     const user = await workspace(engine.formId)
     await typeFilter(user, 'Records', `notes contains ${notes}`)
     await waitFor(() => expect(recordKeys()).toHaveLength(1), ARRIVES)
-    within(within(gridSection('Records')).getByRole('grid', { name: 'Records' }))
-      .getAllByRole('gridcell')[0]
-      ?.focus()
+    dataCell(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).focus()
     await user.keyboard('/')
     expect(document.activeElement).toBe(filterLine('Records'))
     await user.keyboard(' and a')

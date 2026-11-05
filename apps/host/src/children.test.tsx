@@ -4,7 +4,7 @@ import { computeAccessibleName } from 'dom-accessibility-api'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answeredOnce, chooseForm, chooseRenderer, gridSection, mount, newRecord, RENDERERS, searchRecords, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, chooseRenderer, dataRows, gridSection, mount, newRecord, RENDERERS, searchRecords, signIn, stamp } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -67,14 +67,11 @@ async function orderWithLines(engine: Engine, token: string, notes: string, line
 /** The data rows of the grid a heading names, each as its cells' text. */
 function rows(heading: string): string[][] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) =>
-      within(row)
-        .getAllByRole('gridcell')
-        .map((cell) => cell.textContent ?? ''),
-    )
+  return dataRows(grid).map((row) =>
+    within(row)
+      .getAllByRole('gridcell')
+      .map((cell) => cell.textContent ?? ''),
+  )
 }
 
 /** Click the row of the grid `heading` names whose first cell says `first`. */

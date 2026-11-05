@@ -4,7 +4,21 @@ import type { ListFilterTerm, PublishedForm, RecordExportQuery, RecordListQuery 
 import { REFUSED_FILTER_HELP } from './grid-datasource.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, applyCondition, filterBox, listsApplied, listsSent, openFilter } from './test-filter.js'
-import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, recordKeys, signIn, stamp } from './test-host.js'
+import {
+  answeredOnce,
+  chooseForm,
+  dataRows,
+  exportButton,
+  exportLine,
+  gridSection,
+  gridStatus,
+  keeping,
+  load,
+  mount,
+  recordKeys,
+  signIn,
+  stamp,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Sent } from './test-fetch.js'
@@ -82,9 +96,8 @@ async function freshOrders(engine: Engine, notes: string, amounts: readonly stri
 /** The first cell of every data row of the grid `heading` names: a record's key, as the grid shows it. */
 function firstCells(heading: string): string[] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .flatMap((row) => within(row).queryAllByRole('gridcell').slice(0, 1))
+  return dataRows(grid)
+    .flatMap((row) => within(row).getAllByRole('gridcell').slice(0, 1))
     .map((cell) => cell.textContent ?? '')
 }
 
@@ -109,7 +122,7 @@ async function says(heading: string, text: string): Promise<void> {
 }
 
 /** A file's records after its header, one line each: the values these cases file hold no comma, quote or line break. */
-const dataRows = (text: string): string[] =>
+const csvRows = (text: string): string[] =>
   text
     .split('\r\n')
     .slice(1)
@@ -203,7 +216,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
     expect(new Uint8Array(await saved.file.arrayBuffer())).toEqual(new Uint8Array(await server.value.file.arrayBuffer()))
-    expect(dataRows(await saved.file.text()).map((row) => row.split(',')[0])).toEqual(orders.slice(1))
+    expect(csvRows(await saved.file.text()).map((row) => row.split(',')[0])).toEqual(orders.slice(1))
   })
 
   // Each condition is removed on its own, the grid listing what the rest
@@ -413,7 +426,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const [saved] = kept.saved
     if (saved === undefined) throw new Error('nothing was saved')
     expect(new Uint8Array(await saved.file.arrayBuffer())).toEqual(new Uint8Array(await file.value.file.arrayBuffer()))
-    expect(dataRows(await saved.file.text()).map((row) => row.split(',')[0])).toEqual([deliveries[1]])
+    expect(csvRows(await saved.file.text()).map((row) => row.split(',')[0])).toEqual([deliveries[1]])
     expect(screen.queryByRole('alert')).toBeNull()
     expect(await floor('a child section filtered')).toEqual(CLEAN('a child section filtered'))
   })

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answer, formLink, gridSection, gridStatus, load, newRecord, openForm, shows, unsavedNotice } from './test-host.js'
+import { answer, dataCell, formLink, gridSection, gridStatus, load, newRecord, openForm, shows, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -162,7 +162,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     const pane = await waitFor(() => screen.getByRole('region', { name: 'New Order line React' }), ARRIVES)
     const quantity = await waitFor(() => within(pane).getByLabelText(/^Quantity\b/), ARRIVES)
     await user.type(quantity, '3')
-    await user.click(within(lines).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(lines))
     const notice = await asking()
     expect(within(notice).getByRole('list').textContent).toBe('New Order line, React: changes that are not saved.')
     await keep(user, notice)
@@ -181,7 +181,7 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
 
     // And Discard on another row opens it: the line's own form, its record named.
     await user.type(within(screen.getByRole('region', { name: 'New Order line React' })).getByLabelText(/^Quantity\b/), '5')
-    await user.click(within(lines).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(lines))
     again = await asking()
     await discard(user, again)
     await screen.findByRole('heading', { level: 5, name: /^Order line k1:/ }, ARRIVES)

@@ -10,6 +10,8 @@ import {
   chooseCustomer,
   chooseForm,
   chooseRenderer,
+  dataCell,
+  dataRows,
   exportButton,
   exportLine,
   gridSection,
@@ -192,7 +194,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(await floor('a record and its lines')).toEqual(CLEAN('a record and its lines'))
 
     const lines = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
-    await user.click(within(lines).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(lines))
     await waitFor(() => expect(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).toBeTruthy(), { timeout: 15_000 })
     await within(screen.getByRole('region', { name: `Order line ${EDGES.seededOrder},1 Angular` })).findByRole(
       'spinbutton',
@@ -243,7 +245,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Search' }))
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Rows 1–2.'), { timeout: 15_000 })
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await screen.findByRole('heading', { level: 3, name: `Order ${kept}` }, { timeout: 15_000 })
     await shows('Angular', 'Customer', 'Muster AG')
     const keep = async (question: string): Promise<void> =>
@@ -274,8 +276,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
 
     if (connection === 'ms') {
       const line = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
-      await waitFor(() => expect(within(line).queryAllByRole('gridcell').length).toBeGreaterThan(0), { timeout: 15_000 })
-      await user.click(within(line).getAllByRole('gridcell')[0] as HTMLElement)
+      await waitFor(() => expect(dataRows(line).length).toBeGreaterThan(0), { timeout: 15_000 })
+      await user.click(dataCell(line))
       await screen.findByRole('heading', { level: 5, name: `Order line ${kept},1` }, { timeout: 15_000 })
       await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
       expect(await floor('a line, confirming')).toEqual(CLEAN('a line, confirming'))

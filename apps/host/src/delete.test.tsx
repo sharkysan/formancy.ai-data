@@ -8,6 +8,7 @@ import {
   answeredOnce,
   chooseForm,
   chooseRenderer,
+  dataRows,
   gridSection,
   gridStatus,
   mount,
@@ -108,9 +109,7 @@ async function workspace(formId: string, fetch: typeof globalThis.fetch = plane.
 /** The data rows of the grid a heading names. */
 function rows(heading: string): HTMLElement[] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
+  return dataRows(grid)
 }
 
 /** Click the row of the grid `heading` names whose first cell says `first`, and wait until the detail it opens is drawn in both renderers. */

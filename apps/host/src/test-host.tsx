@@ -280,15 +280,30 @@ export function stamp(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * The data rows of a grid: the rows with cells, less the row of its header
+ * boxes (0132), whose cells hold controls named Filter and a column's label.
+ */
+export function dataRows(grid: HTMLElement): HTMLElement[] {
+  const boxed = (row: HTMLElement): boolean =>
+    within(row).queryAllByRole('textbox', { name: /^Filter / }).length + within(row).queryAllByRole('combobox', { name: /^Filter / }).length > 0
+  return within(grid)
+    .getAllByRole('row')
+    .filter((row) => within(row).queryAllByRole('gridcell').length > 0 && !boxed(row))
+}
+
+/** The cell at `index` of a grid's first data row: what a test clicks or focuses to reach a record, never a header box's cell. */
+export function dataCell(grid: HTMLElement, index = 0): HTMLElement {
+  const [first] = dataRows(grid)
+  const cell = first === undefined ? undefined : within(first).getAllByRole('gridcell')[index]
+  if (cell === undefined) throw new Error('the grid has no data row')
+  return cell
+}
+
 /** The first cell of every data row in the Records grid: a record's key, as the grid shows it. */
 export function recordKeys(): string[] {
   const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-  return within(grid)
-    .getAllByRole('row')
-    .flatMap((row) => {
-      const cells = within(row).queryAllByRole('gridcell')
-      return cells.length === 0 ? [] : [cells[0]?.textContent ?? '']
-    })
+  return dataRows(grid).map((row) => within(row).getAllByRole('gridcell')[0]?.textContent ?? '')
 }
 
 /**

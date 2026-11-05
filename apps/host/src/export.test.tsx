@@ -6,6 +6,8 @@ import { focusedName } from './test-accessible.js'
 import {
   answeredOnce,
   chooseForm,
+  dataCell,
+  dataRows,
   exportButton,
   exportLine,
   formLink,
@@ -134,9 +136,8 @@ function gridHeaders(heading: string): string[] {
 /** The first cell of every data row of the grid in the section `heading` names. */
 function firstCells(heading: string): string[] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .flatMap((row) => within(row).queryAllByRole('gridcell').slice(0, 1))
+  return dataRows(grid)
+    .flatMap((row) => within(row).getAllByRole('gridcell').slice(0, 1))
     .map((cell) => cell.textContent ?? '')
 }
 
@@ -195,7 +196,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const headers = gridHeaders('Records')
     // Id descending, from the keyboard: a cell of the column, up to its header, Enter twice.
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await user.keyboard('{ArrowUp}{Enter}{Enter}')
     await waitFor(() => expect(within(grid).getByRole('columnheader', { name: /^Id/ }).getAttribute('aria-sort')).toBe('descending'), ARRIVES)
     await waitFor(() => expect(firstCells('Records')).toEqual([...orders].reverse()), ARRIVES)
@@ -336,7 +337,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const headers = gridHeaders('Order line')
     // Line no descending, from the keyboard, as the Records case sorts Id: a cell of the column, up to its header, Enter twice.
     const grid = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await user.keyboard('{ArrowUp}{Enter}{Enter}')
     await waitFor(
       () =>
