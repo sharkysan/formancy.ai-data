@@ -7,7 +7,9 @@
 // giving the keyboard to its Undo; the filter line -- its completion open
 // over the grid, a line typed and applied with Enter, and a chip removed; a
 // column header's box, reached from its header by the keyboard, Tab on to
-// the next box and Esc giving an edit up; and = on a cell. Each state is
+// the next box and Esc giving an edit up; a lookup column's box offering
+// the records its search finds over the page, and the one picked applied
+// by its token and said by its label (0135); and = on a cell. Each state is
 // measured by the gate's `measured` on the way: the colours and target
 // sizes, the chips wrapping inside their row, the completion inside the
 // page, and no sideways scroll, down to 320 px.
@@ -151,6 +153,41 @@ export function filterJourney(plane, { check }) {
         await page.keyboard.press('Escape')
         check('a header box: Esc gives up what was typed', same(await control(page, 'textbox', 'Filter Notes').inputValue(), ''))
         check('a header box: and the filter is as it was', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
+      },
+    ],
+    [
+      'A lookup’s records offered (Records)',
+      async (page) => {
+        // From the keyboard: Customer's header, Down to its box, Enter into it, and part of a name (0135).
+        await records(page).getByRole('columnheader', { name: 'Customer' }).focus()
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Enter')
+        const box = control(page, 'combobox', 'Filter Customer')
+        check('a lookup’s box: Down from its header and Enter put the keyboard in it', await focusedOn(page, box))
+        await page.keyboard.type('Muster')
+        // Drawn over the page, under the box: measured open, inside the window down to 320 px.
+        await page.getByRole('listbox', { name: 'Records of Customer' }).getByRole('option', { name: 'Muster AG' }).waitFor(WITHIN)
+        check('a lookup’s box: the keyboard stays in it while it offers records', await focusedOn(page, box))
+      },
+    ],
+    [
+      'A lookup’s record applied (Records)',
+      async (page) => {
+        const sent = nextList(page)
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Enter')
+        const request = await sent
+        const filter = JSON.parse(request.postData() ?? '{}').filter
+        const customer = filter.find((term) => term.field === 'customer')
+        check(
+          'a lookup’s record applied: its token is the condition in the list request’s body',
+          customer?.op === 'equals' && /^k1:/.test(customer.value) ? null : `it sent ${JSON.stringify(filter)}`,
+        )
+        check('a lookup’s record applied: the box says it by its label', same(await control(page, 'combobox', 'Filter Customer').inputValue(), 'Muster AG'))
+        check(
+          'a lookup’s record applied: the line says it by its label',
+          same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0 and customer = "Muster AG"'),
+        )
       },
     ],
     [

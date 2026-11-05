@@ -3,8 +3,9 @@ import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
 import { DownloadCsv } from './download.js'
-import { lineFields, panelFields, panelShown, viewName } from './filter-terms.js'
+import { lineFields, panelFields, panelShown, viewName, withRecords } from './filter-terms.js'
 import { HeaderFilterContext } from './header-filter.js'
+import { useKnownRecords } from './known-records.js'
 import type { HeaderFilters } from './header-filter.js'
 import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
@@ -99,14 +100,25 @@ export function Records({
   const { filter, sort } = state
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
-  const filterable = useMemo(() => panelFields(definition), [definition])
+  /** The records each lookup field has heard of (0135), with which the line, the chips and the boxes say a lookup's condition. */
+  const records = useKnownRecords(client, formId, definition, filter)
+  const offers = useMemo(() => panelFields(definition), [definition])
+  const filterable = useMemo(() => withRecords(offers, records.known), [offers, records.known])
   /** Whether the grid's first page under the filter came back with no rows. */
   const [unmatched, setUnmatched] = useState(false)
-  /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
+  /** What each column header's box reads and changes (0132): the line's fields, the filter, the grid's line for a refusal, and a lookup's search (0135). */
   const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
   const headerFilters = useMemo<HeaderFilters>(
-    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]), hint: 'records-filter-line-hint' }),
-    [boxFields, filter, state.setFilter, grid],
+    () => ({
+      fields: boxFields,
+      filter,
+      onFilter: state.setFilter,
+      refused: (message) => grid.current?.say([message]),
+      hint: 'records-filter-line-hint',
+      records: records.records,
+      heard: records.heard,
+    }),
+    [boxFields, filter, state.setFilter, grid, records.records, records.heard],
   )
 
   const searchBlock =

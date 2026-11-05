@@ -85,8 +85,10 @@
 //     it reads with Enter, in the body and in no URL, and a chip removed
 //     gives the keyboard to its Undo; a header's box is reached from its
 //     header with Down and Enter, Tab goes on to the next and Esc gives an
-//     edit up (0132); and = on a cell keeps its value, the keyboard back on
-//     a cell after (0133);
+//     edit up (0132); a lookup column's box offers the records its search
+//     finds, drawn over the page inside the window, and applies the one
+//     picked by its token, said by its label (0135); and = on a cell keeps
+//     its value, the keyboard back on a cell after (0133);
 //   - a form's list views (0105): the View picker and Show view between
 //     Search and Filter in the keyboard's order; a choice in the select,
 //     the change an arrow fires on a closed select, sends nothing; Show

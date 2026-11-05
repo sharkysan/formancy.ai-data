@@ -734,7 +734,12 @@ to that cell to point at the next
 Each condition applied is a chip in words -- "Amount is over 1000" -- with
 its own Remove, and Clear filter removes them all; either offers Undo
 until the filter changes some other way, and a list nothing matches
-offers to try it without its last condition. The line and the boxes offer
+offers to try it without its last condition. A lookup's column searches
+its lookup in its box, and the line names a record by the label the grid
+shows (`approved_by = grace`) or by whether there is one (`approved_by is
+empty`); `=` on a lookup's cell takes its record
+([0135](./docs/decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)).
+The line and the boxes offer
 every field the server offers a filter on, less any the form's
 administrator left out in the studio's List views, though a view may
 still filter on one, which is then a chip and not in the line

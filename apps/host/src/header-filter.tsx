@@ -1,5 +1,5 @@
 import { createContext, useContext, useId, useRef, useState } from 'react'
-import type { KeyboardEvent, ReactElement } from 'react'
+import type { CSSProperties, KeyboardEvent, ReactElement } from 'react'
 import { headerCondition, headerText } from '@formancy/data-client'
 import type { LineField, ListFilterTerm, LookupRow } from '@formancy/data-client'
 import type { IFilterComp, IFloatingFilterParams, SuppressHeaderKeyboardEventParams } from 'ag-grid-community'
@@ -204,6 +204,20 @@ function ChoiceBox({ field, headers }: { field: LineField; headers: HeaderFilter
 /** The select's value for a condition its values do not say. */
 const OTHER = '\u0000other'
 
+/**
+ * Where a lookup column's listbox opens: under its box, at least as wide,
+ * and toward the side of the window with room -- from the box's left edge,
+ * or, for a box in the window's right half, back from its right edge -- so
+ * on a phone it stays inside the window.
+ */
+function listPlace(box: DOMRect): CSSProperties {
+  const top = `${String(box.bottom + 4)}px`
+  const minWidth = `${String(Math.min(box.width, window.innerWidth - 32))}px`
+  return box.left > window.innerWidth / 2
+    ? { top, right: `${String(Math.max(16, window.innerWidth - box.right))}px`, minWidth }
+    : { top, left: `${String(Math.max(16, box.left))}px`, minWidth }
+}
+
 /** What a lookup column's listbox offers: whether the field refers to a record, or a record a search found. */
 type LookupOption = { kind: 'null' | 'not-null'; words: string } | { kind: 'record'; row: LookupRow }
 
@@ -374,9 +388,7 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
           role="listbox"
           aria-label={`Records of ${field.label}`}
           hidden={!listed}
-          style={
-            place === undefined ? undefined : { top: `${String(place.bottom + 4)}px`, left: `${String(place.left)}px`, minWidth: `${String(place.width)}px` }
-          }
+          style={place === undefined ? undefined : listPlace(place)}
         >
           {options.map((option, index) => (
             <li

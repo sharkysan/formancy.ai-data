@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { PublishedForm } from '@formancy/data-client'
-import { panelFields, panelShown, summaryOf, viewName, withTerm } from './filter-terms.js'
+import { lineFields, panelFields, panelShown, summaryOf, viewName, withRecords, withTerm } from './filter-terms.js'
 import type { PanelField } from './filter-terms.js'
 
 /*
@@ -100,6 +100,31 @@ describe('the fields a filter offers', () => {
       form: { ...definition.form, model: { fields: [{ key: 'carrier', type: 'text', label: { $t: 'shipment.carrier' } }] } },
     } as unknown as PublishedForm
     expect(panelFields(referenced).find((offered) => offered.field === 'carrier')?.label).toBe('carrier')
+  })
+})
+
+describe('a lookup’s records (0135)', () => {
+  const ORDER: PanelField = { field: 'order', label: 'Order', offered: true, operators: ['equals'], input: 'lookup', days: null }
+  const known = new Map([['order', new Map([['k1:7', 'Order of 2026-10-08']])]])
+
+  // The records a grid has heard of are the lookup's values in the line,
+  // which reads and writes them by their labels, and a chip says the
+  // record by its label; one the grid has heard no label for is said as
+  // its token (watched failing with the records left off: the line had no
+  // values and the chip said the token).
+  test('are the line’s values and the words a chip says the record in', () => {
+    const fields = withRecords([ORDER, field('carrier')], known)
+    expect(lineFields(fields, null).find((offered) => offered.field === 'order')).toEqual({
+      field: 'order',
+      label: 'Order',
+      operators: ['equals'],
+      input: 'lookup',
+      values: [{ value: 'k1:7', label: 'Order of 2026-10-08' }],
+    })
+    expect(lineFields(fields, null).find((offered) => offered.field === 'carrier')).not.toHaveProperty('values')
+    expect(summaryOf({ field: 'order', op: 'equals', value: 'k1:7' }, fields[0])).toBe('Order is “Order of 2026-10-08”')
+    expect(summaryOf({ field: 'order', op: 'equals', value: 'k1:9' }, fields[0])).toBe('Order is “k1:9”')
+    expect(lineFields(withRecords([ORDER], new Map()), null)[0]?.values).toEqual([])
   })
 })
 

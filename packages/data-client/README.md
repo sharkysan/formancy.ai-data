@@ -73,7 +73,9 @@ says which fields a page may be searched, sorted and filtered by
 condition may name, the operators among `equals`, `range`, `contains`,
 `null` and `not-null`, and `input` what a value is typed as -- `text`,
 `integer`, `decimal`, `date`, `uuid` or `boolean`, a timestamp's range
-being days -- or `null` where only `null` and `not-null` are offered, and
+being days, or `lookup`, a record's token the lookup's own search finds
+([0135](../../docs/decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md))
+-- or `null` where only `null` and `not-null` are offered, and
 `days` whose clock a timestamp's days are on, `utc` for an instant and
 `wall` for one in no zone, `null` for any other field; `offered` is
 whether the form's Filter panel offers it, false where its administrator
