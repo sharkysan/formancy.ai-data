@@ -240,6 +240,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     const header = container.querySelector('.ag-header')?.getBoundingClientRect().height || 40
     const height = wellHeight(header, shown.current.loaded ? shown.current.rows : 0, Number.parseFloat(getComputedStyle(container).maxHeight))
     container.style.height = `${String(height)}px`
+    // Never shorter than its header and one whole row: a panel short of
+    // room shrinks the well to its least (records.css), which was a row
+    // under one header row, and less than one under the boxes' row (0132).
+    container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
   }, [])
 
   /** Each column sized to the first page that has rows, once, after those rows are drawn: paging never makes the columns jump; letting go of the separator does, below. */
