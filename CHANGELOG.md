@@ -23,10 +23,13 @@ the same day (formancy.ai 0232).
   the order, open the customer form and search for the name the lookup
   showed. What you notice: on the host page, under each lookup of the
   record whose answer is a record, one button per form you may read it
-  in -- "Open in Customers", or "Open in Order (pg-order)" where two forms
-  share a title -- in both renderers, drawn through formancy 0.13.0's
-  field addition and dressed by the theme, on the answer the field holds
-  now, saved or not; nothing under an empty lookup. Open shows that
+  in -- "Open in Customers", "Open in Order (pg-order)" where two forms
+  share a title, "Open Approved by in Employee" where another lookup of
+  the record opens in a form of that title, so no two buttons read alike
+  and a name never changes as you type -- in both renderers, drawn
+  through formancy 0.13.0's field addition and dressed by the theme, on
+  the answer the field holds now, saved or not; nothing under an empty
+  lookup. Open shows that
   record one Drill down level below, in that form, with its Delete, its
   child sections and its own lookups' Opens; the trail names it and leads
   back up with the record above as you left it, and opening another

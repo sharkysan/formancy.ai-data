@@ -681,7 +681,7 @@ budget and a derivation, not measurements
 
 Held by `apps/host/src/drill.test.tsx` and `open-lookup.test.tsx` on both
 engines, `layout.test.ts`, `leave.test.ts`, `crumbs.test.ts`,
-`lookup-opens.test.ts`, `lookup-addition.test.tsx`, `address.test.tsx`, and
+`lookup-opens.test.ts`, `steady-offer.test.ts`, `lookup-addition.test.tsx`, `address.test.tsx`, and
 the browser gate's `apps/host/scripts/browser/drilling.mjs`. What it costs:
 the levels are in memory only, so a reload opens the records; a row open on
 a rail in another layout and the same row a level down are two panes; a

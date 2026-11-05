@@ -710,8 +710,9 @@ The levels are in the page's memory, so a reload starts on the records
 ([0090](./docs/decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)).
 Under each lookup of a record that names a record, the paper offers one
 Open per form you may read it in -- "Open in Order (pg-order)" says the id
-where two forms share a title -- on the answer the field holds now, saved
-or not, and nothing under an empty one. Open shows that record a level
+where two forms share a title, and "Open Approved by in Employee" the
+lookup where two lookups open in forms of one title -- on the answer the
+field holds now, saved or not, and nothing under an empty one. Open shows that record a level
 below, in that form, from any layout, which becomes Drill down; a record
 the form does not show you leaves you where you were, saying so
 ([0141](./docs/decisions/0141-a-lookups-record-opens-below-the-record.md)).

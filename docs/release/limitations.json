@@ -3915,7 +3915,7 @@
       ]
     },
     "0141": {
-      "reviewed": "sha256:40fda8f167ce4f108a38eadc0a07ba6bea1bd45a1b6f3e474f1704b807af22a4",
+      "reviewed": "sha256:557c76c06b9da4f030e98984c0af0fadbee835137812c9e716d8fe80914b0d07",
       "limitations": [
         {
           "area": "host",
@@ -3939,7 +3939,7 @@
         },
         {
           "area": "host",
-          "says": "Where two forms over a lookup's target share a title, its Opens say their form ids, which name a form for an administrator more than for the person.",
+          "says": "Where two forms over a lookup's target share a title, its Opens say their form ids, which name a form for an administrator more than for the person; where two lookups of a record open in forms of one title, each Open says its lookup's label, even while only the one answers, and two lookups whose labels are one still draw Opens of one name.",
           "heldBy": "apps/host/src/lookup-opens.test.ts"
         },
         {
