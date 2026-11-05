@@ -190,8 +190,8 @@ describe('the demo forms, published over the demo account', () => {
     }
   })
 
-  // Two lookups of one table, both "Employee" as generated: the
-  // presentation names them by what each references.
+  // Two lookups of one table, named by what each references -- by the
+  // generator since 0137, and by the demo's presentation where it differs.
   test('label who created an order and who approved it', async () => {
     const opened = (await call(as('clara'), '/v1/forms/order')).json as OpenedForm
     const labels = opened.form.model.fields.map((field) => field.label)
