@@ -203,7 +203,11 @@ function rangeOf(
     }
   const zone = type.withTimeZone ? 'Z' : ''
   const start = low === null || !above ? low : dayAfter(low)
-  if (low !== null && start === null) return { ok: false, message: `Nothing on ${label} comes after ${low}, the last day both engines store.` }
+  if (low !== null && start === null)
+    return {
+      ok: false,
+      message: `A range on ${label} cannot start after ${low}, since the next midnight is past what SQL Server stores. From ${low} on finds that day and anything later.`,
+    }
   const end = high === null || below ? high : dayAfter(high)
   if (start === null && end === null) return { ok: true, filter: { op: 'not-null', column: name } }
   const midnight = (day: string | null): string | null => (day === null ? null : `${day}T00:00:00${zone}`)

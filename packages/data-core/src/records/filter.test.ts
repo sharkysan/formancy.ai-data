@@ -202,21 +202,28 @@ describe('columnFilter', () => {
       ok: true,
       filter: { from: '2026-10-02T00:00:00', above: null, to: null, before: '2026-10-03T00:00:00' },
     })
-    // Before the first day is a real range, which holds nothing: both engines store that midnight.
+    // Before the first day is a real range, below a midnight both engines
+    // store: nothing on SQL Server, and on PostgreSQL its days before the
+    // common era and -infinity, which a refusal would leave out of reach.
     expect(planned(INSTANT, { op: 'range', from: null, to: '0001-01-01', exclusive: 'to' })).toMatchObject({
       ok: true,
       filter: { from: null, before: '0001-01-01T00:00:00Z' },
     })
   })
 
-  // After the last day both engines store there is no midnight to compare
+  // After the last day SQL Server stores there is no midnight to compare
   // with: said in a sentence rather than planned as a range that holds
-  // every value, which is what a missing lower end would mean.
-  test('says that nothing comes after the last day both engines store', () => {
-    expect(planned(INSTANT, { op: 'range', from: '9999-12-31', to: null, exclusive: 'from' })).toEqual({
-      ok: false,
-      message: 'Nothing on c comes after 9999-12-31, the last day both engines store.',
-    })
+  // every value, which is what a missing lower end would mean. The
+  // sentence never says nothing comes after it, which PostgreSQL's later
+  // years and infinity would make false, and names the range that finds
+  // them, on an instant and a wall-clock timestamp alike.
+  test('says where a range after the last day SQL Server stores may start', () => {
+    for (const column of [INSTANT, WALL_CLOCK])
+      expect(planned(column, { op: 'range', from: '9999-12-31', to: null, exclusive: 'from' })).toEqual({
+        ok: false,
+        message:
+          'A range on c cannot start after 9999-12-31, since the next midnight is past what SQL Server stores. From 9999-12-31 on finds that day and anything later.',
+      })
   })
 
   // 9999-12-31 has no next midnight SQL Server stores, so a range to it has

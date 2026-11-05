@@ -89,9 +89,10 @@ function boundOf(type: RangeFilterType, value: unknown, column: string): string 
  * One condition of the person's filter, fresh, holding what `columnFilter`
  * would have planned and nothing else: an operator from the closed set, a
  * named column, and for each operator the type it compares and values
- * spelled as that type holds them. A range has at least one bound, and its
- * upper one is `to` for a number or a date and `before` for a timestamp,
- * never the other.
+ * spelled as that type holds them. A range has at least one bound, one
+ * lower and one upper at most: a number or a date is bounded by any of
+ * `from`, `above`, `to` and `before`, and a timestamp by `from` and
+ * `before` alone, each a midnight.
  */
 function filterTerm(entry: unknown): RecordFilter {
   if (!isRecord(entry) || !isName(entry['column'])) throw refuse('names the column of each filter condition')

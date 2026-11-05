@@ -238,7 +238,10 @@ Equality on text is exact on both engines, so `muster ag` does not find
 `Muster AG` under a case-insensitive collation, where `contains` does. An
 instant's range is whole days of UTC, which is shifted for a person in
 another zone; a range to 9999-12-31 has no upper end, and on PostgreSQL
-holds a timestamp after that year; a decimal with more fraction digits
+holds a timestamp after that year, while one after 9999-12-31 is refused
+on a timestamp and planned on a date, and one before 0001-01-01 finds
+PostgreSQL's days before the common era, which SQL Server has none of
+([0130](../decisions/0130-a-filters-range-may-leave-out-either-bounds-own-value.md)); a decimal with more fraction digits
 than its column holds is refused, not rounded; and what a filter costs on
 a large table is not measured
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
