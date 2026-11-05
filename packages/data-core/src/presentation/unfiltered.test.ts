@@ -20,7 +20,7 @@ import { carryUnfiltered, unfilteredProblems } from './unfiltered.js'
 const { form, bindings } = generateForm(snapshot(), ORDER)
 const all = bindings.fields.map((binding) => binding.field)
 const offered = (unfiltered: readonly string[]) =>
-  listColumns(bindings, all, [], unfiltered).filterable.map((field) => `${field.field}:${String(field.offered)}`)
+  listColumns(bindings, all, [], { unfiltered }).filterable.map((field) => `${field.field}:${String(field.offered)}`)
 
 describe('the fields the Filter panel does not offer (0123)', () => {
   // The list says, per field it is filtered by, whether the panel offers

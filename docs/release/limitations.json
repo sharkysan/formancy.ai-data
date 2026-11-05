@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:c0a07522b0477703a9468138137e3d52994bd363d91f51272a691df6b4c5313b",
+      "reviewed": "sha256:4a7ad9d575eb46b1680a6b82d22191f7fe2bc7dda0a85fea1faeceb5986b01a6",
       "limitations": [
         {
           "area": "forms",
@@ -3785,7 +3785,7 @@
       ]
     },
     "0135": {
-      "reviewed": "sha256:13e57112d583421c503af354b8e817f564c0ed319797334245b683ea1d51d70f",
+      "reviewed": "sha256:b9029c04d20f7e87e40b6cb7098f49697d6bf364541e71417209ebefad8cd341",
       "limitations": [
         {
           "area": "forms",
@@ -3857,6 +3857,39 @@
         {
           "area": "studio",
           "says": "Every lookup the Choose step ticks by default needs its rows decided in the Policy step before the form publishes."
+        }
+      ]
+    },
+    "0139": {
+      "reviewed": "sha256:733c5aaedb2ac7c3be09ca00ca03c6d6c0e26e72a961dc3295b877821a64cdd5",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A list is filtered through a lookup only by the columns its label shows: a column of the lookup's target the form does not show cannot be filtered by."
+        },
+        {
+          "area": "forms",
+          "says": "A published view cannot name a field through a lookup; a person's own view can."
+        },
+        {
+          "area": "forms",
+          "says": "A condition through a lookup cannot ask that a column is empty: a row with no target row would show it empty too and not be found. The lookup's own is empty finds the rows with no target row."
+        },
+        {
+          "area": "host",
+          "says": "A field through a lookup has no grid column and so no header box: the filter line and its chips alone name one, and no cell offers a condition on one by example."
+        },
+        {
+          "area": "databases",
+          "says": "Under a collation that folds case, accents or trailing spaces, a row whose foreign key differs from its target's key only by what the collation folds is found by no condition through the lookup, as its page shows it no label."
+        },
+        {
+          "area": "access",
+          "says": "A lookup whose filter names an attribute a person does not carry offers them no field through it."
+        },
+        {
+          "area": "operations",
+          "says": "No plan of a condition through a lookup is measured on either engine."
         }
       ]
     }

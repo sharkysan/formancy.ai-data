@@ -158,7 +158,7 @@ only enforcement is "we remember" says so plainly.
 | [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md) | A host token is refused unless it is its compact form exactly | accepted |
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
-| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134, 0135 |
+| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134, 0135; extended by 0139 |
 | [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126, 0136 |
 | [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted; extended by 0126 |
 | [0107](0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md) | A record is duplicated into a new one, of the fields the server names, without its key | accepted |
@@ -189,7 +189,8 @@ only enforcement is "we remember" says so plainly.
 | [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133; amended by 0135 |
 | [0133](0133-a-cell-filters-by-its-value.md) | A cell filters by its value | accepted; amended by 0135 |
 | [0134](0134-the-build-a-condition-panel-is-retired.md) | The Build a condition panel is retired | accepted |
-| [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136 |
+| [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136; extended by 0139 |
 | [0136](0136-a-lookup-field-sorts-by-what-it-shows.md) | A lookup field sorts by what it shows | accepted |
 | [0137](0137-two-lookups-into-one-table-are-told-apart-by-their-columns.md) | Two lookups into one table are told apart by their columns | accepted |
 | [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |
+| [0139](0139-a-lookups-shown-columns-filter-its-records.md) | A lookup's shown columns filter its records | accepted |

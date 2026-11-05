@@ -172,6 +172,9 @@ describe('when the data server is not what answers', () => {
       offer(['range'], 'date', 'local'),
       offer(['equals', 'range'], 'integer', 'utc'),
       offer(['equals'], 'lookup', 'utc'),
+      // A field through a lookup (0139) names its lookup and its column, each as text.
+      { ...columns, filterable: [{ field: 'id.name', offered: true, operators: ['equals'], input: 'text', days: null, related: 'id' }] },
+      { ...columns, filterable: [{ field: 'id.name', offered: true, operators: ['equals'], input: 'text', days: null, related: { lookup: 'id' } }] },
       { searchable: [], sortable: ['id'], filterable: [] },
       { ...columns, filterable: [], views: {} },
       viewed({ name: 7 }),
@@ -198,6 +201,11 @@ describe('when the data server is not what answers', () => {
       offer(['equals', 'range'], 'integer', null, false),
       // A lookup's record (0135): watched failing, refused as no input data-core names.
       offer(['equals', 'null', 'not-null'], 'lookup'),
+      // Through a lookup (0139): watched failing with `related` refused whatever it held.
+      {
+        ...columns,
+        filterable: [{ field: 'id.name', offered: true, operators: ['contains'], input: 'text', days: null, related: { lookup: 'id', column: 'Name' } }],
+      },
       viewed({}),
       viewed({ default: true }),
       { ...columns, filterable: [], own: [VIEW] },

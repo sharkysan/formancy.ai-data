@@ -29,9 +29,7 @@ export function carryViews({ views, follow, bindings, report }: ViewCarry): Stor
     bindings,
     bindings.fields.map((binding) => binding.field),
     [],
-    [],
-    [],
-    displayedLookups(bindings),
+    { labelled: displayedLookups(bindings) },
   )
   const carried: StoredListView[] = []
   for (const [index, view] of views.entries()) {

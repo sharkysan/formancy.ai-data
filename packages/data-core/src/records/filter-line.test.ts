@@ -78,6 +78,38 @@ describe('lineNames', () => {
   })
 })
 
+describe('lineNames, through a lookup', () => {
+  // A field through a lookup (0139) is named by the lookup's name in the
+  // line, a dot, and its column's key -- `customer.name` -- which no
+  // label's name could be, a name holding no dot: the line says which
+  // lookup a condition goes through, under the name a person types for the
+  // lookup. A lookup the line does not name lends its key. Read and
+  // printed by that name. Watched failing with the field named by its
+  // label: `customer_name`.
+  test('names a field through a lookup by the lookup’s name and its column’s key', () => {
+    const through = [
+      named('Customer', 'customer_no'),
+      named('Customer › Name', 'customer_no.name'),
+      named('Customer › E-Mail', 'customer_no.e_mail'),
+      named('Gone › Name', 'gone.name'),
+    ]
+    expect([...lineNames(through).entries()]).toEqual([
+      ['customer_no', 'customer'],
+      ['customer_no.name', 'customer.name'],
+      ['customer_no.e_mail', 'customer.e_mail'],
+      ['gone.name', 'gone.name'],
+    ])
+    const contains = { ...(through[1] as LineField), operators: ['equals', 'contains'] } satisfies LineField
+    expect(parseFilterLine('customer.name contains "Muster AG"', [through[0] as LineField, contains])).toEqual({
+      ok: true,
+      filter: [{ field: 'customer_no.name', op: 'contains', text: 'Muster AG' }],
+    })
+    expect(printFilterLine([{ field: 'customer_no.name', op: 'contains', text: 'Muster AG' }], [through[0] as LineField, contains])).toBe(
+      'customer.name contains "Muster AG"',
+    )
+  })
+})
+
 describe('parseFilterLine', () => {
   // The line's own words become the terms the panel would have sent: an
   // equality, a comparison as a range that leaves out its bound (0130),

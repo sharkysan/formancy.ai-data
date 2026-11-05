@@ -245,8 +245,8 @@ import { listable, listColumns, viewProblems, viewShapeProblems } from '@formanc
 
 viewShapeProblems(presentation.views) // on every read: a name a picker shows, a filter and a sort a request carries
 viewProblems(presentation.views, bindings) // at a write: each view one a list of these bindings can run, named where not
-const listed = listable(snapshot, bindings, policy, context) // the person's fields, and the lookups they may sort by (0136)
-listColumns(bindings, listed.fields, presentation.views, [], [], [...listed.labels.keys()]).views // what one person is offered: the views they could have built
+const listed = listable(snapshot, bindings, policy, context) // the person's fields, the lookups they may sort by (0136) and the fields through them (0139)
+listColumns(bindings, listed.fields, presentation.views, { labelled: [...listed.labels.keys()], related: listed.related }).views // what one person is offered: the views they could have built
 ```
 
 Without the lookups `listable` gives, a view sorted by a lookup is not one
@@ -470,10 +470,13 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   policy first, then a key a token can carry and the snapshot holds NOT
   NULL, rows something scopes where a lookup's options are filtered
   (`unscopedLookups`), and every key column in a field the person may read
-  or pinned by their filter, and which lookups this person may sort by
-  their labels (`labels`, 0136). `listColumns(bindings, fields, views,
-  unfiltered, own, [...labels.keys()])` is what a list may be sorted,
-  searched and filtered by, which `GET /v1/forms/:id` sends as `list`.
+  or pinned by their filter, which lookups this person may sort by
+  their labels (`labels`, 0136), and the fields through those lookups
+  they may filter by, `<lookup>.<column>` on a column a label shows
+  (`related`, 0139). `listColumns(bindings, fields, views, { unfiltered,
+  own, labelled: [...labels.keys()], related })` is what a list may be
+  sorted, searched and filtered by, which `GET /v1/forms/:id` sends as
+  `list`.
   `validateListQuery` checks a body from a browser; `planList` plans a
   `ListRequest` -- the read's columns, filters and throughs, the order
   `listOrder` makes total with the key, the search, the parent -- or no

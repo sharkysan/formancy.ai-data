@@ -81,7 +81,12 @@ being days, or `lookup`, a record's token the lookup's own search finds
 whether the form's Filter panel offers it, false where its administrator
 left it out, though a condition on it is still answered
 ([0123](../../docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)), and a list whose field says nothing of
-it is `unexpected`. `views` is the
+it is `unexpected`. A field through a lookup, `customer.name` on a column
+the lookup shows, also has `related: { lookup, column }`, the lookup's key
+and what its column is called, and an offer whose `related` is not both
+as text is `unexpected`
+([0139](../../docs/decisions/0139-a-lookups-shown-columns-filter-its-records.md)).
+`views` is the
 published views this person could have built from the rest
 ([0105](../../docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
 each `{ name, filter, sort }` and `default: true` on the one a grid opens

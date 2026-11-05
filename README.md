@@ -744,6 +744,13 @@ empty`); `=` on a lookup's cell takes its record
 ([0135](./docs/decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)),
 and its header sorts by what it shows, its first display column
 ([0136](./docs/decisions/0136-a-lookup-field-sorts-by-what-it-shows.md)).
+The line also takes a condition on a column a lookup shows,
+`customer.name contains muster`, which keeps the rows whose customer's
+name holds it among the customers the lookup may show the person, its
+chip saying "Customer › Name contains “muster”"; a column of the
+customer the form does not show is no field, `is empty` is never asked
+through a lookup, and a published view cannot name one yet
+([0139](./docs/decisions/0139-a-lookups-shown-columns-filter-its-records.md)).
 The line and the boxes offer
 every field the server offers a filter on, less any the form's
 administrator left out in the studio's List views, though a view may

@@ -179,6 +179,7 @@ export type {
   RecordSort,
   RecordValue,
   RangeFilterType,
+  RelatedFilter,
   SortLabel,
   SupersedeRequest,
   Through,
@@ -193,6 +194,9 @@ export type { DeleteTerms, ReachTerms } from './records/delete-terms.js'
 export { copiedFields } from './records/copy.js'
 export { fieldHeading } from './records/heading.js'
 export { CURSOR_GONE, cursorRefusal, displayedLookups, listable, listColumns, listOrder, planList, recordPage, viewProblems } from './records/list.js'
+export type { ListOffers } from './records/list.js'
+export { relatedKeys } from './records/related-filter.js'
+export type { RelatedField } from './records/related-filter.js'
 export { decodeListCursor, listCursor } from './records/cursor.js'
 export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
@@ -227,8 +231,8 @@ export type { FilterPlanning, FilterRead } from './records/filter.js'
 export { browseRelations, followTerms } from './records/follow.js'
 export type { BrowseRelation, BrowseRelations, UnfollowedKey } from './records/follow.js'
 export { listTerms } from './records/list-terms.js'
-export type { ListTerms, SortTerm } from './records/list-terms.js'
-export type { LabelSortTerm, LabelTerms } from './records/sort-label.js'
+export type { ListTerms, RelatedTerms, SortTerm } from './records/list-terms.js'
+export type { LabelSortTerm, LabelTerms, LookupReach } from './records/sort-label.js'
 export { throughTerms } from './records/through.js'
 export type { ThroughTerms } from './records/through.js'
 export { DELETE_REFUSED, driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'

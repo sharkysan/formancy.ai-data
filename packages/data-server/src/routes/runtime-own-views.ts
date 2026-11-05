@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { ownViewsProblems, readOwnView, removedOwnView, savedOwnView } from '@formancy/data-core'
-import type { ListColumns, ListView, OwnViews, PolicyContext } from '@formancy/data-core'
+import type { ListColumns, ListView, OwnViews, PolicyContext, RelatedField } from '@formancy/data-core'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
@@ -52,13 +52,22 @@ export interface OwnViewRouteSteps {
   /** The published bundle, or a reply already sent. */
   published(id: string, reply: FastifyReply): Promise<PublishedBundle | undefined>
   context(request: FastifyRequest): PolicyContext
-  /** What this person's list of `bundle` offers them, `own` fitted, or the refusal a list would be answered with. */
-  columns(bundle: PublishedBundle, context: PolicyContext, own: readonly ListView[]): { ok: true; columns: ListColumns } | { ok: false; answer: WriteAnswer }
+  /** What this person's list of `bundle` offers them, `own` fitted, and the fields through its lookups it offers them (0139) -- or the refusal a list would be answered with. */
+  columns(
+    bundle: PublishedBundle,
+    context: PolicyContext,
+    own: readonly ListView[],
+  ): { ok: true; columns: ListColumns; related: RelatedField[] } | { ok: false; answer: WriteAnswer }
   /** A refusal, sent, with what the audit names. */
   answered(reply: FastifyReply, answer: WriteAnswer): Promise<FastifyReply>
 }
 
-type Change = (own: ListView[], columns: ListColumns, bundle: PublishedBundle) => { ok: true; views: ListView[] } | { ok: false; message: string }
+type Change = (
+  own: ListView[],
+  columns: ListColumns,
+  bundle: PublishedBundle,
+  related: readonly RelatedField[],
+) => { ok: true; views: ListView[] } | { ok: false; message: string }
 
 /**
  * `POST /v1/forms/:id/views/save` and `POST /v1/forms/:id/views/remove`
@@ -82,7 +91,7 @@ export function registerOwnViewRoutes(app: FastifyInstance, steps: OwnViewRouteS
       const { base, views } = await ownViewsOf(steps.store, context, form)
       const listed = steps.columns(bundle, context, views)
       if (!listed.ok) return steps.answered(reply, listed.answer)
-      const changed = change(views, listed.columns, bundle)
+      const changed = change(views, listed.columns, bundle, listed.related)
       if (!changed.ok) return reply.code(400).send({ code: 'invalid-view', message: changed.message })
       if (JSON.stringify(changed.views) === JSON.stringify(views)) return { own: listed.columns.own }
       const outcome = await people.publish(form, base, { views: changed.views })
@@ -98,7 +107,7 @@ export function registerOwnViewRoutes(app: FastifyInstance, steps: OwnViewRouteS
   app.post<{ Params: { id: string } }>('/v1/forms/:id/views/save', async (request, reply) => {
     const read = readOwnView(request.body)
     if (!read.ok) return reply.code(400).send({ code: 'invalid-view', message: read.message })
-    return edit(request, reply, (own, columns, bundle) => savedOwnView(own, read.view, bundle.bindings, columns))
+    return edit(request, reply, (own, columns, bundle, related) => savedOwnView(own, read.view, bundle.bindings, columns, related))
   })
 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/views/remove', async (request, reply) => {

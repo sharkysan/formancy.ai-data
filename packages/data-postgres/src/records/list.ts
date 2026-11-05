@@ -1,4 +1,4 @@
-import type { LabelTerms, ListRequest, ListTerms, SortTerm } from '@formancy/data-core'
+import type { LabelTerms, ListRequest, ListTerms, LookupReach, RelatedTerms, SortTerm } from '@formancy/data-core'
 import { op } from '../sql/catalog.js'
 import { filterSql } from '../sql/filters.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
@@ -23,7 +23,8 @@ import type { RecordStatement } from './sql.js'
  *   left join lateral (
  *     select true, <columns>, row_number() over (order by <order>) as "n"
  *     from <table> as "r"
- *     where <parent> and <filters> and <throughs> and <the person's filter> and <search>
+ *     where <parent> and <filters> and <throughs> and <the person's filter>
+ *       and <their conditions through lookups> and <search>
  *       and <after "a" in the order>
  *     order by <order> limit <limit + 1> offset <offset>
  *   ) as "page" on true
@@ -62,6 +63,7 @@ export function listStatement(request: ListRequest, terms: ListTerms): RecordSta
     ...filterSql(statement, ROW, terms.terms),
     ...terms.through.map((entry) => throughSql(statement, entry)),
     ...terms.filter.map((entry) => recordFilterSql(statement, ROW, entry)),
+    ...terms.related.map((entry, index) => relatedSql(statement, ROW, entry, `"x${String(index)}"`)),
   ]
   if (terms.search !== null) where.push(searchSql(statement, ROW, terms.search.columns, terms.search.text))
   // Each lookup's label in the order (0136), read once per row, in a lateral join of its own.
@@ -124,24 +126,44 @@ function anchorSql(statement: Statement, table: ListRequest['target']['table'], 
 }
 
 /**
- * A lookup's label a list is ordered by (0136): the target's display
- * column for `row`'s foreign key, under the lookup's filters on the target,
- * as the page reads the label -- NULL where the target holds no such row or
- * the filters hide it. The key is matched exactly: a text key under the
+ * Where `alias`, a row of a lookup's target, is the one `row`'s foreign key
+ * finds as the page reads its label (0136, 0139), under the lookup's filters
+ * on the target. The key is matched exactly: a text key under the
  * database's default collation, which PostgreSQL holds deterministic, so a
- * row sorts by the label its page shows, which a token resolves to only on
- * an exact match -- under a case-insensitive collation, the parity
- * fixture's ICU one, a child naming `c` sorts with the rows that show no
- * label though its foreign key relates it to `C`. A scalar subquery: one
- * value per row, so it multiplies none; a target key that stopped being
- * unique fails the statement (21000), as no description of the target
- * catches.
+ * row is found by the label its page shows, which a token resolves to only
+ * on an exact match -- under a case-insensitive collation, the parity
+ * fixture's ICU one, a child naming `c` finds no row though its foreign key
+ * relates it to `C`.
  */
-function labelSql(statement: Statement, row: string, label: LabelTerms, alias: string): string {
-  const pairs = label.pairs.map((pair) => {
+function reachedRow(statement: Statement, row: string, reach: LookupReach, alias: string): string[] {
+  const pairs = reach.pairs.map((pair) => {
     const root = `${row}.${quoteIdentifier(pair.column)}`
     return `${alias}.${quoteIdentifier(pair.references)} ${op('=')} ${pair.type.kind === 'text' ? `(${root} collate pg_catalog."default")` : root}`
   })
-  const where = [...pairs, ...filterSql(statement, alias, label.terms)]
-  return `(select ${alias}.${quoteIdentifier(label.display)} from ${quoteTable(label.target)} as ${alias} where ${where.join(' and ')})`
+  return [...pairs, ...filterSql(statement, alias, reach.terms)]
+}
+
+/**
+ * A lookup's label a list is ordered by (0136): the target's display
+ * column for `row`'s foreign key (`reachedRow`) -- NULL where the target
+ * holds no such row or the filters hide it. A scalar subquery: one value
+ * per row, so it multiplies none; a target key that stopped being unique
+ * fails the statement (21000), as no description of the target catches.
+ */
+function labelSql(statement: Statement, row: string, label: LabelTerms, alias: string): string {
+  return `(select ${alias}.${quoteIdentifier(label.display)} from ${quoteTable(label.target)} as ${alias} where ${reachedRow(statement, row, label, alias).join(' and ')})`
+}
+
+/**
+ * A person's conditions through a lookup (0139): whether the target row
+ * `row`'s foreign key finds as its label does (`reachedRow`) holds every
+ * one, each spelled on that row as the person's filter is on the root
+ * (`filter.ts`). EXISTS, as a through is: a row is on the page once
+ * whatever the target holds, never joined to it, and a row whose foreign
+ * key finds no row -- NULL, dangling, hidden by the lookup's filters --
+ * holds no condition. No plan of it is measured.
+ */
+function relatedSql(statement: Statement, row: string, related: RelatedTerms, alias: string): string {
+  const where = [...reachedRow(statement, row, related, alias), ...related.filter.map((entry) => recordFilterSql(statement, alias, entry))]
+  return `exists (select from ${quoteTable(related.target)} as ${alias} where ${where.join(' and ')})`
 }

@@ -60,16 +60,18 @@ const FILTER_DAYS: Readonly<Record<FilterDays, true>> = { utc: true, wall: true 
  * least one, each one data-core names -- what a value is typed as, `null`
  * exactly when it offers only `null` and `not-null`, and whose clock a
  * timestamp's days are on, one data-core names on a date input and `null`
- * on every other. A panel draws its inputs from this, so an offer it could
- * not draw is not the server's.
+ * on every other; through a lookup (0139), the lookup's key and what its
+ * column is called, each as text. A panel draws its inputs from this, so
+ * an offer it could not draw is not the server's.
  */
 function isFilterableField(value: unknown): value is FilterableField {
   if (!isRecord(value) || typeof value['field'] !== 'string' || typeof value['offered'] !== 'boolean' || !isStrings(value['operators'])) return false
   const operators = value['operators']
   if (operators.length === 0 || !operators.every((op) => Object.hasOwn(FILTER_OPERATORS, op))) return false
-  const { input, days } = value
+  const { input, days, related } = value
   const valued = operators.some((op) => op !== 'null' && op !== 'not-null')
   if (!(valued ? typeof input === 'string' && Object.hasOwn(FILTER_INPUTS, input) : input === null)) return false
+  if (related !== undefined && !(isRecord(related) && typeof related['lookup'] === 'string' && typeof related['column'] === 'string')) return false
   return days === null || (input === 'date' && typeof days === 'string' && Object.hasOwn(FILTER_DAYS, days))
 }
 

@@ -108,6 +108,32 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     expect(await floor('a line applied')).toEqual(CLEAN('a line applied'))
   })
 
+  // A condition through a lookup (0139): the line names it after the
+  // lookup, `customer.name`, sends it as that field, and the server keeps
+  // the rows whose customer's name holds it -- every fresh order's, whose
+  // customer is a Muster, and none for a name no customer has. The chip
+  // says it by the lookup's label and the column's.
+  test('filters through a lookup by what its records show', async () => {
+    const notes = stamp('through')
+    const orders = await freshOrders(engine, notes, ['1', '2'])
+    const user = await workspace(engine.formId)
+    plane.sent.length = 0
+
+    await typeFilter(user, 'Records', `notes contains ${notes} and customer.name contains muster`)
+    await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
+    expect(filtersSent(engine.formId)).toEqual([
+      [
+        { field: 'notes', op: 'contains', text: notes },
+        { field: 'customer.name', op: 'contains', text: 'muster' },
+      ],
+    ])
+    await listsApplied('Records', [`Notes contains “${notes}”`, 'Customer › Name contains “muster”'])
+    expect(await floor('a condition through a lookup')).toEqual(CLEAN('a condition through a lookup'))
+
+    await typeFilter(user, 'Records', `notes contains ${notes} and customer.name = nobody`)
+    await waitFor(() => expect(recordKeys()).toEqual([]), ARRIVES)
+  })
+
   // A line the page cannot read is said under it, the characters it is
   // about marked, every character typed and the caret kept, and nothing
   // sent: the grid stays on its last filter.

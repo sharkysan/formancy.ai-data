@@ -94,6 +94,9 @@ export const offerWords = (field: LineField): string[] => field.operators.flatMa
  * script and digits kept and every other run one `_` -- `größe_cm` for
  * "Größe (cm)". Its key instead where that name is empty, is another
  * field's name too or is another field's key, so a name says one field.
+ * A field through a lookup (0139), keyed `<lookup>.<column's key>`, is
+ * named by its lookup's name, or the lookup's key where the line names no
+ * such field, then the dot and its column's key: `customer.name`.
  */
 function slug(label: string): string {
   // Every run is one `_` by now, so at most one is at either end: trimmed without a second pattern over the label.
@@ -109,13 +112,23 @@ function slug(label: string): string {
 
 export function lineNames(fields: readonly LineField[]): Map<string, string> {
   const keys = new Set(fields.map((field) => field.field.toLowerCase()))
-  const candidates = fields.map((field) => slug(field.label))
-  return new Map(
-    fields.map((field, index) => {
+  // A key with a dot is a field through a lookup (0139), named after its lookup below; a label's name holds no dot.
+  const own = fields.filter((field) => !field.field.includes('.'))
+  const candidates = own.map((field) => slug(field.label))
+  const names = new Map(
+    own.map((field, index) => {
       const name = candidates[index] ?? ''
       const shared = candidates.filter((candidate) => candidate === name).length > 1
       const anothers = keys.has(name) && name !== field.field.toLowerCase()
       return [field.field, name === '' || shared || anothers ? field.field : name]
+    }),
+  )
+  return new Map(
+    fields.map((field) => {
+      const dot = field.field.indexOf('.')
+      if (dot === -1) return [field.field, names.get(field.field) as string]
+      const lookup = field.field.slice(0, dot)
+      return [field.field, `${names.get(lookup) ?? lookup}${field.field.slice(dot)}`]
     }),
   )
 }

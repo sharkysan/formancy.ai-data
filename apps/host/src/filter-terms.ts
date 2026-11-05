@@ -37,13 +37,20 @@ export function withRecords(fields: readonly PanelField[], known: Known): PanelF
 
 /**
  * The fields of `definition`'s list a person may filter by, in the server's
- * order, each with its label. Whether a date input is a timestamp's, and
+ * order, each with its label: the form's, or for a field through a lookup
+ * (0139), which the form has none of, its lookup's and its column's. Whether a date input is a timestamp's, and
  * on whose clock its days are, is the offer's `days`, which only the
  * column's type knows: never guessed from the control the form draws.
  */
 export function panelFields(definition: PublishedForm): PanelField[] {
   const headings = new Map(definition.form.model.fields.map((field) => [field.key, fieldHeading(field)]))
-  return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: headings.get(offer.field) ?? offer.field }))
+  return (definition.list?.filterable ?? []).map((offer) => ({
+    ...offer,
+    label:
+      offer.related === undefined
+        ? (headings.get(offer.field) ?? offer.field)
+        : `${headings.get(offer.related.lookup) ?? offer.related.lookup} › ${offer.related.column}`,
+  }))
 }
 
 /**

@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import type { ListView } from '../runtime.js'
-import { listColumns } from './list.js'
+import { listable, listColumns } from './list.js'
 import { OWN_VIEWS_LIMIT, ownViewsProblems, readOwnView, removedOwnView, savedOwnView } from './own-views.js'
-import { CLERK_FIELDS, PG_ORDER } from './test-support.js'
+import { CLERK, CLERK_FIELDS, ORDER_POLICY, PG, PG_ORDER } from './test-support.js'
 
 /*
  * A person's own list views (0126), as data: read from what a page sends,
@@ -72,6 +72,25 @@ describe('savedOwnView', () => {
     expect(savedOwnView([], LARGE, PG_ORDER, auditor)).toEqual({ ok: false, message: 'amount is not a field this list is filtered by.' })
   })
 
+  // A condition through a lookup (0139) is one their list runs too, so a
+  // line saved as their view keeps it -- fitted on the column it is on, as
+  // the planner fits it -- and offered again while it still fits. Watched
+  // failing with a dotted field refused as no field of the form's.
+  test('saves and offers a view with a condition through a lookup, fitted on its column', () => {
+    const listed = listable(PG, PG_ORDER, ORDER_POLICY, CLERK)
+    if (!listed.ok) throw new Error(listed.message)
+    const columns = listColumns(PG_ORDER, CLERK_FIELDS, [], { related: listed.related })
+    const muster: ListView = { name: 'Muster', filter: [{ field: 'customer.name', op: 'contains', text: 'Muster' }], sort: [] }
+    expect(savedOwnView([], muster, PG_ORDER, columns, listed.related)).toEqual({ ok: true, views: [muster] })
+    expect(savedOwnView([], { ...muster, filter: [{ field: 'customer.name', op: 'null' }] }, PG_ORDER, columns, listed.related)).toEqual({
+      ok: false,
+      message: 'customer.name offers no null condition.',
+    })
+    expect(savedOwnView([], muster, PG_ORDER, COLUMNS)).toEqual({ ok: false, message: 'customer.name is not a field this list is filtered by.' })
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], { own: [muster, PLACED], related: listed.related }).own).toEqual([muster, PLACED])
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], { own: [muster, PLACED] }).own).toEqual([PLACED])
+  })
+
   // Two choices a picker could not tell apart: one asking what a view the
   // form offers them asks, whatever its name, or what another of theirs
   // asks. Watched failing with the asks unread: the second "Placed" was
@@ -116,8 +135,8 @@ describe('listColumns, own', () => {
   // they may no longer read is not offered, and not offered without that
   // condition. Watched failing with own passed through unfitted.
   test('offers a person their views their list could run, in their order', () => {
-    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], [], [LARGE, PLACED]).own).toEqual([LARGE, PLACED])
-    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'], [], [], [LARGE, PLACED]).own).toEqual([PLACED])
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], { own: [LARGE, PLACED] }).own).toEqual([LARGE, PLACED])
+    expect(listColumns(PG_ORDER, ['id', 'order_date', 'status'], [], { own: [LARGE, PLACED] }).own).toEqual([PLACED])
   })
 })
 
@@ -131,7 +150,7 @@ describe('an own view whose range leaves out a bound', () => {
     expect(read).toEqual({ ok: true, view: over })
     if (!read.ok) throw new Error(read.message)
     expect(savedOwnView([PLACED], read.view, PG_ORDER, COLUMNS)).toEqual({ ok: true, views: [PLACED, over] })
-    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], [], [PLACED, over]).own).toEqual([PLACED, over])
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], { own: [PLACED, over] }).own).toEqual([PLACED, over])
   })
 
   // The file as this release writes it, byte for byte, reads back. It is

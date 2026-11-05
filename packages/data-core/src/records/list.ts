@@ -14,7 +14,8 @@ import { columnFilter, filterOffer } from './filter.js'
 import { lookupFilter, lookupFilterOffer } from './lookup-filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
 import { columnsOf, keyOrderProblem, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
-import { filtersFor, readColumns, sortLabelsFor, throughFor } from './scope.js'
+import { type RelatedField, relatedFilters, relatedOffer } from './related-filter.js'
+import { filtersFor, reachedLookups, readColumns, relatedFieldsOf, sortLabelsOf, throughFor } from './scope.js'
 import type { ListOutcome, ListRequest, ListSort, RecordFilter, RecordRead, RecordSort, RecordValue, SortLabel, Through } from './types.js'
 
 /*
@@ -41,8 +42,10 @@ export interface Listable {
   through: Through[]
   /** The field keys the actor may read, in the bindings' order. */
   fields: string[]
-  /** The lookups of those this actor may order a list by, each with its label (`sortLabelsFor`, 0136). */
+  /** The lookups of those this actor may order a list by, each with its label (`sortLabelsOf`, 0136). */
   labels: Map<string, SortLabel>
+  /** The fields this actor may filter a list by through those lookups (`relatedFieldsOf`, 0139). */
+  related: RelatedField[]
 }
 
 /**
@@ -107,13 +110,15 @@ export function listable(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   if (!prepared.target.identity.every((column) => seen.has(column.name))) {
     return refuse('field-denied', "This form's records are named by fields you may not read, so they are not listed for you.")
   }
+  const reached = reachedLookups(snapshot, bindings, prepared, policy, context, readable.fields)
   return {
     ok: true,
     prepared,
     filters: filters.filters,
     through: through.through,
     fields: readable.fields,
-    labels: sortLabelsFor(snapshot, bindings, prepared, policy, context, readable.fields),
+    labels: sortLabelsOf(reached),
+    related: relatedFieldsOf(reached),
   }
 }
 
@@ -129,6 +134,14 @@ function readableLookup(bindings: FormBindings, fields: readonly string[], field
   return binding?.kind === 'lookup' && fields.includes(field) ? binding : undefined
 }
 
+/** What `listColumns` offers besides the readable fields and the published views. */
+export interface ListOffers {
+  unfiltered?: readonly string[]
+  own?: readonly ListView[]
+  labelled?: readonly string[]
+  related?: readonly RelatedField[]
+}
+
 /**
  * What a list of this form may be sorted, searched and filtered by, for an
  * actor who may read `fields`: one decision, so what `GET /v1/forms/:id`
@@ -137,7 +150,8 @@ function readableLookup(bindings: FormBindings, fields: readonly string[], field
  * `lookup/searchable.ts`'s set, the kinds a lookup's search matches, matched
  * as it matches (0028). Filterable: those `filterOffer` offers a condition
  * on, with what it offers (0104), and every readable lookup field, by the
- * record it refers to (`lookupFilterOffer`, 0135), in the bindings' order.
+ * record it refers to (`lookupFilterOffer`, 0135), in the bindings' order,
+ * each followed by the fields through it (`related`, 0139).
  *
  * Views: those of `views`, the published ones, that this actor could have
  * built from the rest (`viewFit`, 0105), in their published order. A view
@@ -146,27 +160,31 @@ function readableLookup(bindings: FormBindings, fields: readonly string[], field
  * name; and a default whose view is not offered leaves the list with none.
  * Own: those of `own`, the person's saved ones (0126), fitted alike.
  *
- * `labelled`: the lookup fields a list may be ordered by their labels
- * (0136) -- for one person, those `sortLabelsFor` gives them; for no one
- * in particular, every lookup that shows a display column
- * (`displayedLookups`). None by default, so a caller that names none
- * offers no order by a lookup.
+ * `unfiltered`: the fields the administrator left out of the filter
+ * (0123), offered with `offered: false`, and so is each field through a
+ * lookup of them. `labelled`: the lookup fields a list may be ordered by
+ * their labels (0136) -- for one person, those `sortLabelsOf` gives them;
+ * for no one in particular, every lookup that shows a display column
+ * (`displayedLookups`). `related`: the fields through lookups this person
+ * may filter by (0139), each offered after its lookup by what its column
+ * offers. None of either by default, so a caller that names none offers
+ * no order by a lookup and no field through one.
  */
-export function listColumns(
-  bindings: FormBindings,
-  fields: readonly string[],
-  views: readonly ListView[],
-  unfiltered: readonly string[] = [],
-  own: readonly ListView[] = [],
-  labelled: readonly string[] = [],
-): ListColumns {
+export function listColumns(bindings: FormBindings, fields: readonly string[], views: readonly ListView[], options: ListOffers = {}): ListColumns {
+  const { unfiltered = [], own = [], labelled = [], related = [] } = options
   const columns = readableColumns(bindings, fields)
   const readable = new Set(fields)
   const filterable: FilterableField[] = []
   for (const binding of bindings.fields) {
     if (!readable.has(binding.field)) continue
+    const offered = !unfiltered.includes(binding.field)
     const offer = binding.kind === 'lookup' ? lookupFilterOffer(binding) : filterOffer(binding)
-    if (offer !== null) filterable.push({ field: binding.field, offered: !unfiltered.includes(binding.field), ...offer })
+    if (offer !== null) filterable.push({ field: binding.field, offered, ...offer })
+    for (const through of related) {
+      if (through.lookup !== binding.field) continue
+      const by = relatedOffer(through.column)
+      if (by !== null) filterable.push({ field: through.field, offered, ...by, related: { lookup: binding.field, column: through.label } })
+    }
   }
   const sortable = bindings.fields
     .filter((binding) =>
@@ -177,8 +195,8 @@ export function listColumns(
     searchable: columns.filter((binding) => SEARCHABLE_KINDS.has(binding.type.kind)).map((binding) => binding.field),
     sortable,
     filterable,
-    views: firstDefault(views.filter((view) => viewFit(view, bindings, { filterable, sortable }) === null)),
-    own: ownViewsOffered(own, bindings, { filterable, sortable }),
+    views: firstDefault(views.filter((view) => viewFit(view, bindings, { filterable, sortable }, related) === null)),
+    own: ownViewsOffered(own, bindings, { filterable, sortable }, related),
   }
 }
 
@@ -207,9 +225,7 @@ export function viewProblems(views: readonly StoredListView[], bindings: FormBin
     bindings,
     bindings.fields.map((binding) => binding.field),
     [],
-    [],
-    [],
-    displayedLookups(bindings),
+    { labelled: displayedLookups(bindings) },
   )
   return views.flatMap((view, index) => {
     const why = storedViewFit(view, bindings, all)
@@ -289,20 +305,22 @@ function parentEqual(
  * -- or why not.
  *
  * Checks, in this order: everything `listable` checks; that every sort field
- * is one `listColumns` calls sortable (`not-sortable`); that every filter
- * condition is on a readable column field, one its column offers, with
- * values it can hold (`not-filterable`, 0104); that a search has a field to
- * match (`not-searchable`); the parent; and that a cursor names a key of
- * this form (`invalid-cursor`, 0108), which says nothing of whether the row
- * is there: the page's own statement looks for it. Each row the adapter
- * returns is read as `planRead` would read it, the key and the readable
- * fields' columns and nothing else.
+ * is one `listColumns` calls sortable (`not-sortable`); that every
+ * condition through a lookup is on a field `relatedFieldsOf` gave this
+ * person, one its column offers but `null` (`relatedFilters`, 0139); that
+ * every other filter condition is on a readable column field, one its
+ * column offers, with values it can hold (`not-filterable`, 0104); that a
+ * search has a field to match (`not-searchable`); the parent; and that a
+ * cursor names a key of this form (`invalid-cursor`, 0108), which says
+ * nothing of whether the row is there: the page's own statement looks for
+ * it. Each row the adapter returns is read as `planRead` would read it,
+ * the key and the readable fields' columns and nothing else.
  */
 export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy, context: PolicyContext, query: RecordListQuery): PlannedList {
   const found = listable(snapshot, bindings, policy, context)
   if (!found.ok) return found
-  const { prepared, fields, labels } = found
-  const offered = listColumns(bindings, fields, [], [], [], [...labels.keys()])
+  const { prepared, fields, labels, related } = found
+  const offered = listColumns(bindings, fields, [], { labelled: [...labels.keys()] })
   const byField = new Map(readableColumns(bindings, fields).map((binding) => [binding.field, binding]))
 
   const requested: Array<{ column: string; direction: 'asc' | 'desc' } | { label: SortLabel; direction: 'asc' | 'desc' }> = []
@@ -318,7 +336,14 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     requested.push({ column: binding.column, direction: term.direction })
   }
   const filter: RecordFilter[] = []
+  // A key with a dot is no field of the form's: one through a lookup (0139).
+  const through = relatedFilters(
+    related,
+    query.filter.filter((term) => term.field.includes('.')),
+  )
+  if (!through.ok) return refuse('not-filterable', through.message)
   for (const term of query.filter) {
+    if (term.field.includes('.')) continue
     const binding = byField.get(term.field) ?? readableLookup(bindings, fields, term.field)
     if (binding === undefined) return refuse('not-filterable', `${term.field} is not a field you may filter this list by.`)
     if (binding.kind === 'lookup') {
@@ -357,6 +382,7 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     through: found.through,
     equal: parent.equal,
     filter: [...filter, ...parent.none],
+    related: through.related,
     search: query.search === '' ? null : { text: query.search, columns: search },
     sort: listOrder(prepared, requested),
     after,

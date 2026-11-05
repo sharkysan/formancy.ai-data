@@ -21,6 +21,7 @@ import type {
   BrowseFilterTerm,
   BrowseQuery,
   BrowseRelation,
+  FilterCondition,
   FormBindings,
   FormPolicy,
   FormRecord,
@@ -539,6 +540,70 @@ describe('a parent over a text foreign key', covers('sqlserver', listCase('text-
   })
 })
 
+/**
+ * The label case's tables (0136), made once for the cases that list them:
+ * a child naming its parent by a text key under the database's
+ * case-insensitive collation, its lookup showing the parent's name under
+ * the lookup's own tenant filter, and a page of it planned and run as the
+ * clerk's.
+ */
+const labelForm = (() => {
+  let made: Promise<{ field: string; page: (change: Partial<RecordListQuery>) => Promise<RecordList> }> | undefined
+  return () => {
+    made ??= (async () => {
+      const { parents, children, folded } = LIST_PARITY.label
+      await owner
+        .request()
+        .batch(
+          'create table sales.label_parent (code varchar(10) not null primary key, name nvarchar(40) not null, tenant_id int not null); ' +
+            'create table sales.label_child (id int not null primary key, tenant_id int not null, parent_code varchar(10) null constraint fk_label_child_parent references sales.label_parent (code))',
+        )
+      for (const [code, name, tenant] of parents) {
+        await owner
+          .request()
+          .input('code', mssql.VarChar(10), code)
+          .input('name', mssql.NVarChar(40), name)
+          .input('tenant', mssql.Int, Number(tenant))
+          .query('insert into sales.label_parent (code, name, tenant_id) values (@code, @name, @tenant)')
+      }
+      for (const [id, parent] of [...children, folded.child]) {
+        await owner
+          .request()
+          .input('id', mssql.Int, Number(id))
+          .input('parent', mssql.VarChar(10), parent)
+          .query('insert into sales.label_child (id, tenant_id, parent_code) values (@id, 1, @parent)')
+      }
+      const labelled = await discoverSqlServer(owner, FIXTURE_SCOPE)
+      const bindings = generateForm(labelled, {
+        connection: 'test',
+        root: { schema: 'sales', name: 'label_child' },
+        formId: 'label-child',
+        title: 'Child',
+        lookups: [{ foreignKey: 'fk_label_child_parent', display: ['name'] }],
+      }).bindings
+      const field = bindings.fields.find((binding) => binding.kind === 'lookup')?.field as string
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: [] },
+        fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, READ])),
+        rowFilters: TENANT,
+        lookups: { [field]: TENANT },
+      }
+      const page = async (change: Partial<RecordListQuery>): Promise<RecordList> => {
+        const plan = planList(labelled, bindings, policy, CLARA, { ...EVERY, ...change })
+        if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+        const outcome = await records.list(plan.request)
+        if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
+        return recordPage(bindings, plan, outcome.rows)
+      }
+      return { field, page }
+    })()
+    return made
+  }
+})()
+
+const ids = (listed: RecordList): string[] => listed.rows.map((row) => String(row.answers['id']))
+
 describe('an order by a lookup’s label', covers('sqlserver', listCase('label')), () => {
   // A lookup sorts by what it shows (0136): its parent's name, read under
   // the lookup's own filter, so tenant 2's parent shows no name to tenant
@@ -550,53 +615,8 @@ describe('an order by a lookup’s label', covers('sqlserver', listCase('label')
   // shows no label and sorts among the NULLs (watched failing with the key
   // compared by the column's collation alone: it sorted as Gamma).
   test('orders by the label each row shows, NULLs and a hidden parent last, page after page', async () => {
-    const { parents, children, folded } = LIST_PARITY.label
-    const { asc, desc } = folded
-    await owner
-      .request()
-      .batch(
-        'create table sales.label_parent (code varchar(10) not null primary key, name nvarchar(40) not null, tenant_id int not null); ' +
-          'create table sales.label_child (id int not null primary key, tenant_id int not null, parent_code varchar(10) null constraint fk_label_child_parent references sales.label_parent (code))',
-      )
-    for (const [code, name, tenant] of parents) {
-      await owner
-        .request()
-        .input('code', mssql.VarChar(10), code)
-        .input('name', mssql.NVarChar(40), name)
-        .input('tenant', mssql.Int, Number(tenant))
-        .query('insert into sales.label_parent (code, name, tenant_id) values (@code, @name, @tenant)')
-    }
-    for (const [id, parent] of [...children, folded.child]) {
-      await owner
-        .request()
-        .input('id', mssql.Int, Number(id))
-        .input('parent', mssql.VarChar(10), parent)
-        .query('insert into sales.label_child (id, tenant_id, parent_code) values (@id, 1, @parent)')
-    }
-    const labelled = await discoverSqlServer(owner, FIXTURE_SCOPE)
-    const bindings = generateForm(labelled, {
-      connection: 'test',
-      root: { schema: 'sales', name: 'label_child' },
-      formId: 'label-child',
-      title: 'Child',
-      lookups: [{ foreignKey: 'fk_label_child_parent', display: ['name'] }],
-    }).bindings
-    const field = bindings.fields.find((binding) => binding.kind === 'lookup')?.field as string
-    const policy: FormPolicy = {
-      version: 1,
-      operations: { read: ['clerk'], create: [], update: [] },
-      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, READ])),
-      rowFilters: TENANT,
-      lookups: { [field]: TENANT },
-    }
-    const page = async (change: Partial<RecordListQuery>): Promise<RecordList> => {
-      const plan = planList(labelled, bindings, policy, CLARA, { ...EVERY, ...change })
-      if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
-      const outcome = await records.list(plan.request)
-      if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}: ${outcome.message}`)
-      return recordPage(bindings, plan, outcome.rows)
-    }
-    const ids = (listed: RecordList): string[] => listed.rows.map((row) => String(row.answers['id']))
+    const { field, page } = await labelForm()
+    const { asc, desc } = LIST_PARITY.label.folded
     for (const [direction, expected] of [
       ['asc', asc],
       ['desc', desc],
@@ -612,6 +632,40 @@ describe('an order by a lookup’s label', covers('sqlserver', listCase('label')
       } while (after !== null)
       expect(walked, `${direction}, page after page`).toEqual(expected)
     }
+  })
+})
+
+describe('conditions through a lookup', covers('sqlserver', listCase('related')), () => {
+  // A condition on what a lookup shows (0139) finds the rows whose parent,
+  // found as the label is -- the key matched exactly, under the lookup's
+  // own filter -- holds it: Gamma's child, and never the child naming `c`,
+  // which the case-insensitive key relates to `C` and no label is shown
+  // for; tenant 2's Beta, which the filter hides, finds no row; a row
+  // naming no parent holds no condition. Each row once, as an EXISTS
+  // finds it.
+  test('finds the rows whose parent, as their label shows it, holds every condition', async () => {
+    const { field, page } = await labelForm()
+    for (const [condition, expected] of LIST_PARITY.related.found) {
+      const filter = [{ field: `${field}.name`, ...condition } as RecordListQuery['filter'][number]]
+      expect(ids(await page({ filter })), JSON.stringify(condition)).toEqual(expected)
+    }
+  })
+
+  // Every condition through one lookup holds of the one parent, in one
+  // EXISTS: Alpha holds `a` and not `m`, so its child is not found. And the
+  // conditions narrow the page, never the row it continues after: asked of
+  // that row too, the page after Gamma's child under a condition Gamma
+  // does not hold would find no row to continue after, and hold none.
+  // Watched failing with the conditions through a lookup asked of the
+  // anchor.
+  test('holds every condition on one parent, and continues after a row they do not hold', async () => {
+    const { field, page } = await labelForm()
+    const through = (condition: FilterCondition): ListFilterTerm => ({ field: `${field}.name`, ...condition })
+    const { together, after } = LIST_PARITY.related
+    expect(ids(await page({ filter: together.conditions.map(through) }))).toEqual(together.found)
+    const first = await page({ filter: [through(after.first)], limit: 1 })
+    expect(ids(first)).toEqual(after.page)
+    expect(ids(await page({ filter: [through(after.then)], after: first.next }))).toEqual(after.next)
   })
 })
 

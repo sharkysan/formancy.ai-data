@@ -78,6 +78,7 @@ describe('planList', () => {
         through: [],
         equal: [],
         filter: [],
+        related: [],
         search: null,
         sort: [{ column: 'id', direction: 'asc', nulls: null }],
         after: null,
@@ -443,6 +444,87 @@ describe('planList', () => {
     }
   })
 
+  // A person's conditions through a lookup (0139): on a column its label
+  // shows, among the target rows the lookup may offer them -- under its own
+  // read filter, as its label is -- carried to the adapter with the key's
+  // pairing, every condition through one lookup in one entry, in the order
+  // its first came. Each display column is offered as `<lookup>.<key>`,
+  // after the lookup, by what its column offers; a column no label shows,
+  // credit_limit, is no field, and a lookup whose filter this person does
+  // not resolve offers none. Watched failing with every dotted field
+  // refused as one the list is not filtered by.
+  test('filters through a lookup by the columns its label shows, under its own read filter', () => {
+    const filter: RecordListQuery['filter'] = [
+      { field: 'employee.name', op: 'equals', value: 'Ada' },
+      { field: 'status', op: 'equals', value: 'placed' },
+      { field: 'customer.name', op: 'contains', text: 'Muster' },
+    ]
+    const planned = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ filter }))
+    expect(planned).toMatchObject({
+      ok: true,
+      request: {
+        filter: [{ op: 'equals', column: 'status', value: 'placed' }],
+        related: [
+          {
+            columns: [{ name: 'created_by', type: INT32 }],
+            target: sales('employee'),
+            targetColumns: [{ name: 'id', type: INT32 }],
+            filters: TENANT_ONE,
+            filter: [{ op: 'equals', column: 'name', type: text(200), value: 'Ada' }],
+          },
+          {
+            columns: [
+              { name: 'tenant_id', type: INT32 },
+              { name: 'customer_no', type: INT32 },
+            ],
+            target: sales('customer'),
+            filters: TENANT_ONE,
+            filter: [{ op: 'contains', column: 'name', type: text(200), text: 'Muster' }],
+          },
+        ],
+      },
+    })
+    const related = listable(PG, PG_ORDER, ORDER_POLICY, CLERK)
+    if (!related.ok) throw new Error(related.message)
+    expect(
+      listColumns(PG_ORDER, CLERK_FIELDS, [], { related: related.related }).filterable.filter(
+        (offer) => offer.field.startsWith('customer') || offer.field.startsWith('employee'),
+      ),
+    ).toEqual([
+      { field: 'customer', offered: true, operators: ['equals'], input: 'lookup', days: null },
+      { field: 'customer.name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null, related: { lookup: 'customer', column: 'Name' } },
+      { field: 'employee', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null },
+      { field: 'employee.name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null, related: { lookup: 'employee', column: 'Name' } },
+    ])
+    // Left out of the filter with its lookup (0123): still filtered by, as the lookup is.
+    expect(
+      listColumns(PG_ORDER, CLERK_FIELDS, [], { unfiltered: ['customer'], related: related.related }).filterable.flatMap((offer) =>
+        offer.related === undefined ? [] : [`${offer.field}:${String(offer.offered)}`],
+      ),
+    ).toEqual(['customer.name:false', 'employee.name:true'])
+    const refusals: Array<[RecordListQuery['filter'][number], string]> = [
+      [{ field: 'customer.credit_limit', op: 'null' }, 'customer.credit_limit is not a field you may filter this list by.'],
+      [
+        { field: 'customer.name', op: 'null' },
+        'customer.name offers no empty condition: a row with no customer shows it empty too, and no condition through customer finds that row.',
+      ],
+      [{ field: 'approved_by.name', op: 'equals', value: 'Ada' }, 'approved_by.name is not a field you may filter this list by.'],
+    ]
+    for (const [term, message] of refusals) {
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ filter: [term] })), JSON.stringify(term)).toEqual({
+        ok: false,
+        code: 'not-filterable',
+        message,
+      })
+    }
+    const unoffered: FormPolicy = { ...ORDER_POLICY, lookups: { customer: TENANT, employee: [{ column: 'tenant_id', attribute: 'branch' }] } }
+    expect(planList(PG, PG_ORDER, unoffered, CLERK, query({ filter: [filter[0] as RecordListQuery['filter'][number]] }))).toEqual({
+      ok: false,
+      code: 'not-filterable',
+      message: 'employee.name is not a field you may filter this list by.',
+    })
+  })
+
   // A lookup sorts by what it shows (0136): its first display column, read
   // from its target under the lookup's own read filter, as its label is --
   // the target, the key's pairing and the filter carried to the adapter,
@@ -472,7 +554,7 @@ describe('planList', () => {
         ],
       },
     })
-    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], [], [], ['customer', 'employee']).sortable).toEqual([
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], { labelled: ['customer', 'employee'] }).sortable).toEqual([
       'id',
       'customer',
       'order_date',

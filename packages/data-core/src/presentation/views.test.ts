@@ -177,6 +177,12 @@ describe('viewProblems', () => {
     expect(named({ sort: [{ field: 'nothing', direction: 'asc' }] })).toEqual(['/views/0 (“Placed”): nothing is not a field this list is sorted by.'])
     // A lookup sorts by what it shows (0136), for whoever may read it.
     expect(named({ sort: [{ field: 'customer', direction: 'asc' }] })).toEqual([])
+    // Not yet through a lookup (0139): a published view is fitted against
+    // the bindings alone, which hold no type of the target's columns, so a
+    // condition on one is refused rather than stored unchecked.
+    expect(named({ filter: [{ field: 'customer.name', op: 'contains', text: 'Muster' }] })).toEqual([
+      '/views/0 (“Placed”): customer.name is not a field this list is filtered by.',
+    ])
   })
 
   // Stored untrimmed, the view would send what the server trims, and a

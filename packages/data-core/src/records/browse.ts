@@ -203,6 +203,8 @@ export function planBrowse(snapshot: MetadataSnapshot, query: BrowseQuery): Plan
     through: [],
     equal: equal.equal,
     filter,
+    // A browse has no lookups to filter through (0139).
+    related: [],
     search:
       query.search === ''
         ? null

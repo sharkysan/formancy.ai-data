@@ -111,6 +111,24 @@ export interface SortLabel {
   display: LookupDisplayColumn
 }
 
+/**
+ * A person's conditions through one lookup (0139): the root rows whose
+ * foreign key refers to a target row the lookup may offer them -- under its
+ * own read filter, `filters`, as its label and its search are -- that
+ * holds every one of `filter`, each a condition on one of the target's
+ * display columns. The key is the label's (`SortLabel`), and is matched as
+ * the label is, so a row is found by what its page shows. A row whose
+ * foreign key is NULL, refers to no row, or to one the filter hides shows
+ * no label, and no condition through the lookup holds for it.
+ */
+export interface RelatedFilter {
+  columns: readonly RecordColumn[]
+  target: ObjectRef
+  targetColumns: readonly LookupKeyColumn[]
+  filters: RowFilters
+  filter: readonly RecordFilter[]
+}
+
 /** A list's order by a lookup's label (0136): its NULLs -- no label to show -- always last. */
 export interface LabelSort {
   label: SortLabel
@@ -172,7 +190,8 @@ export type RecordFilter =
  * binds, each with the value the parent's token names, compared with the
  * database's own equality as the foreign key compares them; `[]` for none.
  * `filter` narrows by the person's own conditions, each column once (0104);
- * `[]` for none. Neither adds a permission -- the filters and the throughs
+ * `[]` for none. `related` by theirs through a lookup, one entry per
+ * lookup (0139); `[]` for none. None adds a permission -- the filters and the throughs
  * still decide which rows exist. `search` is `null` for none. The adapter
  * fetches `limit + 1` rows, so `recordPage` can tell whether more follow
  * without a COUNT.
@@ -183,7 +202,7 @@ export type RecordFilter =
  * by `after` alone, its offset always 0; a browse (0099), which may have no
  * key to find a row by, pages by `offset` alone. The row `after` names is
  * found under the trusted filters and every through, as a read finds it,
- * and never under `equal`, `filter` or `search`: it is a place in the order,
+ * and never under `equal`, `filter`, `related` or `search`: it is a place in the order,
  * which a row that stopped matching them still has.
  */
 export interface ListRequest {
@@ -193,6 +212,7 @@ export interface ListRequest {
   through: readonly Through[]
   equal: readonly RecordValue[]
   filter: readonly RecordFilter[]
+  related: readonly RelatedFilter[]
   search: ListSearch | null
   sort: readonly ListSort[]
   after: readonly RecordValue[] | null

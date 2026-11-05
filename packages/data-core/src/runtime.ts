@@ -74,9 +74,13 @@ export interface FilterOffer {
  * A field a list may be filtered by, and what it offers; `offered`, whether
  * the form's Filter panel offers a condition on it, which its administrator
  * may decide it does not (0123). A field not offered is still filtered by:
- * a view may name it, and the panel says a condition on it.
+ * a view may name it, and the panel says a condition on it. `related` is
+ * there on a field through a lookup alone (0139), keyed
+ * `<lookup>.<column's key>`: the lookup's field key, and what the column
+ * is called -- a column of the lookup's target, which the form has no
+ * field of.
  */
-export type FilterableField = { field: string; offered: boolean } & FilterOffer
+export type FilterableField = { field: string; offered: boolean; related?: { lookup: string; column: string } } & FilterOffer
 
 /**
  * A view of a form's list its administrator named (0105), as a person is

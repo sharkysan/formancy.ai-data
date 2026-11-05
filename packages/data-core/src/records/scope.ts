@@ -1,7 +1,8 @@
+import { labelFor } from '../generate/names.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import { buildLookupConfig } from '../lookup/config.js'
 import { scopeRowFilters } from '../lookup/filters.js'
-import type { RowFilters } from '../lookup/types.js'
+import type { LookupDisplayColumn, RowFilters } from '../lookup/types.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import { lookupRowFilter, rowFilter, throughFilters } from '../policy/evaluate.js'
 import { throughProblems } from '../policy/through.js'
@@ -9,6 +10,7 @@ import type { FormPolicy, PolicyContext, RowFilter } from '../policy/types.js'
 import { findObject } from '../snapshot.js'
 import type { PlanRefusal } from './plan-types.js'
 import { columnsOf, inCatalogOrder, type Prepared, refuse } from './prepare.js'
+import { type RelatedField, relatedKeys } from './related-filter.js'
 import type { RecordColumn, SortLabel, Through } from './types.js'
 
 /*
@@ -86,25 +88,32 @@ export function throughFor(
   return { ok: true, through }
 }
 
+/** A lookup a person reaches the target of (0136, 0139): its binding, the target as the snapshot holds it, the display columns its config shows, and the way to the target. */
+export interface ReachedLookup {
+  binding: Extract<FieldBinding, { kind: 'lookup' }>
+  target: ObjectMeta
+  display: readonly LookupDisplayColumn[]
+  reach: Omit<SortLabel, 'display'>
+}
+
 /**
- * The lookup fields of `fields` a list may be ordered by their labels
- * (0136), each with what the adapter orders by: the target's first display
- * column, read under the lookup's own read filter as its label is
+ * The lookup fields of `fields` whose target a list may reach for this
+ * person: read under the lookup's own read filter, as its label is
  * (`lookupRowFilter`, as the server's lookup routes ask it), with the
  * root's foreign-key columns typed from the snapshot. A lookup whose
  * filter this person does not resolve -- the policy says nothing of it, an
- * attribute it names is missing -- or that does not configure, or shows no
- * display column, is not one: its label is no order this person reads.
+ * attribute it names is missing -- or that does not configure is not one:
+ * it offers them no label, so nothing a list could order or filter by.
  */
-export function sortLabelsFor(
+export function reachedLookups(
   snapshot: MetadataSnapshot,
   bindings: FormBindings,
   prepared: Prepared,
   policy: FormPolicy,
   context: PolicyContext,
   fields: readonly string[],
-): Map<string, SortLabel> {
-  const labels = new Map<string, SortLabel>()
+): ReachedLookup[] {
+  const reached: ReachedLookup[] = []
   for (const binding of bindings.fields) {
     if (binding.kind !== 'lookup' || !fields.includes(binding.field)) continue
     const filter = lookupRowFilter(policy, context, bindings, 'read', binding.field)
@@ -115,20 +124,43 @@ export function sortLabelsFor(
     } catch {
       continue
     }
-    const display = config.display[0]
     const target = findObject(snapshot, config.target)
-    if (display === undefined || target === undefined) continue
+    if (target === undefined) continue
     const scoped = scopeRowFilters(target, filter.filter, `lookups.${binding.field}`)
     if (!scoped.ok) continue
-    labels.set(binding.field, {
-      columns: binding.columns.map((name): RecordColumn => ({ name, type: (prepared.columns.get(name) as ColumnMeta).type })),
-      target: config.target,
-      targetColumns: config.targetColumns,
-      filters: scoped.filters,
-      display,
+    reached.push({
+      binding,
+      target,
+      display: config.display,
+      reach: {
+        columns: binding.columns.map((name): RecordColumn => ({ name, type: (prepared.columns.get(name) as ColumnMeta).type })),
+        target: config.target,
+        targetColumns: config.targetColumns,
+        filters: scoped.filters,
+      },
     })
   }
+  return reached
+}
+
+/** The lookups of `reached` a list may be ordered by their labels (0136), each with what the adapter orders by: the target's first display column. A lookup that shows none is not one. */
+export function sortLabelsOf(reached: readonly ReachedLookup[]): Map<string, SortLabel> {
+  const labels = new Map<string, SortLabel>()
+  for (const { binding, display, reach } of reached) {
+    const first = display[0]
+    if (first !== undefined) labels.set(binding.field, { ...reach, display: first })
+  }
   return labels
+}
+
+/** The fields a list may be filtered by through the lookups of `reached` (0139): each display column of each, in the bindings' order, as `relatedKeys` names them. */
+export function relatedFieldsOf(reached: readonly ReachedLookup[]): RelatedField[] {
+  return reached.flatMap(({ binding, target, reach }) =>
+    relatedKeys(binding).flatMap(({ field, column }) => {
+      const meta = target.columns.find((candidate) => candidate.name === column)
+      return meta === undefined ? [] : [{ field, lookup: binding.field, column: meta, label: labelFor(column), reach }]
+    }),
+  )
 }
 
 /**
