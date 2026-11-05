@@ -18,6 +18,22 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A lookup's shown columns filter its records** (0139). Why: finding
+  every order of a customer whose name holds "Muster" -- several
+  customers, or one a person half remembers -- took a record picked at a
+  time. The filter line reads a condition on a column a lookup shows,
+  `customer.name contains Muster`, and keeps the rows whose foreign key
+  finds a target row holding it, among the rows the lookup may offer the
+  person, on both engines: one EXISTS per lookup, so a row is listed
+  once. What you notice: `list.filterable` offers each display column of
+  a lookup as `<lookup>.<column>` after the lookup, with `related`
+  naming the lookup and the column; a chip says it as `Customer › Name`;
+  a person's own view keeps one, and a published view cannot name one
+  yet. For integrators: `ListRequest` carries `related`, `[]` for none,
+  and `listColumns` takes what it offers besides the readable fields and
+  the views as one options object -- `unfiltered`, `own`, `labelled`,
+  `related` -- in place of three positional lists.
+
 - **A lookup field sorts by what it shows** (0136). Why: a grid of orders
   sorted by its customer should order them as a person reads the
   customer, by name, and a lookup's token orders nothing a person reads.

@@ -234,7 +234,11 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    [0133](../decisions/0133-a-cell-filters-by-its-value.md)), over the
    fields `list.filterable` names -- a lookup by the record it refers to,
    its token, which the server plans as each foreign-key column compared
-   by the database's own equality ([0135](../decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)) -- the line and the boxes over those
+   by the database's own equality ([0135](../decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)),
+   and a column a lookup shows, `customer.name`, which it plans as an
+   EXISTS over the lookup's target under the lookup's read filter, the key
+   matched as the label is
+   ([0139](../decisions/0139-a-lookups-shown-columns-filter-its-records.md)) -- the line and the boxes over those
    `offered`, which the presentation's `unfiltered` decides:
    [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort -- a lookup's by its first display column, read
    in a lateral join of its own under the lookup's read filter
