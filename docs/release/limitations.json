@@ -3915,7 +3915,7 @@
       ]
     },
     "0141": {
-      "reviewed": "sha256:05cfe71c6e276c1ddc0d826b0ff9d86f0617c789862c44bdc6c5ebddecb1f6ff",
+      "reviewed": "sha256:40fda8f167ce4f108a38eadc0a07ba6bea1bd45a1b6f3e474f1704b807af22a4",
       "limitations": [
         {
           "area": "host",
@@ -3944,7 +3944,7 @@
         },
         {
           "area": "host",
-          "says": "A lookup drawn disabled, a child row's parent field, still offers Open, which opens the record of the level above again a level further down."
+          "says": "A child row's parent field, drawn disabled, offers no Open: to open the record it holds in another form over its table, a person goes up a level first."
         },
         {
           "area": "host",

@@ -49,3 +49,13 @@ export function openChoices(opens: readonly LookupOpen[], field: string, answer:
 export function openRefused(title: string, refusal: Pick<Refusal, 'code' | 'message'>): string {
   return refusal.code === 'not-found' ? `${title} does not show you this record.` : refusal.message
 }
+
+/**
+ * The Opens a Drill down level offers: its form's, but under its parent
+ * field, which holds the record the level above shows, drawn disabled --
+ * Open there would open that record again a level further down. A level
+ * reached through a lookup has no parent field, `null`.
+ */
+export function opensBelow(opens: readonly LookupOpen[], parentField: string | null): readonly LookupOpen[] {
+  return opens.filter((open) => open.field !== parentField)
+}

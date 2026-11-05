@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { LookupOpen } from '@formancy/data-client'
-import { openChoices, openRefused } from './lookup-opens.js'
+import { openChoices, opensBelow, openRefused } from './lookup-opens.js'
 
 /*
  * What a record's panes offer under a lookup (0141): one Open per form the
@@ -65,5 +65,17 @@ describe('a refused Open', () => {
   // not answer -- is the server's own sentence, which says what happened.
   test("says anything else in the server's words", () => {
     expect(openRefused('Customers', { code: 'forbidden', message: 'You may not read this form.' })).toBe('You may not read this form.')
+  })
+})
+
+describe('the Opens on a Drill down level', () => {
+  // A line opened below its order holds that order in its parent field,
+  // drawn disabled: Open there would open the record the level above
+  // already shows, a level further down. Every other lookup of the level
+  // keeps its Opens, and a level reached through a lookup has no parent
+  // field. Watched failing with the level's opens passed through.
+  test("leave out the level's parent field, and nothing else", () => {
+    expect(opensBelow(OPENS, 'order')).toEqual([OPENS[1]])
+    expect(opensBelow(OPENS, null)).toEqual(OPENS)
   })
 })

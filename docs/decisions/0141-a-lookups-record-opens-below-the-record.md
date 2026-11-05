@@ -8,7 +8,9 @@
   two forms share a title each says its form's id (watched failing with
   the title alone); an empty answer, or one that is no token, offers none
   (watched failing with the answer unchecked), and so does a field no form
-  is named for; a read refused as no such record says the form does not
+  is named for; a Drill down level offers none under its parent field,
+  which holds the record above (watched failing with the level's opens
+  passed through); a read refused as no such record says the form does not
   show it, and anything else is the server's sentence (watched failing
   with the server's sentence passed through).
   `apps/host/src/lookup-addition.test.tsx`, around each renderer -- the
@@ -108,9 +110,9 @@ to it as they left it.
   the record and the Drill down levels do.
 - Where two forms share a title, the buttons say their ids, which name the
   form for an administrator more than for the person.
-- A lookup drawn disabled -- a child row's parent field -- still offers
-  Open, which opens the record of the level above again, a level further
-  down.
+- A child row's parent field, drawn disabled, offers no Open
+  (`opensBelow`): it holds the record the level above shows. To open that
+  record in another form over its table, a person goes up.
 - The Opens are the page's, drawn into the renderers' field addition; a
   host with a page of its own draws its own from `opens`.
 
