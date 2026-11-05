@@ -256,3 +256,58 @@ describe('printFilterLine', () => {
     expect(printFilterLine(filter, FIELDS)).toBe('status = placed')
   })
 })
+
+describe('a lookup in the line (0135)', () => {
+  /** A lookup, with the records the page knows: those its rows showed, its filter's, and those picked in its box. */
+  const EMPLOYEE: LineField = {
+    field: 'employee',
+    label: 'Employee',
+    operators: ['equals', 'null', 'not-null'],
+    input: 'lookup',
+    values: [
+      { value: 'k1:1', label: 'Ada Lovelace' },
+      { value: 'k1:2', label: 'Grace Hopper' },
+      { value: 'k1:3', label: 'Grace Hopper' },
+      { value: 'k1:9', label: 'k1:9' },
+    ],
+  }
+  const read = (text: string) => parseFilterLine(text, [EMPLOYEE, AMOUNT])
+
+  // A person names a record as the page shows it, or by the token the
+  // line wrote for one whose label it has not heard yet; either is the
+  // record's token in the term, read as a state's label is (0129).
+  test('reads a record by the label the page shows, or by its token', () => {
+    expect(read('employee = "ada lovelace"')).toEqual({ ok: true, filter: [{ field: 'employee', op: 'equals', value: 'k1:1' }] })
+    expect(read('employee = k1:9')).toEqual({ ok: true, filter: [{ field: 'employee', op: 'equals', value: 'k1:9' }] })
+    expect(read('employee is empty and amount > 1')).toMatchObject({ ok: true, filter: [{ field: 'employee', op: 'null' }, { field: 'amount' }] })
+  })
+
+  // A label the page has not shown names no record it could send, and one
+  // two records share names neither: sent, the first would be refused by
+  // the server and the second filter by a record the person did not mean.
+  // Watched failing with each sent as typed.
+  test('refuses a label no record shown has, or two share', () => {
+    expect(read('employee = Linus')).toEqual({
+      ok: false,
+      at: 11,
+      length: 5,
+      message: "No record of Employee shown here is called Linus: pick one in its column's box.",
+    })
+    expect(read('employee = "Grace Hopper"')).toEqual({
+      ok: false,
+      at: 11,
+      length: 14,
+      message: "Two records of Employee shown here are called Grace Hopper: pick one in its column's box.",
+    })
+  })
+
+  // The line writes the label a person reads, never a token, unless the
+  // page has no label for it yet; either reads back as the same record.
+  test('writes a record by its label, and reads it back', () => {
+    const ada: ListFilterTerm[] = [{ field: 'employee', op: 'equals', value: 'k1:1' }]
+    expect(printFilterLine(ada, [EMPLOYEE])).toBe('employee = "Ada Lovelace"')
+    expect(parseFilterLine(printFilterLine(ada, [EMPLOYEE]), [EMPLOYEE])).toEqual({ ok: true, filter: ada })
+    const unheard: ListFilterTerm[] = [{ field: 'employee', op: 'equals', value: 'k1:9' }]
+    expect(printFilterLine(unheard, [EMPLOYEE])).toBe('employee = k1:9')
+  })
+})

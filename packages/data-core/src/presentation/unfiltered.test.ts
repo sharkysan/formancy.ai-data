@@ -34,9 +34,10 @@ describe('the fields the Filter panel does not offer (0123)', () => {
   })
 
   // One spelling: none left out is the property left out, a field once,
-  // and only keys. A field must be one the list filters by: a lookup, or a
-  // key the form does not have, is refused as the server refuses it at a
-  // write. Watched failing with the fit unasked: customer was stored.
+  // and only keys. A field must be one the list filters by: a key the form
+  // does not have is refused as the server refuses it at a write, and a
+  // lookup is one since it filters by the record it refers to (0135).
+  // Watched failing with the fit unasked: ghost was stored.
   test('is a list of field keys the list filters by, each once, never empty', () => {
     const shaped = (unfiltered: unknown) => presentationShapeProblems({ ...EMPTY_PRESENTATION, unfiltered })
     expect(shaped(['notes'])).toEqual([])
@@ -45,10 +46,7 @@ describe('the fields the Filter panel does not offer (0123)', () => {
     expect(shaped('notes')).toEqual(['unfiltered must be a list of field keys'])
     expect(shaped([7])).toEqual(['unfiltered must be a list of field keys'])
     expect(unfilteredProblems(['notes', 'paid'], bindings)).toEqual([])
-    expect(unfilteredProblems(['customer', 'ghost'], bindings)).toEqual([
-      '/unfiltered/0: customer is not a field this list is filtered by.',
-      '/unfiltered/1: ghost is not a field this list is filtered by.',
-    ])
+    expect(unfilteredProblems(['customer', 'ghost'], bindings)).toEqual(['/unfiltered/1: ghost is not a field this list is filtered by.'])
   })
 
   // The choice is no part of the form's document, so applying the
@@ -83,7 +81,15 @@ describe('the fields the Filter panel does not offer (0123)', () => {
       ORDER,
     )
     expect(rebasePresentation(published, { base: neither.form, bindings: neither.bindings }).presentation).not.toHaveProperty('unfiltered')
-    // A key followed to one the list does not filter by goes too.
-    expect(carryUnfiltered(['notes'], (key) => (key === 'notes' ? 'customer' : undefined), bindings)).toEqual([])
+    // A key followed to one the list does not filter by goes too: a float
+    // that holds no NULL offers no condition (0104).
+    const unfilterable = {
+      ...bindings,
+      fields: bindings.fields.map((binding) =>
+        binding.field === 'paid' ? { ...binding, type: { kind: 'float' as const, bits: 64 as const }, nullable: false } : binding,
+      ),
+    }
+    expect(carryUnfiltered(['notes'], (key) => (key === 'notes' ? 'paid' : undefined), unfilterable)).toEqual([])
+    expect(carryUnfiltered(['notes'], (key) => (key === 'notes' ? 'paid' : undefined), bindings)).toEqual(['paid'])
   })
 })

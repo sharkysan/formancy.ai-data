@@ -11,6 +11,7 @@ import { lookupAnswer, toFormAnswers } from './answers.js'
 import { ownViewsOffered } from './own-views.js'
 import { decodeListCursor, listCursor } from './cursor.js'
 import { columnFilter, filterOffer } from './filter.js'
+import { lookupFilter, lookupFilterOffer } from './lookup-filter.js'
 import type { PlannedList, PlanRefusal } from './plan-types.js'
 import { columnsOf, keyOrderProblem, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFor } from './scope.js'
@@ -113,6 +114,12 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
   return bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && wanted.has(binding.field))
 }
 
+/** The lookup field `field` binds, where the actor may read it. */
+function readableLookup(bindings: FormBindings, fields: readonly string[], field: string): Extract<FieldBinding, { kind: 'lookup' }> | undefined {
+  const binding = bindings.fields.find((candidate) => candidate.field === field)
+  return binding?.kind === 'lookup' && fields.includes(field) ? binding : undefined
+}
+
 /**
  * What a list of this form may be sorted, searched and filtered by, for an
  * actor who may read `fields`: one decision, so what `GET /v1/forms/:id`
@@ -120,7 +127,8 @@ function readableColumns(bindings: FormBindings, fields: readonly string[]): Col
  * whose kind has canonical text. Searchable: those whose kind is in
  * `lookup/searchable.ts`'s set, the kinds a lookup's search matches, matched
  * as it matches (0028). Filterable: those `filterOffer` offers a condition
- * on, with what it offers (0104).
+ * on, with what it offers (0104), and every readable lookup field, by the
+ * record it refers to (`lookupFilterOffer`, 0135), in the bindings' order.
  *
  * Views: those of `views`, the published ones, that this actor could have
  * built from the rest (`viewFit`, 0105), in their published order. A view
@@ -137,9 +145,11 @@ export function listColumns(
   own: readonly ListView[] = [],
 ): ListColumns {
   const columns = readableColumns(bindings, fields)
+  const readable = new Set(fields)
   const filterable: FilterableField[] = []
-  for (const binding of columns) {
-    const offer = filterOffer(binding)
+  for (const binding of bindings.fields) {
+    if (!readable.has(binding.field)) continue
+    const offer = binding.kind === 'lookup' ? lookupFilterOffer(binding) : filterOffer(binding)
     if (offer !== null) filterable.push({ field: binding.field, offered: !unfiltered.includes(binding.field), ...offer })
   }
   const sortable = columns.filter((binding) => !UNORDERED.has(binding.type.kind)).map((binding) => binding.field)
@@ -268,8 +278,19 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   }
   const filter: RecordFilter[] = []
   for (const term of query.filter) {
-    const binding = byField.get(term.field)
+    const binding = byField.get(term.field) ?? readableLookup(bindings, fields, term.field)
     if (binding === undefined) return refuse('not-filterable', `${term.field} is not a field you may filter this list by.`)
+    if (binding.kind === 'lookup') {
+      const planned = lookupFilter(
+        binding,
+        binding.columns.map((name) => prepared.columns.get(name) as ColumnMeta),
+        term,
+        term.field,
+      )
+      if (!planned.ok) return refuse('not-filterable', planned.message)
+      filter.push(...planned.filters)
+      continue
+    }
     const planned = columnFilter(prepared.columns.get(binding.column) as ColumnMeta, term, term.field)
     if (!planned.ok) return refuse('not-filterable', planned.message)
     filter.push(planned.filter)

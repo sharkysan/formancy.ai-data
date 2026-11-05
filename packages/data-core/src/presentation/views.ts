@@ -1,6 +1,7 @@
 import { canonicalize } from '@formancy/spec'
 import type { FormBindings } from '../generate/types.js'
 import { columnFilter, readFilter } from '../records/filter.js'
+import { lookupConditionProblem } from '../records/lookup-filter.js'
 import { readSort } from '../records/list-query.js'
 import type { PolicyContext } from '../policy/types.js'
 import type { ListColumns, ListFilterTerm, ListView, StoredListView } from '../runtime.js'
@@ -169,7 +170,8 @@ export function viewShapeProblems(value: unknown): string[] {
  * `null` when it is: its filter is read as a request's is, and stored as it
  * reads -- a contains trimmed -- and every condition is on a field
  * `columns.filterable` offers, planned by `columnFilter` over that field's
- * column as `planList` plans it; every sort field is one `columns.sortable`
+ * column as `planList` plans it, or on a lookup as far as its binding tells
+ * (`lookupConditionProblem`, 0135); every sort field is one `columns.sortable`
  * holds. One decision for a write, against everything the list offers, and
  * for an offer, against what one person's list offers them.
  */
@@ -180,8 +182,13 @@ export function viewFit(view: ListView, bindings: FormBindings, columns: Pick<Li
     return 'its filter is not as a request reads it: what a contains condition finds is stored trimmed.'
   for (const term of read.filter) {
     const binding = bindings.fields.find((candidate) => candidate.field === term.field)
-    if (binding?.kind !== 'column' || !columns.filterable.some((offered) => offered.field === term.field))
+    if (binding === undefined || !columns.filterable.some((offered) => offered.field === term.field))
       return `${term.field} is not a field this list is filtered by.`
+    if (binding.kind === 'lookup') {
+      const problem = lookupConditionProblem(binding, term, term.field)
+      if (problem !== null) return problem
+      continue
+    }
     const planned = columnFilter({ name: binding.column, type: binding.type, nullable: binding.nullable }, term, term.field)
     if (!planned.ok) return planned.message
   }

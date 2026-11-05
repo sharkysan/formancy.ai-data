@@ -134,6 +134,7 @@ describe('listTerms', () => {
       { op: 'contains', column: 'notes', type: text(null), text: 'urgent' },
       { op: 'null', column: 'approved_by' },
       { op: 'not-null', column: 'group' },
+      { op: 'refers', column: 'customer_no', type: INT32, value: '1001' },
     ]
     const read = listTerms(altered({ filter }))
     expect(read.filter).toEqual(filter)
@@ -167,6 +168,9 @@ describe('listTerms', () => {
       [{ op: 'null' }],
       [{ op: 'like', column: 'status', type: text(20), value: 'a%' }],
       [{ op: 'equals', column: 'customer_no', type: INT32, value: '007' }],
+      [{ op: 'refers', column: 'customer_no', type: INT32, value: '007' }],
+      [{ op: 'refers', column: 'customer_no', type: { kind: 'boolean' }, value: 'true' }],
+      [{ op: 'refers', column: 'customer_no', type: INT32 }],
       [{ op: 'equals', column: 'paid', type: { kind: 'boolean' }, value: 'TRUE' }],
       [{ op: 'equals', column: 'weight', type: { kind: 'float', bits: 64 }, value: '1.5' }],
       [{ op: 'contains', column: 'customer_no', type: INT32, text: '7' }],
