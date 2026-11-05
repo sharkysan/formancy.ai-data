@@ -4,8 +4,8 @@ import type { LookupSearchColumn, RowFilterTerm } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { NormalizedType } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
-import { readLabelSort } from './sort-label.js'
-import type { LabelSortTerm } from './sort-label.js'
+import { readLabelSort, readReach } from './sort-label.js'
+import type { LabelSortTerm, LookupReach } from './sort-label.js'
 import { throughTerms } from './through.js'
 import type { ThroughTerms } from './through.js'
 import type { EqualsFilterType, ListRequest, RangeFilterType, RecordColumn, RecordFilter, RecordSort, RecordValue } from './types.js'
@@ -26,6 +26,7 @@ export interface ListTerms {
   through: ThroughTerms[]
   equal: RecordValue[]
   filter: RecordFilter[]
+  related: RelatedTerms[]
   search: { text: string; columns: LookupSearchColumn[] } | null
   sort: SortTerm[]
   after: { key: RecordValue[]; seek: SortTerm[] } | null
@@ -38,6 +39,11 @@ export type SortTerm = RecordSort | LabelSortTerm
 
 const refuse = (why: string) => new Error(`A list request ${why}; refusing rather than listing something else than the planner decided.`)
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+
+function hasExactly(record: Record<string, unknown>, keys: readonly string[]): boolean {
+  const present = Object.keys(record)
+  return present.length === keys.length && keys.every((key) => Object.hasOwn(record, key))
+}
 const isName = (value: unknown): value is string => typeof value === 'string' && value !== ''
 
 /** The parent's columns and values: each named once, of a key kind, and spelled as its column holds it, as a record key is. */
@@ -154,6 +160,24 @@ function filterOf(given: unknown): RecordFilter[] {
   return (given as unknown[]).map((entry) => filterTerm(entry))
 }
 
+/** A person's conditions through one lookup (0139), as an adapter builds its EXISTS: the way to the target, and each condition on one of its columns. */
+export interface RelatedTerms extends LookupReach {
+  filter: RecordFilter[]
+}
+
+/** The person's conditions through lookups: a list, `[]` for none, each entry the way to a target and at least one condition on it. */
+function relatedOf(given: unknown): RelatedTerms[] {
+  if (!Array.isArray(given)) throw refuse('filters through lookups by a list, [] for none')
+  return (given as unknown[]).map((entry) => {
+    if (!isRecord(entry) || !hasExactly(entry, ['columns', 'target', 'targetColumns', 'filters', 'filter']))
+      throw refuse('filters through a lookup by columns, a target, its key columns, filters and conditions, and nothing else')
+    const filter = filterOf(entry['filter'])
+    // An entry with no condition would ask only for a target row: a filter the planner never writes.
+    if (filter.length === 0) throw refuse('filters through a lookup by at least one condition')
+    return { ...readReach(entry, refuse), filter }
+  })
+}
+
 /** The search: null, or text a person may search for, trimmed and not empty, over at least one text or integer column. */
 function searchOf(given: unknown): ListTerms['search'] {
   if (given === null) return null
@@ -259,6 +283,7 @@ export function listTerms(request: ListRequest): ListTerms {
     through: throughTerms(request.through),
     equal,
     filter,
+    related: relatedOf(request.related),
     search: searchOf(request.search),
     sort,
     after,

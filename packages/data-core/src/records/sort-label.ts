@@ -12,10 +12,7 @@ import type { SortLabel } from './types.js'
  */
 
 /** A lookup's label as an adapter orders by it: the target, each root column with the target column it references and that column's kind, the target's filter terms -- none where it filters nothing -- and the display column's name. */
-export interface LabelTerms {
-  target: ObjectRef
-  pairs: Array<{ column: string; references: string; type: LookupKeyType }>
-  terms: RowFilterTerm[]
+export interface LabelTerms extends LookupReach {
   display: string
 }
 
@@ -45,6 +42,38 @@ function keyColumns(value: unknown): Array<{ name: string; type: LookupKeyType }
   return columns
 }
 
+/** A lookup's way to its target as an adapter reaches it (0136, 0139): the target, each root column with the target column it references and that column's kind, and the target's filter terms, none where it filters nothing. */
+export interface LookupReach {
+  target: ObjectRef
+  pairs: Array<{ column: string; references: string; type: LookupKeyType }>
+  terms: RowFilterTerm[]
+}
+
+/** The way to a lookup's target a label or a related filter carries, read fresh, or why not: `refuse` words the refusal as the rest of the request's are. */
+export function readReach(entry: Record<string, unknown>, refuse: (why: string) => Error): LookupReach {
+  const target = entry['target']
+  if (!isRecord(target) || !hasExactly(target, ['schema', 'name']) || !isName(target['schema']) || !isName(target['name']))
+    throw refuse('reaches a lookup’s target named by schema and name')
+  const columns = keyColumns(entry['columns'])
+  const references = keyColumns(entry['targetColumns'])
+  if (columns === undefined || references === undefined || columns.length !== references.length)
+    throw refuse('reaches a lookup’s target by each root column paired with the key column it references, each of a key kind')
+  let terms: RowFilterTerm[]
+  try {
+    terms = rowFilterTerms(entry['filters'] as SortLabel['filters'])
+  } catch {
+    throw refuse('reaches a lookup’s target under its lookup’s filters, read as a row filter is')
+  }
+  return {
+    target: { schema: target['schema'], name: target['name'] },
+    pairs: columns.map((column, index) => {
+      const reference = references[index] as { name: string; type: LookupKeyType }
+      return { column: column.name, references: reference.name, type: { ...reference.type } }
+    }),
+    terms,
+  }
+}
+
 /** A label term of a list request's order, read fresh, or why not: `refuse` words the adapter's refusal as the rest of the request's are. */
 export function readLabelSort(entry: Record<string, unknown>, refuse: (why: string) => Error): LabelSortTerm {
   const { label, direction, nulls } = entry
@@ -52,32 +81,8 @@ export function readLabelSort(entry: Record<string, unknown>, refuse: (why: stri
     throw refuse('orders by a lookup’s label asc or desc, its NULLs last')
   if (!isRecord(label) || !hasExactly(label, ['columns', 'target', 'targetColumns', 'filters', 'display']))
     throw refuse('orders by a label of columns, a target, its key columns, filters and a display column, and nothing else')
-  const target = label['target']
-  if (!isRecord(target) || !hasExactly(target, ['schema', 'name']) || !isName(target['schema']) || !isName(target['name']))
-    throw refuse('orders by a label whose target is named by schema and name')
-  const columns = keyColumns(label['columns'])
-  const references = keyColumns(label['targetColumns'])
-  if (columns === undefined || references === undefined || columns.length !== references.length)
-    throw refuse('orders by a label pairing each root column with the key column it references, each of a key kind')
+  const reach = readReach(label, refuse)
   const display = label['display']
   if (!isRecord(display) || !hasExactly(display, ['name', 'type']) || !isName(display['name'])) throw refuse('orders by a label’s named display column')
-  let terms: RowFilterTerm[]
-  try {
-    terms = rowFilterTerms(label['filters'] as SortLabel['filters'])
-  } catch {
-    throw refuse('orders by a label under its lookup’s filters, read as a row filter is')
-  }
-  return {
-    label: {
-      target: { schema: target['schema'], name: target['name'] },
-      pairs: columns.map((column, index) => {
-        const reference = references[index] as { name: string; type: LookupKeyType }
-        return { column: column.name, references: reference.name, type: { ...reference.type } }
-      }),
-      terms,
-      display: display['name'],
-    },
-    direction,
-    nulls,
-  }
+  return { label: { ...reach, display: display['name'] }, direction, nulls }
 }

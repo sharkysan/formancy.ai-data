@@ -195,6 +195,7 @@ describe('a row filter compares the canonical value exactly (FILTER_PARITY)', ()
           columns: [col('tenant_item', 'tenant_code'), col('tenant_item', 'item_no')],
           filters,
           through: [],
+          related: [],
           equal: [],
           filter: [],
           search: null,

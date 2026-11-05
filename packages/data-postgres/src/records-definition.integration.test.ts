@@ -456,6 +456,7 @@ describe('an ALTER that commits while a request waits for it', () => {
             columns: read.columns,
             filters: read.filters,
             through: [],
+            related: [],
             equal: [],
             filter: [],
             search: null,

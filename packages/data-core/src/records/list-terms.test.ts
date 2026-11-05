@@ -19,6 +19,7 @@ const REQUEST: ListRequest = {
   through: [],
   equal: [{ name: 'customer_no', type: INT32, value: '1001' }],
   filter: [],
+  related: [],
   search: { text: 'Muster', columns: [{ name: 'status', type: text(20) as never }] },
   sort: [
     { column: 'notes', direction: 'desc', nulls: 'last' },
@@ -39,6 +40,7 @@ describe('listTerms', () => {
       through: [],
       equal: [{ name: 'customer_no', type: INT32, value: '1001' }],
       filter: [],
+      related: [],
       search: { text: 'Muster', columns: [{ name: 'status', type: text(20) }] },
       sort: REQUEST.sort,
       after: null,
@@ -286,6 +288,62 @@ describe('listTerms', () => {
       { label: { ...label, filters: { kind: 'restricted', equal: [] } }, direction: 'asc', nulls: 'last' },
     ]) {
       expect(() => listTerms(altered({ sort: [term, id] })), JSON.stringify(term)).toThrow(/A list request/)
+    }
+  })
+
+  // A person's conditions through a lookup (0139) reach the adapter fresh,
+  // as a label does: the target, each root column paired with the key
+  // column it references and that column's type, the lookup's filter
+  // terms, and each condition on a target column as columnFilter plans
+  // one. Watched failing with related left out of the terms.
+  test('reads a person’s conditions through a lookup, fresh', () => {
+    const condition = { op: 'contains', column: 'name', type: text(200), text: 'Muster' }
+    const related = [
+      {
+        columns: [{ name: 'created_by', type: INT32 }],
+        target: { schema: 'sales', name: 'employee' },
+        targetColumns: [{ name: 'id', type: INT32 }],
+        filters: TENANT_ONE,
+        filter: [condition, { op: 'null', column: 'email' }],
+      },
+    ]
+    const read = listTerms(altered({ related }))
+    expect(read.related).toEqual([
+      {
+        target: { schema: 'sales', name: 'employee' },
+        pairs: [{ column: 'created_by', references: 'id', type: INT32 }],
+        terms: [{ column: 'tenant_id', type: INT32, value: '1' }],
+        filter: [condition, { op: 'null', column: 'email' }],
+      },
+    ])
+    expect(read.related[0]?.filter[0]).not.toBe(condition)
+    expect(listTerms(altered({ related: [{ ...related[0], filters: { kind: 'unrestricted' } }] })).related[0]).toMatchObject({ terms: [] })
+  })
+
+  // Each is what the planner never writes: no list, a key whose sides
+  // differ in length, a target by name alone, an entry with a property
+  // more, a filter that says nothing, no condition at all -- an EXISTS
+  // that asks only for a target row -- and a condition columnFilter would
+  // not plan. Watched failing with the empty-filter check removed.
+  test('refuses conditions through a lookup the planner would not write', () => {
+    const entry = {
+      columns: [{ name: 'created_by', type: INT32 }],
+      target: { schema: 'sales', name: 'employee' },
+      targetColumns: [{ name: 'id', type: INT32 }],
+      filters: TENANT_ONE,
+      filter: [{ op: 'null', column: 'email' }],
+    }
+    for (const related of [
+      undefined,
+      entry,
+      [{ ...entry, targetColumns: [] }],
+      [{ ...entry, target: { name: 'employee' } }],
+      [{ ...entry, extra: true }],
+      [{ ...entry, filters: { kind: 'restricted', equal: [] } }],
+      [{ ...entry, filter: [] }],
+      [{ ...entry, filter: [{ op: 'contains', column: 'name', type: text(200), text: '' }] }],
+    ]) {
+      expect(() => listTerms(altered({ related })), JSON.stringify(related)).toThrow(/A list request/)
     }
   })
 

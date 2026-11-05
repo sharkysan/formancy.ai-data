@@ -27,6 +27,7 @@ import type {
   PolicyOperation,
   PublishedForm,
   RecordFailure,
+  RelatedField,
   UnknownOutcome,
 } from '@formancy/data-core'
 import type { HostIdentity } from '@formancy/data-identity'
@@ -312,12 +313,21 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     bundle: PublishedBundle,
     actor: PolicyContext,
     own: readonly ListView[],
-  ): { ok: true; columns: ListColumns } | { ok: false; answer: WriteAnswer } {
+  ): { ok: true; columns: ListColumns; related: RelatedField[] } | { ok: false; answer: WriteAnswer } {
     const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, actor)
     if (!listed.ok) return { ok: false, answer: planRefusal(listed.code, listed.message) }
     const presentation = bundle.format === 2 ? bundle.presentation : { views: [], unfiltered: [] }
     const views = viewsFor(presentation.views ?? [], actor, todayOf(Date.now()))
-    return { ok: true, columns: listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [], own, [...listed.labels.keys()]) }
+    return {
+      ok: true,
+      columns: listColumns(bundle.bindings, listed.fields, views, {
+        unfiltered: presentation.unfiltered ?? [],
+        own,
+        labelled: [...listed.labels.keys()],
+        related: listed.related,
+      }),
+      related: listed.related,
+    }
   }
 
   // The forms this person may read (0045): from the published bundles and the policy, asking no database.

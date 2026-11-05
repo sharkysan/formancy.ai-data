@@ -1,5 +1,6 @@
 import type { FormBindings } from '../generate/types.js'
 import { asked, nameProblem, viewFit } from '../presentation/views.js'
+import type { RelatedField } from './related-filter.js'
 import type { ListColumns, ListView } from '../runtime.js'
 import { readFilter } from './filter.js'
 import { readSort } from './list-query.js'
@@ -83,7 +84,8 @@ export function ownViewsProblems(value: unknown): string[] {
 /**
  * `view` saved among a person's `own`: in place of theirs named alike, else
  * last. Refused, in words for the person, when their list could not run it
- * (`viewFit` over `columns`, what their list offers them), when it asks
+ * (`viewFit` over `columns`, what their list offers them, and `related`,
+ * the fields through lookups it offers them, 0139), when it asks
  * what another of theirs asks or what a view `columns` offers them asks --
  * a picker would show either name for it -- or when it would be one more
  * than `OWN_VIEWS_LIMIT`.
@@ -93,8 +95,9 @@ export function savedOwnView(
   view: ListView,
   bindings: FormBindings,
   columns: ListColumns,
+  related: readonly RelatedField[] = [],
 ): { ok: true; views: ListView[] } | { ok: false; message: string } {
-  const why = viewFit(view, bindings, columns)
+  const why = viewFit(view, bindings, columns, related)
   if (why !== null) return { ok: false, message: why }
   const asks = asked(view.filter, view.sort)
   const offered = columns.views.find((other) => asked(other.filter, other.sort) === asks)
@@ -118,6 +121,11 @@ export function removedOwnView(own: readonly ListView[], name: string): ListView
  * they may no longer read, a column gone -- is kept, and offered again
  * once it fits, never offered without the condition it cannot run.
  */
-export function ownViewsOffered(own: readonly ListView[], bindings: FormBindings, columns: Pick<ListColumns, 'filterable' | 'sortable'>): ListView[] {
-  return own.filter((view) => viewFit(view, bindings, columns) === null)
+export function ownViewsOffered(
+  own: readonly ListView[],
+  bindings: FormBindings,
+  columns: Pick<ListColumns, 'filterable' | 'sortable'>,
+  related: readonly RelatedField[] = [],
+): ListView[] {
+  return own.filter((view) => viewFit(view, bindings, columns, related) === null)
 }

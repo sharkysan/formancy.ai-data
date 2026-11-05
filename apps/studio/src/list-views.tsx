@@ -103,9 +103,7 @@ export function ListViewsPanel({
         bindings,
         bindings.fields.map((binding) => binding.field),
         [],
-        [],
-        [],
-        displayedLookups(bindings),
+        { labelled: displayedLookups(bindings) },
       ),
     [bindings],
   )

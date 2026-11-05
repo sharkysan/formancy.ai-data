@@ -3,6 +3,7 @@ import type { FormBindings } from '../generate/types.js'
 import { columnFilter, readFilter } from '../records/filter.js'
 import { lookupConditionProblem } from '../records/lookup-filter.js'
 import { readSort } from '../records/list-query.js'
+import type { RelatedField } from '../records/related-filter.js'
 import type { PolicyContext } from '../policy/types.js'
 import type { ListColumns, ListFilterTerm, ListView, StoredListView } from '../runtime.js'
 import { relativeShape, resolveTerm, standIn } from './view-values.js'
@@ -171,19 +172,31 @@ export function viewShapeProblems(value: unknown): string[] {
  * reads -- a contains trimmed -- and every condition is on a field
  * `columns.filterable` offers, planned by `columnFilter` over that field's
  * column as `planList` plans it, or on a lookup as far as its binding tells
- * (`lookupConditionProblem`, 0135); every sort field is one `columns.sortable`
- * holds. One decision for a write, against everything the list offers, and
+ * (`lookupConditionProblem`, 0135), or through a lookup on a column of
+ * its target, planned on that column (`related`, 0139); every sort field
+ * is one `columns.sortable` holds. One decision for a write, against everything the list offers, and
  * for an offer, against what one person's list offers them.
  */
-export function viewFit(view: ListView, bindings: FormBindings, columns: Pick<ListColumns, 'filterable' | 'sortable'>): string | null {
+export function viewFit(
+  view: ListView,
+  bindings: FormBindings,
+  columns: Pick<ListColumns, 'filterable' | 'sortable'>,
+  related: readonly RelatedField[] = [],
+): string | null {
   const read = readFilter(view.filter, 'field')
   if (!read.ok) return read.message
   if (canonicalize(read.filter) !== canonicalize(view.filter))
     return 'its filter is not as a request reads it: what a contains condition finds is stored trimmed.'
   for (const term of read.filter) {
+    if (!columns.filterable.some((offered) => offered.field === term.field)) return `${term.field} is not a field this list is filtered by.`
+    const through = related.find((entry) => entry.field === term.field)
+    if (through !== undefined) {
+      const planned = columnFilter(through.column, term, term.field)
+      if (!planned.ok) return planned.message
+      continue
+    }
     const binding = bindings.fields.find((candidate) => candidate.field === term.field)
-    if (binding === undefined || !columns.filterable.some((offered) => offered.field === term.field))
-      return `${term.field} is not a field this list is filtered by.`
+    if (binding === undefined) return `${term.field} is not a field this list is filtered by.`
     if (binding.kind === 'lookup') {
       const problem = lookupConditionProblem(binding, term, term.field)
       if (problem !== null) return problem

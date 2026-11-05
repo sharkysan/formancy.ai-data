@@ -377,6 +377,7 @@ describe('the list route', () => {
         through: [],
         equal: [],
         filter: [],
+        related: [],
         search: {
           text: 'Muster',
           columns: [
@@ -512,6 +513,20 @@ describe('the list route', () => {
       direction: 'desc',
       nulls: 'last',
     })
+    // Through a lookup (0139): a condition on the column its label shows,
+    // carried with the way to its target under the lookup's own filter.
+    // Watched failing with the related conditions left out of the request.
+    expect((await list('customer', { filter: [{ field: 'country.name', op: 'contains', text: ' Schweiz ' }] })).statusCode).toBe(200)
+    expect(lists[5]?.filter).toEqual([])
+    expect(lists[5]?.related).toMatchObject([
+      {
+        columns: [{ name: 'country_code' }],
+        target: { name: 'country' },
+        targetColumns: [{ name: 'iso_code' }],
+        filters: { kind: 'unrestricted' },
+        filter: [{ op: 'contains', column: 'name', text: 'Schweiz' }],
+      },
+    ])
   })
 
   // A condition the form does not offer is refused before any statement,
@@ -533,6 +548,8 @@ describe('the list route', () => {
       ['customer', { field: 'customer_no', op: 'range', from: '98765x', to: null }, 'A value given for customer_no is not one it can hold.'],
       ['hidden-limit', { field: 'credit_limit', op: 'not-null' }, 'credit_limit is not a field you may filter this list by.'],
       ['customer', { field: 'row_version', op: 'not-null' }, 'row_version is not a field you may filter this list by.'],
+      ['customer', { field: 'country.iso_code', op: 'equals', value: 'CH' }, 'country.iso_code is not a field you may filter this list by.'],
+      ['customer', { field: 'country.name', op: 'null' }, 'country.name offers no null condition.'],
     ]
     for (const [form, condition, message] of cases) {
       const response = await list(form, { filter: [condition] })
@@ -638,7 +655,9 @@ describe('the list route', () => {
   // `GET` sending the list with `filterable` emptied.
   test('the form says what its list may search, sort and filter by, in the planner’s words', async () => {
     const served = (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as('clerk') })).json()
-    expect(served.list).toEqual(listColumns(customers, served.readable, [], [], [], ['country']))
+    expect({ ...served.list, filterable: served.list.filterable.filter((offer: { related?: unknown }) => offer.related === undefined) }).toEqual(
+      listColumns(customers, served.readable, [], { labelled: ['country'] }),
+    )
     expect(served.list).toEqual({
       searchable: ['tenant_id', 'customer_no', 'name'],
       sortable: ['tenant_id', 'customer_no', 'name', 'country', 'credit_limit'],
@@ -647,13 +666,15 @@ describe('the list route', () => {
         { field: 'customer_no', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
         { field: 'name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null },
         { field: 'country', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null },
+        // Through the lookup (0139): the column its label shows, for a person whose lookup filter resolves.
+        { field: 'country.name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null, related: { lookup: 'country', column: 'Name' } },
         { field: 'credit_limit', offered: true, operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
       views: [],
       own: [],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
-    expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name', 'country'])
+    expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name', 'country', 'country.name'])
     expect(LIST_PAGE_SIZE).toBeLessThanOrEqual(MAX_RESOLVE)
   })
 
@@ -669,6 +690,7 @@ describe('the list route', () => {
       'customer_no:true',
       'name:true',
       'country:true',
+      'country.name:true',
       'credit_limit:false',
     ])
     expect(served.list.views).toEqual([LARGE, MUSTER])
@@ -916,6 +938,11 @@ describe('a person’s own views', () => {
     expect(await own('customer', 'other-clerk')).toEqual([])
     expect(await readdir(join(root, '.people'))).toEqual([personOf({ actor: { id: 'c', roles: [] }, attributes: {} })])
     expect(lists).toEqual([])
+    // A line through a lookup (0139) is saved as their view too, fitted on
+    // the column it is on. Watched failing with the related fields not
+    // handed to the fit: 400, not a field the list is filtered by.
+    const through: ListView = { name: 'Swiss', filter: [{ field: 'country.name', op: 'contains', text: 'Schweiz' }], sort: [] }
+    expect((await save('customer', through)).json()).toEqual({ own: [NAMED, through] })
   })
 
   // Saved again under its name, case aside, it takes its place; removed,

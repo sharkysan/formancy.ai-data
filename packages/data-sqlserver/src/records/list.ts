@@ -1,4 +1,4 @@
-import type { LabelTerms, ListRequest, ListTerms, SortTerm } from '@formancy/data-core'
+import type { LabelTerms, ListRequest, ListTerms, LookupReach, RelatedTerms, SortTerm } from '@formancy/data-core'
 import mssql from 'mssql'
 import { exactText, filterPredicate } from '../sql/filters.js'
 import { after, orderBy } from '../sql/order.js'
@@ -25,8 +25,8 @@ import { described, filterPredicates, keyPredicates, located, ROW, selection, th
  *   outer apply (
  *     select 1 as [found], [c0], …, [version], row_number() over (order by <order>) as [n]
  *     from <table> as [r]
- *     where <parent> and <filters> and <throughs> and <the person's filter> and <search>
- *       and <after [a] in the order>
+ *     where <parent> and <filters> and <throughs> and <the person's filter>
+ *       and <their conditions through lookups> and <search> and <after [a] in the order>
  *     order by <order> offset @o rows fetch next @l rows only
  *   ) as [page]
  *   order by [page].[n]
@@ -64,6 +64,7 @@ export function listStatement(request: ListRequest, terms: ListTerms): Statement
     ...filterPredicates(parameters, terms.terms),
     ...terms.through.map((entry) => throughPredicate(parameters, entry)),
     ...terms.filter.map((entry) => recordFilterPredicate(parameters, ROW, entry)),
+    ...terms.related.map((entry, index) => relatedPredicate(parameters, ROW, entry, `[x${String(index)}]`)),
   ]
   if (terms.search !== null) where.push(searchPredicate(parameters, ROW, terms.search.columns, terms.search.text))
   // Each lookup's label in the order (0136), read once per row, in an apply of its own: never a subquery in the window's order.
@@ -123,26 +124,47 @@ function anchorSql(parameters: Parameters, table: ListRequest['target']['table']
 }
 
 /**
- * A lookup's label a list is ordered by (0136): the target's display
- * column for `row`'s foreign key, under the lookup's filters on the target,
- * as the page reads the label -- NULL where the target holds no such row or
- * the filters hide it. The key is matched exactly, as PostgreSQL's is: a
- * text key by the columns' own equality, which a foreign key holds to one
- * collation and the target's index serves, and again as nvarchar, byte for
- * byte (`exactText`), so a row sorts by the label its page shows, which a
+ * Where `alias`, a row of a lookup's target, is the one `row`'s foreign key
+ * finds as the page reads its label (0136, 0139), under the lookup's filters
+ * on the target. The key is matched exactly, as PostgreSQL's is: a text key
+ * by the columns' own equality, which a foreign key holds to one collation
+ * and the target's index serves, and again as nvarchar, byte for byte
+ * (`exactText`), so a row is found by the label its page shows, which a
  * token resolves to only on an exact match -- under the fixture's
- * case-insensitive collation a child naming `c` sorts with the rows that
- * show no label. A scalar subquery: one value per row, so it multiplies
- * none; a target key that stopped being unique fails the statement (512).
+ * case-insensitive collation a child naming `c` finds no row.
  */
-function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias: string): string {
-  const pairs = label.pairs.map((pair) => {
+function reachedRow(parameters: Parameters, row: string, reach: LookupReach, alias: string): string[] {
+  const pairs = reach.pairs.map((pair) => {
     const target = `${alias}.${quoteName(pair.references)}`
     const root = `${row}.${quoteName(pair.column)}`
     return pair.type.kind === 'text'
       ? `${target} = ${root} and ${exactText(`convert(nvarchar(max), ${target})`, `convert(nvarchar(max), ${root})`)}`
       : `${target} = ${root}`
   })
-  const terms = label.terms.map((term) => filterPredicate(parameters, `${alias}.${quoteName(term.column)}`, term))
-  return `(select ${alias}.${quoteName(label.display)} from ${quoteTable(label.target)} as ${alias} where ${[...pairs, ...terms].join(' and ')})`
+  return [...pairs, ...reach.terms.map((term) => filterPredicate(parameters, `${alias}.${quoteName(term.column)}`, term))]
+}
+
+/**
+ * A lookup's label a list is ordered by (0136): the target's display
+ * column for `row`'s foreign key (`reachedRow`) -- NULL where the target
+ * holds no such row or the filters hide it. A scalar subquery: one value
+ * per row, so it multiplies none; a target key that stopped being unique
+ * fails the statement (512).
+ */
+function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias: string): string {
+  return `(select ${alias}.${quoteName(label.display)} from ${quoteTable(label.target)} as ${alias} where ${reachedRow(parameters, row, label, alias).join(' and ')})`
+}
+
+/**
+ * A person's conditions through a lookup (0139): whether the target row
+ * `row`'s foreign key finds as its label does (`reachedRow`) holds every
+ * one, each spelled on that row as the person's filter is on the root
+ * (`filter.ts`). EXISTS, as a through is: a row is on the page once
+ * whatever the target holds, never joined to it, and a row whose foreign
+ * key finds no row -- NULL, dangling, hidden by the lookup's filters --
+ * holds no condition. No plan of it is measured.
+ */
+function relatedPredicate(parameters: Parameters, row: string, related: RelatedTerms, alias: string): string {
+  const where = [...reachedRow(parameters, row, related, alias), ...related.filter.map((entry) => recordFilterPredicate(parameters, alias, entry))]
+  return `exists (select 1 from ${quoteTable(related.target)} as ${alias} where ${where.join(' and ')})`
 }

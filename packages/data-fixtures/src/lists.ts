@@ -107,6 +107,11 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
  *   collation -- the parity fixture's ICU one on PostgreSQL, the
  *   database's on SQL Server -- the foreign key relates a child naming `c`
  *   to `C`, and that child shows no label, so it sorts among the NULLs.
+ * - `related`: over the `label` case's tables, a condition on what the
+ *   lookup shows (0139) finds the children whose parent, found as the
+ *   label is, holds it: the key matched exactly, so the child naming `c`
+ *   is found by no condition on `C`'s name, and under the lookup's filter,
+ *   so tenant 2's parent's name finds nothing.
  */
 export const LIST_PARITY = {
   pages: {
@@ -218,6 +223,18 @@ export const LIST_PARITY = {
     desc: ['1', '2', '3', '4'],
     /** A fifth child naming `c`, which the case-insensitive key relates to `C` and no label is shown for. */
     folded: { child: ['5', 'c'], asc: ['2', '1', '3', '4', '5'], desc: ['1', '2', '3', '4', '5'] },
+  },
+  related: {
+    /**
+     * Over the label case's tables, a condition on the lookup's `name` and
+     * the children it finds, in key order: Gamma's child alone, never the
+     * one naming `c`; Beta, hidden by the lookup's filter, finds none.
+     */
+    found: [
+      [{ op: 'contains', text: 'am' }, ['1']],
+      [{ op: 'equals', value: 'Alpha' }, ['2']],
+      [{ op: 'contains', text: 'et' }, []],
+    ],
   },
   key: {
     /** `code`, `label`, inserted in this order. */

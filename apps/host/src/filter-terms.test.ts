@@ -92,6 +92,37 @@ describe('the fields a filter offers', () => {
     expect(panelFields({ ...definition, list: null })).toEqual([])
   })
 
+  // A field through a lookup (0139) has no field of the form's to take a
+  // label from: it is called by its lookup's label and its column's, as the
+  // server names the column, and the line names it after its lookup.
+  // Watched failing with the label taken from the form's fields alone: it
+  // was the key.
+  test('offer a field through a lookup by its lookup’s label and its column', () => {
+    const through = {
+      ...definition,
+      list: {
+        ...definition.list,
+        filterable: [
+          { field: 'order', offered: true, operators: ['equals'], input: 'lookup', days: null },
+          {
+            field: 'order.order_date',
+            offered: true,
+            operators: ['equals', 'range'],
+            input: 'date',
+            days: null,
+            related: { lookup: 'order', column: 'Order date' },
+          },
+        ],
+      },
+    } as unknown as PublishedForm
+    const offered = panelFields(through)
+    expect(offered.map((entry) => [entry.field, entry.label])).toEqual([
+      ['order', 'Order'],
+      ['order.order_date', 'Order › Order date'],
+    ])
+    expect(lineFields(offered, null).map((entry) => entry.field)).toEqual(['order', 'order.order_date'])
+  })
+
   // A label may be `{ $t }`, which the page cannot resolve (0079): the panel
   // offers the field by its key, never as "[object Object]".
   test('offer a field whose label is a message reference by its key', () => {
