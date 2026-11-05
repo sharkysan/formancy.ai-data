@@ -496,6 +496,28 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **Every `@formancy/*` dependency moves to 0.13.0, upstream's release of
+  2026-11-05, adopted the day it was published, and generated forms stay
+  on spec 5** (0055). Why: 0.13.0's renderers take `fieldAddition`,
+  content a host draws under a field (formancy.ai 0233), which the record
+  a lookup points to waits on to move from a strip above the form to
+  under its lookup; 0.12.0, between, refuses at publish a pattern that
+  backtracks once read with the Unicode flag the engine runs it with
+  (formancy.ai 0226). The exact pins, `@formancy/code-style`'s among
+  them, and the release-age exemptions move together; the lockfile
+  changes only in the `@formancy` entries, and nothing new is installed.
+  What you notice:
+  - **A typeahead's list scrolls to the row a person arrows to**, and the
+    page with it where the list runs past the window (formancy.ai 0227).
+  - Nothing else a person sees: a generated pattern is digits or a
+    decimal's, which the new analysis passes as the old one did, and the
+    four themes changed only by dressing what a host draws under a field,
+    which nothing here draws yet.
+  - For integrators: `@formancy/code-style` 0.13.0 has 0.12.0's rules and
+    format. The studio's bundle warns past 940 kB, the latest measurement
+    with a little room: 931.4 kB minified at 0.13.0, where main at 0.11.0
+    was 928.3 kB, the studio's own code having outgrown the last limit.
+
 - **The studio offers every lookup it can by default** (0138). Why: a
   lookup now filters by its record and sorts by what it shows (0135,
   0136), so a foreign key left a bare number lost what its lookup gives

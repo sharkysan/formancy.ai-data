@@ -245,7 +245,7 @@ field and a text, a number or a yes/no, is `unexpected`.
   narrow.", under a plain select "Showing the first 50; there are more
   than this list can show.", how many matches cannot be chosen here only
   when the list is complete, and nothing under a closed typeahead or a
-  field a rule disables. The Blueprint theme of formancy 0.6.0 to 0.11.0 draws a
+  field a rule disables. The Blueprint theme of formancy 0.6.0 to 0.13.0 draws a
   typeahead's open list over the line its sentence is on, as the other
   three reference themes' stylesheets place it too, so a sighted person
   does not read the sentence while the list is open; a screen reader hears
@@ -283,8 +283,9 @@ field and a text, a number or a yes/no, is `unexpected`.
 - **Field problems are sentences.** The renderers print an error entry as
   it is, beside the field and in the error summary, as observed at 0.3.0 on
   2026-10-09, at 0.4.0 on 2026-10-10 and at 0.5.0 on 2026-10-11, and read
-  in 0.6.0's code on 2026-10-18, 0.7.0's on 2026-10-22 and 0.11.0's on
-  2026-10-30, where an entry passes through `errorSentence`, which words
+  in 0.6.0's code on 2026-10-18, 0.7.0's on 2026-10-22, 0.11.0's on
+  2026-10-30 and 0.13.0's on 2026-11-05, where an entry passes through
+  `errorSentence`, which words
   the engine's own codes and says any other entry as it is, so
   `fieldProblems` hands them the server's
   sentence, which never echoes a value. The code stays on the
@@ -358,10 +359,11 @@ to update asks under update's filter without a new application.
   was a list of `{ value, label }`, so a list of exactly one page looked
   complete. Past the page a typeahead narrows as the person types; a plain
   select cannot, and says so.
-- **Its types are `@formancy/spec` 0.11.0's.** `PublishedForm.form` is the
+- **Its types are `@formancy/spec` 0.13.0's.** `PublishedForm.form` is the
   `FormSchema` of the `@formancy/spec` this package pins exactly (0002), and
   there `specVersion` may be `"5"`, which `@formancy/core` before 0.8.0 does
-  not declare, read from the declarations on 2026-10-30. A host whose engine
+  not declare, read from the declarations on 2026-10-30 and again, at
+  0.13.0, on 2026-11-05. A host whose engine
   is that old meets what one at 0.3.0 met when the pin moved to spec `"4"`:
   TS2322 at `createFormEngine` in the React snippet above, measured with
   TypeScript 6.0.3 and `skipLibCheck` off on 2026-10-10. A form published
