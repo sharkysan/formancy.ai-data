@@ -386,7 +386,10 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     }
     expect(plane.sent.filter((sent) => sent.path.endsWith('/views/save')).map((sent) => JSON.parse(sent.body ?? '{}') as unknown)).toEqual([kept])
     expect(shown('Records')).toBe('Small, mine')
-    expect(focusedName()).toBe('View')
+    // The keyboard moves to the picker in an effect after the render that
+    // says the view was saved (after-render.ts), so it is waited for: read
+    // at once, a slow runner found it still on the page (CI, main, after #161).
+    await waitFor(() => expect(focusedName()).toBe('View'), ARRIVES)
     const stored = Array.from({ length: localStorage.length }, (_, at) => localStorage.getItem(localStorage.key(at) ?? '') ?? '')
     expect(stored.join(' ')).not.toContain('Small, mine')
     expect(await floor('a view of your own, saved')).toEqual(CLEAN('a view of your own, saved'))
