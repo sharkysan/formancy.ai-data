@@ -140,7 +140,7 @@ function anchorSql(statement: Statement, table: ListRequest['target']['table'], 
 function labelSql(statement: Statement, row: string, label: LabelTerms, alias: string): string {
   const pairs = label.pairs.map((pair) => {
     const root = `${row}.${quoteIdentifier(pair.column)}`
-    return `${alias}.${quoteIdentifier(pair.references)} ${op('=')} ${root}`
+    return `${alias}.${quoteIdentifier(pair.references)} ${op('=')} ${pair.type.kind === 'text' ? `(${root} collate pg_catalog."default")` : root}`
   })
   const where = [...pairs, ...filterSql(statement, alias, label.terms)]
   return `(select ${alias}.${quoteIdentifier(label.display)} from ${quoteTable(label.target)} as ${alias} where ${where.join(' and ')})`
