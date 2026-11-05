@@ -28,8 +28,10 @@ the same day (formancy.ai 0232).
   you notice: nothing on the page yet, which Open under the lookup
   follows. For integrators: opening a form reads every published bundle,
   as the menu does; `@formancy/data-client` answers a form without
-  `opens` `unexpected`, so upgrade the server first; a lookup onto a
-  unique key rather than the primary key opens in no generated form.
+  `opens` `unexpected`, so upgrade the server first; a lookup whose
+  foreign key references other columns than its target form's key, a
+  unique key where the form is keyed by the primary key, opens in no
+  form.
 
 - **A lookup's shown columns filter its records** (0139). Why: finding
   every order of a customer whose name holds "Muster" -- several

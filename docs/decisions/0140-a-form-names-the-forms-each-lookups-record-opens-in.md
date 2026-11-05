@@ -8,14 +8,17 @@
   keyed by what its foreign key references, in codepoint order, the form
   itself included where the lookup is its own table's; a lookup no such form
   is over is not named (watched failing with every lookup named under no
-  form), and nothing is named of a form the person may not read, under a
+  form, and with the forms named in the order they came), and nothing is named of a form the person may not read, under a
   lookup they may not read, or on another connection (watched failing with
   the lookups they may not read named too);
   `packages/data-server/src/routes/runtime-lists.test.ts` -- `GET
   /v1/forms/:id` names a line's order under the order form the clerk may
-  read and not the managers', and a customer's country, whose key no form
-  is keyed by, under none (watched failing with the route answering no
-  opens); `packages/data-client/src/transport.test.ts` -- a reply without
+  read and not the managers', and a customer's country, which references
+  the iso code where the country form is keyed by the id, under none
+  (watched failing with the route answering no opens, and with the key's
+  columns left out of the match); a form whose store cannot list its
+  forms still opens, naming none (watched failing with that answered
+  500); `packages/data-client/src/transport.test.ts` -- a reply without
   `opens`, or with a form named without its id or title, is not the
   server's (watched failing with `opens` left unchecked).
 
@@ -58,11 +61,17 @@ person may read, keyed by what the lookup holds.
 
 **What it costs.**
 - Opening a form reads every published bundle, as the menu does, on top of
-  its own description of the root: the store's cost grows with the number
-  of forms, and nothing is cached.
-- A lookup whose foreign key references a unique key rather than the
-  target's primary key opens in no generated form, which is keyed by the
-  primary key: the customer's country by its iso code, here.
+  its own description of the root -- each validated, its snapshot hashed
+  again -- and nothing is cached: a page that opens a form with children
+  asks each child's definition too, and each Drill down level its own, so
+  the cost grows with the forms published times the definitions a page
+  asks for. A damaged bundle is logged on each.
+- A lookup whose foreign key references other columns than its target
+  form's key opens in no form: the customer's country references the iso
+  code, and a form over the countries is keyed by the primary key, its id,
+  wherever the account may read it.
+- A form over a view of the target is never named: a foreign key
+  references a table.
 - A form named may still not show the record: its row filters can hide it,
   which only the read says.
 - A server older than this sends no `opens`, and `@formancy/data-client`

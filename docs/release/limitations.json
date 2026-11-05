@@ -3894,15 +3894,15 @@
       ]
     },
     "0140": {
-      "reviewed": "sha256:7d63dc0e0f4f3ed7b74686b31c840e5cb5b4d2561311e56899177e2379f3f68d",
+      "reviewed": "sha256:be00a6598e7bcb00b5bf4fd8520f792c85cf0a779e900b632357b81d72ae5092",
       "limitations": [
         {
           "area": "operations",
-          "says": "Opening a form reads every published form's newest version, as the menu does, and nothing is cached: the cost grows with the number of forms published."
+          "says": "Opening a form reads and validates every published form's newest version, as the menu does, and nothing is cached: a page asks a definition for the form, each child and each Drill down level, so the cost grows with the forms published times those definitions."
         },
         {
           "area": "forms",
-          "says": "A lookup whose foreign key references a unique key rather than its target's primary key opens in no generated form, which is keyed by the primary key."
+          "says": "A lookup whose foreign key references other columns than its target form's key -- a unique key where the form is keyed by the primary key -- opens in no form, and a form over a view of the target in none."
         },
         {
           "area": "forms",

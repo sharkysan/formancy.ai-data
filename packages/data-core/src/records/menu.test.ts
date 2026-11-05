@@ -285,9 +285,10 @@ describe('the forms a lookup opens its record in (0140)', () => {
   // line's order in both order forms, in codepoint order; an order's
   // employee in the employee form; an employee's manager in the employee
   // form itself. A lookup no form is over, the order's customer here, is
-  // not named. Watched failing with every lookup named under no form.
+  // not named. Watched failing with every lookup named under no form, and
+  // with the forms named in the order they came.
   test('names every form this person may read its record in, under each lookup', () => {
-    const forms = [ORDER, STAFF, LINES, EMPLOYEES]
+    const forms = [STAFF, ORDER, LINES, EMPLOYEES]
     expect(opensOf(LINES, forms, CLERK)).toEqual([
       {
         field: 'order',

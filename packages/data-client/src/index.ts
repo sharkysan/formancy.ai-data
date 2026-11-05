@@ -38,6 +38,7 @@ export type {
   LineField,
   LineOption,
   LineRefusal,
+  LookupOpen,
   LookupResult,
   LookupRow,
   OwnViews,
