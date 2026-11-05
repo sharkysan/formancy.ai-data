@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import type { PublishedForm } from '@formancy/data-client'
-import { conditionOf, draftFor, draftHint, panelFields, panelShown, summaryOf, withTerm } from './filter-terms.js'
-import type { Draft, PanelField } from './filter-terms.js'
+import { panelFields, panelShown, summaryOf, withTerm } from './filter-terms.js'
+import type { PanelField } from './filter-terms.js'
 
 /*
  * What a grid's filter panel offers and asks for (0104), as data: the fields
@@ -53,7 +53,6 @@ const definition = {
 
 const fields = panelFields(definition)
 const field = (key: string): PanelField => fields.find((offered) => offered.field === key) as PanelField
-const draft = (key: string, rest: Partial<Draft>): Draft => ({ ...draftFor(field(key)), ...rest })
 
 describe('the fields a panel offers', () => {
   // The panel is drawn for a field it offers, or for a condition applied
@@ -104,39 +103,7 @@ describe('the fields a panel offers', () => {
   })
 })
 
-describe('the condition a draft asks for', () => {
-  // Each operator becomes the request's own shape, with values as typed --
-  // a text's spaces kept, since text is compared exactly, and a number's
-  // too, which the server trims -- and a boolean as the select holds it:
-  // whether a value fits its column is the server's to say (watched failing
-  // with the value trimmed: " Post " sent as "Post").
-  test('is the shape the route reads, the values as typed', () => {
-    expect(conditionOf(draft('carrier', { value: ' Post ' }))).toEqual({ ok: true, term: { field: 'carrier', op: 'equals', value: ' Post ' } })
-    expect(conditionOf(draft('carrier', { value: '', op: 'equals' }))).toEqual({ ok: true, term: { field: 'carrier', op: 'equals', value: '' } })
-    expect(conditionOf(draft('notes', { op: 'contains', value: 'zug' }))).toEqual({ ok: true, term: { field: 'notes', op: 'contains', text: 'zug' } })
-    expect(conditionOf(draft('parcels', { op: 'range', from: ' 2', to: '' }))).toEqual({
-      ok: true,
-      term: { field: 'parcels', op: 'range', from: ' 2', to: null },
-    })
-    expect(conditionOf(draft('shipped_at', { from: '', to: '2026-10-08' }))).toEqual({
-      ok: true,
-      term: { field: 'shipped_at', op: 'range', from: null, to: '2026-10-08' },
-    })
-    expect(conditionOf(draft('weight', { op: 'null' }))).toEqual({ ok: true, term: { field: 'weight', op: 'null' } })
-    expect(conditionOf(draft('weight', { op: 'not-null', value: 'left over' }))).toEqual({ ok: true, term: { field: 'weight', op: 'not-null' } })
-    expect(conditionOf(draftFor(field('insured')))).toEqual({ ok: true, term: { field: 'insured', op: 'equals', value: 'true' } })
-    expect(conditionOf(draft('insured', { value: 'false' }))).toEqual({ ok: true, term: { field: 'insured', op: 'equals', value: 'false' } })
-  })
-
-  // A range with neither bound and contains with nothing to find are no
-  // conditions: the route would refuse either as malformed, so the panel
-  // says why and sends nothing (watched failing with the check gone: a
-  // range of two nulls offered as a condition).
-  test('is none for a range with no bound or contains with no text', () => {
-    expect(conditionOf(draft('parcels', { op: 'range', from: ' ', to: '' }))).toEqual({ ok: false, problem: 'A range needs a From, a To or both.' })
-    expect(conditionOf(draft('notes', { op: 'contains', value: '  ' }))).toEqual({ ok: false, problem: 'Contains needs text to find.' })
-  })
-
+describe('a condition applied', () => {
   // Each field is named once (0104): applying a condition on a field that
   // has one puts it in that one's place, and anywhere else it comes last
   // (watched failing with every condition appended: notes named twice).
@@ -149,8 +116,8 @@ describe('the condition a draft asks for', () => {
   })
 })
 
-describe('what a panel says', () => {
-  // A condition as the list under Filter shows it, by its field's label,
+describe('what a condition says', () => {
+  // A condition as its chip shows it, by its field's label,
   // its value as it was typed, quoted where it is text, a boolean as yes or
   // no, a one-sided range by what bounds it (watched failing with the
   // field's key for its label: "shipped_at is on or before …").
@@ -160,11 +127,27 @@ describe('what a panel says', () => {
     expect(summaryOf({ field: 'parcels', op: 'equals', value: '7' }, field('parcels'))).toBe('Parcels is 7')
     expect(summaryOf({ field: 'parcels', op: 'range', from: '2', to: '3' }, field('parcels'))).toBe('Parcels is between 2 and 3')
     expect(summaryOf({ field: 'weight', op: 'range', from: '2.5', to: null }, field('weight'))).toBe('Weight is at least 2.5')
-    expect(summaryOf({ field: 'shipped_at', op: 'range', from: null, to: '2026-10-08' }, field('shipped_at'))).toBe('Shipped at is on or before 2026-10-08')
+    expect(summaryOf({ field: 'shipped_at', op: 'range', from: null, to: '2026-10-08' }, field('shipped_at'))).toBe(
+      'Shipped at is on or before 2026-10-08, whole days in UTC',
+    )
     expect(summaryOf({ field: 'due', op: 'range', from: '2026-10-01', to: null }, field('due'))).toBe('Due is on or after 2026-10-01')
     expect(summaryOf({ field: 'notes', op: 'contains', text: 'zug' }, field('notes'))).toBe('Notes contains “zug”')
     expect(summaryOf({ field: 'notes', op: 'null' }, field('notes'))).toBe('Notes has no value')
     expect(summaryOf({ field: 'weight', op: 'not-null' }, field('weight'))).toBe('Weight has a value')
+  })
+
+  // A time's range is whole days on its clock (0104): the chip says so,
+  // the one place a condition is shown in words, as the panel's hint did
+  // before the panel was retired (watched failing with the days unsaid:
+  // "Shipped at is between 2026-10-08 and 2026-10-09").
+  test('says a time’s range is whole days, on its clock', () => {
+    expect(summaryOf({ field: 'shipped_at', op: 'range', from: '2026-10-08', to: '2026-10-09' }, field('shipped_at'))).toBe(
+      'Shipped at is between 2026-10-08 and 2026-10-09, whole days in UTC',
+    )
+    expect(summaryOf({ field: 'dispatched_at', op: 'range', from: '2026-10-08', to: null, exclusive: 'from' }, field('dispatched_at'))).toBe(
+      'Dispatched at is after 2026-10-08, whole days as stored',
+    )
+    expect(summaryOf({ field: 'due', op: 'range', from: '2026-10-01', to: null }, field('due'))).toBe('Due is on or after 2026-10-01')
   })
 
   // A bound that leaves out its own value (0130) is named for it, a
@@ -178,29 +161,7 @@ describe('what a panel says', () => {
     expect(summaryOf({ field: 'parcels', op: 'range', from: '1', to: '9', exclusive: 'to' }, field('parcels'))).toBe('Parcels is at least 1 and under 9')
     expect(summaryOf({ field: 'due', op: 'range', from: '2026-10-01', to: null, exclusive: 'from' }, field('due'))).toBe('Due is after 2026-10-01')
     expect(summaryOf({ field: 'shipped_at', op: 'range', from: '2026-10-01', to: '2026-11-01', exclusive: 'to' }, field('shipped_at'))).toBe(
-      'Shipped at is on or after 2026-10-01 and before 2026-11-01',
+      'Shipped at is on or after 2026-10-01 and before 2026-11-01, whole days in UTC',
     )
-  })
-
-  // Under a draft, what its condition means where it is not obvious: a
-  // timestamp's range is whole days, on the clock the grid shows it in; a
-  // date's or a number's bounds are included; contains matches as Search
-  // does, which on SQL Server is the column's collation, so it promises no
-  // case; and
-  // text of no characters is a value, so "has no value" does not find it
-  // (watched failing with one hint for every range: an instant's days not
-  // said to be UTC's).
-  test('says what a range, contains and no value mean', () => {
-    expect(draftHint(draft('shipped_at', {}), field('shipped_at'))).toBe(
-      'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.',
-    )
-    expect(draftHint(draft('dispatched_at', {}), field('dispatched_at'))).toBe(
-      'Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.',
-    )
-    expect(draftHint(draft('due', { op: 'range' }), field('due'))).toBe('From and To are included. Either may be left empty.')
-    expect(draftHint(draft('notes', { op: 'contains' }), field('notes'))).toBe('Found anywhere in the field, as Search finds text.')
-    expect(draftHint(draft('notes', { op: 'null' }), field('notes'))).toBe('Text of no characters is a value.')
-    expect(draftHint(draft('weight', { op: 'null' }), field('weight'))).toBeNull()
-    expect(draftHint(draft('parcels', {}), field('parcels'))).toBeNull()
   })
 })

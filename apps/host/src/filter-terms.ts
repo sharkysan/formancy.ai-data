@@ -1,30 +1,27 @@
-import type { FilterInput, FilterOp, FilterableField, LineField, ListFilterTerm, PublishedForm, StateMoves } from '@formancy/data-client'
+import type { FilterDays, FilterInput, FilterableField, LineField, ListFilterTerm, PublishedForm, StateMoves } from '@formancy/data-client'
 import { fieldHeading } from '@formancy/data-client'
 
 /*
- * What a grid's filter panel offers and says (0104), as data: the fields a
- * list may be filtered by, with their labels, the condition a person's
- * draft asks for, and the sentences that name a condition. The panel is
- * filter-panel.tsx; what a grid asks with its filter is grid-datasource.ts's.
+ * What a grid's filter offers and says (0104), as data: the fields a list
+ * may be filtered by, with their labels, the fields the filter line and the
+ * header boxes may name (0131, 0132), and the sentences that name a
+ * condition, which the chips show. What a grid asks with its filter is
+ * grid-datasource.ts's.
  *
  * Everything offered is the server's `list.filterable`: a field, the
- * operators it offers in the order a panel lists them, what a value is
- * typed as, and whose clock a timestamp's days are on. A value is sent as the person typed it, never checked or
- * respelled here: whether it is one the column can hold is the server's to
- * say (`not-filterable`), in its own sentence. What is decided here is only
- * the shape a request must have: a range with a bound, text to find.
+ * operators it offers, what a value is typed as, and whose clock a
+ * timestamp's days are on. A value is sent as the person typed it, never
+ * checked or respelled here: whether it is one the column can hold is the
+ * server's to say (`not-filterable`), in its own sentence.
  */
 
-/** What each operator is called in the panel's Condition menu. */
-export const OPERATOR_WORDS: Readonly<Record<FilterOp, string>> = {
-  equals: 'is',
-  range: 'is between',
-  contains: 'contains',
+/** What a chip says of an operator with no value. */
+const NO_VALUE_WORDS: Readonly<Record<'null' | 'not-null', string>> = {
   null: 'has no value',
   'not-null': 'has a value',
 }
 
-/** A field the panel offers: the server's offer, and the field's label in the form. */
+/** A field the filter offers: the server's offer, and the field's label in the form. */
 export interface PanelField extends FilterableField {
   label: string
 }
@@ -41,8 +38,8 @@ export function panelFields(definition: PublishedForm): PanelField[] {
 }
 
 /**
- * The fields the filter line may name: those the form's Filter panel
- * offers (0123), each with its label, and the state field with its states
+ * The fields the filter line and the header boxes may name: those the
+ * form's filter offers (0123), each with its label, and the state field with its states
  * by the labels an administrator gave them (0129), in the presentation's
  * order, then any other state its moves name, as it is spelled. A
  * boolean's yes and no are the line's own.
@@ -58,54 +55,12 @@ export function lineFields(fields: readonly PanelField[], moves: StateMoves | nu
 }
 
 /**
- * Whether a grid draws its Filter panel: a field the panel offers, or a
- * condition applied -- a view's, on a field the administrator left out of
- * the panel (0123) -- which the panel says.
+ * Whether a grid draws its filter: a field it offers, or a condition
+ * applied -- a view's, on a field the administrator left out of it
+ * (0123) -- which a chip says.
  */
 export function panelShown(fields: readonly PanelField[], filter: readonly ListFilterTerm[]): boolean {
   return fields.some((field) => field.offered) || (fields.length > 0 && filter.length > 0)
-}
-
-/** What a person has chosen and typed in the panel, kept as typed. */
-export interface Draft {
-  field: string
-  op: FilterOp
-  /** What equals compares, or what contains finds. */
-  value: string
-  from: string
-  to: string
-}
-
-/** The draft the panel starts with, or after another field is chosen: its first operator, nothing typed. A boolean starts on yes, the first of its two. */
-export function draftFor(field: PanelField): Draft {
-  return { field: field.field, op: field.operators[0] as FilterOp, value: field.input === 'boolean' ? 'true' : '', from: '', to: '' }
-}
-
-/**
- * The condition `draft` asks for -- or the sentence why it is none yet: a
- * range with neither bound, or contains with no text to find, which the
- * server would refuse as malformed rather than as a value. An empty bound
- * is no bound. Everything else is sent as typed; text of no characters is a
- * value equals compares.
- */
-export function conditionOf(draft: Draft): { ok: true; term: ListFilterTerm } | { ok: false; problem: string } {
-  const { field, op } = draft
-  switch (op) {
-    case 'equals':
-      return { ok: true, term: { field, op, value: draft.value } }
-    case 'range': {
-      const from = draft.from.trim() === '' ? null : draft.from
-      const to = draft.to.trim() === '' ? null : draft.to
-      if (from === null && to === null) return { ok: false, problem: 'A range needs a From, a To or both.' }
-      return { ok: true, term: { field, op, from, to } }
-    }
-    case 'contains':
-      if (draft.value.trim() === '') return { ok: false, problem: 'Contains needs text to find.' }
-      return { ok: true, term: { field, op, text: draft.value } }
-    case 'null':
-    case 'not-null':
-      return { ok: true, term: { field, op } }
-  }
 }
 
 /** `filter` with `term` in it: in place of its field's condition, or last. A field is named once (0104). */
@@ -139,44 +94,30 @@ function bound(side: 'from' | 'to', input: FilterInput | null, exclusive: boolea
   return side === 'from' ? (exclusive ? 'over' : 'at least') : exclusive ? 'under' : 'at most'
 }
 
-/** A condition as a sentence, by its field's label: what the panel lists and a removal names. */
-export function summaryOf(term: ListFilterTerm, field: Pick<PanelField, 'label' | 'input'> | undefined): string {
+/** What a time's range is whole days on, said after it: the one place a condition is shown in words (0104). */
+const DAYS: Readonly<Record<FilterDays, string>> = { utc: ', whole days in UTC', wall: ', whole days as stored' }
+
+/** A condition as a sentence, by its field's label: what a chip says and its Remove names. */
+export function summaryOf(term: ListFilterTerm, field: (Pick<PanelField, 'label' | 'input'> & { days?: FilterDays | null }) | undefined): string {
   const label = field?.label ?? term.field
   const input = field?.input ?? null
   switch (term.op) {
     case 'equals':
       return `${label} is ${quoted(term.value, input)}`
     case 'range': {
-      if (term.from !== null && term.to !== null && term.exclusive === undefined) return `${label} is between ${term.from} and ${term.to}`
+      const days = field?.days === undefined || field.days === null ? '' : DAYS[field.days]
+      if (term.from !== null && term.to !== null && term.exclusive === undefined) return `${label} is between ${term.from} and ${term.to}${days}`
       const leaves = (side: 'from' | 'to'): boolean => term.exclusive === side || term.exclusive === 'both'
       const bounds = [
         ...(term.from === null ? [] : [`${bound('from', input, leaves('from'))} ${term.from}`]),
         ...(term.to === null ? [] : [`${bound('to', input, leaves('to'))} ${term.to}`]),
       ]
-      return `${label} is ${bounds.join(' and ')}`
+      return `${label} is ${bounds.join(' and ')}${days}`
     }
     case 'contains':
       return `${label} contains ${quoted(term.text, 'text')}`
     case 'null':
     case 'not-null':
-      return `${label} ${OPERATOR_WORDS[term.op]}`
+      return `${label} ${NO_VALUE_WORDS[term.op]}`
   }
-}
-
-/**
- * What the panel says under a draft, from what it is: how a range's bounds
- * count -- a timestamp's in whole days, on its clock -- what contains
- * matches, and that text of no characters is a value. Null when there is
- * nothing to say.
- */
-export function draftHint(draft: Draft, field: PanelField | undefined): string | null {
-  if (field === undefined) return null
-  if (draft.op === 'range') {
-    if (field.days === 'utc') return 'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.'
-    if (field.days === 'wall') return 'Whole days, as the time is stored: from the start of From to the end of To. Either may be left empty.'
-    return 'From and To are included. Either may be left empty.'
-  }
-  if (draft.op === 'contains') return 'Found anywhere in the field, as Search finds text.'
-  if ((draft.op === 'null' || draft.op === 'not-null') && field.input === 'text') return 'Text of no characters is a value.'
-  return null
 }

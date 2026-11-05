@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import type { ListFilterTerm, PublishedForm, RecordExportQuery, RecordListQuery } from '@formancy/data-client'
 import { REFUSED_FILTER_HELP } from './grid-datasource.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
-import { applied, applyCondition, filterBox, listsApplied, listsSent, openFilter } from './test-filter.js'
+import { applied, applyCondition, filterLine, headerBox, listsApplied, listsSent } from './test-filter.js'
 import {
   answeredOnce,
   chooseForm,
@@ -25,14 +25,15 @@ import type { Sent } from './test-fetch.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
- * A grid's filter panel on the host page (0104), on both engines, against
- * the real server: that the grid lists exactly the records every condition
- * holds for, each block asked for with the filter in its body and in no
- * URL; that a file is of the filtered records; that a condition is removed
- * on its own and all are cleared; that the keyboard reaches and leaves
- * every control; that a refusal is said in the server's words and keeps
- * what was typed; and that a child section's panel is its own. Every state
- * is held to axe at WCAG 2.2 AA and to a name on every control.
+ * A grid's filter on the host page (0104), set in its columns' header
+ * boxes (0132), on both engines, against the real server: that the grid
+ * lists exactly the records every condition holds for, each block asked
+ * for with the filter in its body and in no URL; that a file is of the
+ * filtered records; that a condition is removed on its own and all are
+ * cleared, the keyboard kept; that a refusal is said in the server's words
+ * and keeps what was typed; and that a child section's filter is its own.
+ * Every state is held to axe at WCAG 2.2 AA and to a name on every
+ * control.
  *
  * What a condition means in the database -- a range's whole days, a
  * contains in any case, NULL against text of no characters -- is the
@@ -259,49 +260,11 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     expect(filtersSent(plane.sent, engine.formId)).toEqual([[]])
   })
 
-  // From the keyboard alone: Enter on Build a condition opens the panel and leaves the
-  // keyboard on it, Tab goes Field, Condition, the value, Apply, and Enter
-  // in the value applies the condition, the keyboard staying in the box
-  // (watched failing with Filter opened by a pointer's press alone: Enter
-  // left it collapsed, aria-expanded "false").
-  test('is reached, filled and applied from the keyboard', async () => {
-    const notes = stamp('keys')
-    const orders = await freshOrders(engine, notes, ['5'])
-    const user = await workspace(plane.fetch, engine.formId)
-    const records = gridSection('Records')
-    const filter = within(records).getByRole('button', { name: 'Build a condition' })
-    filter.focus()
-    await user.keyboard('{Enter}')
-    expect(filter.getAttribute('aria-expanded')).toBe('true')
-    expect(focusedName()).toBe('Build a condition')
-    await user.tab()
-    expect(focusedName()).toBe('Field')
-    await user.selectOptions(within(records).getByRole('combobox', { name: 'Field' }), 'Notes')
-    await user.tab()
-    expect(focusedName()).toBe('Condition')
-    await user.selectOptions(within(records).getByRole('combobox', { name: 'Condition' }), 'contains')
-    await user.tab()
-    expect(focusedName()).toBe('Text')
-    await user.keyboard(notes)
-    await user.tab()
-    expect(focusedName()).toBe('Apply')
-    await user.tab({ shift: true })
-    await user.keyboard('{Enter}')
-    await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
-    expect(focusedName()).toBe('Text')
-    // Enter on Build a condition again closes it; what was applied is still a chip, and still the grid's.
-    filter.focus()
-    await user.keyboard('{Enter}')
-    expect(filter.getAttribute('aria-expanded')).toBe('false')
-    await listsApplied('Records', [`Notes contains “${notes}”`])
-    expect(recordKeys()).toEqual(orders)
-  })
-
   // A value the column cannot hold is the server's to refuse: its
   // sentence on the grid's line, with what to do instead of Ask again --
   // which would be refused the same -- and the value still in its box to
   // correct; applying the corrected value takes the refused one's place.
-  // A draft that is no condition at all is said in the panel and sends
+  // A box that is no condition at all is said on the grid's line and sends
   // nothing (watched failing with Ask again offered: a button that asked
   // again for the same refusal; and with the box emptied by Apply: "" for
   // "12x").
@@ -318,7 +281,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const records = gridSection('Records')
     expect(within(records).getByText(REFUSED_FILTER_HELP)).toBeTruthy()
     expect(within(records).queryByRole('button', { name: 'Ask again' })).toBeNull()
-    expect(filterBox('Records', 'Value').value).toBe('12x')
+    expect(headerBox('Records', 'Id').value).toBe('12x')
     await listsApplied('Records', ['Id is 12x'])
     expect(await floor('a filter refused')).toEqual(CLEAN('a filter refused'))
 
@@ -331,25 +294,22 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     ])
 
     plane.sent.length = 0
-    await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between' })
-    const problem = within(records).getByRole('status', { name: 'Apply' })
-    expect(problem.textContent).toBe('A range needs a From, a To or both.')
+    await user.clear(headerBox('Records', 'Amount'))
+    await user.type(headerBox('Records', 'Amount'), '>{Enter}')
+    await says('Records', 'Amount > needs a value.')
     expect(listsSent(plane.sent, engine.formId)).toEqual([])
     await listsApplied('Records', [`Id is ${String(order)}`])
   })
 
-  // The panel's states, each held to the floor: open on a range, whose
-  // hint and the condition it replaces describe it, and a filter applied,
-  // listed with its Remove buttons and Clear filter (watched failing with
-  // the Remove buttons named only "Remove": the name check passed, and axe
-  // did not object to two buttons of one name, which is why the case
-  // also asks for each by its own).
-  test('passes the floor open, filtered and replacing a condition', async () => {
+  // A filter applied, held to the floor: each condition a chip with its
+  // Remove, and Clear filter (watched failing with the Remove buttons
+  // named only "Remove": the name check passed, and axe did not object to
+  // two buttons of one name, which is why the case also asks for each by
+  // its own).
+  test('passes the floor filtered', async () => {
     const notes = stamp('floor')
     await freshOrders(engine, notes, ['2'])
     const user = await workspace(plane.fetch, engine.formId)
-    await openFilter(user, 'Records')
-    expect(await floor('the panel open')).toEqual(CLEAN('the panel open'))
     await applyCondition(user, 'Records', { field: 'Notes', condition: 'contains', value: notes })
     await applyCondition(user, 'Records', { field: 'Amount', condition: 'is between', from: '1', to: '2' })
     await says('Records', 'Rows 1–1. Filtered by Notes and Amount.')
@@ -357,18 +317,16 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const records = gridSection('Records')
     expect(within(records).getByRole('button', { name: `Remove Notes contains “${notes}”` })).toBeTruthy()
     expect(within(records).getByRole('button', { name: 'Remove Amount is between 1 and 2' })).toBeTruthy()
-    expect(within(records).getByText('Apply replaces the condition Amount has.')).toBeTruthy()
-    expect(within(records).getByText('From and To are included. Either may be left empty.')).toBeTruthy()
   })
 
-  // A child section has a panel of its own over the child form's fields: a
-  // timestamp's range is whole days in UTC, and says so; its conditions
+  // A child section has a filter of its own over the child form's fields: a
+  // timestamp's range is whole days in UTC, and its chip says so; its conditions
   // narrow its rows alone, under its parent, while the Records grid keeps
   // none; nothing matching is said with what narrowed it; and its file is
   // that parent's filtered rows (watched failing with the section's file
   // asked for without its filter: "filter": [] in its body; and with the
   // keyboard left nowhere once a condition was removed).
-  test("a child section's panel filters its rows alone, and its file", async () => {
+  test("a child section's filter narrows its rows alone, and its file", async () => {
     const words = stamp('shipped')
     const [order] = await freshOrders(engine, words, ['1'])
     const record = `k1:${String(order)}`
@@ -387,11 +345,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     plane.sent.length = 0
 
     await applyCondition(user, 'Delivery', { field: 'Shipped at', condition: 'is between', from: '2026-10-08', to: '2026-10-09' })
-    expect(
-      within(gridSection('Delivery')).getByText(
-        'Whole days in UTC, as the grid shows times: from the start of From to the end of To. Either may be left empty.',
-      ),
-    ).toBeTruthy()
+    await listsApplied('Delivery', ['Shipped at is between 2026-10-08 and 2026-10-09, whole days in UTC'])
     const parent = { field: 'order', record }
     const between: ListFilterTerm = { field: 'shipped_at', op: 'range', from: '2026-10-08', to: '2026-10-09' }
     const server = await plane.clerk.list(engine.deliveries, { parent, filter: [between] })
@@ -431,24 +385,28 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     expect(await floor('a child section filtered')).toEqual(CLEAN('a child section filtered'))
   })
 
-  // A field the administrator left out of the Filter panel (0123) is not
-  // in its Field menu, against the real server that says so; the rest are,
-  // in the server's order. Last of its engine's cases, because it publishes
-  // the order form's version 2. Watched failing with the menu over every
-  // field the list is filtered by: Notes was offered.
-  test('offers no condition on a field its administrator left out of the panel', async () => {
+  // A field the administrator left out of the filter (0123) is not offered
+  // by the line's completion nor given a header box, against the real
+  // server that says so; the rest are. Last of its engine's cases, because
+  // it publishes the order form's version 2. Watched failing, when the
+  // panel offered fields, with the menu over every field the list is
+  // filtered by: Notes was offered.
+  test('offers no condition on a field its administrator left out', async () => {
     const stored = (await plane.store.read(engine.formId, 1)) as { presentation: Record<string, unknown> }
     stored.presentation = { ...stored.presentation, unfiltered: ['notes'] }
     expect(await plane.store.publish(engine.formId, 1, stored)).toEqual({ ok: true, version: 2 })
     const definition = await definitionOf(engine.formId)
     expect(definition.list?.filterable.find((offer) => offer.field === 'notes')?.offered).toBe(false)
     const user = await workspace(plane.fetch, engine.formId)
-    const section = await openFilter(user, 'Records')
-    const menu = within(section).getByRole('combobox', { name: 'Field' })
-    const labels = within(menu)
+    const section = gridSection('Records')
+    await user.click(filterLine('Records'))
+    await user.keyboard('{ArrowDown}')
+    const names = within(within(section).getByRole('listbox', { name: 'What may come next' }))
       .getAllByRole('option')
       .map((option) => option.textContent)
-    expect(labels).not.toContain('Notes')
-    expect(labels).toContain('Status')
+    expect(names.some((name) => name?.startsWith('notes'))).toBe(false)
+    expect(names.some((name) => name?.startsWith('status'))).toBe(true)
+    expect(within(section).queryByRole('textbox', { name: 'Filter Notes' })).toBeNull()
+    expect(within(section).getByRole('textbox', { name: 'Filter Amount' })).toBeTruthy()
   })
 })

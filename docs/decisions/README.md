@@ -158,7 +158,7 @@ only enforcement is "we remember" says so plainly.
 | [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md) | A host token is refused unless it is its compact form exactly | accepted |
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
-| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131 |
+| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134 |
 | [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126 |
 | [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted; extended by 0126 |
 | [0107](0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md) | A record is duplicated into a new one, of the fields the server names, without its key | accepted |
@@ -177,7 +177,7 @@ only enforcement is "we remember" says so plainly.
 | [0120](0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md) | A whole-number field refuses a fraction in the browser, as the server does | accepted |
 | [0121](0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md) | A PostgreSQL lookup's cancel is sent again while a delivered one leaves its statement running | accepted |
 | [0122](0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md) | A host page draws a saved record for the update it may send, and a new one for the create | accepted; extended by 0127 |
-| [0123](0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md) | An administrator chooses the fields a form's Filter panel offers | accepted |
+| [0123](0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md) | An administrator chooses the fields a form's Filter panel offers | accepted; amended by 0134 |
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted; amended by 0128 |
@@ -185,6 +185,7 @@ only enforcement is "we remember" says so plainly.
 | [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md) | The grids of an open form share a person's own views | accepted |
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
-| [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md) | A person types a grid's filter as a line, and sees each condition as a chip | accepted; extended by 0132 |
+| [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md) | A person types a grid's filter as a line, and sees each condition as a chip | accepted; extended by 0132; amended by 0134 |
 | [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133 |
 | [0133](0133-a-cell-filters-by-its-value.md) | A cell filters by its value | accepted |
+| [0134](0134-the-build-a-condition-panel-is-retired.md) | The Build a condition panel is retired | accepted |

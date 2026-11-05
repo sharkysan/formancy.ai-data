@@ -36,7 +36,7 @@ export function FilterLine({
 }: {
   /** What every element id of the line starts with: one line per grid. */
   idBase: string
-  /** The fields the line may name: those the form's Filter panel offers. */
+  /** The fields the line may name: those the form's filter offers (0123). */
   fields: readonly LineField[]
   /** The filter as applied: what the grid lists and a file holds. */
   filter: readonly ListFilterTerm[]

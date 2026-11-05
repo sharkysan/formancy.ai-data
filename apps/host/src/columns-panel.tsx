@@ -5,8 +5,8 @@ import type { ColumnChoice } from './columns.js'
 import type { GridColumn } from './grid-datasource.js'
 
 /*
- * A grid's Columns (0106): behind a disclosure, as the filter is
- * (filter-panel.tsx), the grid's columns in their order, each with Show and
+ * A grid's Columns (0106): behind a disclosure, as opening a record by its
+ * token is (record-bar.tsx), the grid's columns in their order, each with Show and
  * a move up and down, then Reset columns. Every change is a press or a key:
  * nothing is dragged, and the grid's own columns stay unmovable
  * (grid-options.tsx), because a drag has no keyboard path (formancy.ai

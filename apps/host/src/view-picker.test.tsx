@@ -18,7 +18,7 @@ import type { Engine, Plane } from './test-plane.js'
  * opening on the default, or on every record when the default is not
  * offered; a choice in the select sending nothing until Show view; a view
  * shown asking for exactly one first page, carrying both its filter and
- * its sort, which the Filter panel lists and the headers show; the picker
+ * its sort, which the chips list and the headers show; the picker
  * saying "Your own filter and sort" for anything else and the view again
  * once the conditions are the view's; "All records" clearing both; a file
  * of the view's records; a child section's views of its own; and no view
@@ -182,8 +182,8 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // the grid opening on nothing: every record listed, by key ascending; with
   // the datasource asking for whatever block AG Grid asks for: two first
   // pages, one asked before the headers showed the view's sort; and with
-  // the picker after the Filter panel: Tab from Search reached Filter; and
-  // with Columns after the Filter panel: Tab from Show view reached Filter).
+  // the picker after the filter: Tab from Search reached Filter; and
+  // with Columns after the filter: Tab from Show view reached Filter).
   test('opens the grid on the default view, with one first page in its filter and its sort', async () => {
     await freshOrders(engine, `${VIEWED} ${stamp('opened')}`, ['5', '7'])
     const user = mount(plane.fetch)
@@ -571,7 +571,7 @@ describe('a form whose list offers no views', () => {
     await signIn(user, TOKENS.clerk)
     await chooseForm(user, engine.lines)
     expect((await definitionOf(engine.lines)).list?.views).toEqual([])
-    expect(within(gridSection('Records')).getByRole('button', { name: 'Build a condition' })).toBeTruthy()
+    expect(within(gridSection('Records')).getByRole('combobox', { name: 'Filter' })).toBeTruthy()
     expect(picker('Records')).toBeNull()
   })
 })

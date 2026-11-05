@@ -3,16 +3,16 @@ import type { ReactElement } from 'react'
 import type { ListFilterTerm, StateMoves } from '@formancy/data-client'
 import { FilterChips, useUndo } from './filter-chips.js'
 import { FilterLine } from './filter-line.js'
-import { FilterPanel } from './filter-panel.js'
 import { lineFields } from './filter-terms.js'
 import type { PanelField } from './filter-terms.js'
 
 /*
- * A grid's filter, seen three ways that are one filter: the line a person
- * types it in, the chips that say each condition in words, and the panel
- * that builds one condition from menus. Each changes the one filter the
- * section lists by, and each shows it whatever changed it. One per grid,
- * in its toolbar, on a row of its own.
+ * A grid's filter in its toolbar: the line a person types it in and the
+ * chips that say each condition in words, which with the boxes under the
+ * grid's headers (0132) are one filter seen three ways. Each changes the
+ * one filter the section lists by, and each shows it whatever changed it.
+ * One per grid, on a row of its own. The panel that built one condition
+ * from menus is retired (0134).
  */
 
 export function GridFilter({
@@ -40,7 +40,6 @@ export function GridFilter({
   onLeave?: () => void
 }): ReactElement {
   const line = useMemo(() => lineFields(fields, moves), [fields, moves])
-  const offered = fields.filter((field) => field.offered)
   const undoing = useUndo(filter, onFilter)
   return (
     <div className="filter-block">
@@ -56,7 +55,6 @@ export function GridFilter({
         />
       )}
       <FilterChips idBase={idBase} fields={fields} filter={filter} undoing={undoing} empty={empty} />
-      {offered.length === 0 ? null : <FilterPanel idBase={idBase} fields={offered} filter={filter} onFilter={onFilter} />}
     </div>
   )
 }

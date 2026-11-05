@@ -4,7 +4,7 @@ import type { FilterInput, FilterOp, ListFilterTerm, RangeExclusive } from '../r
  * A grid's filter as a line a person types: `status = placed and amount >
  * 1000`. The line is read here, in the browser, into the terms a list
  * request carries (0104), and written back from them; the server never
- * sees it, so it can say nothing the Filter panel could not.
+ * sees it, so it can say nothing the terms could not.
  *
  *   line      := condition ("and" condition)*
  *   condition := name ("=" | ">" | ">=" | "<" | "<=" | "contains") value

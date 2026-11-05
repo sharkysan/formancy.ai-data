@@ -734,18 +734,17 @@ to that cell to point at the next
 Each condition applied is a chip in words -- "Amount is over 1000" -- with
 its own Remove, and Clear filter removes them all; either offers Undo
 until the filter changes some other way, and a list nothing matches
-offers to try it without its last condition. Build a condition opens the
-grid's own panel, less any field the form's administrator left out of it
-in the studio's List views, though a view may still filter on one, which
-is then a chip and not in the line
-([0123](./docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)): a
-field, a condition it offers -- is, is between, contains, has no value,
-has a value -- and a value, or a range's From and To, as the field takes
-them; a timestamp's range is whole days, in UTC for an instant, as the grid
-shows times. Apply puts the condition in place of the one its field had,
-and the grid's line says which fields filter it. A value the server
-cannot hold is its sentence on the grid's line, with what you typed still
-in the line or its box. A child section's
+offers to try it without its last condition. The line and the boxes offer
+every field the server offers a filter on, less any the form's
+administrator left out in the studio's List views, though a view may
+still filter on one, which is then a chip and not in the line
+([0123](./docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md));
+a timestamp's range is whole days, in UTC for an instant, as the grid
+shows times, and its chip says so. The grid's line says which fields
+filter it. A value the server cannot hold is its sentence on the grid's
+line, with what you typed still in the line or its box. The panel that
+built one condition from menus is retired
+([0134](./docs/decisions/0134-the-build-a-condition-panel-is-retired.md)). A child section's
 filter is its own, and opening another parent starts without one; the
 filter is in no address, so a reload or another form starts without the
 conditions you typed

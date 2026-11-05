@@ -76,28 +76,28 @@ const chips = () =>
     .getAllByRole('listitem')
     .map((item) => item.textContent)
 
-describe('the condition builder over fields left out of it (0123)', () => {
-  // Its Field menu offers what the panel offers, and not a field the
-  // administrator left out. Watched failing with the menu over every field
-  // filtered by: Notes was offered.
-  test('offers in its Field menu only the fields it offers', async () => {
+describe('the filter over fields left out of it (0123)', () => {
+  // The line's completion offers what the filter offers, and not a field
+  // the administrator left out. Watched failing, when the panel offered
+  // fields, with its menu over every field filtered by: Notes was offered.
+  test('offers in the line only the fields it offers', async () => {
     render(<Section fields={[STATUS, NOTES]} sent={[]} />)
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Build a condition' }))
-    const menu = screen.getByRole('combobox', { name: 'Field' })
+    const user = userEvent.setup()
+    await user.click(line())
+    await user.keyboard('{ArrowDown}')
     expect(
-      within(menu)
+      within(screen.getByRole('listbox', { name: 'What may come next' }))
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['Status'])
+    ).toEqual(['statusStatus'])
   })
 
-  // With nothing to offer, there is no line and no builder, and a
-  // condition applied on a field left out -- a view's -- is still a chip,
-  // with its Remove. Watched failing with the toggle drawn over no field:
-  // a button opened an empty form.
+  // With nothing to offer, there is no line, and a condition applied on a
+  // field left out -- a view's -- is still a chip, with its Remove.
+  // Watched failing, when the panel was drawn, with its toggle over no
+  // field: a button opened an empty form.
   test('says a condition on a field it does not offer, and offers nothing where it offers none', () => {
     render(<Section fields={[NOTES]} start={[{ field: 'notes', op: 'contains', text: 'urgent' }]} sent={[]} />)
-    expect(screen.queryByRole('button', { name: 'Build a condition' })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'Filter' })).toBeNull()
     expect(chips()).toEqual(['Notes contains “urgent”'])
     expect(screen.getByRole('button', { name: 'Remove Notes contains “urgent”' })).toBeTruthy()

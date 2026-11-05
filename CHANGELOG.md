@@ -44,7 +44,8 @@ the same day (formancy.ai 0232).
   Each condition is a chip in plain words; a removal, or Clear filter,
   offers Undo, and a list nothing matches offers to try it without the
   last condition. `/` reaches the Records line and Esc leaves it.
-  What you notice: the panel's button is Build a condition, each chip's
+  What you notice: the panel's button is Build a condition (retired by
+  0134), each chip's
   Remove is named for what it says ("Remove Amount is over 1000"), and
   `@formancy/data-client` exports `parseFilterLine`, `printFilterLine`,
   `completeFilterLine` and `lineNames` with their types. The server is
@@ -447,6 +448,17 @@ the same day (formancy.ai 0232).
     version on that date. `versions` names the chain's key fields too.
 
 ### Changed
+
+- **The Build a condition panel is retired** (0134). Why: since every
+  column's header filters its column (0132) and a cell its value (0133),
+  each condition the panel built from menus is one a person types where
+  they look, and two ways to say one condition were one too many. What
+  you notice: no Build a condition button above a grid; a field is named
+  in the filter line, whose completion lists the fields offered, or in its
+  column's box; and a timestamp's range chip ends "whole days in UTC" or
+  "whole days as stored", which the panel used to say. The studio's "The
+  Filter panel offers" keeps its name and now means the line and the
+  boxes. The server is unchanged.
 
 - **The host page draws a loaded record for its update** (0122). Why: a
   field written on create only -- a key, a chain's start, a column the
