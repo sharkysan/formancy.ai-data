@@ -164,6 +164,10 @@ function labelSql(statement: Statement, row: string, label: LabelTerms, alias: s
  * holds no condition. No plan of it is measured.
  */
 function relatedSql(statement: Statement, row: string, related: RelatedTerms, alias: string): string {
-  const where = [...reachedRow(statement, row, related, alias), ...related.filter.map((entry) => recordFilterSql(statement, alias, entry))]
+  const where = [
+    ...related.pairs.map((pair) => `${alias}.${quoteIdentifier(pair.references)} = ${row}.${quoteIdentifier(pair.column)}`),
+    ...filterSql(statement, alias, related.terms),
+    ...related.filter.map((entry) => recordFilterSql(statement, alias, entry)),
+  ]
   return `exists (select from ${quoteTable(related.target)} as ${alias} where ${where.join(' and ')})`
 }

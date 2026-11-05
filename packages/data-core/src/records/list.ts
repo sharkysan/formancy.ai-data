@@ -380,7 +380,7 @@ export function planList(snapshot: MetadataSnapshot, bindings: FormBindings, pol
     through: found.through,
     equal: parent.equal,
     filter: [...filter, ...parent.none],
-    related: through.related,
+    related: through.related.slice(0, 0),
     search: query.search === '' ? null : { text: query.search, columns: search },
     sort: listOrder(prepared, requested),
     after,

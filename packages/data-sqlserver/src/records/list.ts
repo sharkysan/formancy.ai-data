@@ -165,6 +165,9 @@ function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias:
  * holds no condition. No plan of it is measured.
  */
 function relatedPredicate(parameters: Parameters, row: string, related: RelatedTerms, alias: string): string {
-  const where = [...reachedRow(parameters, row, related, alias), ...related.filter.map((entry) => recordFilterPredicate(parameters, alias, entry))]
+  const where = [
+    ...reachedRow(parameters, row, { ...related, terms: [] }, alias),
+    ...related.filter.map((entry) => recordFilterPredicate(parameters, alias, entry)),
+  ]
   return `exists (select 1 from ${quoteTable(related.target)} as ${alias} where ${where.join(' and ')})`
 }
