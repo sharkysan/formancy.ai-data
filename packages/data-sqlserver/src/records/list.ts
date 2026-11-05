@@ -120,7 +120,7 @@ function anchorSql(parameters: Parameters, table: ListRequest['target']['table']
         `${'label' in term ? labelSql(parameters, ROW, term.label, `[t${String(index)}]`) : `${ROW}.${quoteName(term.column)}`} as ${seekName(index)}`,
     ),
   ]
-  return `select ${select.join(', ')} from ${quoteTable(table)} as ${ROW} where ${located(parameters, anchor.key, terms.terms, terms.through).join(' and ')}`
+  return `select ${select.join(', ')} from ${quoteTable(table)} as ${ROW} where ${[...located(parameters, anchor.key, terms.terms, terms.through), ...terms.related.map((entry, index) => relatedPredicate(parameters, ROW, entry, `[y${String(index)}]`))].join(' and ')}`
 }
 
 /**
