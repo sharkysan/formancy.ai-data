@@ -253,6 +253,8 @@ async function run(gate, browser) {
     )
     // What axe asked about and no screen shows in this state, said rather than counted: its grid has scrolled it out of view, or covers it.
     if (decided.hidden.length > 0) console.log(`  shown nowhere: ${decided.hidden.join('; ')}`)
+    // A box holding nothing in this state: no text to decide, said rather than counted.
+    if (decided.empty.length > 0) console.log(`  empty, nothing to read: ${decided.empty.join('; ')}`)
     // Everything the page did to reach this state, under the policy it was
     // sent with (0083): what the browser refused, and what the console said
     // of the policy.

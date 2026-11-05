@@ -269,8 +269,10 @@ async function reveal(page, at) {
  * background axe "could not determine due to a pseudo element" (UX-SPEC F1),
  * or because "it is overlapped by another element" -- by the text's computed
  * colour against the background the browser painted in that cell's padding,
- * at 4.5:1 or more. Anything axe left undecided outside a grid, or for
- * another reason, stays undecided: the gate fails it. Overlapped is what axe
+ * at 4.5:1 or more. An empty box -- axe's "Element has no value" -- has no
+ * text to decide, and is returned as `empty`, said and not counted.
+ * Anything else axe left undecided outside a grid, or for another reason,
+ * stays undecided: the gate fails it. Overlapped is what axe
  * says of a row the grid keeps drawn above its scroller's top, where the
  * page's own toolbar lies over it: the same text scrolled out of view as
  * below, found `hidden` the same way (seen 2026-10-28, when a grid's Filter
@@ -311,9 +313,18 @@ export async function decide(page, undecided) {
   const left = []
   const decided = []
   const hidden = []
+  const empty = []
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
     for (const node of undecided) {
+      // An empty box has no text to read in this state, which is what axe
+      // says of it; a box's text is measured in the states that type in it
+      // (workspace.mjs's search). Seen 2026-11-05, the search box emptied
+      // by the filter's states, in one window width of three.
+      if (/has no value/.test(node.reason)) {
+        empty.push(node.html)
+        continue
+      }
       if (/partially obscured/.test(node.reason)) {
         const revealed = await reveal(page, node.at)
         if (revealed.verdict === 'passes') continue
@@ -407,7 +418,7 @@ export async function decide(page, undecided) {
   } finally {
     await page.evaluate(([x, y]) => window.scrollTo(x, y), scrolled)
   }
-  return { left, decided, hidden, failing: decided.filter((entry) => entry.ratio < 4.5) }
+  return { left, decided, hidden, empty, failing: decided.filter((entry) => entry.ratio < 4.5) }
 }
 
 /** What has the keyboard's focus, said so that a failure names it. */
