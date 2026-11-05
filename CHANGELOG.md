@@ -478,6 +478,15 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **Two lookups into one table are told apart by their columns** (0137).
+  Why: an order's `created_by` and `approved_by` both refer to employees,
+  and both lookups read "Employee", so a person could not tell who
+  created an order from who approved it. A lookup into a table another
+  lookup of the form refers to is labelled from its own column ("Created
+  by", "Approved by"), a trailing id left out; one alone into its table
+  keeps the table's name. What you notice: regenerating such a form
+  changes those labels in its base, and keys stay as they were.
+
 - **The Build a condition panel is retired** (0134). Why: since every
   column's header filters its column (0132) and a cell its value (0133),
   each condition the panel built from menus is one a person types where

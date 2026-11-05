@@ -9,6 +9,7 @@ import { buildLookupConfig } from '../lookup/config.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
 import { createSnapshot, findObject } from '../snapshot.js'
 import { generateForm } from './generate.js'
+import { labelOfLookup } from './names.js'
 import type { GenerationRequest } from './types.js'
 
 /*
@@ -1103,6 +1104,41 @@ describe('lookup controls (0066)', () => {
         'A lookup over fk_order_customer (tenant_id, customer_no), showing customer_no, name of customer, drawn as a typeahead searching customer_no, name; label from the table name.',
       ])
     }
+  })
+
+  // Two lookups into one table are told apart by the column each is over
+  // (0138): labelled from the table, both would read "Employee", and a
+  // person could not tell who created an order from who approved it; a
+  // lookup alone into its table keeps the table's name. A trailing `_id`
+  // names no more than the table does, so it is left out. The keys are the
+  // table's, as before. Watched failing with every lookup labelled from its
+  // table.
+  test('two lookups into one table are labelled by their columns, one alone by its table', () => {
+    const employees = {
+      ...ORDER,
+      lookups: [
+        { foreignKey: 'fk_order_customer', display: ['name'] },
+        { foreignKey: 'fk_order_created_by', display: ['name'] },
+        { foreignKey: 'fk_order_approved_by', display: ['name'] },
+      ],
+    }
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const { form, notes } = generateForm(fixtureLike(kind), employees)
+      const lookups = form.model.fields.filter((field) => field.type === 'select').map((field) => [field.key, field.label])
+      expect(lookups, kind).toEqual([
+        ['customer', 'Customer'],
+        ['employee', 'Created by'],
+        ['employee_2', 'Approved by'],
+      ])
+      expect(
+        notes.map((note) => note.message).filter((message) => message.includes('fk_order_created_by')),
+        kind,
+      ).toEqual([
+        'A lookup over fk_order_created_by (created_by), showing name of employee, drawn as a typeahead searching name; label from its column, since another lookup refers to employee too.',
+      ])
+    }
+    expect(labelOfLookup('manager_id')).toBe('Manager')
+    expect(labelOfLookup('approved_by')).toBe('Approved by')
   })
 
   // A lookup showing only a date has nothing a search matches, and the
