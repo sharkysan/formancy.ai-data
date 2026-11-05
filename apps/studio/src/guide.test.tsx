@@ -28,7 +28,7 @@ import type { TestPlane } from './test-server.js'
 const GUIDE = journey as Journey
 
 /** The plane's connection for each of the guide's. */
-const ON_PLANE: Readonly<Record<string, string>> = { pg: 'fixture-writer', ms: 'fixture-sqlserver' }
+const ON_PLANE: Readonly<Record<string, string>> = { pg: 'fixture-writer', ms: 'fixture-sqlserver-writer' }
 
 let plane: TestPlane
 
@@ -88,6 +88,8 @@ async function perform(user: User, { step, control, action }: WalkRow): Promise<
     }
     case 'tick': {
       const box = within(here()).getByRole<HTMLInputElement>('checkbox', { name: control })
+      // "Keep it ticked": the studio ticked it by default (0138), or the guide would be telling the reader something false.
+      if (action.already === true) expect(box.checked, `${control} ticked by default`).toBe(true)
       if (!box.checked) await user.click(box)
       expect(box.checked).toBe(true)
       if (action.keep !== undefined) {

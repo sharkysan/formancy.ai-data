@@ -53,7 +53,7 @@ describe('the administrator plane, through the studio client', () => {
     expect(await admin.whoami()).toEqual({ ok: true, value: { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } } })
     expect(await admin.connections()).toEqual({
       ok: true,
-      value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-writer'],
+      value: ['fixture', 'fixture-reader', 'fixture-sqlserver', 'fixture-sqlserver-reader', 'fixture-sqlserver-writer', 'fixture-writer'],
     })
     expect(await admin.test('fixture')).toEqual({
       ok: true,

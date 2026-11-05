@@ -21,7 +21,16 @@ import reader from './fixtures/postgres-reader.json'
 import writer from './fixtures/postgres-writer.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
-import { OWNER_SNAPSHOT, READER_SNAPSHOT, readSnapshot, SQLSERVER_READER_SNAPSHOT, SQLSERVER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
+import sqlserverWriter from './fixtures/sqlserver-writer.json'
+import {
+  OWNER_SNAPSHOT,
+  READER_SNAPSHOT,
+  readSnapshot,
+  SQLSERVER_READER_SNAPSHOT,
+  SQLSERVER_SNAPSHOT,
+  SQLSERVER_WRITER_SNAPSHOT,
+  WRITER_SNAPSHOT,
+} from './test-server.js'
 
 /**
  * The databases the suite's server discovers are captured from the shared
@@ -34,6 +43,7 @@ const FILES: ReadonlyArray<[string, unknown]> = [
   ['the writer', writer],
   ['the SQL Server owner', sqlserver],
   ['the SQL Server reader', sqlserverReader],
+  ['the SQL Server writer', sqlserverWriter],
 ]
 
 describe('the captured snapshots', () => {
@@ -92,6 +102,17 @@ describe('the captured snapshots', () => {
     expect(WRITER_SNAPSHOT.gaps).toEqual([])
   })
 
+  // The order form's own account on SQL Server, the getting-started guide's
+  // `ms` connection: what it may do as the fixture grants it, and no
+  // employee it may read, so the guide's studio steps meet the lookups that
+  // account is offered (0138).
+  test('the SQL Server writer agrees with what the fixture grants it', () => {
+    expect(SQLSERVER_WRITER_SNAPSHOT.kind).toBe('sqlserver')
+    expect(accessDisagreements(SQLSERVER_WRITER_SNAPSHOT, WRITER_ACCESS)).toEqual([])
+    const employee = SQLSERVER_WRITER_SNAPSHOT.objects.find((object) => object.ref.name === 'employee')
+    expect(employee?.columns.some((column) => column.access.select)).toBe(false)
+  })
+
   // The version is printed by the studio and is outside the fingerprint, so
   // an edit to it would pass the cases above. It must be the major of the
   // image the fixture runs -- for SQL Server, the major its year names,
@@ -101,7 +122,8 @@ describe('the captured snapshots', () => {
     const major = String(imageMajor('postgres', POSTGRES_IMAGE))
     for (const snapshot of [OWNER_SNAPSHOT, READER_SNAPSHOT, WRITER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(major)
     const release = String(imageMajor('sqlserver', SQLSERVER_IMAGE))
-    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(release)
+    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, SQLSERVER_WRITER_SNAPSHOT])
+      expect(snapshot.serverVersion.split('.')[0]).toBe(release)
   })
 
   // The server is outside the fingerprint as well (0068), and the studio

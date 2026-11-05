@@ -68,9 +68,23 @@ export function titleFor(ref: ObjectRef): string {
   return words === '' ? ref.name : `${words.charAt(0).toUpperCase()}${words.slice(1)}`
 }
 
-/** A fresh choice for `ref`: nothing offered, nothing confirmed. */
-export function choiceFor(ref: ObjectRef): Choice {
-  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups: [], versionColumn: null, validity: null }
+/**
+ * A fresh choice for `ref`: every foreign key the studio can offer offered
+ * as a lookup, each with the column it suggests (0138) -- a lookup filters
+ * and sorts by what it shows (0135, 0136), so it takes nothing from a key
+ * drawn as a number, and the administrator unticks what they do not want --
+ * and nothing confirmed. A key `lookupBlocker` refuses, or whose target
+ * offers no column to show, is not offered.
+ */
+export function choiceFor(ref: ObjectRef, snapshot: MetadataSnapshot): Choice {
+  const root = findObject(snapshot, ref)
+  const lookups = (root?.foreignKeys ?? []).flatMap((foreignKey) => {
+    if (root === undefined || lookupBlocker(snapshot, root, foreignKey) !== null || foreignKey.references === null) return []
+    const target = findObject(snapshot, foreignKey.references.table)
+    const display = target === undefined ? [] : suggestedDisplay(target, foreignKey.references.columns)
+    return display.length === 0 ? [] : [{ foreignKey: foreignKey.name, display }]
+  })
+  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, validity: null }
 }
 
 /** The gaps about one object itself, which are what "cannot tell" is made of (0004). */

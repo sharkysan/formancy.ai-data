@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:5a046aa2ab9f92b254e512a3879341667b840f1e20e785a632ed8e9995f148f2",
+      "reviewed": "sha256:c776ca43258d2778c39edf0cf73cf829b0e3671053f16a808b1448f304147e89",
       "limitations": [
         {
           "area": "studio",
@@ -3848,6 +3848,15 @@
         {
           "area": "forms",
           "says": "A form regenerated with two lookups into one table changes those two labels in its base: a presentation that renamed them keeps its names, one that did not shows the new ones."
+        }
+      ]
+    },
+    "0138": {
+      "reviewed": "sha256:3b7b03cafcf802cc8146ff876b5a7c9b2e73254e0d8611afc678a0afc3dc2153",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "Every lookup the Choose step ticks by default needs its rows decided in the Policy step before the form publishes."
         }
       ]
     }

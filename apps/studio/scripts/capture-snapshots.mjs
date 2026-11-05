@@ -17,7 +17,10 @@
 //     studio shows as a concurrency token with nothing to confirm;
 //   - SQL Server as the reader, whose catalog hides what it may not use: the
 //     snapshot with gaps, which the studio has to show as "cannot tell"
-//     rather than "no relationship" (0004).
+//     rather than "no relationship" (0004);
+//   - SQL Server as the writer, the order form's own account, which reads no
+//     employee: what the getting-started guide's account sees there, so the
+//     guide's studio steps are followed against it (0138).
 //
 // It refuses to write any of them if the shared model, or what the fixture
 // grants each account, disagrees with it, by the same comparators the adapter
@@ -28,7 +31,7 @@
 //
 //   pnpm --filter @formancy/data-studio snapshot
 //
-// and commit the five files. Re-run when the fixture changes:
+// and commit the six files. Re-run when the fixture changes:
 // src/fixtures.test.ts compares the committed files with the model and fails
 // when they disagree.
 
@@ -83,9 +86,15 @@ async function captureSqlServer() {
   const fixture = await startSqlServerFixture(SQLSERVER_IMAGE)
   const owner = await new mssql.ConnectionPool(fixture.admin).connect()
   const reader = await new mssql.ConnectionPool(fixture.reader).connect()
+  const writer = await new mssql.ConnectionPool(fixture.writer).connect()
   try {
-    return { complete: await discoverSqlServer(owner, FIXTURE_SCOPE), restricted: await discoverSqlServer(reader, FIXTURE_SCOPE) }
+    return {
+      complete: await discoverSqlServer(owner, FIXTURE_SCOPE),
+      restricted: await discoverSqlServer(reader, FIXTURE_SCOPE),
+      writing: await discoverSqlServer(writer, FIXTURE_SCOPE),
+    }
   } finally {
+    await writer.close()
     await reader.close()
     await owner.close()
     await fixture.stop()
@@ -103,6 +112,7 @@ const problems = [
   ...snapshotDisagreements(ms.complete).map((problem) => `sqlserver owner: ${problem}`),
   ...restrictedDisagreements(ms.restricted).map((problem) => `sqlserver reader: ${problem}`),
   ...accessDisagreements(ms.restricted, READER_ACCESS).map((problem) => `sqlserver reader: ${problem}`),
+  ...accessDisagreements(ms.writing, WRITER_ACCESS).map((problem) => `sqlserver writer: ${problem}`),
 ]
 if (problems.length > 0) throw new Error(`the discovered snapshots disagree with the fixture model:\n  ${problems.join('\n  ')}`)
 // The SQL Server reader is the capture that shows "cannot tell"; PostgreSQL's
@@ -122,6 +132,7 @@ write('postgres-reader.json', pg.restricted)
 write('postgres-writer.json', pg.writing)
 write('sqlserver-owner.json', ms.complete)
 write('sqlserver-reader.json', ms.restricted)
+write('sqlserver-writer.json', ms.writing)
 console.log(
-  `snapshots: PostgreSQL ${pg.complete.serverVersion} owner ${String(pg.complete.objects.length)} objects, reader ${String(pg.restricted.objects.length)}, writer ${String(pg.writing.objects.length)}; SQL Server ${ms.complete.serverVersion} owner ${String(ms.complete.objects.length)} objects, reader ${String(ms.restricted.objects.length)} objects and ${String(ms.restricted.gaps.length)} gaps`,
+  `snapshots: PostgreSQL ${pg.complete.serverVersion} owner ${String(pg.complete.objects.length)} objects, reader ${String(pg.restricted.objects.length)}, writer ${String(pg.writing.objects.length)}; SQL Server ${ms.complete.serverVersion} owner ${String(ms.complete.objects.length)} objects, reader ${String(ms.restricted.objects.length)} objects and ${String(ms.restricted.gaps.length)} gaps, writer ${String(ms.writing.objects.length)} objects and ${String(ms.writing.gaps.length)} gaps`,
 )

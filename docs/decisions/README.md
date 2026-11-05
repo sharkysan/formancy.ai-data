@@ -78,7 +78,7 @@ only enforcement is "we remember" says so plainly.
 | [0021](0021-generated-forms-preview-in-both-frameworks.md) | Generated forms are previewed in both frameworks, generated in the browser from a captured snapshot | accepted; narrowed by 0029; extended by 0058, 0069 |
 | [0022](0022-the-runtime-plane-asks-the-policy-every-time.md) | The runtime plane asks the policy on every request, and removes only the echo it can prove | accepted; narrowed by 0031, 0040, 0098; extended by 0041, 0044, 0045, 0050, 0112, 0117 |
 | [0023](0023-the-audit-trail-is-operational-not-evidence.md) | The audit trail is operational, never holds a value, and is not evidence | accepted; extended by 0031, 0033, 0044, 0045, 0050, 0079, 0112, 0113 |
-| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075; palette copy reversed by 0096 |
+| [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075; palette copy reversed by 0096; extended by 0138 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061, 0074 |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
@@ -192,3 +192,4 @@ only enforcement is "we remember" says so plainly.
 | [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136 |
 | [0136](0136-a-lookup-field-sorts-by-what-it-shows.md) | A lookup field sorts by what it shows | accepted |
 | [0137](0137-two-lookups-into-one-table-are-told-apart-by-their-columns.md) | Two lookups into one table are told apart by their columns | accepted |
+| [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |
