@@ -392,15 +392,15 @@ describe('a publish that cannot', () => {
   })
 
   // A label that says what the generator already says is refused by the
-  // server (0030); refused before it is sent, with applyPresentation's reason.
-  test('refuses a label the generated form already has', async () => {
+  // server (0030), so the demo leaves it out: since 0137 the generator labels
+  // the order's employee lookups as the demo does, and the demo's
+  // presentation names neither, while the published form still says both.
+  test('leaves out a label the generated form already has', async () => {
     const order = spec('order')
     const proposal = (await call(as('image-build'), '/v1/form-proposals', generationRequest(order))).json as Proposal
-    const same: DemoFormSpec = {
-      ...order,
-      lookups: order.lookups.map((lookup) => (lookup.foreignKey === 'fk_order_created_by' ? { ...lookup, label: 'Employee' } : lookup)),
-    }
-    expect(() => demoBundle(same, proposal)).toThrow(/^order: the demo's labels do not apply to the generated form: .*equals the base's/)
+    const bundle = demoBundle(order, proposal)
+    expect(bundle.presentation.fields).toEqual([])
+    expect(bundle.form.model.fields.map((field) => field.label)).toEqual(expect.arrayContaining(['Created by', 'Approved by']))
   })
 })
 
