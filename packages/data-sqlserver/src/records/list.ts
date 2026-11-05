@@ -75,8 +75,13 @@ export function listStatement(request: ListRequest, terms: ListTerms): Statement
     applied.push(`cross apply (select ${labelSql(parameters, ROW, term.label, `[t${at}]`)} as [v]) as [l${at}]`)
     labels.set(term, `[l${at}].[v]`)
   }
-  const ordered = (term: SortTerm): OrderTerm =>
-    'label' in term ? { column: term.label.display, direction: term.direction, nulls: 'last', value: labels.get(term) as string } : term
+  const ordered = (term: SortTerm): OrderTerm => {
+    if (!('label' in term)) return term
+    // Every term of the seek is one of the order's; a label read in no join would order by a root column of its name.
+    const value = labels.get(term)
+    if (value === undefined) throw new Error(`The label of ${term.label.display} was read in no join to order by.`)
+    return { column: term.label.display, direction: term.direction, nulls: 'last', value }
+  }
   const anchor = terms.after === null ? null : anchorSql(parameters, request.target.table, terms, terms.after)
   if (terms.after !== null) where.push(after(ROW, (index) => `${ANCHOR}.${seekName(index)}`, terms.after.seek.map(ordered)))
   const order = orderBy(ROW, terms.sort.map(ordered))
@@ -122,20 +127,21 @@ function anchorSql(parameters: Parameters, table: ListRequest['target']['table']
  * column for `row`'s foreign key, under the lookup's filters on the target,
  * as the page reads the label -- NULL where the target holds no such row or
  * the filters hide it. The key is matched exactly, as PostgreSQL's is: a
- * text key under the database's default collation, for the target's index,
- * and again byte for byte (`exactText`), so a row sorts by the label its
- * page shows, which a token resolves to only on an exact match -- under the
- * fixture's case-insensitive collation `ch` sorts with the rows that show
- * no label -- and a key whose two columns differ in collation is compared
- * rather than refused (468). A scalar subquery: one value per row, so it
- * multiplies none; a target key that stopped being unique fails the
- * statement (512).
+ * text key by the columns' own equality, which a foreign key holds to one
+ * collation and the target's index serves, and again as nvarchar, byte for
+ * byte (`exactText`), so a row sorts by the label its page shows, which a
+ * token resolves to only on an exact match -- under the fixture's
+ * case-insensitive collation a child naming `c` sorts with the rows that
+ * show no label. A scalar subquery: one value per row, so it multiplies
+ * none; a target key that stopped being unique fails the statement (512).
  */
 function labelSql(parameters: Parameters, row: string, label: LabelTerms, alias: string): string {
   const pairs = label.pairs.map((pair) => {
     const target = `${alias}.${quoteName(pair.references)}`
     const root = `${row}.${quoteName(pair.column)}`
-    return pair.type.kind === 'text' ? `${target} = ${root} collate database_default and ${exactText(target, root)}` : `${target} = ${root}`
+    return pair.type.kind === 'text'
+      ? `${target} = ${root} and ${exactText(`convert(nvarchar(max), ${target})`, `convert(nvarchar(max), ${root})`)}`
+      : `${target} = ${root}`
   })
   const terms = label.terms.map((term) => filterPredicate(parameters, `${alias}.${quoteName(term.column)}`, term))
   return `(select ${alias}.${quoteName(label.display)} from ${quoteTable(label.target)} as ${alias} where ${[...pairs, ...terms].join(' and ')})`

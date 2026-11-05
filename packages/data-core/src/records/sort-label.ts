@@ -60,7 +60,7 @@ export function readLabelSort(entry: Record<string, unknown>, refuse: (why: stri
   if (columns === undefined || references === undefined || columns.length !== references.length)
     throw refuse('orders by a label pairing each root column with the key column it references, each of a key kind')
   const display = label['display']
-  if (!isRecord(display) || !isName(display['name'])) throw refuse('orders by a label’s named display column')
+  if (!isRecord(display) || !hasExactly(display, ['name', 'type']) || !isName(display['name'])) throw refuse('orders by a label’s named display column')
   let terms: RowFilterTerm[]
   try {
     terms = rowFilterTerms(label['filters'] as SortLabel['filters'])

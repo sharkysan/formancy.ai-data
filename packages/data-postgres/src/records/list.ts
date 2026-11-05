@@ -73,8 +73,13 @@ export function listStatement(request: ListRequest, terms: ListTerms): RecordSta
     laterals.push(`cross join lateral (select ${labelSql(statement, ROW, term.label, `"t${at}"`)} as "v") as "l${at}"`)
     labels.set(term, `"l${at}"."v"`)
   }
-  const ordered = (term: SortTerm): OrderTerm =>
-    'label' in term ? { column: term.label.display, direction: term.direction, nulls: 'last', value: labels.get(term) as string } : term
+  const ordered = (term: SortTerm): OrderTerm => {
+    if (!('label' in term)) return term
+    // Every term of the seek is one of the order's; a label read in no join would order by a root column of its name.
+    const value = labels.get(term)
+    if (value === undefined) throw new Error(`The label of ${term.label.display} was read in no join to order by.`)
+    return { column: term.label.display, direction: term.direction, nulls: 'last', value }
+  }
   const anchor = terms.after === null ? null : anchorSql(statement, request.target.table, terms, terms.after)
   if (terms.after !== null) where.push(after(ROW, (index) => `${ANCHOR}.${seekName(index)}`, terms.after.seek.map(ordered)))
   const order = orderBy(ROW, terms.sort.map(ordered))

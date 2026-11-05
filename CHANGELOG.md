@@ -25,7 +25,8 @@ the same day (formancy.ai 0232).
   read under the lookup's own filter, as its label is: a row whose
   target the filter hides, or that refers to nothing, comes after every
   label, both ways. What you notice: `list.sortable` names a lookup this
-  person may read, and the studio's views may sort by one.
+  person may read and whose filter resolves for them, as its labels are
+  shown them, and the studio's views may sort by one.
 
 - **A lookup field filters by the record it refers to** (0135). Why: a
   foreign key shown as a lookup was the one column a person could not

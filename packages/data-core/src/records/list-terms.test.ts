@@ -263,8 +263,9 @@ describe('listTerms', () => {
   })
 
   // Each is what the planner never writes for a label: NULLs placed
-  // otherwise, a key whose two sides differ in length or kind, a display
-  // column with no name, a target by name alone, a property more.
+  // otherwise, a key whose two sides differ in length, a side of no key
+  // kind, a display column with no name or a property more, a target by
+  // name alone, a label with a property more, a filter that says nothing.
   test('refuses a lookup’s label the planner would not write', () => {
     const label = {
       columns: [{ name: 'created_by', type: INT32 }],
@@ -279,6 +280,7 @@ describe('listTerms', () => {
       { label: { ...label, targetColumns: [] }, direction: 'asc', nulls: 'last' },
       { label: { ...label, columns: [{ name: 'created_by', type: { kind: 'boolean' } }] }, direction: 'asc', nulls: 'last' },
       { label: { ...label, display: { type: text(200) } }, direction: 'asc', nulls: 'last' },
+      { label: { ...label, display: { name: 'name', type: text(200), extra: true } }, direction: 'asc', nulls: 'last' },
       { label: { ...label, target: { name: 'employee' } }, direction: 'asc', nulls: 'last' },
       { label: { ...label, extra: true }, direction: 'asc', nulls: 'last' },
       { label: { ...label, filters: { kind: 'restricted', equal: [] } }, direction: 'asc', nulls: 'last' },

@@ -545,10 +545,13 @@ describe('an order by a lookup’s label', covers('sqlserver', listCase('label')
   // 1's clerk and its child sorts with the one that names no parent --
   // after every name, both ways, by its key -- and every page after a row
   // continues the same order, the label read in an apply of its own rather
-  // than in the window's order. The key is text: matched exactly under one
-  // collation, never refused as a through's is.
+  // than in the window's order. The key is text, matched exactly: a child
+  // naming `c`, which the fixture's case-insensitive key relates to `C`,
+  // shows no label and sorts among the NULLs (watched failing with the key
+  // compared by the column's collation alone: it sorted as Gamma).
   test('orders by the label each row shows, NULLs and a hidden parent last, page after page', async () => {
-    const { parents, children, asc, desc } = LIST_PARITY.label
+    const { parents, children, folded } = LIST_PARITY.label
+    const { asc, desc } = folded
     await owner
       .request()
       .batch(
@@ -563,7 +566,7 @@ describe('an order by a lookup’s label', covers('sqlserver', listCase('label')
         .input('tenant', mssql.Int, Number(tenant))
         .query('insert into sales.label_parent (code, name, tenant_id) values (@code, @name, @tenant)')
     }
-    for (const [id, parent] of children) {
+    for (const [id, parent] of [...children, folded.child]) {
       await owner
         .request()
         .input('id', mssql.Int, Number(id))

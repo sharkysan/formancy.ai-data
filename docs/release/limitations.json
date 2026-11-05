@@ -3818,7 +3818,7 @@
       ]
     },
     "0136": {
-      "reviewed": "sha256:83e88dedeb1c219dcc6e03950773c7d02e2ac0c92b1f03bb31391e472d9b395e",
+      "reviewed": "sha256:b5e9c30e377c52a65f656dfa7f913dcc50e76ec19d5e72b1e79b03717e627a0b",
       "limitations": [
         {
           "area": "forms",
@@ -3838,7 +3838,7 @@
         },
         {
           "area": "operations",
-          "says": "Each sort by a lookup adds a subquery per row to a page's statement; what it costs is not measured."
+          "says": "A sort by a lookup reads the label for every row in scope, and no index serves that order, so each page reads and sorts the whole scope; what it costs is not measured."
         }
       ]
     }

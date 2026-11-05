@@ -460,6 +460,24 @@ describe('the export route', () => {
     ])
   })
 
+  // What GET offers is what the planner takes (0136): the country lookup's
+  // filter names the clerk's region, so a clerk with one may sort by its
+  // label, and one without is offered no such sort and has one refused --
+  // though the list itself is not, its lookup's filter being no part of
+  // which rows exist. Watched failing with GET offering every lookup that
+  // shows a display column.
+  test('offers a sort by a lookup only to whom its filter resolves, as the planner takes it', async () => {
+    const sortable = async (token: string): Promise<string[]> =>
+      (await app.inject({ method: 'GET', url: '/v1/forms/customer', headers: as(token) })).json().list.sortable
+    expect(await sortable('clerk')).toContain('country')
+    expect(await sortable('clerk-unregioned')).not.toContain('country')
+    const sorted = (token: string) =>
+      app.inject({ method: 'POST', url: '/v1/forms/customer/records/list', headers: as(token), payload: { sort: [{ field: 'country', direction: 'asc' }] } })
+    expect((await sorted('clerk-unregioned')).json()).toMatchObject({ code: 'not-sortable' })
+    expect((await sorted('clerk')).statusCode).toBe(200)
+    expect((await app.inject({ method: 'POST', url: '/v1/forms/customer/records/list', headers: as('clerk-unregioned'), payload: {} })).statusCode).toBe(200)
+  })
+
   // Nothing is exported for a person the host has not vouched for, the
   // policy does not let list, or whose context cannot scope the rows or the
   // labels -- and the port is never asked. A lookup filter the person

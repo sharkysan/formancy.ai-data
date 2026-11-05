@@ -17,10 +17,18 @@
   a child listed by its parent's name over a text key, ascending and
   descending, a parent of another tenant -- hidden by the lookup's filter
   -- and a child with none both after every name by their keys, and the
-  same order page after page. `packages/data-server/src/routes/runtime-lists.test.ts`
-  -- the form offers the lookup as sortable and a sort by it reaches the
-  port as its label. `apps/studio/src/list-views.test.tsx` -- a view's
-  Sort by offers a lookup (watched failing without).
+  same order page after page; on PostgreSQL the child's key is under "C"
+  and the parent's under the default collation (watched failing without
+  the named collation, 42P22), and on SQL Server a child naming `c`, which
+  the case-insensitive key relates to `C`, sorts among the rows that show
+  no label (watched failing with the key compared by its collation alone).
+  `packages/data-server/src/routes/runtime-lists.test.ts` -- the form
+  offers the lookup as sortable and a sort by it reaches the port as its
+  label; `runtime-exports.test.ts` -- a clerk whose region the lookup's
+  filter names is offered the sort, one without is not and has it
+  refused, and still lists (watched failing with every displayed lookup
+  offered). `apps/studio/src/list-views.test.tsx` -- a view's Sort by
+  offers a lookup (watched failing without).
 
 ## Context
 
@@ -36,8 +44,9 @@ first in its label, read from the target for each row's foreign key
 (`packages/data-core/src/records/scope.ts`'s `sortLabelsFor`), under the
 lookup's own read filter -- the one the page's labels are read under
 (`lookupRowFilter`), scoped on the target. A lookup whose filter this
-person does not resolve, an attribute it names missing, is not offered as
-sortable to them; the form's description and the planner ask the same
+person does not resolve -- the policy has no rule for it, or an attribute
+it names is missing -- is not offered as sortable to them, as no label is
+shown them; the form's description and the planner ask the same
 function (`listable`), and a view's store and a regeneration offer every
 lookup that shows a display column (`displayedLookups`).
 
@@ -55,13 +64,14 @@ row is not refused as gone.
 **Read once per row, matched exactly.** Each adapter reads the label in a
 lateral join of its own -- PostgreSQL's `cross join lateral`, SQL Server's
 `cross apply` -- a scalar subquery, one value per row, so it multiplies
-none, and orders, numbers and seeks by that column; SQL Server's window
-then orders by a column rather than a subquery. A text key is compared
-under the database's default collation, and on SQL Server byte for byte as
-well, so a row sorts by exactly the label its page shows -- a token is
-labelled only on an exact match -- and a key whose two columns differ in
-collation is compared under one rather than refused, as a through's is.
-The label's text is ordered by its column's collation, as any text is.
+none, and orders, numbers and seeks by that column. A text key is matched
+exactly, so a row sorts by exactly the label its page shows -- a token is
+labelled only on an exact match: on PostgreSQL under the database's
+default collation, which is deterministic, so a key whose two columns
+differ in collation is compared under one rather than refused, as a
+through's is; on SQL Server, whose foreign key holds one collation, by
+the columns' own equality and again byte for byte. The label's text is
+ordered by its column's collation, as any text is.
 
 ## Consequences
 
@@ -78,7 +88,8 @@ it, on both engines, page after page.
   describes its root, not a lookup's target.
 - A lookup whose filter names an attribute the person does not carry is
   not sortable for them.
-- Each label sort adds a subquery per row of the page's statement; its
+- A sort by a label reads the label for every row in scope, and no index
+  serves that order, so each page reads and sorts the whole scope; its
   cost is not measured.
 
 **What it forecloses.** Nothing: the order is the planner's, as every
@@ -95,9 +106,8 @@ by what they read.
 
 **The scalar subquery in the order itself.** One copy in the window's
 order, the page's order, each side of the seek and SQL Server's NULL
-placement -- some eight copies of one subquery -- and a subquery in a
-window's order that SQL Server may refuse; a column of a lateral join is
-read once.
+placement -- some eight copies of one subquery, each a statement's text
+to keep alike; a column of a lateral join is read once.
 
 **A through's EXISTS.** A through compares no text key without a collation
 to name, and its filter decides which rows exist.
