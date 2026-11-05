@@ -4,7 +4,7 @@ import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessi
 import { createAdminClient } from './api.js'
 import type { Proposal, ProposalRequest } from './api.js'
 import { NOTE_KINDS } from './generate.js'
-import { audit, chooseOrder, discover, generateOrder, offerOnly, paragraphs, signIn, step } from './test-studio.js'
+import { audit, chooseOrder, discover, generateOrder, goTo, offerOnly, paragraphs, signIn, step } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -56,9 +56,10 @@ describe('choosing', () => {
   // the finding-records design, 0137), each with the column it suggests --
   // a lookup filters and sorts by what it shows (0135, 0136), so a key left
   // a bare number loses nothing by it -- and the administrator unticks what
-  // they do not want; one the connection cannot offer stays unticked (the
-  // test below). Watched failing with nothing ticked.
-  test('offers every lookup it can by default, each with its suggested column, and one it cannot not at all', async () => {
+  // they do not want, and one unticked stays so when the step is left and
+  // come back to; one the connection cannot offer stays unticked (the test
+  // below). Watched failing with nothing ticked.
+  test('offers every lookup it can by default, each with its suggested column', async () => {
     const user = await signIn(plane)
     const choose = await toChoose(user)
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
@@ -70,10 +71,14 @@ describe('choosing', () => {
         .filter((box) => box.checked)
         .map((box) => computeAccessibleName(box))
     expect(shown('fk_order_customer')).toEqual(['name'])
+    expect(shown('fk_order_created_by')).toEqual(['name'])
     expect(shown('fk_order_approved_by')).toEqual(['name'])
     await user.click(offered('fk_order_approved_by'))
     expect(offered('fk_order_approved_by').checked).toBe(false)
     expect(await audit()).toEqual([])
+    await goTo(user, 'Connect')
+    const again = await goTo(user, 'Choose')
+    expect(within(again).getByRole<HTMLInputElement>('checkbox', { name: 'Offer fk_order_approved_by as a lookup' }).checked).toBe(false)
   })
 
   // A relationship whose target this connection cannot see is listed and

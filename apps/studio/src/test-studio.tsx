@@ -83,6 +83,8 @@ export async function offerOnly(user: User, choose: HTMLElement, foreignKeys: re
     const name = /^Offer (.+) as a lookup$/.exec(computeAccessibleName(box))?.[1] ?? ''
     if (box.checked !== foreignKeys.includes(name)) await user.click(box)
   }
+  // A key named and not offered -- misspelt, or one the step cannot offer -- is the case's mistake, not a lookup left out.
+  for (const name of foreignKeys) expect(within(choose).getByRole<HTMLInputElement>('checkbox', { name: `Offer ${name} as a lookup` }).checked, name).toBe(true)
 }
 
 /**
