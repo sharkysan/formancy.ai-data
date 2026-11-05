@@ -344,8 +344,7 @@ export function useDrill({
       below.through.from === from.owner &&
       below.through.field === field &&
       below.form.id === target.id &&
-      below.token === token &&
-      level < 0
+      below.token === token
     ) {
       showBelow(level)
       return

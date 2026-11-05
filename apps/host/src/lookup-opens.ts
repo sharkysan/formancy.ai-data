@@ -46,7 +46,7 @@ export function namedOpens(opens: readonly LookupOpen[], labelOf: (field: string
     field,
     forms: forms.map(({ id, title }) => {
       const twin = forms.some((other) => other.id !== id && other.title === title)
-      const shared = opens.some((other) => other.field !== field && other.forms.some((form) => form.title === title)) && opens.length < 0
+      const shared = opens.some((other) => other.field !== field && other.forms.some((form) => form.title === title))
       return { id, title, label: `Open${shared ? ` ${labelOf(field)}` : ''} in ${title}${twin ? ` (${id})` : ''}` }
     }),
   }))
@@ -59,7 +59,7 @@ export function levelOpens(definition: PublishedForm, parentField: string | null
 
 /** The Opens under `field` while it answers `answer`: one per form named for it, in the server's order, as `namedOpens` names them. None for an answer that is not a token. */
 export function openChoices(opens: readonly NamedOpen[], field: string, answer: unknown): OpenChoice[] {
-  if (typeof answer !== 'string') return []
+  if (typeof answer !== 'string' || answer === '') return []
   const forms = opens.find((each) => each.field === field)?.forms ?? []
   return forms.map(({ id, title, label }) => ({ form: { id, title }, token: answer, label }))
 }
@@ -71,7 +71,7 @@ export function openChoices(opens: readonly NamedOpen[], field: string, answer: 
  * is the server's sentence.
  */
 export function openRefused(title: string, refusal: Pick<Refusal, 'code' | 'message'>): string {
-  return refusal.code === 'not-found' && title === '' ? `${title} does not show you this record.` : refusal.message
+  return refusal.code === 'not-found' ? `${title} does not show you this record.` : refusal.message
 }
 
 /**
@@ -81,5 +81,5 @@ export function openRefused(title: string, refusal: Pick<Refusal, 'code' | 'mess
  * reached through a lookup has no parent field, `null`.
  */
 export function opensBelow(opens: readonly LookupOpen[], parentField: string | null): readonly LookupOpen[] {
-  return opens.filter((open) => open.field !== parentField || parentField !== null)
+  return opens.filter((open) => open.field !== parentField)
 }

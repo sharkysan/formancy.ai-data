@@ -38,24 +38,24 @@
   the real server -- in React and in Angular, a line's order opens below
   the line in either order form, from Side by side, which becomes Drill
   down, the trail naming both and leading back up to the line's typing
-  (to be watched failing in CI with the record's panes given no offer, and
-  with Open from another layout left in it); in each, an empty lookup
+  (not watched failing as a page case: `lookup-addition.test.tsx` holds
+  the addition given and the press handed on); in each, an empty lookup
   offers nothing and passes axe, and the order picked for a new line,
-  unsaved, is the one that opens (to be watched failing in CI with the
-  answer unchecked in `openChoices`); a refused read stays on the record,
-  in its layout, the keyboard on the Open, its line saying the form does
-  not show the record (to be watched failing in CI with the refusal
-  unsaid); and Open again shows the level below as it was, while another
-  form asks about its typing first (to be watched failing in CI with the
-  level below read again whatever it holds); a line opened below its
-  order offers no Open under that order (to be watched failing in CI with
-  `opensBelow` passing the level's opens through); and a staff order opened
-  from a line offers an Open per employee lookup, each named for its
-  lookup, which opens a level further down, the trail naming all four
-  levels and its crumbs going back up (to be watched failing in CI with
-  forms told apart within one lookup alone). That file needs Docker,
-  which the machine it was written on could not run, so its failures are
-  CI's to watch.
+  unsaved, is the one that opens (not watched failing under the answer's
+  empty text left unchecked, since a lookup with no answer holds none at
+  all: the pure test holds the check); a refused read stays on the
+  record, in its layout, the keyboard on the Open, its line saying the
+  form does not show the record (watched failing in CI with the server's
+  sentence said instead); and Open again shows the level below as it
+  was, while another form asks about its typing first (watched failing in
+  CI with the level below read again whatever it holds); a line opened
+  below its order offers no Open under that order (watched failing in CI
+  with `opensBelow` passing the level's opens through); and a staff order
+  opened from a line offers an Open per employee lookup, each named for
+  its lookup, which opens a level further down, the trail naming all four
+  levels and its crumbs going back up (watched failing in CI with forms
+  told apart within one lookup alone) -- each on both engines, in one run
+  of five such breaks, since reverted.
 
 ## Context
 
