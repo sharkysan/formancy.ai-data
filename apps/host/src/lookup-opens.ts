@@ -1,4 +1,5 @@
-import type { LookupOpen, Refusal } from '@formancy/data-client'
+import type { LookupOpen, PublishedForm, Refusal } from '@formancy/data-client'
+import { headingOf } from './heading.js'
 
 /*
  * What a record's panes offer under a lookup (0141): one Open per form the
@@ -16,28 +17,51 @@ export interface OpenChoice {
   label: string
 }
 
+/** A lookup, and the forms its record opens in, each with what its Open says (`namedOpens`). */
+export interface NamedOpen {
+  field: string
+  forms: ReadonlyArray<{ id: string; title: string; label: string }>
+}
+
 /** What a record's panes are given to offer Open under each lookup: the forms each opens in, as the server names them, and what a press does. */
 export interface LookupOffer {
-  opens: readonly LookupOpen[]
+  opens: readonly NamedOpen[]
   /** Open pressed under the lookup `field`; `button` is the one pressed, which the keyboard goes back to when the person keeps editing. */
   open: (field: string, choice: OpenChoice, button: HTMLElement) => void
 }
 
 /**
- * The Opens under `field` while it answers `answer`: one per form the server
- * names for it, in its order; where two of them share a title, each says
- * its form's id too, as the Forms list names every form, so no two buttons
- * have one name. None for an answer that is not a token.
+ * What each Open of a record's panes says, decided once from the forms the
+ * server names under each lookup and the fields' labels -- never from the
+ * answers, so a name does not change as the person types. "Open in
+ * <title>"; where another form named for the same lookup has that title,
+ * its id after it, as the Forms list names every form: "Open in Order
+ * (pg-order)"; where another lookup of the record opens in a form of that
+ * title, the lookup's label before it: "Open Approved by in Employee". So
+ * no two Opens of one pane share a name -- but under two lookups whose
+ * labels are one.
  */
-export function openChoices(opens: readonly LookupOpen[], field: string, answer: unknown): OpenChoice[] {
+export function namedOpens(opens: readonly LookupOpen[], labelOf: (field: string) => string): NamedOpen[] {
+  return opens.map(({ field, forms }) => ({
+    field,
+    forms: forms.map(({ id, title }) => {
+      const twin = forms.some((other) => other.id !== id && other.title === title)
+      const shared = opens.some((other) => other.field !== field && other.forms.some((form) => form.title === title))
+      return { id, title, label: `Open${shared ? ` ${labelOf(field)}` : ''} in ${title}${twin ? ` (${id})` : ''}` }
+    }),
+  }))
+}
+
+/** The Opens a record's panes offer, named: its form's, but under the level's parent field where it has one (`opensBelow`), each lookup called by its heading. */
+export function levelOpens(definition: PublishedForm, parentField: string | null): NamedOpen[] {
+  return namedOpens(opensBelow(definition.opens, parentField), (field) => headingOf(definition, field))
+}
+
+/** The Opens under `field` while it answers `answer`: one per form named for it, in the server's order, as `namedOpens` names them. None for an answer that is not a token. */
+export function openChoices(opens: readonly NamedOpen[], field: string, answer: unknown): OpenChoice[] {
   if (typeof answer !== 'string' || answer === '') return []
   const forms = opens.find((each) => each.field === field)?.forms ?? []
-  const twins = (title: string): boolean => forms.filter((form) => form.title === title).length > 1
-  return forms.map((form) => ({
-    form: { id: form.id, title: form.title },
-    token: answer,
-    label: twins(form.title) ? `Open in ${form.title} (${form.id})` : `Open in ${form.title}`,
-  }))
+  return forms.map(({ id, title, label }) => ({ form: { id, title }, token: answer, label }))
 }
 
 /**

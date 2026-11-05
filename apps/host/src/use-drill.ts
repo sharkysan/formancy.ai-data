@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { DataClient, FormMenuEntry, FormRecord, LookupOpen, PublishedForm } from '@formancy/data-client'
+import type { DataClient, FormMenuEntry, FormRecord, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
 import { recordName } from './crumbs.js'
@@ -10,7 +10,7 @@ import { levelShown } from './layout.js'
 import type { Layout, View } from './layout.js'
 import type { LeaveRequest, PaneWork, Said } from './leave.js'
 import { openRefused } from './lookup-opens.js'
-import type { LookupOffer, OpenChoice } from './lookup-opens.js'
+import type { LookupOffer, NamedOpen, OpenChoice } from './lookup-opens.js'
 
 /*
  * Drill down's levels (0090), as one open form holds them: level 0 is its
@@ -132,7 +132,7 @@ export interface Drill {
   /** A section of `from.level` goes down. */
   descend: (from: SectionAt, want: DrillWant, back: { toRow: () => void; refused: (message: string) => void }) => void
   /** What the panes of `at`'s record offer under its lookups, `opens` (0141): Open goes one level down, into the record in the form chosen; a refused read is said by `refused`. */
-  offer(at: LookupAt, opens: readonly LookupOpen[], refused: (message: string) => void): LookupOffer
+  offer(at: LookupAt, opens: readonly NamedOpen[], refused: (message: string) => void): LookupOffer
   /** A crumb: the level shown is `level`, an entry pushed; `back` on Keep editing. */
   up(level: number, back: () => void): void
   /** What a section at `level` is given in Drill down. */

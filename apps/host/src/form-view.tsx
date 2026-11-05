@@ -21,6 +21,7 @@ import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
+import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
@@ -203,7 +204,7 @@ export function FormView({
   const paged = layout === 'separate' || layout === 'drill'
   const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
   /** Open under the record's lookups: its record a level down; refused, said on the detail's line. */
-  const offer = drill.offer({ level: 1, owner: 'master' }, definition.opens, (message) => say([message], 'refused'))
+  const offer = drill.offer({ level: 1, owner: 'master' }, levelOpens(definition, null), (message) => say([message], 'refused'))
 
   /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not; in Drill down, its level, 0 or 1. True when it was hidden. */
   function reveal(half: View): boolean {

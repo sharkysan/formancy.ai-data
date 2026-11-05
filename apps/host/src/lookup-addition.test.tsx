@@ -46,8 +46,8 @@ function offerTo(pressed: Pressed[]): LookupOffer {
       {
         field: 'customer',
         forms: [
-          { id: 'customers', title: 'Customers' },
-          { id: 'my-customers', title: 'My customers' },
+          { id: 'customers', title: 'Customers', label: 'Open in Customers' },
+          { id: 'my-customers', title: 'My customers', label: 'Open in My customers' },
         ],
       },
     ],

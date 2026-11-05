@@ -12,7 +12,7 @@ import type { PaneEntry } from './guard.js'
 import { drillBase, drillOwner } from './leave.js'
 import type { Said } from './leave.js'
 import { OneChild } from './one-child.js'
-import { opensBelow } from './lookup-opens.js'
+import { levelOpens } from './lookup-opens.js'
 import { useOpening } from './opening.js'
 import { Pane } from './pane.js'
 import { renderersOf } from './panes.js'
@@ -129,8 +129,9 @@ export function DrillLevel({
 
   const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, parentField)
 
-  /** Open under this level's lookups (0141), but its parent field (`opensBelow`): its record a level further down; refused, said on this level's line. */
-  const offer = drill.offer({ level, owner }, opensBelow(definition.opens, parentField), (message) => setLine([message]))
+  /** Open under this level's lookups (0141), but its parent field (`opensBelow`): its record a level further down; refused, said on this level's line. Made once, as the renderers keep one offer (steady-offer.ts). */
+  const opens = useMemo(() => levelOpens(definition, parentField), [definition, parentField])
+  const offer = drill.offer({ level, owner }, opens, (message) => setLine([message]))
 
   /** A save one of this level's forms answered: a created row is the level's, and its crumb names what is stored. */
   function answered(result: SaveResult, from: Session): void {

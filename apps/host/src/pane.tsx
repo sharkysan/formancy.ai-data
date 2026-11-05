@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
@@ -6,6 +6,7 @@ import { AngularForm } from './angular-mount.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
 import type { SaveResult, Session, Submitted } from './session.js'
+import { useSteadyOffer } from './steady-offer.js'
 import { UnknownNotice } from './unknown-notice.js'
 import { NoticeHeading } from './words.js'
 
@@ -46,9 +47,9 @@ type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: numbe
  *
  * Given an `offer`, each lookup the server names forms for offers Open
  * under its field, in the paper (0141). The renderers are handed one offer
- * for the session's life -- its forms, which are the definition's, and a
- * press read through a ref -- so neither redraws a field for a render of
- * the page, nor Angular starts again.
+ * while its Opens say the same, a press read through a ref
+ * (steady-offer.ts), so neither redraws a field for a render of the page,
+ * nor Angular starts again.
  */
 export function Pane({
   session,
@@ -76,15 +77,7 @@ export function Pane({
   offer?: LookupOffer
 }): ReactElement {
   const { engine, generation } = useSyncExternalStore(session.subscribe, session.opened)
-  const pressed = useRef(offer)
-  useEffect(() => {
-    pressed.current = offer
-  })
-  const opens = offer?.opens
-  const steady = useMemo<LookupOffer | undefined>(
-    () => (opens === undefined ? undefined : { opens, open: (field, choice, button) => pressed.current?.open(field, choice, button) }),
-    [opens],
-  )
+  const steady = useSteadyOffer(offer)
   const name = NAMES[session.renderer]
   const headingId = `pane-${idBase}-${session.renderer}`
   const Heading = level === 4 ? 'h4' : 'h6'
