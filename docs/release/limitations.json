@@ -3734,7 +3734,7 @@
       ]
     },
     "0132": {
-      "reviewed": "sha256:97906df533ef72b5d6d4918dbe3766f0ed0f930be64b6b08c75c2bdf4c7ab322",
+      "reviewed": "sha256:7be217b166382fb0a69418f2e30f6d17f098388be44775625de69a69be4b4be3",
       "limitations": [
         {
           "area": "host",
@@ -3747,6 +3747,23 @@
         {
           "area": "host",
           "says": "A lookup column has no box, as the filter line names no lookup field."
+        }
+      ]
+    },
+    "0133": {
+      "reviewed": "sha256:d99dc188532ebde3d41592b9570770e1ddd6ba5f51eca3d761749440cfe2348c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Filter by example is the keyboard's alone: = on a focused cell. A pointer types the value into the column's header box instead."
+        },
+        {
+          "area": "host",
+          "says": "An example replaces its column's condition with no Undo of its own; the condition it replaced is gone."
+        },
+        {
+          "area": "host",
+          "says": "A timestamp's cell offers an example only when it is empty, and a lookup's never: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
         }
       ]
     }

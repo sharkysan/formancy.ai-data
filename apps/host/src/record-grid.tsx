@@ -11,6 +11,7 @@ import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
 import { columnDefsOf, gridOptionsFor } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
+import { filterByExample } from './cell-example.js'
 import { HeaderFilterContext } from './header-filter.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
@@ -239,6 +240,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     const header = container.querySelector('.ag-header')?.getBoundingClientRect().height || 40
     const height = wellHeight(header, shown.current.loaded ? shown.current.rows : 0, Number.parseFloat(getComputedStyle(container).maxHeight))
     container.style.height = `${String(height)}px`
+    // Never shorter than its header and one whole row: a panel short of
+    // room shrinks the well to its least (records.css), which was a row
+    // under one header row, and less than one under the boxes' row (0132).
+    container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
   }, [])
 
   /** Each column sized to the first page that has rows, once, after those rows are drawn: paging never makes the columns jump; letting go of the separator does, below. */
@@ -347,6 +352,18 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         }
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
+        // After `=`, the keyboard back on the row it was pressed on, or the first, in its column (0133).
+        const example = exampleAt.current
+        if (example !== null && start === 0) {
+          exampleAt.current = null
+          const grid = api.current
+          const node = example.record === null ? undefined : grid?.getRowNode(example.record)
+          const at = node?.rowIndex ?? (rows.length > 0 ? 0 : null)
+          if (grid !== null && !grid.isDestroyed() && at !== null) {
+            grid.ensureIndexVisible(at)
+            grid.setFocusedCell(at, example.colId)
+          }
+        }
       },
       refused: (message, code) => {
         shown.current = { ...shown.current, rows: 0, loaded: true, retrying: false }
@@ -432,7 +449,18 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   // A row's Delete reads the page's handler when pressed: the column is made once per noun.
   const removeNoun = props.remove?.noun
   // A box under each header the section's filter line may name (0132), the keys as one string so the columns are made again only when they change.
-  const boxedKeys = (useContext(HeaderFilterContext)?.fields ?? []).map((field) => field.field).join('\n')
+  const headerFilters = useContext(HeaderFilterContext)
+  const headersNow = useRef(headerFilters)
+  headersNow.current = headerFilters
+  /** Where `=` kept a cell's value (0133): the keyboard goes back to that row and column once the list it asked for answers. */
+  const exampleAt = useRef<{ record: string | null; colId: string } | null>(null)
+  // The grid described by the filter line's hint, which says `=`, where there is a line to say it.
+  const describedBy = headerFilters !== null && headerFilters.fields.length > 0 ? (headerFilters.hint ?? null) : null
+  useEffect(() => {
+    const grid = api.current
+    if (grid !== null && !grid.isDestroyed()) grid.setGridAriaProperty('describedby', describedBy)
+  }, [describedBy])
+  const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
   const columnDefs = useMemo(
     () =>
       columnDefsOf(
@@ -442,6 +470,17 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       ),
     [arranged, removeNoun, boxedKeys],
   )
+
+  // The header's height changes after the well is fitted -- its row of
+  // boxes laid out (0132), a label wrapping -- and a well fitted to the
+  // header as it was leaves less than a row under it: fitted again each time.
+  useEffect(() => {
+    const header = well.current?.querySelector('.ag-header')
+    if (header === null || header === undefined || typeof ResizeObserver !== 'function') return undefined
+    const observer = new ResizeObserver(() => fit())
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [fit, boxedKeys])
 
   // A column shown that was hidden when the page was sized: sized now, to
   // the rows shown, and the well fitted to a header the change may have
@@ -478,6 +517,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ready: (ready) => {
             api.current = ready
             if (!shown.current.loaded) ready.setGridAriaProperty('busy', 'true')
+            const headers = headersNow.current
+            if (headers !== null && headers.fields.length > 0 && headers.hint !== undefined) ready.setGridAriaProperty('describedby', headers.hint)
             // The sort the section opens on: a default view's (0105).
             showSort()
           },
@@ -497,6 +538,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
           drilling: () => latest.current.drilling === true,
+          example: (row, colId) => {
+            if (filterByExample(headersNow.current, row, colId)) {
+              exampleAt.current = { record: row?.record ?? null, colId }
+              return
+            }
+            const label = latest.current.columns.find((column) => column.key === colId)?.label ?? colId
+            setStatus({ kind: 'answer', text: [`= keeps no value of ${label}: the filter cannot say one.`], help: null, clear: false, retry: false })
+          },
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest` and `firstShown`.

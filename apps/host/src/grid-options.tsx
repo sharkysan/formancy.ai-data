@@ -253,6 +253,8 @@ export interface GridCallbacks {
   drilling(): boolean
   /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
   sorted(): void
+  /** `=` on a cell: its value kept as its column's condition (0133), or said where the column offers none. */
+  example(row: GridRow | undefined, colId: string): void
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
@@ -316,7 +318,15 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       on.asked(event.data, 'click', event.rowIndex, firstColumn())
     },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
-      const key = (event.event as KeyboardEvent | null | undefined)?.key ?? ''
+      const keyboard = event.event as KeyboardEvent | null | undefined
+      const key = keyboard?.key ?? ''
+      // `=` keeps the rows with the cell's value (0133) -- not with Ctrl or
+      // Cmd, which zoom, nor a plain Alt; AltGr, which some layouts type `=`
+      // with, is Ctrl and Alt together.
+      if (key === '=' && keyboard !== null && keyboard !== undefined && !keyboard.metaKey && keyboard.ctrlKey === keyboard.altKey) {
+        on.example(event.data, event.column.getColId())
+        return
+      }
       // Space and Enter on a row's Delete are its button's: the browser presses it.
       if (!SPACE_OR_ENTER(key) || event.column.getColId() === DELETE_COLUMN) return
       event.event?.preventDefault()

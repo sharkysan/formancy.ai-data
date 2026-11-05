@@ -17,7 +17,7 @@
 // the browser's own control, not the page's.
 
 import { FORM, TOKENS } from './plane.mjs'
-import { focusedOn, until, WITHIN } from './measure.mjs'
+import { dataRows, focusedOn, until, WITHIN } from './measure.mjs'
 
 const LISTS = `/v1/forms/${FORM}/records/list`
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -176,6 +176,34 @@ export function filterJourney(plane, { check }) {
         await page.keyboard.press('Escape')
         check('a header box: Esc gives up what was typed', same(await control(page, 'textbox', 'Filter Notes').inputValue(), ''))
         check('a header box: and the filter is as it was', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
+      },
+    ],
+    [
+      'A cell’s example applied (Records)',
+      async (page) => {
+        // From the keyboard: a data row's Amount cell, and = on it.
+        const grid = records(page).getByRole('grid', { name: 'Records', exact: true })
+        const amount = await grid.getByRole('columnheader', { name: /^Amount/ }).getAttribute('aria-colindex')
+        const cell = dataRows(grid, page)
+          .first()
+          .locator(`[role="gridcell"][aria-colindex="${String(amount)}"]`)
+        await cell.focus()
+        const sent = nextList(page)
+        await page.keyboard.press('=')
+        const request = await sent
+        const terms = JSON.parse(request.postData() ?? '{}').filter
+        check(
+          'a cell’s example: = keeps the rows with its value',
+          terms.some((term) => term.field === 'amount' && term.op === 'equals') ? null : `the filter is ${JSON.stringify(terms)}`,
+        )
+        // The keyboard back on a data cell once the grid lists again, to point at the next value: a gridcell outside the header's row of boxes, read from the DOM, which says where a cell is.
+        const back = await until(
+          () => page.evaluate(() => document.activeElement?.getAttribute('role') === 'gridcell' && document.activeElement.closest('.ag-header') === null),
+          'the keyboard never came back to a cell of the grid after =',
+        )
+          .then(() => null)
+          .catch((error) => error.message)
+        check('a cell’s example: the keyboard is back on a cell of the grid', back)
       },
     ],
     [

@@ -105,7 +105,7 @@ export function Records({
   /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
   const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
   const headerFilters = useMemo<HeaderFilters>(
-    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]) }),
+    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]), hint: 'records-filter-line-hint' }),
     [boxFields, filter, state.setFilter, grid],
   )
 
