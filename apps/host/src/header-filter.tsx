@@ -276,9 +276,11 @@ function useLookupSearch(field: LineField, headers: HeaderFilters): LookupSearch
 
 /**
  * A lookup column's listbox, drawn over the page under its box, since the
- * grid's header clips what its cells hold. A record whose label another
- * shares shows its token beside it. A press anywhere on the list keeps the
- * keyboard in the box, and the option the arrows reach is kept in view.
+ * grid's header clips what its cells hold: in the box's own `<main>`, so it
+ * is in the page's landmarks as the box is, and in the document's body only
+ * where a page has none. A record whose label another shares shows its
+ * token beside it. A press anywhere on the list keeps the keyboard in the
+ * box, and the option the arrows reach is kept in view.
  */
 function LookupList({
   id,
@@ -287,6 +289,7 @@ function LookupList({
   active,
   shown,
   place,
+  landmark,
   onPick,
 }: {
   id: string
@@ -295,6 +298,7 @@ function LookupList({
   active: number
   shown: boolean
   place: DOMRect | undefined
+  landmark: Element | null
   onPick: (option: LookupOption) => void
 }): ReactElement {
   const list = useRef<HTMLUListElement>(null)
@@ -328,7 +332,7 @@ function LookupList({
         </li>
       ))}
     </ul>,
-    document.body,
+    landmark ?? document.body,
   )
 }
 
@@ -461,7 +465,16 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
         }}
         onKeyDown={onKeyDown}
       />
-      <LookupList id={id} label={field.label} options={options} active={active} shown={listed} place={input.current?.getBoundingClientRect()} onPick={pick} />
+      <LookupList
+        id={id}
+        label={field.label}
+        options={options}
+        active={active}
+        shown={listed}
+        place={input.current?.getBoundingClientRect()}
+        landmark={input.current?.closest('main') ?? null}
+        onPick={pick}
+      />
     </>
   )
 }
