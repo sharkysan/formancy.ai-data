@@ -30,6 +30,9 @@ type LevelOpen = { kind: 'new' } | { kind: 'record'; token: string }
  * offers it, a status line, its form in the renderers chosen, with the
  * parent's field preset and drawn disabled -- and below it the child
  * sections the menu names for its own form, which go down a level in turn.
+ * Or the record a lookup of the level above names, opened by its Open in a
+ * form of the person's choosing (0141): the same, with no field preset.
+ * Its record's lookups offer Open in turn, a level further down.
  *
  * Its sessions are its own, owned under its level (`drillOwner`), so a form
  * that is its own child mints no element id twice and the guard drops a
@@ -54,9 +57,11 @@ export function DrillLevel({
   refit: number
   drill: Drill
 }): ReactElement {
-  const { level, form, parent } = step
-  const { child, menu, definition } = form
-  const owner = drillOwner(level, child.form, child.field)
+  const { level, form, through } = step
+  const { id: formId, menu, definition } = form
+  const owner = drillOwner(level, formId, through.field)
+  /** The field naming the level above: a child row's parent, which the page fills in; a lookup's record has none. */
+  const parentField = through.kind === 'child' ? through.field : null
   const idBase = `drill-${String(level)}`
   const headingId = `${idBase}-heading`
   const title = menu.title
@@ -72,8 +77,9 @@ export function DrillLevel({
   const sessions = useMemo(
     () =>
       (['react', 'angular'] as const).map((which) => {
-        const session = createSession({ client, formId: child.form, definition, renderer: which, namespace: owner, fixed: [child.field] })
-        session.open(step.record === null ? { record: null, version: null, answers: { [child.field]: parent } } : structuredClone(step.record))
+        const session = createSession({ client, formId, definition, renderer: which, namespace: owner, fixed: parentField === null ? [] : [parentField] })
+        const answers = through.kind === 'child' ? { [through.field]: through.parent } : {}
+        session.open(step.record === null ? { record: null, version: null, answers } : structuredClone(step.record))
         return session
       }),
     // A level is mounted again for another step: these never change under it.
@@ -91,11 +97,11 @@ export function DrillLevel({
     [sessions, owner, title],
   )
   useRegistered(entries)
-  const opening = useOpening({ client, formId: child.form, owner, sessions })
+  const opening = useOpening({ client, formId, owner, sessions })
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
-    formId: child.form,
+    formId,
     owner,
     sessions,
     discards: { kind: 'drill-delete', below: level - 1, record: open.kind === 'record' ? open.token : '' },
@@ -120,7 +126,10 @@ export function DrillLevel({
   })
   const { saving } = removal
 
-  const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, child.field)
+  const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, parentField)
+
+  /** Open under this level's lookups (0141): its record a level further down; refused, said on this level's line. */
+  const offer = drill.offer({ level, owner }, definition.opens, (message) => setLine([message]))
 
   /** A save one of this level's forms answered: a created row is the level's, and its crumb names what is stored. */
   function answered(result: SaveResult, from: Session): void {
@@ -151,7 +160,7 @@ export function DrillLevel({
 
   const heading: Said = open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]
   const parentNow = open.kind === 'record' ? { kind: 'record' as const, token: open.token } : { kind: 'new' as const }
-  const twice = (formId: string): boolean => (childForms ?? []).filter((each) => each.child.form === formId).length > 1
+  const twice = (id: string): boolean => (childForms ?? []).filter((each) => each.child.form === id).length > 1
 
   return (
     <section className="detail drill-level" aria-labelledby={headingId} hidden={hidden}>
@@ -198,6 +207,7 @@ export function DrillLevel({
               namedBy={headingId}
               onAnswer={(result) => answered(result, session)}
               onLoaded={() => loaded(session)}
+              offer={offer}
             />
           ))}
       </div>
