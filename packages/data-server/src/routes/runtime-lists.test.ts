@@ -549,7 +549,11 @@ describe('the list route', () => {
       ['hidden-limit', { field: 'credit_limit', op: 'not-null' }, 'credit_limit is not a field you may filter this list by.'],
       ['customer', { field: 'row_version', op: 'not-null' }, 'row_version is not a field you may filter this list by.'],
       ['customer', { field: 'country.iso_code', op: 'equals', value: 'CH' }, 'country.iso_code is not a field you may filter this list by.'],
-      ['customer', { field: 'country.name', op: 'null' }, 'country.name offers no null condition.'],
+      [
+        'customer',
+        { field: 'country.name', op: 'null' },
+        'country.name offers no empty condition: a row with no country shows it empty too, and no condition through country finds that row.',
+      ],
     ]
     for (const [form, condition, message] of cases) {
       const response = await list(form, { filter: [condition] })
