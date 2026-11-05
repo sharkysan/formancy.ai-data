@@ -18,6 +18,15 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A lookup field sorts by what it shows** (0136). Why: a grid of orders
+  sorted by its customer should order them as a person reads the
+  customer, by name, and a lookup's token orders nothing a person reads.
+  A lookup's column header sorts by the lookup's first display column,
+  read under the lookup's own filter, as its label is: a row whose
+  target the filter hides, or that refers to nothing, comes after every
+  label, both ways. What you notice: `list.sortable` names a lookup this
+  person may read, and the studio's views may sort by one.
+
 - **A lookup field filters by the record it refers to** (0135). Why: a
   foreign key shown as a lookup was the one column a person could not
   filter by -- the orders of one customer, the orders nobody approved --

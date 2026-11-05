@@ -117,7 +117,7 @@ export function listable(snapshot: MetadataSnapshot, bindings: FormBindings, pol
   }
 }
 
-/** The readable column fields of the form, in the bindings' order: the only fields a list sorts, searches or filters by. A lookup field holds a token, not the label a person reads. */
+/** The readable column fields of the form, in the bindings' order: the fields a list sorts, searches or filters by as columns. A lookup field holds a token, not the label a person reads: it is filtered by its record (0135) and sorted by its label (0136). */
 function readableColumns(bindings: FormBindings, fields: readonly string[]): ColumnBinding[] {
   const wanted = new Set(fields)
   return bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && wanted.has(binding.field))
