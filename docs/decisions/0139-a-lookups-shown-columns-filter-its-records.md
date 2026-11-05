@@ -30,7 +30,8 @@
   own equality, on SQL Server with the lookup's filter left out, and on
   both with the conditions dropped by the planner); two conditions hold
   of one parent together, and a page continues after a row they do not
-  hold (watched failing on both with the conditions asked of that row).
+  hold (watched failing on SQL Server with the conditions asked of that
+  row; on PostgreSQL the same run failed it first on the key's break).
   `packages/data-server/src/routes/runtime-lists.test.ts` -- the form
   offers `country.name` with its lookup and column, a condition on it
   reaches the port as a related entry, and a person saves a view holding

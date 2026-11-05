@@ -122,7 +122,7 @@ function anchorSql(statement: Statement, table: ListRequest['target']['table'], 
       (term, index) => `${'label' in term ? labelSql(statement, ROW, term.label, `"t${String(index)}"`) : column(term.column)} as ${seekName(index)}`,
     ),
   ]
-  return `select ${select.join(', ')} from ${quoteTable(table)} as ${ROW} where ${[...located(statement, anchor.key, terms.terms, terms.through), ...terms.related.map((entry, index) => relatedSql(statement, ROW, entry, `"y${String(index)}"`))].join(' and ')}`
+  return `select ${select.join(', ')} from ${quoteTable(table)} as ${ROW} where ${located(statement, anchor.key, terms.terms, terms.through).join(' and ')}`
 }
 
 /**
@@ -164,10 +164,6 @@ function labelSql(statement: Statement, row: string, label: LabelTerms, alias: s
  * holds no condition. No plan of it is measured.
  */
 function relatedSql(statement: Statement, row: string, related: RelatedTerms, alias: string): string {
-  const where = [
-    ...related.pairs.map((pair) => `${alias}.${quoteIdentifier(pair.references)} = ${row}.${quoteIdentifier(pair.column)}`),
-    ...filterSql(statement, alias, related.terms),
-    ...related.filter.map((entry) => recordFilterSql(statement, alias, entry)),
-  ]
+  const where = [...reachedRow(statement, row, related, alias), ...related.filter.map((entry) => recordFilterSql(statement, alias, entry))]
   return `exists (select from ${quoteTable(related.target)} as ${alias} where ${where.join(' and ')})`
 }
