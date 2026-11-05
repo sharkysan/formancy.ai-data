@@ -23,7 +23,7 @@ import type { Engine, Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ children: true })
 })
 
 afterAll(async () => {
