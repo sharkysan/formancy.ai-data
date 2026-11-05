@@ -8,6 +8,7 @@
  */
 import { createHmac, randomBytes } from 'node:crypto'
 import {
+  completeFilterLine,
   createDataClient,
   EXPORT_MAX_BYTES,
   exportFileName,
@@ -15,9 +16,11 @@ import {
   fieldProblems,
   LIST_PAGE_SIZE,
   lookupSources,
+  parseFilterLine,
+  printFilterLine,
   sourceNames,
 } from '@formancy/data-client'
-import type { DeleteOutcome, FormMenu, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
+import type { DeleteOutcome, FilterLineRead, FormMenu, LineField, Outcome, PublishedForm, RecordFile, RecordList, Refusal } from '@formancy/data-client'
 import { DATABASE_KINDS, isDatabaseKind, reachesPast } from '@formancy/data-core'
 import type { CascadeRule, DatabaseAdapter, DatabaseKind, FormPolicy } from '@formancy/data-core'
 import { createIdentityVerifier, KeySet, readKeySet } from '@formancy/data-identity'
@@ -192,6 +195,14 @@ if (exportFileName('order') !== file.value.name) throw new Error('exportFileName
 
 if (fieldHeading({ key: 'order', label: { $t: 'order.label' } }) !== 'order')
   throw new Error('fieldHeading() named a message reference by anything but its key')
+
+// The filter line a host page types a grid's filter in, read in the
+// browser, written back from its terms and completed at the caret.
+const lineFields: LineField[] = [{ field: 'amount', label: 'Amount', operators: ['equals', 'range'], input: 'decimal' }]
+const line: FilterLineRead = parseFilterLine('amount > 1000', lineFields)
+if (!line.ok || printFilterLine(line.filter, lineFields) !== 'amount > 1000')
+  throw new Error('parseFilterLine() and printFilterLine() did not read a line back')
+if (completeFilterLine('am', 2, lineFields).options[0]?.insert !== 'amount ') throw new Error('completeFilterLine() did not offer the field begun')
 
 // What a delete may act through (0051): a policy that names a key with its
 // action, typed by what the published core declares, and the core's own

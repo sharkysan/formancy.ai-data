@@ -18,6 +18,21 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A person types a grid's filter as a line, and sees each condition as a
+  chip** (0131). Why: a person who knows they want the placed orders over
+  1000 had four choices and Apply to make for each condition, and asked for
+  "some sort of filter language" that is easy and fun to use. Above each
+  grid, `status = placed and amount > 1000` is read in the browser into
+  the terms the panel sends, completion offers what may come next, and a
+  line that cannot be read keeps every character and says where and why.
+  Each condition is a chip in plain words; a removal, or Clear filter,
+  offers Undo, and a list nothing matches offers to try it without the
+  last condition. `/` reaches the Records line and Esc leaves it.
+  What you notice: the panel's button is Build a condition, each chip's
+  Remove is named for what it says ("Remove Amount is over 1000"), and
+  `@formancy/data-client` exports `parseFilterLine`, `printFilterLine`,
+  `completeFilterLine` and `lineNames` with their types. The server is
+  unchanged: it receives the terms.
 - **A filter's range may leave out either bound's own value** (0130). Why:
   a grid's filter is becoming a line a person types, and a line has `<` and
   `>`, which an inclusive range could say only by moving the bound, which a

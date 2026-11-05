@@ -299,7 +299,10 @@ async function reveal(page, at) {
  * the window was read against that black too (0058).
  *
  * Partially obscured is what axe says of a text its own scrolling pane cuts
- * at an edge: side by side, the Records panel scrolls inside itself, so a
+ * at an edge -- and "Element has no value" of an empty box it cuts, whose
+ * contrast failed for want of the background the pane hid (seen 2026-11-05,
+ * the search box at the Records panel's top once the filter line made the
+ * panel taller, a 320-pixel window scrolled to the panel's Value): side by side, the Records panel scrolls inside itself, so a
  * focused control is never covered (records.css), and a text at its top or
  * bottom edge is half shown. Such a text outside a grid is decided by
  * `reveal`. Seen 2026-10-28, when a grid's View row (0105) made
@@ -314,14 +317,18 @@ export async function decide(page, undecided) {
   const scrolled = await page.evaluate(() => [window.scrollX, window.scrollY])
   try {
     for (const node of undecided) {
-      if (/partially obscured/.test(node.reason)) {
+      // An empty box its pane cuts is said by axe as having no value -- which
+      // it says only of a contrast that failed, here for want of the
+      // background the pane hid -- and is shown whole as a cut text is.
+      if (/partially obscured|has no value/.test(node.reason)) {
         const revealed = await reveal(page, node.at)
         if (revealed.verdict === 'passes') continue
         left.push(`${node.html} (${revealed.verdict === 'violation' ? `shown whole in the pane that cut it, at ${String(revealed.ratio)}:1` : revealed.why})`)
         continue
       }
       if (!/pseudo element|overlapped by another element/.test(node.reason)) {
-        left.push(node.html)
+        // With axe's reason, so a run says why rather than only which.
+        left.push(`${node.html} (${node.reason})`)
         continue
       }
       await page.evaluate((at) => {

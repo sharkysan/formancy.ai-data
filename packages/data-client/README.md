@@ -56,8 +56,12 @@ The reply types — `FormMenu`, `FormMenuEntry`, `FormMenuChild`,
 `PublishedForm`, `FormRecord`, `RecordList`, `RecordListQuery`,
 `RecordExportQuery`, `ListSortTerm`, `ListFilterTerm`, `FilterCondition`,
 `FilterOp`, `RangeExclusive`, `FilterOffer`, `FilterInput`, `FilterableField`, `ListColumns`, `ListView`, `OwnViews`, `StateMoves`,
-`LookupResult`, `LookupRow`, `FieldError` — and `LIST_PAGE_SIZE`,
-`EXPORT_MAX_BYTES`, `exportFileName` and `fieldHeading` are re-exported from
+`LookupResult`, `LookupRow`, `FieldError`, and the filter line's
+`LineField`, `FilterLineRead`, `LineRefusal`, `LineCompletion` and
+`LineOption` — and `LIST_PAGE_SIZE`, `EXPORT_MAX_BYTES`, `exportFileName`,
+`fieldHeading`, and `parseFilterLine`, `printFilterLine`,
+`completeFilterLine` and `lineNames`, which read a grid's filter typed as a
+line into its terms in the browser and write it back, are re-exported from
 `@formancy/data-core`, where the server's handlers are checked against the
 same declarations. A form's `list`
 is `null` when the server would refuse this person a page, and otherwise

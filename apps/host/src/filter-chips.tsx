@@ -1,0 +1,167 @@
+import { useRef, useState } from 'react'
+import type { ReactElement } from 'react'
+import type { ListFilterTerm } from '@formancy/data-client'
+import { useAfterRender } from './after-render.js'
+import { summaryOf } from './filter-terms.js'
+import type { PanelField } from './filter-terms.js'
+
+/*
+ * The conditions a grid's filter holds, each a chip in plain words --
+ * "Amount is over 1000" -- with its own Remove named for what it says, and
+ * Clear filter after them. A removal is forgiven: Undo puts back what was
+ * removed, and stays until the filter changes some other way, never on a
+ * timer (WCAG 2.2.1). A list nothing matches is no dead end: the chips
+ * offer to try it without the last condition, a removal like any other.
+ *
+ * A removal puts the keyboard on the next chip's Remove, or the one
+ * before, or on Undo once none is left; Undo puts it on the Remove of the
+ * condition it put back.
+ */
+
+/** What Undo puts back: the filter before a removal, and what Undo says. */
+export interface Undoing {
+  before: ListFilterTerm[]
+  /** The filter the removal left, as JSON: Undo lasts while the filter is that. */
+  left: string
+  words: string
+}
+
+/** A grid's Undo, which the chips and the line share: what it puts back, a removal that offers it, and putting back. */
+export interface UndoState {
+  undo: Undoing | null
+  /** `next` applied in place of the filter, Undo offered for it in `words`. */
+  removing: (next: ListFilterTerm[], words: string) => void
+  /** The filter before the removal applied again; the condition it put back first, for the keyboard. */
+  putBack: () => ListFilterTerm | undefined
+}
+
+const same = (a: readonly ListFilterTerm[], b: readonly ListFilterTerm[]): boolean => JSON.stringify(a) === JSON.stringify(b)
+
+/**
+ * The Undo of a grid's filter. It is forgotten as soon as the filter
+ * changes in any way but the removal it undoes -- followed while
+ * rendering, React's way to follow a value -- so it never comes back when
+ * the filter later returns to what the removal left.
+ */
+export function useUndo(filter: readonly ListFilterTerm[], onFilter: (next: ListFilterTerm[]) => void): UndoState {
+  const [undoing, setUndoing] = useState<Undoing | null>(null)
+  const now = JSON.stringify(filter)
+  const [seen, setSeen] = useState(now)
+  if (seen !== now) {
+    setSeen(now)
+    if (undoing !== null && undoing.left !== now) setUndoing(null)
+  }
+  const undo = undoing !== null && undoing.left === now ? undoing : null
+  return {
+    undo,
+    removing: (next, words) => {
+      setUndoing({ before: [...filter], left: JSON.stringify(next), words })
+      onFilter(next)
+    },
+    putBack: () => {
+      if (undo === null) return undefined
+      setUndoing(null)
+      onFilter(undo.before)
+      return undo.before.find((term) => !filter.some((given) => same([given], [term]))) ?? undo.before[0]
+    },
+  }
+}
+
+export function FilterChips({
+  idBase,
+  fields,
+  filter,
+  undoing,
+  empty,
+}: {
+  idBase: string
+  /** The fields the list is filtered by, offered or not, for their labels. */
+  fields: readonly PanelField[]
+  filter: readonly ListFilterTerm[]
+  /** The grid's Undo, shared with its line. */
+  undoing: UndoState
+  /** Whether the grid's first page under this filter, searched for nothing, came back with no rows. */
+  empty: boolean
+}): ReactElement | null {
+  const byField = new Map(fields.map((field) => [field.field, field]))
+  const { undo, removing } = undoing
+  const removes = useRef(new Map<string, HTMLButtonElement>())
+  const undoRef = useRef<HTMLButtonElement>(null)
+  const after = useAfterRender()
+  const words = (term: ListFilterTerm): string => summaryOf(term, byField.get(term.field))
+
+  function remove(index: number): void {
+    const term = filter[index]
+    if (term === undefined) return
+    const next = filter.filter((_, at) => at !== index)
+    removing(next, `removing ${words(term)}`)
+    after(() => {
+      const then = next[index] ?? next[index - 1]
+      if (then === undefined) undoRef.current?.focus()
+      else removes.current.get(then.field)?.focus()
+    })
+  }
+
+  function clear(): void {
+    removing([], 'clearing the filter')
+    after(() => undoRef.current?.focus())
+  }
+
+  function putBack(): void {
+    const back = undoing.putBack()
+    after(() => {
+      if (back !== undefined) removes.current.get(back.field)?.focus()
+    })
+  }
+
+  const last = filter.at(-1)
+  if (filter.length === 0 && undo === null) return null
+  return (
+    <div className="filter-active">
+      {filter.length === 0 ? null : (
+        <>
+          <p className="filter-label" id={`${idBase}-active`}>
+            Filtered by
+          </p>
+          <ul className="filter-terms" aria-labelledby={`${idBase}-active`}>
+            {filter.map((term, index) => (
+              <li key={term.field} className="filter-chip">
+                <span>{words(term)}</span>
+                <button
+                  type="button"
+                  className="button quiet filter-chip-remove"
+                  aria-label={`Remove ${words(term)}`}
+                  ref={(element) => {
+                    if (element === null) removes.current.delete(term.field)
+                    else removes.current.set(term.field, element)
+                  }}
+                  onClick={() => remove(index)}
+                >
+                  <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button type="button" className="button" onClick={clear}>
+            Clear filter
+          </button>
+        </>
+      )}
+      {undo === null ? null : (
+        <button type="button" className="button quiet filter-wraps" ref={undoRef} onClick={putBack}>
+          Undo {undo.words}
+        </button>
+      )}
+      {empty && last !== undefined ? (
+        <p className="filter-dead-end">
+          No rows match all of these.{' '}
+          <button type="button" className="button filter-wraps" onClick={() => remove(filter.length - 1)}>
+            Try without {words(last)}
+          </button>
+        </p>
+      ) : null}
+    </div>
+  )
+}

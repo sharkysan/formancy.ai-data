@@ -1,4 +1,4 @@
-import type { FilterInput, FilterOp, FilterableField, ListFilterTerm, PublishedForm } from '@formancy/data-client'
+import type { FilterInput, FilterOp, FilterableField, LineField, ListFilterTerm, PublishedForm, StateMoves } from '@formancy/data-client'
 import { fieldHeading } from '@formancy/data-client'
 
 /*
@@ -38,6 +38,23 @@ export interface PanelField extends FilterableField {
 export function panelFields(definition: PublishedForm): PanelField[] {
   const headings = new Map(definition.form.model.fields.map((field) => [field.key, fieldHeading(field)]))
   return (definition.list?.filterable ?? []).map((offer) => ({ ...offer, label: headings.get(offer.field) ?? offer.field }))
+}
+
+/**
+ * The fields the filter line may name: those the form's Filter panel
+ * offers (0123), each with its label, and the state field with its states
+ * by the labels an administrator gave them (0129), in the presentation's
+ * order, then any other state its moves name, as it is spelled. A
+ * boolean's yes and no are the line's own.
+ */
+export function lineFields(fields: readonly PanelField[], moves: StateMoves | null): LineField[] {
+  const states = moves === null ? [] : [...new Set([...moves.labels.map((entry) => entry.state), ...moves.moves.flatMap((move) => [move.from, move.to])])]
+  const values = states.flatMap((state) =>
+    state === null ? [] : [{ value: state, label: moves?.labels.find((entry) => entry.state === state)?.label ?? state }],
+  )
+  return fields
+    .filter((field) => field.offered)
+    .map(({ field, label, operators, input }) => ({ field, label, operators, input, ...(field === moves?.field && values.length > 0 ? { values } : {}) }))
 }
 
 /**
@@ -95,6 +112,19 @@ export function conditionOf(draft: Draft): { ok: true; term: ListFilterTerm } | 
 export function withTerm(filter: readonly ListFilterTerm[], term: ListFilterTerm): ListFilterTerm[] {
   const at = filter.findIndex((given) => given.field === term.field)
   return at === -1 ? [...filter, term] : filter.map((given, index) => (index === at ? term : given))
+}
+
+/** A view's name from its conditions, as the chips say them, cut to the 80 characters a name may have (0126). */
+export function viewName(filter: readonly ListFilterTerm[], fields: readonly PanelField[]): string {
+  const said = filter
+    .map((term) =>
+      summaryOf(
+        term,
+        fields.find((field) => field.field === term.field),
+      ),
+    )
+    .join(', ')
+  return said.length <= 80 ? said : `${said.slice(0, 79).trimEnd()}…`
 }
 
 /** A value as a condition's sentence quotes it: text in quotes, a boolean as yes or no, anything else as typed. */

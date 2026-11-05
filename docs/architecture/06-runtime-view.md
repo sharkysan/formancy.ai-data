@@ -224,10 +224,14 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
 2. The Records panel (`apps/host/src/record-grid.tsx`, `grid-datasource.ts`)
    asks one `POST /v1/forms/:id/records/list` per block of AG Grid's
    infinite row model, the search sent on Search or Enter, never per key
-   (0047), and with every block the conditions its Filter panel applied
-   (`apps/host/src/filter-panel.tsx`, over the fields `list.filterable`
-   names, its Field menu over those `offered`, which the presentation's
-   `unfiltered` decides: [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
+   (0047), and with every block the conditions its filter applied -- typed
+   as a line the browser reads into terms (`apps/host/src/filter-line.tsx`,
+   data-core's `records/filter-line.ts`:
+   [0131](../decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)),
+   or built in its panel (`apps/host/src/filter-panel.tsx`), over the
+   fields `list.filterable` names, the line and the panel over those
+   `offered`, which the presentation's `unfiltered` decides:
+   [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
    block before: the datasource keeps every answered page's `next` by the
    row the page after it starts at
    ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));

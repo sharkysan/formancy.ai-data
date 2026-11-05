@@ -69,6 +69,8 @@ export interface RecordGridHandle {
   focusRecord(token: string, colId?: string): boolean
   /** The keyboard back on the cell a request came from. */
   focusAt(at: RowAt): void
+  /** The keyboard on the first row's first cell shown, when the page has a row; false otherwise. */
+  focusFirst(): boolean
   /** The page asked for again: after a save, so stored values show. */
   reload(): void
   /** A sentence of the page's own on the status line, until the next answer. */
@@ -126,6 +128,8 @@ export interface RecordGridProps {
   /** A header sorted by the person: the grid's sort now, in its order, for the section to hold as given -- the grid knows its own report by identity. */
   onSort(sort: ListSortTerm[]): void
   onClearSearch?: () => void
+  /** Told whether the grid's first page came back with no rows under a filter: the section's filter offers a way out. */
+  onFiltered?: (empty: boolean) => void
 }
 
 /** Every row of the page selected exactly when it is the open record's; the rows whose selection changed. */
@@ -288,6 +292,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     () => ({
       loading: (start, end) => {
         shown.current.loaded = false
+        latest.current.onFiltered?.(false)
         api.current?.setGridAriaProperty('busy', 'true')
         const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
         shown.current.quiet = false
@@ -318,6 +323,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ...(noun === undefined ? {} : { noun }),
         })
         setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false })
+        latest.current.onFiltered?.(start === 0 && rows.length === 0 && asked.length > 0)
         setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()
         fit()
@@ -341,6 +347,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         api.current?.setGridAriaProperty('busy', null)
         // A filter the server cannot apply is refused again however often it is asked: its recovery is the condition.
         const filterRefused = code === 'not-filterable'
+        latest.current.onFiltered?.(false)
         setStatus({ kind: 'refused', text: first([message]), help: filterRefused ? REFUSED_FILTER_HELP : null, clear: false, retry: !filterRefused })
         setPager((before) => ({ ...before, hasMore: false }))
         fit()
@@ -394,6 +401,13 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         if (grid === null || grid.isDestroyed()) return
         grid.ensureIndexVisible(rowIndex)
         grid.setFocusedCell(rowIndex, colId)
+      },
+      focusFirst() {
+        const grid = api.current
+        if (grid === null || grid.isDestroyed() || shown.current.rows === 0 || firstShown.current === '') return false
+        grid.ensureIndexVisible(0)
+        grid.setFocusedCell(0, firstShown.current)
+        return true
       },
       reload() {
         api.current?.purgeInfiniteCache()
