@@ -13,8 +13,8 @@
       "width": 1425,
       "height": 1650
     },
-    "bytes": 196572,
-    "sha256": "e2c2777a8521f4f4f86a5dadf5208ad1678c13abd5e7e0d0aec0c292b6c55b0e",
+    "bytes": 196894,
+    "sha256": "39d9e88f5ff2a8dee4bbfec4e6f93ec9313071a38b841227f07fcdcf2e16a9c4",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -661,8 +661,8 @@
       "width": 1165,
       "height": 658
     },
-    "bytes": 88176,
-    "sha256": "71867ac2b551ded15cb669abc8602446b07ff8e2c92a5805a056beab583e34f5",
+    "bytes": 88008,
+    "sha256": "779649b466dfd65df46da1a80cc126ddda40bcbcaf690714e578ab06c5917509",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -693,8 +693,8 @@
       "width": 561,
       "height": 972
     },
-    "bytes": 64340,
-    "sha256": "9d6325fdea85fc915c5d250f18c27b60abb3851d2229b17f0d8a00cbf9e3de7f",
+    "bytes": 64280,
+    "sha256": "343d99fa6a06d392e712c1bac6140e99fcbd61cceb8a39850c0bab2258ee67fb",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -725,8 +725,8 @@
       "width": 1165,
       "height": 979
     },
-    "bytes": 88190,
-    "sha256": "cff85724c3e49203cc7b3669055ac228dbdf9685d2fe1c4ab6aa8e651d6bb589",
+    "bytes": 88402,
+    "sha256": "9d404d80af313a4e0658de5886ca259140d5295fb654e1a0f3a0f4e5ecfb884c",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
