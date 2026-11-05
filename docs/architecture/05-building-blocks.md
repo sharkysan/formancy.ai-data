@@ -413,7 +413,7 @@ the Choose step's `src/choose-versions.tsx` names a chain of versions
 ([0114](../decisions/0114-the-studio-names-a-chain-of-versions-in-the-choose-step.md)),
 and `src/choice.ts`'s `choiceFor` starts it with every foreign key it can
 offer ticked as a lookup
-([0137](../decisions/0137-the-studio-offers-every-lookup-it-can-by-default.md));
+([0138](../decisions/0138-the-studio-offers-every-lookup-it-can-by-default.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request

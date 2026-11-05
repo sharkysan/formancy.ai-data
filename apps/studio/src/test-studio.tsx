@@ -74,7 +74,7 @@ export async function discover(user: User, connection = 'fixture'): Promise<void
 /**
  * The lookups offered, by their foreign keys' names, and no other: each
  * named one ticked, every other one the step offers unticked. The step
- * offers every lookup it can by default (0137); a case that means one
+ * offers every lookup it can by default (0138); a case that means one
  * lookup says so, rather than clicking a box that is already ticked.
  */
 export async function offerOnly(user: User, choose: HTMLElement, foreignKeys: readonly string[]): Promise<void> {

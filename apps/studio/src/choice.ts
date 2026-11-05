@@ -70,7 +70,7 @@ export function titleFor(ref: ObjectRef): string {
 
 /**
  * A fresh choice for `ref`: every foreign key the studio can offer offered
- * as a lookup, each with the column it suggests (0137) -- a lookup filters
+ * as a lookup, each with the column it suggests (0138) -- a lookup filters
  * and sorts by what it shows (0135, 0136), so it takes nothing from a key
  * drawn as a number, and the administrator unticks what they do not want --
  * and nothing confirmed. A key `lookupBlocker` refuses, or whose target

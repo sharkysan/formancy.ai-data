@@ -478,7 +478,7 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
-- **The studio offers every lookup it can by default** (0137). Why: a
+- **The studio offers every lookup it can by default** (0138). Why: a
   lookup now filters by its record and sorts by what it shows (0135,
   0136), so a foreign key left a bare number lost what its lookup gives
   and gained nothing. The Choose step ticks every foreign key it can

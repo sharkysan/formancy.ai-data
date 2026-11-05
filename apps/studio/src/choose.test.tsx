@@ -53,7 +53,7 @@ function list(container: HTMLElement, name: string): string[] {
 
 describe('choosing', () => {
   // Every foreign key the studio can offer is offered by default (part 3 of
-  // the finding-records design, 0137), each with the column it suggests --
+  // the finding-records design, 0138), each with the column it suggests --
   // a lookup filters and sorts by what it shows (0135, 0136), so a key left
   // a bare number loses nothing by it -- and the administrator unticks what
   // they do not want, and one unticked stays so when the step is left and
@@ -92,7 +92,7 @@ describe('choosing', () => {
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
     const customer = within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' })
     expect(customer).toHaveProperty('disabled', true)
-    // Not offered by default either (0137): a lookup the connection cannot offer is no default.
+    // Not offered by default either (0138): a lookup the connection cannot offer is no default.
     expect(customer).toHaveProperty('checked', false)
     expect(customer.getAttribute('aria-describedby')).not.toBeNull()
     expect(paragraphs(choose)).toContain(

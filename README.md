@@ -501,8 +501,8 @@ links this repository for the rest
 
 `apps/studio` is the administrator's application, private and never
 published: sign in with a host token, connect, choose a root table -- every
-foreign key it can offer ticked as a lookup, to untick what you do not want
-([0137](./docs/decisions/0137-the-studio-offers-every-lookup-it-can-by-default.md))
+foreign key it can offer and show ticked as a lookup, to untick what you do not want
+([0138](./docs/decisions/0138-the-studio-offers-every-lookup-it-can-by-default.md))
 -- generate,
 write the policy, arrange labels, preview, publish, and review drift. It
 speaks only to the server's administrator plane and `/v1/whoami`

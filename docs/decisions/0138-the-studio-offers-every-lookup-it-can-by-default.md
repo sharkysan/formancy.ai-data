@@ -1,4 +1,4 @@
-# 0137 — The studio offers every lookup it can by default
+# 0138 — The studio offers every lookup it can by default
 
 - **Status:** accepted; extends [0024](0024-the-studio-speaks-only-the-admin-plane.md): the Choose step starts with every foreign key it can offer ticked as a lookup
 - **Date:** 2026-11-05
@@ -6,11 +6,15 @@
 - **Verified by:** `apps/studio/src/choose.test.tsx` -- choosing
   `sales.order` on a connection that may read every target ticks the
   customer, created-by and approved-by keys, each with the column it
-  suggests, and one unticks as before (watched failing with nothing
-  ticked); a key whose target the connection cannot see stays unticked and
-  disabled. `apps/studio/src/guide.test.tsx` -- the getting-started guide's
-  studio steps, followed control by control, keep the customer lookup the
-  step ticked, since the guide's account may read no employee.
+  suggests, and one unticked stays so when the step is left and come back
+  to (watched failing with nothing ticked); a key whose target the
+  connection cannot see stays unticked and disabled.
+  `apps/studio/src/guide.test.tsx` -- the getting-started guide's studio
+  steps, followed control by control on each engine as its own account,
+  the writer, which reads no employee -- SQL Server's captured for it,
+  `apps/studio/src/fixtures/sqlserver-writer.json` -- find the customer
+  lookup ticked by default where the guide says to keep it (watched
+  failing with nothing ticked by default).
 
 ## Context
 
@@ -25,11 +29,15 @@ ticking them takes nothing away.
 
 **Every key the step can offer is ticked when a root is chosen**, each
 with the column it already suggests -- the first text column of the
-target that is not its key and that the connection may read
-(`apps/studio/src/choice.ts`'s `choiceFor`, `suggestedDisplay`). A key the
-step cannot offer -- `lookupBlocker` says why, a target out of sight or a
-key the account may not read -- or whose target has no column to show is
-not ticked, as before. The administrator unticks what they do not want;
+target that is not its key, else its first column, of those the
+connection may show (`apps/studio/src/choice.ts`'s `choiceFor`,
+`suggestedDisplay`). A key the step cannot offer -- `lookupBlocker` says
+why, a target out of sight or a key the account may not read -- is not
+ticked, as before, and neither is one whose target has no column the
+connection may show, which is still offered for a person to tick and
+choose for. Two lookups into one table read by their columns, not both
+by the table's name
+([0137](0137-two-lookups-into-one-table-are-told-apart-by-their-columns.md)). The administrator unticks what they do not want;
 the default is a choice made for them, shown, never one sent unseen.
 
 ## Consequences
@@ -49,9 +57,9 @@ always was.
 
 ## Alternatives considered
 
-**Tick only a lookup whose target has a text column.** Every target the
-step can offer has a column it may show, or it is not offered; the
-suggestion already prefers text.
+**Tick only a lookup whose target has a text column.** The suggestion
+already prefers text, and a target with none still has a column a person
+recognises it by, its first.
 
 **Tick none, and suggest.** The behaviour before: a key a person did not
 think about stayed a number, now less useful than its lookup.

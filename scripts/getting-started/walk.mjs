@@ -64,7 +64,7 @@ export const stepTitle = (step) => step.replace(/^\d+\.\s+/, '')
  * - `select` and `type`: choose `value` in a select box, or type it into a
  *   text box, cleared first;
  * - `tick`: tick a checkbox -- `already` where the studio ticks it by
- *   default (0137), so the guide says to keep it -- `keep` names a group
+ *   default (0138), so the guide says to keep it -- `keep` names a group
  *   under it whose `ticked` boxes stay ticked, `holds` a text box that says
  *   `value`;
  * - `none`: there is no control of that name, and the step reads `reads`;

@@ -610,7 +610,7 @@ describe('keys that now stand for another column', () => {
   })
 })
 
-/** The Choose step with sales.order chosen, every lookup it offers by default ticked (0137), and nothing else. */
+/** The Choose step with sales.order chosen, every lookup it offers by default ticked (0138), and nothing else. */
 async function toChooseOrder(user: Awaited<ReturnType<typeof signIn>>): Promise<HTMLElement> {
   await user.click(within(step('Connect')).getByRole('button', { name: 'Discover fixture' }))
   await user.click(await screen.findByRole('button', { name: 'Choose a root' }))
