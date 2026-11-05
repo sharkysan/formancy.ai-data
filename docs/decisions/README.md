@@ -63,7 +63,7 @@ only enforcement is "we remember" says so plainly.
 | [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077 |
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028; extended by 0079 |
-| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109 |
+| [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109, 0137 |
 | [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068, 0111 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050, 0112 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
@@ -191,4 +191,5 @@ only enforcement is "we remember" says so plainly.
 | [0134](0134-the-build-a-condition-panel-is-retired.md) | The Build a condition panel is retired | accepted |
 | [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136 |
 | [0136](0136-a-lookup-field-sorts-by-what-it-shows.md) | A lookup field sorts by what it shows | accepted |
+| [0137](0137-two-lookups-into-one-table-are-told-apart-by-their-columns.md) | Two lookups into one table are told apart by their columns | accepted |
 | [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |

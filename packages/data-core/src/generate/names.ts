@@ -107,6 +107,17 @@ function trimHyphens(text: string): string {
 }
 
 /**
+ * A lookup's label from the column it is over, where another lookup of the
+ * form refers to the same table (0138): `approved_by` reads "Approved by".
+ * A trailing id names no more than the table does, so `manager_id` reads
+ * "Manager".
+ */
+export function labelOfLookup(column: string): string {
+  const bare = column.replace(/(?:_id|_ID|Id)$/, '')
+  return labelFor(bare === '' ? column : bare)
+}
+
+/**
  * A label from an identifier: `customer_no` reads "Customer no", `createdAt`
  * reads "Created at". A starting point for a person or the optional AI pass to
  * improve, and marked as inferred in the notes for that reason.

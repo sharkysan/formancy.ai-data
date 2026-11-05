@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:31d6cdb8bb4e61fcff6f25cecf4f0de1741829abd658abb5c93c84ba271ec1e2",
+      "reviewed": "sha256:bf869f2174f9dfd039280ad263f45c8ba9fff92f1d1ca3ebb5c8b1f80459e4c8",
       "limitations": [
         {
           "area": "forms",
@@ -3839,6 +3839,15 @@
         {
           "area": "operations",
           "says": "A sort by a lookup reads the label for every row in scope, and no index serves that order, so each page reads and sorts the whole scope; what it costs is not measured."
+        }
+      ]
+    },
+    "0137": {
+      "reviewed": "sha256:8c33f0917ae4f34973a6f9ed44d61c7201c07d33684d5ba729a598c4cdb6db54",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form regenerated with two lookups into one table changes those two labels in its base: a presentation that renamed them keeps its names, one that did not shows the new ones."
         }
       ]
     },

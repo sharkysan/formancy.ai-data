@@ -4,9 +4,9 @@ import type { Engine } from './test-plane.js'
 /*
  * What the forms `startPlane` publishes are published with, for tenant 1's
  * clerk: each form's policy, derived from the bindings its proposal
- * answered, the child forms of `ENGINES` -- their tables, the lookups the
- * generator makes of their foreign keys and the labels a person gave two of
- * them in the studio -- and, with `views`, the list views an administrator
+ * answered, the child forms of `ENGINES` -- their tables and the lookups
+ * the generator makes of their foreign keys, two into one table labelled
+ * by their columns (0137) -- and, with `views`, the list views an administrator
  * named (0105). test-plane.ts starts the server and publishes them.
  */
 
@@ -104,7 +104,6 @@ export interface ChildPublication {
   lookups: Array<{ foreignKey: string; display: string[] }>
   versionColumn?: string
   pinned?: string[]
-  labels?: Record<string, string>
   /** Its list views, in its presentation (0105). */
   views?: ListView[]
   policy: (bindings: Proposed) => FormPolicy
@@ -163,8 +162,6 @@ export function childForms(
       ...version,
       // Its tenant comes from the token, as the row filter says.
       pinned: ['tenant_id'],
-      // The generator labels both lookups by their table, "Employee"; a person tells them apart.
-      labels: { fk_order_created_by: 'Created by', fk_order_approved_by: 'Approved by' },
       // Read only, so the page draws a record of it with every field disabled.
       policy: (bindings) => ({
         ...clerkPolicy(bindings.fields),

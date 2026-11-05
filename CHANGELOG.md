@@ -485,6 +485,14 @@ the same day (formancy.ai 0232).
   offer, each with the column it suggests; the administrator unticks what
   they do not want. What you notice: each lookup needs its rows decided
   in the Policy step before the form publishes, as any lookup does.
+- **Two lookups into one table are told apart by their columns** (0137).
+  Why: an order's `created_by` and `approved_by` both refer to employees,
+  and both lookups read "Employee", so a person could not tell who
+  created an order from who approved it. A lookup into a table another
+  lookup of the form refers to is labelled from its own column ("Created
+  by", "Approved by"), a trailing id left out; one alone into its table
+  keeps the table's name. What you notice: regenerating such a form
+  changes those labels in its base, and keys stay as they were.
 
 - **The Build a condition panel is retired** (0134). Why: since every
   column's header filters its column (0132) and a cell its value (0133),
