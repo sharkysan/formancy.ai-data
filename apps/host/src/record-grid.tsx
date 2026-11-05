@@ -227,11 +227,16 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     if (changed.length > 0 && first !== '') grid.refreshCells({ rowNodes: changed, columns: [first], force: true })
   }, [])
 
-  /** The well as tall as its page, never past its cap. A DOM read: the header's height is laid out by AG Grid. */
+  /**
+   * The well as tall as its page, never past its cap. A DOM read: the
+   * header's height is laid out by AG Grid, and is its every row -- the
+   * columns' and, where the line may name a column, the boxes' (0132),
+   * which counted as the first alone left the last row under the scrollbar.
+   */
   const fit = useCallback(() => {
     const container = well.current
     if (container === null) return
-    const header = container.querySelector('[role="row"][aria-rowindex="1"]')?.getBoundingClientRect().height || 40
+    const header = container.querySelector('.ag-header')?.getBoundingClientRect().height || 40
     const height = wellHeight(header, shown.current.loaded ? shown.current.rows : 0, Number.parseFloat(getComputedStyle(container).maxHeight))
     container.style.height = `${String(height)}px`
   }, [])

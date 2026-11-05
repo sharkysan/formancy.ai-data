@@ -197,7 +197,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     // Id descending, from the keyboard: a cell of the column, up to its header, Enter twice.
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
     await user.click(dataCell(grid))
-    await user.keyboard('{ArrowUp}{Enter}{Enter}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}{Enter}{Enter}')
     await waitFor(() => expect(within(grid).getByRole('columnheader', { name: /^Id/ }).getAttribute('aria-sort')).toBe('descending'), ARRIVES)
     await waitFor(() => expect(firstCells('Records')).toEqual([...orders].reverse()), ARRIVES)
     // Typed and not submitted: not what the grid lists.
@@ -338,7 +339,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     // Line no descending, from the keyboard, as the Records case sorts Id: a cell of the column, up to its header, Enter twice.
     const grid = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
     await user.click(dataCell(grid))
-    await user.keyboard('{ArrowUp}{Enter}{Enter}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}{Enter}{Enter}')
     await waitFor(
       () =>
         expect(

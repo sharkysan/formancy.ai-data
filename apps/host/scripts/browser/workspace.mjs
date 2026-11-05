@@ -141,7 +141,17 @@ export function workspaceJourney(plane, { check }, run) {
         // form's order.
         const headers = async () => (await grid(page, 'Records').getByRole('columnheader').allTextContents()).map((text) => text.trim())
         const order = await headers()
-        await grid(page, 'Records').getByRole('gridcell').nth(1).focus()
+        // A data row's cell, then up through the row of the header boxes (0132) to its header.
+        await grid(page, 'Records')
+          .getByRole('row')
+          .filter({ has: page.getByRole('gridcell') })
+          .filter({ hasNot: page.getByRole('textbox', { name: /^Filter / }) })
+          .filter({ hasNot: page.getByRole('combobox', { name: /^Filter / }) })
+          .first()
+          .getByRole('gridcell')
+          .nth(1)
+          .focus()
+        await page.keyboard.press('ArrowUp')
         await page.keyboard.press('ArrowUp')
         const onHeader = await page.evaluate(() => document.activeElement?.getAttribute('role') === 'columnheader')
         await page.keyboard.press('Shift+ArrowRight')

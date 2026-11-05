@@ -263,7 +263,8 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     await user.click(dataCell(records()))
     // From a cell to its header, and Enter: the keyboard's way to sort.
     for (let column = 0; column < headersOf().indexOf('Order date'); column += 1) await user.keyboard('{ArrowRight}')
-    await user.keyboard('{ArrowUp}{Enter}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}{Enter}')
     await waitFor(() => expect(date.getAttribute('aria-sort')).toBe('ascending'), { timeout: 15_000 })
     const last = () => JSON.parse(plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)?.body ?? '{}') as unknown
     await waitFor(() => expect(last()).toMatchObject({ sort: [{ field: 'order_date', direction: 'asc' }] }), { timeout: 15_000 })

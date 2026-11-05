@@ -116,7 +116,8 @@ describe.each(ENGINES)('the record grid on $engine', ({ formId }) => {
   test('resizes no column', async () => {
     const user = await inTheGrid(formId)
     const order = headers()
-    await user.keyboard('{ArrowUp}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}')
     expect(document.activeElement?.getAttribute('role')).toBe('columnheader')
     const header = document.activeElement as HTMLElement
     const width = header.style.width
