@@ -99,3 +99,21 @@ describe('headerText', () => {
     expect(headerText(undefined, NOTES)).toBe('')
   })
 })
+
+describe('a lookup column’s box (0135)', () => {
+  const EMPLOYEE: LineField = {
+    field: 'employee',
+    label: 'Employee',
+    operators: ['equals', 'null', 'not-null'],
+    input: 'lookup',
+    values: [{ value: 'k1:1', label: 'Ada Lovelace' }],
+  }
+
+  // The box says the record by its label and reads the label back as the
+  // record, as the line does (watched failing with the token in the box).
+  test('says and reads a record by its label', () => {
+    expect(headerText({ field: 'employee', op: 'equals', value: 'k1:1' }, EMPLOYEE)).toBe('Ada Lovelace')
+    expect(term('Ada Lovelace', EMPLOYEE)).toEqual({ field: 'employee', op: 'equals', value: 'k1:1' })
+    expect(term('is empty', EMPLOYEE)).toEqual({ field: 'employee', op: 'null' })
+  })
+})

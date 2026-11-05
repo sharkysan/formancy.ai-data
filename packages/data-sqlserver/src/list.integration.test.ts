@@ -74,6 +74,7 @@ let records: RecordAdapter
 let snapshot: MetadataSnapshot
 let customers: FormBindings
 let lines: FormBindings
+let orders: FormBindings
 let shipments: ReturnType<typeof generateForm>
 
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
@@ -97,6 +98,15 @@ const LINE_POLICY: FormPolicy = {
   rowFilters: [],
   lookups: { order: TENANT },
   through: ['order'],
+}
+
+/** A tenant's orders by their customer (0135): the key and the customer lookup read, the tenant pinned on both. */
+const ORDER_POLICY: FormPolicy = {
+  version: 1,
+  operations: { read: ['clerk'], create: [], update: [] },
+  fields: { id: READ, customer: READ },
+  rowFilters: TENANT,
+  lookups: { customer: TENANT },
 }
 
 /** A tenant's shipments, every field the generator makes readable, the tenant pinned. */
@@ -135,11 +145,11 @@ beforeAll(async () => {
       .query('insert into sales.customer (tenant_id, customer_no, name, credit_limit) values (1, @number, @name, convert(decimal(14, 2), @credit))')
   }
   // IDENTITY_INSERT is the session's, so the orders go in one batch; every value is a constant of LIST_ROWS's digits.
-  const orders = LIST_ROWS.orders.map(([id, tenant]) => `(${id}, ${tenant}, 1001, '2026-10-09', 1)`).join(', ')
+  const orderRows = LIST_ROWS.orders.map(([id, tenant]) => `(${id}, ${tenant}, 1001, '2026-10-09', 1)`).join(', ')
   await owner
     .request()
     .batch(
-      `set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orders}; set identity_insert sales.[order] off;`,
+      `set identity_insert sales.[order] on; insert into sales.[order] (id, tenant_id, customer_no, order_date, amount) values ${orderRows}; set identity_insert sales.[order] off;`,
     )
   for (const [order, line] of LIST_ROWS.lines) {
     await owner
@@ -184,6 +194,13 @@ beforeAll(async () => {
     formId: 'order-line',
     title: 'Order line',
     lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'] }],
+  }).bindings
+  orders = generateForm(snapshot, {
+    connection: 'test',
+    root: { schema: 'sales', name: 'order' },
+    formId: 'orders',
+    title: 'Orders',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
   }).bindings
   shipments = generateForm(snapshot, {
     connection: 'test',
@@ -834,6 +851,30 @@ describe('a filter beside a parent', covers('sqlserver', columnFilterCase('paren
       const parent = entry.order === null ? null : { field: 'order', record: `k1:${entry.order}` }
       expect(tokens(await listed(lines, LINE_POLICY, { parent, filter: [...entry.filter] })), String(entry.order)).toEqual(entry.lines.map(lineToken))
     }
+  })
+})
+
+describe('a filter on a lookup field', covers('sqlserver', columnFilterCase('lookup')), () => {
+  // A lookup is filtered by the record it refers to, its columns compared
+  // by the database's equality, as a parent is: under the fixture's
+  // case-insensitive collation `ch` names CH, where on PostgreSQL it names
+  // nothing. A key of two columns is both, and neither a tenant's row
+  // filter nor a line's through is ever widened by one.
+  test('finds the rows that refer to a record, or to none', async () => {
+    const { country, customer, order } = COLUMN_FILTER_PARITY.lookup
+    const field = country.field
+    expect(numbers(await customersWhere([{ field, op: 'equals', value: country.record.value }]))).toEqual(country.record.keys)
+    expect(numbers(await customersWhere([{ field, op: 'equals', value: country.folded.value }]))).toEqual(country.folded.keys.sqlserver)
+    expect(numbers(await customersWhere([{ field, op: 'null' }]))).toEqual(country.null)
+    expect(numbers(await customersWhere([{ field, op: 'not-null' }]))).toEqual(country['not-null'])
+    for (const entry of customer)
+      expect(tokens(await listed(orders, ORDER_POLICY, { filter: [{ field: 'customer', op: 'equals', value: entry.record }] })), entry.record).toEqual(
+        entry.ids.map((id) => `k1:${id}`),
+      )
+    for (const entry of order)
+      expect(tokens(await listed(lines, LINE_POLICY, { filter: [{ field: 'order', op: 'equals', value: entry.record }] })), entry.record).toEqual(
+        entry.lines.map(lineToken),
+      )
   })
 })
 

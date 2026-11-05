@@ -110,6 +110,14 @@ function filterTerm(entry: unknown): RecordFilter {
         throw refuse(`compares ${column} with a value spelled as it holds them`)
       return { op: 'equals', column, type, value }
     }
+    case 'refers': {
+      // A key's kinds are a row filter's (0012), read fresh by the same function.
+      const type = rowFilterType(entry['type'])
+      const value = entry['value']
+      if (type === undefined || typeof value !== 'string' || !isKeyValue(type, value))
+        throw refuse(`compares ${column} with a key value spelled as it holds them`)
+      return { op: 'refers', column, type, value }
+    }
     case 'contains': {
       const type = rowFilterType(entry['type'])
       const text = checkSearch(entry['text'])
@@ -131,7 +139,7 @@ function filterTerm(entry: unknown): RecordFilter {
       return { op: 'range', column, type, from, above, to, before }
     }
     default:
-      throw refuse('filters by equals, range, contains, null or not-null')
+      throw refuse('filters by equals, refers, range, contains, null or not-null')
   }
 }
 

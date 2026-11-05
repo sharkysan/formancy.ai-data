@@ -78,6 +78,30 @@ describe('completeFilterLine', () => {
     expect(labels('amount > ')).toEqual([])
   })
 
+  // A lookup's records (0135) are offered by the labels the page shows and
+  // inserted by them, as a person reads them back; two records sharing a
+  // label are inserted by their tokens, which tell them apart, each token
+  // beside its label (watched failing with every record inserted by its
+  // token, which the line then showed).
+  test('offers a lookup’s records by their labels, and inserts a shared one by its token', () => {
+    const EMPLOYEE: LineField = {
+      field: 'employee',
+      label: 'Employee',
+      operators: ['equals', 'null', 'not-null'],
+      input: 'lookup',
+      values: [
+        { value: 'k1:1', label: 'Ada Lovelace' },
+        { value: 'k1:2', label: 'Grace Hopper' },
+        { value: 'k1:3', label: 'Grace Hopper' },
+      ],
+    }
+    expect(completeFilterLine('employee = ', 11, [EMPLOYEE]).options).toEqual([
+      { insert: '"Ada Lovelace" ', label: 'Ada Lovelace', hint: '' },
+      { insert: 'k1:2 ', label: 'Grace Hopper', hint: 'k1:2' },
+      { insert: 'k1:3 ', label: 'Grace Hopper', hint: 'k1:3' },
+    ])
+  })
+
   // After a whole condition comes `and`; inside a quote, anything may, and
   // an option offered there would break the value the person is typing
   // (watched failing with a quote read as a word: names were offered).

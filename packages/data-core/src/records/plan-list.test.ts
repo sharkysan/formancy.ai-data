@@ -272,7 +272,8 @@ describe('planList', () => {
   // What a list may be sorted and searched by is one function's answer, the
   // one `GET /v1/forms/:id` sends: readable column fields; sortable when the
   // kind has canonical text, searchable when it is text or integer. A lookup
-  // field holds a token, not the label a person reads, so it is neither.
+  // field holds a token, not the label a person reads, so it is neither;
+  // it is filtered by the record it refers to (the test below, 0135).
   test('sorts and searches only by readable column fields, and searches only text and integers', () => {
     const clerk = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ search: 'Muster' }))
     expect(clerk).toMatchObject({
@@ -296,11 +297,13 @@ describe('planList', () => {
       sortable: ['id', 'order_date', 'status', 'amount', 'notes', 'group', 'approved_by', 'paid'],
       filterable: [
         { field: 'id', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
+        { field: 'customer', offered: true, operators: ['equals'], input: 'lookup', days: null },
         { field: 'order_date', offered: true, operators: ['equals', 'range'], input: 'date', days: null },
         { field: 'status', offered: true, operators: ['equals', 'contains'], input: 'text', days: null },
         { field: 'amount', offered: true, operators: ['equals', 'range'], input: 'decimal', days: null },
         { field: 'notes', offered: true, operators: ['equals', 'contains', ...NULLS], input: 'text', days: null },
         { field: 'group', offered: true, operators: ['equals', 'contains', ...NULLS], input: 'text', days: null },
+        { field: 'employee', offered: true, operators: ['equals', ...NULLS], input: 'lookup', days: null },
         { field: 'approved_by', offered: true, operators: ['equals', 'range', ...NULLS], input: 'integer', days: null },
         { field: 'paid', offered: true, operators: ['equals', ...NULLS], input: 'boolean', days: null },
       ],
@@ -359,8 +362,8 @@ describe('planList', () => {
   })
 
   // A condition is on the column a readable column field binds (0104),
-  // planned by columnFilter. A field the actor may not read, a lookup, an
-  // operator its column does not offer and a value it cannot hold are each
+  // planned by columnFilter. A field the actor may not read, an operator
+  // its column does not offer and a value it cannot hold are each
   // refused before an adapter sees them, naming the field and never the
   // value. Watched failing with the field read from the request rather
   // than from the readable bindings.
@@ -386,7 +389,6 @@ describe('planList', () => {
     })
     const refusals: Array<[typeof CLERK, RecordListQuery['filter'][number], string]> = [
       [AUDITOR, { field: 'amount', op: 'range', from: '10', to: null }, 'amount is not a field you may filter this list by.'],
-      [CLERK, { field: 'customer', op: 'null' }, 'customer is not a field you may filter this list by.'],
       [CLERK, { field: 'nothing', op: 'null' }, 'nothing is not a field you may filter this list by.'],
       [CLERK, { field: 'amount', op: 'contains', text: '1' }, 'amount offers no contains condition.'],
       [CLERK, { field: 'order_date', op: 'equals', value: '2026-02-30' }, 'A value given for order_date is not one it can hold.'],
@@ -394,6 +396,52 @@ describe('planList', () => {
     for (const [who, term, message] of refusals) {
       expect(planList(PG, PG_ORDER, ORDER_POLICY, who, query({ filter: [term] })), term.field).toEqual({ ok: false, code: 'not-filterable', message })
     }
+  })
+
+  // A lookup field filters by the record it refers to (0135): `=` a token,
+  // decoded through the root's foreign-key columns as a parent's is (the
+  // test below), each column compared with the database's own equality,
+  // as the foreign key compares it; a single nullable key also by whether
+  // it refers to one. A composite key offers equality alone: it is empty
+  // when any of its columns is NULL, which no condition on one column
+  // says. A token no row of the lookup could have is refused, naming the
+  // field and never the token. Watched failing with every lookup refused
+  // as a field the list is not filtered by.
+  test('filters by a lookup field: the record it refers to, or whether it refers to one', () => {
+    const filter: RecordListQuery['filter'] = [
+      { field: 'customer', op: 'equals', value: 'k1:1,1001' },
+      { field: 'employee', op: 'null' },
+    ]
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ filter }))).toMatchObject({
+      ok: true,
+      request: {
+        equal: [],
+        filter: [
+          { op: 'refers', column: 'tenant_id', type: INT32, value: '1' },
+          { op: 'refers', column: 'customer_no', type: INT32, value: '1001' },
+          { op: 'null', column: 'created_by' },
+        ],
+      },
+    })
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, []).filterable.filter((offer) => offer.input === 'lookup')).toEqual([
+      { field: 'customer', offered: true, operators: ['equals'], input: 'lookup', days: null },
+      { field: 'employee', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null },
+    ])
+    const refusals: Array<[RecordListQuery['filter'][number], string]> = [
+      [{ field: 'customer', op: 'null' }, 'customer offers no null condition.'],
+      [{ field: 'employee', op: 'contains', text: 'Ada' }, 'employee offers no contains condition.'],
+      [{ field: 'customer', op: 'equals', value: 'k1:1' }, 'A record given for customer is not one it can refer to.'],
+      [{ field: 'customer', op: 'equals', value: 'k1:1,007' }, 'A record given for customer is not one it can refer to.'],
+    ]
+    for (const [term, message] of refusals) {
+      expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ filter: [term] })), JSON.stringify(term)).toEqual({
+        ok: false,
+        code: 'not-filterable',
+        message,
+      })
+    }
+    // Sorting by one is not offered yet: its token is no order a person reads.
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, []).sortable).not.toContain('customer')
   })
 
   // A search the form cannot match would answer with the unfiltered first

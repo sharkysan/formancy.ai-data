@@ -102,6 +102,13 @@ function listSaysMore(name, { check }) {
       under.elsewhere.length === 0 ? null : `undecided elsewhere: ${under.elsewhere.slice(0, 4).join('; ')}`,
     )
     console.log(`  where the sentence is, the window shows ${under.shown}; ${String(open.undecided.length)} texts lie under the open list`)
+    // Left as the gate's own audit wants it -- the keyboard out of Customer and the list closed -- once the list is gone. Closed
+    // by the gate's blur alone, Angular's list was still drawn when axe read the paper in WebKit, its texts undecidable under
+    // it: twice on CI, on main after #161 and on #163.
+    await page.evaluate(() => (document.activeElement instanceof HTMLElement ? document.activeElement.blur() : undefined))
+    await paper(page, name)
+      .getByRole('listbox', { name: 'Customer suggestions' })
+      .waitFor({ state: 'hidden', ...WITHIN })
   }
 }
 

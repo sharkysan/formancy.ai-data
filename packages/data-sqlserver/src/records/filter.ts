@@ -65,6 +65,11 @@ function boundOf(parameters: Parameters, type: Extract<RecordFilter, { op: 'rang
  *   under any collation: the search's difference, which the README names.
  * - `null`, `not-null`: `is null`, `is not null`. A varchar of no
  *   characters is a value, as PostgreSQL's is.
+ * - `refers`: one of a lookup's columns (0135) with `=` in the column's
+ *   own collation, as a parent's key is compared (`keyPredicates`) and as
+ *   the foreign key compares it -- never again under BIN2, so under the
+ *   fixture's case-insensitive collation `ch` finds the customer of `CH`,
+ *   where PostgreSQL's deterministic default finds none.
  */
 export function recordFilterPredicate(parameters: Parameters, row: string, filter: RecordFilter): string {
   const column = `${row}.${quoteName(filter.column)}`
@@ -83,6 +88,8 @@ export function recordFilterPredicate(parameters: Parameters, row: string, filte
     }
     case 'contains':
       return searchPredicate(parameters, row, [{ name: filter.column, type: filter.type }], filter.text)
+    case 'refers':
+      return `${column} = ${bindValue(parameters, filter.type, filter.value)}`
     case 'null':
       return `${column} is null`
     case 'not-null':

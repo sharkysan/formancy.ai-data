@@ -171,6 +171,7 @@ describe('when the data server is not what answers', () => {
       offer(['null', 'not-null'], 'text'),
       offer(['range'], 'date', 'local'),
       offer(['equals', 'range'], 'integer', 'utc'),
+      offer(['equals'], 'lookup', 'utc'),
       { searchable: [], sortable: ['id'], filterable: [] },
       { ...columns, filterable: [], views: {} },
       viewed({ name: 7 }),
@@ -195,6 +196,8 @@ describe('when the data server is not what answers', () => {
       offer(['range'], 'date', 'utc'),
       offer(['range', 'null', 'not-null'], 'date', 'wall'),
       offer(['equals', 'range'], 'integer', null, false),
+      // A lookup's record (0135): watched failing, refused as no input data-core names.
+      offer(['equals', 'null', 'not-null'], 'lookup'),
       viewed({}),
       viewed({ default: true }),
       { ...columns, filterable: [], own: [VIEW] },

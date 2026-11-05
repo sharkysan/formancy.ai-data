@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:47f573d19ac377104f863909dba7ff80a41bc07dfb725e6c1341c49d36806e79",
+      "reviewed": "sha256:c0a07522b0477703a9468138137e3d52994bd363d91f51272a691df6b4c5313b",
       "limitations": [
         {
           "area": "forms",
@@ -3076,7 +3076,7 @@
         },
         {
           "area": "forms",
-          "says": "A float, a time, binary, a rowversion and an unsupported column can be filtered only by whether they are empty, and only where they hold NULLs; a lookup field and a field the person may not read cannot be filtered at all.",
+          "says": "A float, a time, binary, a rowversion and an unsupported column can be filtered only by whether they are empty, and only where they hold NULLs; a field the person may not read cannot be filtered at all, and a lookup field only by the record it refers to (0135).",
           "heldBy": "packages/data-core/src/records/plan-list.test.ts"
         },
         {
@@ -3538,7 +3538,7 @@
       ]
     },
     "0123": {
-      "reviewed": "sha256:123a3a8c7585a7f22138d12afb149aa125a88d3f2b52bd663ad1f1c7c1a1f261",
+      "reviewed": "sha256:a34d9f0713a93d55e3fcefd437efaf5116b035abef9e08642b4b2f080f7b4eca",
       "limitations": [
         {
           "area": "host",
@@ -3699,7 +3699,7 @@
       ]
     },
     "0131": {
-      "reviewed": "sha256:b18b9150a1df9ae66819d66d53c464d6d3f5f2ed6e900ffe8a6be6016d2f1876",
+      "reviewed": "sha256:f66a698a4f9125341117b410bc98336b49bb39116a976c92e81060f79be2ab50",
       "limitations": [
         {
           "area": "host",
@@ -3734,7 +3734,7 @@
       ]
     },
     "0132": {
-      "reviewed": "sha256:7be217b166382fb0a69418f2e30f6d17f098388be44775625de69a69be4b4be3",
+      "reviewed": "sha256:99776f8ffa7e4e3d93f220e5f22489c4e57783f1c7613c4dca233ffb484747f8",
       "limitations": [
         {
           "area": "host",
@@ -3743,15 +3743,11 @@
         {
           "area": "host",
           "says": "The header boxes ride on AG Grid's floating filter row and its keys -- Down from a header to the box's cell, Enter into the box, Esc out, Tab on to the next column's box -- which an AG Grid upgrade could change; the host's browser gate holds the path."
-        },
-        {
-          "area": "host",
-          "says": "A lookup column has no box, as the filter line names no lookup field."
         }
       ]
     },
     "0133": {
-      "reviewed": "sha256:d99dc188532ebde3d41592b9570770e1ddd6ba5f51eca3d761749440cfe2348c",
+      "reviewed": "sha256:3c21531ca0607a94c9018499071ad0d797894b83fd91ef488589253775cd04a3",
       "limitations": [
         {
           "area": "host",
@@ -3763,7 +3759,7 @@
         },
         {
           "area": "host",
-          "says": "A timestamp's cell offers an example only when it is empty, and a lookup's never: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
+          "says": "A timestamp's cell offers an example only when it is empty: an instant's column is filtered by whole days. A lookup's cell offers the record it holds (0135)."
         }
       ]
     },
@@ -3785,6 +3781,39 @@
         {
           "area": "studio",
           "says": "The studio's Presentation step still says \"The Filter panel offers\" of the fields the host's filter line and header boxes may name."
+        }
+      ]
+    },
+    "0135": {
+      "reviewed": "sha256:880fdd8622744481aba66d259d7b0172467bbbe5a4fcf9ccbc40b8a5a0ad9ee7",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A lookup field filters but does not sort: its token orders nothing a person reads."
+        },
+        {
+          "area": "forms",
+          "says": "A lookup over a key of several nullable columns offers no is empty or is not empty: such a key refers to nothing when any column is NULL, which no condition on one column says."
+        },
+        {
+          "area": "databases",
+          "says": "A lookup's record is compared by the database's own equality, as its foreign key is: under SQL Server's case-insensitive collation a text key finds every spelling the key relates, where PostgreSQL's deterministic default finds one."
+        },
+        {
+          "area": "host",
+          "says": "The filter line names only the records of a lookup the grid has shown, picked or been given by a view; a record never shown is picked in its column's box, after which the line knows it."
+        },
+        {
+          "area": "host",
+          "says": "Each keystroke in a lookup column's box asks the server for its records; the request before is abandoned."
+        },
+        {
+          "area": "studio",
+          "says": "A view in the studio offers a lookup by whether it refers to a record, and no record of it: the studio has no picker for one."
+        },
+        {
+          "area": "forms",
+          "says": "A published view's record on a lookup is checked to be a token of the key's size; whether each value fits its column is said when the list is asked for."
         }
       ]
     }

@@ -154,14 +154,15 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
 
   // The server's refusal, passed through in its own words: a page larger
   // than the bound, a sort by a field the list cannot be sorted by, and a
-  // filter a field does not offer (0104) -- a lookup, and a value its
-  // column cannot hold, said without the value.
+  // filter a field does not offer (0104) -- a lookup's emptiness on a key
+  // of two columns (0135), and a value its column cannot hold, said
+  // without the value.
   test("a refusal comes back as the server's code and sentence", async () => {
-    expect(await plane.client().list(formId, { filter: [{ field: 'customer', op: 'equals', value: 'k1:1,1001' }] })).toEqual({
+    expect(await plane.client().list(formId, { filter: [{ field: 'customer', op: 'null' }] })).toEqual({
       ok: false,
       status: 400,
       code: 'not-filterable',
-      message: 'customer is not a field you may filter this list by.',
+      message: 'customer offers no null condition.',
     })
     expect(await plane.client().list(formId, { filter: [{ field: 'amount', op: 'equals', value: '1.23456' }] })).toEqual({
       ok: false,

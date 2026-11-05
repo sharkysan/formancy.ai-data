@@ -493,6 +493,12 @@ describe('the list route', () => {
     ])
     expect((await list('customer', { filter: [{ field: 'credit_limit', op: 'null' }] })).statusCode).toBe(200)
     expect(lists[1]?.filter).toEqual([{ op: 'null', column: 'credit_limit' }])
+    // A lookup by the record it refers to, its token decoded to the foreign
+    // key's column (0135), and by whether it refers to one.
+    expect((await list('customer', { filter: [{ field: 'country', op: 'equals', value: 'k1:CH' }] })).statusCode).toBe(200)
+    expect(lists[2]?.filter).toMatchObject([{ op: 'refers', column: 'country_code', value: 'CH' }])
+    expect((await list('customer', { filter: [{ field: 'country', op: 'null' }] })).statusCode).toBe(200)
+    expect(lists[3]?.filter).toEqual([{ op: 'null', column: 'country_code' }])
   })
 
   // A condition the form does not offer is refused before any statement,
@@ -506,7 +512,8 @@ describe('the list route', () => {
   // was a 500.
   test('refuses a condition the form does not offer 400 not-filterable, naming the field and never the value, and asks nothing', async () => {
     const cases: Array<[string, unknown, string]> = [
-      ['customer', { field: 'country', op: 'equals', value: 'k1:CH' }, 'country is not a field you may filter this list by.'],
+      ['customer', { field: 'country', op: 'contains', text: 'CH' }, 'country offers no contains condition.'],
+      ['customer', { field: 'country', op: 'equals', value: 'k1:CH,DE' }, 'A record given for country is not one it can refer to.'],
       ['customer', { field: 'customer_no', op: 'contains', text: '7' }, 'customer_no offers no contains condition.'],
       ['customer', { field: 'name', op: 'null' }, 'name offers no null condition.'],
       ['customer', { field: 'credit_limit', op: 'equals', value: '98765.4321' }, 'A value given for credit_limit is not one it can hold.'],
@@ -611,7 +618,8 @@ describe('the list route', () => {
   // sent with the form, so a grid offers exactly the headers, search and
   // conditions the server accepts (0104): each readable column field with
   // its kind's operators, `null` and `not-null` only where the column holds
-  // NULLs, never a lookup, and never a field the person may not read -- a
+  // NULLs, a lookup by the record it refers to (0135), and never a field
+  // the person may not read -- a
   // filter on one would tell them its values a condition at a time. And
   // one page's tokens for one lookup fit one resolve. Watched failing with
   // `GET` sending the list with `filterable` emptied.
@@ -625,13 +633,14 @@ describe('the list route', () => {
         { field: 'tenant_id', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
         { field: 'customer_no', offered: true, operators: ['equals', 'range'], input: 'integer', days: null },
         { field: 'name', offered: true, operators: ['equals', 'contains'], input: 'text', days: null },
+        { field: 'country', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null },
         { field: 'credit_limit', offered: true, operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal', days: null },
       ],
       views: [],
       own: [],
     })
     const kept = (await app.inject({ method: 'GET', url: '/v1/forms/hidden-limit', headers: as('clerk') })).json()
-    expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name'])
+    expect(kept.list.filterable.map((offer: { field: string }) => offer.field)).toEqual(['tenant_id', 'customer_no', 'name', 'country'])
     expect(LIST_PAGE_SIZE).toBeLessThanOrEqual(MAX_RESOLVE)
   })
 
@@ -646,6 +655,7 @@ describe('the list route', () => {
       'tenant_id:true',
       'customer_no:true',
       'name:true',
+      'country:true',
       'credit_limit:false',
     ])
     expect(served.list.views).toEqual([LARGE, MUSTER])

@@ -232,7 +232,9 @@ secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
    [0132](../decisions/0132-each-column-header-filters-its-column.md)),
    or taken from a cell's value (`apps/host/src/cell-example.tsx`:
    [0133](../decisions/0133-a-cell-filters-by-its-value.md)), over the
-   fields `list.filterable` names, the line and the boxes over those
+   fields `list.filterable` names -- a lookup by the record it refers to,
+   its token, which the server plans as each foreign-key column compared
+   by the database's own equality ([0135](../decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)) -- the line and the boxes over those
    `offered`, which the presentation's `unfiltered` decides:
    [0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) and the section's sort, each block after the last row of the
    block before: the datasource keeps every answered page's `next` by the

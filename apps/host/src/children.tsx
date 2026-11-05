@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
-import { lineFields, panelFields, panelShown, viewName } from './filter-terms.js'
+import { lineFields, panelFields, panelShown, viewName, withRecords } from './filter-terms.js'
 import { HeaderFilterContext } from './header-filter.js'
+import { useKnownRecords } from './known-records.js'
 import type { HeaderFilters } from './header-filter.js'
 import { GridFilter } from './grid-filter.js'
 import { columnsOf } from './grid-datasource.js'
@@ -167,13 +168,16 @@ export function ChildSection({
   useRegistered(entries)
   const opening = useOpening({ client, formId: child.form, owner, sessions })
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
-  const filterable = useMemo(() => panelFields(definition), [definition])
+  const offers = useMemo(() => panelFields(definition), [definition])
   /** Whether the grid's first page under the filter came back with no rows. */
   const [unmatched, setUnmatched] = useState(false)
   const views = definition.list?.views ?? []
   const mine = useOwnViews(client, child.form, definition)
   const state = useGridState({ formId: child.form, section: { kind: 'child', field: child.field }, columns, list: definition.list })
   const { filter, sort } = state
+  /** The records each lookup field has heard of (0135), with which the line, the chips and the boxes say a lookup's condition. */
+  const records = useKnownRecords(client, child.form, definition, filter)
+  const filterable = useMemo(() => withRecords(offers, records.known), [offers, records.known])
   /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
   const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
   const headerFilters = useMemo<HeaderFilters>(
@@ -183,8 +187,10 @@ export function ChildSection({
       onFilter: state.setFilter,
       refused: (message) => grid.current?.say([message]),
       hint: `${headingId}-filter-line-hint`,
+      records: records.records,
+      heard: records.heard,
     }),
-    [boxFields, filter, state.setFilter, headingId],
+    [boxFields, filter, state.setFilter, headingId, records.records, records.heard],
   )
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({

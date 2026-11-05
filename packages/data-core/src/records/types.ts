@@ -1,5 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
-import type { LookupKeyColumn, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
+import type { LookupKeyColumn, LookupKeyType, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
@@ -122,9 +122,14 @@ export type RangeFilterType = Extract<NormalizedType, { kind: 'integer' | 'decim
  * - `contains`: the column holds `text`, matched as a search matches it.
  * - `null`, `not-null`: the column is NULL, or not. Text of no characters
  *   is a value.
+ * - `refers`: the column equals `value` by the database's own equality, as
+ *   a foreign key compares it -- one of a lookup's columns, each of a
+ *   record's key values spelled as the column holds it (0135), as `equal`
+ *   compares a parent's.
  */
 export type RecordFilter =
   | { op: 'equals'; column: string; type: EqualsFilterType; value: string }
+  | { op: 'refers'; column: string; type: LookupKeyType; value: string }
   | { op: 'range'; column: string; type: RangeFilterType; from: string | null; above: string | null; to: string | null; before: string | null }
   | { op: 'contains'; column: string; type: Extract<LookupSearchType, { kind: 'text' }>; text: string }
   | { op: 'null' | 'not-null'; column: string }

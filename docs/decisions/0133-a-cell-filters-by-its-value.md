@@ -1,6 +1,6 @@
 # 0133 — A cell filters by its value
 
-- **Status:** accepted; extends [0132](0132-each-column-header-filters-its-column.md): a column's condition can be taken from one of its cells
+- **Status:** accepted; extends [0132](0132-each-column-header-filters-its-column.md): a column's condition can be taken from one of its cells; amended by [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md): a lookup's cell gives the record it holds, said by its label
 - **Date:** 2026-11-05
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/host/src/cell-example.test.tsx`, without a server

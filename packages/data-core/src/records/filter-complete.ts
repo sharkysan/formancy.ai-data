@@ -37,6 +37,20 @@ const SAYS: Readonly<Record<string, readonly [string, string]>> = {
 
 const AND: LineOption = { insert: 'and ', label: 'and', hint: 'and another condition that holds too' }
 
+/**
+ * A lookup's records (0135), by the labels the page shows: inserted by the
+ * label, which the line reads back as the record, or by the token where
+ * two records share one, the token beside it to tell them apart.
+ */
+function records(values: NonNullable<LineField['values']>): LineOption[] {
+  return values.map((entry) => {
+    const shared = values.some((other) => other !== entry && other.label.toLowerCase() === entry.label.toLowerCase())
+    return shared
+      ? { insert: `${written(entry.value)} `, label: entry.label, hint: entry.value }
+      : { insert: `${written(entry.label)} `, label: entry.label, hint: '' }
+  })
+}
+
 /** What may come next where the line stands. */
 function offered(state: LineState, fields: readonly LineField[]): LineOption[] {
   switch (state.want) {
@@ -66,6 +80,7 @@ function offered(state: LineState, fields: readonly LineField[]): LineOption[] {
           { insert: 'yes ', label: 'yes', hint: 'true' },
           { insert: 'no ', label: 'no', hint: 'false' },
         ]
+      if (state.field.input === 'lookup') return records(state.field.values ?? [])
       return (state.field.values ?? []).map((entry) => ({ insert: `${written(entry.value)} `, label: entry.label, hint: entry.value }))
     case 'and':
       return [AND]

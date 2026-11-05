@@ -416,6 +416,8 @@ describe('the export route', () => {
       filter: [
         { field: 'notes', op: 'null' },
         { field: 'customer_no', op: 'range', from: '+01', to: '0200' },
+        // A lookup's record beside the parent on the same column (0135): a condition of its own, never a second `equal`.
+        { field: 'country', op: 'equals', value: 'k1:CH' },
       ],
     }
     const response = await exported('customer', body)
@@ -433,6 +435,7 @@ describe('the export route', () => {
         filter: [
           { op: 'null', column: 'notes' },
           { op: 'range', column: 'customer_no', type: INT32, from: '1', above: null, to: '200', before: null },
+          { op: 'refers', column: 'country_code', value: 'CH' },
         ],
         filters: { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] },
       })
@@ -505,7 +508,7 @@ describe('the export route', () => {
     }
     expect((await exported('customer', { sort: [{ field: 'country', direction: 'asc' }] })).json()).toMatchObject({ code: 'not-sortable' })
     for (const [condition, message] of [
-      [{ field: 'country', op: 'equals', value: 'k1:CH' }, 'country is not a field you may filter this list by.'],
+      [{ field: 'country', op: 'equals', value: 'k1:CH,DE' }, 'A record given for country is not one it can refer to.'],
       [{ field: 'customer_no', op: 'equals', value: '98765x' }, 'A value given for customer_no is not one it can hold.'],
       [{ field: 'name', op: 'not-null' }, 'name offers no not-null condition.'],
     ] as const) {

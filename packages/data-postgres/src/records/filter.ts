@@ -41,6 +41,11 @@ import { sqlTypeOf } from '../sql/types.js'
  *   whose own collation is nondeterministic, which LIKE refuses (0A000).
  * - `null`, `not-null`: `is null`, `is not null`. Text of no characters is
  *   a value, as PostgreSQL always has it.
+ * - `refers`: one of a lookup's columns (0135) with the column's own `=`
+ *   against a value cast to its type, as a parent's `equal` is spelled
+ *   (`list.ts`) and as the foreign key compares it -- never again under
+ *   `"C"`, so a column under a collation that folds case finds the record
+ *   its foreign key refers to.
  */
 export function recordFilterSql(statement: Statement, row: string, filter: RecordFilter): string {
   const column = `${row}.${quoteIdentifier(filter.column)}`
@@ -61,6 +66,8 @@ export function recordFilterSql(statement: Statement, row: string, filter: Recor
     }
     case 'contains':
       return searchSql(statement, row, [{ name: filter.column, type: filter.type }], filter.text)
+    case 'refers':
+      return `${column} ${op('=')} ${statement.as(filter.value, sqlTypeOf(filter.type))}`
     case 'null':
       return `${column} is null`
     case 'not-null':

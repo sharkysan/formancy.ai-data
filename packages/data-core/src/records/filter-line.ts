@@ -20,7 +20,7 @@ import type { FilterInput, FilterOp, ListFilterTerm, RangeExclusive } from '../r
  * filter's conditions all hold.
  */
 
-/** A field the line may name: the server's offer for it, its label, and the values it says, a boolean's or a state field's (0129). */
+/** A field the line may name: the server's offer for it, its label, and the values it says: a state field's (0129), or a lookup's records the page has heard of (0135). */
 export interface LineField {
   field: string
   label: string
@@ -305,11 +305,13 @@ function valued(state: Extract<LineState, { want: 'value' }>, token: LineToken, 
 
 /**
  * A value as the term carries it: a boolean's yes or no as `true` or
- * `false`, a state by its value where its label was typed, and a number
- * typed with separators refused with the number it is read as.
+ * `false`, a state by its value where its label was typed, a lookup's
+ * record by its token (`recordOf`), and a number typed with separators
+ * refused with the number it is read as.
  */
 function spelled(field: LineField, equality: boolean, token: LineToken): string | LineRefusal {
   const typed = token.value
+  if (field.input === 'lookup') return recordOf(field, token)
   if (field.input === 'boolean' && equality) {
     const said = typed.toLowerCase()
     if (said === 'yes' || said === 'true') return 'true'
@@ -321,6 +323,37 @@ function spelled(field: LineField, equality: boolean, token: LineToken): string 
   if (equality && field.values !== undefined && !field.values.some((entry) => entry.value === typed))
     return field.values.find((entry) => entry.label.toLowerCase() === typed.toLowerCase())?.value ?? typed
   return typed
+}
+
+/**
+ * A lookup's record (0135) by its token or by the label the page shows for
+ * it: one of the records the page knows (`values`), or the line's refusal.
+ * A label the page has not shown names no record the line could send, and
+ * one two records share names neither.
+ */
+function recordOf(field: LineField, token: LineToken): string | LineRefusal {
+  const known = field.values ?? []
+  if (known.some((entry) => entry.value === token.value)) return token.value
+  const named = known.filter((entry) => entry.label.toLowerCase() === token.value.toLowerCase())
+  if (named.length === 1) return (named[0] as { value: string }).value
+  const which = named.length === 0 ? `No record of ${field.label} shown here is called` : `Two records of ${field.label} shown here are called`
+  return refuse(token, `${which} ${token.value}: pick one in its column's box.`)
+}
+
+/**
+ * What the line and a box write for `value` on `field`: a lookup's record
+ * by its label where that label names it alone (0135) -- no other record
+ * has it, and it is no other record's token -- and otherwise by its token,
+ * which reads back as the record; anything else as it is.
+ */
+export function shownValue(field: LineField, value: string): string {
+  if (field.input !== 'lookup') return value
+  const known = field.values ?? []
+  const label = known.find((entry) => entry.value === value)?.label
+  if (label === undefined) return value
+  const named = label.toLowerCase()
+  const alone = known.every((entry) => entry.value === value || (entry.label.toLowerCase() !== named && entry.value !== label))
+  return alone ? label : value
 }
 
 /** `1'000,50` as the number it is read as: apostrophes dropped, the last point or comma the decimal point. */
@@ -420,7 +453,7 @@ export function conditionsOf(term: ListFilterTerm, name: string, field: LineFiel
   switch (term.op) {
     case 'equals':
       return [
-        `${name} = ${field.input === 'boolean' && (term.value === 'true' || term.value === 'false') ? (term.value === 'true' ? 'yes' : 'no') : written(term.value)}`,
+        `${name} = ${field.input === 'boolean' && (term.value === 'true' || term.value === 'false') ? (term.value === 'true' ? 'yes' : 'no') : written(shownValue(field, term.value))}`,
       ]
     case 'contains':
       return [`${name} contains ${written(term.text)}`]

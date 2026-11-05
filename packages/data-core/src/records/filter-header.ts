@@ -1,5 +1,5 @@
 import type { ListFilterTerm } from '../runtime.js'
-import { conditionsOf, lineTokens, parseFilterLine, quoted, written } from './filter-line.js'
+import { conditionsOf, lineTokens, parseFilterLine, quoted, shownValue, written } from './filter-line.js'
 import type { LineField, LineToken } from './filter-line.js'
 
 /*
@@ -66,7 +66,8 @@ export function headerCondition(text: string, field: LineField): { ok: true; ter
  */
 export function headerText(term: ListFilterTerm | undefined, field: LineField): string {
   if (term === undefined) return ''
-  const value = term.op === 'contains' && bare(field) === 'contains' ? term.text : term.op === 'equals' && bare(field) === '=' ? term.value : null
+  const value =
+    term.op === 'contains' && bare(field) === 'contains' ? term.text : term.op === 'equals' && bare(field) === '=' ? shownValue(field, term.value) : null
   if (value !== null) {
     const plain = value !== '' && value === value.trim() && !value.startsWith('"') && !startsOperator(lineTokens(value), 0)
     return plain ? value : quoted(value)

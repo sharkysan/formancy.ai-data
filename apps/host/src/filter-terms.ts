@@ -1,5 +1,6 @@
 import type { FilterDays, FilterInput, FilterableField, LineField, ListFilterTerm, PublishedForm, StateMoves } from '@formancy/data-client'
 import { fieldHeading } from '@formancy/data-client'
+import type { Known } from './known-records.js'
 
 /*
  * What a grid's filter offers and says (0104), as data: the fields a list
@@ -21,9 +22,17 @@ const NO_VALUE_WORDS: Readonly<Record<'null' | 'not-null', string>> = {
   'not-null': 'has a value',
 }
 
-/** A field the filter offers: the server's offer, and the field's label in the form. */
+/** A field the filter offers: the server's offer, the field's label in the form, and a lookup's records the grid has heard of (0135). */
 export interface PanelField extends FilterableField {
   label: string
+  records?: ReadonlyArray<{ value: string; label: string }>
+}
+
+/** `fields` with each lookup's records the grid has heard of (`known-records.ts`, 0135), by token and label: what the line reads and a chip says a record by. */
+export function withRecords(fields: readonly PanelField[], known: Known): PanelField[] {
+  return fields.map((field) =>
+    field.input === 'lookup' ? { ...field, records: [...(known.get(field.field) ?? [])].map(([value, label]) => ({ value, label })) } : field,
+  )
 }
 
 /**
@@ -41,8 +50,9 @@ export function panelFields(definition: PublishedForm): PanelField[] {
  * The fields the filter line and the header boxes may name: those the
  * form's filter offers (0123), each with its label, and the state field with its states
  * by the labels an administrator gave them (0129), in the presentation's
- * order, then any other state its moves name, as it is spelled. A
- * boolean's yes and no are the line's own.
+ * order, then any other state its moves name, as it is spelled; and a
+ * lookup with the records the grid has heard of (0135). A boolean's yes
+ * and no are the line's own.
  */
 export function lineFields(fields: readonly PanelField[], moves: StateMoves | null): LineField[] {
   const states = moves === null ? [] : [...new Set([...moves.labels.map((entry) => entry.state), ...moves.moves.flatMap((move) => [move.from, move.to])])]
@@ -51,7 +61,13 @@ export function lineFields(fields: readonly PanelField[], moves: StateMoves | nu
   )
   return fields
     .filter((field) => field.offered)
-    .map(({ field, label, operators, input }) => ({ field, label, operators, input, ...(field === moves?.field && values.length > 0 ? { values } : {}) }))
+    .map(({ field, label, operators, input, records }) => ({
+      field,
+      label,
+      operators,
+      input,
+      ...(input === 'lookup' ? { values: records ?? [] } : field === moves?.field && values.length > 0 ? { values } : {}),
+    }))
 }
 
 /**
@@ -78,7 +94,10 @@ export function viewName(filter: readonly ListFilterTerm[], fields: readonly Pan
   const said = filter
     .map((term) => {
       const field = fields.find((offered) => offered.field === term.field)
-      return summaryOf(term, field === undefined ? undefined : { label: field.label, input: field.input })
+      return summaryOf(
+        term,
+        field === undefined ? undefined : { label: field.label, input: field.input, ...(field.records === undefined ? {} : { records: field.records }) },
+      )
     })
     .join(', ')
   return said.length <= 80 ? said : `${said.slice(0, 79).trimEnd()}…`
@@ -100,11 +119,13 @@ function bound(side: 'from' | 'to', input: FilterInput | null, exclusive: boolea
 const DAYS: Readonly<Record<FilterDays, string>> = { utc: ', whole days in UTC', wall: ', whole days as stored' }
 
 /** A condition as a sentence, by its field's label: what a chip says and its Remove names. */
-export function summaryOf(term: ListFilterTerm, field: (Pick<PanelField, 'label' | 'input'> & { days?: FilterDays | null }) | undefined): string {
+export function summaryOf(term: ListFilterTerm, field: (Pick<PanelField, 'label' | 'input' | 'records'> & { days?: FilterDays | null }) | undefined): string {
   const label = field?.label ?? term.field
   const input = field?.input ?? null
   switch (term.op) {
     case 'equals':
+      // A lookup's record by the label the grid heard for it, or its token where it heard none (0135).
+      if (input === 'lookup') return `${label} is “${field?.records?.find((record) => record.value === term.value)?.label ?? term.value}”`
       return `${label} is ${quoted(term.value, input)}`
     case 'range': {
       const days = field?.days === undefined || field.days === null ? '' : DAYS[field.days]

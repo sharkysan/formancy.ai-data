@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
-import type { FormBindings, StoredListView } from '@formancy/data-core'
+import type { FilterableField, FormBindings, StoredListView } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 
 import { labelOf } from './document.js'
@@ -49,6 +49,25 @@ export function SavedView({ view, label }: { view: StoredListView; label: (key: 
 }
 
 /**
+ * The offers a view's condition may be built from here: a lookup's record
+ * is picked by what the lookup shows of it (0135), and the studio has no
+ * picker for one, so a lookup offers only whether it refers to a record --
+ * and a key of several columns, which offers no more than its record, is
+ * not offered. A lookup whose record the view being edited already holds,
+ * published by another client, is not offered either, so that row is kept
+ * as it was, as a key of several columns' is, rather than turned into the
+ * first condition the field offers here.
+ */
+export function buildableOffers(filterable: readonly FilterableField[], draft: ViewDraft): FilterableField[] {
+  return filterable.flatMap((offer) => {
+    if (offer.input !== 'lookup') return [offer]
+    if (draft.filter.some((row) => row.field === offer.field && row.op === 'equals')) return []
+    const operators = offer.operators.filter((op) => op === 'null' || op === 'not-null')
+    return operators.length === 0 ? [] : [{ ...offer, operators, input: null }]
+  })
+}
+
+/**
  * The views, each in words with what may be done to it, and the form that
  * makes one or edits one. A press that takes away the button pressed puts
  * the keyboard where a person goes on from: a moved view keeps it, on the
@@ -89,6 +108,7 @@ export function ListViewsPanel({
   )
   const label = (key: string) => labelOf(document, key)
   const [draft, setDraft] = useState<ViewDraft>(EMPTY_VIEW)
+  const buildable = useMemo(() => buildableOffers(columns.filterable, draft), [columns, draft])
   // The view in the form, by the name it was saved under: the name typed may change, and a move changes its place.
   const [editing, setEditing] = useState<string | null>(null)
   const [refused, setRefused] = useState<string[]>([])
@@ -104,7 +124,7 @@ export function ListViewsPanel({
 
   function save(event: FormEvent): void {
     event.preventDefault()
-    const view = viewOf(draft, columns.filterable)
+    const view = viewOf(draft, buildable)
     const at = editingAt === -1 ? views.length : editingAt
     // One view opens the grid: saved as the default, this one takes it from the one that had it.
     const took = view.default === true ? views.find((other, index) => index !== at && other.default === true) : undefined
@@ -203,7 +223,7 @@ export function ListViewsPanel({
       <ViewForm
         heading={editingAt === -1 ? 'New view' : `Editing view ${String(editingAt + 1)}, “${editing ?? ''}”`}
         draft={draft}
-        offers={columns.filterable}
+        offers={buildable}
         sortable={columns.sortable}
         label={label}
         refused={refused}

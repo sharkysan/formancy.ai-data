@@ -27,16 +27,17 @@ const STATUS: LineField = { field: 'status', label: 'Status', operators: ['equal
 const AMOUNT: LineField = { field: 'amount', label: 'Amount', operators: ['equals', 'range'], input: 'decimal' }
 const RUSH: LineField = { field: 'rush', label: 'Rush', operators: ['equals', 'null', 'not-null'], input: 'boolean' }
 const CREATED: LineField = { field: 'created_at', label: 'Created at', operators: ['range', 'null', 'not-null'], input: 'date' }
-const FIELDS = [STATUS, AMOUNT, RUSH, CREATED]
+const CUSTOMER: LineField = { field: 'customer', label: 'Customer', operators: ['equals'], input: 'lookup' }
+const FIELDS = [STATUS, AMOUNT, RUSH, CREATED, CUSTOMER]
 
 const row = (answers: Record<string, unknown>, labels: Record<string, string> = {}): GridRow => ({ id: 'k1:1', record: 'k1:1', version: null, answers, labels })
 
 describe('exampleTerm', () => {
   // A value the line could say is equal to it, spelled as the row holds
-  // it; none where the column offers no equality -- a timestamp's days --
-  // or where the cell shows a lookup's label rather than its value, which
-  // equality on the column would not find (watched failing with the label
-  // taken for the value).
+  // it; none where the column offers no equality -- a timestamp's days.
+  // A lookup's cell shows a label and holds the record's token, which is
+  // what its column is filtered by (0135); a key of two columns empty
+  // offers none, since it offers no emptiness.
   test('says the condition a value puts on its column, or none', () => {
     expect(exampleTerm(row({ status: 'placed' }), STATUS)).toEqual({ field: 'status', op: 'equals', value: 'placed' })
     expect(exampleTerm(row({ amount: 1000.5 }), AMOUNT)).toEqual({ field: 'amount', op: 'equals', value: '1000.5' })
@@ -44,7 +45,8 @@ describe('exampleTerm', () => {
     expect(exampleTerm(row({ status: null }), STATUS)).toEqual({ field: 'status', op: 'null' })
     expect(exampleTerm(row({ amount: null }), AMOUNT)).toBeNull()
     expect(exampleTerm(row({ created_at: '2026-11-05T10:00:00Z' }), CREATED)).toBeNull()
-    expect(exampleTerm(row({ status: 'k2:9' }, { status: 'Placed by Clara' }), STATUS)).toBeNull()
+    expect(exampleTerm(row({ customer: 'k1:1,1001' }, { customer: 'Muster AG' }), CUSTOMER)).toEqual({ field: 'customer', op: 'equals', value: 'k1:1,1001' })
+    expect(exampleTerm(row({ customer: null }), CUSTOMER)).toBeNull()
   })
 
   // The example takes the column's place in the filter, as a header box
@@ -68,6 +70,22 @@ describe('exampleTerm', () => {
       ],
     ])
     expect(filterByExample(headers, row({ created_at: '2026-11-05T10:00:00Z' }), 'created_at')).toBe(false)
+  })
+
+  // A lookup's example is its record, which the page then hears of by the
+  // label the cell shows, so the chip and the line say it so (watched
+  // failing with the label unheard: the line wrote the token).
+  test('hears of the record a lookup’s cell shows', () => {
+    const heard: Array<[string, unknown]> = []
+    const headers: HeaderFilters = {
+      fields: FIELDS,
+      filter: [],
+      onFilter: () => {},
+      refused: () => {},
+      heard: (field, rows) => heard.push([field, rows]),
+    }
+    expect(filterByExample(headers, row({ customer: 'k1:1,1001' }, { customer: 'Muster AG' }), 'customer')).toBe(true)
+    expect(heard).toEqual([['customer', [{ token: 'k1:1,1001', label: 'Muster AG' }]]])
   })
 })
 

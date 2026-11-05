@@ -18,6 +18,24 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A lookup field filters by the record it refers to** (0135). Why: a
+  foreign key shown as a lookup was the one column a person could not
+  filter by -- the orders of one customer, the orders nobody approved --
+  while the same key drawn as a number could be. A lookup's column has a
+  box that searches its lookup, the filter line reads and writes a record
+  by the label the page shows (`approved_by = grace`, `approved_by is
+  empty`), and `=` on a lookup's cell takes its record; each is sent as
+  the record's token and said in a chip by its label. The server compares
+  each foreign-key column by the database's own equality, as the foreign
+  key does, so under SQL Server's case-insensitive collation a text key
+  finds what the key relates. What you notice: `list.filterable` offers a
+  lookup with `input: "lookup"`, which this release's
+  `@formancy/data-client` accepts and an earlier one refuses as a reply it
+  does not know, so a host upgrades its `@formancy/data-client` before the
+  server; the studio's "The Filter panel offers" lists
+  lookups, and its views offer a lookup by whether it refers to a record.
+  A lookup does not sort yet.
+
 - **A cell filters by its value** (0133). Why: a person filters by
   pointing at what they see before they ever type. `=` on a focused cell
   keeps the rows with its value, in place of its column's condition, and

@@ -43,8 +43,12 @@ export type FilterCondition =
   | { op: 'null' }
   | { op: 'not-null' }
 
-/** What a filter's value or bound is typed as. A timestamp's bounds are dates. */
-export type FilterInput = 'text' | 'integer' | 'decimal' | 'date' | 'uuid' | 'boolean'
+/**
+ * What a filter's value or bound is typed as. A timestamp's bounds are
+ * dates. A lookup's value is a record's token, which a person picks by
+ * what the lookup shows of it rather than types (0135).
+ */
+export type FilterInput = 'text' | 'integer' | 'decimal' | 'date' | 'uuid' | 'boolean' | 'lookup'
 
 /**
  * Whose clock a timestamp's whole days are counted on (0104): `utc` for an

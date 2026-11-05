@@ -5,11 +5,14 @@ import { viewProblems } from '@formancy/data-core'
 import type { StoredListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Bundle, ProposalRequest } from './api.js'
-import { audit, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
+import { audit, chooseOrder, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 import { addCondition, addSort, fill, nameView, opensTheGrid, pressSave, rows, savedViews, saveView, viewForm, viewsPanel } from './test-views.js'
+import { buildableOffers } from './list-views.js'
+import { draftOfView, viewOf } from './view-form.js'
+import type { FilterableField } from '@formancy/data-core'
 
 /**
  * A form's list views (0105), made in the Presentation step: named
@@ -189,12 +192,32 @@ describe('making a view', () => {
     ])
   })
 
+  // A lookup filters by the record it refers to (0135), which a person
+  // picks by what the lookup shows of it; the studio has no picker for
+  // one, so a lookup of one nullable column -- Employee, over approved_by --
+  // is offered by whether it
+  // refers to a record, with no box, and the customer, a key of two
+  // columns that offers nothing more, not at all. Watched failing with
+  // the list's offer taken whole: Customer was a field with an equals
+  // condition and a box for a token.
+  test('offers a lookup by whether it refers to a record, and a key of two columns not at all', async () => {
+    const user = await signIn(plane)
+    const choose = await chooseOrder(user)
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_approved_by as a lookup' }))
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await goTo(user, 'Presentation')
+    // The generator names the lookup over approved_by for the table it refers to.
+    const row = await addCondition(user, 'Employee', 'is NULL')
+    expect(options(row, 'Field')).not.toContain('Customer')
+    expect(options(row, 'Condition')).toEqual(['is NULL', 'is not NULL'])
+    expect(within(row).queryByRole('textbox')).toBeNull()
+  })
+
   // What a view may be built from is what the form's list offers anybody:
-  // a lookup holds a token, not its label, and offers neither; each field
+  // a lookup only as the test above says; each field
   // is named as the form labels it now, a label edited above included; and
   // each condition's operators, boxes and hint are the Browse step's for
-  // the field's type and NULLs. A panel that offered the lookup would save
-  // a view the server refuses; one that named fields by key would read
+  // the field's type and NULLs. A panel that named fields by key would read
   // otherwise than the form the person sees.
   test('offers what the form’s list offers, by the form’s labels, with the Browse step’s boxes', async () => {
     const user = await toViews()
@@ -420,5 +443,22 @@ describe('the views saved', () => {
     await within(publish).findByText('Published version 1 of sales-order.')
     const stored = (await plane.store.read('sales-order', 1)) as Bundle
     expect(stored.format === 2 && stored.presentation).not.toHaveProperty('views')
+  })
+})
+
+describe('a view holding a lookup’s record', () => {
+  // A view published by another client may hold a lookup's record, which
+  // the studio cannot pick: opened and saved again -- renamed, say -- it
+  // keeps the condition as it was, as a key of two columns does, never
+  // turned into the first condition the field offers here (watched
+  // failing: `= k1:2` was saved as `is NULL`, another list under the
+  // view's name).
+  test('keeps the record when it is saved again', () => {
+    const offers: FilterableField[] = [{ field: 'employee', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null }]
+    const stored: StoredListView = { name: 'Grace’s', filter: [{ field: 'employee', op: 'equals', value: 'k1:2' }], sort: [] }
+    const draft = { ...draftOfView(stored), name: 'Approved by Grace' }
+    expect(viewOf(draft, buildableOffers(offers, draft)).filter).toEqual(stored.filter)
+    const unapproved = draftOfView({ ...stored, filter: [{ field: 'employee', op: 'null' }] })
+    expect(buildableOffers(offers, unapproved)).toEqual([{ ...offers[0], operators: ['null', 'not-null'], input: null }])
   })
 })

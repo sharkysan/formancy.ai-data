@@ -13,6 +13,7 @@ import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import { filterByExample } from './cell-example.js'
 import { HeaderFilterContext } from './header-filter.js'
+import { pageRecords } from './known-records.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
@@ -334,6 +335,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ...(noun === undefined ? {} : { noun }),
         })
         setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false })
+        // The records the page shows, by the labels the line, the chips and the boxes then say a lookup's condition by (0135).
+        for (const [field, named] of pageRecords(shownColumns, rows)) headersNow.current?.heard?.(field, named)
         latest.current.onFiltered?.(start === 0 && rows.length === 0 && asked.length > 0)
         setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()

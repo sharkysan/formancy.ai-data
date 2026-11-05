@@ -160,7 +160,19 @@ describe('viewProblems', () => {
     expect(named({})).toEqual([])
     expect(named({ filter: [{ field: 'amount', op: 'equals', value: '1.23456' }] })).toEqual([expect.stringMatching(/^\/views\/0 \(“Placed”\): .*amount/)])
     expect(named({ filter: [{ field: 'amount', op: 'contains', text: '1' }] })).toEqual(['/views/0 (“Placed”): amount offers no contains condition.'])
-    expect(named({ filter: [{ field: 'customer', op: 'null' }] })).toEqual(['/views/0 (“Placed”): customer is not a field this list is filtered by.'])
+    expect(named({ filter: [{ field: 'customer', op: 'null' }] })).toEqual(['/views/0 (“Placed”): customer offers no null condition.'])
+    // A lookup's condition (0135): the record a token names, with as many
+    // values as its key has columns; whether each fits its column is the
+    // list's to say, which reads the snapshot (watched failing with every
+    // lookup refused as no field the list is filtered by).
+    expect(named({ filter: [{ field: 'customer', op: 'equals', value: 'k1:1,1001' }] })).toEqual([])
+    expect(named({ filter: [{ field: 'employee', op: 'null' }] })).toEqual([])
+    expect(named({ filter: [{ field: 'customer', op: 'equals', value: 'k1:1' }] })).toEqual([
+      '/views/0 (“Placed”): A record given for customer is not one it can refer to.',
+    ])
+    expect(named({ filter: [{ field: 'customer', op: 'equals', value: 'Muster AG' }] })).toEqual([
+      '/views/0 (“Placed”): A record given for customer is not one it can refer to.',
+    ])
     expect(named({ filter: [{ field: 'nothing', op: 'null' }] })).toEqual(['/views/0 (“Placed”): nothing is not a field this list is filtered by.'])
     expect(named({ sort: [{ field: 'customer', direction: 'asc' }] })).toEqual(['/views/0 (“Placed”): customer is not a field this list is sorted by.'])
   })
