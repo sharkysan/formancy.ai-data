@@ -69,15 +69,17 @@ export function withTerm(filter: readonly ListFilterTerm[], term: ListFilterTerm
   return at === -1 ? [...filter, term] : filter.map((given, index) => (index === at ? term : given))
 }
 
-/** A view's name from its conditions, as the chips say them, cut to the 80 characters a name may have (0126). */
+/**
+ * A view's name from its conditions, as the chips say them less a time's
+ * days, which would read as a condition of their own, cut to the 80
+ * characters a name may have (0126).
+ */
 export function viewName(filter: readonly ListFilterTerm[], fields: readonly PanelField[]): string {
   const said = filter
-    .map((term) =>
-      summaryOf(
-        term,
-        fields.find((field) => field.field === term.field),
-      ),
-    )
+    .map((term) => {
+      const field = fields.find((offered) => offered.field === term.field)
+      return summaryOf(term, field === undefined ? undefined : { label: field.label, input: field.input })
+    })
     .join(', ')
   return said.length <= 80 ? said : `${said.slice(0, 79).trimEnd()}…`
 }

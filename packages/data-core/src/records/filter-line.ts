@@ -292,6 +292,8 @@ function valued(state: Extract<LineState, { want: 'value' }>, token: LineToken, 
     case '=':
       return added(context, field, name, { op: 'equals', value }, span)
     case 'contains':
+      // The server finds no text in spaces alone, and refuses it.
+      if (value.trim() === '') return refuse(token, `${field.label} ${operator.text} needs text to find.`)
       return added(context, field, name, { op: 'contains', text: value }, span)
     case '>':
     case '>=':

@@ -266,8 +266,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
   // correct; applying the corrected value takes the refused one's place.
   // A box that is no condition at all is said on the grid's line and sends
   // nothing (watched failing with Ask again offered: a button that asked
-  // again for the same refusal; and with the box emptied by Apply: "" for
-  // "12x").
+  // again for the same refusal).
   test('says a refusal in the server’s words and keeps what was typed', async () => {
     const [order] = await freshOrders(engine, stamp('refused'), ['1'])
     const user = await workspace(plane.fetch, engine.formId)
@@ -388,9 +387,9 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
   // A field the administrator left out of the filter (0123) is not offered
   // by the line's completion nor given a header box, against the real
   // server that says so; the rest are. Last of its engine's cases, because
-  // it publishes the order form's version 2. Watched failing, when the
-  // panel offered fields, with the menu over every field the list is
-  // filtered by: Notes was offered.
+  // it publishes the order form's version 2. Its completion and box are
+  // lineFields' (grid-filter.test.tsx, watched failing there with every
+  // field the list is filtered by offered).
   test('offers no condition on a field its administrator left out', async () => {
     const stored = (await plane.store.read(engine.formId, 1)) as { presentation: Record<string, unknown> }
     stored.presentation = { ...stored.presentation, unfiltered: ['notes'] }

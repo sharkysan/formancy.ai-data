@@ -26,7 +26,7 @@ export interface SectionGrid {
   filter: ListFilterTerm[]
   sort: ListSortTerm[]
   choices: ColumnChoice[]
-  /** The filter applied, by the filter panel. */
+  /** The filter applied, by its line, a chip, a header's box or a cell (0131-0133). */
   setFilter: (filter: ListFilterTerm[]) => void
   /** A header sorted by the person. */
   setSort: (sort: ListSortTerm[]) => void

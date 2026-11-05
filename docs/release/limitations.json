@@ -3768,7 +3768,7 @@
       ]
     },
     "0134": {
-      "reviewed": "sha256:4fa6f3851a359897e5f82247c11fab731e355273dfabfc4d53b4973d91f9be0d",
+      "reviewed": "sha256:3e8719051faa18c7340d42912ab0bd62117c6d180d0d0fd5f3add7b6316fd27b",
       "limitations": [
         {
           "area": "host",
@@ -3776,7 +3776,11 @@
         },
         {
           "area": "host",
-          "says": "No control says any longer that contains ignores case or that an empty text is a value rather than empty; a chip says what a condition finds, a timestamp's range included as whole days in UTC or as stored."
+          "says": "No control says any longer that contains finds text anywhere in the field, as Search does, or that text of no characters is a value, which is empty does not find; a chip says what a condition finds, a timestamp's range included as whole days in UTC or as stored."
+        },
+        {
+          "area": "host",
+          "says": "A date is typed as YYYY-MM-DD and a number with a point, in the filter line or a header box: the Build a condition panel's date picker and numeric keypads are gone, so a phone shows its letters' keyboard."
         },
         {
           "area": "studio",

@@ -7,7 +7,7 @@ import { useAfterRender } from './after-render.js'
 /*
  * A grid's filter as a line a person types: `status = placed and amount >
  * 1000`. The line is read here, by data-core's reader through the client,
- * into the terms the panel would have sent; the server sees those terms in
+ * into the terms a list request carries (0104); the server sees those terms in
  * the list's body and never the line.
  *
  * An ARIA 1.2 combobox: what may come next at the caret is a listbox under
@@ -19,7 +19,7 @@ import { useAfterRender } from './after-render.js'
  * second Esc puts back what is applied and gives the keyboard to the grid.
  *
  * What the line shows, while the person is not editing it, is the filter
- * applied, however it was applied -- a chip, a view, the panel -- written
+ * applied, however it was applied -- a chip, a view, a header's box -- written
  * by the same module that reads it. A condition on a field the line does
  * not offer (0123) is a chip, not in the line, and applying the line keeps
  * it, before what the line says.
@@ -57,7 +57,7 @@ export function FilterLine({
   const [active, setActive] = useState(-1)
   const [refusal, setRefusal] = useState<LineRefusal | null>(null)
   const [focused, setFocused] = useState(false)
-  // A filter changed elsewhere -- a view, a chip, the panel -- while the
+  // A filter changed elsewhere -- a view, a chip, a header's box -- while the
   // person is not in the line is what the line shows: an edit they left
   // unapplied is dropped, or the line and the chips would say two filters.
   // Followed while rendering, React's way to follow a value.

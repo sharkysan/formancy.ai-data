@@ -175,7 +175,7 @@ async function lists(heading: string, formId: string, query: Partial<RecordListQ
 describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // The grid opens on the view the server offered as the default, with one
   // first page asked for in its filter and its sort -- never a page of
-  // every record before it -- the picker naming it, the panel listing its
+  // every record before it -- the picker naming it, a chip saying its
   // condition and the Id header sorted descending; and the picker and Show
   // view sit between Search and Filter in the keyboard's order, Columns
   // after them (0106) (watched failing with
@@ -250,7 +250,7 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
   // (watched failing with the datasource asking for whatever block AG Grid
   // asks for: two first pages for one pick, one asked before the headers
   // showed the view's sort -- whether it sent the view's sort or AG Grid's).
-  test('picks a view: one first page with its filter and its sort, listed in the panel and shown on the headers', async () => {
+  test('picks a view: one first page with its filter and its sort, said by the chips and shown on the headers', async () => {
     await freshOrders(engine, `${VIEWED} ${stamp('picked')}`, ['150', '20', '300'])
     const user = await workspace(engine.formId)
     await lists('Records', engine.formId, NEWEST, `Rows 1–${String((await serverLists(engine.formId, NEWEST)).length)}. Filtered by Notes.`)

@@ -10,9 +10,14 @@
   value the server refuses is its sentence on the grid's line, the box
   keeping what was typed; a condition the line cannot read sends nothing;
   and a field its administrator left out is offered by neither the line
-  nor a box. `apps/host/src/filter-terms.test.ts`, without a server -- a
-  timestamp's range chip says it is whole days, in UTC or as stored
-  (watched failing with the words taken out). `apps/host/src/grid-filter.test.tsx`
+  nor a box. `packages/data-core/src/records/filter-line.test.ts` and
+  `filter-header.test.ts` -- a `contains` whose text is only spaces is the
+  line's and the box's refusal, not a request the server refuses, as the
+  panel's was (watched failing with it read and sent).
+  `apps/host/src/filter-terms.test.ts`, without a server -- a timestamp's
+  range chip says it is whole days, in UTC or as stored, and a view's
+  suggested name does not (each watched failing: with the words taken
+  out, and with them in the name). `apps/host/src/grid-filter.test.tsx`
   -- the line completes only the fields the form offers.
   `apps/host/scripts/browser/filtering.mjs`, in Chromium, Firefox and
   WebKit -- a header box applies its condition with Enter and keeps the
@@ -38,7 +43,10 @@ the column's own box.
 panel's hints said moved where a person reads a condition: a timestamp's
 range chip ends with "whole days in UTC" for an instant and "whole days
 as stored" for a time without a zone (`apps/host/src/filter-terms.ts`'s
-`summaryOf`), and the line's hint says the words it reads.
+`summaryOf`). A view's suggested name leaves them out (`viewName`), where
+they would read as a condition of their own. A `contains` with no text,
+which the panel refused before sending, the line and the boxes refuse
+too, in the words the line uses: "Notes contains needs text to find."
 
 **0123's name stays.** The studio's "The Filter panel offers", a
 presentation's `unfiltered` and a description's `offered` keep the name
@@ -57,9 +65,13 @@ the boxes say it back, and one button less above every grid.
   a menu named Field.
 - A field the grid does not show as a column has no box: only the line
   names it.
-- The panel's word that `contains` ignores case and that an empty text is
-  a value, not empty, is said by no control; the chips say what a
-  condition finds, not how.
+- Two of the panel's hints are said by no control: that `contains` finds
+  text anywhere in the field, as Search does, and that text of no
+  characters is a value, so `is empty` does not find it. The chips say
+  what a condition finds, not how.
+- The panel's date picker and its numeric keypads are gone: a date is
+  typed as `YYYY-MM-DD` and a number with a point, in the line or a box,
+  on a phone with the keyboard's letters.
 - An operator the server comes to offer is offered by no control until
   the line's reader learns to write it.
 - The studio still says "The Filter panel offers" of the line and the

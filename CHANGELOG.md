@@ -39,7 +39,7 @@ the same day (formancy.ai 0232).
   1000 had four choices and Apply to make for each condition, and asked for
   "some sort of filter language" that is easy and fun to use. Above each
   grid, `status = placed and amount > 1000` is read in the browser into
-  the terms the panel sends, completion offers what may come next, and a
+  the terms a list request carries, completion offers what may come next, and a
   line that cannot be read keeps every character and says where and why.
   Each condition is a chip in plain words; a removal, or Clear filter,
   offers Undo, and a list nothing matches offers to try it without the
@@ -96,8 +96,9 @@ the same day (formancy.ai 0232).
   person, an internal code or a technical flag included. In the studio's
   Presentation step, under List views, "The Filter panel offers" ticks each
   field a list is filtered by; unticked, the host page's Field menu leaves
-  it out. It is presentation, not permission: a view may still filter on
-  it, the panel says such a condition with its Remove, and the list route
+  it out (the filter line and the header boxes since 0134). It is
+  presentation, not permission: a view may still filter on it, a chip
+  says such a condition with its Remove, and the list route
   still answers one. What you notice: `list.filterable` gives each field
   `offered`, which this release's `@formancy/data-client` requires, so a
   host upgrades its server first; a presentation may hold `unfiltered`,
@@ -456,9 +457,10 @@ the same day (formancy.ai 0232).
   you notice: no Build a condition button above a grid; a field is named
   in the filter line, whose completion lists the fields offered, or in its
   column's box; and a timestamp's range chip ends "whole days in UTC" or
-  "whole days as stored", which the panel used to say. The studio's "The
-  Filter panel offers" keeps its name and now means the line and the
-  boxes. The server is unchanged.
+  "whole days as stored", which the panel used to say, and a `contains`
+  with no text is the line's refusal, as it was the panel's, rather than
+  the server's. The studio's "The Filter panel offers" keeps its name and
+  now means the line and the boxes. The server is unchanged.
 
 - **The host page draws a loaded record for its update** (0122). Why: a
   field written on create only -- a key, a chain's start, a column the

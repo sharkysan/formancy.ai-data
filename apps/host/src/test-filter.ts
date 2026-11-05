@@ -7,7 +7,7 @@ import type { Sent } from './test-fetch.js'
 
 /*
  * How the suites drive a grid's filter (0104) -- its line, its chips and
- * the panel that builds a condition -- as a person does: by role and
+ * its columns' header boxes (0132) -- as a person does: by role and
  * accessible name (formancy.ai 0034), inside the section whose heading
  * names the grid -- the Records panel, or a child section, each with a
  * filter of its own.
@@ -17,7 +17,7 @@ import type { Sent } from './test-fetch.js'
 export interface Asked {
   field: string
   condition: 'is' | 'is between' | 'contains' | 'has no value' | 'has a value'
-  /** What Value or Text is given: typed, or for a yes-or-no field chosen. */
+  /** The value the condition holds: typed into the box, or for a field with values chosen. */
   value?: string
   from?: string
   to?: string

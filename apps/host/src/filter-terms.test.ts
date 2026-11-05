@@ -1,14 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import type { PublishedForm } from '@formancy/data-client'
-import { panelFields, panelShown, summaryOf, withTerm } from './filter-terms.js'
+import { panelFields, panelShown, summaryOf, viewName, withTerm } from './filter-terms.js'
 import type { PanelField } from './filter-terms.js'
 
 /*
- * What a grid's filter panel offers and asks for (0104), as data: the fields
- * the server offers, by their labels, the condition a draft is, and the
- * sentences that name one. What the server does with a condition is the
- * suites' against the real server (filter.test.tsx); this holds what the
- * page makes of the person's choices before anything is sent.
+ * What a grid's filter offers and says (0104), as data: the fields the
+ * server offers, by their labels, and the sentences that name a condition.
+ * What the server does with a condition is the suites' against the real
+ * server (filter.test.tsx); this holds what the page makes of a filter
+ * before anything is sent.
  */
 
 /** A delivery's form as the server publishes it, with every input kind among its offers: the fields' types are the generator's. */
@@ -54,12 +54,12 @@ const definition = {
 const fields = panelFields(definition)
 const field = (key: string): PanelField => fields.find((offered) => offered.field === key) as PanelField
 
-describe('the fields a panel offers', () => {
-  // The panel is drawn for a field it offers, or for a condition applied
-  // -- a view's, on a field the administrator left out of the panel (0123)
-  // -- which it says; with neither, a grid has no panel to draw. Watched
-  // failing with the panel drawn for any field filtered by: a list whose
-  // every field was left out drew an empty panel.
+describe('the fields a filter offers', () => {
+  // The filter is drawn for a field it offers, or for a condition applied
+  // -- a view's, on a field the administrator left out of it (0123) --
+  // which a chip says; with neither, a grid has no filter to draw. Watched
+  // failing with the filter drawn for any field filtered by: a list whose
+  // every field was left out drew an empty one.
   test('is drawn for a field it offers, or for a condition applied on one it does not', () => {
     const notes = [field('notes')]
     expect(panelShown(fields, [])).toBe(true)
@@ -148,6 +148,22 @@ describe('what a condition says', () => {
       'Dispatched at is after 2026-10-08, whole days as stored',
     )
     expect(summaryOf({ field: 'due', op: 'range', from: '2026-10-01', to: null }, field('due'))).toBe('Due is on or after 2026-10-01')
+  })
+
+  // A view's suggested name is its conditions as the chips say them, less
+  // the days: ", whole days in UTC" would read as a condition of its own
+  // between two others, and spend the 80 characters a name has (0126)
+  // (watched failing with the days in the name).
+  test('names a view by its conditions, without the days a time’s range is on', () => {
+    expect(
+      viewName(
+        [
+          { field: 'shipped_at', op: 'range', from: '2026-10-08', to: '2026-10-09' },
+          { field: 'parcels', op: 'equals', value: '5' },
+        ],
+        fields,
+      ),
+    ).toBe('Shipped at is between 2026-10-08 and 2026-10-09, Parcels is 5')
   })
 
   // A bound that leaves out its own value (0130) is named for it, a

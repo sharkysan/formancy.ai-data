@@ -8,7 +8,7 @@ import { GridFilter } from './grid-filter.js'
 import type { PanelField } from './filter-terms.js'
 
 /*
- * A grid's filter -- its line, its chips and its condition builder --
+ * A grid's filter -- its line, its hint and its chips --
  * without a server: what each offers, what each sends to the one filter,
  * and how each shows it whatever changed it. What the server lists for a
  * filter, and that the terms reach it in the body alone, is the page's
@@ -78,8 +78,8 @@ const chips = () =>
 
 describe('the filter over fields left out of it (0123)', () => {
   // The line's completion offers what the filter offers, and not a field
-  // the administrator left out. Watched failing, when the panel offered
-  // fields, with its menu over every field filtered by: Notes was offered.
+  // the administrator left out (watched failing with every field the list
+  // is filtered by offered: Notes was an option).
   test('offers in the line only the fields it offers', async () => {
     render(<Section fields={[STATUS, NOTES]} sent={[]} />)
     const user = userEvent.setup()
@@ -94,8 +94,8 @@ describe('the filter over fields left out of it (0123)', () => {
 
   // With nothing to offer, there is no line, and a condition applied on a
   // field left out -- a view's -- is still a chip, with its Remove.
-  // Watched failing, when the panel was drawn, with its toggle over no
-  // field: a button opened an empty form.
+  // Watched failing with every field the list is filtered by offered: the
+  // line was drawn over Notes.
   test('says a condition on a field it does not offer, and offers nothing where it offers none', () => {
     render(<Section fields={[NOTES]} start={[{ field: 'notes', op: 'contains', text: 'urgent' }]} sent={[]} />)
     expect(screen.queryByRole('combobox', { name: 'Filter' })).toBeNull()
@@ -208,7 +208,7 @@ describe('the chips', () => {
 })
 
 describe('the line and the filter it shows', () => {
-  // A filter changed elsewhere -- a view picked, a header, the panel -- is
+  // A filter changed elsewhere -- a view picked, a chip, a header's box -- is
   // what the line shows once the person has left it, an edit they did not
   // apply dropped: kept, the line would say one filter and the chips
   // another, and Enter would put back what the view had replaced (watched
