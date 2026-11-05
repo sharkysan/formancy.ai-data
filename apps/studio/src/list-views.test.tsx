@@ -10,6 +10,9 @@ import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 import { addCondition, addSort, fill, nameView, opensTheGrid, pressSave, rows, savedViews, saveView, viewForm, viewsPanel } from './test-views.js'
+import { buildableOffers } from './list-views.js'
+import { draftOfView, viewOf } from './view-form.js'
+import type { FilterableField } from '@formancy/data-core'
 
 /**
  * A form's list views (0105), made in the Presentation step: named
@@ -440,5 +443,22 @@ describe('the views saved', () => {
     await within(publish).findByText('Published version 1 of sales-order.')
     const stored = (await plane.store.read('sales-order', 1)) as Bundle
     expect(stored.format === 2 && stored.presentation).not.toHaveProperty('views')
+  })
+})
+
+describe('a view holding a lookup’s record', () => {
+  // A view published by another client may hold a lookup's record, which
+  // the studio cannot pick: opened and saved again -- renamed, say -- it
+  // keeps the condition as it was, as a key of two columns does, never
+  // turned into the first condition the field offers here (watched
+  // failing: `= k1:2` was saved as `is NULL`, another list under the
+  // view's name).
+  test('keeps the record when it is saved again', () => {
+    const offers: FilterableField[] = [{ field: 'employee', offered: true, operators: ['equals', 'null', 'not-null'], input: 'lookup', days: null }]
+    const stored: StoredListView = { name: 'Grace’s', filter: [{ field: 'employee', op: 'equals', value: 'k1:2' }], sort: [] }
+    const draft = { ...draftOfView(stored), name: 'Approved by Grace' }
+    expect(viewOf(draft, buildableOffers(offers, draft)).filter).toEqual(stored.filter)
+    const unapproved = draftOfView({ ...stored, filter: [{ field: 'employee', op: 'null' }] })
+    expect(buildableOffers(offers, unapproved)).toEqual([{ ...offers[0], operators: ['null', 'not-null'], input: null }])
   })
 })

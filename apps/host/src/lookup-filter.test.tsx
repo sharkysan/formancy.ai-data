@@ -102,10 +102,7 @@ describe.each(ENGINES)("a lookup field's filter on $engine", (engine) => {
     const box = within(gridSection('Records')).getByRole('combobox', { name: 'Filter Approved by' })
     await user.type(box, 'Gra')
     await waitFor(
-      () =>
-        expect(
-          within(screen.getByRole('listbox', { name: 'Records of Approved by', hidden: true })).getAllByRole('option', { hidden: true }).length,
-        ).toBeGreaterThan(0),
+      () => expect(within(screen.getByRole('listbox', { name: 'Records of Approved by' })).getAllByRole('option').length).toBeGreaterThan(0),
       ARRIVES,
     )
     expect(await floor('a lookup’s records offered')).toEqual(CLEAN('a lookup’s records offered'))

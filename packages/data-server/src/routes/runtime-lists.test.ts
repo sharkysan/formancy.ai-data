@@ -493,6 +493,12 @@ describe('the list route', () => {
     ])
     expect((await list('customer', { filter: [{ field: 'credit_limit', op: 'null' }] })).statusCode).toBe(200)
     expect(lists[1]?.filter).toEqual([{ op: 'null', column: 'credit_limit' }])
+    // A lookup by the record it refers to, its token decoded to the foreign
+    // key's column (0135), and by whether it refers to one.
+    expect((await list('customer', { filter: [{ field: 'country', op: 'equals', value: 'k1:CH' }] })).statusCode).toBe(200)
+    expect(lists[2]?.filter).toMatchObject([{ op: 'refers', column: 'country_code', value: 'CH' }])
+    expect((await list('customer', { filter: [{ field: 'country', op: 'null' }] })).statusCode).toBe(200)
+    expect(lists[3]?.filter).toEqual([{ op: 'null', column: 'country_code' }])
   })
 
   // A condition the form does not offer is refused before any statement,

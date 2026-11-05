@@ -30,8 +30,9 @@ the same day (formancy.ai 0232).
   key does, so under SQL Server's case-insensitive collation a text key
   finds what the key relates. What you notice: `list.filterable` offers a
   lookup with `input: "lookup"`, which this release's
-  `@formancy/data-client` accepts and an earlier one refuses, so a host
-  upgrades its server first; the studio's "The Filter panel offers" lists
+  `@formancy/data-client` accepts and an earlier one refuses as a reply it
+  does not know, so a host upgrades its `@formancy/data-client` before the
+  server; the studio's "The Filter panel offers" lists
   lookups, and its views offer a lookup by whether it refers to a record.
   A lookup does not sort yet.
 

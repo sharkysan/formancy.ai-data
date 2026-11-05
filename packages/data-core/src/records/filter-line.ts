@@ -20,7 +20,7 @@ import type { FilterInput, FilterOp, ListFilterTerm, RangeExclusive } from '../r
  * filter's conditions all hold.
  */
 
-/** A field the line may name: the server's offer for it, its label, and the values it says, a boolean's or a state field's (0129). */
+/** A field the line may name: the server's offer for it, its label, and the values it says: a state field's (0129), or a lookup's records the page has heard of (0135). */
 export interface LineField {
   field: string
   label: string
@@ -340,9 +340,20 @@ function recordOf(field: LineField, token: LineToken): string | LineRefusal {
   return refuse(token, `${which} ${token.value}: pick one in its column's box.`)
 }
 
-/** What the line and a box write for `value` on `field`: a lookup's record by its label where the page knows one (0135), anything else as it is. */
+/**
+ * What the line and a box write for `value` on `field`: a lookup's record
+ * by its label where that label names it alone (0135) -- no other record
+ * has it, and it is no other record's token -- and otherwise by its token,
+ * which reads back as the record; anything else as it is.
+ */
 export function shownValue(field: LineField, value: string): string {
-  return field.input === 'lookup' ? (field.values?.find((entry) => entry.value === value)?.label ?? value) : value
+  if (field.input !== 'lookup') return value
+  const known = field.values ?? []
+  const label = known.find((entry) => entry.value === value)?.label
+  if (label === undefined) return value
+  const named = label.toLowerCase()
+  const alone = known.every((entry) => entry.value === value || (entry.label.toLowerCase() !== named && entry.value !== label))
+  return alone ? label : value
 }
 
 /** `1'000,50` as the number it is read as: apostrophes dropped, the last point or comma the decimal point. */

@@ -416,6 +416,8 @@ describe('the export route', () => {
       filter: [
         { field: 'notes', op: 'null' },
         { field: 'customer_no', op: 'range', from: '+01', to: '0200' },
+        // A lookup's record beside the parent on the same column (0135): a condition of its own, never a second `equal`.
+        { field: 'country', op: 'equals', value: 'k1:CH' },
       ],
     }
     const response = await exported('customer', body)
@@ -433,6 +435,7 @@ describe('the export route', () => {
         filter: [
           { op: 'null', column: 'notes' },
           { op: 'range', column: 'customer_no', type: INT32, from: '1', above: null, to: '200', before: null },
+          { op: 'refers', column: 'country_code', value: 'CH' },
         ],
         filters: { kind: 'restricted', equal: [{ column: 'tenant_id', value: '1' }] },
       })

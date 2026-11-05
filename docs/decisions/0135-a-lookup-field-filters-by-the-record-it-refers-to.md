@@ -5,29 +5,41 @@
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/records/plan-list.test.ts` --
   a token on a key of two columns is planned as each column's `refers`,
-  emptiness on a single nullable key as its column's `null`, a key of
-  several columns offers equality alone, and a token no row could have is
-  refused naming the field (watched failing with every lookup refused as
-  no field the list is filtered by); `list-terms.test.ts` -- an adapter
+  emptiness on a single nullable key as its column's `null`, and a token
+  no row could have is refused naming the field (watched failing with
+  every lookup refused as no field the list is filtered by);
+  `lookup-filter.test.ts` -- a key of several nullable columns offers
+  equality alone (watched failing with the column count unasked);
+  `list-terms.test.ts` -- an adapter
   reads `refers` fresh and refuses one spelled otherwise;
   `presentation/views.test.ts` and `unfiltered.test.ts` -- a view and the
   administrator's choice accept a lookup; `filter-line.test.ts`,
   `filter-header.test.ts` and `filter-complete.test.ts` -- the line and a
-  box read a record by the label the page shows and write it so, refuse a
-  label no record shown has or two share (watched failing with each sent
-  as typed), and completion inserts a record by its label. Both adapters'
+  box read a record by the label the page shows and write it so where it
+  names the record alone and by its token otherwise, refuse a label no
+  record shown has or two share (watched failing with each sent as typed,
+  and with a shared label written, then refused), and completion inserts a
+  record by its label. `packages/data-server/src/routes/runtime-lists.test.ts`
+  and `runtime-exports.test.ts` -- a lookup's record reaches the port as
+  `refers`, beside a parent on the same column. Both adapters'
   `list.integration.test.ts` hold the shared case `column filter: lookup`:
   a customer's country, a key of two columns and a line's order under its
   throughs, each by the database's equality. `apps/studio/src/list-views.test.tsx`
   -- a view offers a lookup by whether it refers to a record, and a key of
   two columns not at all (watched failing with the list's offer taken
-  whole). `apps/host/src/lookup-box.test.tsx`, `cell-example.test.tsx`,
+  whole), and a published view's record is kept when it is saved again
+  (watched failing: it was saved as `is NULL`).
+  `apps/host/src/lookup-box.test.tsx`, `cell-example.test.tsx`,
   `known-records.test.ts` and `filter-terms.test.ts`, without a server,
   and `apps/host/src/lookup-filter.test.tsx`, on both engines against the
   real server -- the box searches its lookup and applies the record
-  picked, the line takes a record's label, `=` on a cell takes its record,
-  each sent as the token and said by its label. The browser gate's
-  `filtering.mjs` measures the box's records open over the page.
+  picked, a search abandoned for the next keystroke and a resolve the
+  filter changed under leaving no rejection unheard (each watched failing
+  as one), the line takes a record's label, `=` on a cell takes its
+  record, each sent as the token and said by its label, and a view's
+  records are resolved by their labels. The browser gate's `filtering.mjs`
+  measures the box's records open over the page for sideways scroll and
+  the window's edges.
 
 ## Context
 
@@ -65,19 +77,25 @@ field (`apps/host/src/known-records.ts`): those its pages showed, those
 picked in a box or taken from a cell, and those its filter names, which a
 view brings without a label and the page resolves as it resolves a page's
 rows. They are the lookup's values in the line, which reads `approved_by =
-grace` as Grace's token and writes it back by the label, completes a
-record by its label, and refuses a label no record shown has, or two
-share, rather than send it; a chip says `Approved by is “Grace”`. A
+grace` as Grace's token and writes it back by the label -- by the token
+where the label is another record's too, or one the page has not heard,
+which reads back as the same record -- completes a record by its label,
+and refuses a label no record shown has, or two share, rather than send
+it; a chip says `Approved by is “Grace”`. A
 lookup's column has a box of its own (`apps/host/src/header-filter.tsx`'s
 `LookupBox`): a combobox that searches the lookup as the person types, as
 a form's lookup does, offers whether the field refers to a record while
-empty, and applies the record picked. `=` on a lookup's cell takes the
-record it holds.
+empty, and applies the record picked; two records of one label show their
+tokens beside it. Each keystroke's search abandons the one before, which
+stops in the database (0061), rather than wait for a pause: a pause would
+be a number nothing measured. `=` on a lookup's cell takes the record it
+holds.
 
 **The studio offers what it can pick.** Its view editor has no record
 picker, so it offers a lookup by whether it refers to a record, and a key
-of several columns not at all; a person's own view holds any lookup
-condition the line held.
+of several columns not at all; a view another client published with a
+lookup's record keeps it when the studio saves the view again. A
+person's own view holds any lookup condition the line held.
 
 **A view's record is fitted as far as its bindings tell.** A published
 view's token is checked to be a token of as many values as the key has

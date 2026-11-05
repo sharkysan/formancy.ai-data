@@ -165,7 +165,10 @@ export function filterJourney(plane, { check }) {
         const box = control(page, 'combobox', 'Filter Customer')
         check('a lookup’s box: Down from its header and Enter put the keyboard in it', await focusedOn(page, box))
         await page.keyboard.type('Muster')
-        // Drawn over the page, under the box: measured open, inside the window down to 320 px.
+        // Drawn over the page, under the box: measured open for sideways scroll
+        // and the window's edges, down to 320 px. Axe runs once the gate has
+        // left the box, which closes the list and reads "Muster" as the line
+        // would -- no record is called that -- saying so on the grid's line.
         await page.getByRole('listbox', { name: 'Records of Customer' }).getByRole('option', { name: 'Muster AG' }).waitFor(WITHIN)
         check('a lookup’s box: the keyboard stays in it while it offers records', await focusedOn(page, box))
       },
@@ -173,6 +176,8 @@ export function filterJourney(plane, { check }) {
     [
       'A lookup’s record applied (Records)',
       async (page) => {
+        // Back into the box the gate's measure left, its search still found: Down offers it again.
+        await control(page, 'combobox', 'Filter Customer').focus()
         const sent = nextList(page)
         await page.keyboard.press('ArrowDown')
         await page.keyboard.press('Enter')

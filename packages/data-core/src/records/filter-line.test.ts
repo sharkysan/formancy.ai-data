@@ -315,4 +315,23 @@ describe('a lookup in the line (0135)', () => {
     const unheard: ListFilterTerm[] = [{ field: 'employee', op: 'equals', value: 'k1:9' }]
     expect(printFilterLine(unheard, [EMPLOYEE])).toBe('employee = k1:9')
   })
+
+  // A label two records share, or one that is another record's token,
+  // names no one record: the line writes the token, which reads back as
+  // the record, where the label would be the line's own refusal (watched
+  // failing with "Grace Hopper" written, then refused as shared).
+  test('writes a record by its token where its label names no one record', () => {
+    const grace: ListFilterTerm[] = [{ field: 'employee', op: 'equals', value: 'k1:2' }]
+    expect(printFilterLine(grace, [EMPLOYEE])).toBe('employee = k1:2')
+    expect(parseFilterLine(printFilterLine(grace, [EMPLOYEE]), [EMPLOYEE])).toEqual({ ok: true, filter: grace })
+    const posing: LineField = {
+      ...EMPLOYEE,
+      values: [
+        { value: 'k1:5', label: 'k1:6' },
+        { value: 'k1:6', label: 'Bob' },
+      ],
+    }
+    const five: ListFilterTerm[] = [{ field: 'employee', op: 'equals', value: 'k1:5' }]
+    expect(parseFilterLine(printFilterLine(five, [posing]), [posing])).toEqual({ ok: true, filter: five })
+  })
 })

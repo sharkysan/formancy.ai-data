@@ -61,10 +61,14 @@ export function useKnownRecords(client: DataClient, formId: string, definition: 
     const byField = new Map<string, string[]>()
     for (const [field, token] of pairs) byField.set(field, [...(byField.get(field) ?? []), token])
     for (const [field, tokens] of byField) {
-      void client.resolve(formId, sources.get(field) as string, { operation: 'read', tokens }, controller.signal).then((named) => {
-        // A label the server does not give leaves the token said as itself.
-        if (named.ok) heard(field, named.value)
-      })
+      client.resolve(formId, sources.get(field) as string, { operation: 'read', tokens }, controller.signal).then(
+        (named) => {
+          // A label the server does not give leaves the token said as itself.
+          if (named.ok) heard(field, named.value)
+        },
+        // Abandoned as the filter changed: the one asked after it answers.
+        () => {},
+      )
     }
     return () => controller.abort()
   }, [asked, client, formId, sources, heard])

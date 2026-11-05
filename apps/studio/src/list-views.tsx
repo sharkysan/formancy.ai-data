@@ -49,6 +49,25 @@ export function SavedView({ view, label }: { view: StoredListView; label: (key: 
 }
 
 /**
+ * The offers a view's condition may be built from here: a lookup's record
+ * is picked by what the lookup shows of it (0135), and the studio has no
+ * picker for one, so a lookup offers only whether it refers to a record --
+ * and a key of several columns, which offers no more than its record, is
+ * not offered. A lookup whose record the view being edited already holds,
+ * published by another client, is not offered either, so that row is kept
+ * as it was, as a key of several columns' is, rather than turned into the
+ * first condition the field offers here.
+ */
+export function buildableOffers(filterable: readonly FilterableField[], draft: ViewDraft): FilterableField[] {
+  return filterable.flatMap((offer) => {
+    if (offer.input !== 'lookup') return [offer]
+    if (draft.filter.some((row) => row.field === offer.field && row.op === 'equals')) return []
+    const operators = offer.operators.filter((op) => op === 'null' || op === 'not-null')
+    return operators.length === 0 ? [] : [{ ...offer, operators, input: null }]
+  })
+}
+
+/**
  * The views, each in words with what may be done to it, and the form that
  * makes one or edits one. A press that takes away the button pressed puts
  * the keyboard where a person goes on from: a moved view keeps it, on the
@@ -62,19 +81,6 @@ export function SavedView({ view, label }: { view: StoredListView; label: (key: 
  * shape and its fit to these bindings, and a refusal is said in their
  * words with everything typed kept.
  */
-/**
- * An offer as a view's condition may be built from it here: a lookup's
- * record is picked by what the lookup shows of it (0135), and the studio
- * has no picker for one, so a lookup offers only whether it refers to a
- * record -- and a key of several columns, which offers no more than its
- * record, is not offered.
- */
-function buildableOffer(offer: FilterableField): FilterableField[] {
-  if (offer.input !== 'lookup') return [offer]
-  const operators = offer.operators.filter((op) => op === 'null' || op === 'not-null')
-  return operators.length === 0 ? [] : [{ ...offer, operators, input: null }]
-}
-
 export function ListViewsPanel({
   bindings,
   document,
@@ -100,9 +106,9 @@ export function ListViewsPanel({
       ),
     [bindings],
   )
-  const buildable = useMemo(() => columns.filterable.flatMap(buildableOffer), [columns])
   const label = (key: string) => labelOf(document, key)
   const [draft, setDraft] = useState<ViewDraft>(EMPTY_VIEW)
+  const buildable = useMemo(() => buildableOffers(columns.filterable, draft), [columns, draft])
   // The view in the form, by the name it was saved under: the name typed may change, and a move changes its place.
   const [editing, setEditing] = useState<string | null>(null)
   const [refused, setRefused] = useState<string[]>([])

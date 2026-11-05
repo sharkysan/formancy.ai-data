@@ -1,4 +1,4 @@
-import { createContext, useContext, useId, useRef, useState } from 'react'
+import { createContext, useContext, useEffect, useId, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent, ReactElement } from 'react'
 import { headerCondition, headerText } from '@formancy/data-client'
 import type { LineField, ListFilterTerm, LookupRow } from '@formancy/data-client'
@@ -227,21 +227,124 @@ const emptiness = (field: LineField): LookupOption[] => [
   ...(field.operators.includes('not-null') ? [{ kind: 'not-null' as const, words: 'is not empty' }] : []),
 ]
 
+/** A lookup's records whose labels match what is typed, searched as it is typed. */
+interface LookupSearch {
+  found: readonly LookupRow[]
+  /** Search for `text`, abandoning the search before it; nothing for empty text. */
+  search: (text: string) => void
+  /** Abandon the search under way. */
+  abandon: () => void
+}
+
+/**
+ * Each keystroke's search abandons the one before it, which stops in the
+ * database (0061) and whose rejection is heard here and dropped; a search
+ * the server refuses is said once, however many keystrokes it took.
+ */
+function useLookupSearch(field: LineField, headers: HeaderFilters): LookupSearch {
+  const [found, setFound] = useState<readonly LookupRow[]>([])
+  const searching = useRef<AbortController | null>(null)
+  /** The search refusal last said, so each keystroke of one refused search does not say it again. */
+  const said = useRef<string | null>(null)
+  const abandon = (): void => searching.current?.abort()
+  function search(text: string): void {
+    abandon()
+    if (text.trim() === '' || headers.records === undefined) {
+      setFound([])
+      return
+    }
+    const controller = new AbortController()
+    searching.current = controller
+    headers.records(field.field, text, controller.signal).then(
+      (rows) => {
+        if (controller.signal.aborted) return
+        if (typeof rows === 'string') {
+          if (said.current !== rows) headers.refused(rows)
+          said.current = rows
+          setFound([])
+          return
+        }
+        said.current = null
+        setFound(rows)
+      },
+      // Abandoned for the next keystroke, or as the box closed: nothing to say.
+      () => {},
+    )
+  }
+  return { found, search, abandon }
+}
+
+/**
+ * A lookup column's listbox, drawn over the page under its box, since the
+ * grid's header clips what its cells hold. A record whose label another
+ * shares shows its token beside it. A press anywhere on the list keeps the
+ * keyboard in the box, and the option the arrows reach is kept in view.
+ */
+function LookupList({
+  id,
+  label,
+  options,
+  active,
+  shown,
+  place,
+  onPick,
+}: {
+  id: string
+  label: string
+  options: readonly LookupOption[]
+  active: number
+  shown: boolean
+  place: DOMRect | undefined
+  onPick: (option: LookupOption) => void
+}): ReactElement {
+  const list = useRef<HTMLUListElement>(null)
+  useEffect(() => {
+    if (shown && active >= 0) list.current?.children[active]?.scrollIntoView?.({ block: 'nearest' })
+  }, [shown, active])
+  const shared = (row: LookupRow): boolean =>
+    options.some((other) => other.kind === 'record' && other.row !== row && other.row.label.toLowerCase() === row.label.toLowerCase())
+  return createPortal(
+    <ul
+      ref={list}
+      id={`${id}-records`}
+      className="filter-options lookup-options"
+      role="listbox"
+      aria-label={`Records of ${label}`}
+      hidden={!shown}
+      style={place === undefined ? undefined : listPlace(place)}
+      // A press on the list, its scroll bar included, keeps the keyboard in the box.
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      {options.map((option, index) => (
+        <li
+          key={option.kind === 'record' ? option.row.token : option.kind}
+          id={`${id}-record-${String(index)}`}
+          role="option"
+          aria-selected={index === active}
+          onMouseDown={() => onPick(option)}
+        >
+          <span className="filter-option-label">{option.kind === 'record' ? option.row.label : option.words}</span>
+          {option.kind === 'record' && shared(option.row) ? <span className="filter-option-hint">{option.row.token}</span> : null}
+        </li>
+      ))}
+    </ul>,
+    document.body,
+  )
+}
+
 /**
  * A lookup column's box (0135): an ARIA 1.2 combobox that searches the
- * lookup as the person types -- each keystroke's search abandoning the one
- * before it, which stops in the database (0061) -- and offers the records
- * it finds by their labels, or, while empty, whether the field refers to
- * a record. A record picked is the column's condition by its token, and
- * the page hears of it, so the line says it by its label. Enter on typed
- * text reads it as the line would, a label the page knows or the words
- * `is empty`; Esc gives an edit up. The listbox is drawn over the page,
- * under the box, since the grid's header clips what its cells hold.
+ * lookup as the person types (`useLookupSearch`) and offers the records it
+ * finds by their labels, or, while empty, whether the field refers to a
+ * record. A record picked is the column's condition by its token, and the
+ * page hears of it, so the line says it by its label. Enter on typed text,
+ * or leaving the box, reads it as the line would -- a label the page knows,
+ * or the words `is empty` -- and Esc gives an edit up.
  */
 function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilters }): ReactElement {
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
-  const [found, setFound] = useState<readonly LookupRow[]>([])
+  const { found, search, abandon } = useLookupSearch(field, headers)
   // The records found count as known: a label typed whole names one of them, and one picked is shown by its label.
   const known: LineField = {
     ...field,
@@ -257,9 +360,6 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
   const [focused, setFocused] = useState(false)
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(-1)
-  const searching = useRef<AbortController | null>(null)
-  /** The search refusal last said, so each keystroke of one refused search does not say it again. */
-  const saidSearch = useRef<string | null>(null)
   const givingUp = useRef(false)
   const refusedText = useRef<string | null>(null)
   const now = JSON.stringify(headers.filter)
@@ -272,31 +372,9 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
   const listed = open && options.length > 0
 
   function close(): void {
-    searching.current?.abort()
+    abandon()
     setOpen(false)
     setActive(-1)
-  }
-
-  function search(text: string): void {
-    searching.current?.abort()
-    setActive(-1)
-    if (text.trim() === '' || headers.records === undefined) {
-      setFound([])
-      return
-    }
-    const controller = new AbortController()
-    searching.current = controller
-    void headers.records(field.field, text, controller.signal).then((rows) => {
-      if (controller.signal.aborted) return
-      if (typeof rows === 'string') {
-        if (saidSearch.current !== rows) headers.refused(rows)
-        saidSearch.current = rows
-        setFound([])
-        return
-      }
-      saidSearch.current = null
-      setFound(rows)
-    })
   }
 
   function commit(term: ListFilterTerm | null): void {
@@ -330,7 +408,22 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
     commit(term)
   }
 
-  const place = input.current?.getBoundingClientRect()
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>): void {
+    if (composing(event.nativeEvent)) return
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setOpen(true)
+      const step = event.key === 'ArrowDown' ? 1 : -1
+      setActive((at) => (options.length === 0 ? -1 : (at + step + options.length) % options.length))
+      return
+    }
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    const option = listed && active >= 0 ? options[active] : undefined
+    if (option === undefined) applyTyped()
+    else pick(option)
+  }
+
   return (
     <>
       <input
@@ -349,6 +442,7 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
         onChange={(event) => {
           setDraft(event.target.value)
           setOpen(true)
+          setActive(-1)
           search(event.target.value)
         }}
         onFocus={() => setFocused(true)}
@@ -365,49 +459,9 @@ function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilter
           setDraft(null)
           close()
         }}
-        onKeyDown={(event) => {
-          if (composing(event.nativeEvent)) return
-          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault()
-            setOpen(true)
-            const step = event.key === 'ArrowDown' ? 1 : -1
-            setActive((at) => (options.length === 0 ? -1 : (at + step + options.length) % options.length))
-            return
-          }
-          if (event.key !== 'Enter') return
-          event.preventDefault()
-          const option = listed && active >= 0 ? options[active] : undefined
-          if (option === undefined) applyTyped()
-          else pick(option)
-        }}
+        onKeyDown={onKeyDown}
       />
-      {createPortal(
-        <ul
-          id={`${id}-records`}
-          className="filter-options lookup-options"
-          role="listbox"
-          aria-label={`Records of ${field.label}`}
-          hidden={!listed}
-          style={place === undefined ? undefined : listPlace(place)}
-        >
-          {options.map((option, index) => (
-            <li
-              key={option.kind === 'record' ? option.row.token : option.kind}
-              id={`${id}-record-${String(index)}`}
-              role="option"
-              aria-selected={index === active}
-              onMouseDown={(event) => {
-                // Taken where it is pressed, the keyboard staying in the box.
-                event.preventDefault()
-                pick(option)
-              }}
-            >
-              <span className="filter-option-label">{option.kind === 'record' ? option.row.label : option.words}</span>
-            </li>
-          ))}
-        </ul>,
-        document.body,
-      )}
+      <LookupList id={id} label={field.label} options={options} active={active} shown={listed} place={input.current?.getBoundingClientRect()} onPick={pick} />
     </>
   )
 }
