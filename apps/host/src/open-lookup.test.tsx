@@ -3,7 +3,22 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
-import { chooseForm, chooseRenderer, load, loaded, mount, newRecord, RENDERERS, signIn, stamp, unsavedNotice } from './test-host.js'
+import {
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  dataRows,
+  gridSection,
+  load,
+  loaded,
+  mount,
+  newRecord,
+  RENDERERS,
+  searchRecords,
+  signIn,
+  stamp,
+  unsavedNotice,
+} from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -16,7 +31,9 @@ import type { Engine, Plane } from './test-plane.js'
  * renderer, against the real server, through the forms `startPlane({
  * children: true, deletes: true })` publishes: an order line, whose order
  * both the order form and the staff's order form are over, keyed by what
- * the line's foreign key references, both titled "Order".
+ * the line's foreign key references, both titled "Order"; and the staff's
+ * order, whose creator and approver are both employees, which the
+ * employee form is over.
  *
  * Found by role and accessible name. What the accessibility tree cannot
  * answer is read off the DOM, each where it is made: `location.hash`, which
@@ -105,11 +122,30 @@ async function notesAt(heading: string, renderer: RendererName): Promise<HTMLInp
   return waitFor(() => within(levelPane(heading, renderer)).getByLabelText<HTMLInputElement>('Notes', { exact: true }), ARRIVES)
 }
 
-/** Every Open a pane offers, by name. */
+/** Every Open a pane offers, by name: "Open in <form>", or "Open <lookup> in <form>". */
 function opensIn(container: HTMLElement): string[] {
   return within(container)
-    .queryAllByRole('button', { name: /^Open in / })
+    .queryAllByRole('button', { name: /^Open (.+ )?in / })
     .map((button) => button.textContent ?? '')
+}
+
+/** Enter on the first cell of the row of the grid `heading` names whose first cell says `first`, once it is listed. */
+async function enterRow(user: User, heading: string, first: string): Promise<void> {
+  const row = await waitFor(() => {
+    const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
+    const found = dataRows(grid).find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === first)
+    expect(found, `${heading} lists no ${first}`).toBeDefined()
+    return found as HTMLElement
+  }, ARRIVES)
+  ;(within(row).getAllByRole('gridcell')[0] as HTMLElement).focus()
+  await user.keyboard('{Enter}')
+}
+
+/** An employee's name, as stored. */
+async function employeeName(engine: Engine, token: string): Promise<string> {
+  const read = await client(TOKENS.clerk).read(engine.employees, token)
+  if (!read.ok) throw new Error(read.message)
+  return String(read.value.answers['name'])
 }
 
 /** The two Opens under a line's order: both order forms are titled Order, so each says its id. */
@@ -277,5 +313,66 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     const read = await notesAt(`Order ${order}`, 'React')
     await waitFor(() => expect({ value: read.value, disabled: read.disabled }).toEqual({ value: words, disabled: true }), ARRIVES)
+  })
+
+  // A line opened below its order holds that order in its parent field,
+  // drawn disabled: Open there would open the record the level above
+  // shows, again, a level further down -- the line at level 1 offers both
+  // order forms under that field, as the first case shows (to be watched
+  // failing in CI with the level's opens passed through opensBelow
+  // unfiltered).
+  test('a line opened below its order offers no Open under its order', async () => {
+    const words = stamp('open-parent')
+    const { order, line } = await lineOf(engine, words)
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.formId)
+    await chooseRenderer(user, 'React')
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    await searchRecords(user, words, [order.slice(3)])
+    await enterRow(user, 'Records', order.slice(3))
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await answeredOnce('Order line')
+    await enterRow(user, 'Order line', '1')
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+    const below = levelPane(`Order line ${line}`, 'React')
+    const parent = await waitFor(() => within(below).getByRole<HTMLSelectElement>('combobox', { name: /^Order\*?$/ }), ARRIVES)
+    await waitFor(() => expect({ value: parent.value, disabled: parent.disabled }).toEqual({ value: order, disabled: true }), ARRIVES)
+    expect(opensIn(below)).toEqual([])
+  })
+
+  // A level reached through a lookup offers Open under its own lookups,
+  // a level further down, the trail naming every level and its crumbs
+  // going back up. The staff's order names two employees, its creator and
+  // its approver, both in the employee form: each Open says its lookup,
+  // so a person -- and this test -- can tell them apart by name (to be
+  // watched failing in CI with forms told apart within one lookup alone:
+  // two buttons named "Open in Employee").
+  test("a lookup's record opens a level further down, each Open named for its lookup", async () => {
+    const order = await plane.db.insertApprovedOrder(engine.connection, 1, 2)
+    const made = await client(TOKENS.clerk).create(engine.lines, { order, line_no: '1', quantity: '1', unit_price: '2.50' })
+    if (!made.ok || made.value.record === null) throw new Error(`the line was not created: ${made.ok ? 'no token' : made.message}`)
+    const line = made.value.record
+    const [approver, creator] = [await employeeName(engine, 'k1:1'), await employeeName(engine, 'k1:2')]
+    const user = await lineLoaded(engine, 'React', line)
+    await user.click(await waitFor(() => within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.staff})` }), ARRIVES))
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    const staff = (): HTMLElement => levelPane(`Order ${order}`, 'React')
+    await waitFor(() => expect(opensIn(staff()).sort()).toEqual(['Open Approved by in Employee', 'Open Created by in Employee']), ARRIVES)
+
+    await user.click(within(staff()).getByRole('button', { name: 'Open Approved by in Employee' }))
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
+    expect(trail()).toEqual(['Records', `Order line ${line}`, `Order ${order}`, `Employee ${approver}`])
+    expect(window.location.hash).toBe(`#form=${engine.lines}&layout=drill&view=record&level=3`)
+
+    await crumb(user, `Order ${order}`)
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    await user.click(within(staff()).getByRole('button', { name: 'Open Created by in Employee' }))
+    await waitFor(() => expect(focusedName()).toBe('Employee k1:2'), ARRIVES)
+    expect(trail()).toEqual(['Records', `Order line ${line}`, `Order ${order}`, `Employee ${creator}`])
+
+    await crumb(user, `Order line ${line}`)
+    await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
+    expect(window.location.hash).toBe(`#form=${engine.lines}&layout=drill&view=record&level=1`)
   })
 })

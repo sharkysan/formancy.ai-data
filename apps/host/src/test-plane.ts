@@ -180,11 +180,12 @@ export interface Plane {
     /** A row of `parity.removable_child` that refers to the removable record `record`, with NO ACTION: a delete of it is refused while this row is there. */
     referToRemovable(connection: Engine['connection'], record: string): Promise<void>
     /**
-     * An order of tenant 1's approved by employee `approver`, written by the
-     * owner -- the clerk may only read the form that names approvers -- and
-     * its token, which spells its key.
+     * An order of tenant 1's approved by employee `approver` -- and created
+     * by `creator`, where one is given -- written by the owner -- the clerk
+     * may only read the form that names approvers -- and its token, which
+     * spells its key.
      */
-    insertApprovedOrder(connection: Engine['connection'], approver: number): Promise<string>
+    insertApprovedOrder(connection: Engine['connection'], approver: number, creator?: number | null): Promise<string>
   }
   close(): Promise<void>
 }
@@ -489,18 +490,19 @@ export async function startPlane(
             "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, notes) select 1, 1001, '2026-10-08', 'placed', 1, concat(@notes, ' ', value) from generate_series(1, @count)",
           )
       },
-      insertApprovedOrder: async (connection, approver) => {
+      insertApprovedOrder: async (connection, approver, creator = null) => {
         if (connection === 'pg') {
           const [row] = await pgAdmin<
             Array<{ id: string }>
-          >`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, approved_by) values (1, 1001, date '2026-10-08', 'placed', 1, ${approver}) returning id::text as id`
+          >`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) values (1, 1001, date '2026-10-08', 'placed', 1, ${approver}, ${creator}) returning id::text as id`
           return `k1:${String(row?.id)}`
         }
         const result = await msAdmin
           .request()
           .input('approver', mssql.Int, approver)
+          .input('creator', mssql.Int, creator)
           .query<{ id: string }>(
-            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver)",
+            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver, @creator)",
           )
         return `k1:${String(result.recordset[0]?.id)}`
       },
