@@ -462,19 +462,28 @@ line says, the record read through `src/opening.ts`
 and `src/next-version.ts` Change from a date's next version of an open one,
 which the session saves with `supersede`
 ([0115](../decisions/0115-a-host-page-changes-an-open-version-from-a-date.md));
-`src/form-head.tsx` is an open form's header;
+`src/form-head.tsx` is an open form's header, and `src/detail.tsx` the
+open record's;
 `src/children.tsx` lists a record's child rows, and `src/one-child.tsx`
 draws a child that is a section of the record -- its one row in a form, or
 Add -- shown by `src/section.ts` while the record as stored holds its
 condition's answer
 ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md));
+`src/record-tabs.tsx` draws a record and those children as tabs beside it,
+the record's own first, `src/tabs.ts` deciding which children get a tab,
+what each is named and where a key moves the selection, and
+`src/tab-list.tsx` WAI-ARIA's tabs over them, each panel drawn the first
+time its tab is shown and kept after, all of them forgotten for another
+record
+([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md));
 `src/record-tree.tsx` shows a form that is its own child as a tree of its
 records, a level asked for when it is expanded, and `src/tree-lines.ts`
 what it says of a level that holds none
 ([0110](../decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md));
 Drill down, a layout of one level at a time, is
 `src/use-drill.ts` -- the levels below the record, in memory -- with
-`src/drill-level.tsx` drawing a level, `src/trail.tsx` the trail back up,
+`src/drill-level.tsx` drawing a level, its children in tabs as the
+record's are, `src/trail.tsx` the trail back up,
 `src/crumbs.ts` what each crumb is called, and `src/child-forms.ts` the
 children the menu names for a level's form
 ([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)),

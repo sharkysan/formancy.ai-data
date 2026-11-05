@@ -402,9 +402,10 @@ until then the address is formancy.ai's 404
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
   a statement to any database; the host page draws them as its menu of
-  forms, and an open record's child rows below it
+  forms, and an open record's child rows in tabs beside it
   ([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md),
-  [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+  [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
+  [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](./docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md),
@@ -678,13 +679,18 @@ searched when you press Search and sorted by any header the server says
 sorts. Space opens a row beside the grid, Enter opens it and moves there;
 the record is drawn by `@formancy/react`, `@formancy/angular` or both, as you
 choose, and the choice is kept in this browser with where you left the
-separator between the records and the record. Below the record, each form
-whose rows reference it lists them -- an order's lines -- and each child row
-opens in its own form; a new one is created under the open record. A form
-generated as a section of the record -- a table whose key is its foreign
-key onto the record's, holding at most one row of it -- is its one row in
-its own form instead, or Add, shown while the record as stored holds the
-value its generation names
+separator between the records and the record. Beside the record, each form
+whose rows reference it is a tab -- an order's lines, its deliveries --
+after the record's own, which holds its form; Left and Right move between
+the tabs, and Tab goes on into the one shown. A child's tab lists its rows
+the first time it is shown and keeps them, a row open and what you typed in
+it, while you look at another; another record opens on its own tab
+([0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
+Each child row opens in its own form; a new one is created under the open
+record. A form generated as a section of the record -- a table whose key
+is its foreign key onto the record's, holding at most one row of it -- is
+its one row in its own form instead, in the record's own tab, or Add,
+shown while the record as stored holds the value its generation names
 ([0109](./docs/decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
 A form that is its own child -- an employee and their manager -- shows its
 records as a grid or as a tree: the records with no parent, and under each
@@ -695,8 +701,8 @@ the address says which form and layout, never which record. Open by record
 token loads one by its token.
 
 Drill down, the fourth layout, shows one level at a time: the records, the
-record, a child row of it with its own children, and so on as deep as the
-forms go -- an employee, an order it approved, that order's line. Opening a
+record, a child row of it with its own children in tabs beside it, and so
+on as deep as the forms go -- an employee, an order it approved, that order's line. Opening a
 row goes down a level, and a trail above says where you are, each level
 above a button back to it; Back and Forward move between the levels too.
 A record is named in the trail by its first required plain text field, a
@@ -1093,7 +1099,7 @@ Each tenant has 120 customers and 420 orders, with their lines and
 deliveries, generated from a fixed seed and dated back from a fixed day, so
 every build holds the same rows (`apps/live-demo/src/data/`). Search the
 orders and page through them, open
-one with its lines and deliveries in the linked grids, find a customer with
+one with its lines and deliveries in tabs beside it, find a customer with
 the typeahead, change an order, add one with a line and delete it again. As
 Otto, tenant 1's orders are not there; as Vera, every write is refused. The
 four forms are what the generator made from the demo account's grants,
