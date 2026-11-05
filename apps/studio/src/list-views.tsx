@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
-import { listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
+import { displayedLookups, listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
 import type { FilterableField, FormBindings, StoredListView } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 
@@ -103,6 +103,9 @@ export function ListViewsPanel({
         bindings,
         bindings.fields.map((binding) => binding.field),
         [],
+        [],
+        [],
+        displayedLookups(bindings),
       ),
     [bindings],
   )

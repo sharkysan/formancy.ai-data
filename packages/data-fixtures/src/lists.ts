@@ -97,6 +97,13 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
  *   NULL, and again once its unique key is dropped and a key value is
  *   inserted twice, a page decided over its own statement's description is
  *   refused (0044), though a read by token still is not.
+ * - `label`: a table pair the suite creates, a child naming its parent by a
+ *   text key, listed by the lookup's label (0136): the parent's name, read
+ *   under the lookup's filter -- tenant 1's parents alone -- so a child of
+ *   tenant 2's parent sorts among the children that show no label, after
+ *   every name both ways, by its key; and the same order page after page,
+ *   each one row after the one before. The names order alike under any
+ *   collation.
  */
 export const LIST_PARITY = {
   pages: {
@@ -189,6 +196,23 @@ export const LIST_PARITY = {
     field: 'country',
     exact: { record: 'k1:CH', keys: ['1001'] },
     folded: { record: 'k1:ch', keys: { postgres: [], sqlserver: ['1001'] } },
+  },
+  label: {
+    /** The parents, `code`, `name`, `tenant_id`: tenant 2's B is hidden from tenant 1's clerk by the lookup's filter. */
+    parents: [
+      ['A', 'Alpha', '1'],
+      ['B', 'Beta', '2'],
+      ['C', 'Gamma', '1'],
+    ],
+    /** Tenant 1's children, `id`, `parent_code` (null is NULL). */
+    children: [
+      ['1', 'C'],
+      ['2', 'A'],
+      ['3', 'B'],
+      ['4', null],
+    ],
+    asc: ['2', '1', '3', '4'],
+    desc: ['1', '2', '3', '4'],
   },
   key: {
     /** `code`, `label`, inserted in this order. */

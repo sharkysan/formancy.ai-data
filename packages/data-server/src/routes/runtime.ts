@@ -317,7 +317,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     if (!listed.ok) return { ok: false, answer: planRefusal(listed.code, listed.message) }
     const presentation = bundle.format === 2 ? bundle.presentation : { views: [], unfiltered: [] }
     const views = viewsFor(presentation.views ?? [], actor, todayOf(Date.now()))
-    return { ok: true, columns: listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [], own) }
+    return { ok: true, columns: listColumns(bundle.bindings, listed.fields, views, presentation.unfiltered ?? [], own, [...listed.labels.keys()]) }
   }
 
   // The forms this person may read (0045): from the published bundles and the policy, asking no database.

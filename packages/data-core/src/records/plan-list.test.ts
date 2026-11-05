@@ -40,6 +40,7 @@ import {
   snapshot,
   STAMPED,
   table,
+  TENANT,
   TENANT_ONE,
   text,
   value,
@@ -440,8 +441,56 @@ describe('planList', () => {
         message,
       })
     }
-    // Sorting by one is not offered yet: its token is no order a person reads.
-    expect(listColumns(PG_ORDER, CLERK_FIELDS, []).sortable).not.toContain('customer')
+  })
+
+  // A lookup sorts by what it shows (0136): its first display column, read
+  // from its target under the lookup's own read filter, as its label is --
+  // the target, the key's pairing and the filter carried to the adapter,
+  // NULLs last whatever the key, since a target the filter hides shows no
+  // label -- then the key, so the order is total. Only a lookup whose
+  // filter this person resolves is offered: one whose filter names an
+  // attribute they do not carry offers them no options, and so no order.
+  // Watched failing with every lookup refused as not sortable.
+  test('sorts by a lookup’s first display column, under its own read filter', () => {
+    const employee = { name: 'name', type: text(200) }
+    expect(planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ sort: [{ field: 'employee', direction: 'desc' }] }))).toMatchObject({
+      ok: true,
+      request: {
+        sort: [
+          {
+            label: {
+              columns: [{ name: 'created_by', type: INT32 }],
+              target: sales('employee'),
+              targetColumns: [{ name: 'id', type: INT32 }],
+              filters: TENANT_ONE,
+              display: employee,
+            },
+            direction: 'desc',
+            nulls: 'last',
+          },
+          { column: 'id', direction: 'asc', nulls: null },
+        ],
+      },
+    })
+    expect(listColumns(PG_ORDER, CLERK_FIELDS, [], [], [], ['customer', 'employee']).sortable).toEqual([
+      'id',
+      'customer',
+      'order_date',
+      'status',
+      'amount',
+      'notes',
+      'group',
+      'employee',
+      'approved_by',
+      'paid',
+    ])
+    const unoffered: FormPolicy = { ...ORDER_POLICY, lookups: { customer: TENANT, employee: [{ column: 'tenant_id', attribute: 'branch' }] } }
+    expect(planList(PG, PG_ORDER, unoffered, CLERK, query({ sort: [{ field: 'employee', direction: 'asc' }] }))).toEqual({
+      ok: false,
+      code: 'not-sortable',
+      message: 'employee is not a field you may sort this list by.',
+    })
+    expect(planList(PG, PG_ORDER, unoffered, CLERK, query({ sort: [{ field: 'customer', direction: 'asc' }] }))).toMatchObject({ ok: true })
   })
 
   // A search the form cannot match would answer with the unfiltered first

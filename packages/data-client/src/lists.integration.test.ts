@@ -176,11 +176,13 @@ describe.each(ENGINES)('lists on $engine', ({ connection }) => {
       code: 'limit-out-of-range',
       message: `The limit is a whole number from 1 to ${String(LIST_PAGE_SIZE)}.`,
     })
-    expect(await plane.client().list(formId, { sort: [{ field: 'customer', direction: 'asc' }] })).toEqual({
+    expect(await plane.client().list(formId, { sort: [{ field: 'nothing', direction: 'asc' }] })).toEqual({
       ok: false,
       status: 400,
       code: 'not-sortable',
-      message: 'customer is not a field you may sort this list by.',
+      message: 'nothing is not a field you may sort this list by.',
     })
+    // A lookup sorts by what it shows (0136).
+    expect((await plane.client().list(formId, { sort: [{ field: 'customer', direction: 'asc' }] })).ok).toBe(true)
   })
 })

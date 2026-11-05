@@ -36,7 +36,12 @@ export interface OrderTerm {
   column: string
   direction: 'asc' | 'desc'
   nulls: 'first' | 'last' | null
+  /** What is ordered by in place of `row`'s column: a lookup's label, a column of the apply it is read in (0136). */
+  value?: string
 }
+
+/** What a term orders by: its expression, or `row`'s column. */
+const valueOf = (row: string, term: OrderTerm): string => term.value ?? `${row}.${quoteName(term.column)}`
 
 /**
  * The order of `row`'s columns, made explicit about NULLs where a term says
@@ -57,7 +62,7 @@ export function orderBy(row: string, terms: readonly OrderTerm[]): string {
   return terms
     .flatMap((term) => {
       if (term.direction !== 'asc' && term.direction !== 'desc') throw new Error(`${term.column} sorts asc or desc`)
-      const name = `${row}.${quoteName(term.column)}`
+      const name = valueOf(row, term)
       if (term.nulls === null) return [`${name} ${term.direction}`]
       if (term.nulls !== 'first' && term.nulls !== 'last') throw new Error(`${term.column} puts NULLs first or last`)
       const [nullRank, valueRank] = term.nulls === 'first' ? ['0', '1'] : ['1', '0']
@@ -93,7 +98,7 @@ export function after(row: string, anchor: (index: number) => string, terms: rea
     if (term.direction !== 'asc' && term.direction !== 'desc') throw new Error(`${term.column} sorts asc or desc`)
     if (term.nulls !== null && term.nulls !== 'last') throw new Error(`${term.column} has no place after a row this adapter can spell.`)
     const past = term.direction === 'asc' ? '>' : '<'
-    const column = `${row}.${quoteName(term.column)}`
+    const column = valueOf(row, term)
     const value = anchor(index)
     const beyond = term.nulls === null ? `${column} ${past} ${value}` : `(${column} ${past} ${value} or (${column} is null and ${value} is not null))`
     const tied = term.nulls === null ? `${column} = ${value}` : `(${column} = ${value} or (${column} is null and ${value} is null))`

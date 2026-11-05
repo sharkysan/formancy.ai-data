@@ -1,5 +1,5 @@
 import type { ApiValue } from '../codecs/codec.js'
-import type { LookupKeyColumn, LookupKeyType, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
+import type { LookupDisplayColumn, LookupKeyColumn, LookupKeyType, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
 
 /**
@@ -92,6 +92,35 @@ export interface RecordSort {
   nulls: 'last' | null
 }
 
+/**
+ * A lookup's label a list is ordered by (0136): what the grid shows for the
+ * row's foreign key -- the target's first display column -- read under the
+ * lookup's own read filter, as the label is. `columns` are the root's
+ * foreign-key columns in the binding's order, `targetColumns` the key they
+ * reference, of any key kind, text included; `filters` the lookup's filter
+ * on the target, `unrestricted` where it filters nothing. Not a `Through`:
+ * a through decides which rows exist, and a label decides none of that --
+ * a row whose target the filter hides, or holds no row for, sorts as one
+ * with no label.
+ */
+export interface SortLabel {
+  columns: readonly RecordColumn[]
+  target: ObjectRef
+  targetColumns: readonly LookupKeyColumn[]
+  filters: RowFilters
+  display: LookupDisplayColumn
+}
+
+/** A list's order by a lookup's label (0136): its NULLs -- no label to show -- always last. */
+export interface LabelSort {
+  label: SortLabel
+  direction: 'asc' | 'desc'
+  nulls: 'last'
+}
+
+/** One term of a list's order: a column's, or a lookup's label, told apart by `'label' in term`. */
+export type ListSort = RecordSort | LabelSort
+
 /** A list's search: the trimmed text, never empty, and the columns it is matched against, each of a kind both engines spell alike as text (0028). */
 export interface ListSearch {
   text: string
@@ -165,7 +194,7 @@ export interface ListRequest {
   equal: readonly RecordValue[]
   filter: readonly RecordFilter[]
   search: ListSearch | null
-  sort: readonly RecordSort[]
+  sort: readonly ListSort[]
   after: readonly RecordValue[] | null
   offset: number
   limit: number

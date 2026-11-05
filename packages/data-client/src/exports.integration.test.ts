@@ -100,11 +100,11 @@ describe.each(ENGINES)('exports on $engine', ({ connection }) => {
   // would never learn why. A filter a field does not offer is refused as
   // a list refuses it (0104).
   test("a refusal comes back as the server's code and sentence", async () => {
-    expect(await plane.client().exportRecords(formId, { sort: [{ field: 'customer', direction: 'asc' }] })).toEqual({
+    expect(await plane.client().exportRecords(formId, { sort: [{ field: 'nothing', direction: 'asc' }] })).toEqual({
       ok: false,
       status: 400,
       code: 'not-sortable',
-      message: 'customer is not a field you may sort this list by.',
+      message: 'nothing is not a field you may sort this list by.',
     })
     expect(await plane.client().exportRecords(formId, { filter: [{ field: 'order_date', op: 'contains', text: '2026' }] })).toEqual({
       ok: false,
