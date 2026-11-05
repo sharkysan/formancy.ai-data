@@ -706,19 +706,36 @@ In every layout Back goes on past the open form's earlier views and
 levels, one press each, to the form before
 ([0097](./docs/decisions/0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md)).
 
-Filter, under the search and in each child section, opens the grid's own
-panel over the fields the server offers a filter on, by their labels --
-less any the form's administrator left out of the panel in the studio's
-List views, though a view may still filter on one and the panel says it
-([0123](./docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)) -- : a
+Filter, under the search and in each child section, is a line you type
+the grid's filter in -- `status = placed and amount > 1000` -- over the
+fields the server offers a filter on, each named by its label as you
+would type it (`order_date`), or by its key where two labels would say
+one name. A condition is a name, `=`, `>`, `>=`, `<`, `<=` or `contains`
+and a value, quoted where it holds a space, or a name and `is empty` or
+`is not empty`, and conditions are joined by `and`; two comparisons on one
+field are one range. As you type, a list under the line offers what may
+come next: the fields with their labels, a field's operators, a state's
+labels, yes or no. Enter applies the line and lists the grid again from
+its first row, and a line the page cannot read keeps what you typed,
+selects what it is about and says why -- `1'000` is written `1000`. `/`
+puts the keyboard on the Records line, and Esc twice gives it back to the
+grid
+([0131](./docs/decisions/0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)).
+Each condition applied is a chip in words -- "Amount is over 1000" -- with
+its own Remove, and Clear filter removes them all; either offers Undo
+until the filter changes some other way, and a list nothing matches
+offers to try it without its last condition. Build a condition opens the
+grid's own panel, less any field the form's administrator left out of it
+in the studio's List views, though a view may still filter on one, which
+is then a chip and not in the line
+([0123](./docs/decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md)): a
 field, a condition it offers -- is, is between, contains, has no value,
 has a value -- and a value, or a range's From and To, as the field takes
 them; a timestamp's range is whole days, in UTC for an instant, as the grid
-shows times. Apply puts the condition in place of the one its field had and
-lists the grid again from its first row, and the grid's line says which
-fields filter it. Each condition is listed with its own Remove, and Clear
-filter removes them all. A value the server cannot hold is its sentence on
-the grid's line, with what you typed still in its box. A child section's
+shows times. Apply puts the condition in place of the one its field had,
+and the grid's line says which fields filter it. A value the server
+cannot hold is its sentence on the grid's line, with what you typed still
+in the line or its box. A child section's
 filter is its own, and opening another parent starts without one; the
 filter is in no address, so a reload or another form starts without the
 conditions you typed
@@ -730,7 +747,7 @@ offers you by its name -- those for one of your roles and those for
 everyone, which the administrator decides per view in the studio
 ([0124](./docs/decisions/0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md)). Choosing one sends nothing; Show view sets the
 grid's filter and sort at once, in one request, and keeps the keyboard on
-the button: the Filter panel lists its conditions and the headers show its
+the button: the chips and the line show its conditions and the headers show its
 order. Any condition you add or header you press makes it
 Your own filter and sort, and the view's own conditions and order show the
 view again. A grid opens on the view marked to open it, and on every record

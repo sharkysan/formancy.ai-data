@@ -95,11 +95,13 @@ export const offerWords = (field: LineField): string[] => field.operators.flatMa
  * "Größe (cm)". Its key instead where that name is empty, is another
  * field's name too or is another field's key, so a name says one field.
  */
-const slug = (label: string): string =>
-  label
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '_')
-    .replace(/^_+|_+$/gu, '')
+function slug(label: string): string {
+  // Every run is one `_` by now, so at most one is at either end: trimmed without a second pattern over the label.
+  const joined = label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '_')
+  const start = joined.startsWith('_') ? 1 : 0
+  const end = joined.length > start && joined.endsWith('_') ? joined.length - 1 : joined.length
+  return joined.slice(start, end)
+}
 
 export function lineNames(fields: readonly LineField[]): Map<string, string> {
   const keys = new Set(fields.map((field) => field.field.toLowerCase()))
@@ -233,7 +235,13 @@ function step(state: LineState, token: LineToken, context: Context): LineState |
   }
 }
 
-type Asked = { op: 'equals'; value: string } | { op: 'contains'; text: string } | { op: 'null' | 'not-null' } | { op: 'lower' | 'upper'; bound: Bound }
+type Asked =
+  | { op: 'equals'; value: string }
+  | { op: 'contains'; text: string }
+  | { op: 'null' }
+  | { op: 'not-null' }
+  | { op: 'lower'; bound: Bound }
+  | { op: 'upper'; bound: Bound }
 
 /** The condition a value completes, its operator read by what it bounds. */
 function valued(state: Extract<LineState, { want: 'value' }>, token: LineToken, context: Context): LineState | LineRefusal {

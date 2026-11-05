@@ -3067,7 +3067,7 @@
       ]
     },
     "0104": {
-      "reviewed": "sha256:7b2eb4039e128ce6283720d0e1f8729c05be0591490aff079e38eeb4b6ddbbd6",
+      "reviewed": "sha256:2d070ec89a46a8ff79601634afa6ab17d45380176dd4a6cbc903d6935b28547b",
       "limitations": [
         {
           "area": "forms",
@@ -3695,6 +3695,33 @@
           "area": "forms",
           "says": "A timestamp's bounds are still whole days: after a day means from the next midnight on and before a day below its own. After 9999-12-31 is refused in a sentence that offers from 9999-12-31 on instead, which on PostgreSQL also finds later years and infinity; before 0001-01-01 finds nothing on SQL Server and, on PostgreSQL, days before the common era and -infinity.",
           "heldBy": "packages/data-core/src/records/filter.test.ts"
+        }
+      ]
+    },
+    "0131": {
+      "reviewed": "sha256:ffb5b6324799d4790bf65d95ebd893d9ce2a3849cc62a91127dbc3b6ff0a2fe7",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A field's name in the filter line is its label, lower-cased, so a field relabelled in the studio is typed by its new name; a view stores keys and keeps working.",
+          "heldBy": "packages/data-core/src/records/filter-line.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The filter line's words -- and, contains, is empty -- are English, and it has no or, no not and no parentheses: every condition holds."
+        },
+        {
+          "area": "host",
+          "says": "Undo puts back one removal, until the filter changes some other way; a list nothing matches offers to drop its last condition, which need not be the one that empties it."
+        },
+        {
+          "area": "host",
+          "says": "A number is typed in the line with a point and no separators, and a date as YYYY-MM-DD; 1'000 or 1000,50 is refused with the number it would be read as.",
+          "heldBy": "packages/data-core/src/records/filter-line.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "An operator the server comes to offer is the Build a condition panel's alone until the line's reader learns to write it."
         }
       ]
     }
