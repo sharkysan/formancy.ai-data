@@ -197,8 +197,11 @@ export function filterJourney(plane, { check }) {
           terms.some((term) => term.field === 'amount' && term.op === 'equals') ? null : `the filter is ${JSON.stringify(terms)}`,
         )
         check(
-          'a cell’s example: the cell shows the button that keeps them',
-          (await cell.getByRole('button', { name: /^Only rows where Amount is / }).count()) === 1 ? null : 'no button in the cell',
+          'a cell’s example: the cell shows the button that keeps them, out of the accessibility tree',
+          // By its title: the accessibility tree names nothing it leaves out.
+          (await cell.getByTitle(/^Only rows where Amount is /).count()) === 1 && (await cell.getByRole('button').count()) === 0
+            ? null
+            : 'no button in the cell, or one the accessibility tree reads',
         )
       },
     ],

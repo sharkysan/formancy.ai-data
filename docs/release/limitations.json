@@ -3751,11 +3751,11 @@
       ]
     },
     "0133": {
-      "reviewed": "sha256:86a42d1827a049602fa442fe02a49a88420fc257426d69c7fca4446de946fe4c",
+      "reviewed": "sha256:6bd54b5f4312014a7fdd996a1a62bd6b7a454b39cde53587651843b6487e0f86",
       "limitations": [
         {
           "area": "host",
-          "says": "A cell's button that keeps the rows with its value shows only while the cell has the keyboard: a pointer clicks the cell, which opens its row, then the button; the keyboard's way is = on the cell, which the filter line's hint says."
+          "says": "A cell's button that keeps the rows with its value shows only while the cell has the keyboard: a pointer clicks the cell, which opens its row, then the button; the keyboard's way is = on the cell, which the filter line's hint says, and the button is out of the accessibility tree, so a screen reader hears the key's way alone."
         },
         {
           "area": "host",

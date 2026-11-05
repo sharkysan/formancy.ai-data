@@ -142,16 +142,20 @@ describe('a cell’s example', () => {
     expect(sent).toEqual([[{ field: 'status', op: 'equals', value: 'placed' }]])
   })
 
-  // A cell that has the keyboard shows a button, named for what it keeps,
+  // A cell that has the keyboard shows a button, titled for what it keeps,
   // which a pointer presses; a cell without it shows none (watched failing
-  // with no button drawn).
+  // with no button drawn). The button is out of the accessibility tree, so
+  // the cell's name stays its value (watched failing with the button read
+  // into the cell's name); the tree cannot name what it leaves out, so the
+  // button is found by its title, which a pointer's tooltip shows.
   test('is offered as a button while the cell has the keyboard', async () => {
     const sent: ListFilterTerm[][] = []
     render(<Grid sent={sent} />)
     const amount = await cell('8', 3)
     expect(within(amount).queryByRole('button')).toBeNull()
     amount.focus()
-    const button = await within(amount).findByRole('button', { name: 'Only rows where Amount is 3.00' })
+    const button = await within(amount).findByTitle('Only rows where Amount is 3.00')
+    expect(within(amount).queryByRole('button')).toBeNull()
     await userEvent.setup().click(button)
     expect(sent).toEqual([[{ field: 'amount', op: 'equals', value: '3.00' }]])
   })

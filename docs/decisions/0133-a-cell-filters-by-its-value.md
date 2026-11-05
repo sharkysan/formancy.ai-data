@@ -8,7 +8,8 @@
   offers that, and none where the column offers no equality or the cell
   shows a lookup's label; the example takes the place of the condition its
   column had; `=` on a focused cell applies it, and a cell with the
-  keyboard shows a button named for what it keeps (each watched failing:
+  keyboard shows a button titled for what it keeps, out of the
+  accessibility tree so the cell's name stays its value (each watched failing:
   with the label taken for the value, with `=` heard nowhere, and with the
   button never drawn). `apps/host/src/filter-line.test.tsx`, on
   both engines against the real server -- `=` on a cell lists the rows
@@ -36,11 +37,13 @@ column offers that. Only a column the filter line may name offers one,
 and only where the line could say it: a timestamp offers no equality, and
 a lookup's cell shows a label whose value it is not.
 
-**A cell that has the keyboard shows a button.** "=", named "Only rows
+**A cell that has the keyboard shows a button.** "=", titled "Only rows
 where Status is “placed”", in the cell's own style attribute as a row's
-Delete is (no rule of host.css reaches into a grid), 24 pixels a side,
-out of the Tab order: a pointer's way to the same thing. A click on it is
-the button's, never the row's. The filter line's hint says the key.
+Delete is (no rule of host.css reaches into a grid), 24 pixels a side: a
+pointer's way to the same thing, out of the Tab order and out of the
+accessibility tree, since inside the cell its name would be read with the
+cell's every time the keyboard reached it. A click on it is the button's,
+never the row's. The filter line's hint says the key.
 
 ## Consequences
 
@@ -52,7 +55,8 @@ takes it back.
 - The button appears only on a cell that has the keyboard -- a pointer
   clicks the cell, which opens its row, then the button.
 - `=` is a key a person learns from the line's hint; nothing on the cell
-  says it while it has no focus.
+  says it while it has no focus, and a screen reader hears no button in
+  the cell -- the key is its way.
 - A timestamp's cell offers nothing: its value is an instant, and its
   column is filtered by whole days.
 

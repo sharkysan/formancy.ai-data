@@ -38,10 +38,13 @@ export function filterByExample(headers: HeaderFilters | null, row: GridRow | un
 }
 
 /**
- * The button a focused cell shows: "=", named for what it keeps. Its own
+ * The button a focused cell shows: "=", titled for what it keeps. Its own
  * style attribute, in room variables, because no rule of host.css reaches
  * into a grid (0047), as a row's Delete is; 24 pixels a side, WCAG 2.5.8's
- * least. Out of the Tab order: the keyboard's way is `=` on the cell.
+ * least. A pointer's way alone, out of the Tab order and out of the
+ * accessibility tree: inside the cell its name would be read with the
+ * cell's every time the cell is reached, and the keyboard's way, `=` on the
+ * cell, is the one the filter line's hint says.
  */
 const EXAMPLE_LOOK: CSSProperties = {
   display: 'inline-grid',
@@ -82,8 +85,9 @@ export function ExampleButton({ cell, row, colId }: { cell: HTMLElement; row: Gr
     <button
       type="button"
       tabIndex={-1}
+      aria-hidden="true"
       style={EXAMPLE_LOOK}
-      aria-label={`Only rows where ${summaryOf(term, field)}`}
+      title={`Only rows where ${summaryOf(term, field)}`}
       onClick={() => filterByExample(headers, row, colId)}
     >
       =
