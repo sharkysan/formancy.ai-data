@@ -17,7 +17,7 @@ import {
 import { controlFor } from './controls.js'
 import { helpTextFor, tooLongNote } from './help.js'
 import type { HelpText } from './help.js'
-import { createKeyAllocator, fieldKeyFor, labelFor, sourceNameFor } from './names.js'
+import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
 import { sectionFor } from './section.js'
 import { narrowForValidity, validityFor, validityOperations } from './validity.js'
@@ -93,7 +93,11 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     const lookup = lookupByColumn.get(column.name)
     if (lookup !== undefined) {
       // A lookup takes the place of its first column; its other columns are part of it.
-      if (lookup.foreignKey.columns[0] === column.name) planned.push(planLookup(root, lookup, request, identity, allocate, isView, notes))
+      if (lookup.foreignKey.columns[0] === column.name) {
+        // Another lookup into the same table: each is told apart by its own column (0138).
+        const shared = lookups.some((other) => other !== lookup && sameTable(other.foreignKey, lookup.foreignKey))
+        planned.push(planLookup(root, lookup, request, identity, allocate, isView, notes, shared))
+      }
       continue
     }
     const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), notes)
@@ -180,6 +184,7 @@ function planLookup(
   allocate: (wanted: string) => string,
   isView: boolean,
   notes: GenerationNote[],
+  shared: boolean,
 ): Planned {
   const { choice, foreignKey } = lookup
   const target = foreignKey.references
@@ -199,7 +204,7 @@ function planLookup(
   notes.push({
     subject: key,
     kind: 'inferred',
-    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}, ${controlNote(searched)}; label from the table name${help.kind === 'comment' ? ", help text from its column's comment" : ''}.`,
+    message: `A lookup over ${foreignKey.name} (${foreignKey.columns.join(', ')}), showing ${choice.display.join(', ')} of ${target.table.name}, ${controlNote(searched)}; ${shared ? `label from its column, since another lookup refers to ${target.table.name} too` : 'label from the table name'}${help.kind === 'comment' ? ", help text from its column's comment" : ''}.`,
   })
   if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   const possible = !isView && columns.every((column) => column.generated === 'none')
@@ -211,7 +216,9 @@ function planLookup(
     field: {
       key,
       type: 'select',
-      label: labelFor(target.table.name),
+      label: shared
+        ? labelOfLookup(foreignKey.columns.length === 1 ? (foreignKey.columns[0] as string) : foreignKey.name.replace(/^fk_/, ''))
+        : labelFor(target.table.name),
       ...described(help),
       optionsSource: source,
       ...(searched.length > 0 ? { widget: 'typeahead' as const } : {}),
@@ -520,4 +527,10 @@ function layoutFor(root: ObjectMeta, planned: readonly Planned[]): LayoutNode[] 
   if (main.length > 0) nodes.push({ kind: 'section', label: labelFor(root.ref.name), children: [grid(main)] })
   if (system.length > 0) nodes.push({ kind: 'section', label: 'Record', children: [grid(system)] })
   return nodes
+}
+
+/** Whether two foreign keys refer to one table. */
+function sameTable(left: ForeignKeyMeta, right: ForeignKeyMeta): boolean {
+  const [a, b] = [left.references?.table, right.references?.table]
+  return a !== undefined && b !== undefined && a.schema === b.schema && a.name === b.name
 }

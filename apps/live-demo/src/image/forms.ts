@@ -207,9 +207,10 @@ export function demoPresentation(spec: DemoFormSpec, base: GeneratedForm['form']
       choice.label === undefined ? [] : [[binding.field, { binding, label: choice.label }] as const],
     ),
   )
+  // A label the base already gives is no entry: one that changes nothing is refused at publish (0030).
   const fields = base.model.fields.flatMap((field) => {
     const entry = labelled.get(field.key)
-    return entry === undefined ? [] : [{ field: field.key, anchor: fieldAnchor(entry.binding), label: entry.label }]
+    return entry === undefined || entry.label === field.label ? [] : [{ field: field.key, anchor: fieldAnchor(entry.binding), label: entry.label }]
   })
   return { version: PRESENTATION_VERSION, fields, sections: [] }
 }

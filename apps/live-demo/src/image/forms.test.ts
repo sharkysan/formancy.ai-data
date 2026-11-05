@@ -171,9 +171,10 @@ describe('the demo forms', () => {
     expect(validatePolicy(demoPolicy(order, orderBindings()), orderBindings())).toEqual({ ok: true })
   })
 
-  // Two lookups of one table are both "Employee" as generated; the
-  // labels are chosen by foreign key, so they follow the column when the
-  // generator renumbers the keys (0030).
+  // The demo labels the employee lookups by their foreign keys, so the
+  // labels follow the column when the generator renumbers the keys (0030),
+  // over a base that labelled both "Employee", as one generated before 0137
+  // did.
   test('relabel the employee lookups by their foreign keys, in the base order', () => {
     for (const [created, approved] of [
       ['employee', 'employee_2'],
@@ -193,5 +194,23 @@ describe('the demo forms', () => {
     const lines = DEMO_FORM_SPECS.find((spec) => spec.id === 'order-line') as DemoFormSpec
     const bindings: FormBindings = { ...orderBindings(), fields: [lookupBinding('order', 'fk_order_line_order', ['order_id'], 'order')] }
     expect(demoPresentation(lines, baseOf(bindings), bindings)).toEqual({ version: 1, fields: [], sections: [] })
+  })
+
+  // Since 0137 the generator labels two lookups into one table by their
+  // columns, so the base already says "Created by" and "Approved by": an
+  // entry repeating the base's label is refused at publish (0030), and the
+  // image's build failed on it. Watched failing with every demo label
+  // written.
+  test('leave out a label the base already gives', () => {
+    const bindings = orderBindings()
+    const base = {
+      model: {
+        fields: bindings.fields.map((binding) => ({
+          key: binding.field,
+          label: binding.kind === 'lookup' && binding.foreignKey === 'fk_order_created_by' ? 'Created by' : 'Employee',
+        })),
+      },
+    } as unknown as GeneratedForm['form']
+    expect(demoPresentation(order, base, bindings).fields.map((field) => field.label)).toEqual(['Approved by'])
   })
 })

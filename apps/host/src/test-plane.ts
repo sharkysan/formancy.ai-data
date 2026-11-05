@@ -13,7 +13,7 @@ import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
-import { childForms, clerkPolicy, lookupsOf, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
+import { childForms, clerkPolicy, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
 import { injectingFetch } from './test-fetch.js'
 import type { Sent } from './test-fetch.js'
@@ -423,14 +423,7 @@ export async function startPlane(
         ...(child.pinned === undefined ? {} : { pinned: child.pinned }),
       })
       const proposed = bindings as Proposed & FormBindings
-      const presentation: PresentationOverrides = {
-        ...EMPTY_PRESENTATION,
-        fields: lookupsOf(proposed).flatMap(({ field, foreignKey }) => {
-          const label = child.labels?.[foreignKey]
-          return label === undefined ? [] : [{ field, anchor: { kind: 'lookup' as const, foreignKey }, label }]
-        }),
-        ...(child.views === undefined ? {} : { views: child.views }),
-      }
+      const presentation: PresentationOverrides = { ...EMPTY_PRESENTATION, ...(child.views === undefined ? {} : { views: child.views }) }
       const presented = applyPresentation(form as FormSchema, presentation, proposed)
       if (!presented.ok) throw new Error(presented.problems.join('; '))
       const bundle = {
