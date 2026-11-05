@@ -22,7 +22,15 @@ import writer from './fixtures/postgres-writer.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
 import sqlserverWriter from './fixtures/sqlserver-writer.json'
-import { OWNER_SNAPSHOT, READER_SNAPSHOT, readSnapshot, SQLSERVER_READER_SNAPSHOT, SQLSERVER_SNAPSHOT, SQLSERVER_WRITER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
+import {
+  OWNER_SNAPSHOT,
+  READER_SNAPSHOT,
+  readSnapshot,
+  SQLSERVER_READER_SNAPSHOT,
+  SQLSERVER_SNAPSHOT,
+  SQLSERVER_WRITER_SNAPSHOT,
+  WRITER_SNAPSHOT,
+} from './test-server.js'
 
 /**
  * The databases the suite's server discovers are captured from the shared
@@ -114,7 +122,8 @@ describe('the captured snapshots', () => {
     const major = String(imageMajor('postgres', POSTGRES_IMAGE))
     for (const snapshot of [OWNER_SNAPSHOT, READER_SNAPSHOT, WRITER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(major)
     const release = String(imageMajor('sqlserver', SQLSERVER_IMAGE))
-    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, SQLSERVER_WRITER_SNAPSHOT]) expect(snapshot.serverVersion.split('.')[0]).toBe(release)
+    for (const snapshot of [SQLSERVER_SNAPSHOT, SQLSERVER_READER_SNAPSHOT, SQLSERVER_WRITER_SNAPSHOT])
+      expect(snapshot.serverVersion.split('.')[0]).toBe(release)
   })
 
   // The server is outside the fingerprint as well (0068), and the studio
