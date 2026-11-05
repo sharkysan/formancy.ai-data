@@ -37,6 +37,8 @@ export interface HeaderFilters {
   filter: readonly ListFilterTerm[]
   onFilter: (next: ListFilterTerm[]) => void
   refused: (message: string) => void
+  /** The id of the filter line's hint, which says `=` on a cell (0133): the grid is described by it. */
+  hint?: string
 }
 
 /** A grid's boxes' filter, for the boxes AG Grid draws in its header. */

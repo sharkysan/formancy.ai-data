@@ -14,9 +14,11 @@ import type { HeaderFilters } from './header-filter.js'
 
 /*
  * Filter by example (0133), without a server: a cell's value made the
- * condition on its column, by `=` on the cell or by the button the cell
- * shows while it has the keyboard. What the server lists for it is the
- * page's against it (filter-line.test.tsx).
+ * condition on its column by `=` on the cell. What the server lists for it,
+ * and where the keyboard is after, is the page's against it
+ * (filter-line.test.tsx). A cell is found by the text of its row's first
+ * cell and by `aria-colindex`, AG Grid's number of its column: the
+ * accessibility tree names a cell by its value, not by its column.
  */
 
 afterEach(cleanup)
@@ -97,7 +99,9 @@ function Grid({ sent }: { sent: ListFilterTerm[][] }): ReactElement {
         asked: () => {},
         drilling: () => false,
         sorted: () => {},
-        example: (at, colId) => filterByExample(now.current, at, colId),
+        example: (at, colId) => {
+          filterByExample(now.current, at, colId)
+        },
       },
     }),
   )
@@ -142,24 +146,15 @@ describe('a cell’s example', () => {
     expect(sent).toEqual([[{ field: 'status', op: 'equals', value: 'placed' }]])
   })
 
-  // A cell that has the keyboard shows a button, titled for what it keeps,
-  // which a pointer presses; a cell without it shows none (watched failing
-  // with no button drawn). The button is out of the accessibility tree, so
-  // the cell's name stays its value (watched failing with the button read
-  // into the cell's name, and with its "=" written into the cell's text);
-  // the tree cannot name what it leaves out, so the button is found by its
-  // title, which a pointer's tooltip shows.
-  test('is offered as a button while the cell has the keyboard', async () => {
+  // `=` with Ctrl or Cmd is the browser's zoom, and with a plain Alt a
+  // shortcut: none of them filters (watched failing with every `=` heard).
+  test('is not applied by = held with Ctrl, Cmd or Alt', async () => {
     const sent: ListFilterTerm[][] = []
     render(<Grid sent={sent} />)
-    const amount = await cell('8', 3)
-    expect(within(amount).queryByRole('button')).toBeNull()
-    amount.focus()
-    const button = await within(amount).findByTitle('Only rows where Amount is 3.00')
-    expect(within(amount).queryByRole('button')).toBeNull()
-    // Nothing of it in the cell's text, which a person copies and the suites read rows by.
-    expect(amount.textContent).toBe('3.00')
-    await userEvent.setup().click(button)
-    expect(sent).toEqual([[{ field: 'amount', op: 'equals', value: '3.00' }]])
+    const status = await cell('7', 2)
+    status.focus()
+    const user = userEvent.setup()
+    await user.keyboard('{Control>}={/Control}{Meta>}={/Meta}{Alt>}={/Alt}')
+    expect(sent).toEqual([])
   })
 })

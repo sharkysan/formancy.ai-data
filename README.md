@@ -728,8 +728,8 @@ text and equal to anything else -- applied with Enter or on leaving it,
 and a select of its values for a state or a yes-or-no column; the
 keyboard reaches it from the header with Down and Enter
 ([0132](./docs/decisions/0132-each-column-header-filters-its-column.md)).
-`=` on a cell keeps the rows with its value, and a cell that has the
-keyboard shows a button that does the same
+`=` on a cell keeps the rows with its value, and the keyboard comes back
+to that cell to point at the next
 ([0133](./docs/decisions/0133-a-cell-filters-by-its-value.md)).
 Each condition applied is a chip in words -- "Amount is over 1000" -- with
 its own Remove, and Clear filter removes them all; either offers Undo

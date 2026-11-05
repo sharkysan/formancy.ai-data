@@ -259,8 +259,11 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
   })
 
   // A cell's value is its column's condition on `=` (0133): the list
-  // asked for with it in the body, and the chip and the box saying it.
-  // Without the key a person would retype what they are looking at.
+  // asked for with it in the body, the chip and the box saying it, and the
+  // keyboard back on the row it was pressed on, in its column, so a person
+  // can point at one value after another. Without the key a person would
+  // retype what they are looking at; without the keyboard put back, it
+  // was left on the page itself.
   test('keeps the rows with a cell’s value on =', async () => {
     const notes = stamp('example')
     const orders = await freshOrders(engine, notes, ['1', '2'])
@@ -276,16 +279,20 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     const cell = within(second as HTMLElement)
       .getAllByRole('gridcell')
       .find((each) => each.getAttribute('aria-colindex') === amount) as HTMLElement
+    const value = cell.textContent ?? ''
     cell.focus()
     await user.keyboard('=')
     await waitFor(() => expect(recordKeys()).toEqual(orders.slice(1)), ARRIVES)
     expect(filtersSent(engine.formId)).toEqual([
       [
         { field: 'notes', op: 'contains', text: notes },
-        { field: 'amount', op: 'equals', value: cell.textContent ?? '' },
+        { field: 'amount', op: 'equals', value },
       ],
     ])
-    expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(cell.textContent)
+    await listsApplied('Records', [`Notes contains “${notes}”`, `Amount is ${value}`])
+    expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(value)
+    await waitFor(() => expect([document.activeElement?.getAttribute('role'), document.activeElement?.textContent]).toEqual(['gridcell', value]), ARRIVES)
+    expect(await floor('a cell’s example applied')).toEqual(CLEAN('a cell’s example applied'))
   })
 
   // A list nothing matches is no dead end: the page offers to try it

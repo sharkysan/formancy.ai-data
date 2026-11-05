@@ -177,8 +177,14 @@ export function ChildSection({
   /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
   const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
   const headerFilters = useMemo<HeaderFilters>(
-    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]) }),
-    [boxFields, filter, state.setFilter],
+    () => ({
+      fields: boxFields,
+      filter,
+      onFilter: state.setFilter,
+      refused: (message) => grid.current?.say([message]),
+      hint: `${headingId}-filter-line-hint`,
+    }),
+    [boxFields, filter, state.setFilter, headingId],
   )
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({

@@ -188,13 +188,6 @@ export function filterJourney(plane, { check }) {
           .first()
           .locator(`[role="gridcell"][aria-colindex="${String(amount)}"]`)
         await cell.focus()
-        // Before =: once it applies, the grid lists again and the cell has the keyboard no more.
-        const button = cell.getByTitle(/^Only rows where Amount is /)
-        await button.waitFor(WITHIN)
-        check(
-          'a cell’s example: the cell shows the button that keeps them, out of the accessibility tree',
-          (await button.count()) === 1 && (await cell.getByRole('button').count()) === 0 ? null : 'no button in the cell, or one the accessibility tree reads',
-        )
         const sent = nextList(page)
         await page.keyboard.press('=')
         const request = await sent
@@ -203,6 +196,14 @@ export function filterJourney(plane, { check }) {
           'a cell’s example: = keeps the rows with its value',
           terms.some((term) => term.field === 'amount' && term.op === 'equals') ? null : `the filter is ${JSON.stringify(terms)}`,
         )
+        // The keyboard back on a data cell once the grid lists again, to point at the next value: a gridcell outside the header's row of boxes, read from the DOM, which says where a cell is.
+        const back = await until(
+          () => page.evaluate(() => document.activeElement?.getAttribute('role') === 'gridcell' && document.activeElement.closest('.ag-header') === null),
+          'the keyboard never came back to a cell of the grid after =',
+        )
+          .then(() => null)
+          .catch((error) => error.message)
+        check('a cell’s example: the keyboard is back on a cell of the grid', back)
       },
     ],
     [

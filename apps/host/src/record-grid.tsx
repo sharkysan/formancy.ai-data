@@ -348,6 +348,18 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         }
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
+        // After `=`, the keyboard back on the row it was pressed on, or the first, in its column (0133).
+        const example = exampleAt.current
+        if (example !== null && start === 0) {
+          exampleAt.current = null
+          const grid = api.current
+          const node = example.record === null ? undefined : grid?.getRowNode(example.record)
+          const at = node?.rowIndex ?? (rows.length > 0 ? 0 : null)
+          if (grid !== null && !grid.isDestroyed() && at !== null) {
+            grid.ensureIndexVisible(at)
+            grid.setFocusedCell(at, example.colId)
+          }
+        }
       },
       refused: (message, code) => {
         shown.current = { ...shown.current, rows: 0, loaded: true, retrying: false }
@@ -436,6 +448,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const headerFilters = useContext(HeaderFilterContext)
   const headersNow = useRef(headerFilters)
   headersNow.current = headerFilters
+  /** Where `=` kept a cell's value (0133): the keyboard goes back to that row and column once the list it asked for answers. */
+  const exampleAt = useRef<{ record: string | null; colId: string } | null>(null)
+  // The grid described by the filter line's hint, which says `=`, where there is a line to say it.
+  const describedBy = headerFilters !== null && headerFilters.fields.length > 0 ? (headerFilters.hint ?? null) : null
+  useEffect(() => {
+    const grid = api.current
+    if (grid !== null && !grid.isDestroyed()) grid.setGridAriaProperty('describedby', describedBy)
+  }, [describedBy])
   const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
   const columnDefs = useMemo(
     () =>
@@ -482,6 +502,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ready: (ready) => {
             api.current = ready
             if (!shown.current.loaded) ready.setGridAriaProperty('busy', 'true')
+            const headers = headersNow.current
+            if (headers !== null && headers.fields.length > 0 && headers.hint !== undefined) ready.setGridAriaProperty('describedby', headers.hint)
             // The sort the section opens on: a default view's (0105).
             showSort()
           },
@@ -501,7 +523,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
           drilling: () => latest.current.drilling === true,
-          example: (row, colId) => filterByExample(headersNow.current, row, colId),
+          example: (row, colId) => {
+            if (filterByExample(headersNow.current, row, colId)) {
+              exampleAt.current = { record: row?.record ?? null, colId }
+              return
+            }
+            const label = latest.current.columns.find((column) => column.key === colId)?.label ?? colId
+            setStatus({ kind: 'answer', text: [`= keeps no value of ${label}: the filter cannot say one.`], help: null, clear: false, retry: false })
+          },
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest` and `firstShown`.

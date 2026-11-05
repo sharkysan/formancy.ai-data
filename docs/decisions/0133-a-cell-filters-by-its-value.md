@@ -7,73 +7,77 @@
   -- a value is equal to itself as its row holds it, empty where the column
   offers that, and none where the column offers no equality or the cell
   shows a lookup's label; the example takes the place of the condition its
-  column had; `=` on a focused cell applies it, and a cell with the
-  keyboard shows a button titled for what it keeps, out of the
-  accessibility tree so the cell's name stays its value (each watched failing:
-  with the label taken for the value, with `=` heard nowhere, and with the
-  button never drawn). `apps/host/src/filter-line.test.tsx`, on
-  both engines against the real server -- `=` on a cell lists the rows
-  with its value, the box saying it. `apps/host/scripts/browser/filtering.mjs`,
-  in Chromium, Firefox and WebKit -- `=` from the keyboard, and the cell's
-  button, measured with the state.
+  column had; `=` on a focused cell applies it, and `=` held with Ctrl, Cmd
+  or a plain Alt does not (each watched failing: with the label taken for
+  the value -- a branch only a field the line may name and a lookup could
+  reach, which none does yet -- with `=` heard nowhere, and with every `=`
+  heard). `apps/host/src/filter-line.test.tsx`, on both engines against
+  the real server -- `=` on a cell lists the rows with its value, the chip
+  and the box saying it, the keyboard back on that row's cell in its
+  column, and axe and a name on every control.
+  `apps/host/scripts/browser/filtering.mjs`, in Chromium, Firefox and
+  WebKit -- `=` from the keyboard, its condition in the list's body, and
+  the keyboard back on a cell of the grid once it lists again.
 
 ## Context
 
 The design of 2026-11-04, "easy to use, and fun": a person filters by
 pointing at what they see before they ever type. The grid is one Tab stop
 (0047): Enter on a cell opens its row, Space too, and Tab leaves the grid,
-so a cell has no key of its own for anything else, and a button in every
-cell would be a Tab stop each or reachable by no key.
+so a cell has no key of its own for anything else.
 
 ## Decision
 
 **`=` on a focused cell keeps the rows with its value.** A printable key
 on a cell is free -- nothing in the grid edits -- and `=` is the line's
-own word for equality. The value is the one the row holds, not the text
-the cell shows, made the condition on its column in place of the one the
-column had (`apps/host/src/cell-example.tsx`'s `exampleTerm`,
-`filterByExample`): equal to it, or `is empty` for an empty cell where the
-column offers that. Only a column the filter line may name offers one,
-and only where the line could say it: a timestamp offers no equality, and
-a lookup's cell shows a label whose value it is not.
+own word for equality. Not with Ctrl or Cmd, which zoom, nor with a plain
+Alt; AltGr, Ctrl and Alt together, types `=` on some layouts. The value is
+the one the row holds, not the text the cell shows, made the condition on
+its column in place of the one the column had (`apps/host/src/cell-example.tsx`'s
+`exampleTerm`, `filterByExample`): equal to it, or `is empty` for an
+empty cell where the column offers that. Only a column the filter line may
+name offers one, and only where the line could say it: a timestamp offers
+no equality, so only its empty cells offer one, and a lookup's cell shows
+a label whose value it is not. A column that offers none says so on the
+grid's line.
 
-**A cell that has the keyboard shows a button.** An equals sign, drawn
-rather than written so nothing of it is in the cell's text, titled "Only
-rows where Status is “placed”", in its own style attribute as a row's
-Delete is (no rule of host.css reaches into a grid), placed over the
-cell's end out of its flow, so the cell sized to its value neither wraps
-nor grows when it appears, 24 pixels a side: a
-pointer's way to the same thing, out of the Tab order and out of the
-accessibility tree, since inside the cell its name would be read with the
-cell's every time the keyboard reached it. A click on it is the button's,
-never the row's. The filter line's hint says the key.
+**The keyboard stays where the person pointed.** Once the list the
+example asked for answers, the keyboard is back on the row it was pressed
+on, in its column, or on the first row's (`apps/host/src/record-grid.tsx`),
+so a person can point at one value after another. The grid is described
+by the filter line's hint, which says the key, so a screen reader reads
+it on entering the grid.
 
 ## Consequences
 
-**What it buys.** "Only these" is one key, or a click, on what the
-person is looking at; the chip, the box and the line say it, and Undo
-takes it back.
+**What it buys.** "Only these" is one key on what the person is looking
+at; the chip, the box and the line say it.
 
 **What it costs.**
-- The button appears only on a cell that has the keyboard -- a pointer
-  clicks the cell, which opens its row, then the button.
-- `=` is a key a person learns from the line's hint; nothing on the cell
-  says it while it has no focus, and a screen reader hears no button in
-  the cell -- the key is its way.
-- A timestamp's cell offers nothing: its value is an instant, and its
-  column is filtered by whole days.
+- A pointer has no example of its own: a person with a mouse types into
+  the column's box (0132) instead.
+- An example replaces its column's condition without an Undo: the
+  condition it replaced is gone, and the chip, the box and the line say
+  the new one.
+- `=` is a key a person learns from the line's hint, which the grid's
+  description reads to a screen reader once on entering it.
 
 **What it forecloses.** Nothing on the server: what reaches it is what
 the line and the panel send.
 
 ## Alternatives considered
 
+**A button in the focused cell.** Built and taken out again in review:
+inside the cell its name was read with the cell's, and its "=" was in the
+cell's text, which a person copies; in the cell's line it overflowed a
+cell sized to its value and moved the rows; drawn over the cell's end it
+covered the value; and in Drill down a click on a cell goes down a level,
+so a pointer never reaches it. One button per grid, outside the grid,
+placed over the focused cell, would avoid each of these, and is the shape
+a pointer's example would take.
+
 **A "Not this" beside it.** The line has no "not equal" (0131); a
 condition the line could not say would be a chip nothing else can show.
 
 **A context menu on the cell.** AG Grid Community has none, and one of the
 page's own would be a second menu over the grid for one action.
-
-**A button in every cell, always shown.** A row of buttons in every row,
-read by a screen reader with every cell, for an action most rows never
-need.

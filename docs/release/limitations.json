@@ -3751,15 +3751,19 @@
       ]
     },
     "0133": {
-      "reviewed": "sha256:4b9459b048b90f3d01e413b852b49a963f3507218e64202ee1608ca241fa9464",
+      "reviewed": "sha256:d99dc188532ebde3d41592b9570770e1ddd6ba5f51eca3d761749440cfe2348c",
       "limitations": [
         {
           "area": "host",
-          "says": "A cell's button that keeps the rows with its value shows only while the cell has the keyboard: a pointer clicks the cell, which opens its row, then the button; the keyboard's way is = on the cell, which the filter line's hint says, and the button is out of the accessibility tree, so a screen reader hears the key's way alone."
+          "says": "Filter by example is the keyboard's alone: = on a focused cell. A pointer types the value into the column's header box instead."
         },
         {
           "area": "host",
-          "says": "A timestamp's cell, and a lookup's, offer no example: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
+          "says": "An example replaces its column's condition with no Undo of its own; the condition it replaced is gone."
+        },
+        {
+          "area": "host",
+          "says": "A timestamp's cell offers an example only when it is empty, and a lookup's never: an instant's column is filtered by whole days, and a lookup's cell shows a label, not its value."
         }
       ]
     }

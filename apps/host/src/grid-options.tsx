@@ -19,7 +19,6 @@ import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
-import { ExampleButton } from './cell-example.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 
 /*
@@ -103,7 +102,7 @@ function EmptyCell(): null {
  * no CSS rule: nothing inside the grid is styled by the host. Hidden from
  * the accessibility tree, where `aria-selected` says it.
  */
-function OpenCell(params: ICellRendererParams<GridRow> & { example?: boolean }): ReactElement {
+function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
   const open = params.node.isSelected() === true
   return (
     <>
@@ -111,17 +110,6 @@ function OpenCell(params: ICellRendererParams<GridRow> & { example?: boolean }):
         {open ? <rect x="0" y="0" width="4" height="15" rx="2" fill="var(--client)" /> : null}
       </svg>
       {String(params.value ?? '')}
-      {params.example === true ? <ExampleButton cell={params.eGridCell} row={params.data} colId={params.column?.getColId() ?? ''} /> : null}
-    </>
-  )
-}
-
-/** A cell of a column the filter line may name: its value, and while it has the keyboard the button that keeps rows with it (0133). */
-function ExampleCell(params: ICellRendererParams<GridRow>): ReactElement {
-  return (
-    <>
-      {String(params.value ?? '')}
-      <ExampleButton cell={params.eGridCell} row={params.data} colId={params.column?.getColId() ?? ''} />
     </>
   )
 }
@@ -222,11 +210,7 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
     hide: !column.shown,
     minWidth: headerMinWidth(column.label, column.sortable),
     maxWidth: 320,
-    ...(column.key === first
-      ? { cellRenderer: OpenCell, cellRendererParams: { example: boxed.has(column.key) } }
-      : boxed.has(column.key)
-        ? { cellRenderer: ExampleCell }
-        : {}),
+    ...(column.key === first ? { cellRenderer: OpenCell } : {}),
     // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
     // Shown only: a hidden column's box would keep a row of empty cells under the headers.
     ...(boxed.has(column.key) && column.shown
@@ -269,8 +253,8 @@ export interface GridCallbacks {
   drilling(): boolean
   /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
   sorted(): void
-  /** `=` on a cell: its value kept as its column's condition (0133); false where the column offers none. */
-  example(row: GridRow | undefined, colId: string): boolean
+  /** `=` on a cell: its value kept as its column's condition (0133), or said where the column offers none. */
+  example(row: GridRow | undefined, colId: string): void
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
@@ -334,10 +318,13 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       on.asked(event.data, 'click', event.rowIndex, firstColumn())
     },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
-      const key = (event.event as KeyboardEvent | null | undefined)?.key ?? ''
-      // `=` keeps the rows with the cell's value, where its column offers that (0133).
-      if (key === '=' && on.example(event.data, event.column.getColId())) {
-        event.event?.preventDefault()
+      const keyboard = event.event as KeyboardEvent | null | undefined
+      const key = keyboard?.key ?? ''
+      // `=` keeps the rows with the cell's value (0133) -- not with Ctrl or
+      // Cmd, which zoom, nor a plain Alt; AltGr, which some layouts type `=`
+      // with, is Ctrl and Alt together.
+      if (key === '=' && keyboard !== null && keyboard !== undefined && !keyboard.metaKey && keyboard.ctrlKey === keyboard.altKey) {
+        on.example(event.data, event.column.getColId())
         return
       }
       // Space and Enter on a row's Delete are its button's: the browser presses it.
