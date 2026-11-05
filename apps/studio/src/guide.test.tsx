@@ -28,7 +28,7 @@ import type { TestPlane } from './test-server.js'
 const GUIDE = journey as Journey
 
 /** The plane's connection for each of the guide's. */
-const ON_PLANE: Readonly<Record<string, string>> = { pg: 'fixture-writer', ms: 'fixture-sqlserver' }
+const ON_PLANE: Readonly<Record<string, string>> = { pg: 'fixture-writer', ms: 'fixture-sqlserver-writer' }
 
 let plane: TestPlane
 
