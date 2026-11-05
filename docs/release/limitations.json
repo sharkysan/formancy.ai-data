@@ -2829,7 +2829,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:84ce6cfdde5fae7ba0a7ec50735540e2a39d7db63f6f80565718f0e0e08f9803",
+      "reviewed": "sha256:ce80258b82f5b0ccb17b9ca13bc9fe4dd13cebcfc0fdba7c4cb2ce1149441485",
       "limitations": [
         {
           "area": "host",
@@ -3911,6 +3911,44 @@
         {
           "area": "server",
           "says": "@formancy/data-client answers a form from a server older than this, which sends no opens, unexpected: a host upgrades its server first."
+        }
+      ]
+    },
+    "0141": {
+      "reviewed": "sha256:05cfe71c6e276c1ddc0d826b0ff9d86f0617c789862c44bdc6c5ebddecb1f6ff",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "Open under a lookup in Side by side, Stacked or Separate views leaves that layout for Drill down, and Back then goes up the levels rather than back to the layout chosen, which the Layout group gives back."
+        },
+        {
+          "area": "operations",
+          "says": "Each Open under a lookup asks the form's definition beside the record's read, two requests, and a definition reads every published form's newest version; nothing is cached."
+        },
+        {
+          "area": "host",
+          "says": "A record open at one level and opened again a level below through a lookup is two forms with their own unsaved changes: a save in one makes the other's next save stale, which says so."
+        },
+        {
+          "area": "host",
+          "says": "A save at a level a lookup opened renames its crumb, but the lookup above still shows the label it was read with until the record above is read again."
+        },
+        {
+          "area": "host",
+          "says": "A child row on a section's rail and a section of the record offer no Open under their lookups: only the record and Drill down's levels do."
+        },
+        {
+          "area": "host",
+          "says": "Where two forms over a lookup's target share a title, its Opens say their form ids, which name a form for an administrator more than for the person.",
+          "heldBy": "apps/host/src/lookup-opens.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A lookup drawn disabled, a child row's parent field, still offers Open, which opens the record of the level above again a level further down."
+        },
+        {
+          "area": "host",
+          "says": "The Opens are drawn by the host page into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
         }
       ]
     }

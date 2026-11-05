@@ -144,7 +144,7 @@ only enforcement is "we remember" says so plainly.
 | [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md) | A live demo start Cloudflare has no instance for is started again, within a minute | accepted |
 | [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) | The demo image makes PostgreSQL's socket directory at every start, and the gate runs it with /run empty, as Cloudflare does | accepted |
 | [0089](0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md) | The live demo's account may not write when a customer was created | accepted |
-| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted; amended by 0094, 0097 |
+| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted; amended by 0094, 0097; extended by 0141 |
 | [0091](0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md) | The host identity verifier is a package of its own, which the server re-exports | accepted |
 | [0092](0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md) | The SBOM describes what a consumer installs, and is held to that install | accepted |
 | [0093](0093-a-column-named-proto-is-generated-under-another-key.md) | A column named `__proto__` is generated under another key, and `constructor` keeps its own | accepted |
@@ -195,3 +195,4 @@ only enforcement is "we remember" says so plainly.
 | [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |
 | [0139](0139-a-lookups-shown-columns-filter-its-records.md) | A lookup's shown columns filter its records | accepted |
 | [0140](0140-a-form-names-the-forms-each-lookups-record-opens-in.md) | A form names the forms each lookup's record opens in | accepted |
+| [0141](0141-a-lookups-record-opens-below-the-record.md) | A lookup's record opens below the record | accepted |

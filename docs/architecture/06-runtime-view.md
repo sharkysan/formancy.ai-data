@@ -665,13 +665,29 @@ budget and a derivation, not measurements
    and not the depth, and shows the level above, replacing the entry, its
    section's grid saying the row is gone. Back, like a crumb, drops a
    row's read still out.
+5. Under each lookup of the record at level n, and in every layout,
+   `apps/host/src/lookup-opens.ts` offers one Open per form `GET
+   /v1/forms/:id` names for it (`opens`, 6.4), on the answer the engine
+   holds now, drawn in the paper through each renderer's field addition
+   (`apps/host/src/react-form.tsx`, `apps/host/src/angular-form.ts`).
+   Open asks the guard with a `drill` request as a section's row does,
+   sends `GET /v1/forms/:form` (`apps/host/src/child-forms.ts`'s
+   `levelFormOf`) beside `POST /v1/forms/:form/records/read` (6.6) by the answer
+   as the token, and places a level reached `through` the lookup, with no
+   field preset; from another layout it becomes Drill down first, the
+   entry written over at level n. A refused read stays on level n, its
+   line saying why
+   ([0141](../decisions/0141-a-lookups-record-opens-below-the-record.md)).
 
-Held by `apps/host/src/drill.test.tsx` on both engines, `layout.test.ts`,
-`leave.test.ts`, `crumbs.test.ts`, `address.test.tsx`, and the browser
-gate's `apps/host/scripts/browser/drilling.mjs`. What it costs: the levels
-are in memory only, so a reload opens the records; a row open on a rail in
-another layout and the same row a level down are two panes; a crumb's name
-comes from a rule over the form's fields (0090).
+Held by `apps/host/src/drill.test.tsx` and `open-lookup.test.tsx` on both
+engines, `layout.test.ts`, `leave.test.ts`, `crumbs.test.ts`,
+`lookup-opens.test.ts`, `lookup-addition.test.tsx`, `address.test.tsx`, and
+the browser gate's `apps/host/scripts/browser/drilling.mjs`. What it costs:
+the levels are in memory only, so a reload opens the records; a row open on
+a rail in another layout and the same row a level down are two panes; a
+crumb's name comes from a rule over the form's fields (0090); an Open from
+another layout leaves it for Drill down, and asks the form's definition
+each time (0141).
 
 ## 6.12 Browsing a connection's rows
 
