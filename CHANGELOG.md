@@ -478,6 +478,14 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The studio offers every lookup it can by default** (0137). Why: a
+  lookup now filters by its record and sorts by what it shows (0135,
+  0136), so a foreign key left a bare number lost what its lookup gives
+  and gained nothing. The Choose step ticks every foreign key it can
+  offer, each with the column it suggests; the administrator unticks what
+  they do not want. What you notice: each lookup needs its rows decided
+  in the Policy step before the form publishes, as any lookup does.
+
 - **The Build a condition panel is retired** (0134). Why: since every
   column's header filters its column (0132) and a cell its value (0133),
   each condition the panel built from menus is one a person types where

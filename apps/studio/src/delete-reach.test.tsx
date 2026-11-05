@@ -16,6 +16,7 @@ import {
   focusedName,
   generateOrder,
   goTo,
+  offerOnly,
   paragraphs,
   pressEnter,
   servedDocument,
@@ -129,7 +130,7 @@ async function orderPolicyOn(user: User, connection = 'fixture'): Promise<HTMLEl
     await user.click(screen.getByRole('button', { name: 'Choose a root' }))
     const choose = step('Choose')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_customer'])
     await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
     const version = within(choose).queryByLabelText('Version column')
     if (version !== null) await user.selectOptions(version, 'row_version')

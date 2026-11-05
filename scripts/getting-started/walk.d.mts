@@ -11,7 +11,7 @@ export type Action =
   | { kind: 'discover'; group: string; button: string; seen: string }
   | { kind: 'press'; opens?: string; shows?: string; says?: string }
   | { kind: 'select' | 'type'; value: string }
-  | { kind: 'tick'; keep?: { group: string; ticked: readonly string[] }; holds?: { name: string; value: string } }
+  | { kind: 'tick'; already?: boolean; keep?: { group: string; ticked: readonly string[] }; holds?: { name: string; value: string } }
   | { kind: 'none'; reads: string }
   | { kind: 'rules'; rules: readonly Rule[]; from: string }
   | { kind: 'says'; text: string }

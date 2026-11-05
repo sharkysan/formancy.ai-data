@@ -191,7 +191,7 @@ published already and stays so.
 | 2. Choose | **Root table or view** | `sales.order` | the same |
 |  | **Form id** | `pg-order` | `ms-order` |
 |  | **Title** | `Order` | the same |
-|  | **Offer fk_order_customer as a lookup** | tick it; under **Columns to show for fk_order_customer** keep `name` ticked | the same |
+|  | **Offer fk_order_customer as a lookup** | keep it ticked; under **Columns to show for fk_order_customer** keep `name` ticked | the same |
 |  | **Pin tenant_id** | tick it; **Attribute tenant_id is pinned to** says `tenant` | the same |
 |  | **Version column** | `row_version` | nothing to choose: the studio says the table has a rowversion column |
 |  | **Generate the form** | press it; it opens **3. Generate**, which shows **What the generator chose** | the same |

@@ -226,7 +226,7 @@ function cell(action) {
       return code(action.value)
     case 'tick':
       return joined([
-        'tick it',
+        action.already === true ? 'keep it ticked' : 'tick it',
         action.keep === undefined ? undefined : `under **${action.keep.group}** keep ${action.keep.ticked.map(code).join(', ')} ticked`,
         action.holds === undefined ? undefined : `**${action.holds.name}** says ${code(action.holds.value)}`,
       ])

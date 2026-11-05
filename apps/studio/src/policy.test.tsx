@@ -16,6 +16,7 @@ import {
   focusedName,
   generateOrder,
   goTo,
+  offerOnly,
   paragraphs,
   pressEnter,
   servedDocument,
@@ -281,7 +282,7 @@ describe('what the editor writes', () => {
   test('refuses an undecided lookup until somebody decides it', async () => {
     const user = await signIn(plane)
     const choose = await toChooseOrder(user)
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_customer'])
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     const policy = await goTo(user, 'Policy')
@@ -326,7 +327,7 @@ describe('rows reached through a lookup (0043)', () => {
     await user.click(screen.getByRole('button', { name: 'Choose a root' }))
     const choose = step('Choose')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order_line')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_line_order as a lookup' }))
+    await offerOnly(user, choose, ['fk_order_line_order'])
     await user.selectOptions(within(choose).getByLabelText('Version column'), 'row_version')
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
@@ -391,7 +392,7 @@ describe('rows reached through a lookup (0043)', () => {
     await user.click(screen.getByRole('button', { name: 'Choose a root' }))
     const choose = step('Choose')
     await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.customer')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_customer_country as a lookup' }))
+    await offerOnly(user, choose, ['fk_customer_country'])
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     const policy = await goTo(user, 'Policy')
@@ -467,7 +468,8 @@ describe('a policy kept across a regeneration', () => {
     await generateOrder(user)
     await writeOrderPolicy(user)
     const choose = await goTo(user, 'Choose')
-    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_customer as a lookup' }))
+    // The customer no longer offered as a lookup.
+    await offerOnly(user, choose, [])
     await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
 
@@ -623,6 +625,7 @@ async function discoverAndGenerateWithoutVersion(user: Awaited<ReturnType<typeof
   await user.click(await screen.findByRole('button', { name: 'Choose a root' }))
   const choose = step('Choose')
   await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
+  await offerOnly(user, choose, [])
   await user.click(within(choose).getByRole('checkbox', { name: 'Pin tenant_id' }))
   await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
   await screen.findByRole('main', { name: 'Generate' })

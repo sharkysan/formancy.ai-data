@@ -381,7 +381,7 @@ export function ChooseStep({
           value={selected}
           onChange={(event) => {
             const object = snapshot.objects[Number(event.target.value)]
-            if (object !== undefined) onChoice(choiceFor(object.ref))
+            if (object !== undefined) onChoice(choiceFor(object.ref, snapshot))
           }}
         >
           <option value="" disabled>

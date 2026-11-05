@@ -430,7 +430,7 @@
       ]
     },
     "0024": {
-      "reviewed": "sha256:5a046aa2ab9f92b254e512a3879341667b840f1e20e785a632ed8e9995f148f2",
+      "reviewed": "sha256:15416e8a3c086c7d598ca6fb06ba50f2d03d0b96d2863e51aefbfcb01731271b",
       "limitations": [
         {
           "area": "studio",
@@ -3839,6 +3839,15 @@
         {
           "area": "operations",
           "says": "A sort by a lookup reads the label for every row in scope, and no index serves that order, so each page reads and sorts the whole scope; what it costs is not measured."
+        }
+      ]
+    },
+    "0137": {
+      "reviewed": "sha256:1dca66696098787223e62e62c0eeedddfcfe274050c9837152bc59e200a61b14",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "Every lookup the Choose step ticks by default needs its rows decided in the Policy step before the form publishes."
         }
       ]
     }
