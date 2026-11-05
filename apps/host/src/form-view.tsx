@@ -21,6 +21,7 @@ import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
+import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
@@ -36,6 +37,7 @@ import type { SaveResult, Session } from './session.js'
 import { Split } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
+import type { FormOf } from './use-drill.js'
 
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
 
@@ -51,7 +53,9 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  *
  * The record is the page's, in memory: never in the address (layout.ts).
  * Where the server offers delete, the record's header and each row of the
- * grid ask for one, in place, under what asked (0053, delete-flow.ts).
+ * grid ask for one, in place, under what asked (0053, delete-flow.ts). Each
+ * lookup of the record offers Open under its field, which goes a Drill down
+ * level below it, from any layout (0141).
  */
 export function FormView({
   client,
@@ -74,6 +78,7 @@ export function FormView({
   onSplit,
   onSplitSettled,
   childFormsOf,
+  formOf,
 }: {
   client: DataClient
   entry: FormMenuEntry
@@ -102,6 +107,8 @@ export function FormView({
   onSplitSettled: (share: number) => void
   /** The children the menu names for a form: each Drill down level's sections. */
   childFormsOf: (formId: string) => Promise<ChildForm[]>
+  /** A form a lookup's record opens in (0141), as the menu names it and the server defines it. */
+  formOf: FormOf
 }): ReactElement {
   const formId = entry.id
   const { ask } = useGuardContext()
@@ -184,8 +191,10 @@ export function FormView({
     historyView,
     open: open !== null,
     onView,
+    onDrill: (at) => onLayout('drill', { view: 'record', level: at }),
     headingOf: (at) => (at === 0 ? recordsHeading.current : detailHeading.current),
     childFormsOf,
+    formOf,
   })
   const drilling = layout === 'drill'
   const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
@@ -194,6 +203,8 @@ export function FormView({
   /** One view at a time: Separate views' two, or Drill down's levels (0090). */
   const paged = layout === 'separate' || layout === 'drill'
   const say = (said: Said, kind: 'answer' | 'refused' = 'answer'): void => setLine({ said, kind })
+  /** Open under the record's lookups: its record a level down; refused, said on the detail's line. */
+  const offer = drill.offer({ level: 1, owner: 'master' }, levelOpens(definition, null), (message) => say([message], 'refused'))
 
   /** In Separate views, `half` shown if it is not, without a step of its own in the history: the page moved there, the person did not; in Drill down, its level, 0 or 1. True when it was hidden. */
   function reveal(half: View): boolean {
@@ -531,6 +542,7 @@ export function FormView({
               <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" />
             ) : null
           }
+          offer={offer}
         >
           {parent === null
             ? null
@@ -574,7 +586,7 @@ export function FormView({
             key={step.key}
             client={client}
             step={step}
-            childForms={drill.childrenOf(step.form.child.form)}
+            childForms={drill.childrenOf(step.form.id)}
             renderer={renderer}
             hidden={!drilling || drill.shown !== step.level}
             refit={released}

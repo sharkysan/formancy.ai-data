@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import type { FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAddressRequests, useHistory } from './address.js'
 import { useAfterRender } from './after-render.js'
-import { childFormsOf } from './child-forms.js'
+import { childFormsOf, levelFormOf } from './child-forms.js'
 import type { ChildForm } from './children.js'
 import { FormView } from './form-view.js'
 import { FormsNav } from './forms-nav.js'
@@ -86,6 +86,9 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     },
     [client, menu, menuEntry],
   )
+
+  /** A form a lookup's record opens in, as Open is pressed (0141). */
+  const formOf = useCallback((id: string) => levelFormOf(client, menu, id), [client, menu])
 
   const openForm = useCallback(
     async (id: string, { focus, push }: { focus: boolean; push: boolean }) => {
@@ -206,6 +209,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
                 onSplit={setSplit}
                 onSplitSettled={(share) => writeSplit(storage, share)}
                 childFormsOf={childrenFor}
+                formOf={formOf}
               />
             </OwnViewsScope>
           </GuardContext.Provider>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { DataClient, FormRecord } from '@formancy/data-client'
+import type { DataClient, FormMenuEntry, FormRecord, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
 import { recordName } from './crumbs.js'
@@ -9,6 +9,8 @@ import { formsAtRisk, useGuardContext } from './guard.js'
 import { levelShown } from './layout.js'
 import type { Layout, View } from './layout.js'
 import type { LeaveRequest, PaneWork, Said } from './leave.js'
+import { openRefused } from './lookup-opens.js'
+import type { LookupOffer, NamedOpen, OpenChoice } from './lookup-opens.js'
 
 /*
  * Drill down's levels (0090), as one open form holds them: level 0 is its
@@ -18,13 +20,17 @@ import type { LeaveRequest, PaneWork, Said } from './leave.js'
  * state or storage (0047) -- and every one of them stays mounted, shown or
  * not, as every lane does: going up only changes which level is shown.
  *
- * - **Down.** Opening a row of a section, or its New, goes down a level.
- *   Into the row the level below already holds, it is shown again as it
- *   was; into any other, the levels below are replaced, through the guard,
- *   which asks when one of them holds work. A row is read first and shown
- *   once the server answers; an answer for a request the person has since
- *   replaced, or one that arrives while the page waits for them, is
- *   dropped, as `opening.ts` drops one.
+ * - **Down.** Opening a row of a section, or its New, goes down a level;
+ *   so does Open under a lookup of a level's record (0141), into the
+ *   record its answer names, in the form the person chose -- from any
+ *   layout, which becomes Drill down, since a level is where a record
+ *   below a record is shown. Into the record the level below already
+ *   holds, reached the same way, it is shown again as it was; into any
+ *   other, the levels below are replaced, through the guard, which asks
+ *   when one of them holds work. A record is read first and shown once the
+ *   server answers; an answer for a request the person has since replaced,
+ *   or one that arrives while the page waits for them, is dropped, as
+ *   `opening.ts` drops one.
  * - **Up.** A crumb, or Back, shows a level above; it drops nothing.
  * - **Where.** The level shown is the workspace's place, `view` and
  *   `level`, so Back and Forward move between levels as they move between
@@ -42,19 +48,42 @@ import type { LeaveRequest, PaneWork, Said } from './leave.js'
 /** What a section asks to go down into: a row by its token, or a new one. */
 export type DrillWant = { kind: 'record'; token: string } | { kind: 'new' }
 
-/** One level from 2 down: the child row it shows, opened from the level above. */
+/** The form a level shows a record of: its id, the menu's entry for it, and its definition. */
+export interface LevelForm {
+  id: string
+  menu: FormMenuEntry
+  definition: PublishedForm
+}
+
+/** A form a lookup's record opens in (0141), asked as Open is pressed: the menu's entry and the server's definition, or why not. */
+export type FormOf = (formId: string) => Promise<{ ok: true; form: LevelForm } | { ok: false; message: string }>
+
+/**
+ * How a level was reached from the one above. A row of one of its child
+ * sections: the child's `field` names the record above, `parent`, and
+ * `from` is the section's owner. Or Open under one of its record's lookups
+ * (0141): `field` is the lookup, whose answer is this level's token, and
+ * `from` the owner of the panes it was pressed in.
+ */
+export type Through =
+  | {
+      kind: 'child'
+      field: string
+      from: string
+      parent: string
+      /** The form of the level above, as its sections name it: "For Order k1:4711". */
+      parentNoun: string
+    }
+  | { kind: 'lookup'; field: string; from: string }
+
+/** One level from 2 down: the record it shows, reached from the level above. */
 export interface DrillStep {
   /** New for each step placed: a level replaced is mounted again. */
   key: number
   level: number
-  /** The owner of the section it was opened from, one level up. */
-  from: string
-  form: ChildForm
-  /** The record of the level above, which this row's parent field names. */
-  parent: string
-  /** The form of the level above, as its sections name it: "For Order k1:4711". */
-  parentNoun: string
-  /** As it was read, or null for a new row. */
+  form: LevelForm
+  through: Through
+  /** As it was read, or null for a new child row. */
   record: FormRecord | null
   /** Its token once it has one: a new row has none until a save creates it. */
   token: string | null
@@ -102,6 +131,8 @@ export interface Drill {
   enter(open: boolean): { view: View; level?: number }
   /** A section of `from.level` goes down. */
   descend: (from: SectionAt, want: DrillWant, back: { toRow: () => void; refused: (message: string) => void }) => void
+  /** What the panes of `at`'s record offer under its lookups, `opens` (0141): Open goes one level down, into the record in the form chosen; a refused read is said by `refused`. */
+  offer(at: LookupAt, opens: readonly NamedOpen[], refused: (message: string) => void): LookupOffer
   /** A crumb: the level shown is `level`, an entry pushed; `back` on Keep editing. */
   up(level: number, back: () => void): void
   /** What a section at `level` is given in Drill down. */
@@ -133,6 +164,15 @@ export interface SectionAt {
   parent: string
 }
 
+/** Where a lookup's Open was pressed: the level whose record holds the lookup, and the owner of that level's panes. */
+export interface LookupAt {
+  level: number
+  owner: string
+}
+
+/** Whether `step` was opened from the section `owner`. */
+const fromSection = (step: DrillStep | undefined, owner: string): boolean => step?.through.kind === 'child' && step.through.from === owner
+
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
 
 export function useDrill({
@@ -143,8 +183,10 @@ export function useDrill({
   historyView,
   open,
   onView,
+  onDrill,
   headingOf,
   childFormsOf,
+  formOf,
 }: {
   client: DataClient
   layout: Layout
@@ -155,9 +197,12 @@ export function useDrill({
   /** A record, or a new one, is open at level 1. */
   open: boolean
   onView: (view: View, replace?: boolean, level?: number) => void
+  /** Another layout made Drill down, showing `level`, without a step of its own in the history: a lookup's Open there goes below it. */
+  onDrill: (level: number) => void
   /** The heading of level 0 or 1, which the form holds. */
   headingOf: (level: 0 | 1) => HTMLElement | null
   childFormsOf: (formId: string) => Promise<ChildForm[]>
+  formOf: FormOf
 }): Drill {
   const guard = useGuardContext()
   const after = useAfterRender()
@@ -214,29 +259,40 @@ export function useDrill({
     void childFormsOf(formId).then((found) => setChildren((now) => ({ ...now, [formId]: found })))
   }
 
-  /** The levels down to `from.level`, and `step` below them. */
-  function place(from: SectionAt, record: FormRecord | null, said: Said): void {
+  /** The levels above `level`, and a step at `level` below them. */
+  function place(level: number, form: LevelForm, through: Through, record: FormRecord | null, said: Said): void {
     keys.current += 1
-    const { form } = from
     const step: DrillStep = {
       key: keys.current,
-      level: from.level + 1,
-      from: from.owner,
+      level,
       form,
-      parent: from.parent,
-      parentNoun: from.parentNoun,
+      through,
       record,
       token: record?.record ?? null,
-      name: record === null ? null : recordName(form.definition.form.model.fields, record.answers, form.child.field),
+      // A child row's parent field names the level above, not this one.
+      name: record === null ? null : recordName(form.definition.form.model.fields, record.answers, through.kind === 'child' ? through.field : null),
       said,
     }
-    want(form.child.form)
-    setPath([...pathRef.current.slice(0, from.level - 1), step])
+    want(form.id)
+    setPath([...pathRef.current.slice(0, level - 2), step])
+  }
+
+  /** A section's step below `from`. */
+  function placeRow(from: SectionAt, record: FormRecord | null, said: Said): void {
+    const { child, menu, definition } = from.form
+    const through: Through = { kind: 'child', field: child.field, from: from.owner, parent: from.parent, parentNoun: from.parentNoun }
+    place(from.level + 1, { id: child.form, menu, definition }, through, record, said)
+  }
+
+  /** `level` shown in Drill down: from another layout, the level above it becomes Drill down's first, so Back goes up a level as there. */
+  function showBelow(level: number): void {
+    if (layoutRef.current !== 'drill') onDrill(level - 1)
+    show(level, false)
   }
 
   function descend(from: SectionAt, wanted: DrillWant, back: { toRow: () => void; refused: (message: string) => void }): void {
     const below = pathRef.current[from.level - 1]
-    if (wanted.kind === 'record' && below !== undefined && below.from === from.owner && below.token === wanted.token) {
+    if (wanted.kind === 'record' && below !== undefined && fromSection(below, from.owner) && below.token === wanted.token) {
       show(from.level + 1, false)
       return
     }
@@ -248,7 +304,7 @@ export function useDrill({
         asked.current += 1
         const mine = asked.current
         if (wanted.kind === 'new') {
-          place(from, null, [...(discarded ? DISCARDED : []), `A new ${title}, for ${from.parentNoun} `, { code: from.parent }, '.'])
+          placeRow(from, null, [...(discarded ? DISCARDED : []), `A new ${title}, for ${from.parentNoun} `, { code: from.parent }, '.'])
           show(from.level + 1, false)
           return
         }
@@ -267,7 +323,7 @@ export function useDrill({
           guard.askOnAnswer(
             request,
             (again) => {
-              place(from, record, [...(discarded || again ? DISCARDED : []), 'Opened ', { code: record.record ?? wanted.token }, '.'])
+              placeRow(from, record, [...(discarded || again ? DISCARDED : []), 'Opened ', { code: record.record ?? wanted.token }, '.'])
               show(from.level + 1, false)
             },
             back.toRow,
@@ -275,6 +331,63 @@ export function useDrill({
         })
       },
       back.toRow,
+    )
+  }
+
+  function openLookup(from: LookupAt, field: string, choice: OpenChoice, back: { toButton: () => void; refused: (message: string) => void }): void {
+    const { form: target, token } = choice
+    const level = from.level + 1
+    const below = pathRef.current[from.level - 1]
+    // The record the level below holds, opened the same way: shown as it was, typing kept.
+    if (
+      below?.through.kind === 'lookup' &&
+      below.through.from === from.owner &&
+      below.through.field === field &&
+      below.form.id === target.id &&
+      below.token === token
+    ) {
+      showBelow(level)
+      return
+    }
+    const request: LeaveRequest = { kind: 'drill', below: from.level, record: token, title: target.title }
+    guard.ask(
+      request,
+      (discarded) => {
+        asked.current += 1
+        const mine = asked.current
+        const refuse = (message: string): void => {
+          back.refused(message)
+          // The question's buttons are gone with it: the keyboard goes back to the Open pressed.
+          if (discarded) after(back.toButton)
+        }
+        // The form's definition is asked as Open is pressed, beside the read: a page opens no form for a lookup it never follows.
+        void Promise.all([formOf(target.id), client.read(target.id, token)]).then(([form, answer]) => {
+          if (asked.current !== mine || guard.waiting()) return
+          if (!form.ok) {
+            refuse(form.message)
+            return
+          }
+          if (!answer.ok) {
+            refuse(openRefused(target.title, answer))
+            return
+          }
+          const record = answer.value
+          guard.askOnAnswer(
+            request,
+            (again) => {
+              place(level, form.form, { kind: 'lookup', field, from: from.owner }, record, [
+                ...(discarded || again ? DISCARDED : []),
+                'Opened ',
+                { code: record.record ?? token },
+                '.',
+              ])
+              showBelow(level)
+            },
+            back.toButton,
+          )
+        })
+      },
+      back.toButton,
     )
   }
 
@@ -291,7 +404,7 @@ export function useDrill({
 
   function section(at: SectionAt): SectionDrill {
     const below = path[at.level - 1]
-    const mine = below !== undefined && below.from === at.owner ? below : undefined
+    const mine = fromSection(below, at.owner) ? below : undefined
     return {
       held: mine?.token ?? null,
       descend: (wanted, toRow, refused) => descend(at, wanted, { toRow, refused }),
@@ -300,7 +413,7 @@ export function useDrill({
 
   /** The first level that holds `formId`'s record `token`, and every level below it, dropped: its index in the path, or null when none held it. */
   function drop(formId: string, token: string): number | null {
-    const index = pathRef.current.findIndex((step) => step.form.child.form === formId && step.token === token)
+    const index = pathRef.current.findIndex((step) => step.form.id === formId && step.token === token)
     if (index === -1) return null
     asked.current += 1
     setPath(pathRef.current.slice(0, index))
@@ -309,7 +422,7 @@ export function useDrill({
 
   const levels: HeldLevels = {
     atRisk: (formId, token) => {
-      const index = pathRef.current.findIndex((step) => step.form.child.form === formId && step.token === token)
+      const index = pathRef.current.findIndex((step) => step.form.id === formId && step.token === token)
       return index === -1 ? [] : formsAtRisk(guard.registry, { kind: 'drill-delete', below: index + 1, record: token })
     },
     recordGone: (formId, token) => {
@@ -325,20 +438,25 @@ export function useDrill({
     const now = pathRef.current.find((each) => each.key === step.key)
     if (now === undefined) return
     setPath(pathRef.current.map((each) => (each === now ? { ...each, token, name } : each)))
-    sections.current.get(now.from)?.reload()
+    // The section it was opened from lists it: a lookup's record is in no grid above.
+    if (now.through.kind === 'child') sections.current.get(now.through.from)?.reload()
   }
 
   function gone(step: DrillStep, target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
     // The grid it was opened from says so, while it still lists that parent's rows.
-    const above = sections.current.get(step.from)
-    if (above !== undefined && above.parent === step.parent) above.removed(goneLine(target, word))
-    const index = drop(step.form.child.form, target.record)
+    const { through } = step
+    const above = through.kind === 'child' ? sections.current.get(through.from) : undefined
+    if (above !== undefined && through.kind === 'child' && above.parent === through.parent) above.removed(goneLine(target, word))
+    const index = drop(step.form.id, target.record)
     if (index === null || layoutRef.current !== 'drill') return
     const at = index + 2
     const showing = shownRef.current
     if (showing >= at) show(at - 1, true, false)
-    // The keyboard on the section's heading when the person is where it is drawn: one who moved on hears nothing.
-    if (!quiet && showing >= at - 1) after(() => above?.focusHeading())
+    // The keyboard on the section's heading when the person is where it is drawn -- a lookup's record was
+    // opened from no section, so on the level's above -- and one who moved on hears nothing.
+    if (quiet || showing < at - 1) return
+    if (through.kind === 'lookup') focusLevel(at - 1)
+    else after(() => above?.focusHeading())
   }
 
   function reveal(at: number): boolean {
@@ -386,6 +504,10 @@ export function useDrill({
     shown,
     enter,
     descend,
+    offer: (at, opens, refused) => ({
+      opens,
+      open: (field, choice, button) => openLookup(at, field, choice, { toButton: () => button.focus(), refused }),
+    }),
     up,
     section,
     levels,

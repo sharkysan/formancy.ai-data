@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { Said } from './leave.js'
 import type { Layout } from './layout.js'
+import type { LookupOffer } from './lookup-opens.js'
 import { Pane } from './pane.js'
 import { CHOICES, renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
@@ -58,6 +59,7 @@ export function Detail({
   deleteRef,
   onDelete,
   deleteRegion,
+  offer,
   children,
 }: {
   formTitle: string
@@ -96,6 +98,8 @@ export function Detail({
   onDelete: () => void
   /** The delete's confirmation, right after the header row that holds Delete record. */
   deleteRegion: ReactNode
+  /** Open under each lookup of the record (0141). */
+  offer: LookupOffer
   children: ReactNode
 }): ReactElement {
   const separate = layout === 'separate'
@@ -184,6 +188,7 @@ export function Detail({
               idBase={formId}
               onAnswer={(result) => onAnswer(result, session)}
               onLoaded={() => onLoaded(session)}
+              offer={offer}
             />
           ))}
       </div>

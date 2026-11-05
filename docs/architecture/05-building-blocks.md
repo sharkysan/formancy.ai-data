@@ -477,7 +477,15 @@ Drill down, a layout of one level at a time, is
 `src/drill-level.tsx` drawing a level, `src/trail.tsx` the trail back up,
 `src/crumbs.ts` what each crumb is called, and `src/child-forms.ts` the
 children the menu names for a level's form
-([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)); `src/download.tsx` is Download CSV in the head of the Records
+([0090](../decisions/0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md)),
+and the form a lookup's record opens in, a level holding that record too:
+`src/lookup-opens.ts` is which Opens a lookup offers on its answer, what
+each is named, and what a refused one says, drawn under the field in the
+paper through each renderer's field addition by `src/react-form.tsx` and
+`src/angular-form.ts`, the Angular half handed them through
+`src/angular-offer.ts`, and each pane handing its renderers one offer
+while its Opens say the same through `src/steady-offer.ts`
+([0141](../decisions/0141-a-lookups-record-opens-below-the-record.md)); `src/download.tsx` is Download CSV in the head of the Records
 panel and of each child section, and `src/save-file.ts` hands the file to
 the browser through an object URL and a clicked `<a download>`
 ([0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md)); `src/guard.ts` and `src/leave.ts` are one guard over every way

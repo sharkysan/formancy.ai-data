@@ -17,6 +17,7 @@ import type { Renderer } from './session.js'
  * | a renderer hidden by the renderer switch                       | that renderer's panes, everywhere        |
  * | a layout or view change; paging; search; sort                  | nothing: every view stays mounted        |
  * | Drill down: going down from level n; a delete there            | every level below n (0090)               |
+ * | Open under a lookup of level n's record                        | every level below n (0141)               |
  * | Drill down: going up a level                                   | nothing: every level stays mounted       |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
@@ -72,7 +73,7 @@ export type LeaveRequest =
   /** The detail following a record one of its panes created: `owner`'s pane in `by` holds it already. */
   | { kind: 'created'; owner: string; record: string; by: Renderer }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
-  /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`. */
+  /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`; or into the record a lookup there names, by Open (0141). */
   | { kind: 'drill'; below: number; record: string | null; title: string }
   /** Drill down: deleting `record`, which drops the levels below `below`. */
   | { kind: 'drill-delete'; below: number; record: string }

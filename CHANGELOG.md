@@ -18,6 +18,27 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A lookup's record opens below the record** (0141). Why: 0140 named
+  the forms a lookup's record opens in, and a person still had to leave
+  the order, open the customer form and search for the name the lookup
+  showed. What you notice: on the host page, under each lookup of the
+  record whose answer is a record, one button per form you may read it
+  in -- "Open in Customers", "Open in Order (pg-order)" where two forms
+  share a title, "Open Approved by in Employee" where another lookup of
+  the record opens in a form of that title, so no two buttons read alike
+  and a name never changes as you type -- in both renderers, drawn
+  through formancy 0.13.0's field addition and dressed by the theme, on
+  the answer the field holds now, saved or not; nothing under an empty
+  lookup. Open shows that
+  record one Drill down level below, in that form, with its Delete, its
+  child sections and its own lookups' Opens; the trail names it and leads
+  back up with the record above as you left it, and opening another
+  record there asks first about unsaved typing below. From Side by side,
+  Stacked or Separate views the layout becomes Drill down, and Back goes
+  up the levels. A record the form does not show you -- gone, or outside
+  its row filters -- leaves you where you were, saying so. Each Open asks
+  the form's definition beside the read; nothing is cached.
+
 - **A form names the forms each lookup's record opens in** (0140). Why: a
   person reading an order who wants its customer -- the address, the
   other orders -- had to leave the order and search the customer form for
