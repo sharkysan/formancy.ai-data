@@ -3,7 +3,7 @@ import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, unnamed } from './test-accessible.js'
-import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
+import { answeredOnce, chooseForm, dataCell, dataRows, gridSection, mount, searchRecords, signIn, stamp, unsavedNotice } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { holdingRequests } from './test-network.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -73,14 +73,11 @@ async function orderWithLines(engine: Engine, notes: string, lines: readonly num
 /** The data rows of the grid a heading names, each as its cells' text. */
 function rows(heading: string): string[][] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) =>
-      within(row)
-        .getAllByRole('gridcell')
-        .map((cell) => cell.textContent ?? ''),
-    )
+  return dataRows(grid).map((row) =>
+    within(row)
+      .getAllByRole('gridcell')
+      .map((cell) => cell.textContent ?? ''),
+  )
 }
 
 /** The row of the grid `heading` names whose first cell says `first`, once it is listed. */
@@ -335,8 +332,7 @@ describe.each(ENGINES)('Drill down on $engine', (engine) => {
     // AG Grid speaks of a row when it moves the keyboard itself -- an arrow
     // key, a click -- and not when a cell is focused from outside it: so a
     // row's first cell is focused, and the keyboard moves one column.
-    const firstCell = (): HTMLElement =>
-      within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
+    const firstCell = (): HTMLElement => dataCell(within(gridSection('Records')).getByRole('grid', { name: 'Records' }))
     firstCell().focus()
     await user.keyboard('{ArrowRight}')
     await waitFor(() => expect(rowSays('Records')).toBe('Space or Enter opens this record and moves to it.'), ARRIVES)

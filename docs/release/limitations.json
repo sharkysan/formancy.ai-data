@@ -3699,7 +3699,7 @@
       ]
     },
     "0131": {
-      "reviewed": "sha256:b3b2aee5d1a048f2043e6fa6c4d787df59b5bcbe38eae1920dffee58fc68b678",
+      "reviewed": "sha256:db094b4c009b27cb47b74cf463282555ee2e91bdb4d19b354263590208a76ae2",
       "limitations": [
         {
           "area": "host",
@@ -3730,6 +3730,23 @@
         {
           "area": "testing",
           "says": "The host's browser gate shows an empty box its scrolling pane cuts whole in that pane and asks axe again, as it does a text axe calls partially obscured; an empty box no pane cuts that axe still finds no value in fails the gate."
+        }
+      ]
+    },
+    "0132": {
+      "reviewed": "sha256:97906df533ef72b5d6d4918dbe3766f0ed0f930be64b6b08c75c2bdf4c7ab322",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A box under each column's header applies when it is left as well as on Enter, so text typed into one and clicked away from filters the grid."
+        },
+        {
+          "area": "host",
+          "says": "The header boxes ride on AG Grid's floating filter row and its keys -- Down from a header to the box's cell, Enter into the box, Esc out, Tab on to the next column's box -- which an AG Grid upgrade could change; the host's browser gate holds the path."
+        },
+        {
+          "area": "host",
+          "says": "A lookup column has no box, as the filter line names no lookup field."
         }
       ]
     }

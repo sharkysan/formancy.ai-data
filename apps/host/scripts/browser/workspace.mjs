@@ -9,7 +9,7 @@
 // separator is let go, and no host rule reaching into a grid.
 
 import { FORM, LINES, TOKENS } from './plane.mjs'
-import { contrast, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
+import { contrast, dataRows, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -141,7 +141,9 @@ export function workspaceJourney(plane, { check }, run) {
         // form's order.
         const headers = async () => (await grid(page, 'Records').getByRole('columnheader').allTextContents()).map((text) => text.trim())
         const order = await headers()
-        await grid(page, 'Records').getByRole('gridcell').nth(1).focus()
+        // A data row's cell, then up through the row of the header boxes (0132) to its header.
+        await dataRows(grid(page, 'Records'), page).first().getByRole('gridcell').nth(1).focus()
+        await page.keyboard.press('ArrowUp')
         await page.keyboard.press('ArrowUp')
         const onHeader = await page.evaluate(() => document.activeElement?.getAttribute('role') === 'columnheader')
         await page.keyboard.press('Shift+ArrowRight')
@@ -164,6 +166,9 @@ export function workspaceJourney(plane, { check }, run) {
         // header's, and the grid stayed 40 px to the side, its first column
         // cut, in 3 of 130 WebKit runs of the state on 2026-10-16 and in none
         // of Chromium's or Firefox's; a person's keys are frames apart.
+        // Down twice: from the header through the row of its boxes (0132) to the first row.
+        await page.keyboard.press('ArrowDown')
+        await settled(page)
         await page.keyboard.press('ArrowDown')
         await settled(page)
         await page.keyboard.press('Home')
@@ -313,7 +318,12 @@ export function workspaceJourney(plane, { check }, run) {
       'A line open',
       async (page) => {
         const lines = page.getByRole('region', { name: 'Order line', exact: true })
-        await lines.getByRole('grid', { name: 'Order line' }).getByRole('gridcell').first().click()
+        // The first data row's cell: the row of the header boxes (0132) holds cells too.
+        await dataRows(lines.getByRole('grid', { name: 'Order line' }), page)
+          .first()
+          .getByRole('gridcell')
+          .first()
+          .click()
         for (const name of ['React', 'Angular'])
           await page
             .getByRole('region', { name: `Order line ${run.record},1 ${name}`, exact: true })

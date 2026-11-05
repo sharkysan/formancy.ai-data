@@ -4,7 +4,7 @@ import type { ListFilterTerm, PublishedForm } from '@formancy/data-client'
 import { REFUSED_FILTER_HELP } from './grid-datasource.js'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, chipRemove, filterLine, listsApplied, listsSent, typeFilter } from './test-filter.js'
-import { chooseForm, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
+import { chooseForm, dataCell, gridSection, gridStatus, keeping, mount, recordKeys, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -202,9 +202,7 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     const user = await workspace(engine.formId)
     await typeFilter(user, 'Records', `notes contains ${notes}`)
     await waitFor(() => expect(recordKeys()).toHaveLength(1), ARRIVES)
-    within(within(gridSection('Records')).getByRole('grid', { name: 'Records' }))
-      .getAllByRole('gridcell')[0]
-      ?.focus()
+    dataCell(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).focus()
     await user.keyboard('/')
     expect(document.activeElement).toBe(filterLine('Records'))
     await user.keyboard(' and a')
@@ -215,6 +213,49 @@ describe.each(ENGINES)("a grid's filter line on $engine", (engine) => {
     await user.keyboard('{Escape}')
     expect(filterLine('Records').value).toBe(`notes contains ${notes}`)
     expect(document.activeElement?.getAttribute('role')).toBe('gridcell')
+  })
+
+  // A column's header box is the line's condition on that column: typed
+  // there it is applied as the line would send it, and the line and the
+  // chips say it; a chip removed empties the box (watched failing with no
+  // box under the headers).
+  test('filters a column from its header’s box, the line and the chips saying it', async () => {
+    const notes = stamp('box')
+    const orders = await freshOrders(engine, notes, ['1', '2'])
+    const user = await workspace(engine.formId)
+    await typeFilter(user, 'Records', `notes contains ${notes}`)
+    await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
+    plane.sent.length = 0
+    const amount = within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' })
+    await user.type(amount, '> 1{Enter}')
+    await waitFor(() => expect(recordKeys()).toEqual(orders.slice(1)), ARRIVES)
+    expect(filtersSent(engine.formId)).toEqual([
+      [
+        { field: 'notes', op: 'contains', text: notes },
+        { field: 'amount', op: 'range', from: '1', to: null, exclusive: 'from' },
+      ],
+    ])
+    expect(filterLine('Records').value).toBe(`notes contains ${notes} and amount > 1`)
+    await listsApplied('Records', [`Notes contains “${notes}”`, 'Amount is over 1'])
+    expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Notes' }).value).toBe(notes)
+    expect(await floor('a header box applied')).toEqual(CLEAN('a header box applied'))
+    await user.click(chipRemove('Records', 'Amount is over 1'))
+    await waitFor(() => expect(within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' }).value).toBe(''), ARRIVES)
+  })
+
+  // A box the line would refuse sends nothing, is said on the grid's line
+  // -- where the grid speaks, through its handle -- and keeps what was
+  // typed. Unwired, the refusal would be said nowhere, and a person would
+  // not know why the grid did not change.
+  test('says a header box’s refusal on the grid’s line, keeping what was typed', async () => {
+    const user = await workspace(engine.formId)
+    plane.sent.length = 0
+    const amount = within(gridSection('Records')).getByRole<HTMLInputElement>('textbox', { name: 'Filter Amount' })
+    await user.type(amount, '1000,50{Enter}')
+    await waitFor(() => expect(gridStatus('Records')?.textContent).toBe('Write numbers with a point and no separators: 1000.50.'), ARRIVES)
+    expect(amount.value).toBe('1000,50')
+    expect(listsSent(plane.sent, engine.formId)).toEqual([])
+    expect(await floor('a header box refused')).toEqual(CLEAN('a header box refused'))
   })
 
   // A list nothing matches is no dead end: the page offers to try it

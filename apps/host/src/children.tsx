@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
-import { panelFields, panelShown, viewName } from './filter-terms.js'
+import { lineFields, panelFields, panelShown, viewName } from './filter-terms.js'
+import { HeaderFilterContext } from './header-filter.js'
+import type { HeaderFilters } from './header-filter.js'
 import { GridFilter } from './grid-filter.js'
 import { columnsOf } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
@@ -172,6 +174,12 @@ export function ChildSection({
   const mine = useOwnViews(client, child.form, definition)
   const state = useGridState({ formId: child.form, section: { kind: 'child', field: child.field }, columns, list: definition.list })
   const { filter, sort } = state
+  /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
+  const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
+  const headerFilters = useMemo<HeaderFilters>(
+    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]) }),
+    [boxFields, filter, state.setFilter],
+  )
   const canDelete = menu.operations.includes('delete') && definition.operations.includes('delete') && definition.deleting !== null
   const removal = useDeleteFlow({
     client,
@@ -356,68 +364,70 @@ export function ChildSection({
           <p className="child-sub">
             <Words said={[`For ${parentNoun} `, { code: parent.token }]} />
           </p>
-          <RecordGrid
-            ref={grid}
-            client={client}
-            formId={child.form}
-            definition={definition}
-            columns={columns}
-            choices={state.choices}
-            labelledBy={headingId}
-            noun={title}
-            parent={{ field: child.field, record: parent.token }}
-            search=""
-            filter={filter}
-            sort={sort}
-            openToken={drill !== undefined ? drill.held : open?.kind === 'record' ? open.token : null}
-            canCreate={canCreate}
-            quiet
-            toolbarStart={
-              <>
-                <ViewPicker
-                  idBase={headingId}
-                  views={views}
-                  own={mine.own}
-                  filter={filter}
-                  sort={sort}
-                  onPick={state.pick}
-                  onSave={(name) => mine.save({ name, filter, sort })}
-                  onRemove={mine.remove}
-                  named={viewName(filter, filterable)}
-                />
-                <ColumnsPanel
-                  idBase={`${headingId}-columns`}
-                  columns={columns}
-                  choices={state.choices}
-                  onChoices={state.setChoices}
-                  onReset={state.resetChoices}
-                />
-                {!panelShown(filterable, filter) ? null : (
-                  <GridFilter
-                    idBase={`${headingId}-filter`}
-                    fields={filterable}
-                    moves={definition.moves}
+          <HeaderFilterContext.Provider value={headerFilters}>
+            <RecordGrid
+              ref={grid}
+              client={client}
+              formId={child.form}
+              definition={definition}
+              columns={columns}
+              choices={state.choices}
+              labelledBy={headingId}
+              noun={title}
+              parent={{ field: child.field, record: parent.token }}
+              search=""
+              filter={filter}
+              sort={sort}
+              openToken={drill !== undefined ? drill.held : open?.kind === 'record' ? open.token : null}
+              canCreate={canCreate}
+              quiet
+              toolbarStart={
+                <>
+                  <ViewPicker
+                    idBase={headingId}
+                    views={views}
+                    own={mine.own}
                     filter={filter}
-                    onFilter={state.setFilter}
-                    empty={unmatched}
-                    onLeave={() => grid.current?.focusFirst()}
+                    sort={sort}
+                    onPick={state.pick}
+                    onSave={(name) => mine.save({ name, filter, sort })}
+                    onRemove={mine.remove}
+                    named={viewName(filter, filterable)}
                   />
-                )}
-              </>
-            }
-            refit={refit}
-            bench="child-bench"
-            {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
-            after={
-              removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
-                <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} />
-              ) : null
-            }
-            drilling={drill !== undefined}
-            onOpen={askRow}
-            onSort={state.setSort}
-            onFiltered={setUnmatched}
-          />
+                  <ColumnsPanel
+                    idBase={`${headingId}-columns`}
+                    columns={columns}
+                    choices={state.choices}
+                    onChoices={state.setChoices}
+                    onReset={state.resetChoices}
+                  />
+                  {!panelShown(filterable, filter) ? null : (
+                    <GridFilter
+                      idBase={`${headingId}-filter`}
+                      fields={filterable}
+                      moves={definition.moves}
+                      filter={filter}
+                      onFilter={state.setFilter}
+                      empty={unmatched}
+                      onLeave={() => grid.current?.focusFirst()}
+                    />
+                  )}
+                </>
+              }
+              refit={refit}
+              bench="child-bench"
+              {...(canDelete ? { remove: { noun: title, press: deleteRow } } : {})}
+              after={
+                removal.deletion.state !== 'idle' && removal.deletion.target.from.kind === 'row' && definition.deleting !== null ? (
+                  <DeleteRegion flow={removal} deleting={definition.deleting} level={5} idBase={`${headingId}-row-delete`} />
+                ) : null
+              }
+              drilling={drill !== undefined}
+              onOpen={askRow}
+              onSort={state.setSort}
+              onFiltered={setUnmatched}
+            />
+          </HeaderFilterContext.Provider>
         </>
       )}
       {open === null ? null : (

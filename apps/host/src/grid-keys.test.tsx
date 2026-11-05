@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { chooseForm, gridSection, mount, signIn } from './test-host.js'
+import { chooseForm, dataCell, gridSection, mount, signIn } from './test-host.js'
 import type { User } from './test-host.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -59,7 +59,7 @@ async function inTheGrid(formId: string): Promise<User> {
   const user = mount(plane.fetch)
   await signIn(user, TOKENS.clerk)
   await chooseForm(user, formId)
-  await user.click(within(records()).getAllByRole('gridcell')[1] as HTMLElement)
+  await user.click(dataCell(records(), 1))
   await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: /^Order k1:/ })).toBeTruthy(), { timeout: 15_000 })
   await waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('gridcell'))
   await settled()
@@ -116,7 +116,8 @@ describe.each(ENGINES)('the record grid on $engine', ({ formId }) => {
   test('resizes no column', async () => {
     const user = await inTheGrid(formId)
     const order = headers()
-    await user.keyboard('{ArrowUp}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}')
     expect(document.activeElement?.getAttribute('role')).toBe('columnheader')
     const header = document.activeElement as HTMLElement
     const width = header.style.width

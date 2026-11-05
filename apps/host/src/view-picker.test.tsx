@@ -5,7 +5,7 @@ import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm, RecordExpor
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, applyCondition, listsApplied, listsSent } from './test-filter.js'
 import { DELIVERY_VIEWS, ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, dataRows, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Sent } from './test-fetch.js'
@@ -107,9 +107,8 @@ function sortOf(heading: string, label: string): string | null {
 /** The first cell of every data row of the grid `heading` names: a record's key, as the grid shows it. */
 function firstCells(heading: string): string[] {
   const grid = within(gridSection(heading)).getByRole('grid', { name: heading })
-  return within(grid)
-    .getAllByRole('row')
-    .flatMap((row) => within(row).queryAllByRole('gridcell').slice(0, 1))
+  return dataRows(grid)
+    .flatMap((row) => within(row).getAllByRole('gridcell').slice(0, 1))
     .map((cell) => cell.textContent ?? '')
 }
 

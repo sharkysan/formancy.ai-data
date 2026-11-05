@@ -3,7 +3,9 @@ import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
 import { DownloadCsv } from './download.js'
-import { panelFields, panelShown, viewName } from './filter-terms.js'
+import { lineFields, panelFields, panelShown, viewName } from './filter-terms.js'
+import { HeaderFilterContext } from './header-filter.js'
+import type { HeaderFilters } from './header-filter.js'
 import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
 import { GridFilter } from './grid-filter.js'
@@ -100,6 +102,12 @@ export function Records({
   const filterable = useMemo(() => panelFields(definition), [definition])
   /** Whether the grid's first page under the filter came back with no rows. */
   const [unmatched, setUnmatched] = useState(false)
+  /** What each column header's box reads and changes (0132): the line's fields, the filter, and the grid's line for a refusal. */
+  const boxFields = useMemo(() => lineFields(filterable, definition.moves), [filterable, definition.moves])
+  const headerFilters = useMemo<HeaderFilters>(
+    () => ({ fields: boxFields, filter, onFilter: state.setFilter, refused: (message) => grid.current?.say([message]) }),
+    [boxFields, filter, state.setFilter, grid],
+  )
 
   const searchBlock =
     searchable.length === 0 ? null : (
@@ -174,64 +182,66 @@ export function Records({
           onOpen={onTreeOpen}
         />
       ) : (
-        <RecordGrid
-          ref={grid}
-          client={client}
-          formId={formId}
-          definition={definition}
-          columns={columns}
-          choices={state.choices}
-          labelledBy="records-heading"
-          parent={null}
-          search={search}
-          filter={filter}
-          sort={sort}
-          openToken={openToken}
-          canCreate={canCreate}
-          toolbarStart={
-            <>
-              {searchBlock}
-              <ViewPicker
-                idBase="records"
-                views={views}
-                own={mine.own}
-                filter={filter}
-                sort={sort}
-                onPick={state.pick}
-                onSave={(name) => mine.save({ name, filter, sort })}
-                named={viewName(filter, filterable)}
-                onRemove={mine.remove}
-              />
-              <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
-              {!panelShown(filterable, filter) ? null : (
-                <GridFilter
-                  idBase="records-filter"
-                  fields={filterable}
-                  moves={definition.moves}
+        <HeaderFilterContext.Provider value={headerFilters}>
+          <RecordGrid
+            ref={grid}
+            client={client}
+            formId={formId}
+            definition={definition}
+            columns={columns}
+            choices={state.choices}
+            labelledBy="records-heading"
+            parent={null}
+            search={search}
+            filter={filter}
+            sort={sort}
+            openToken={openToken}
+            canCreate={canCreate}
+            toolbarStart={
+              <>
+                {searchBlock}
+                <ViewPicker
+                  idBase="records"
+                  views={views}
+                  own={mine.own}
                   filter={filter}
-                  onFilter={state.setFilter}
-                  // Nothing matched a search: the search is the way out, which the grid's line offers.
-                  empty={unmatched && search.trim() === ''}
-                  slash
-                  onLeave={() => grid.current?.focusFirst()}
+                  sort={sort}
+                  onPick={state.pick}
+                  onSave={(name) => mine.save({ name, filter, sort })}
+                  named={viewName(filter, filterable)}
+                  onRemove={mine.remove}
                 />
-              )}
-            </>
-          }
-          refit={refit}
-          bench="master-bench"
-          {...(remove === undefined ? {} : { remove })}
-          after={after}
-          drilling={drilling}
-          onOpen={onOpen}
-          onSort={state.setSort}
-          onFiltered={setUnmatched}
-          onClearSearch={() => {
-            setTyped('')
-            onSearch('')
-            searchRef.current?.focus()
-          }}
-        />
+                <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+                {!panelShown(filterable, filter) ? null : (
+                  <GridFilter
+                    idBase="records-filter"
+                    fields={filterable}
+                    moves={definition.moves}
+                    filter={filter}
+                    onFilter={state.setFilter}
+                    // Nothing matched a search: the search is the way out, which the grid's line offers.
+                    empty={unmatched && search.trim() === ''}
+                    slash
+                    onLeave={() => grid.current?.focusFirst()}
+                  />
+                )}
+              </>
+            }
+            refit={refit}
+            bench="master-bench"
+            {...(remove === undefined ? {} : { remove })}
+            after={after}
+            drilling={drilling}
+            onOpen={onOpen}
+            onSort={state.setSort}
+            onFiltered={setUnmatched}
+            onClearSearch={() => {
+              setTyped('')
+              onSearch('')
+              searchRef.current?.focus()
+            }}
+          />
+        </HeaderFilterContext.Provider>
       )}
     </section>
   )

@@ -54,6 +54,8 @@ export {
   EXPORT_MAX_BYTES,
   exportFileName,
   fieldHeading,
+  headerCondition,
+  headerText,
   lineNames,
   LIST_PAGE_SIZE,
   parseFilterLine,

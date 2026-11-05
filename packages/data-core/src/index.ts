@@ -218,6 +218,7 @@ export { columnFilter, dayAfter, filterOffer, readFilter } from './records/filte
 export { lineNames, parseFilterLine, printFilterLine } from './records/filter-line.js'
 export type { FilterLineRead, LineField, LineRefusal } from './records/filter-line.js'
 export { completeFilterLine } from './records/filter-complete.js'
+export { headerCondition, headerText } from './records/filter-header.js'
 export type { LineCompletion, LineOption } from './records/filter-complete.js'
 export type { FilterPlanning, FilterRead } from './records/filter.js'
 export { browseRelations, followTerms } from './records/follow.js'

@@ -5,8 +5,9 @@
 // in its body and its words in no URL, and the condition a chip; a value
 // the server refuses said on the grid's line, with what was typed still in
 // its box and no Ask again; Clear filter giving the keyboard to its Undo;
-// and the filter line -- its completion open over the grid, a line typed
-// and applied with Enter, and a chip removed. Each state is measured by
+// the filter line -- its completion open over the grid, a line typed and
+// applied with Enter, and a chip removed; and a column header's box,
+// reached from its header by the keyboard and applied with Enter. Each state is measured by
 // the gate's `measured` on the way: the colours and target sizes, the
 // chips wrapping inside their row, the completion inside the page, and no
 // sideways scroll, down to 320 px.
@@ -147,6 +148,43 @@ export function filterJourney(plane, { check }) {
           await focusedOn(page, control(page, 'button', `Undo removing Notes contains “${words.toUpperCase()}”`)),
         )
         check('a chip removed: the line is empty', same(await control(page, 'combobox', 'Filter').inputValue(), ''))
+      },
+    ],
+    [
+      'A header box applied (Records)',
+      async (page) => {
+        // From the keyboard: a header, Down to its box's cell, Enter into the box.
+        await records(page).getByRole('columnheader', { name: 'Amount' }).focus()
+        await page.keyboard.press('ArrowDown')
+        await page.keyboard.press('Enter')
+        const box = control(page, 'textbox', 'Filter Amount')
+        check('a header box: Down from its header and Enter put the keyboard in it', await focusedOn(page, box))
+        await page.keyboard.type('> 0')
+        const sent = nextList(page)
+        await page.keyboard.press('Enter')
+        const request = await sent
+        check(
+          'a header box applied: its condition is in the list request’s body',
+          same(JSON.parse(request.postData() ?? '{}').filter, [{ field: 'amount', op: 'range', from: '0', to: null, exclusive: 'from' }]),
+        )
+        check('a header box applied: the line says it', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
+        // Tab goes on to the next column's box, as AG Grid's floating row walks.
+        await page.keyboard.press('Tab')
+        check('a header box: Tab reaches the next column’s box', await focusedOn(page, control(page, 'textbox', 'Filter Notes')))
+        // Esc gives an edit up: the box shows its column's condition again, and the filter is as it was.
+        await page.keyboard.type('given up')
+        await page.keyboard.press('Escape')
+        check('a header box: Esc gives up what was typed', same(await control(page, 'textbox', 'Filter Notes').inputValue(), ''))
+        check('a header box: and the filter is as it was', same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0'))
+      },
+    ],
+    [
+      'A header box cleared (Records)',
+      async (page) => {
+        // Cleared again, as the journeys after this one found the filter.
+        await control(page, 'button', 'Clear filter').click()
+        await until(async () => /^Rows 1–\d+(; more follow)?\.$/.test(await lineOf(page)), 'the grid never listed the records once the filter was cleared')
+        check('a header box cleared: the box is empty', same(await control(page, 'textbox', 'Filter Amount').inputValue(), ''))
       },
     ],
   ]

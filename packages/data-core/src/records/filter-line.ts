@@ -163,10 +163,13 @@ function quotedAt(text: string, at: number): LineToken {
   return { kind: 'quoted', text: text.slice(at), value, at, end, open: true }
 }
 
+/** A value in quotes, its backslashes and quotes escaped: one value whatever it holds. */
+export const quoted = (value: string): string => `"${value.replace(/\\/gu, '\\\\').replace(/"/gu, '\\"')}"`
+
 /** A value as the line writes it: bare where it reads back as one word, and quoted otherwise. */
 export function written(value: string): string {
   if (value !== '' && !/[\s"<>=]/u.test(value) && !value.includes('!=')) return value
-  return `"${value.replace(/\\/gu, '\\\\').replace(/"/gu, '\\"')}"`
+  return quoted(value)
 }
 
 interface Context {
@@ -410,7 +413,8 @@ export function printFilterLine(filter: readonly ListFilterTerm[], fields: reado
     .join(' and ')
 }
 
-function conditionsOf(term: ListFilterTerm, name: string, field: LineField): string[] {
+/** A term's conditions as the line writes them, each led by `name`. */
+export function conditionsOf(term: ListFilterTerm, name: string, field: LineField): string[] {
   switch (term.op) {
     case 'equals':
       return [

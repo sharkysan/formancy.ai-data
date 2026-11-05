@@ -6,6 +6,7 @@ import {
   answeredOnce,
   chooseCustomer,
   chooseForm,
+  dataCell,
   formLink,
   gridSection,
   load,
@@ -83,7 +84,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     const user = await openForm(plane, engine.formId)
     seen.push(window.location.href)
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: /^Order k1:/ })).toBeTruthy(), ARRIVES)
     seen.push(window.location.href)
     await load(user, EDGES.seededOrder)
@@ -227,7 +228,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await chooseForm(user, engine.formId)
     await user.click(screen.getByRole('radio', { name: 'Separate views' }))
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    const cell = within(grid).getAllByRole('gridcell')[0] as HTMLElement
+    const cell = dataCell(grid)
     const token = `k1:${String(cell.textContent)}`
     cell.focus()
     await user.keyboard('{Enter}')
@@ -261,7 +262,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await user.click(screen.getByRole('radio', { name: 'Drill down' }))
     expect(window.location.hash).toBe(`#form=${engine.formId}&layout=drill&view=records`)
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    const cell = within(grid).getAllByRole('gridcell')[0] as HTMLElement
+    const cell = dataCell(grid)
     const token = `k1:${String(cell.textContent)}`
     cell.focus()
     await user.keyboard('{Enter}')
@@ -293,7 +294,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await chooseForm(user, engine.formId)
     await user.click(screen.getByRole('radio', { name: 'Drill down' }))
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    const cell = within(grid).getAllByRole('gridcell')[0] as HTMLElement
+    const cell = dataCell(grid)
     const token = `k1:${String(cell.textContent)}`
     cell.focus()
     await user.keyboard('{Enter}')
@@ -314,7 +315,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await signIn(user, TOKENS.clerk)
     await chooseForm(user, engine.formId)
     await user.click(screen.getByRole('radio', { name: 'Drill down' }))
-    const cell = within(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).getAllByRole('gridcell')[0] as HTMLElement
+    const cell = dataCell(within(gridSection('Records')).getByRole('grid', { name: 'Records' }))
     const token = `k1:${String(cell.textContent)}`
     cell.focus()
     await user.keyboard('{Enter}')
@@ -430,7 +431,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     expect(within(unsavedNotice() as HTMLElement).getAllByRole('paragraph')[0]?.textContent).toBe('Going back closes these forms:')
 
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await waitFor(() => expect(within(unsavedNotice() as HTMLElement).getAllByRole('paragraph')[0]?.textContent).toMatch(/^Opening k1:/))
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
     await waitFor(() => expect(window.location.hash).toBe(here), ARRIVES)

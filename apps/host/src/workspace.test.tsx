@@ -9,6 +9,8 @@ import {
   answeredOnce,
   chooseForm,
   chooseRenderer,
+  dataCell,
+  dataRows,
   formLink,
   gridSection,
   gridStatus,
@@ -65,14 +67,11 @@ const headersOf = (): string[] =>
 
 /** The data rows of a grid, each as the text of its cells. */
 function rowsOf(grid: HTMLElement): string[][] {
-  return within(grid)
-    .getAllByRole('row')
-    .filter((row) => within(row).queryAllByRole('gridcell').length > 0)
-    .map((row) =>
-      within(row)
-        .getAllByRole('gridcell')
-        .map((cell) => cell.textContent ?? ''),
-    )
+  return dataRows(grid).map((row) =>
+    within(row)
+      .getAllByRole('gridcell')
+      .map((cell) => cell.textContent ?? ''),
+  )
 }
 
 /** The row of a grid whose first cell says `first`. */
@@ -261,10 +260,11 @@ describe.each(ENGINES)('the workspace on $engine', (engine) => {
     const sortable = new Set(definition.value.list?.sortable ?? [])
     const date = within(records()).getByRole('columnheader', { name: /Order date/ })
     expect(sortable.has('order_date')).toBe(true)
-    await user.click(within(records()).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(records()))
     // From a cell to its header, and Enter: the keyboard's way to sort.
     for (let column = 0; column < headersOf().indexOf('Order date'); column += 1) await user.keyboard('{ArrowRight}')
-    await user.keyboard('{ArrowUp}{Enter}')
+    // Up twice: through the row of the header boxes (0132) to the column's header.
+    await user.keyboard('{ArrowUp}{ArrowUp}{Enter}')
     await waitFor(() => expect(date.getAttribute('aria-sort')).toBe('ascending'), { timeout: 15_000 })
     const last = () => JSON.parse(plane.sent.filter((request) => request.path === `/v1/forms/${engine.formId}/records/list`).at(-1)?.body ?? '{}') as unknown
     await waitFor(() => expect(last()).toMatchObject({ sort: [{ field: 'order_date', direction: 'asc' }] }), { timeout: 15_000 })

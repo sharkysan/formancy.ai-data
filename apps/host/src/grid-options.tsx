@@ -3,6 +3,7 @@ import type { CSSProperties, ReactElement } from 'react'
 import {
   ColumnApiModule,
   ColumnAutoSizeModule,
+  CustomFilterModule,
   InfiniteRowModelModule,
   LocaleModule,
   ModuleRegistry,
@@ -18,6 +19,7 @@ import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
+import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 
 /*
  * How the page configures AG Grid Community for a record grid (0047): the
@@ -51,7 +53,9 @@ import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
  * would ship code nothing calls. RowApiModule is for finding the open row,
  * ColumnAutoSizeModule for sizing columns to the first page, LocaleModule
  * for the page's own words in AG Grid's live region, ColumnApiModule for
- * reading the headers' sort and showing the section's on them (0105);
+ * reading the headers' sort and showing the section's on them (0105),
+ * CustomFilterModule for the floating row that holds each header's box
+ * (0132);
  * grid-keys.test.tsx fails on the console error AG Grid writes for an
  * option whose module is missing.
  */
@@ -65,6 +69,7 @@ export const GRID_MODULES: readonly Module[] = [
   ColumnAutoSizeModule,
   LocaleModule,
   ColumnApiModule,
+  CustomFilterModule,
 ]
 ModuleRegistry.registerModules([...GRID_MODULES])
 
@@ -194,7 +199,7 @@ function headerMinWidth(label: string, sortable: boolean): number {
  * section gives it is the headers' still, so the datasource asks for it
  * (grid-datasource.ts). The first shown carries the open row's bar.
  */
-export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDelete): ColDef<GridRow>[] {
+export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDelete, boxed: ReadonlySet<string> = new Set()): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key
   const fields: ColDef<GridRow>[] = columns.map((column) => ({
     colId: column.key,
@@ -206,6 +211,18 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
     minWidth: headerMinWidth(column.label, column.sortable),
     maxWidth: 320,
     ...(column.key === first ? { cellRenderer: OpenCell } : {}),
+    // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
+    // Shown only: a hidden column's box would keep a row of empty cells under the headers.
+    ...(boxed.has(column.key) && column.shown
+      ? {
+          filter: NeverFilter,
+          floatingFilter: true,
+          floatingFilterComponent: HeaderBox,
+          suppressFloatingFilterButton: true,
+          suppressHeaderFilterButton: true,
+          suppressHeaderKeyboardEvent: boxKeys,
+        }
+      : {}),
   }))
   if (remove === undefined) return fields
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.

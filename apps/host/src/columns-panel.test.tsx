@@ -4,7 +4,7 @@ import type { ListView, PublishedForm, RecordListQuery } from '@formancy/data-cl
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, gridSection, gridStatus, load, mount, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, dataCell, gridSection, gridStatus, load, mount, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -215,7 +215,7 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     expect(await floor('the last column shown')).toEqual(CLEAN('the last column shown'))
 
     const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-    await user.click(within(grid).getAllByRole('gridcell')[0] as HTMLElement)
+    await user.click(dataCell(grid))
     await waitFor(() => expect(within(grid).getByRole('row', { selected: true })).toBeTruthy(), ARRIVES)
     const open = within(grid).getByRole('row', { selected: true })
     await waitFor(() => expect(within(open).getAllByRole('gridcell')[0]?.querySelector('svg rect')).not.toBeNull(), ARRIVES)
