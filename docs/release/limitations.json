@@ -3892,6 +3892,27 @@
           "says": "No plan of a condition through a lookup is measured on either engine."
         }
       ]
+    },
+    "0140": {
+      "reviewed": "sha256:7d63dc0e0f4f3ed7b74686b31c840e5cb5b4d2561311e56899177e2379f3f68d",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "Opening a form reads every published form's newest version, as the menu does, and nothing is cached: the cost grows with the number of forms published."
+        },
+        {
+          "area": "forms",
+          "says": "A lookup whose foreign key references a unique key rather than its target's primary key opens in no generated form, which is keyed by the primary key."
+        },
+        {
+          "area": "forms",
+          "says": "A form named for a lookup may still not show its record: its row filters can hide it, which only the read says."
+        },
+        {
+          "area": "server",
+          "says": "@formancy/data-client answers a form from a server older than this, which sends no opens, unexpected: a host upgrades its server first."
+        }
+      ]
     }
   }
 }

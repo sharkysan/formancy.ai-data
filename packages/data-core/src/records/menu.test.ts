@@ -3,7 +3,7 @@ import { generateForm } from '../generate/generate.js'
 import type { FormBindings } from '../generate/types.js'
 import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
-import { formMenu, grantedOperations, menuForm } from './menu.js'
+import { formMenu, grantedOperations, lookupOpens, menuForm } from './menu.js'
 import type { MenuBundle } from './menu.js'
 import {
   actor,
@@ -266,5 +266,54 @@ describe('a section under its parent (0109)', () => {
     expect(menuOf([hidden, company()], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
       { form: 'company', field: 'customer', one: true, when: null },
     ])
+  })
+})
+
+describe('the forms a lookup opens its record in (0140)', () => {
+  /** What `GET /v1/forms/:id` says of `open` for this person: every bundle read alone, as the menu reads them, then matched against its lookups. */
+  const opensOf = (open: MenuBundle, bundles: readonly MenuBundle[], context: PolicyContext) =>
+    lookupOpens(
+      open,
+      context,
+      bundles.map((entry) => menuForm(entry, context)),
+    )
+  const STAFF = bundle('order-staff', 'Orders for staff', PG, orderForm(PG).bindings, ORDER_POLICY)
+
+  // A lookup's record opens in every form this person may read whose root
+  // is the lookup's target, keyed by what its foreign key references --
+  // the rule that makes a child, read the other way (childFields): a
+  // line's order in both order forms, in codepoint order; an order's
+  // employee in the employee form; an employee's manager in the employee
+  // form itself. A lookup no form is over, the order's customer here, is
+  // not named. Watched failing with every lookup named under no form.
+  test('names every form this person may read its record in, under each lookup', () => {
+    const forms = [ORDER, STAFF, LINES, EMPLOYEES]
+    expect(opensOf(LINES, forms, CLERK)).toEqual([
+      {
+        field: 'order',
+        forms: [
+          { id: 'order', title: 'Order' },
+          { id: 'order-staff', title: 'Orders for staff' },
+        ],
+      },
+    ])
+    expect(opensOf(ORDER, forms, CLERK)).toEqual([{ field: 'employee', forms: [{ id: 'employee', title: 'Employee' }] }])
+    expect(opensOf(EMPLOYEES, forms, CLERK)).toEqual([{ field: 'employee', forms: [{ id: 'employee', title: 'Employee' }] }])
+  })
+
+  // Nothing is said of a form the policy keeps from this person, nor of a
+  // lookup they may not read, whose value a page never shows them; and a
+  // table of the same name on another connection is another table. Watched
+  // failing with the lookups the person may not read named too.
+  test('names no form the person may not read, under no lookup they may not read', () => {
+    const managersOnly = bundle('order', 'Order', PG, orderForm(PG).bindings, { ...ORDER_POLICY, operations: { read: ['manager'], create: [], update: [] } })
+    expect(opensOf(LINES, [managersOnly, LINES], CLERK)).toEqual([])
+    const hidden = bundle('order', 'Order', PG, orderForm(PG).bindings, {
+      ...ORDER_POLICY,
+      fields: { ...ORDER_POLICY.fields, employee: { read: [], write: ['clerk'] } },
+    })
+    expect(opensOf(hidden, [hidden, EMPLOYEES], CLERK)).toEqual([])
+    const elsewhere = bundle('order', 'Order', PG, orderForm(PG).bindings, ORDER_POLICY, 'archive')
+    expect(opensOf(LINES, [elsewhere, LINES], CLERK)).toEqual([])
   })
 })

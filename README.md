@@ -668,6 +668,9 @@ FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-host dev
 
 Sign in with a host token, and Forms lists the published forms you may read
 ([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)).
+A form's definition names, under each lookup, the forms you may read its
+record in
+([0140](./docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
 A form's records are a grid, AG Grid Community, a page at a time from the
 server's list
 ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)),

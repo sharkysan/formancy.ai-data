@@ -4,7 +4,7 @@ import type { FieldBinding, FormBindings, SectionBinding } from '../generate/typ
 import { authorizeOperation, readableFields } from '../policy/evaluate.js'
 import { byCodepoint, OPERATIONS } from '../policy/inputs.js'
 import type { FormPolicy, PolicyContext, PolicyOperation } from '../policy/types.js'
-import type { FormMenu, FormMenuChild } from '../runtime.js'
+import type { FormMenu, FormMenuChild, LookupOpen } from '../runtime.js'
 import { formValue } from './answers.js'
 import { childLookups, parentKey, referencingFields } from './children.js'
 import type { ChildLookup, ParentKey, PublishedTable } from './children.js'
@@ -132,4 +132,24 @@ export function formMenu(forms: readonly MenuForm[]): FormMenu {
       return { id: parent.id, title: parent.title, operations: [...parent.operations], children }
     }),
   }
+}
+
+/**
+ * Each lookup of `open` this person may read, with the forms of `forms` they
+ * may read its record in (0140): `formMenu`'s rule for a child read the
+ * other way, a form whose key is what the lookup references
+ * (`referencingFields`). A lookup no such form is over is not named. No list
+ * is asked of: the record opens by its token, as a read.
+ */
+export function lookupOpens(open: MenuBundle, context: PolicyContext, forms: readonly MenuForm[]): LookupOpen[] {
+  const fields = readableFields(open.policy, context, open.bindings)
+  if (!fields.ok) return []
+  const readable = new Set(fields.fields)
+  const named = forms.filter((form) => form.operations.includes('read')).sort((left, right) => byCodepoint(left.id, right.id))
+  return childLookups(open)
+    .filter((lookup) => readable.has(lookup.field))
+    .flatMap((lookup) => {
+      const into = named.filter((form) => referencingFields(form.key, [lookup]).length > 0)
+      return into.length === 0 ? [] : [{ field: lookup.field, forms: into.map(({ id, title }) => ({ id, title })) }]
+    })
 }

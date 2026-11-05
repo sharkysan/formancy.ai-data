@@ -18,6 +18,19 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A form names the forms each lookup's record opens in** (0140). Why: a
+  person reading an order who wants its customer -- the address, the
+  other orders -- had to leave the order and search the customer form for
+  the name the lookup showed. `GET /v1/forms/:id` now sends `opens`: each
+  lookup field the person may read, with the published forms they may
+  read its record in, those over the lookup's target keyed by what its
+  foreign key references, so its value is a record token of each. What
+  you notice: nothing on the page yet, which Open under the lookup
+  follows. For integrators: opening a form reads every published bundle,
+  as the menu does; `@formancy/data-client` answers a form without
+  `opens` `unexpected`, so upgrade the server first; a lookup onto a
+  unique key rather than the primary key opens in no generated form.
+
 - **A lookup's shown columns filter its records** (0139). Why: finding
   every order of a customer whose name holds "Muster" -- several
   customers, or one a person half remembers -- took a record picked at a

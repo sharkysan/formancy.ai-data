@@ -194,3 +194,4 @@ only enforcement is "we remember" says so plainly.
 | [0137](0137-two-lookups-into-one-table-are-told-apart-by-their-columns.md) | Two lookups into one table are told apart by their columns | accepted |
 | [0138](0138-the-studio-offers-every-lookup-it-can-by-default.md) | The studio offers every lookup it can by default | accepted |
 | [0139](0139-a-lookups-shown-columns-filter-its-records.md) | A lookup's shown columns filter its records | accepted |
+| [0140](0140-a-form-names-the-forms-each-lookups-record-opens-in.md) | A form names the forms each lookup's record opens in | accepted |

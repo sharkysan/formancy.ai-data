@@ -138,6 +138,7 @@ describe('when the data server is not what answers', () => {
       versions: null,
       writable: { create: null, update: null },
       moves: null,
+      opens: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -738,7 +739,16 @@ describe('a delete (0050)', () => {
   // all, is no form this server sent, as a form without `list` is not
   // (watched failing with `deleting` left unchecked).
   test("a form's deleting is null exactly when it offers no delete", async () => {
-    const FORM = { form: { model: {} }, readable: ['id'], list: null, copied: null, versions: null, writable: { create: null, update: null }, moves: null }
+    const FORM = {
+      form: { model: {} },
+      readable: ['id'],
+      list: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: null },
+      moves: null,
+      opens: [],
+    }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -771,7 +781,7 @@ describe('a delete (0050)', () => {
   // copy nobody decided -- as one from a server older than 0107, which
   // sends nothing, would.
   test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [] }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -808,7 +818,7 @@ describe('a delete (0050)', () => {
   // a server older than 0113 -- is no form this server sent, and a page
   // that offered a change from it would offer one nobody decided.
   test("a form's versions are null, or the start and end where it offers create and update", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [], moves: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [], moves: null, opens: [] }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
       update: operations.includes('update') ? [] : null,
@@ -847,7 +857,7 @@ describe('a delete (0050)', () => {
   // this server sent, and a page that drew by it would withhold or offer an
   // edit nobody decided. Watched failing with `writable` left unchecked.
   test("a form's writable names fields for exactly the writes it offers", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [] }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -891,6 +901,7 @@ describe('a delete (0050)', () => {
       copied: null,
       versions: null,
       writable: { create: null, update: [] },
+      opens: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -924,6 +935,45 @@ describe('a delete (0050)', () => {
     ]) {
       body = { ...FORM, moves }
       expect(await client.form('pg-ticket')).toEqual({ ok: true, value: body })
+    }
+  })
+
+  // `opens` is each lookup this person may read with the forms its record
+  // opens in (0140): a reply without it is from a server older than 0140,
+  // and a form named without its id or its title, or a lookup without its
+  // field, is none a page could offer to open. Watched failing with
+  // `opens` left unchecked.
+  test("a form's opens are each a lookup and the forms its record opens in", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read'],
+      readable: ['order'],
+      list: null,
+      deleting: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: null },
+      moves: null,
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const opens of [
+      undefined,
+      null,
+      [{ field: 'order' }],
+      [{ forms: [{ id: 'order', title: 'Order' }] }],
+      [{ field: 'order', forms: [{ id: 'order' }] }],
+      [{ field: 'order', forms: [{ id: 7, title: 'Order' }] }],
+    ]) {
+      body = { ...FORM, opens }
+      expect(await client.form('pg-line'), JSON.stringify(opens)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+    for (const opens of [[], [{ field: 'order', forms: [{ id: 'order', title: 'Order' }] }]]) {
+      body = { ...FORM, opens }
+      expect(await client.form('pg-line')).toEqual({ ok: true, value: body })
     }
   })
 

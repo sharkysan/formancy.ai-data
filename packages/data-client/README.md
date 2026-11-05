@@ -141,6 +141,11 @@ this person may make, each `{ from, to }` with `from` `null` for a
 create, or `null` where it holds none or the person writes neither; a
 reply without it is `unexpected`
 ([0127](../../docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
+A form's `opens` is each lookup field this person may read with the forms
+they may read its record in, `{ field, forms: [{ id, title }] }`, the
+lookup's value a record token of each; a reply without it is
+`unexpected`
+([0140](../../docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.

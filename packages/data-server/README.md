@@ -416,6 +416,10 @@ existed would be documented and inert.
   and `moves`, the state field the policy holds to moves and those this
   person may make, from `stateMoves`, or `null`
   ([0127](../../docs/decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
+  It names `opens`, each lookup field this person may read with the
+  published forms they may read its record in, from `lookupOpens` over
+  every bundle as the menu reads them, asking no other database
+  ([0140](../../docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
   `routes/runtime-deletes.test.ts` holds the route over
   fake ports, and `e2e.integration.test.ts` and
   `e2e-lost-answer.integration.test.ts` on both engines.

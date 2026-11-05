@@ -52,6 +52,30 @@ async function entry(
 }
 
 /**
+ * Every published form as this person's menu reads it (`entry`), in the
+ * store's order, or `null` when the store cannot list its forms -- which the
+ * log says. What the menu answers from, and what a form's lookups are
+ * matched against (0140).
+ */
+export async function menuForms(steps: MenuRouteSteps, request: FastifyRequest): Promise<MenuForm[] | null> {
+  let ids: string[]
+  try {
+    ids = await steps.store.list()
+  } catch (error) {
+    request.log.error({ error: (error as Error).message }, 'the configuration store cannot list its forms')
+    return null
+  }
+  const context = steps.context(request)
+  const allowed = steps.connections()
+  const forms: MenuForm[] = []
+  for (const id of ids) {
+    const read = await entry(steps.store, allowed, id, context, request.log)
+    if (read !== undefined) forms.push(read)
+  }
+  return forms
+}
+
+/**
  * `GET /v1/forms` (0045): the published forms this person may read, in
  * codepoint order of their ids, each with its title, the operations the
  * policy grants them of what it offers as published, and the children a
@@ -68,20 +92,8 @@ async function entry(
  */
 export function registerMenuRoute(app: FastifyInstance, steps: MenuRouteSteps): void {
   app.get('/v1/forms', async (request, reply) => {
-    let ids: string[]
-    try {
-      ids = await steps.store.list()
-    } catch (error) {
-      request.log.error({ error: (error as Error).message }, 'the configuration store cannot list its forms')
-      return reply.code(500).send(STORE_UNAVAILABLE)
-    }
-    const context = steps.context(request)
-    const allowed = steps.connections()
-    const forms: MenuForm[] = []
-    for (const id of ids) {
-      const read = await entry(steps.store, allowed, id, context, request.log)
-      if (read !== undefined) forms.push(read)
-    }
+    const forms = await menuForms(steps, request)
+    if (forms === null) return reply.code(500).send(STORE_UNAVAILABLE)
     return formMenu(forms) satisfies FormMenu
   })
 }
