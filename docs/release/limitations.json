@@ -3818,7 +3818,7 @@
       ]
     },
     "0136": {
-      "reviewed": "sha256:b5e9c30e377c52a65f656dfa7f913dcc50e76ec19d5e72b1e79b03717e627a0b",
+      "reviewed": "sha256:976eaa1ebbc6066a9a8ddb85f16438da4315f16b8fc315abb90125de6867b581",
       "limitations": [
         {
           "area": "forms",
@@ -3826,7 +3826,7 @@
         },
         {
           "area": "databases",
-          "says": "Under SQL Server's case-insensitive collation, a foreign key spelled in another case than its target's key sorts with the rows that show no label, as the grid shows it unlabelled."
+          "says": "Under a case-insensitive collation -- SQL Server's default, or a nondeterministic one on PostgreSQL -- a foreign key spelled in another case than its target's key sorts with the rows that show no label, as the grid shows it unlabelled."
         },
         {
           "area": "databases",

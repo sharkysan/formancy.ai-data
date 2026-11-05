@@ -130,8 +130,9 @@ function anchorSql(statement: Statement, table: ListRequest['target']['table'], 
  * the filters hide it. The key is matched exactly: a text key under the
  * database's default collation, which PostgreSQL holds deterministic, so a
  * row sorts by the label its page shows, which a token resolves to only on
- * an exact match, and a key whose two columns differ in collation is
- * compared under one rather than refused (42P22). A scalar subquery: one
+ * an exact match -- under a case-insensitive collation, the parity
+ * fixture's ICU one, a child naming `c` sorts with the rows that show no
+ * label though its foreign key relates it to `C`. A scalar subquery: one
  * value per row, so it multiplies none; a target key that stopped being
  * unique fails the statement (21000), as no description of the target
  * catches.

@@ -103,11 +103,10 @@ const KEY_ORDER = ['1001', '2001', '2002', '2003', '2004', '2005', '2006']
  *   tenant 2's parent sorts among the children that show no label, after
  *   every name both ways, by its key; and the same order page after page,
  *   each one row after the one before. The names order alike under any
- *   collation. The key is matched exactly under one collation: on
- *   PostgreSQL the child's key is under "C" and the parent's under the
- *   database's default, which an EXISTS over the two could not compare
- *   (42P22); on SQL Server, whose case-insensitive key relates `c` to `C`,
- *   a child naming `c` shows no label, and sorts among the NULLs.
+ *   collation. The key is matched exactly: under a case-insensitive
+ *   collation -- the parity fixture's ICU one on PostgreSQL, the
+ *   database's on SQL Server -- the foreign key relates a child naming `c`
+ *   to `C`, and that child shows no label, so it sorts among the NULLs.
  */
 export const LIST_PARITY = {
   pages: {
@@ -217,7 +216,7 @@ export const LIST_PARITY = {
     ],
     asc: ['2', '1', '3', '4'],
     desc: ['1', '2', '3', '4'],
-    /** SQL Server alone: a fifth child naming `c`, which its foreign key relates to `C` and no label is shown for. */
+    /** A fifth child naming `c`, which the case-insensitive key relates to `C` and no label is shown for. */
     folded: { child: ['5', 'c'], asc: ['2', '1', '3', '4', '5'], desc: ['1', '2', '3', '4', '5'] },
   },
   key: {

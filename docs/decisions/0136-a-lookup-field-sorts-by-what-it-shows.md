@@ -17,11 +17,11 @@
   a child listed by its parent's name over a text key, ascending and
   descending, a parent of another tenant -- hidden by the lookup's filter
   -- and a child with none both after every name by their keys, and the
-  same order page after page; on PostgreSQL the child's key is under "C"
-  and the parent's under the default collation (watched failing without
-  the named collation, 42P22), and on SQL Server a child naming `c`, which
-  the case-insensitive key relates to `C`, sorts among the rows that show
-  no label (watched failing with the key compared by its collation alone).
+  same order page after page; and a child naming `c`, which a
+  case-insensitive key relates to `C` -- PostgreSQL's under the parity
+  fixture's ICU collation, SQL Server's under the database's -- sorts
+  among the rows that show no label (watched failing on both with the key
+  compared by its collation alone: it sorted as Gamma).
   `packages/data-server/src/routes/runtime-lists.test.ts` -- the form
   offers the lookup as sortable and a sort by it reaches the port as its
   label; `runtime-exports.test.ts` -- a clerk whose region the lookup's
@@ -67,10 +67,11 @@ lateral join of its own -- PostgreSQL's `cross join lateral`, SQL Server's
 none, and orders, numbers and seeks by that column. A text key is matched
 exactly, so a row sorts by exactly the label its page shows -- a token is
 labelled only on an exact match: on PostgreSQL under the database's
-default collation, which is deterministic, so a key whose two columns
-differ in collation is compared under one rather than refused, as a
-through's is; on SQL Server, whose foreign key holds one collation, by
-the columns' own equality and again byte for byte. The label's text is
+default collation, which is deterministic, and on SQL Server, whose
+foreign key holds one collation, by the columns' own equality and again
+byte for byte. A key under a case-insensitive collation is related by
+its foreign key to a target spelled in another case, which the label is
+not. The label's text is
 ordered by its column's collation, as any text is.
 
 ## Consequences
@@ -80,9 +81,10 @@ it, on both engines, page after page.
 
 **What it costs.**
 - A label of several display columns sorts by its first alone.
-- Under SQL Server's case-insensitive collation, a key spelled in another
-  case than its target's sorts with the rows that show no label, as the
-  grid shows it unlabelled.
+- Under a case-insensitive collation -- SQL Server's default, or a
+  nondeterministic one on PostgreSQL -- a key spelled in another case than
+  its target's sorts with the rows that show no label, as the grid shows
+  it unlabelled.
 - A target key that stopped being unique since the form was published
   fails the list (21000 on PostgreSQL, 512 on SQL Server): a list
   describes its root, not a lookup's target.

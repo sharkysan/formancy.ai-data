@@ -509,19 +509,24 @@ describe('an order by a lookup’s label', covers('postgres', listCase('label'))
   // the lookup's own filter, so tenant 2's parent shows no name to tenant
   // 1's clerk and its child sorts with the one that names no parent --
   // after every name, both ways, by its key -- and every page after a row
-  // continues the same order. The key is text, the child's under "C" and
-  // the parent's under the database's default: compared under one named
-  // collation, never refused as a through's is (watched failing without
-  // it, 42P22).
+  // continues the same order. The key is text under the parity fixture's
+  // case-insensitive ICU collation, matched exactly: a child naming `c`,
+  // which the key relates to `C`, shows no label and sorts among the NULLs
+  // (watched failing with the key compared by its collation alone: it
+  // sorted as Gamma).
   test('orders by the label each row shows, NULLs and a hidden parent last, page after page', async () => {
-    const { parents, children, asc, desc } = LIST_PARITY.label
-    await owner.unsafe('create table sales.label_parent (code varchar(10) not null primary key, name varchar(40) not null, tenant_id integer not null)')
+    const { parents, children, folded } = LIST_PARITY.label
+    const { asc, desc } = folded
     await owner.unsafe(
-      'create table sales.label_child (id integer not null primary key, tenant_id integer not null, parent_code varchar(10) collate "C" null constraint fk_label_child_parent references sales.label_parent (code))',
+      'create table sales.label_parent (code varchar(10) collate parity.ci not null primary key, name varchar(40) not null, tenant_id integer not null)',
+    )
+    await owner.unsafe(
+      'create table sales.label_child (id integer not null primary key, tenant_id integer not null, parent_code varchar(10) collate parity.ci null constraint fk_label_child_parent references sales.label_parent (code))',
     )
     for (const [code, name, tenant] of parents)
       await owner.unsafe('insert into sales.label_parent (code, name, tenant_id) values ($1, $2, $3::int)', [code, name, tenant])
-    for (const [id, parent] of children) await owner.unsafe('insert into sales.label_child (id, tenant_id, parent_code) values ($1::int, 1, $2)', [id, parent])
+    for (const [id, parent] of [...children, folded.child])
+      await owner.unsafe('insert into sales.label_child (id, tenant_id, parent_code) values ($1::int, 1, $2)', [id, parent])
     const labelled = await discoverPostgres(owner, FIXTURE_SCOPE)
     const bindings = generateForm(labelled, {
       connection: 'test',

@@ -767,8 +767,8 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   refused, a varchar walked a label at a time, a literal search, NULLs last both
   ways, a NOT NULL sort spelled without a placement, a parent over an
   integer and over a `char(2)` foreign key, a child's lines through their
-  order, every row its read, an order by a lookup's label over a text key
-  of two collations (0136), and a page refused once its own description
+  order, every row its read, an order by a lookup's label, its text key
+  matched exactly under a case-insensitive collation (0136), and a page refused once its own description
   says the key can be NULL or is not unique; and a file of the shipments
   (0079), `EXPORT_PARITY`'s `export: shipments`: the shipments listed
   through the adapter and written by data-core are the shared file's
