@@ -63,8 +63,10 @@ const box = async (name: string) => screen.findByRole<HTMLInputElement>('textbox
 
 describe('a column header’s filter box', () => {
   // A box per column the line may name, by its column's label; none for
-  // one it may not -- a lookup -- where a box would offer a condition the
-  // server refuses (watched failing with no floating row at all).
+  // one it may not -- Customer here, a field the filter does not offer --
+  // where a box would offer a condition the server refuses (watched
+  // failing with no floating row at all). A lookup the filter offers has
+  // a box of its own (lookup-box.test.tsx, 0135).
   test('is offered on each column the line may name, by its label', async () => {
     render(<Grid sent={[]} />)
     expect((await box('Filter Notes')).value).toBe('')

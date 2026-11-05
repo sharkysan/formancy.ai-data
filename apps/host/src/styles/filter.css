@@ -312,3 +312,12 @@
   gap: 0.375rem 0.75rem;
   margin: 0;
 }
+
+/* A lookup column's records (0135), drawn over the page under its header
+   box, since the grid's header clips what its cells hold; placed by the
+   box, as fixed as the box is while the person picks. */
+.lookup-options {
+  position: fixed;
+  inset-inline: auto;
+  max-width: calc(100vw - 2rem);
+}

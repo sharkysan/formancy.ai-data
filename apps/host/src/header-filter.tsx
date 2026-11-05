@@ -1,8 +1,9 @@
-import { createContext, useContext, useRef, useState } from 'react'
+import { createContext, useContext, useId, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement } from 'react'
 import { headerCondition, headerText } from '@formancy/data-client'
-import type { LineField, ListFilterTerm } from '@formancy/data-client'
+import type { LineField, ListFilterTerm, LookupRow } from '@formancy/data-client'
 import type { IFilterComp, IFloatingFilterParams, SuppressHeaderKeyboardEventParams } from 'ag-grid-community'
+import { createPortal } from 'react-dom'
 import { withTerm } from './filter-terms.js'
 
 /*
@@ -14,7 +15,8 @@ import { withTerm } from './filter-terms.js'
  * nothing the line could not say: Enter, or leaving the box, applies it,
  * and a refusal is said where the grid speaks, what was typed kept. A
  * column whose field has values -- a state, a boolean -- offers them in a
- * select instead. A column the line cannot name has no box.
+ * select instead, and a lookup's column searches its lookup (0135). A
+ * column the line cannot name has no box.
  *
  * The keyboard reaches a box as AG Grid's header keys do: Down from a
  * header to its box's cell and Enter into the box; Esc gives up an edit
@@ -39,6 +41,10 @@ export interface HeaderFilters {
   refused: (message: string) => void
   /** The id of the filter line's hint, which says `=` on a cell (0133): the grid is described by it. */
   hint?: string
+  /** A lookup field's records whose labels match `search` (0135), or the server's refusal; none where the grid has no search of its lookups. */
+  records?: (field: string, search: string, signal: AbortSignal) => Promise<readonly LookupRow[] | string>
+  /** Records a box picked or found, which the line then reads and writes by their labels. */
+  heard?: (field: string, rows: readonly LookupRow[]) => void
 }
 
 /** A grid's boxes' filter, for the boxes AG Grid draws in its header. */
@@ -88,6 +94,7 @@ export function HeaderBox({ column }: IFloatingFilterParams): ReactElement | nul
   const headers = useContext(HeaderFilterContext)
   const field = headers?.fields.find((entry) => entry.field === column.getColId())
   if (headers === null || field === undefined) return null
+  if (field.input === 'lookup') return <LookupBox field={field} headers={headers} />
   return field.input === 'boolean' || field.values !== undefined ? <ChoiceBox field={field} headers={headers} /> : <TextBox field={field} headers={headers} />
 }
 
@@ -196,3 +203,199 @@ function ChoiceBox({ field, headers }: { field: LineField; headers: HeaderFilter
 
 /** The select's value for a condition its values do not say. */
 const OTHER = '\u0000other'
+
+/** What a lookup column's listbox offers: whether the field refers to a record, or a record a search found. */
+type LookupOption = { kind: 'null' | 'not-null'; words: string } | { kind: 'record'; row: LookupRow }
+
+/** The emptiness conditions `field` offers, in the line's words. */
+const emptiness = (field: LineField): LookupOption[] => [
+  ...(field.operators.includes('null') ? [{ kind: 'null' as const, words: 'is empty' }] : []),
+  ...(field.operators.includes('not-null') ? [{ kind: 'not-null' as const, words: 'is not empty' }] : []),
+]
+
+/**
+ * A lookup column's box (0135): an ARIA 1.2 combobox that searches the
+ * lookup as the person types -- each keystroke's search abandoning the one
+ * before it, which stops in the database (0061) -- and offers the records
+ * it finds by their labels, or, while empty, whether the field refers to
+ * a record. A record picked is the column's condition by its token, and
+ * the page hears of it, so the line says it by its label. Enter on typed
+ * text reads it as the line would, a label the page knows or the words
+ * `is empty`; Esc gives an edit up. The listbox is drawn over the page,
+ * under the box, since the grid's header clips what its cells hold.
+ */
+function LookupBox({ field, headers }: { field: LineField; headers: HeaderFilters }): ReactElement {
+  const id = useId()
+  const input = useRef<HTMLInputElement>(null)
+  const [found, setFound] = useState<readonly LookupRow[]>([])
+  // The records found count as known: a label typed whole names one of them, and one picked is shown by its label.
+  const known: LineField = {
+    ...field,
+    values: [
+      ...new Map([...(field.values ?? []).map((entry) => [entry.value, entry.label] as const), ...found.map((row) => [row.token, row.label] as const)]),
+    ].map(([value, label]) => ({ value, label })),
+  }
+  const shown = headerText(
+    headers.filter.find((term) => term.field === field.field),
+    known,
+  )
+  const [draft, setDraft] = useState<string | null>(null)
+  const [focused, setFocused] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(-1)
+  const searching = useRef<AbortController | null>(null)
+  /** The search refusal last said, so each keystroke of one refused search does not say it again. */
+  const saidSearch = useRef<string | null>(null)
+  const givingUp = useRef(false)
+  const refusedText = useRef<string | null>(null)
+  const now = JSON.stringify(headers.filter)
+  const [followed, setFollowed] = useState(now)
+  if (followed !== now) {
+    setFollowed(now)
+    if (!focused) setDraft(null)
+  }
+  const options: LookupOption[] = (draft ?? '').trim() === '' ? emptiness(field) : found.map((row) => ({ kind: 'record', row }))
+  const listed = open && options.length > 0
+
+  function close(): void {
+    searching.current?.abort()
+    setOpen(false)
+    setActive(-1)
+  }
+
+  function search(text: string): void {
+    searching.current?.abort()
+    setActive(-1)
+    if (text.trim() === '' || headers.records === undefined) {
+      setFound([])
+      return
+    }
+    const controller = new AbortController()
+    searching.current = controller
+    void headers.records(field.field, text, controller.signal).then((rows) => {
+      if (controller.signal.aborted) return
+      if (typeof rows === 'string') {
+        if (saidSearch.current !== rows) headers.refused(rows)
+        saidSearch.current = rows
+        setFound([])
+        return
+      }
+      saidSearch.current = null
+      setFound(rows)
+    })
+  }
+
+  function commit(term: ListFilterTerm | null): void {
+    refusedText.current = null
+    setDraft(null)
+    close()
+    const next = withCondition(headers.filter, field.field, term)
+    if (JSON.stringify(next) !== JSON.stringify(headers.filter)) headers.onFilter(next)
+  }
+
+  function pick(option: LookupOption): void {
+    if (option.kind !== 'record') {
+      commit({ field: field.field, op: option.kind })
+      return
+    }
+    headers.heard?.(field.field, [option.row])
+    commit({ field: field.field, op: 'equals', value: option.row.token })
+  }
+
+  function applyTyped(): void {
+    if (draft === null) return
+    const read = headerCondition(draft, known)
+    if (!read.ok) {
+      if (refusedText.current !== draft) headers.refused(read.message)
+      refusedText.current = draft
+      return
+    }
+    const term = read.term
+    const row = term?.op === 'equals' ? found.find((entry) => entry.token === term.value) : undefined
+    if (row !== undefined) headers.heard?.(field.field, [row])
+    commit(term)
+  }
+
+  const place = input.current?.getBoundingClientRect()
+  return (
+    <>
+      <input
+        ref={input}
+        type="text"
+        className={TEXT_BOX}
+        role="combobox"
+        aria-label={`Filter ${field.label}`}
+        aria-autocomplete="list"
+        aria-expanded={listed}
+        aria-controls={`${id}-records`}
+        aria-activedescendant={listed && active >= 0 ? `${id}-record-${String(active)}` : undefined}
+        autoComplete="off"
+        spellCheck={false}
+        value={draft ?? shown}
+        onChange={(event) => {
+          setDraft(event.target.value)
+          setOpen(true)
+          search(event.target.value)
+        }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false)
+          close()
+          if (givingUp.current) givingUp.current = false
+          else applyTyped()
+        }}
+        // Before AG Grid's own listener on the cell, which hears Esc first and blurs the box.
+        onKeyDownCapture={(event: KeyboardEvent<HTMLInputElement>) => {
+          if (composing(event.nativeEvent) || event.key !== 'Escape') return
+          givingUp.current = true
+          setDraft(null)
+          close()
+        }}
+        onKeyDown={(event) => {
+          if (composing(event.nativeEvent)) return
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault()
+            setOpen(true)
+            const step = event.key === 'ArrowDown' ? 1 : -1
+            setActive((at) => (options.length === 0 ? -1 : (at + step + options.length) % options.length))
+            return
+          }
+          if (event.key !== 'Enter') return
+          event.preventDefault()
+          const option = listed && active >= 0 ? options[active] : undefined
+          if (option === undefined) applyTyped()
+          else pick(option)
+        }}
+      />
+      {createPortal(
+        <ul
+          id={`${id}-records`}
+          className="filter-options lookup-options"
+          role="listbox"
+          aria-label={`Records of ${field.label}`}
+          hidden={!listed}
+          style={
+            place === undefined ? undefined : { top: `${String(place.bottom + 4)}px`, left: `${String(place.left)}px`, minWidth: `${String(place.width)}px` }
+          }
+        >
+          {options.map((option, index) => (
+            <li
+              key={option.kind === 'record' ? option.row.token : option.kind}
+              id={`${id}-record-${String(index)}`}
+              role="option"
+              aria-selected={index === active}
+              onMouseDown={(event) => {
+                // Taken where it is pressed, the keyboard staying in the box.
+                event.preventDefault()
+                pick(option)
+              }}
+            >
+              <span className="filter-option-label">{option.kind === 'record' ? option.row.label : option.words}</span>
+            </li>
+          ))}
+        </ul>,
+        document.body,
+      )}
+    </>
+  )
+}

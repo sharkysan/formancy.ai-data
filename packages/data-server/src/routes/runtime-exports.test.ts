@@ -505,7 +505,7 @@ describe('the export route', () => {
     }
     expect((await exported('customer', { sort: [{ field: 'country', direction: 'asc' }] })).json()).toMatchObject({ code: 'not-sortable' })
     for (const [condition, message] of [
-      [{ field: 'country', op: 'equals', value: 'k1:CH' }, 'country is not a field you may filter this list by.'],
+      [{ field: 'country', op: 'equals', value: 'k1:CH,DE' }, 'A record given for country is not one it can refer to.'],
       [{ field: 'customer_no', op: 'equals', value: '98765x' }, 'A value given for customer_no is not one it can hold.'],
       [{ field: 'name', op: 'not-null' }, 'name offers no not-null condition.'],
     ] as const) {
