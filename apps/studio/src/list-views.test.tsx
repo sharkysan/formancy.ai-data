@@ -5,7 +5,7 @@ import { viewProblems } from '@formancy/data-core'
 import type { StoredListView } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Bundle, ProposalRequest } from './api.js'
-import { audit, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
+import { audit, chooseOrder, focusedName, generateOrder, goTo, paragraphs, pressEnter, signIn, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -189,12 +189,32 @@ describe('making a view', () => {
     ])
   })
 
+  // A lookup filters by the record it refers to (0135), which a person
+  // picks by what the lookup shows of it; the studio has no picker for
+  // one, so a lookup of one nullable column -- Employee, over approved_by --
+  // is offered by whether it
+  // refers to a record, with no box, and the customer, a key of two
+  // columns that offers nothing more, not at all. Watched failing with
+  // the list's offer taken whole: Customer was a field with an equals
+  // condition and a box for a token.
+  test('offers a lookup by whether it refers to a record, and a key of two columns not at all', async () => {
+    const user = await signIn(plane)
+    const choose = await chooseOrder(user)
+    await user.click(within(choose).getByRole('checkbox', { name: 'Offer fk_order_approved_by as a lookup' }))
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await goTo(user, 'Presentation')
+    // The generator names the lookup over approved_by for the table it refers to.
+    const row = await addCondition(user, 'Employee', 'is NULL')
+    expect(options(row, 'Field')).not.toContain('Customer')
+    expect(options(row, 'Condition')).toEqual(['is NULL', 'is not NULL'])
+    expect(within(row).queryByRole('textbox')).toBeNull()
+  })
+
   // What a view may be built from is what the form's list offers anybody:
-  // a lookup holds a token, not its label, and offers neither; each field
+  // a lookup only as the test above says; each field
   // is named as the form labels it now, a label edited above included; and
   // each condition's operators, boxes and hint are the Browse step's for
-  // the field's type and NULLs. A panel that offered the lookup would save
-  // a view the server refuses; one that named fields by key would read
+  // the field's type and NULLs. A panel that named fields by key would read
   // otherwise than the form the person sees.
   test('offers what the form’s list offers, by the form’s labels, with the Browse step’s boxes', async () => {
     const user = await toViews()

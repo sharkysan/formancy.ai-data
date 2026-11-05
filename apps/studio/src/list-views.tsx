@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { listColumns, viewProblems, viewShapeProblems } from '@formancy/data-core'
-import type { FormBindings, StoredListView } from '@formancy/data-core'
+import type { FilterableField, FormBindings, StoredListView } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 
 import { labelOf } from './document.js'
@@ -62,6 +62,19 @@ export function SavedView({ view, label }: { view: StoredListView; label: (key: 
  * shape and its fit to these bindings, and a refusal is said in their
  * words with everything typed kept.
  */
+/**
+ * An offer as a view's condition may be built from it here: a lookup's
+ * record is picked by what the lookup shows of it (0135), and the studio
+ * has no picker for one, so a lookup offers only whether it refers to a
+ * record -- and a key of several columns, which offers no more than its
+ * record, is not offered.
+ */
+function buildableOffer(offer: FilterableField): FilterableField[] {
+  if (offer.input !== 'lookup') return [offer]
+  const operators = offer.operators.filter((op) => op === 'null' || op === 'not-null')
+  return operators.length === 0 ? [] : [{ ...offer, operators, input: null }]
+}
+
 export function ListViewsPanel({
   bindings,
   document,
@@ -87,6 +100,7 @@ export function ListViewsPanel({
       ),
     [bindings],
   )
+  const buildable = useMemo(() => columns.filterable.flatMap(buildableOffer), [columns])
   const label = (key: string) => labelOf(document, key)
   const [draft, setDraft] = useState<ViewDraft>(EMPTY_VIEW)
   // The view in the form, by the name it was saved under: the name typed may change, and a move changes its place.
@@ -104,7 +118,7 @@ export function ListViewsPanel({
 
   function save(event: FormEvent): void {
     event.preventDefault()
-    const view = viewOf(draft, columns.filterable)
+    const view = viewOf(draft, buildable)
     const at = editingAt === -1 ? views.length : editingAt
     // One view opens the grid: saved as the default, this one takes it from the one that had it.
     const took = view.default === true ? views.find((other, index) => index !== at && other.default === true) : undefined
@@ -203,7 +217,7 @@ export function ListViewsPanel({
       <ViewForm
         heading={editingAt === -1 ? 'New view' : `Editing view ${String(editingAt + 1)}, “${editing ?? ''}”`}
         draft={draft}
-        offers={columns.filterable}
+        offers={buildable}
         sortable={columns.sortable}
         label={label}
         refused={refused}

@@ -131,6 +131,14 @@ export const COLUMN_FILTER_TENANT = '3'
  *   case, accents and a trailing space counting; and a contains folds case
  *   on that column as the search does, where PostgreSQL refuses LIKE under
  *   a nondeterministic collation outright.
+ * - `lookup`: a lookup field filtered by the record it refers to (0135),
+ *   each of its columns compared by the database's own equality, as a
+ *   parent is (`text-parent`): a customer's country equals CH, and `ch`
+ *   finds it on SQL Server alone, whose collation folds case; a country
+ *   is empty, or not; an order's customer, a key of two columns, equals
+ *   tenant 1's customer 1001 or tenant 2's, whose orders the clerk of
+ *   tenant 1 never sees; and a line's order, under the throughs (0043),
+ *   equals tenant 1's second order or tenant 2's, which finds nothing.
  */
 export const COLUMN_FILTER_PARITY = {
   text: {
@@ -263,6 +271,29 @@ export const COLUMN_FILTER_PARITY = {
     entries: [
       { filter: [{ column: 'order_date', op: 'equals', value: '2026-10-09' }], ids: [SECOND] },
       { filter: [{ column: 'order_date', op: 'equals', value: '2026-10-08' }], ids: [OURS] },
+    ],
+  },
+  lookup: {
+    country: {
+      field: 'country',
+      record: { value: 'k1:CH', keys: ['1001'] },
+      folded: { value: 'k1:ch', keys: { postgres: [], sqlserver: ['1001'] } },
+      null: ['2001', '2002', '2003', '2004', '2005', '2006'],
+      'not-null': ['1001'],
+    },
+    customer: [
+      { record: 'k1:1,1001', ids: [OURS, SECOND] },
+      { record: 'k1:2,1001', ids: [] },
+    ],
+    order: [
+      {
+        record: `k1:${SECOND}`,
+        lines: [
+          [SECOND, '1'],
+          [SECOND, '2'],
+        ],
+      },
+      { record: `k1:${THEIRS}`, lines: [] },
     ],
   },
   collation: {

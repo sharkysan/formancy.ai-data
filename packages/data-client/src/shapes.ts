@@ -52,7 +52,7 @@ function isStrings(value: unknown): value is string[] {
  * is a reply this client refuses or an offer it passes unread.
  */
 const FILTER_OPERATORS: Readonly<Record<FilterOp, true>> = { equals: true, range: true, contains: true, null: true, 'not-null': true }
-const FILTER_INPUTS: Readonly<Record<FilterInput, true>> = { text: true, integer: true, decimal: true, date: true, uuid: true, boolean: true }
+const FILTER_INPUTS: Readonly<Record<FilterInput, true>> = { text: true, integer: true, decimal: true, date: true, uuid: true, boolean: true, lookup: true }
 const FILTER_DAYS: Readonly<Record<FilterDays, true>> = { utc: true, wall: true }
 
 /**

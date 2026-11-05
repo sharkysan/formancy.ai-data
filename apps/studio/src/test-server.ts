@@ -272,6 +272,9 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
       return value !== null && String(value) === condition.value
     case 'contains':
       return typeof value === 'string' && value.toLowerCase().includes(condition.text.toLowerCase())
+    case 'refers':
+      // A lookup field's (0135): a browse names columns, never a lookup, so the studio never sends one.
+      throw new Error(`a browse planned a lookup's condition on ${condition.column}`)
     case 'range': {
       if (value === null) return false
       const order = (bound: string) => rangeOrder(condition.type, String(value), bound)
