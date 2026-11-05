@@ -43,7 +43,7 @@ export const CANNOT_OPEN = 'This row cannot be opened: its key does not fit in a
  * (`not-filterable`, 0104): asking again would be refused again, so the
  * recovery is the condition, which the panel still holds as typed.
  */
-export const REFUSED_FILTER_HELP = 'Change the condition under Filter and apply it again, or remove it.'
+export const REFUSED_FILTER_HELP = 'Change the condition in Filter and press Enter, or remove it.'
 
 /** The readable fields of `definition`, in the form's order, without the parent's field in a child grid. */
 export function columnsOf(definition: PublishedForm, parentField: string | null): GridColumn[] {

@@ -208,11 +208,12 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
 
   // Each condition is removed on its own, the grid listing what the rest
   // hold for, and Clear filter removes them all; the keyboard goes to the
-  // next condition's Remove, the one before, or Filter once none is left,
+  // next condition's Remove, the one before, or Undo once none is left,
   // and the line no longer says the list is filtered (watched failing with
   // the keyboard left on a Remove no longer there: the page itself focused;
   // and, before the Remove buttons were named for their fields, with no
-  // button "Remove the condition on Amount" to press).
+  // button "Remove the condition on Amount" to press, as the chips' Remove
+  // is now named for what the condition says).
   test('removes each condition on its own, clears them all, and keeps the keyboard', async () => {
     const notes = stamp('removed')
     const orders = await freshOrders(engine, notes, ['1', '2', '3'])
@@ -222,16 +223,16 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await waitFor(() => expect(recordKeys()).toEqual(orders.slice(1)), ARRIVES)
 
     const records = gridSection('Records')
-    within(records).getByRole('button', { name: 'Remove the condition on Amount' }).focus()
+    within(records).getByRole('button', { name: 'Remove Amount is between 2 and 3' }).focus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
     await says('Records', 'Rows 1–3. Filtered by Notes.')
     await listsApplied('Records', [`Notes contains “${notes}”`])
-    expect(focusedName()).toBe('Remove the condition on Notes')
+    expect(focusedName()).toBe(`Remove Notes contains “${notes}”`)
 
     await user.keyboard(' ')
     await waitFor(() => expect(applied('Records')).toEqual([]), ARRIVES)
-    expect(focusedName()).toBe('Filter')
+    expect(focusedName()).toBe(`Undo removing Notes contains “${notes}”`)
     await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Rows 1–\d+(; more follow)?\.$/), ARRIVES)
 
     await applyCondition(user, 'Records', { field: 'Notes', condition: 'contains', value: notes })
@@ -240,12 +241,12 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     plane.sent.length = 0
     await user.click(within(records).getByRole('button', { name: 'Clear filter' }))
     await waitFor(() => expect(applied('Records')).toEqual([]), ARRIVES)
-    expect(focusedName()).toBe('Filter')
+    expect(focusedName()).toBe('Undo clearing the filter')
     await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Rows 1–\d+(; more follow)?\.$/), ARRIVES)
     expect(filtersSent(plane.sent, engine.formId)).toEqual([[]])
   })
 
-  // From the keyboard alone: Enter on Filter opens the panel and leaves the
+  // From the keyboard alone: Enter on Build a condition opens the panel and leaves the
   // keyboard on it, Tab goes Field, Condition, the value, Apply, and Enter
   // in the value applies the condition, the keyboard staying in the box
   // (watched failing with Filter opened by a pointer's press alone: Enter
@@ -255,11 +256,11 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     const orders = await freshOrders(engine, notes, ['5'])
     const user = await workspace(plane.fetch, engine.formId)
     const records = gridSection('Records')
-    const filter = within(records).getByRole('button', { name: 'Filter' })
+    const filter = within(records).getByRole('button', { name: 'Build a condition' })
     filter.focus()
     await user.keyboard('{Enter}')
     expect(filter.getAttribute('aria-expanded')).toBe('true')
-    expect(focusedName()).toBe('Filter')
+    expect(focusedName()).toBe('Build a condition')
     await user.tab()
     expect(focusedName()).toBe('Field')
     await user.selectOptions(within(records).getByRole('combobox', { name: 'Field' }), 'Notes')
@@ -275,7 +276,7 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await user.keyboard('{Enter}')
     await waitFor(() => expect(recordKeys()).toEqual(orders), ARRIVES)
     expect(focusedName()).toBe('Text')
-    // Enter on Filter again closes it; what was applied is still listed, and still the grid's.
+    // Enter on Build a condition again closes it; what was applied is still a chip, and still the grid's.
     filter.focus()
     await user.keyboard('{Enter}')
     expect(filter.getAttribute('aria-expanded')).toBe('false')
@@ -341,8 +342,8 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await says('Records', 'Rows 1–1. Filtered by Notes and Amount.')
     expect(await floor('a filter applied')).toEqual(CLEAN('a filter applied'))
     const records = gridSection('Records')
-    expect(within(records).getByRole('button', { name: 'Remove the condition on Notes' })).toBeTruthy()
-    expect(within(records).getByRole('button', { name: 'Remove the condition on Amount' })).toBeTruthy()
+    expect(within(records).getByRole('button', { name: `Remove Notes contains “${notes}”` })).toBeTruthy()
+    expect(within(records).getByRole('button', { name: 'Remove Amount is between 1 and 2' })).toBeTruthy()
     expect(within(records).getByText('Apply replaces the condition Amount has.')).toBeTruthy()
     expect(within(records).getByText('From and To are included. Either may be left empty.')).toBeTruthy()
   })
@@ -393,10 +394,10 @@ describe.each(ENGINES)("a grid's filter on $engine", (engine) => {
     await waitFor(() => expect(firstCells('Delivery')).toEqual([deliveries[4]]), ARRIVES)
     await applyCondition(user, 'Delivery', { field: 'Id', condition: 'is', value: String(deliveries[1]).toUpperCase() })
     await says('Delivery', 'No Delivery rows match the filter on Shipped at and Id.')
-    within(gridSection('Delivery')).getByRole('button', { name: 'Remove the condition on Shipped at' }).focus()
+    within(gridSection('Delivery')).getByRole('button', { name: 'Remove Shipped at has no value' }).focus()
     await user.keyboard('{Enter}')
     await waitFor(() => expect(firstCells('Delivery')).toEqual([deliveries[1]]), ARRIVES)
-    expect(focusedName()).toBe('Remove the condition on Id')
+    expect(focusedName()).toBe(`Remove Id is ${String(deliveries[1]).toUpperCase()}`)
 
     plane.sent.length = 0
     await user.click(exportButton('Delivery'))

@@ -572,7 +572,7 @@ describe('a form whose list offers no views', () => {
     await signIn(user, TOKENS.clerk)
     await chooseForm(user, engine.lines)
     expect((await definitionOf(engine.lines)).list?.views).toEqual([])
-    expect(within(gridSection('Records')).getByRole('button', { name: 'Filter' })).toBeTruthy()
+    expect(within(gridSection('Records')).getByRole('button', { name: 'Build a condition' })).toBeTruthy()
     expect(picker('Records')).toBeNull()
   })
 })

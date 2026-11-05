@@ -3,10 +3,10 @@ import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
 import { DownloadCsv } from './download.js'
-import { FilterPanel } from './filter-panel.js'
-import { panelFields, panelShown } from './filter-terms.js'
+import { panelFields, panelShown, viewName } from './filter-terms.js'
 import { listed } from './grid-datasource.js'
 import type { GridColumn } from './grid-datasource.js'
+import { GridFilter } from './grid-filter.js'
 import { RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.js'
 import type { GridSection } from './prefs.js'
@@ -98,6 +98,8 @@ export function Records({
   const labels = new Map(columns.map((column) => [column.key, column.label]))
   const searchable = (definition.list?.searchable ?? []).map((key) => labels.get(key) ?? key)
   const filterable = useMemo(() => panelFields(definition), [definition])
+  /** Whether the grid's first page under the filter came back with no rows. */
+  const [unmatched, setUnmatched] = useState(false)
 
   const searchBlock =
     searchable.length === 0 ? null : (
@@ -197,10 +199,22 @@ export function Records({
                 sort={sort}
                 onPick={state.pick}
                 onSave={(name) => mine.save({ name, filter, sort })}
+                named={viewName(filter, filterable)}
                 onRemove={mine.remove}
               />
               <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
-              {!panelShown(filterable, filter) ? null : <FilterPanel idBase="records-filter" fields={filterable} filter={filter} onFilter={state.setFilter} />}
+              {!panelShown(filterable, filter) ? null : (
+                <GridFilter
+                  idBase="records-filter"
+                  fields={filterable}
+                  moves={definition.moves}
+                  filter={filter}
+                  onFilter={state.setFilter}
+                  empty={unmatched}
+                  slash
+                  onLeave={() => grid.current?.focusFirst()}
+                />
+              )}
             </>
           }
           refit={refit}
@@ -210,6 +224,7 @@ export function Records({
           drilling={drilling}
           onOpen={onOpen}
           onSort={state.setSort}
+          onFiltered={setUnmatched}
           onClearSearch={() => {
             setTyped('')
             onSearch('')

@@ -75,13 +75,16 @@
 //     server answers for the request the page sent, with no anchor of it
 //     left in the document -- the Records' file and an order's lines' --
 //     and a refusal is the server's sentence on the button's line;
-//   - a grid's filter panel (0104): Enter on Filter opens it and keeps the
-//     keyboard there, the next Tab reaches Field, and Enter in a condition's
-//     box applies it, the keyboard staying in the box; the grid then says it
-//     is filtered and lists the condition, whose request carries it in the
-//     body and its words in no URL; a value the server refuses is its
-//     sentence on the grid's line, the value still in its box and no Ask
-//     again; and Clear filter puts the keyboard back on Filter;
+//   - a grid's filter (0104): Enter on Build a condition opens the panel and
+//     keeps the keyboard there, the next Tab reaches Field, and Enter in a
+//     condition's box applies it, the keyboard staying in the box; the grid
+//     then says it is filtered and the condition is a chip, whose request
+//     carries it in the body and its words in no URL; a value the server
+//     refuses is its sentence on the grid's line, the value still in its box
+//     and no Ask again; Clear filter puts the keyboard on its Undo; and the
+//     filter line completes the field begun in a listbox over the grid,
+//     applies what it reads with Enter, in the body and in no URL, and a
+//     chip removed gives the keyboard to its Undo;
 //   - a form's list views (0105): the View picker and Show view between
 //     Search and Filter in the keyboard's order; a choice in the select,
 //     the change an arrow fires on a closed select, sends nothing; Show

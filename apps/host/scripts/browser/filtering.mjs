@@ -1,13 +1,15 @@
-// A grid's filter panel in the browser (0104), on the workspace Download
-// CSV's states left open: Filter opened from the keyboard and the next Tab
-// on Field; a condition chosen and applied with Enter in its box, the grid
-// narrowed and its line saying so, the request carrying the condition in
-// its body and its words in no URL; a value the server refuses said on the
-// grid's line, with what was typed still in its box and no Ask again; and
-// Clear filter giving the keyboard back to Filter. Each state is measured by
-// the gate's `measured` on the way: the panel's colours and target sizes,
-// its conditions wrapping inside the panel, and no sideways scroll, down to
-// 320 px.
+// A grid's filter in the browser (0104), on the workspace Download CSV's
+// states left open: Build a condition opened from the keyboard and the next
+// Tab on Field; a condition chosen and applied with Enter in its box, the
+// grid narrowed and its line saying so, the request carrying the condition
+// in its body and its words in no URL, and the condition a chip; a value
+// the server refuses said on the grid's line, with what was typed still in
+// its box and no Ask again; Clear filter giving the keyboard to its Undo;
+// and the filter line -- its completion open over the grid, a line typed
+// and applied with Enter, and a chip removed. Each state is measured by
+// the gate's `measured` on the way: the colours and target sizes, the
+// chips wrapping inside their row, the completion inside the page, and no
+// sideways scroll, down to 320 px.
 //
 // A select is chosen with Playwright's selectOption, not its keys: how a
 // closed select answers an arrow differs by browser and platform, and is
@@ -44,11 +46,11 @@ export function filterJourney(plane, { check }) {
         await control(page, 'textbox', 'Search').fill('')
         await control(page, 'button', 'Search').click()
         await until(async () => /^Rows 1–/.test(await lineOf(page)), 'the records were never listed unsearched')
-        const filter = control(page, 'button', 'Filter')
+        const filter = control(page, 'button', 'Build a condition')
         await filter.focus()
         await page.keyboard.press('Enter')
-        check('Enter on Filter opens the panel', same(await filter.getAttribute('aria-expanded'), 'true'))
-        check('and leaves the keyboard on Filter', await focusedOn(page, filter))
+        check('Enter on Build a condition opens the panel', same(await filter.getAttribute('aria-expanded'), 'true'))
+        check('and leaves the keyboard on Build a condition', await focusedOn(page, filter))
         await page.keyboard.press('Tab')
         check('the next Tab reaches Field', await focusedOn(page, control(page, 'combobox', 'Field')))
         await control(page, 'combobox', 'Field').selectOption({ label: 'Notes' })
@@ -69,7 +71,7 @@ export function filterJourney(plane, { check }) {
         await until(async () => (await lineOf(page)) === 'Rows 1–2. Filtered by Notes.', 'the grid never said it listed the two orders, filtered')
         check('a filter applied: the keyboard stays in Text', await focusedOn(page, box(page, 'Text')))
         const listed = await control(page, 'list', 'Filtered by').getByRole('listitem').allTextContents()
-        check('a filter applied: it is listed with its Remove', same(listed, [`Notes contains “${words.toUpperCase()}”Remove`]))
+        check('a filter applied: it is a chip', same(listed, [`Notes contains “${words.toUpperCase()}”`]))
       },
     ],
     [
@@ -100,11 +102,51 @@ export function filterJourney(plane, { check }) {
         await clear.focus()
         await page.keyboard.press('Enter')
         await until(async () => /^Rows 1–\d+(; more follow)?\.$/.test(await lineOf(page)), 'the grid never listed the records unfiltered')
-        const filter = control(page, 'button', 'Filter')
-        check('a filter cleared: the keyboard is on Filter', await focusedOn(page, filter))
+        check('a filter cleared: the keyboard is on its Undo', await focusedOn(page, control(page, 'button', 'Undo clearing the filter')))
         // Closed again, as the journeys after this one found the panel.
+        const filter = control(page, 'button', 'Build a condition')
+        await filter.focus()
         await page.keyboard.press('Enter')
-        check('a filter cleared: Enter on Filter closes the panel', same(await filter.getAttribute('aria-expanded'), 'false'))
+        check('a filter cleared: Enter on Build a condition closes the panel', same(await filter.getAttribute('aria-expanded'), 'false'))
+      },
+    ],
+    [
+      'A filter line completing (Records)',
+      async (page) => {
+        const line = control(page, 'combobox', 'Filter')
+        await line.focus()
+        await page.keyboard.type('not')
+        const options = control(page, 'listbox', 'What may come next')
+        await options.waitFor({ state: 'visible', ...WITHIN })
+        check('a line completing: the field begun is offered by its name', same(await options.getByRole('option').allTextContents(), ['notesNotes']))
+        check('a line completing: the line says it is expanded', same(await line.getAttribute('aria-expanded'), 'true'))
+      },
+    ],
+    [
+      'A filter line applied (Records)',
+      async (page) => {
+        const line = control(page, 'combobox', 'Filter')
+        await page.keyboard.press('Escape')
+        await line.fill(`notes contains ${words.toUpperCase()}`)
+        const sent = nextList(page)
+        await page.keyboard.press('Enter')
+        const request = await sent
+        check('a line applied: what it reads is in the list request’s body', same(JSON.parse(request.postData() ?? '{}').filter, [contains]))
+        check('a line applied: its words are in no URL', request.url().toLowerCase().includes(words) ? `the URL is ${request.url()}` : null)
+        await until(async () => (await lineOf(page)) === 'Rows 1–2. Filtered by Notes.', 'the grid never listed the two orders the line asked for')
+        check('a line applied: the keyboard stays in the line', await focusedOn(page, line))
+      },
+    ],
+    [
+      'A filter line chip removed (Records)',
+      async (page) => {
+        await control(page, 'button', `Remove Notes contains “${words.toUpperCase()}”`).click()
+        await until(async () => /^Rows 1–\d+(; more follow)?\.$/.test(await lineOf(page)), 'the grid never listed the records once the chip was removed')
+        check(
+          'a chip removed: the keyboard is on its Undo',
+          await focusedOn(page, control(page, 'button', `Undo removing Notes contains “${words.toUpperCase()}”`)),
+        )
+        check('a chip removed: the line is empty', same(await control(page, 'combobox', 'Filter').inputValue(), ''))
       },
     ],
   ]

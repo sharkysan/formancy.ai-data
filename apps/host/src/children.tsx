@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient, FormMenuChild, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { ColumnsPanel } from './columns-panel.js'
-import { FilterPanel } from './filter-panel.js'
-import { panelFields, panelShown } from './filter-terms.js'
+import { panelFields, panelShown, viewName } from './filter-terms.js'
+import { GridFilter } from './grid-filter.js'
 import { columnsOf } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
@@ -166,6 +166,8 @@ export function ChildSection({
   const opening = useOpening({ client, formId: child.form, owner, sessions })
   const columns = useMemo(() => columnsOf(definition, child.field), [definition, child.field])
   const filterable = useMemo(() => panelFields(definition), [definition])
+  /** Whether the grid's first page under the filter came back with no rows. */
+  const [unmatched, setUnmatched] = useState(false)
   const views = definition.list?.views ?? []
   const mine = useOwnViews(client, child.form, definition)
   const state = useGridState({ formId: child.form, section: { kind: 'child', field: child.field }, columns, list: definition.list })
@@ -381,6 +383,7 @@ export function ChildSection({
                   onPick={state.pick}
                   onSave={(name) => mine.save({ name, filter, sort })}
                   onRemove={mine.remove}
+                  named={viewName(filter, filterable)}
                 />
                 <ColumnsPanel
                   idBase={`${headingId}-columns`}
@@ -390,7 +393,15 @@ export function ChildSection({
                   onReset={state.resetChoices}
                 />
                 {!panelShown(filterable, filter) ? null : (
-                  <FilterPanel idBase={`${headingId}-filter`} fields={filterable} filter={filter} onFilter={state.setFilter} />
+                  <GridFilter
+                    idBase={`${headingId}-filter`}
+                    fields={filterable}
+                    moves={definition.moves}
+                    filter={filter}
+                    onFilter={state.setFilter}
+                    empty={unmatched}
+                    onLeave={() => grid.current?.focusFirst()}
+                  />
                 )}
               </>
             }
@@ -405,6 +416,7 @@ export function ChildSection({
             drilling={drill !== undefined}
             onOpen={askRow}
             onSort={state.setSort}
+            onFiltered={setUnmatched}
           />
         </>
       )}

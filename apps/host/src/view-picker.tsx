@@ -54,6 +54,7 @@ export function ViewPicker({
   onPick,
   onSave,
   onRemove,
+  named = '',
 }: {
   /** What the select's id starts with: one picker per grid. */
   idBase: string
@@ -70,6 +71,8 @@ export function ViewPicker({
   onSave: (name: string) => Promise<string | null>
   /** The person's view of this name let go: null once gone, else the sentence it was refused with. */
   onRemove: (name: string) => Promise<string | null>
+  /** What the name box holds until the person types in it: the conditions in words. */
+  named?: string
 }): ReactElement | null {
   const offered = viewMatching(views, filter, sort)
   const mine = offered === null ? viewMatching(own, filter, sort) : null
@@ -85,7 +88,9 @@ export function ViewPicker({
     setFollowed(current)
     setDraft(current)
   }
-  const [name, setName] = useState('')
+  /** The name typed; null until the person types one, while the box holds `named`. */
+  const [typedName, setName] = useState<string | null>(null)
+  const name = typedName ?? named
   const [said, setSaid] = useState<Said | null>(null)
   const sending = useRef(false)
   const [busy, setBusy] = useState(false)
@@ -119,7 +124,7 @@ export function ViewPicker({
       return
     }
     setSaid({ kind: 'answer', text: done })
-    setName('')
+    setName(null)
     after(() => (selectRef.current ?? nameRef.current)?.focus())
   }
 

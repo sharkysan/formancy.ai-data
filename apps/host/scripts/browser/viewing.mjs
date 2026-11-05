@@ -122,7 +122,7 @@ export function viewJourney(_plane, { check }) {
         await page.keyboard.press('Tab')
         check('the next Tab Columns', await focusedOn(page, records(page).getByRole('button', { name: 'Columns', exact: true })))
         await page.keyboard.press('Tab')
-        check('and the next Tab Filter', await focusedOn(page, records(page).getByRole('button', { name: 'Filter', exact: true })))
+        check('and the next Tab Filter', await focusedOn(page, records(page).getByRole('combobox', { name: 'Filter', exact: true })))
         check(
           'views offered: every view, and the grid on every record',
           same(await choices(page), { offered: ['All records', PLACED.name, NOTED.name], shown: 'All records' }),
