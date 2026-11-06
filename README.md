@@ -706,10 +706,10 @@ A form's records are a grid, AG Grid Community, a page at a time from the
 server's list
 ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)),
 searched when you press Search and sorted by any header the server says
-sorts. Space opens a row beside the grid, Enter opens it and moves there;
-the record is drawn by `@formancy/react`, `@formancy/angular` or both, as you
-choose, and the choice is kept in this browser with where you left the
-separator between the records and the record. Beside the record, each form
+sorts. Space opens a row under the grid, or beside it, Enter opens it and
+moves there; the record is drawn by `@formancy/react`, `@formancy/angular`
+or both, as you choose, and the choice is kept in this browser with where
+you left the line between the records and the record. Beside the record, each form
 whose rows reference it is a tab -- an order's lines, its deliveries --
 after the record's own, which holds its form; Left and Right move between
 the tabs, and Tab goes on into the one shown. A child's tab lists its rows
@@ -726,8 +726,17 @@ A form that is its own child -- an employee and their manager -- shows its
 records as a grid or as a tree: the records with no parent, and under each
 record, once it is expanded, those naming it
 ([0110](./docs/decisions/0110-a-form-that-is-its-own-child-is-shown-as-a-tree-of-its-records.md)). The
-records and the record are side by side, stacked, or separate views, and
-the address says which form and layout, never which record. Open by record
+records and the record are stacked, the records above, side by side, or
+separate views, and the address says which form and layout, never which
+record. Stacked is where a page opens with no layout in its address and
+none kept -- Separate views on a phone -- and in it a line between the
+records and the record shares the window's height, as Side by side's
+shares the width: drag it, or press Down and Up a step and Home and End
+to its limits, the Records panel as tall as it says. The layout you choose
+is kept in this browser, and a page whose address names no layout opens in
+it; one that names a layout opens that one and keeps nothing, and Drill
+down reached by a lookup's Open is not kept
+([0145](./docs/decisions/0145-the-layout-is-the-persons.md)). Open by record
 token loads one by its token.
 
 Drill down, the fourth layout, shows one level at a time: the records, the
@@ -996,7 +1005,8 @@ real drivers, with literal tokens and a `fetch` that goes through
 `app.inject`. `pnpm test:browser` measures the page in Chromium, and with
 `FORMANCY_BROWSERS=all` in Firefox and WebKit too, as CI's legs do, against
 the real server on PostgreSQL, which needs Docker: the workspace in every
-layout down to 320 pixels, the grids' keyboard and colours, the record's
+layout down to 320 pixels, Stacked's line moved by its keys and a pointer,
+the grids' keyboard and colours, the record's
 journey, a delete's confirmations and answers, and a file downloaded, its
 bytes the server's.
 

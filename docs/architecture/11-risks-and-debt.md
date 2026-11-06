@@ -342,6 +342,13 @@ form's title with ’s whatever it ends in; Down and Up move along it, Home,
 End and a letter do not; and on a window narrower than 80rem the box and
 the headings take room in the band above the form
 ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
+In Stacked the Records panel is as tall as its line's share of the
+window's height however few rows its page holds, and scrolls inside itself
+where that is shorter than its toolbar; the line's limits and default are
+worked out from the stylesheets' heights, not measured; a scroll begun
+with a finger on the line moves it; and the layout a person chose is kept
+in their browser, the last viewer's on a shared machine
+([0145](../decisions/0145-the-layout-is-the-persons.md)).
 Download CSV drops a file in the making when the person leaves the form or
 signs out, and a child section's when they open another record, says
 nothing about it, names no count of records, and says the page handed the

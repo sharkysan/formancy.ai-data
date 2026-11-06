@@ -101,7 +101,7 @@ only enforcement is "we remember" says so plainly.
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110, 0136 |
 | [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050, 0109, 0143 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
-| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131, 0142, 0144 |
+| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131, 0142, 0144, 0145 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054; amended by 0064 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted; narrowed by 0050; extended by 0056 |
 | [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; narrowed by 0067, 0113; extended by 0051, 0052, 0053, 0057 |
@@ -144,7 +144,7 @@ only enforcement is "we remember" says so plainly.
 | [0087](0087-a-live-demo-start-cloudflare-has-no-instance-for-is-started-again-within-a-minute.md) | A live demo start Cloudflare has no instance for is started again, within a minute | accepted |
 | [0088](0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md) | The demo image makes PostgreSQL's socket directory at every start, and the gate runs it with /run empty, as Cloudflare does | accepted |
 | [0089](0089-the-live-demos-account-may-not-write-when-a-customer-was-created.md) | The live demo's account may not write when a customer was created | accepted |
-| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted; amended by 0094, 0097; extended by 0141, 0142 |
+| [0090](0090-a-hosts-workspace-can-drill-down-one-level-at-a-time-with-a-trail-back.md) | A host's workspace can drill down one level at a time, with a trail back | accepted; amended by 0094, 0097; extended by 0141, 0142, 0145 |
 | [0091](0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md) | The host identity verifier is a package of its own, which the server re-exports | accepted |
 | [0092](0092-the-sbom-describes-what-a-consumer-installs-and-is-held-to-that-install.md) | The SBOM describes what a consumer installs, and is held to that install | accepted |
 | [0093](0093-a-column-named-proto-is-generated-under-another-key.md) | A column named `__proto__` is generated under another key, and `constructor` keeps its own | accepted |
@@ -199,3 +199,4 @@ only enforcement is "we remember" says so plainly.
 | [0142](0142-a-records-child-forms-are-tabs-beside-it.md) | A record's child forms are tabs beside it | accepted |
 | [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted; extended by 0144 |
 | [0144](0144-the-host-lists-its-forms-by-group.md) | The host lists its forms by group, with a search and the forms linked to the open one | accepted |
+| [0145](0145-the-layout-is-the-persons.md) | The layout is the person's: Stacked first, its height shared by a line they move, and the layout they chose kept | accepted |
