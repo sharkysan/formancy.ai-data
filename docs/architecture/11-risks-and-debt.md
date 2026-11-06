@@ -337,9 +337,10 @@ The list of forms keeps a letter's marks in Find a form, "zurich" finding
 no "Zürich", and matches an id too; its search narrows the groups and not
 the forms linked to the open one, so a form can be listed twice, and stays
 as typed after a form is chosen; its groups are ordered as English words
-whatever the reader's language; Down and Up move along it, Home, End and
-a letter do not; and on a window narrower than 80rem the box and the
-headings take room in the band above the form
+whatever the reader's language; a linked form's name says the open
+form's title with ’s whatever it ends in; Down and Up move along it, Home,
+End and a letter do not; and on a window narrower than 80rem the box and
+the headings take room in the band above the form
 ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
 Download CSV drops a file in the making when the person leaves the form or
 signs out, and a child section's when they open another record, says

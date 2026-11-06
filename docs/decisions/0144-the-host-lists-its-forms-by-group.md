@@ -38,15 +38,30 @@
   for each way), never the open form (watched failing with it kept),
   fields first and each at its first place (watched failing with the
   rows first), never one the menu does not name (watched failing with it
-  kept under its id); and the ways said in words (watched failing with
-  arrows for words). It needs no database, but every host file runs
-  under the suite's `globalSetup`, which starts both: it was run and
-  watched failing under a copy of `apps/host/vitest.config.ts` without
-  it, which was not kept. `apps/host/src/forms-nav.test.tsx`, against
-  the real server -- the clerk's forms under "Parity" and "Sales", each a
-  list its heading names, and Tab from the list's heading to Find a form
-  and then the first form (to be watched failing in CI with the headings
-  left undrawn); the list narrowed as the person types and the status
+  kept under its id); and the ways said in words that name the open form
+  (watched failing with them unnamed: "from its fields").
+  `apps/host/src/forms-nav-alone.test.tsx`, the list in jsdom without a
+  server -- Enter, Esc and Down left to an input method while it
+  composes, and to the key 229 Safari reports after it (watched failing
+  with the composition unread: Enter opened Order line; and with 229
+  unread); Down with Shift, Ctrl, Meta or Alt left to the box (watched
+  failing with the modifiers unread) and Down and Up with one left to the
+  browser on a form (watched failing with the modifiers unread on the
+  list); each linked form's arrow, read off the DOM since it is hidden
+  from the tree (watched failing with the arrows of fields and rows
+  swapped); the keyboard on a linked link taken away moved to the same
+  form's link in its group, or to the box where a search left that out
+  (watched failing with the keyboard left where the link was, and with no
+  fallback); and left where the person moved it (watched failing with the
+  link that had the keyboard never forgotten). Neither file needs a
+  database, but every host file runs under the suite's `globalSetup`,
+  which starts both: they were run and watched failing under a copy of
+  `apps/host/vitest.config.ts` without it, which was not kept.
+  `apps/host/src/forms-nav.test.tsx`, against the real server -- the
+  clerk's forms under "Parity" and "Sales", each a list its heading
+  names, and Tab from the list's heading to Find a form and then the
+  first form (to be watched failing in CI with the headings undrawn, the
+  groups kept); the list narrowed as the person types and the status
   saying how many match (to be watched failing in CI with the list drawn
   from every form whatever was typed); Enter opening the one form that
   matches, with the keyboard on its heading and its link marked, and
@@ -60,16 +75,25 @@
   the search left undrawn); the floor -- axe and a name on every control
   -- while searching, finding nothing, and with linked forms (to be
   watched failing in CI with the linked forms' items drawn without their
-  list); and, on both engines, an order line's lookup naming both forms
-  over the orders "from its fields", one of them opening as the list
-  opens it (to be watched failing in CI with the definition's `opens`
-  left unread by the workspace), an employee naming the staff's orders
-  once as "its child rows" and not itself (to be watched failing in CI
-  with the menu's children left unread by the workspace), and Enter over
+  list); the search kept as typed after a form is chosen from it (to be
+  watched failing in CI with the box emptied whenever the open form
+  changes); the linked forms left whole while it narrows the groups (to
+  be watched failing in CI with the linked forms narrowed by the search
+  too); Escape in an empty box heard by the document, not prevented (to
+  be watched failing in CI with Escape always taken by the box); and, on
+  both engines, an order line's lookup naming both forms over the orders
+  "where Order line’s fields lead", one of them opening as the list opens
+  it (to be watched failing in CI with the definition's `opens` left
+  unread by the workspace), an employee naming the staff's orders once as
+  "rows that refer to Employee" and not itself (to be watched failing in
+  CI with the menu's children left unread by the workspace), Enter over
   unsaved work asking first, Keep editing giving the keyboard back to the
   box (to be watched failing in CI with the matching form's link handed
-  to the guard in place of the box) -- ten breaks chosen so that each
-  fails its own case and no other. Every other host suite finds a form's
+  to the guard in place of the box), and a linked form chosen keeping the
+  keyboard on its link in its group while it is asked for, then on its
+  heading, and on Back on the form's link in its group (to be watched
+  failing in CI with the keyboard left where the link was) -- fourteen
+  breaks chosen so that each fails its own case and no other. Every other host suite finds a form's
   link as before, by its title and id, which a linked form's name does
   not end in (`formLink` in `test-host.tsx`); the browser gate's
   `allowance.mjs`, `demo.mjs`, `drilling.mjs`, `more.mjs` and
@@ -109,7 +133,9 @@ is two forms, told apart by their ids alone.
 
 **Forms holds, in order, Find a form, the forms under their groups, the
 forms linked to the one open, and Sign out** (`apps/host/src/forms-nav.tsx`,
-which draws what `apps/host/src/form-list.ts` decides).
+which puts together `find-form.tsx`, `form-groups.tsx` and
+`linked-forms.tsx`, each drawing what `apps/host/src/form-list.ts`
+decides, every link through `form-link.tsx`).
 
 **Each group is a heading and the list it names**, in the order of the
 headings as English words, the page's language -- the alphabet's order
@@ -142,9 +168,13 @@ the one form that matches as a click on it would -- through the
 unsaved-changes guard, whose Keep editing gives the keyboard back to the
 box -- and does nothing while several or none match; Escape empties a box
 that holds something and keeps the keyboard there, and in an empty box is
-the page's; Down moves to the first form listed. On a form, Down and Up
-move to the next and the one before, through the groups and the linked
-forms, and Up from the first goes back to the box. There is no shortcut
+neither taken nor stopped, but left to the page; Down moves to the first
+form listed. On a form, Down and Up move to the next and the one before,
+through the groups and the linked forms, and Up from the first goes back
+to the box. While an input method composes a word, every key in the box
+is its own, as in the filter line: Enter takes the word and Esc ends the
+composition. With Shift, Ctrl, Meta or Alt held, Down and Up are the
+box's, the browser's or the screen reader's. There is no shortcut
 from elsewhere on the page: `/` is the filter line's
 ([0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md)).
 
@@ -154,12 +184,24 @@ names them, then the children the menu names for it, each once at its
 first place with every way it is linked. The open form itself is left
 out -- a form that is its own child, or whose lookup opens in it, links
 to where the person is -- and so is one the menu does not name. Each link
-is named by the form's title, its id and how it is linked, in words from
-the open form's side: "Order pg-order from its fields", "Order line
-pg-order-line its child rows", or "from its fields and its child rows".
-An arrow, → ← or ↔, is drawn beside the words and hidden from the
-accessibility tree, which would read it as "rightwards arrow" or not at
-all.
+is named by the form's title, its id and how it is linked, in words that
+name the open form and say which way the link runs, since a screen
+reader's list of links reads a link without the heading over it:
+"Customer pg-customer where Order’s fields lead", "Order line
+pg-order-line rows that refer to Order", or "where Order’s fields lead,
+and rows that refer to Order". An arrow, → for where its fields lead, ←
+for rows that refer to it, ↔ for both, is drawn beside the words and
+hidden from the accessibility tree, which would read it as "rightwards
+arrow" or not at all.
+
+**The keyboard is kept when the linked forms are drawn without its
+link.** While a linked form chosen is asked for, no linked form is drawn,
+and the link the keyboard was on is gone; Back and Forward open a form
+without moving the keyboard. Once a commit has taken that link away, the
+keyboard goes to the same form's link in its group, or, where a search
+left that out, to the box. Which link has the keyboard is heard from the
+document's `focusin`, which every move of the keyboard to an element
+fires and a link taken out of the document does not.
 
 **Every link opens its form as before**: it carries the form's fragment,
 a press goes through the guard and puts the keyboard on the form's
@@ -182,6 +224,11 @@ tables are all in one schema looks as before, with a box above it.
 **What it costs.**
 - Marks are kept: "zurich" finds no "Zürich", and a person types the
   letter with its mark.
+- A linked form's name says the open form's title with ’s whatever it
+  ends in: "where Orders’s fields lead".
+- A keyboard that left a linked link for nothing, a press on the page's
+  background, is still that link's: once the link is gone, the keyboard
+  is put on the same form's link in its group.
 - The id is matched too: "pg" or "order" lists forms whose titles do not
   hold it.
 - The search narrows the groups alone, so a form can be listed twice,
@@ -243,8 +290,19 @@ a second pattern for what was a list of links.
 **Arrows alone for the way a form is linked**, or the arrows in the
 name: read out as "rightwards arrow", or not at all.
 
-**Two linked lists, "From its fields" and "Its child rows"**: a form
-linked both ways would be listed twice under one heading's form.
+**Two linked lists, one for where its fields lead and one for rows that
+refer to it**: a form linked both ways would be listed twice under one
+heading's form.
+
+**Words from the open form's side, "from its fields", "its child rows"**,
+as the list first had them: heard in a screen reader's list of links
+without the heading over them, they said neither whose fields nor which
+way the link runs.
+
+**The linked forms kept drawn while the form chosen is asked for**: the
+link chosen would stay, but the list would name the forms linked to a
+form no longer open, and Back would still take away the link the
+keyboard was on once the next form answered.
 
 **A shortcut to the box**: `/` already puts the keyboard on the filter
 line, and any other letter is one a person types into a grid's boxes.

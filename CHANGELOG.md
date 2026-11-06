@@ -33,9 +33,12 @@ the same day (formancy.ai 0232).
   headings in alphabetical order, a number by its value, the forms in no
   group last under "Forms"; where no form is in a group the list has no
   headings and looks as before. Under them, "Linked to" the open form names
-  the forms its fields lead to and the forms of its child rows, each once,
-  in words a screen reader says -- "from its fields", "its child rows" --
-  beside an arrow; the open form itself is never among them. A narrower
+  the forms its fields lead to and the forms whose rows refer to it, each
+  once, in words that name it and say which way the link runs -- "where
+  Order’s fields lead", "rows that refer to Order" -- beside an arrow, →,
+  ← or ↔; the open form itself is never among them, and choosing one keeps
+  the keyboard on that form's link in its group until it opens. While an
+  input method composes a word, Enter and Esc in the box are its own. A narrower
   window's band of tabs holds the box and the headings too, and wraps.
   `@formancy/data-client` and the server are unchanged.
 - **A form is listed in a group** (0143). Why: the menu named every form a

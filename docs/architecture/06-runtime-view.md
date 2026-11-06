@@ -200,7 +200,8 @@ moment can both succeed, and nothing deletes a draft (0065).
    linked to it -- those its `opens` names and its children in the menu,
    each once, never itself -- all decided in the browser from the menu
    and that definition by `apps/host/src/form-list.ts`, asking the server
-   nothing more
+   nothing more; while a linked form chosen is asked for, the keyboard
+   waits on its link in its group
    ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
    Opening a form reads every bundle the same way (`menuForms`), and
    `lookupOpens` names under each lookup the person may read the forms its
@@ -218,8 +219,9 @@ byte after a form the person may not read is published; and
 `apps/host/src/plane.test.tsx`: every request carries the token in its
 header only; `presentation/group.test.ts`, where the default group is
 worded and the default spelled out is refused at a write (0143); and
-`apps/host/src/form-list.test.ts` and `forms-nav.test.tsx`, where the
-list is ordered, searched and linked, and drawn (0144). What it
+`apps/host/src/form-list.test.ts`, `forms-nav-alone.test.tsx` and
+`forms-nav.test.tsx`, where the list is ordered, searched and linked,
+heard from the keyboard, and drawn (0144). What it
 costs: every menu reads and validates every published form; a form it
 names can be 409 `drift` when opened, since only opening asks the database
 (0045); a form whose presentation names no group moves with the words a

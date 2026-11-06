@@ -694,10 +694,13 @@ Find a form, at the top of the list, narrows it as you type, to the forms
 whose title or id holds what you typed in any case, a letter's marks kept,
 and says how many match; Enter opens the one that matches, Escape empties
 the box, and Down moves into the list, where Down and Up go on and Up from
-the first comes back. Under the groups, "Linked to" the open form names
-the forms its fields lead to and those of its child rows, each once, in
-words beside an arrow -- "Order pg-order from its fields", "Order line
-pg-order-line its child rows" -- and never the open form itself
+the first comes back; while an input method composes, its keys are its
+own. Under the groups, "Linked to" the open form names the forms its
+fields lead to and those whose rows refer to it, each once, in words that
+name it beside an arrow -- "Customer pg-customer where Order’s fields
+lead", "Order line pg-order-line rows that refer to Order" -- and never
+the open form itself; choosing one keeps the keyboard on that form in its
+group until the form opens
 ([0144](./docs/decisions/0144-the-host-lists-its-forms-by-group.md)).
 A form's records are a grid, AG Grid Community, a page at a time from the
 server's list
