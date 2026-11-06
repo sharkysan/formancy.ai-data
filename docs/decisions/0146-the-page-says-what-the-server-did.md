@@ -79,8 +79,9 @@
   `step-end` on every `server-did`); and `workspace.mjs`'s "A row open,
   side by side", in which the demo's controls are one closed disclosure
   where a person arrives (with them open by default), and Enter on it
-  changes it with the keyboard staying there (with the keyboard taken off
-  it after every press). The fade and its stillness under reduced motion
+  changes it, read as a change from what the arrival drew, with the
+  keyboard staying there (with the keyboard taken off it after every
+  press). The fade and its stillness under reduced motion
   are one check, since one break of the timing cannot fail either alone in
   one stylesheet. Each break fails its own case or check and no other page
   case or check; the breaks of the rows kept under a sort and of the

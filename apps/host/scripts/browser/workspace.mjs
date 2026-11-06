@@ -269,20 +269,23 @@ export function workspaceJourney(plane, { check }, run) {
         await page.getByRole('heading', { level: 3, name: `Order ${run.record}` }).waitFor(WITHIN)
         check('Enter on a row: the keyboard is on the record', await focusedOn(page, page.getByRole('heading', { level: 3, name: `Order ${run.record}` })))
         // The demo's controls (0146): closed where a person arrives, the
-        // renderer switch behind them not shown; Enter opens them, the keyboard
-        // staying on the disclosure.
+        // renderer switch behind them not shown; Enter changes them, the
+        // keyboard staying on the disclosure -- read as a change from what
+        // the arrival drew, so this check holds the key and the focus alone.
         const disclosure = page.getByRole('button', { name: 'For the demo', exact: true })
+        const arrived = await disclosure.getAttribute('aria-expanded')
         check(
           "the demo's controls: one closed disclosure on arrival, the renderer switch not shown",
-          (await disclosure.getAttribute('aria-expanded')) === 'false' && !(await page.getByRole('radio', { name: 'Both', exact: true }).isVisible())
-            ? null
-            : `aria-expanded is ${String(await disclosure.getAttribute('aria-expanded'))}`,
+          arrived === 'false' && !(await page.getByRole('radio', { name: 'Both', exact: true }).isVisible()) ? null : `aria-expanded is ${String(arrived)}`,
         )
         await disclosure.focus()
         await page.keyboard.press('Enter')
+        // Two frames, by when anything the press set off has moved the keyboard.
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        const changed = (await disclosure.getAttribute('aria-expanded')) !== arrived
         check(
-          "the demo's controls: Enter opens them, the keyboard staying on the disclosure",
-          (await disclosure.getAttribute('aria-expanded')) === 'true' ? await focusedOn(page, disclosure) : 'Enter left them closed',
+          "the demo's controls: Enter changes them, the keyboard staying on the disclosure",
+          changed ? await focusedOn(page, disclosure) : 'Enter left them as they were',
         )
         // Both renderers from here on: the gate walks with Both, so 0029's promise is measured in each.
         await demo(page, true)
