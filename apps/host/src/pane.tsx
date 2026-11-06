@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from '
 import type { ReactElement } from 'react'
 import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
+import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
@@ -50,6 +51,11 @@ type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: numbe
  * while its Opens say the same, a press read through a ref
  * (steady-offer.ts), so neither redraws a field for a render of the page,
  * nor Angular starts again.
+ *
+ * Where the record's tabs hide the pane (0142), a refused save's notice,
+ * or the renderer's summary of a refused answer, which take the keyboard,
+ * show its tab first (`onShow`): nothing hidden takes the keyboard, and a
+ * refusal said there is heard by nobody.
  */
 export function Pane({
   session,
@@ -60,6 +66,7 @@ export function Pane({
   onAnswer,
   onLoaded,
   offer,
+  onShow,
 }: {
   session: Session
   title: string
@@ -75,6 +82,8 @@ export function Pane({
   onLoaded?: () => void
   /** Open under each lookup of the record (0141); none under a child row's rail. */
   offer?: LookupOffer
+  /** The pane's tab shown, where the record's tabs hide it: true when it was hidden, and is drawn on the next render (0142). */
+  onShow?: (() => boolean) | undefined
 }): ReactElement {
   const { engine, generation } = useSyncExternalStore(session.subscribe, session.opened)
   const steady = useSteadyOffer(offer)
@@ -132,6 +141,7 @@ export function Pane({
           session.open(record)
           loaded()
         }}
+        onShow={onShow}
       />
     </section>
   )
@@ -150,6 +160,7 @@ function PaneBody({
   onAnswer,
   onReload,
   onLoad,
+  onShow,
 }: {
   session: Session
   engine: FormEngine
@@ -164,6 +175,7 @@ function PaneBody({
   onAnswer: ((result: SaveResult) => void) | undefined
   onReload: () => Promise<string | null>
   onLoad: (record: FormRecord) => void
+  onShow: (() => boolean) | undefined
 }): ReactElement {
   const [notice, setNotice] = useState<Notice | null>(null)
   const opened = useRef(0)
@@ -175,12 +187,21 @@ function PaneBody({
   const noticeRef = useRef<HTMLDivElement>(null)
   const noticeId = `${headingId}-notice`
 
+  // The pane's tab, as of the last render: a save's answer comes later.
+  const toShow = useRef(onShow)
+  toShow.current = onShow
+  const after = useAfterRender()
+
   // A refused save takes the keyboard to what was refused, the way the
   // renderers' error summary does: focused, not announced as an alert, which
-  // would say it twice (formancy.ai's ErrorSummary and ResumeNotice).
+  // would say it twice (formancy.ai's ErrorSummary and ResumeNotice). In a
+  // tab another hides, once the tab is shown (0142).
   useEffect(() => {
-    if (notice !== null) noticeRef.current?.focus()
-  }, [notice])
+    if (notice === null) return
+    const focus = (): void => noticeRef.current?.focus()
+    if (toShow.current?.() === true) after(focus)
+    else focus()
+  }, [notice, after])
 
   /**
    * What a save's answer does to this part of the pane. It may arrive after
@@ -202,9 +223,12 @@ function PaneBody({
     setNotice(null)
     if (result?.kind === 'saved' || result?.kind === 'created') onAnswer?.(result)
     // A refused selection is said on its field and in the error summary,
-    // which takes the focus; this line says only that nothing was saved.
-    if (result?.kind === 'invalid') say(`Not saved. ${result.message}`, 'refused')
-    else say(result === null ? '' : result.message)
+    // which takes the focus -- its tab shown first, where one hides it --
+    // and this line says only that nothing was saved.
+    if (result?.kind === 'invalid') {
+      toShow.current?.()
+      say(`Not saved. ${result.message}`, 'refused')
+    } else say(result === null ? '' : result.message)
   }
 
   async function submit(outcome: Submitted): Promise<void> {

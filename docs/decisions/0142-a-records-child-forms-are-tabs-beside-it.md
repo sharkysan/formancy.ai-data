@@ -28,6 +28,15 @@
   a database, but every host file runs under the suite's `globalSetup`,
   which starts both: they were run and watched failing under a copy of
   `apps/host/vitest.config.ts` without it, which was not kept.
+  `apps/host/src/grid-sizing.test.ts`, run and watched failing the same
+  way -- a first page, a refit and columns shown while nothing was listed
+  are owed while the grid is hidden and made once it is shown (watched
+  failing with the size made while hidden, as before); a later page, or a
+  resize with nothing owed, sizes nothing (watched failing with a later
+  page sized again, with every resize sizing, and with a size owed paid
+  while still hidden); nothing is sized with no rows (watched failing with
+  that check gone); and a well is hidden under any hidden element (watched
+  failing with the well's own attribute read alone).
   `apps/host/src/record-tabs.test.tsx`, on both engines against the real
   server -- an order's own tab first and shown, then a tab per child form
   in the menu's order, no child's grid drawn nor its page asked until its
@@ -45,20 +54,32 @@
   SQL Server, a line's delete answered with "Not deleted" while the
   order's tab is shown shows the lines' tab again with the keyboard on
   the question (to be watched failing in CI with a section's `onShow`
-  showing its view alone) -- six breaks chosen so that each fails its own
-  case and no other. The suites that reach a child section --
+  showing its view alone); in each, a line's save refused as stale while
+  the order's tab is shown shows the lines' tab with the keyboard on its
+  notice (to be watched failing in CI with a pane's notice focused where
+  it is, its tab hidden); and typing in a line on the lines' tab is named
+  by the guard when another order opens from the order's tab (to be
+  watched failing in CI with the guard counting the forms of the tab
+  shown alone) -- eight breaks chosen so that each fails its own case and
+  no other. The suites that reach a child section --
   `children.test.tsx`, `drill.test.tsx`, `delete.test.tsx`,
   `delete-rows.test.tsx`, `export.test.tsx`, `filter.test.tsx`,
   `columns-panel.test.tsx`, `remembered.test.tsx`, `view-picker.test.tsx`,
   `leaving.test.tsx`, `races.test.tsx`, `unknown-child.test.tsx`,
   `open-lookup.test.tsx`, `page.test.tsx` and `plane.test.tsx` -- now
-  press its tab first (`showChild` in `test-host.tsx`), and `page.test.tsx`
-  holds the row and the lines' panel to the floor; and the browser gate's
-  `demo.mjs`, `exporting.mjs`, `drilling.mjs` and `workspace.mjs` press it
-  in Chromium, Firefox and WebKit, measuring the tabs in each state they
-  reach for reflow down to 320 pixels, target size and contrast, and no
-  rule of `styles/tabs.css` reaching the paper (not watched failing:
-  pressing a tab is what they now do to reach a section).
+  press its tab first (`showChild` in `test-host.tsx`); `page.test.tsx`
+  holds the row and the lines' panel to the floor and checks the record's
+  tab selected again after a Load, and `children.test.tsx` and
+  `drill.test.tsx` read the floor in every tab, axe reading only the panel
+  shown. The browser gate's `demo.mjs`, `exporting.mjs`, `drilling.mjs` and
+  `workspace.mjs` press it in Chromium, Firefox and WebKit, measuring the
+  record's tab and each child's in the states they reach for reflow down
+  to 320 pixels, target size and contrast, and no rule of
+  `styles/tabs.css` reaching the paper (not watched failing: pressing a
+  tab is what they now do to reach a section); and `drilling.mjs` holds a
+  customer's orders until their tab is hidden again, lets the page land
+  there, shows the tab and finds no cell of it cut (to be watched failing
+  in CI with the size made while hidden, as before).
 
 ## Context
 
@@ -104,18 +125,32 @@ takes the keyboard itself, as the pattern's example does, and Shift+Tab
 comes back to the tab.
 
 **A panel is drawn the first time its tab is shown, and kept after**,
-hidden: a child's grid asks for its first page once a person looks at it,
-and keeps its page, cursor, sort, filter and open row, a child row on its
-rail and the typing in it, while another tab is shown. Changing tabs drops
-nothing, so it asks the unsaved-changes guard nothing.
+hidden: a child's grid asks for its first page the first time its tab is
+shown -- an arrow passing over a tab shows it -- and keeps its page,
+cursor, sort, filter and open row, a child row on its rail and the typing
+in it, while another tab is shown. A tab shown again asks nothing;
+changing tabs drops nothing, so it asks the unsaved-changes guard nothing.
+
+**A grid sizes its columns where it is drawn** (`apps/host/src/grid-sizing.ts`,
+`use-grid-sizing.ts`). AG Grid measures a cell in a hidden panel as
+nothing, so a grid sized there would keep its headers' least widths: one
+whose first page lands, or whose separator is let go, while its tab is
+hidden owes the size, and makes it when its well is drawn again. Hidden
+means under an element the page hides by its `hidden` attribute -- a tab's
+panel, a view of Separate views, a Drill down level -- which is read from
+the document rather than measured, since jsdom measures every box as
+empty.
 
 **Another record starts again on its own tab**, with no other panel drawn
 until its tab is shown: any record the detail is given -- a row opened,
 Load, New record, Duplicate record, Change from a date, the record read
-again after its delete was refused, a record its first save created. Saving, deleting and a child's own
-Drill down behave as before, and a section's deletion that asks something
-while another tab is shown shows its tab first, as Separate views shows
-the record view.
+again after its delete was refused, a record its first save created.
+Saving, deleting and a child's own Drill down behave as before. What
+takes the keyboard in a tab another hides shows that tab first, as
+Separate views shows the record view for a deletion: a section's deletion
+that asks something, a save refused in one of its panes -- its notice, or
+the renderer's summary of a refused answer -- and a child row opened by
+Enter, or New, whose answer lands while another tab is shown.
 
 **A Drill down level is drawn the same way**: its record's own tab and a
 tab per child of its form, through the same component, each level keeping
@@ -132,7 +167,7 @@ inside a paper or a grid.
 
 **What it buys.** A record's children are one press away and never a
 scroll, each named in one row a keyboard crosses with the arrows; a child
-the person does not look at asks nothing of the server; and a child row's
+whose tab is never shown asks nothing of the server; and a child row's
 work survives a look at the record's form.
 
 **What it costs.**
@@ -144,9 +179,13 @@ work survives a look at the record's form.
   record's own. New record pressed again, over a new record, starts again
   too.
 - A child's grid asks for its first page when its tab is first shown, so
-  the wait moves from the record's opening to the press; and a tab shown
-  keeps its grid and forms in the page's memory, hidden, until another
-  record opens.
+  the wait moves from the record's opening to the press, and arrowing
+  across the row to its last tab asks every child passed over for its
+  page; a tab shown keeps its grid and forms in the page's memory, hidden,
+  until another record opens.
+- What only says something is not heard in a tab another hides: a save's
+  "Saved." and a delete's "Deleted …" said there wait in its panel. Only
+  what asks something of the person shows its tab.
 - Each panel is a Tab stop of its own, as the pattern's example has it:
   from the record's tab, Tab stops on its panel before the first field of
   its form, one stop more than before, the tab itself another.

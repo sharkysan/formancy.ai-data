@@ -312,8 +312,8 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await screen.findByRole('region', { name: 'Not deleted' }, { timeout: 15_000 })
     expect(await floor('not deleted')).toEqual(CLEAN('not deleted'))
     await user.click(within(screen.getByRole('region', { name: 'Not deleted' })).getByRole('button', { name: 'Load the saved record' }))
-    // On SQL Server the lines' tab was shown last; the record loaded again opens on its own (0142).
-    await showTab(user, `Order ${kept}`)
+    // On SQL Server the lines' tab was shown last: the record read again is another record, which opens on its own tab (0142).
+    await waitFor(() => expect(screen.getByRole('tab', { name: `Order ${kept}` }).getAttribute('aria-selected')).toBe('true'), { timeout: 15_000 })
     await shows('Angular', 'Notes', `${notes} moved`)
 
     lose = true

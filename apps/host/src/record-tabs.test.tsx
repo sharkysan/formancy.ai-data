@@ -29,9 +29,11 @@ import type { Engine, Plane } from './test-plane.js'
  * menu's order; a child's section drawn the first time its tab is shown,
  * and kept, with what is in it, while another is; another record starting
  * again on its own tab; a record whose children are all sections of it
- * drawing no tabs; a Drill down level's children in tabs of its own; and a
- * deletion's question in a tab another hides showing that tab.
- * tab-list.test.tsx holds the pattern's keys without a database.
+ * drawing no tabs; a Drill down level's children in tabs of its own; a
+ * deletion's question and a refused save's notice in a tab another hides
+ * showing that tab; and typing in a hidden tab asked about before another
+ * record replaces it. tab-list.test.tsx holds the pattern's keys without a
+ * database.
  *
  * Found by role and accessible name. Where the claim is that a hidden
  * panel holds nothing at all, the query includes what no person can reach
@@ -282,6 +284,73 @@ describe.each(ENGINES)("a record's child forms on $engine", (engine) => {
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     expect(tabsOf(`Order ${order}`).selected).toEqual(['Order line'])
     expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
+  })
+
+  // A line's save refused as stale -- the line changed beside the page --
+  // answered while the person has gone to the order's own tab: its notice
+  // takes the keyboard, and nothing hidden can, so the lines' tab is shown
+  // first and "Not saved" is heard (to be watched failing in CI with a
+  // pane's notice focused where it is, its tab left hidden: the keyboard
+  // stayed on the order's tab).
+  test("a line's refused save, answered in another tab, shows the lines' tab and its notice", async () => {
+    const words = stamp('tabs-refused')
+    const { order, lines } = await orderWith(engine, words, [1])
+    const line = `Order line ${lines[0] ?? ''}`
+    const held = holdingRequests(plane.fetch, ({ path }) => path === `/v1/forms/${engine.lines}/records/update`)
+    const user = await workspace(engine.formId, held.fetch)
+    await searchRecords(user, words, [order.slice(3)])
+    await openRow(user, 'Records', order.slice(3))
+    await showChild(user, 'Order line')
+    await answeredOnce('Order line')
+    await openRow(user, 'Order line', '1')
+    const quantity = await waitFor(() => within(rowPane(line)).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.clear(quantity)
+    await user.type(quantity, '7')
+    await user.click(within(rowPane(line)).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    // Moved on beside the page while the save is held: sent at the version read, it is stale.
+    const stored = await plane.clerk.read(engine.lines, lines[0] ?? '')
+    if (!stored.ok || stored.value.version === null) throw new Error('the line was not read')
+    if (!(await plane.clerk.update(engine.lines, { record: lines[0] ?? '', version: stored.value.version, answers: { quantity: '4' } })).ok)
+      throw new Error('the line did not move on')
+
+    await showTab(user, `Order ${order}`)
+    expect(screen.queryByRole('region', { name: `${line} React` })).toBeNull()
+    await held.pass()
+    await waitFor(() => expect(focusedName()).toBe(`${line} React Not saved`), ARRIVES)
+    expect(tabsOf(`Order ${order}`).selected).toEqual(['Order line'])
+  })
+
+  // Typing in a line on the lines' tab stays the guard's while the order's
+  // own tab is shown: opening another order from the records asks first,
+  // naming that line's form, and Keep editing leaves it as it was (to be
+  // watched failing in CI with the guard counting the forms of the tab
+  // shown alone: the other order opened over the typing).
+  test('asks about typing in a hidden tab before another record replaces it', async () => {
+    const words = stamp('tabs-guard')
+    const first = await orderWith(engine, words, [1])
+    const second = await orderWith(engine, words, [1])
+    const line = `Order line ${first.lines[0] ?? ''}`
+    const user = await workspace(engine.formId)
+    await searchRecords(user, words, [first.order.slice(3), second.order.slice(3)])
+    await openRow(user, 'Records', first.order.slice(3))
+    await showChild(user, 'Order line')
+    await answeredOnce('Order line')
+    await openRow(user, 'Order line', '1')
+    const quantity = await waitFor(() => within(rowPane(line)).getByLabelText<HTMLInputElement>(/^Quantity\b/), ARRIVES)
+    await waitFor(() => expect(quantity.value).toBe('1'), ARRIVES)
+    await user.clear(quantity)
+    await user.type(quantity, '5')
+
+    await showTab(user, `Order ${first.order}`)
+    await openRow(user, 'Records', second.order.slice(3))
+    const notice = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(within(notice).getByRole('list').textContent).toBe(`${line}, React: changes that are not saved.`)
+    await user.click(within(notice).getByRole('button', { name: 'Keep editing' }))
+    expect(screen.getByRole('heading', { level: 3, name: `Order ${first.order}` })).toBeTruthy()
+    await showChild(user, 'Order line')
+    expect(within(rowPane(line)).getByLabelText<HTMLInputElement>(/^Quantity\b/).value).toBe('5')
   })
 })
 

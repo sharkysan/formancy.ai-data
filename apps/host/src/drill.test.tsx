@@ -1013,30 +1013,33 @@ describe.each(ENGINES)('Drill down on a phone, and the floor, on $engine', (engi
   // Every level a person reaches passes axe with a name on every control:
   // the trail's crumbs are buttons named by their text, and the level shown
   // is no button (watched failing with the crumbs' text left out). A grid
-  // just mounted is named once AG Grid has drawn it, so each level is read
-  // once every section's grid has answered.
+  // just mounted is named once AG Grid has drawn it, so each tab of a level
+  // is read once its section's grid has answered.
   test('every level passes axe with a name on every control', async () => {
-    const floor = async (level: number): Promise<void> => {
+    // Read in each tab of a level, the record's own first: axe reads only the panel shown (0142).
+    const floor = async (level: number, tab = ''): Promise<void> => {
       await waitFor(() => expect(unnamed()).toEqual([]), ARRIVES)
-      expect({ level, axe: await audit(), unnamed: unnamed() }).toEqual({ level, axe: [], unnamed: [] })
+      expect({ level, tab, axe: await audit(), unnamed: unnamed() }).toEqual({ level, tab, axe: [], unnamed: [] })
     }
     const { order, line } = await approvedOrder(engine)
     const user = await drilling(engine.employees)
     await floor(0)
     await pressOn(user, 'Records', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe('Employee k1:1'), ARRIVES)
-    // Each section in its tab (0142), drawn once the tab is shown; the floor read with the last one shown.
+    await floor(1, 'Employee k1:1')
     for (const section of ['Employee', 'Order, Created by', 'Order, Approved by']) {
       await showChild(user, section)
       await answeredOnce(section)
+      await floor(1, section)
     }
-    await floor(1)
     await pressOn(user, 'Order, Approved by', order.slice(3), '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
     // A level's tabs are drawn once its form's children are known, a moment after the level.
+    await screen.findByRole('tablist', { name: `Order ${order}` }, ARRIVES)
+    await floor(2, `Order ${order}`)
     await showChild(user, 'Order line')
     await answeredOnce('Order line')
-    await floor(2)
+    await floor(2, 'Order line')
     await pressOn(user, 'Order line', '1', '{Enter}')
     await waitFor(() => expect(focusedName()).toBe(`Order line ${line}`), ARRIVES)
     await floor(3)

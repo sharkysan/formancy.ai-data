@@ -3953,7 +3953,7 @@
       ]
     },
     "0142": {
-      "reviewed": "sha256:17ab11ee703a193806f237affac0487e5d5ddad7a49a592b20f04a64856910a5",
+      "reviewed": "sha256:4a41bc01b7d4c6207387ac1669047aad87d3fd3778f73f72cfed41d7d76ce107",
       "limitations": [
         {
           "area": "host",
@@ -3966,8 +3966,12 @@
         },
         {
           "area": "host",
-          "says": "A child's grid asks for its first page when its tab is first shown rather than when the record opens, and a tab shown keeps its grid and forms in the page's memory, hidden, until another record opens.",
+          "says": "A child's grid asks for its first page when its tab is first shown rather than when the record opens, and arrowing across the row of tabs shows, and so asks, every child passed over; a tab shown keeps its grid and forms in the page's memory, hidden, until another record opens.",
           "heldBy": "apps/host/src/tab-list.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "What only says something is not heard in a tab another hides: a save's \"Saved.\" and a delete's \"Deleted\" line said there wait in its panel, and only what asks something of the person shows its tab."
         },
         {
           "area": "host",

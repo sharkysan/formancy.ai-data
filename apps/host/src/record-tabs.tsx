@@ -24,7 +24,9 @@ import { Words } from './words.js'
  * whose sections are owned under the level (`ownerBase`, `childIdBase`).
  * Where `drilling`, a section's row goes a level down from `level`. A
  * section's deletion asking something while its tab or its view is hidden
- * shows both before it takes the keyboard. Another `record`, by identity,
+ * shows both before it takes the keyboard; a refused save's notice in a pane
+ * of a hidden tab, and a row opened by Enter whose read lands there, show
+ * that tab. Another `record`, by identity,
  * starts again on the record's tab (`TabList`'s `start`).
  */
 export function RecordTabs({
@@ -72,11 +74,11 @@ export function RecordTabs({
   /** The level the record is at: 1 for the open record. */
   level: number
   drilling: boolean
-  /** The record's own panes. */
-  children: ReactNode
+  /** The record's own panes, given how to show the record's tab, which a pane's refused save shows first. */
+  children: (show: () => boolean) => ReactNode
 }): ReactElement {
   const below = parent?.kind === 'record' ? parent.token : 'new'
-  const sections =
+  const sections = (show: () => boolean): ReactNode =>
     parent === null
       ? null
       : childForms.map((form, index) =>
@@ -91,6 +93,7 @@ export function RecordTabs({
               renderer={renderer}
               ownerBase={ownerBase}
               idBase={childIdBase}
+              onTab={show}
             />
           ) : null,
         )
@@ -98,10 +101,10 @@ export function RecordTabs({
     {
       key: RECORD_TAB,
       name: <Words said={heading} />,
-      panel: () => (
+      panel: (show) => (
         <>
-          {children}
-          {sections}
+          {children(show)}
+          {sections(show)}
         </>
       ),
     },
@@ -128,6 +131,7 @@ export function RecordTabs({
                 const viewHidden = onShow()
                 return tabHidden || viewHidden
               }}
+              onTab={show}
               levels={drill.levels}
               drill={
                 drilling && parent.kind === 'record' ? drill.section({ level, owner: `${ownerBase}${key}`, form, parentNoun, parent: parent.token }) : undefined

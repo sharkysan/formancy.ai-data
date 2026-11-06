@@ -101,8 +101,8 @@ export function Detail({
   deleteRegion: ReactNode
   /** Open under each lookup of the record (0141). */
   offer: LookupOffer
-  /** What follows the header: the record's panes, given, in the record's tab beside its child sections' (record-tabs.tsx), and the heading that names that tab. */
-  body: (panes: ReactElement, heading: Said) => ReactNode
+  /** What follows the header: the record's panes, drawn given how to show the record's tab, in that tab beside its child sections' (record-tabs.tsx), and the heading that names it. */
+  body: (panes: (show: () => boolean) => ReactElement, heading: Said) => ReactNode
 }): ReactElement {
   const separate = layout === 'separate'
   const shown = renderersOf(renderer)
@@ -180,21 +180,24 @@ export function Detail({
         </div>
       </div>
       {body(
-        <div className="panes" data-count={shown.length} hidden={open === null}>
-          {sessions
-            .filter((session) => shown.includes(session.renderer))
-            .map((session) => (
-              <Pane
-                key={session.renderer}
-                session={session}
-                title={formTitle}
-                idBase={formId}
-                onAnswer={(result) => onAnswer(result, session)}
-                onLoaded={() => onLoaded(session)}
-                offer={offer}
-              />
-            ))}
-        </div>,
+        (show) => (
+          <div className="panes" data-count={shown.length} hidden={open === null}>
+            {sessions
+              .filter((session) => shown.includes(session.renderer))
+              .map((session) => (
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={formTitle}
+                  idBase={formId}
+                  onAnswer={(result) => onAnswer(result, session)}
+                  onLoaded={() => onLoaded(session)}
+                  offer={offer}
+                  onShow={show}
+                />
+              ))}
+          </div>
+        ),
         heading,
       )}
     </section>

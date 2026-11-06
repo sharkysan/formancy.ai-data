@@ -90,6 +90,10 @@ type ChildOpen = null | { kind: 'new' } | { kind: 'record'; token: string }
  * before its Delete asks anything, and once gone takes them with it
  * (`levels`). A section of a level from 2 down is owned under its level
  * (`ownerBase`, `idBase`), so no owner or id is twice.
+ *
+ * It is drawn in a tab of its own beside the record (0142): a refused save
+ * of a child row, a row opened by Enter or New, whose answer lands while
+ * another tab is shown, show this one first (`onTab`).
  */
 export function ChildSection({
   client,
@@ -105,6 +109,7 @@ export function ChildSection({
   idBase = 'child',
   drill,
   levels,
+  onTab,
 }: {
   client: DataClient
   form: ChildForm
@@ -126,6 +131,8 @@ export function ChildSection({
   drill?: SectionDrill | undefined
   /** The Drill down levels held, which a row deleted here may hold, in every layout. */
   levels?: HeldLevels | undefined
+  /** The section's tab shown, where another hides it: true when it was hidden (0142). */
+  onTab?: () => boolean
 }): ReactElement {
   const { child, menu, definition } = form
   const owner = `${ownerBase}${child.form}~${child.field}`
@@ -257,6 +264,7 @@ export function ChildSection({
           opened: (now) => {
             setOpen({ kind: 'record', token })
             setLine([...prefix(now.discarded), 'Opened ', { code: token }, '.'])
+            if (how === 'enter') onTab?.()
             after(() => {
               if (how === 'enter') detailHeading.current?.focus()
               else if (now.discarded) toRow()
@@ -325,6 +333,7 @@ export function ChildSection({
         for (const session of sessions) session.open({ record: null, version: null, answers: { [child.field]: parentToken } })
         setOpen({ kind: 'new' })
         setLine([...prefix(discarded), `A new ${title}, for ${parentNoun} `, { code: parentToken }, '.'])
+        onTab?.()
         after(() => detailHeading.current?.focus())
       },
       () => newButton.current?.focus(),
@@ -485,6 +494,7 @@ export function ChildSection({
                   idBase={owner}
                   namedBy={`${headingId}-detail`}
                   onAnswer={(result) => answered(result, session)}
+                  onShow={onTab}
                 />
               ))}
           </div>

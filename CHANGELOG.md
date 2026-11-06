@@ -30,9 +30,11 @@ the same day (formancy.ai 0232).
   showing the tab it reaches, and Tab goes on into the one shown. A child's
   grid lists its rows the first time its tab is shown and keeps them -- its
   page, its sort and filter, a row open on its rail and what you typed
-  there -- while you look at another, so changing tabs asks nothing.
-  Another record opens on its own tab, and a record its first save created
-  counts as another. Drill down's levels draw their children the same way,
+  there -- while you look at another, so changing tabs asks you nothing.
+  An arrow passing over a tab shows it, so its rows are asked for then. A
+  save refused in a tab you have left shows that tab with its notice; a
+  "Saved." or "Deleted" line said there waits in it. Another record opens
+  on its own tab, and a record its first save created counts as another. Drill down's levels draw their children the same way,
   each level keeping its tab. A record with no child form, or only sections
   of it, draws no tabs, as before; a foreign key gets none, since Open under
   it goes a level down (0141).

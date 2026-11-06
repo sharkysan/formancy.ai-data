@@ -15,6 +15,7 @@ import {
   RENDERERS,
   searchRecords,
   showChild,
+  showTab,
   signIn,
   stamp,
 } from './test-host.js'
@@ -225,10 +226,11 @@ describe.each(ENGINES)('an employee and the forms under it on $engine', (engine)
   // tab while another is shown (0142): the employee form as its own child,
   // through the manager, and the order form twice, through who created and
   // who approved -- each a namespace of its own, so no element id is minted
-  // twice, and the page still passes axe with a name on every control
-  // (watched failing with the child sessions in the record's namespace,
-  // and with the two order sections in one: the approved order's Amount
-  // label named the created one's input).
+  // twice, and the page still passes axe with a name on every control, in
+  // each tab, the record's own included, since axe reads only the panel
+  // shown (watched failing, before 0142, with the child sessions in the
+  // record's namespace, and with the two order sections in one: the
+  // approved order's Amount label named the created one's input).
   test('opens a row under every child, each kept in its tab, with no id twice, and passes the floor', async () => {
     const approved = await plane.db.insertApprovedOrder(engine.connection, 1)
     const user = await workspace(engine.employees)
@@ -255,6 +257,7 @@ describe.each(ENGINES)('an employee and the forms under it on $engine', (engine)
     for (const [tab, row, field] of opened) {
       await showChild(user, tab)
       for (const renderer of RENDERERS) await waitFor(() => expect(within(childPane(row, renderer)).getByLabelText(field)).toBeTruthy(), ARRIVES)
+      expect({ tab, axe: await audit(), unnamed: unnamed() }).toEqual({ tab, axe: [], unnamed: [] })
     }
     // The order form is one this clerk may only read: its record's fields are drawn disabled.
     await showChild(user, 'Order, Created by')
@@ -263,6 +266,7 @@ describe.each(ENGINES)('an employee and the forms under it on $engine', (engine)
     // Read from the DOM: an id has no role and no name.
     const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([])
-    expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
+    await showTab(user, 'Employee k1:1')
+    expect({ tab: 'Employee k1:1', axe: await audit(), unnamed: unnamed() }).toEqual({ tab: 'Employee k1:1', axe: [], unnamed: [] })
   })
 })

@@ -474,7 +474,8 @@ the record's own first, `src/tabs.ts` deciding which children get a tab,
 what each is named and where a key moves the selection, and
 `src/tab-list.tsx` WAI-ARIA's tabs over them, each panel drawn the first
 time its tab is shown and kept after, all of them forgotten for another
-record
+record, and `src/use-grid-sizing.ts` a grid's columns sized only where it
+is drawn, owed while it is hidden, as `src/grid-sizing.ts` decides
 ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md));
 `src/record-tree.tsx` shows a form that is its own child as a tree of its
 records, a level asked for when it is expanded, and `src/tree-lines.ts`

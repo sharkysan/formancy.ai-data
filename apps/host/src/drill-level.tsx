@@ -213,23 +213,26 @@ export function DrillLevel({
         level={level}
         drilling
       >
-        <div className="panes" data-count={renderersOf(renderer).length}>
-          {sessions
-            .filter((session) => renderersOf(renderer).includes(session.renderer))
-            .map((session) => (
-              // The paper is named for the row, so it differs from a level above of the same form.
-              <Pane
-                key={session.renderer}
-                session={session}
-                title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
-                idBase={owner}
-                namedBy={headingId}
-                onAnswer={(result) => answered(result, session)}
-                onLoaded={() => loaded(session)}
-                offer={offer}
-              />
-            ))}
-        </div>
+        {(show) => (
+          <div className="panes" data-count={renderersOf(renderer).length}>
+            {sessions
+              .filter((session) => renderersOf(renderer).includes(session.renderer))
+              .map((session) => (
+                // The paper is named for the row, so it differs from a level above of the same form.
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
+                  idBase={owner}
+                  namedBy={headingId}
+                  onAnswer={(result) => answered(result, session)}
+                  onLoaded={() => loaded(session)}
+                  offer={offer}
+                  onShow={show}
+                />
+              ))}
+          </div>
+        )}
       </RecordTabs>
     </section>
   )
