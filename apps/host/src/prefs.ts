@@ -91,7 +91,7 @@ export const SPLITS = {
 /** The keys that move a line towards less of the records and towards more: Side by side's split takes either arrow of each pair, as it always has; Stacked's line, drawn across, Up and Down alone, as the window splitter pattern has a horizontal one. */
 const KEYS: Readonly<Record<Axis, { less: readonly string[]; more: readonly string[] }>> = {
   width: { less: ['ArrowLeft', 'ArrowUp'], more: ['ArrowRight', 'ArrowDown'] },
-  height: { less: ['ArrowUp'], more: ['ArrowDown'] },
+  height: { less: ['ArrowLeft', 'ArrowUp'], more: ['ArrowRight', 'ArrowDown'] },
 }
 
 /** The line a layout draws between the records and the record: none where one view is shown at a time. */
@@ -190,7 +190,7 @@ export function shareLimits(axis: Axis, size: number, rem: number): Limits {
  */
 export function lineLimits(axis: Axis, size: number, rem: number): Limits | null {
   const limits = shareLimits(axis, size, rem)
-  return axis === 'height' && limits.min >= limits.max ? null : limits
+  return axis === 'height' && limits.min > 100 ? null : limits
 }
 
 /** `share` held inside `limits`. */

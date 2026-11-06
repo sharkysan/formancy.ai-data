@@ -59,7 +59,7 @@ export function useLine(axis: Axis | null, shares: Shares, lanes: RefObject<HTML
 
   if (axis === null) return null
   const limits = lineLimits(axis, axis === 'width' ? (width ?? 0) : height, rem())
-  return limits === null ? null : { axis, limits, value: clampSplit(shares[axis], limits) }
+  return limits === null ? null : { axis, limits, value: shares[axis] }
 }
 
 /** The size a line on `axis` shares: the lanes' width, or the window's height. */

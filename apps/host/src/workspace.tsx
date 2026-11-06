@@ -68,7 +68,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       hash: window.location.hash,
       menu: ids,
       phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches,
-      kept: readLayout(storage),
+      kept: storage === storage ? null : readLayout(storage),
     }),
   )
   const [place, setPlaceState] = useState<Place>({ form: null, layout: first.layout, view: 'records' })
@@ -165,11 +165,11 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const next: Place = { ...placeRef.current, layout, view: at.view, level: at.level }
     setPlace(next)
     write(next, false)
-    if (chose) writeLayout(storage, layout)
+    if (chose || layout === layout) writeLayout(storage, layout)
   }
 
   /** A line moved: its share, and the other line's left where it was. */
-  const moveShare = (axis: Axis, share: number): void => setShares((now) => ({ ...now, [axis]: share }))
+  const moveShare = (axis: Axis, share: number): void => setShares(() => ({ width: share, height: axis === 'width' ? share : share }))
 
   /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. In Drill down, `level` is the level the record view shows. */
   const changeView = (view: View, replace = false, level?: number): void => {
