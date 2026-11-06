@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:b5eb0ae0ecc4ec2cdf38ea2f7f8fcc45eba03a75b55bc4f952a122328211755d",
+      "reviewed": "sha256:9ee84f951698ec0873c620e187fd747bb43ca49ed0dff952219a241c461d563a",
       "limitations": [
         {
           "area": "studio",
@@ -1242,7 +1242,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:5651601c8ffd25f46730cd105ce9172c4a073901f6cddfeb20331a8c65370084",
+      "reviewed": "sha256:cc66c8c8c854c3dc9e9b4e05143113afa7dbc678f636a2a4ad62cc69c509f6b1",
       "limitations": [
         {
           "area": "server",
@@ -3985,6 +3985,38 @@
         {
           "area": "host",
           "says": "A foreign key has no tab of its own: its record opens a Drill down level below the record, and a person goes back up to see both."
+        }
+      ]
+    },
+    "0143": {
+      "reviewed": "sha256:7e43238237e9c4d95d93071353545cae499eaa6ed8d3c266eea5d1b819789927",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A form's group is its root schema's name in words until an administrator types another, so on SQL Server, where most tables are in dbo, every such form is listed under \"Dbo\".",
+          "heldBy": "packages/data-core/src/presentation/group.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A group is one text, not one for each language a form is shown in, and is each form's own: renaming a group is an edit and a publish of every form in it, and two forms that spell it differently, \"Sales\" and \"sales\", are in two groups."
+        },
+        {
+          "area": "forms",
+          "says": "The default group is worded from the schema's name at every read, not stored, so a later release that words an identifier otherwise moves every form whose presentation names no group, without a publish."
+        },
+        {
+          "area": "studio",
+          "says": "A group is at most 80 characters, and a schema whose name in words is longer, or has no letter or digit in it, lists its forms under no group until an administrator types one.",
+          "heldBy": "packages/data-core/src/presentation/group.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A server of an earlier release refuses a version whose presentation names a group, and @formancy/data-client reads a menu of forms without groups as unexpected, so a host upgrades its server before its client.",
+          "heldBy": "packages/data-client/src/transport.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The menu of forms names each form's group, and the host page does not draw them yet: its Forms list is as it was."
         }
       ]
     }

@@ -401,11 +401,14 @@ until then the address is formancy.ai's 404
 - **A person is shown the forms they may read**, and nothing about any
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
-  a statement to any database; the host page draws them as its menu of
-  forms, and an open record's child rows in tabs beside it
+  a statement to any database, and the group it is listed under -- its
+  root schema's name in words, "Sales", unless its presentation names
+  another or none; the host page draws them as its menu of forms, not yet
+  grouped, and an open record's child rows in tabs beside it
   ([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md),
   [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
-  [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
+  [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md),
+  [0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md)).
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](./docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md),
@@ -638,6 +641,14 @@ views, gives each state its moves name a label, "Label of placed", which
 the host page offers it by; a label of a state the moves no longer name is
 left out of the publish
 ([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
+Group, last, is the group a host's list of forms puts the form under: one
+box that shows it -- the root schema's name in words, "Sales", until
+another is typed -- and No group, which empties it. What is typed is kept
+without the spaces around it, a group past 80 characters is refused in the
+box, and the publish leaves the default out; Generate again and a
+regeneration keep the group, and a reviewer sees it under the draft's
+policy
+([0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
 connection registry over snapshots captured from the shared fixture, as every

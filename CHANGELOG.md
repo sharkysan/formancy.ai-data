@@ -18,6 +18,24 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A form is listed in a group** (0143). Why: the menu named every form a
+  person may read in the order of their ids, and nothing published said
+  which belong together, so a host's list of forty forms was one list read
+  from the top; the host's list of tables groups them next, from the menu
+  alone. What you notice: each entry of `GET /v1/forms` names its `group`
+  -- the root table's schema in words, "Sales" for `sales`, "Order entry"
+  for `order_entry`, unless its presentation names another, or `null`
+  where it names none -- still without a statement to any database. A
+  version published before groups, or before presentations, is listed
+  under its schema's words. The studio's Presentation step ends with Group,
+  a box showing what the form will be listed under, the default until you
+  type another, and No group; a group is at most 80 characters, and the
+  publish leaves the default out, which the server refuses spelled out, as
+  it refuses an empty group. A draft's reviewer is shown the group. On SQL
+  Server, forms over `dbo` are listed under "Dbo" until you type one.
+  `@formancy/data-client` reads a menu without groups as `unexpected`, and
+  an earlier server refuses a version with one, so upgrade the server
+  before the client. The host page does not draw the groups yet.
 - **A record's child forms are tabs beside it** (0142). Why: an order with
   lines and deliveries was its form and two grids below it, an employee its
   form and three, so a person scrolled past every child to reach the one

@@ -358,6 +358,12 @@ A field moved to another section lands last in it, a section keeps one
 field, a move a regeneration cannot carry is dropped and said, and a 0.1.0
 server refuses a version holding a move
 ([0075](../decisions/0075-a-field-may-move-to-another-generated-section.md)).
+A form's group is its root schema's name in words until an administrator
+types another -- "Dbo" for every form over SQL Server's `dbo` -- worded at
+every read, so a release that words a schema otherwise moves the forms
+that name none; a group is each form's own, renamed one form at a time, and
+the host page does not draw the groups yet
+([0143](../decisions/0143-a-form-is-listed-in-a-group.md)).
 What a delete also does is listed by foreign key only, never by trigger or
 rule ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
 and the Review step does not show what a draft changes from the version it
