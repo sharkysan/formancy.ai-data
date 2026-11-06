@@ -106,7 +106,12 @@ export function linkedForms(menu: FormMenu, open: FormMenuEntry, opens: readonly
   return [...linked.values()]
 }
 
-/** How a linked form is linked, in words, from the open form's side: arrows are read out as "rightwards arrow", or not at all. */
-export function linkWords({ fields, rows }: { fields: boolean; rows: boolean }): string {
-  return [...(fields ? ['from its fields'] : []), ...(rows ? ['its child rows'] : [])].join(' and ')
+/**
+ * How a linked form is linked, in words that name the open form, `title`,
+ * and say which way the link runs: a link is heard in a screen reader's
+ * list of links without the heading over it, and an arrow is read out as
+ * "rightwards arrow", or not at all.
+ */
+export function linkWords({ fields, rows }: { fields: boolean; rows: boolean }, title: string): string {
+  return [...(fields ? [`where ${title}’s fields lead`] : []), ...(rows ? [`rows that refer to ${title}`] : [])].join(', and ')
 }

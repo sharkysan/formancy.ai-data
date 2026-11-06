@@ -4,6 +4,7 @@ import { computeAccessibleName } from 'dom-accessibility-api'
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { answer, chooseForm, mount, openForm, signIn, unsavedNotice } from './test-host.js'
 import type { User } from './test-host.js'
+import { holdingRequests } from './test-network.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 
@@ -17,10 +18,12 @@ import type { Plane } from './test-plane.js'
  * orders, matches and links is form-list.test.ts's; here, that the page
  * draws it and the keyboard goes through it.
  *
- * Found by role and accessible name. Two reads the accessibility tree
+ * Found by role and accessible name. Three reads the accessibility tree
  * cannot answer as a query, each where it is made: a link's
- * `aria-current`, a state testing-library has no query for, and the box's
- * value, which a person sees and the tree holds as no name.
+ * `aria-current`, a state testing-library has no query for; the box's
+ * value, which a person sees and the tree holds as no name; and a key
+ * heard by the document, which is where whatever else on the page answers
+ * a key would hear it, and which no role names.
  */
 
 let plane: Plane
@@ -49,7 +52,7 @@ const names = (elements: readonly HTMLElement[]): string[] => elements.map((elem
 const listed = (): string[] => names(within(nav()).getAllByRole('link'))
 
 /** The linked forms' links, by name: each ends in how it is linked, which no group's link says. */
-const linked = (): string[] => listed().filter((name) => / (from its fields|its child rows)$/.test(name))
+const linked = (): string[] => listed().filter((name) => / (where .+’s fields lead|rows that refer to .+)$/.test(name))
 
 /** What the list's status says: the one status of the list once the menu names a form. */
 const saying = (): string => within(nav()).getByRole('status').textContent ?? ''
@@ -68,8 +71,8 @@ describe('the list of forms', () => {
   // under their groups it is a few headings, each a list it names, so a
   // screen reader's list of lists says "Parity" and "Sales". And Find a
   // form is the first stop after the list's heading, before any form
-  // (watched failing in CI with the headings left undrawn, every form in
-  // one unnamed list).
+  // (to be watched failing in CI with the headings undrawn, the groups
+  // kept).
   test('lists the forms under their groups, each a list its heading names, after Find a form', async () => {
     const user = await arrived()
     expect(names(within(nav()).getAllByRole('heading', { level: 3 }))).toEqual(['Parity', 'Sales'])
@@ -91,7 +94,7 @@ describe('the list of forms', () => {
   })
 
   // A search that only counted would leave the person reading the whole
-  // list for the two they asked for (watched failing in CI with the list
+  // list for the two they asked for (to be watched failing in CI with the list
   // drawn from every form whatever was typed).
   test('narrows the list as the person types, and says how many forms match', async () => {
     const user = await arrived()
@@ -104,7 +107,7 @@ describe('the list of forms', () => {
 
   // The one form a search leaves is the one the person wants: Enter opens
   // it, as a click would, with the keyboard on its heading; with three left
-  // Enter has nothing to choose between and opens nothing (watched failing
+  // Enter has nothing to choose between and opens nothing (to be watched failing
   // in CI with Enter opening the first form that matches, however many
   // do).
   test('opens the one form that matches on Enter, and nothing while several do', async () => {
@@ -139,7 +142,7 @@ describe('the list of forms', () => {
   // Down from the box is the way into what it found, and Down and Up go on
   // along the list, Up from its first form back to the box: a list only Tab
   // crosses is one stop per form between the box and the form wanted
-  // (watched failing in CI with Down and Up on a form unhandled).
+  // (to be watched failing in CI with Down and Up on a form unhandled).
   test('moves from the box along the list with Down, and back with Up', async () => {
     const user = await arrived()
     await user.click(box())
@@ -153,7 +156,7 @@ describe('the list of forms', () => {
 
   // A search that finds nothing is a dead end unless the page says so and
   // offers the way back: the line says what was looked for, and Clear the
-  // search empties the box with the keyboard in it (watched failing in CI
+  // search empties the box with the keyboard in it (to be watched failing in CI
   // with Clear the search left undrawn).
   test('says when nothing matches, and Clear the search empties the box', async () => {
     const user = await arrived()
@@ -168,7 +171,7 @@ describe('the list of forms', () => {
 
   // The floor in each state the list reaches: a search, a search that
   // finds nothing, and a form open with its linked forms -- axe and a name
-  // on every control (watched failing in CI with the linked forms' items
+  // on every control (to be watched failing in CI with the linked forms' items
   // drawn without their list).
   test('passes the floor while searching, finding nothing, and with linked forms', async () => {
     const user = await arrived()
@@ -189,19 +192,68 @@ describe('the list of forms', () => {
   })
 })
 
+describe('the search', () => {
+  // The search is the person's: a form chosen from a narrowed list leaves
+  // it as typed, so the next of the forms it found is a press away (to be
+  // watched failing in CI with the box emptied whenever the open form
+  // changes).
+  test('stays as typed after a form is chosen from it', async () => {
+    const user = await arrived()
+    await user.type(box(), 'line')
+    await user.click(within(nav()).getByRole('link', { name: 'Order line pg-order-line' }))
+    await screen.findByRole('main', { name: 'Order line pg-order-line' }, ARRIVES)
+    expect(box().value).toBe('line')
+    expect(saying()).toMatch(/^2 of \d+ forms match\.$/)
+  })
+
+  // The forms linked to the open one are what a person looks at next, and
+  // the search is for the rest of the list: narrowed by it, a form found by
+  // typing and opened would hide its own links (to be watched failing in
+  // CI with the linked forms narrowed by the search too).
+  test('leaves the linked forms whole while it narrows the groups', async () => {
+    const user = await arrived()
+    await chooseForm(user, 'pg-order-line')
+    await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Order line' }, ARRIVES)
+    await user.type(box(), 'employee')
+    await waitFor(() => expect(saying()).toMatch(/^2 of \d+ forms match\.$/))
+    expect(linked()).toEqual(['Order pg-order where Order line’s fields lead', 'Order pg-order-staff where Order line’s fields lead'])
+  })
+
+  // Escape in an empty box has nothing to empty, and is the page's: taken
+  // there, it would never reach whatever else on the page answers it (to
+  // be watched failing in CI with Escape always taken by the box). Heard
+  // where the page would hear it, on the document.
+  test('passes Escape in an empty box on to the page', async () => {
+    const user = await arrived()
+    await user.click(box())
+    const heard: boolean[] = []
+    const listener = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') heard.push(event.defaultPrevented)
+    }
+    document.addEventListener('keydown', listener)
+    try {
+      await user.keyboard('{Escape}')
+    } finally {
+      document.removeEventListener('keydown', listener)
+    }
+    expect(heard).toEqual([false])
+  })
+})
+
 describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) => {
   // An order line's order is where its Order field leads, in either form
   // over the orders (0140): both are named under "Linked to Order line",
-  // said in words to lead from its fields, and one opens as the list
-  // opens it, the keyboard on its heading and its own entry marked
-  // (watched failing in CI with the definition's `opens` left unread).
+  // said in words to be where Order line's fields lead, and one opens as
+  // the list opens it, the keyboard on its heading and its own entry
+  // marked (to be watched failing in CI with the definition's `opens` left
+  // unread).
   test("names the forms an order line's lookups open in, and opens one", async () => {
     const user = await arrived()
     await chooseForm(user, engine.lines)
     await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Order line' }, ARRIVES)
-    expect(linked()).toEqual([`Order ${engine.formId} from its fields`, `Order ${engine.staff} from its fields`])
-    await user.click(within(nav()).getByRole('link', { name: `Order ${engine.staff} from its fields` }))
-    await waitFor(() => expect(focusedName()).toBe(`Order ${engine.staff}`), ARRIVES)
+    expect(linked()).toEqual([`Order ${engine.formId} where Order line’s fields lead`, `Order ${engine.staff} where Order line’s fields lead`])
+    await user.click(within(nav()).getByRole('link', { name: `Order ${engine.staff} where Order line’s fields lead` }))
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: `Order ${engine.staff}` })), ARRIVES)
     expect(
       within(nav())
         .getByRole('link', { name: `Order ${engine.staff}` })
@@ -211,19 +263,19 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
 
   // The staff's orders refer to an employee twice, through who created and
   // who approved them, and the employee form is its own child through the
-  // manager: the list names the orders once, as its child rows, and not the
-  // employee form, which is where the person is (watched failing in CI
-  // with the menu's children left unread).
+  // manager: the list names the orders once, as rows that refer to
+  // Employee, and not the employee form, which is where the person is (to
+  // be watched failing in CI with the menu's children left unread).
   test('names the forms whose rows refer to an employee once, and not the employee form', async () => {
     const user = await arrived()
     await chooseForm(user, engine.employees)
     await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Employee' }, ARRIVES)
-    expect(linked()).toEqual([`Order ${engine.staff} its child rows`])
+    expect(linked()).toEqual([`Order ${engine.staff} rows that refer to Employee`])
   })
 
   // Enter in the box over unsaved work asks first, as a click does, and
   // Keep editing gives the keyboard back to the box it was pressed in,
-  // with what was typed there (watched failing in CI with the matching
+  // with what was typed there (to be watched failing in CI with the matching
   // form's link handed to the guard in place of the box).
   test('asks before Enter leaves unsaved work, and Keep editing returns to the box', async () => {
     const user = await openForm(plane, engine.formId)
@@ -233,5 +285,32 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
     expect(focusedName()).toBe('Find a form')
     expect(box().value).toBe(engine.employees)
+  })
+
+  // A linked form chosen opens, and while it is asked for no linked form
+  // is drawn: the link with the keyboard is gone. The keyboard goes to the
+  // same form's link in its group, and on to its heading once it opens, as
+  // a choice from the groups does; on Back, which opens a form without
+  // moving the keyboard, it stays on that form's link in its group rather
+  // than on the page itself for good (to be watched failing in CI with the
+  // keyboard left where the link was).
+  test('keeps the keyboard on a linked form chosen while it opens, and on Back', async () => {
+    const holding = holdingRequests(plane.fetch, ({ method, path }) => method === 'GET' && path === `/v1/forms/${engine.formId}`)
+    const user = mount(holding.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.lines)
+    await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Order line' }, ARRIVES)
+    await user.click(within(nav()).getByRole('link', { name: `Order ${engine.formId} where Order line’s fields lead` }))
+    await waitFor(() => expect(holding.held).toEqual([`/v1/forms/${engine.formId}`]), ARRIVES)
+    expect(document.activeElement).toBe(within(nav()).getByRole('link', { name: `Order ${engine.formId}` }))
+    await holding.pass()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: `Order ${engine.formId}` })), ARRIVES)
+    within(nav())
+      .getByRole('link', { name: `Order line ${engine.lines} rows that refer to Order` })
+      .focus()
+    window.history.back()
+    await screen.findByRole('main', { name: `Order line ${engine.lines}` }, ARRIVES)
+    await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Order line' }, ARRIVES)
+    expect(document.activeElement).toBe(within(nav()).getByRole('link', { name: `Order line ${engine.lines}` }))
   })
 })

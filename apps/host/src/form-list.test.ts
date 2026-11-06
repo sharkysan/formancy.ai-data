@@ -241,12 +241,13 @@ describe('linkedForms', () => {
 })
 
 describe('linkWords', () => {
-  // An arrow is read out as "rightwards arrow", or not at all: the
-  // direction is said in words, from the open form's side, which the
-  // heading names -- "Linked to Order line".
-  test('says each way a form is linked in words', () => {
-    expect(linkWords({ fields: true, rows: false })).toBe('from its fields')
-    expect(linkWords({ fields: false, rows: true })).toBe('its child rows')
-    expect(linkWords({ fields: true, rows: true })).toBe('from its fields and its child rows')
+  // An arrow is read out as "rightwards arrow", or not at all, and a link
+  // is heard in a screen reader's list of links without the heading over
+  // it: so the words name the open form and say which way the link runs.
+  // "From its fields" said neither whose fields nor that they lead here.
+  test('says each way a form is linked in words that name the open form', () => {
+    expect(linkWords({ fields: true, rows: false }, 'Order line')).toBe('where Order line’s fields lead')
+    expect(linkWords({ fields: false, rows: true }, 'Order')).toBe('rows that refer to Order')
+    expect(linkWords({ fields: true, rows: true }, 'Order')).toBe('where Order’s fields lead, and rows that refer to Order')
   })
 })
