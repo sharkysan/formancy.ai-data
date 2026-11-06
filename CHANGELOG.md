@@ -933,6 +933,19 @@ the same day (formancy.ai 0232).
 
 ### Fixed
 
+- **A crumb, or any press that shows a level, keeps the keyboard on what it
+  shows.** Why: React runs the effects a commit still has pending before
+  it renders again, and the host page's after-render queue was drained by
+  any render's effect -- so a press landing between a commit and its
+  effects, an answer from the server drawn just before a crumb is pressed,
+  had the earlier effect run the press's focus first, on a level still
+  hidden, whose heading takes no keyboard; the crumb pressed went, and the
+  keyboard fell to the page. `open-lookup.test.tsx` failed so on
+  PostgreSQL in CI, going up from a lookup's record two levels down. Each
+  action now waits for the render that took its request (`after-render.ts`).
+  What you notice: nothing, but the keyboard on the heading of the level a
+  crumb, Open or a row's Enter shows, every time.
+
 - **An abandoned PostgreSQL lookup is stopped when its cancel overtakes its
   execute** (0121). Why: the cancel sent after a lookup's execute travels
   on a connection of its own, so on a loaded network it can reach
