@@ -177,16 +177,30 @@ const page = (ids: readonly number[], next: string | null): Outcome<RecordList> 
   value: { rows: ids.map((id) => ({ record: `k1:${String(id)}`, version: '1', answers: { id: String(id) } })), hasMore: next !== null, next },
 })
 
-/** The hooks a datasource tells, each call kept by its name. */
-function told(): { hooks: DatasourceHooks; calls: Array<[string, ...unknown[]]> } {
+/** The hooks a datasource tells, each call kept by its name, and the list each says it came from. */
+function told(): { hooks: DatasourceHooks; calls: Array<[string, ...unknown[]]>; from: unknown[] } {
   const calls: Array<[string, ...unknown[]]> = []
+  const from: unknown[] = []
   return {
     calls,
+    from,
     hooks: {
-      loading: (...args) => void calls.push(['loading', ...args]),
-      answered: (start, rows) => void calls.push(['answered', start, rows.length]),
-      refused: (...args) => void calls.push(['refused', ...args]),
-      restart: () => void calls.push(['restart']),
+      loading: (start, end, ahead, source) => {
+        calls.push(['loading', start, end, ahead])
+        from.push(source)
+      },
+      answered: (start, rows, _hasMore, _filter, source) => {
+        calls.push(['answered', start, rows.length])
+        from.push(source)
+      },
+      refused: (message, code, ahead, source) => {
+        calls.push(['refused', message, code, ahead])
+        from.push(source)
+      },
+      restart: (source) => {
+        calls.push(['restart'])
+        from.push(source)
+      },
     },
   }
 }
@@ -280,7 +294,7 @@ describe('the rows on screen while the next are asked for (0146)', () => {
   // them (watched failing with that block failed, as before 0146: the grid
   // was left with no rows).
   test('answers a block asked under another order with the rows on screen, asking nothing', async () => {
-    const { client, asked } = answering([page([1, 2], 'c1:2')])
+    const { client, asked } = answering([page([1, 2], null)])
     const { hooks, calls } = told()
     const source = datasource(client, hooks)
     source.getRows(block(0).params)
@@ -290,6 +304,52 @@ describe('the rows on screen while the next are asked for (0146)', () => {
     expect(resorted.got).toMatchObject({ rows: [{ record: 'k1:1' }, { record: 'k1:2' }], last: 2 })
     expect(asked).toHaveLength(1)
     expect(calls).toHaveLength(2)
+  })
+
+  // Rows on screen that had more after them are answered as having more:
+  // answered as the last, AG Grid would count one page and clamp the next
+  // page turned to back to it, and never ask for it (watched failing with
+  // their count given as the last row: 50).
+  test('answers the rows on screen as having more where they had', async () => {
+    const whole = Array.from({ length: 50 }, (_, index) => index + 1)
+    const { client } = answering([page(whole, 'c1:50')])
+    const source = datasource(client, told().hooks)
+    source.getRows(block(0).params)
+    await settled()
+    const resorted = block(0, [{ colId: 'id', sort: 'desc' }])
+    source.getRows(resorted.params)
+    expect(resorted.got).toMatchObject({ last: undefined })
+  })
+
+  // A page asked first that AG Grid was never moved to is dropped, so a
+  // block it asks for later at that row asks the server, never shows rows
+  // from before (watched failing with the drop doing nothing: the kept
+  // rows answered it, and nothing was asked).
+  test('drops a page asked first, and asks the server for that block after', async () => {
+    const whole = Array.from({ length: 50 }, (_, index) => index + 1)
+    const { client, asked } = answering([page(whole, 'c1:50'), page([51], null), page([52], null)])
+    const source = datasource(client, told().hooks)
+    source.getRows(block(0).params)
+    await settled()
+    expect(await source.askFirst(50, 100)).toBe('ready')
+    source.drop()
+    const later = block(50)
+    source.getRows(later.params)
+    await settled()
+    expect({ asked: asked.length, got: later.got }).toMatchObject({ asked: 3, got: { rows: [{ record: 'k1:52' }] } })
+  })
+
+  // Every hook says which list it comes from, so the grid can hear the list
+  // shown and the list asked for and no other (use-held-rows.ts) (watched
+  // failing with the list left unsaid: undefined).
+  test('says which list each word comes from', async () => {
+    const { client } = answering([page([1], null), { ok: false, status: 503, code: 'unavailable', message: 'The database cannot be reached.' }])
+    const { hooks, from } = told()
+    const source = datasource(client, hooks)
+    source.getRows(block(0).params)
+    await settled()
+    await source.askFirst(0, 50)
+    expect(from).toEqual([source, source, source, source])
   })
 
   // A page asked first that the server refuses is said as one asked first --

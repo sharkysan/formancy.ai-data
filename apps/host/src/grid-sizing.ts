@@ -1,3 +1,5 @@
+import { ROW_HEIGHT } from './grid-theme.js'
+
 /*
  * When a grid sizes its columns to the rows it shows (0047). AG Grid sizes
  * a column by measuring its cells, and a cell in a hidden panel measures
@@ -5,7 +7,8 @@
  * longest word, and kept it, since paging never sizes again. A grid in a
  * tab another hides (0142), in Separate views' hidden view or on a Drill
  * down level not shown, so sizes only where it is drawn, and otherwise
- * owes the size, which it pays when it is shown.
+ * owes the size, which it pays when it is shown. And how tall a grid's well
+ * is for the rows its page holds (`wellHeight`).
  */
 
 /** What a grid knows of its page and its columns. */
@@ -47,4 +50,17 @@ export function sizing(state: SizeState, want: SizeWant, hidden: boolean): { siz
  */
 export function hiddenWell(well: Element | null): boolean {
   return well === null || well.closest('[hidden]') !== null
+}
+
+/**
+ * How tall a well is for `rows` rows: the header, a 36px band each (two
+ * when there are none), the 16px scrollbar AG Grid keeps, and the frame --
+ * and where the well's own max-height caps it, whole rows only, so no row is
+ * cut by the scrollbar's band (UX-SPEC §3).
+ */
+export function wellHeight(header: number, rows: number, cap: number): number {
+  const band = 16
+  let bands = Math.max(rows, 2)
+  if (Number.isFinite(cap)) bands = Math.max(2, Math.min(bands, Math.floor((cap - header - band - 2) / ROW_HEIGHT)))
+  return Math.ceil(header + bands * ROW_HEIGHT + band + 2)
 }

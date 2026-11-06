@@ -708,7 +708,8 @@ server's list
 searched when you press Search and sorted by any header the server says
 sorts. While the next page, a sort or a search is asked for, the rows on
 screen stay, dimmed, and a refusal leaves them there with the server's
-sentence; the grid's line says what the server answered in the room's teal
+sentence, Previous rows and Next rows waiting for a refused search,
+filter or sort; the grid's line says what the server answered in the room's teal
 for a moment, as a form's "Saved." does, and is muted after
 ([0146](./docs/decisions/0146-the-page-says-what-the-server-did.md)).
 Space opens a row under the grid, or beside it, Enter opens it and

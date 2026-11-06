@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
+import { STANDING_HELP } from './grid-datasource.js'
 import { answer, chooseForm, dataCell, dataRows, gridSection, gridStatus, mount, pane, said, save, shows, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { holdingRequests, holdingWrites } from './test-network.js'
@@ -52,6 +54,37 @@ const waiting = (): boolean => records().closest('.grid-bench')?.hasAttribute('d
 const teal = (line: HTMLElement | undefined): Element | null => line?.querySelector('.server-did') ?? null
 const button = (name: string): HTMLElement => within(gridSection('Records')).getByRole('button', { name })
 const lineSays = (text: string): Promise<void> => waitFor(() => expect(gridStatus('Records')?.textContent).toBe(text), ARRIVES)
+
+/**
+ * `fetch` with each answer `holds` picks kept back after the server gave it,
+ * until the test hands it over: a list the server answered before a save,
+ * delivered after it. A request the page has abandoned meanwhile rejects
+ * with its signal's reason, as the browser's does.
+ */
+function holdingAnswers(
+  fetch: typeof globalThis.fetch,
+  holds: (request: { path: string; body: string | undefined }) => boolean,
+): { fetch: typeof globalThis.fetch; held: string[]; pass: () => Promise<void> } {
+  const waiting: Array<() => void> = []
+  const held: string[] = []
+  return {
+    held,
+    fetch: async (input, init) => {
+      const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
+      if (!holds({ path, body: typeof init?.body === 'string' ? init.body : undefined })) return fetch(input, init)
+      const reply = await fetch(input, init)
+      held.push(path)
+      await new Promise<void>((resolve) => waiting.push(resolve))
+      held.splice(held.indexOf(path), 1)
+      init?.signal?.throwIfAborted()
+      return reply
+    },
+    pass: async () => {
+      waiting.shift()?.()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    },
+  }
+}
 
 /** The page on `fetch`, signed in, `formId` chosen, and its records searched for `words`. */
 async function searched(fetch: typeof globalThis.fetch, formId: string, words: string): Promise<User> {
@@ -168,6 +201,126 @@ describe.each(ENGINES)('what the server did, on $engine', (engine) => {
     await lineSays('The data server could not be reached.')
     expect(shown()).toEqual(before)
     expect(waiting()).toBe(false)
+  })
+
+  // A new search refused stands over the last list's rows: Previous rows
+  // and Next rows wait for it, said why by the line and its help, and a press
+  // of Next rows sends nothing -- paging the last list would list rows the
+  // search box no longer names, as though the search were applied (to be
+  // watched failing in CI with the pager left to the last list: Next rows
+  // was not aria-disabled).
+  test('waits with Previous rows and Next rows while a new search refused stands', async () => {
+    const notes = stamp('stands')
+    const { held, holding } = await pages(notes)
+    const user = await searched(held.fetch, engine.formId, notes)
+    await lineSays(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`)
+    holding.on = true
+    const search = screen.getByRole('search', { name: 'Search records' })
+    await user.type(within(search).getByRole('textbox', { name: 'Search' }), ' 5')
+    await user.click(within(search).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await held.fail()
+    await lineSays('The data server could not be reached.')
+    for (const name of ['Previous rows', 'Next rows']) {
+      expect(button(name).getAttribute('aria-disabled'), name).toBe('true')
+      expect(computeAccessibleDescription(button(name)), name).toBe(`The data server could not be reached. ${STANDING_HELP}`)
+    }
+    await user.click(button('Next rows'))
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(held.held).toHaveLength(0)
+    expect(button('Ask again')).toBeTruthy()
+    holding.on = false
+  })
+
+  // Ask again is for what was refused last: a page refused, then the grid
+  // answered by a save's reload, then that reload's next one refused -- Ask
+  // again asks for the grid's own page, never the page refused before it,
+  // which would move the person to rows they did not ask for (to be watched
+  // failing in CI with the grid never telling the hook it was asked or
+  // answered: "Rows 51–53.").
+  test('asks again for what was refused last, not a page refused before an answer', async () => {
+    const notes = stamp('last')
+    const { held, holding } = await pages(notes)
+    const user = await searched(held.fetch, engine.formId, notes)
+    await lineSays(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`)
+    holding.on = true
+    await user.click(button('Next rows'))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await held.fail()
+    await lineSays('The data server could not be reached.')
+    holding.on = false
+    await user.click(dataCell(records()))
+    await screen.findByRole('heading', { level: 3, name: /^Order k1:/ }, ARRIVES)
+    await shows('React', 'Notes', `${notes} 1`)
+    await answer(user, 'React', 'Notes', `${notes} changed`)
+    await save(user, 'React')
+    await said('React', /^Saved\.$/)
+    await lineSays(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`)
+    holding.on = true
+    await answer(user, 'React', 'Notes', `${notes} again`)
+    await save(user, 'React')
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await held.fail()
+    await lineSays('The data server could not be reached.')
+    holding.on = false
+    await user.click(button('Ask again'))
+    await lineSays(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`)
+  })
+
+  // A save while a new sort is on its way lists that sort again, so what
+  // the grid draws once it answers is what was saved -- not the list asked
+  // before the save, nor the rows on screen, which answer the last list
+  // under the new sort (to be watched failing in CI with a save's reload
+  // left to AG Grid: the row showed its notes from before the save).
+  test('lists what was saved when a save comes while a new sort is asked for', async () => {
+    const notes = stamp('sorted')
+    await plane.db.insertOrders(engine.connection, 2, notes)
+    const holding = { on: false }
+    const held = holdingAnswers(plane.fetch, ({ path, body }) => holding.on && path === lists && body?.includes(notes) === true)
+    const user = await searched(held.fetch, engine.formId, notes)
+    await lineSays('Rows 1–2.')
+    await user.click(dataCell(records()))
+    await screen.findByRole('heading', { level: 3, name: /^Order k1:/ }, ARRIVES)
+    await shows('React', 'Notes', `${notes} 1`)
+    holding.on = true
+    // Id ascending, from the keyboard: from the cell clicked, up through the header boxes' row to its header.
+    await user.keyboard('{ArrowUp}{ArrowUp}{Enter}')
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await answer(user, 'React', 'Notes', `${notes} saved`)
+    await save(user, 'React')
+    await said('React', /^Saved\.$/)
+    holding.on = false
+    while (held.held.length > 0) await held.pass()
+    await waitFor(() => expect(shown()[0]).toContain(`${notes} saved`), ARRIVES)
+  })
+
+  // A press on a row while a new search is on its way opens that row's
+  // record, and the search's rows follow once it is let go: given to AG Grid
+  // during the press, they would be drawn over the row pressed, and the
+  // release would open nothing (to be watched failing in CI with the list
+  // given at once, as in run 42203470148: the record never opened).
+  test('opens the row pressed while a new search is on its way', async () => {
+    const notes = stamp('pressed')
+    await plane.db.insertOrders(engine.connection, 2, notes)
+    const holding = { on: false }
+    const held = holdingRequests(plane.fetch, ({ path, body }) => holding.on && path === lists && body?.includes(notes) === true)
+    const user = await searched(held.fetch, engine.formId, notes)
+    await lineSays('Rows 1–2.')
+    const cell = dataCell(records())
+    const key = cell.textContent ?? ''
+    holding.on = true
+    const search = screen.getByRole('search', { name: 'Search records' })
+    await user.type(within(search).getByRole('textbox', { name: 'Search' }), ' 2')
+    await user.click(within(search).getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
+    await user.pointer({ keys: '[MouseLeft>]', target: cell })
+    holding.on = false
+    await held.pass()
+    // The search answered while the pointer is down: a few ticks for the page to hold it back.
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    await user.pointer({ keys: '[/MouseLeft]', target: cell })
+    await screen.findByRole('heading', { level: 3, name: `Order k1:${key}` }, ARRIVES)
+    await lineSays('Rows 1–1.')
   })
 
   // A page the server answered is said in teal, and so is "No records

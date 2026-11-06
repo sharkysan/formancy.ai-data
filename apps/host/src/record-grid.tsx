@@ -1,14 +1,14 @@
 import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
-import type { GridApi, IRowNode } from 'ag-grid-community'
+import type { GridApi } from 'ag-grid-community'
 import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
-import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STARTED_AGAIN } from './grid-datasource.js'
-import type { DatasourceHooks, GridColumn, GridRow } from './grid-datasource.js'
-import { columnDefsOf, gridOptionsFor } from './grid-options.js'
+import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STANDING_HELP, STARTED_AGAIN } from './grid-datasource.js'
+import type { DatasourceHooks, GridColumn, GridRow, GridSource } from './grid-datasource.js'
+import { columnDefsOf, gridOptionsFor, headerSort, select } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import { filterByExample } from './cell-example.js'
@@ -17,8 +17,10 @@ import { pageRecords } from './known-records.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
+import { wellHeight } from './grid-sizing.js'
 import { useGridSizing } from './use-grid-sizing.js'
 import { useHeldRows } from './use-held-rows.js'
+import type { HeldRows } from './use-held-rows.js'
 import { sameSort } from './views.js'
 
 export type { OpenHow, RowDelete } from './grid-options.js'
@@ -40,9 +42,11 @@ export { DELETE_COLUMN } from './grid-options.js'
  * The rows on screen stay while the next are asked for (0146): a page
  * turned to and a new list's first page are asked for before AG Grid is
  * shown them (use-held-rows.ts), and the well is marked `data-waiting`,
- * which the room's stylesheet dims, while the line says what is asked. What
- * the server answered is said in the room's teal for a moment, a page's own
- * sentence not (pager.tsx).
+ * which the room's stylesheet dims, while the line says what is asked; the
+ * grid hears only the list shown and the list asked for. While a refused
+ * new list stands, Previous rows and Next rows wait, and a reload asks for
+ * that list. What the server answered is said in the room's teal for a
+ * moment, a page's own sentence not (pager.tsx).
  *
  * A record gone from it (0053) -- deleted, or not found by a delete and
  * closed -- is said once, before the sentence of the page asked for again;
@@ -144,42 +148,6 @@ export interface RecordGridProps {
   onFiltered?: (empty: boolean) => void
 }
 
-/** Every row of the page selected exactly when it is the open record's; the rows whose selection changed. */
-function select(grid: GridApi<GridRow>, open: string | null): IRowNode<GridRow>[] {
-  const changed: IRowNode<GridRow>[] = []
-  grid.forEachNode((node) => {
-    if (node.data === undefined) return
-    const want = node.data.record !== null && node.data.record === open
-    if (node.isSelected() !== want) {
-      node.setSelected(want)
-      changed.push(node)
-    }
-  })
-  return changed
-}
-
-/** The sort the grid's headers show, in its order: what a header press leaves, or what was applied to them. */
-function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
-  return grid
-    .getColumnState()
-    .filter((column) => column.sort === 'asc' || column.sort === 'desc')
-    .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
-    .map((column) => ({ field: column.colId, direction: column.sort as ListSortTerm['direction'] }))
-}
-
-/**
- * How tall a well is for `rows` rows: the header, a 36px band each (two
- * when there are none), the 16px scrollbar AG Grid keeps, and the frame --
- * and where the well's own max-height caps it, whole rows only, so no row is
- * cut by the scrollbar's band (UX-SPEC §3).
- */
-function wellHeight(header: number, rows: number, cap: number): number {
-  const band = 16
-  let bands = Math.max(rows, 2)
-  if (Number.isFinite(cap)) bands = Math.max(2, Math.min(bands, Math.floor((cap - header - band - 2) / ROW_HEIGHT)))
-  return Math.ceil(header + bands * ROW_HEIGHT + band + 2)
-}
-
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
   const {
     client,
@@ -215,6 +183,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   })
   /** How many times the line has said what the server answered: each time, its words are drawn in teal anew. */
   const answers = useRef(0)
+  /** The line as it is, and as it was when a page was asked first: said again where AG Grid is not moved to that page. */
+  const statusNow = useRef(status)
+  statusNow.current = status
+  const beforeAsk = useRef<Status | null>(null)
+  /** The rows held while the next are asked for, read when a hook runs: made below, from the datasource these hooks are given to. */
+  const heldNow = useRef<HeldRows | null>(null)
+  /** What `from` says is the page's: the list shown, or the list asked for (use-held-rows.ts). */
+  const ours = (from: GridSource): boolean => heldNow.current?.live(from) ?? true
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, owed: false, quiet, retrying: false })
   /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
@@ -289,9 +265,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
 
   const hooks = useMemo<DatasourceHooks>(
     () => ({
-      loading: (start, end, ahead) => {
-        // Asked first, the rows on screen stay, and so does the page they are on.
-        if (!ahead) shown.current.loaded = false
+      loading: (start, end, ahead, from) => {
+        if (!ours(from)) return
+        // Asked first, the rows on screen stay, and so does the page they are on; asked by AG Grid, a refusal before is not Ask again's.
+        if (ahead) beforeAsk.current = statusNow.current
+        else {
+          shown.current.loaded = false
+          heldNow.current?.heard()
+        }
         latest.current.onFiltered?.(false)
         api.current?.setGridAriaProperty('busy', 'true')
         const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
@@ -299,7 +280,9 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setStatus((before) => ({ kind: 'loading', text: [words], help: null, clear: false, retry: before.retry && shown.current.retrying, said: null }))
         if (!ahead) setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
       },
-      answered: (start, rows, hasMore, asked) => {
+      answered: (start, rows, hasMore, asked, from) => {
+        if (!ours(from)) return
+        heldNow.current?.heard()
         // A page left empty that is not the first -- its last row deleted --
         // says nothing: with fewer rows than the page starts at, AG Grid's
         // pagination moves to the last page there is and asks for it, which
@@ -352,17 +335,20 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           }
         }
       },
-      refused: (message, code, ahead) => {
+      refused: (message, code, ahead, from) => {
+        if (!ours(from)) return
         // Asked first, the rows on screen are still there, and the pager still theirs.
         shown.current = ahead ? { ...shown.current, retrying: false } : { ...shown.current, rows: 0, loaded: true, retrying: false }
         api.current?.setGridAriaProperty('busy', null)
         // A filter the server cannot apply is refused again however often it is asked: its recovery is the condition.
         const filterRefused = code === 'not-filterable'
+        // A new list refused stands, over the last list's rows: the pager waits for it.
+        const stands = ahead && heldNow.current !== null && heldNow.current.source !== from
         latest.current.onFiltered?.(false)
         setStatus({
           kind: 'refused',
           text: first([message]),
-          help: filterRefused ? REFUSED_FILTER_HELP : null,
+          help: filterRefused ? REFUSED_FILTER_HELP : stands ? STANDING_HELP : null,
           clear: false,
           retry: !filterRefused,
           said: null,
@@ -371,13 +357,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setPager((before) => ({ ...before, hasMore: false }))
         fit()
       },
-      restart: () => {
+      restart: (from) => {
+        if (!ours(from)) return
         // The row the asked page comes after is gone (0108): the first page
         // is where the list starts again, and its line says why first. A
         // task later, so AG Grid is out of the block it is failing.
         shown.current = { ...shown.current, retrying: false }
         removedLine.current = [STARTED_AGAIN]
-        setTimeout(() => restartNow.current(), 0)
+        setTimeout(() => heldNow.current?.restart(), 0)
       },
     }),
     [applySelection, fit, sizeOnce, sizeAdded],
@@ -401,9 +388,12 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   }, [quiet, parent?.record])
   useEffect(() => applySelection(), [openToken, applySelection])
   // After the parent's line is quieted above: a new list's first page is asked here, and its line is the quiet one.
-  const held = useHeldRows(api, datasource)
-  const restartNow = useRef(held.restart)
-  restartNow.current = held.restart
+  // A page AG Grid was not moved to: the wait is over, and the line says what it said before the ask.
+  const held = useHeldRows(api, datasource, () => {
+    api.current?.setGridAriaProperty('busy', null)
+    if (beforeAsk.current !== null) setStatus(beforeAsk.current)
+  })
+  heldNow.current = held
 
   useImperativeHandle(
     handle,
@@ -430,14 +420,15 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         return true
       },
       reload() {
-        api.current?.purgeInfiniteCache()
+        // A list on its way, or a refused one standing, is the one to list again: the rows shown are the last list's.
+        if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
       },
       say(line) {
         setStatus({ kind: 'answer', text: line, help: null, clear: false, retry: false, said: null })
       },
       removed(line) {
         removedLine.current = line
-        api.current?.purgeInfiniteCache()
+        if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
       },
     }),
     [],
@@ -564,6 +555,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           status={status}
           first={pager.page === 0}
           last={!pager.hasMore}
+          waits={held.standing}
           asking={shown.current.retrying}
           retryRef={retryButton}
           onClear={onClearSearch}
@@ -574,15 +566,15 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             if (!held.again()) api.current?.purgeInfiniteCache()
           }}
           onPrevious={() => {
-            if (pager.page > 0) held.turn(-1)
+            if (pager.page > 0 && !held.standing) held.turn(-1)
           }}
           onNext={() => {
-            if (pager.hasMore) held.turn(1)
+            if (pager.hasMore && !held.standing) held.turn(1)
           }}
         />
       </div>
       {/* Dimmed by the room's stylesheet while a page is asked for: the rows on screen stay (0146). */}
-      <div className={`grid-bench ${bench}`} ref={well} data-waiting={status.kind === 'loading' ? '' : undefined}>
+      <div className={`grid-bench ${bench}`} ref={well} data-waiting={status.kind === 'loading' ? '' : undefined} onPointerDown={() => held.press(true)}>
         <AgGridReact<GridRow> gridOptions={options} columnDefs={columnDefs} datasource={held.source} />
       </div>
       {after}

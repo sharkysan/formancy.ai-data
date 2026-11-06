@@ -301,7 +301,9 @@ line (0059).
    then takes that answer without asking again; a header pressed is
    answered with the rows on screen until the section's new list has
    answered; a refusal leaves the rows, and Ask again asks for what was
-   refused. The line then says what the server answered in the room's
+   refused; while a refused new list stands Previous rows and Next rows
+   wait for it, and a save's or a delete's reload asks for it, or for a
+   new list on its way. The line then says what the server answered in the room's
    teal for a moment (`apps/host/src/server-did.tsx`,
    [0146](../decisions/0146-the-page-says-what-the-server-did.md)). A form
    that is its own child can show its records as a tree instead

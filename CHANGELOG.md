@@ -30,8 +30,11 @@ the same day (formancy.ai 0232).
   search, a filter or a view leave the rows you were looking at on screen,
   the grid dimmed a little after a fifth of a second, until the answer
   replaces them; a refusal leaves them there, no longer dimmed, with the
-  server's sentence and Ask again, which asks for what was refused; and a
-  second press of Next rows while a page is asked for sends nothing. A
+  server's sentence and Ask again, which asks for what was refused; after
+  a new search, filter, view or sort is refused, Previous rows and Next
+  rows wait for it, saying why, and a save or a delete lists it again
+  rather than the list on screen; and a second press of Next rows while a
+  page is asked for sends nothing. A
   grid's line saying a page, a filter or a view applied, or a record
   deleted, a form's line saying "Saved." or "Created record …", the View
   picker's saying a view kept or removed, and Download CSV's saying a
@@ -43,8 +46,7 @@ the same day (formancy.ai 0232).
   disclosure of its own -- and stays as you left it in this browser; a
   refused Load opens it to say why, and the renderer you chose draws the
   record whether it is open or not. The getting-started guide's section 5
-  says to open it, and the README's host pictures show the header as it
-  was until they are taken again.
+  says to open it.
 - **The host page's layout is the person's: Stacked first, its height
   shared by a line they move, and the layout they chose kept** (0145).
   Why: the design of finding records has a person see the grid above and

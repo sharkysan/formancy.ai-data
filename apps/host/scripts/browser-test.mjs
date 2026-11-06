@@ -116,7 +116,8 @@
 //     on the first crumb it drew;
 //   - the rows on screen while the next are asked for (0146): a header
 //     pressed with its list held keeps the rows the grid showed, its well
-//     dimmed to 0.8 and the grid busy, and once the list answers the well is
+//     dimmed with every text in it still at 4.5:1 and the grid busy, and
+//     once the list answers the well is
 //     no longer dimmed and nothing busy; the line that says so is drawn in
 //     the room's teal, which axe finds at 4.5:1 or more, and three fifths
 //     through its moment has faded from where it began, and under reduced

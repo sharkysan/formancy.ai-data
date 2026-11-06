@@ -297,8 +297,10 @@ browser's save of an object URL, which jsdom cannot make, so the host's
 `export.test.tsx` takes the file where the page hands it over and
 `save-file.test.ts` holds the anchor and the revoke (0080). It fails too
 when a header pressed with its list held leaves the grid without the rows
-it showed, its well not dimmed to 0.8 while it waits or still dimmed once
-it answers, or AG Grid not busy while it waits; when the line that says
+it showed, its well not dimmed while it waits or still dimmed once it
+answers, a text in the dimmed well below 4.5:1 -- axe's audit of the well,
+and the header's and a cell's text composed at its opacity from the pixels
+painted before and during the dim -- or AG Grid not busy while it waits; when the line that says
 the answer is not the room's teal as it is said, which axe measures there
 since the gate waits for every animation to end before its own audit, or
 has not faded from where it began three fifths through its moment, or has

@@ -2,7 +2,11 @@
 // said in the room's teal, in the browser (0146), on the workspace the views'
 // states left: every record, no sort. A header pressed with the list it asks
 // for held: the grid keeps the rows it showed, its well is dimmed and AG
-// Grid says it is busy, and once the list is let go the sorted rows are
+// Grid says it is busy, every text in the dimmed well still at 4.5:1 --
+// axe's own audit of the well, which reads its opacity, and the header's
+// and a cell's text, which axe cannot decide behind AG Grid's layers,
+// composed at the well's opacity from the pixels painted before and during
+// the dim -- and once the list is let go the sorted rows are
 // shown, the well no longer dimmed and nothing busy. The line that says so
 // is drawn in the room's teal -- the colour room.css gives --server --
 // which axe finds at 4.5:1 or more on its glass, and three fifths through
@@ -18,7 +22,7 @@
 // the `.server-did` the page draws its words in, and its animation.
 
 import { FORM } from './plane.mjs'
-import { audit, dataRows, until } from './measure.mjs'
+import { audit, contrast, dataRows, painted, parseColor, until } from './measure.mjs'
 
 const LISTS = `**/v1/forms/${FORM}/records/list`
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -28,6 +32,13 @@ const line = (page) => records(page).getByRole('status', { name: /^$/ }).first()
 /** The well the grid is drawn in, which has no role: the grid's nearest `.grid-bench`. */
 const well = (page) => grid(page).locator('xpath=ancestor::*[contains(concat(" ", @class, " "), " grid-bench ")][1]')
 const opacity = async (page) => Number(await well(page).evaluate((element) => getComputedStyle(element).opacity))
+/** The opacity the well is drawn with: its own and every ancestor's, as the browser composites them. */
+const drawnOpacity = (page) =>
+  well(page).evaluate((element) => {
+    let alpha = 1
+    for (let at = element; at !== null; at = at.parentElement) alpha *= Number(getComputedStyle(at).opacity)
+    return alpha
+  })
 const header = (page) => grid(page).getByRole('columnheader', { name: /^Order date/ })
 /** Every data row's text, in order: what the grid shows. */
 const shown = async (page) => dataRows(grid(page), page).allTextContents()
@@ -71,6 +82,44 @@ function tealAt(page, share) {
   }, share)
 }
 
+/**
+ * The Records grid's first header and first data cell with text: a point
+ * inside each, clear of its text, where `decide` reads a grid's background
+ * too, and each text's colour as the browser computes it.
+ */
+const gridTexts = (page) =>
+  grid(page).evaluate((root) => {
+    const header = root.querySelector('[role="columnheader"]')
+    const cell = [...root.querySelectorAll('[role="row"]')]
+      .map((row) => row.querySelector('[role="gridcell"]'))
+      .find((each) => each !== null && (each.textContent ?? '').trim() !== '' && each.querySelector('input') === null)
+    return [header, cell]
+      .filter((each) => each !== null && each !== undefined)
+      .map((element) => {
+        const box = element.getBoundingClientRect()
+        return { name: (element.textContent ?? '').trim().slice(0, 30), color: getComputedStyle(element).color, point: { x: box.left + 4, y: box.top + 4 } }
+      })
+  })
+
+/**
+ * Each of `texts` as the dimmed well draws it, against what was painted
+ * behind it: the well is composited at `alpha`, its own opacity and its
+ * ancestors', over what lies behind them, so what that gives is read from
+ * the background painted undimmed, `plain`, and dimmed, `dimmed`, and the
+ * text's colour is composited over it as the background was. `decide` compares a text's computed colour with the
+ * pixels, which leaves out the well's opacity; this puts it in.
+ */
+function dimmedRatios(texts, plain, dimmed, alpha) {
+  return texts.map((text, at) => {
+    const own = parseColor(text.color)?.rgb ?? [0, 0, 0]
+    const under = plain[at]
+    const shown = dimmed[at]
+    const glass = shown.map((channel, index) => (alpha >= 0.999 ? channel : Math.min(255, Math.max(0, (channel - alpha * under[index]) / (1 - alpha)))))
+    const drawn = own.map((channel, index) => alpha * channel + (1 - alpha) * glass[index])
+    return { name: text.name, ratio: contrast(drawn, shown) }
+  })
+}
+
 /** Null once `condition` holds, or the problem `until` gives up with. */
 const reached = (condition, problem) =>
   until(condition, problem)
@@ -103,6 +152,11 @@ export function waitingJourney(_plane, { check }) {
       async (page) => {
         await answered(page)
         const before = await shown(page)
+        const texts = await gridTexts(page)
+        const plain = await painted(
+          page,
+          texts.map((text) => text.point),
+        )
         const held = []
         let asked = () => {}
         const askedFor = new Promise((resolve) => {
@@ -117,15 +171,36 @@ export function waitingJourney(_plane, { check }) {
             await header(page).click()
             await askedFor
             // Past the dim's fifth of a second, and its transition.
-            const dimmed = await reached(async () => Math.abs((await opacity(page)) - 0.8) < 0.01, 'the well was never dimmed to 0.8')
+            const dimmed = await reached(async () => (await opacity(page)) < 1, 'the well was never dimmed')
+            await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => null))))
             const rows = await shown(page)
             const busy = (await grid(page).getAttribute('aria-busy')) === 'true' ? null : 'aria-busy was not true while it was asked for'
+            // Every text in the dimmed well at 4.5:1: axe's own, which reads the well's opacity, and the grid's texts it cannot decide behind AG Grid's layers, composed here.
+            const wellAudit = await audit(page, await well(page).elementHandle())
+            const ratios = dimmedRatios(
+              texts,
+              plain,
+              await painted(
+                page,
+                texts.map((text) => text.point),
+              ),
+              await drawnOpacity(page),
+            )
+            const low = ratios.filter((entry) => entry.ratio < 4.5)
+            const readable =
+              wellAudit.violations.length > 0
+                ? wellAudit.violations.join('; ')
+                : ratios.length < 2
+                  ? `only ${String(ratios.length)} of the grid's texts was found`
+                  : low.length > 0
+                    ? low.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; ')
+                    : null
             await holdTheNextTeal(page)
             const [request] = held
             if (request === undefined) throw new Error('no list was held')
             await page.unroute(LISTS)
             await request.continue()
-            return { dimmed, rows, busy }
+            return { dimmed, rows, busy, readable }
           } finally {
             await page.unroute(LISTS)
           }
@@ -138,7 +213,8 @@ export function waitingJourney(_plane, { check }) {
         )
         await answered(page)
         const undimmed = await reached(async () => (await opacity(page)) === 1, 'the well stayed dimmed once it answered')
-        check('a sort asked for: the well dimmed to 0.8 while it is, and not once it answers', whileAsked.dimmed ?? undimmed)
+        check('a sort asked for: the well dimmed while it is, and not once it answers', whileAsked.dimmed ?? undimmed)
+        check('a sort asked for: every text in the dimmed well at 4.5:1 or more, its header and a cell composed at its opacity', whileAsked.readable)
         check(
           'a sort asked for: the grid busy while it is, and not once it answers',
           whileAsked.busy ?? ((await grid(page).getAttribute('aria-busy')) === null ? null : 'aria-busy was still set once it answered'),

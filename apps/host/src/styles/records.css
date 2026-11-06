@@ -160,8 +160,11 @@
    end without a transition: `data-still`, read from the preference by the
    page, since the gate reads no `@media` but a width (0146). Teal is
    11.34:1 on the glass over the ground and the muted it settles in 7.04:1,
-   and never less than the muted along the fade, worked out from room.css's
-   values; every light behind the glass at once, 10.05:1 and 6.23:1. */
+   and never less than the muted along the fade in sRGB; every light behind
+   the glass at once, 10.05:1 and 6.23:1 -- worked out on 2026-11-06 from
+   @formancy/themes 0.13.0's room.css, the glass composited over the
+   ground. The browser gate measures the teal at its start with axe
+   (scripts/browser/waiting.mjs). */
 .server-did {
   animation: server-did 2.4s ease-out;
 }
@@ -199,9 +202,12 @@
    well, never a rule inside it, a fifth of a second after the ask, so an
    answer quicker than that draws no dim at all. 0.8 is the most the well is
    dimmed with every text in it still at 4.5:1 -- the header's muted text the
-   least, 4.90:1 over the glass, worked out from room.css's values and the
-   grid's theme -- where 0.75 leaves it at 4.45:1. Colour, not motion, as
-   the controls' transitions are. */
+   least, 4.90:1 over the glass, where 0.75 leaves it at 4.45:1 -- worked out
+   on 2026-11-06 from @formancy/themes 0.13.0's room.css and grid-theme.ts's
+   colours, the well composited at its opacity over the glass over the
+   ground; the browser gate measures every text of the dimmed well
+   (scripts/browser/waiting.mjs). Colour, not motion, as the controls'
+   transitions are. */
 .grid-bench[data-waiting] {
   opacity: 0.8;
   transition-delay: 200ms;

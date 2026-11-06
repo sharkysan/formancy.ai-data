@@ -352,8 +352,9 @@ in their browser, the last viewer's on a shared machine
 ([0145](../decisions/0145-the-layout-is-the-persons.md)).
 While a sort or a new list is asked for, a grid shows the last list's
 rows, dimmed, under headers and a line that already say the new one, and
-after a new list is refused its rows and its pager stay the last list's;
-a page asked for again after a save or a delete, Ask again after a form's
+after a new list is refused those rows stay while Previous rows and Next
+rows wait for it and a save or a delete lists it again; a page asked for
+again after a save or a delete with no other list asked for, Ask again after a form's
 first page was refused, and a list started again still blank while they
 are asked, and AG Grid may draw a page it is handed empty for one task,
 read from its source and not measured; the dim takes the whole well, its

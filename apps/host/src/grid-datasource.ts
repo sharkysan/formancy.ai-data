@@ -45,6 +45,13 @@ export const CANNOT_OPEN = 'This row cannot be opened: its key does not fit in a
  */
 export const REFUSED_FILTER_HELP = 'Change the condition in Filter and press Enter, or remove it.'
 
+/**
+ * What the line adds when a new list -- a search, a filter, a view, a sort
+ * -- is refused and the last list's rows stay on screen (0146): Previous
+ * rows and Next rows wait for the list asked for, which they would not page.
+ */
+export const STANDING_HELP = 'The rows shown are the list before this one. Previous rows and Next rows wait until Ask again lists it.'
+
 /** The readable fields of `definition`, in the form's order, without the parent's field in a child grid. */
 export function columnsOf(definition: PublishedForm, parentField: string | null): GridColumn[] {
   const readable = new Set(definition.readable)
@@ -169,16 +176,20 @@ export function answered({
 /** What the line says before the first page, once a page had nowhere to start (0108). */
 export const STARTED_AGAIN = 'The record those rows came after is gone, so the list starts again at its first page.'
 
-/** What the datasource tells the grid component as it goes. */
+/**
+ * What the datasource tells the grid component as it goes, each with the
+ * list it comes from: the list shown and a list asked for share these, and
+ * the grid hears only those two (use-held-rows.ts, 0146).
+ */
 export interface DatasourceHooks {
   /** A block asked for; `ahead`, asked before the grid is shown it, while the rows on screen stay (0146). */
-  loading(start: number, end: number, ahead: boolean): void
+  loading(start: number, end: number, ahead: boolean, from: GridSource): void
   /** A block answered, for the filter it was asked with: the line names the fields that filter is on. */
-  answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[]): void
+  answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[], from: GridSource): void
   /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). `ahead` as `loading` has it. */
-  refused(message: string, code: string, ahead: boolean): void
+  refused(message: string, code: string, ahead: boolean, from: GridSource): void
   /** A block with nowhere to start: the row it comes after is gone (0108), and the first page is where the list starts again. */
-  restart(): void
+  restart(from: GridSource): void
 }
 
 /** What a datasource asks the runtime plane: a page of records, and the labels of a page's lookups. */
@@ -195,6 +206,8 @@ export interface GridSource extends IDatasource {
    * block next, is answered from what came, asking nothing again.
    */
   askFirst(start: number, end: number): Promise<AskedFirst>
+  /** What was asked first and not taken dropped: AG Grid was not moved to it, and the block it asks for there later asks the server. */
+  drop(): void
   abort(): void
 }
 
@@ -256,8 +269,8 @@ export function createDatasource({
   const cursors = new Map<number, string | null>([[0, null]])
   /** A block asked first, until AG Grid takes it. */
   let kept: { start: number; rows: GridRow[]; hasMore: boolean } | null = null
-  /** The rows the grid was last given: on screen, until it is given others. */
-  let onScreen: GridRow[] | null = null
+  /** The rows the grid was last given, and whether more followed them: on screen, until it is given others. */
+  let onScreen: { rows: GridRow[]; more: boolean } | null = null
 
   async function rowsFor(
     start: number,
@@ -295,7 +308,7 @@ export function createDatasource({
     const controller = new AbortController()
     current = controller
     const query = listQuery({ search, sort, parent, filter, after, size: end - start })
-    hooks.loading(start, end, ahead)
+    hooks.loading(start, end, ahead, self)
     const answer = rowsFor(start, query, controller.signal).then(
       (answered) => {
         if (controller.signal.aborted) return 'aborted' as const
@@ -309,17 +322,18 @@ export function createDatasource({
 
   /** `rows` given to AG Grid for the block from `start`: the last row where no more follow. */
   function give(params: IGetRowsParams, rows: GridRow[], hasMore: boolean): void {
-    onScreen = rows
+    onScreen = { rows, more: hasMore }
     params.successCallback(rows, hasMore ? undefined : params.startRow + rows.length)
-    hooks.answered(params.startRow, rows, hasMore, filter)
+    hooks.answered(params.startRow, rows, hasMore, filter, self)
   }
 
-  return {
+  const self: GridSource = {
     getRows(params) {
       if (!sameSort(sortOfModel(params.sortModel), sort)) {
         current?.abort()
+        // With more after them where they had more: counted as the last, AG Grid would clamp a page turned to back to this one.
         if (onScreen === null) params.failCallback()
-        else params.successCallback(onScreen, onScreen.length)
+        else params.successCallback(onScreen.rows, onScreen.more ? undefined : params.startRow + onScreen.rows.length)
         return
       }
       const ready = kept
@@ -331,15 +345,15 @@ export function createDatasource({
       const asked = ask(params.startRow, params.endRow, false)
       if (asked === null) {
         params.failCallback()
-        hooks.restart()
+        hooks.restart(self)
         return
       }
       void asked.answer.then((answer) => {
         if (answer === 'aborted') return params.failCallback()
         if ('refused' in answer) {
           params.failCallback()
-          if (answer.code === 'cursor-gone') hooks.restart()
-          else hooks.refused(answer.refused, answer.code, false)
+          if (answer.code === 'cursor-gone') hooks.restart(self)
+          else hooks.refused(answer.refused, answer.code, false, self)
           return
         }
         give(params, answer.rows, answer.hasMore)
@@ -349,24 +363,28 @@ export function createDatasource({
       kept = null
       const asked = ask(start, end, true)
       if (asked === null) {
-        hooks.restart()
+        hooks.restart(self)
         return 'dropped'
       }
       const answer = await asked.answer
       if (answer === 'aborted') return 'dropped'
       if ('refused' in answer) {
         if (answer.code === 'cursor-gone') {
-          hooks.restart()
+          hooks.restart(self)
           return 'dropped'
         }
-        hooks.refused(answer.refused, answer.code, true)
+        hooks.refused(answer.refused, answer.code, true, self)
         return 'refused'
       }
       kept = { start, rows: answer.rows, hasMore: answer.hasMore }
       return 'ready'
     },
+    drop() {
+      kept = null
+    },
     abort() {
       current?.abort()
     },
   }
+  return self
 }

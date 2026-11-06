@@ -18,7 +18,24 @@
   viewer opens them and as they left them after, closed being nothing kept
   (watched failing with them read as open whatever is kept), a value the
   page did not write opening nothing (watched failing with any value kept
-  read as open), and storage that throws. `apps/host/src/demo-tools.test.tsx`
+  read as open), and storage that throws. `apps/host/src/use-held-rows.test.tsx`
+  -- a new list refused stands, and a turn or a reload asks for it again
+  until a list is shown (watched failing with a turn paging the list
+  shown: rows 51-100 of the last list asked for); a page AG Grid does not
+  move to dropped and the wait ended (watched failing with the move taken
+  as made); a page refused forgotten once the grid has asked or been
+  answered since (watched failing with the refusal kept: Ask again asked
+  for rows 51-100); the list shown and the list asked for heard and no
+  other (watched failing with every list heard); and a reload while a new
+  list is on its way asking for that list, not the list shown (watched
+  failing with the reload left to AG Grid); and a list given to AG Grid
+  between presses, never during one (watched failing with the list given
+  at once: shown while the pointer was down). `grid-datasource.test.ts`
+  also: the rows on screen answered as having more where they had (watched
+  failing with their count given as the last row); a page asked first and
+  dropped asking the server after (watched failing with the drop doing
+  nothing); and every hook naming the list it comes from (watched failing
+  with it left unsaid). `apps/host/src/demo-tools.test.tsx`
   -- one closed disclosure on arrival, the Renderer group and Record token
   out of the tree, Enter opening it with the keyboard staying on it and the
   next Tab on the renderer chosen, axe and a name on every control
@@ -53,7 +70,21 @@
   "No records match", in teal, and the page's own "Record … is not on this
   page." not (with the page's own sentences counted as the server's); and
   a save the server answered in teal, "Saving…" not (with no save said as
-  the server's). `apps/host/src/choices.test.tsx` -- the renderer chosen
+  the server's); a new search refused standing, Previous rows and Next
+  rows `aria-disabled` and described by the line and its help, and a press
+  sending nothing (with the pager left to the last list); Ask again after a
+  page refused, an answer and a refusal since asking for the grid's own
+  page (with the grid never telling the hook it was asked or answered:
+  "Rows 51–53."); and a save while a new sort is on its way listing what
+  was saved (with a save's reload left to AG Grid: the row's notes from
+  before the save); and a row pressed while a new search is on its way
+  opening its record, the search's rows after (with the list given at
+  once: the record never opened, as `delete.test.tsx`'s "Not deleted"
+  case found on PostgreSQL in CI run 42203470148, whose `searchRecords`
+  took the last list's one row, still on screen, for the search's, and
+  pressed it as the answer came). `test-host.tsx`'s `searchRecords` now
+  also waits until the grid no longer says it is busy, not watched failing
+  on its own. `apps/host/src/choices.test.tsx` -- the renderer chosen
   drawing the record with the demo's controls closed, on this page and the
   next (with the record drawn by the switch only while it is shown: React
   alone, once closed). Changed to the new controls and not watched
@@ -67,8 +98,12 @@
   is asked for", in which a header is pressed with the list it asks for
   held -- the gate's plane holds less than a page of orders, so no page is
   turned there -- and the rows shown stay (with that block failed, which
-  also fails the datasource's own case above), the well is dimmed to 0.8
-  while it is asked for and not once it answers (with the dim at 1), AG
+  also fails the datasource's own case above), the well is dimmed while it
+  is asked for and not once it answers (with the dim at 1), every text in
+  the dimmed well is at 4.5:1 or more -- axe's audit of the well, which
+  reads its opacity, and the header's and a cell's text, which axe cannot
+  decide behind AG Grid's layers, composed at the well's opacity from the
+  pixels painted before and during the dim (with the dim at 0.5), AG
   Grid says it is busy and then not (with `busy` left unset while a block
   is asked for), the line says the answer in the colour room.css gives
   `--server`, held at the start of its moment, which axe finds enough on
@@ -139,17 +174,39 @@ and the room's stylesheet dims it to 0.8 a fifth of a second after the
 ask, so an answer quicker than that draws no dim at all. 0.8 is the most
 the well is dimmed with every text in it at 4.5:1 or more: the header's
 muted text is the least, 4.90:1 over the glass, where 0.75 leaves it at
-4.45:1, worked out from room.css's values and the grid's theme
-(`grid-theme.ts`). The rule selects the well, never anything inside it,
-as every host rule must (0047). AG Grid says the grid is busy, as it did.
+4.45:1 -- worked out on 2026-11-06 from `@formancy/themes` 0.13.0's
+room.css and `grid-theme.ts`'s colours, the well composited at its opacity
+over the glass over the ground, and held by the browser gate, which
+measures every text of the dimmed well. The rule selects the well, never
+anything inside it, as every host rule must (0047). AG Grid says the grid
+is busy, as it did. A page AG Grid does not move to -- one it counts no
+rows for -- is dropped, and the line says again what it said before the
+ask, nothing dimmed or busy.
 
 **A refusal leaves the grid as it was.** A page or a list asked first and
-refused leaves the rows on screen, no longer dimmed, the pager as it was,
-and the server's sentence on the line with Ask again, which asks for what
-was refused -- that page, that list -- not AG Grid's own page. A press of
-Previous rows or Next rows while a page or a list is asked first sends
-nothing: the answer coming is the one the person waits for, and a page
-asked from one not yet answered would have no row to start from (0108).
+refused leaves the rows on screen, no longer dimmed, and the server's
+sentence on the line with Ask again, which asks for what was refused --
+that page, that list -- not AG Grid's own page; once AG Grid has asked
+for a block of its own, or a block has answered, a page refused before is
+not what Ask again asks for. A press of Previous rows or Next rows while a
+page or a list is asked first sends nothing: the answer coming is the one
+the person waits for, and a page asked from one not yet answered would
+have no row to start from (0108).
+
+**A new list refused stands, and nothing pages or lists the one before
+it.** The rows on screen are then the last list's, which the search, the
+filter, the view or the sort on screen no longer name. Previous rows and
+Next rows wait -- `aria-disabled`, still focusable, described by the line
+and its help, which says the rows shown are the list before and Ask again
+lists the one asked for -- and a press sends nothing; a save's or a
+delete's reload asks for the refused list again, as Ask again does, until
+a list is shown or another asked for. A reload while a new list is on its
+way asks for that list again, so what it shows is what was saved. The
+grid hears what the list shown and the list asked for say, and nothing a
+list replaced says. What has answered is given to AG Grid between presses,
+never during one: AG Grid draws the rows it is given over those on screen,
+and a press begun on a row it redrew would end on none, so the click would
+open nothing; a press is let go wherever the pointer is.
 
 **What the server did is said in the room's teal, for a moment**
 (`apps/host/src/server-did.tsx`). The lines that say it, and only when
@@ -216,14 +273,19 @@ a person sees one quiet button where the demo's two controls were.
 - While a sort or a new list is asked for, the rows on screen are the last
   list's, in its order, under headers, boxes and a line that already say
   the new one; they can be opened, and are the records they show.
-- After a new list is refused, the rows and the pager are the last list's:
-  Next rows pages the list shown, not the one refused, until Ask again or
-  another search.
+- A list or a page that answers while a pointer is pressed on the grid is
+  drawn only once it is let go, so a press held down keeps the rows before
+  it on screen, dimmed.
+- After a new list is refused, the rows on screen are the last list's,
+  and Previous rows and Next rows wait for the refused one: nothing pages
+  the list shown, and a save or a delete lists the refused list again,
+  until Ask again or another search lists one.
 - AG Grid makes a block's rows empty a task before it asks its datasource
   for them (`InfiniteBlock.loadFromDatasource`, ag-grid-community 36.2.0),
   so a page given to it may still be drawn empty for that task, a frame at
   most -- read from that source, not measured.
-- A page asked for again after a save or a delete, Ask again after a
+- A page asked for again after a save or a delete with no other list asked
+  for, Ask again after a
   refusal of AG Grid's own first page, and a list started again because its
   row was gone (0108) are asked by AG Grid, and blank while asked, as before.
 - The dim dims the whole well, its headers and their boxes too, which can
@@ -242,8 +304,7 @@ a person sees one quiet button where the demo's two controls were.
   `host-loaded`, shows For the demo closed where the renderer switch and
   Open by record token were; `host-other-tenant` shows it open; and the
   grid's and the save's lines are muted in `host-loaded`, `host-delete`,
-  `host-other-tenant` and `host-stale`. Until they are taken again,
-  `pnpm test:pictures` fails on them.
+  `host-other-tenant` and `host-stale`.
 - The browser gate holds the rows kept while a sort is asked for, not a
   page turned: its plane holds less than a page of orders. The page turned
   is held against the real server in jsdom.

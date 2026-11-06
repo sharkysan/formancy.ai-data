@@ -331,9 +331,12 @@ export function recordKeys(): string[] {
 
 /**
  * Search the Records grid for `words`, typed into Search and submitted, and
- * wait until it lists exactly the records `keys` names, in order: the page
- * the search asked for, and not the one it replaces, whose rows a test could
- * otherwise click as they went.
+ * wait until it lists exactly the records `keys` names, in order, and no
+ * longer says it is busy: the page the search asked for, and not the one it
+ * replaces, whose rows stay on screen while the search is asked for (0146)
+ * and may already be those records -- on PostgreSQL in CI run 42203470148,
+ * the removable form's one row -- which a test could otherwise click as
+ * they went.
  */
 export async function searchRecords(user: User, words: string, keys: readonly string[]): Promise<void> {
   const search = screen.getByRole('search', { name: 'Search records' })
@@ -341,7 +344,8 @@ export async function searchRecords(user: User, words: string, keys: readonly st
   await user.clear(box)
   await user.type(box, words)
   await user.click(within(search).getByRole('button', { name: 'Search' }))
-  await waitFor(() => expect({ words, keys: recordKeys() }).toEqual({ words, keys }), ARRIVES_WITHIN)
+  const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+  await waitFor(() => expect({ words, keys: recordKeys(), busy: grid.getAttribute('aria-busy') }).toEqual({ words, keys, busy: null }), ARRIVES_WITHIN)
 }
 
 /** Press New record in the Records panel: both panes empty for a new record. Nothing is waited for. */

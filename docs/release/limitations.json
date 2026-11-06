@@ -4112,16 +4112,16 @@
       ]
     },
     "0146": {
-      "reviewed": "sha256:3d7492d645a0bdffc1cebbf47dd6d07a984477e24a488225dc879a83ecfcc5c7",
+      "reviewed": "sha256:72e6778e448767588997027cf10f9eefab9a1e976d5ada9b284f0340504ec60e",
       "limitations": [
         {
           "area": "host",
-          "says": "While a sort or a new search is asked for, the host page's grid shows the last list's rows, dimmed, under headers and a line that already say the new list, and after a new list is refused its rows and its pager stay the last list's.",
+          "says": "While a sort or a new search is asked for, the host page's grid shows the last list's rows, dimmed, under headers and a line that already say the new list, and after a new list is refused those rows stay while Previous rows and Next rows wait for it and a save or a delete lists it again.",
           "heldBy": "apps/host/src/held-rows.test.tsx"
         },
         {
           "area": "host",
-          "says": "A grid's page asked for again after a save or a delete, Ask again after a form's first page was refused and a list started again because its row was gone still draw the grid empty while they are asked, and AG Grid may draw a page it is handed empty for one task first."
+          "says": "A grid's page asked for again after a save or a delete with no other list asked for, Ask again after a form's first page was refused and a list started again because its row was gone still draw the grid empty while they are asked, and AG Grid may draw a page it is handed empty for one task first."
         },
         {
           "area": "host",
