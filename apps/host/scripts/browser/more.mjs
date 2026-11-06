@@ -125,7 +125,7 @@ export function moreJourney(_plane, gate) {
         // Signed in again, the page opens the form its address names, which the downloads left: chosen anew all the same.
         await page
           .getByRole('navigation', { name: 'Forms' })
-          .getByRole('link', { name: `Order ${FORM}` })
+          .getByRole('link', { name: `Order ${FORM}`, exact: true })
           .click()
         await page.getByRole('heading', { level: 2, name: `Order ${FORM}` }).waitFor(WITHIN)
         await until(

@@ -97,7 +97,7 @@ async function signInAsClara(page) {
 
 /** Opens the orders, waiting for their first page. */
 async function openOrders(page) {
-  await page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: 'Order order' }).click()
+  await page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: 'Order order', exact: true }).click()
   await says(records(page), /^Rows 1–50; more follow\.$/)
 }
 

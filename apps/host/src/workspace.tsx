@@ -5,6 +5,7 @@ import { useAddressRequests, useHistory } from './address.js'
 import { useAfterRender } from './after-render.js'
 import { childFormsOf, levelFormOf } from './child-forms.js'
 import type { ChildForm } from './children.js'
+import { linkedForms } from './form-list.js'
 import { FormView } from './form-view.js'
 import { FormsNav } from './forms-nav.js'
 import { GuardContext, useGuard } from './guard.js'
@@ -40,6 +41,8 @@ type Opened =
  * with it: the Forms the person may read, and the open form in main. It
  * holds what spans forms -- the address, the layout, the renderer choice,
  * the split, and the unsaved-changes guard -- and FormView holds one form.
+ * Forms lists, below the groups, the forms linked to the one open, once its
+ * definition has answered (0144).
  *
  * The address is `#form=…&layout=…&view=…` and never a record (layout.ts):
  * choosing a form and changing the view in Separate views push an entry, a
@@ -127,7 +130,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs once on arrival, for what the address said when the person signed in
   }, [])
 
-  const choose = (id: string, link: HTMLAnchorElement): void => {
+  const choose = (id: string, from: HTMLElement): void => {
     if (id === placeRef.current.form) {
       formHeading.current?.focus()
       return
@@ -136,7 +139,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     guard.ask(
       { kind: 'form', title: chosen?.title ?? id },
       () => void openForm(id, { focus: true, push: true }),
-      () => link.focus(),
+      () => from.focus(),
     )
   }
 
@@ -170,6 +173,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         menu={menu}
         current={place.form}
         layout={place.layout}
+        linked={opened?.state === 'open' ? { title: opened.entry.title, forms: linkedForms(menu, opened.entry, opened.definition.opens) } : null}
         headingRef={formsHeading}
         signOutRef={signOutRef}
         onChoose={choose}

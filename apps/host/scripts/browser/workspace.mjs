@@ -131,7 +131,7 @@ export function workspaceJourney(plane, { check }, run) {
       async (page) => {
         await page
           .getByRole('navigation', { name: 'Forms' })
-          .getByRole('link', { name: `Order ${FORM}` })
+          .getByRole('link', { name: `Order ${FORM}`, exact: true })
           .click()
         await answered(records(page), /^Rows 1–/)
         check('a form chosen: the keyboard is on its heading', await focusedOn(page, page.getByRole('heading', { level: 2, name: `Order ${FORM}` })))
@@ -427,7 +427,7 @@ export function workspaceJourney(plane, { check }, run) {
         // moves from nothing to the first order, a token. Only React's is
         // pressed: Angular's is the same native element, and axe measures both
         // here.
-        await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order line ${LINES}` }))
+        await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order line ${LINES}`, exact: true }))
         await answered(records(page), /^Rows 1–/)
         await carryOn(page, records(page).getByRole('button', { name: 'New record' }))
         await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)
@@ -472,7 +472,7 @@ export function workspaceJourney(plane, { check }, run) {
           .getByRole('status')
           .filter({ hasText: /^Created record / })
           .waitFor(WITHIN)
-        await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}` }))
+        await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}`, exact: true }))
         await answered(records(page), /^Rows 1–/)
         await carryOn(page, records(page).getByRole('button', { name: 'New record' }))
         await page.getByRole('heading', { level: 3, name: 'New record' }).waitFor(WITHIN)

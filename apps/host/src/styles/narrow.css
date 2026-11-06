@@ -34,13 +34,41 @@
     margin: 0 0.5rem 0 0.25rem;
   }
 
+  /* Find a form beside the heading, what it found under the box. */
+  .forms-find {
+    display: flex;
+    flex: 1 1 16rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    max-width: 28rem;
+    padding: 0.25rem 0;
+  }
+
+  .forms-find input:where(:not(.sheet *, .grid-bench *)) {
+    flex: 1 1 8rem;
+    width: auto;
+  }
+
+  /* Each group in the band: its heading, then its tabs. */
+  .forms-lists,
+  .forms-group,
   .forms-list {
     display: flex;
-    flex: 0 1 auto;
     flex-wrap: wrap;
+    align-items: center;
     gap: 0;
     padding: 0;
     overflow: visible;
+  }
+
+  .forms-lists {
+    flex: 0 1 auto;
+    column-gap: 1rem;
+  }
+
+  .forms-group-heading {
+    margin: 0 0.25rem;
   }
 
   .form-link,
@@ -191,15 +219,17 @@
     gap: 0.75rem;
   }
 
-  /* The tabs: the title alone is drawn. The id stays in the link's name
-     ("Order pg-order"), which still starts with what is drawn (WCAG 2.5.3). */
+  /* The tabs: the title alone is drawn, and a linked form's arrow. The id
+     and how it is linked stay in the link's name ("Order pg-order from its
+     fields"), which still starts with what is drawn (WCAG 2.5.3). */
   .form-link,
   .form-link[aria-current='page'] {
     padding-inline: 0.5rem;
     font-size: 0.875rem;
   }
 
-  .form-link code {
+  .form-link code,
+  .form-link-words {
     position: absolute;
     width: 1px;
     height: 1px;

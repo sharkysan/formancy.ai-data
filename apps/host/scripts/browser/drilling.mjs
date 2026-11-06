@@ -77,7 +77,7 @@ async function aCustomer(page, at) {
   await plane.insertCustomer(at.no, at.name)
   at.order = await plane.order(1, null, at.name)
   at.line = `${at.order},1`
-  await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Customer ${CUSTOMERS}` }))
+  await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Customer ${CUSTOMERS}`, exact: true }))
   await records(page).getByRole('grid', { name: 'Records', exact: true }).waitFor(WITHIN)
   // Level 0 is Separate views' records view, sized as it is at this width: the panel and the grid's well.
   await page.getByRole('radio', { name: 'Separate views', exact: true }).check()

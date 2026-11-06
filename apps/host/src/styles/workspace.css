@@ -91,7 +91,8 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
 
 /* Forms: a flat sidebar, 15rem, sticky at the place it is drawn so it never
    moves, and as tall as the window below the app bar, so Sign out stays at
-   its foot. A long menu scrolls inside its list. */
+   its foot. Find a form stays at its head; a long menu scrolls between them,
+   group by group, then the forms linked to the one open (0144). */
 .forms {
   position: sticky;
   top: 4.25rem;
@@ -108,16 +109,66 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
   font-weight: 500;
 }
 
-.forms-list {
+.forms-find {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0 4px;
+}
+
+/* 1rem, so a phone does not zoom on focus. */
+.forms-find input:where(:not(.sheet *, .grid-bench *)) {
+  font-size: 1rem;
+}
+
+.forms-find .button {
+  justify-self: start;
+}
+
+/* It quotes what was typed, which may be one long word: broken anywhere
+   rather than past the sidebar's edge or a phone's. */
+.forms-matched {
+  overflow-wrap: anywhere;
+}
+
+/* Silent while nothing is typed: no empty line under the box. It stays in
+   the tree, so what it says once a search starts is heard. */
+.forms .forms-matched:empty {
+  min-height: 0;
+}
+
+.forms-lists {
   display: grid;
   flex: 1 1 auto;
   align-content: start;
-  gap: 0.125rem;
+  gap: 0.75rem;
   min-height: 0;
-  margin: 0;
   padding: 4px;
   overflow: auto;
+}
+
+.forms-group {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.forms-group-heading {
+  margin: 0 0 0 0.75rem;
+  font-weight: 500;
+}
+
+.forms-list {
+  display: grid;
+  gap: 0.125rem;
+  margin: 0;
+  padding: 0;
   list-style: none;
+}
+
+/* How a linked form is linked: its arrow, and the words a screen reader
+   says, quiet under the title and the id. */
+.form-link-way {
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .form-link {
