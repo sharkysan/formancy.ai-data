@@ -348,9 +348,11 @@ describe('what a draft shows its reviewer', () => {
 
   // The group a list of forms puts the form under (0143) is put in force
   // by approving the draft as much as its views are: said beside them, No
-  // group for one cleared, and nothing where the draft keeps the default,
-  // which its presentation leaves out. Watched failing with the group left
-  // out of the draft's view.
+  // group for one cleared, and the default, said to be it, where the
+  // draft's presentation says nothing -- approving that moves a form whose
+  // version named another back to it. Watched failing with the group left
+  // out of the draft's view; and with nothing said for the default: the
+  // third draft named no group.
   test('shows the group approving it would list the form under', async () => {
     const bundle = await orderBundle(plane)
     if (bundle.format !== 2) throw new Error('the order bundle is not format 2')
@@ -361,7 +363,7 @@ describe('what a draft shows its reviewer', () => {
     expect(items(await open(user, review, 1), 'Group')).toEqual(['Orders'])
     expect(await audit()).toEqual([])
     expect(items(await open(user, review, 2), 'Group')).toEqual(['No group'])
-    expect(within(await open(user, review, 3)).queryByRole('list', { name: 'Group' })).toBeNull()
+    expect(items(await open(user, review, 3), 'Group')).toEqual(['Sales (the default)'])
   })
 })
 

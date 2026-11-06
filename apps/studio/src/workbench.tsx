@@ -160,7 +160,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       views: [],
       unfiltered: [],
       states: [],
-      group: defaultGroup(outcome.value.bindings.root),
+      group: defaultGroup(outcome.value.bindings.root, outcome.value.snapshot.kind),
       carried: null,
     })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
@@ -233,7 +233,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       views: regeneration.presentation.views ?? [],
       unfiltered: regeneration.presentation.unfiltered ?? [],
       states: regeneration.presentation.states ?? [],
-      group: formGroup(regeneration.presentation.group, bindings.root),
+      group: formGroup(regeneration.presentation.group, bindings.root, snapshot.kind),
       carried: {
         from: `version ${String(version)}`,
         version,
@@ -353,6 +353,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             policy={policy}
             states={states}
             onStates={statesChosen}
+            engine={proposal.snapshot.kind}
             group={group}
             onGroup={groupChosen}
             carried={carried}

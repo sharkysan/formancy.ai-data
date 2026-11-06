@@ -243,7 +243,7 @@ export function PublishStep({
     const named = statesOf(policy)
     const labelled = states.filter((entry) => named.includes(entry.state)).map((entry) => ({ ...entry }))
     // And the default group, the root schema's in words, is the group left out: the server refuses it spelled out (0143).
-    const listed = group === undefined || group === defaultGroup(bindings.root) ? {} : { group }
+    const listed = group === undefined || group === defaultGroup(bindings.root, snapshot.kind) ? {} : { group }
     const presentation = {
       ...derived.presentation,
       ...(views.length === 0 ? {} : { views: [...views] }),

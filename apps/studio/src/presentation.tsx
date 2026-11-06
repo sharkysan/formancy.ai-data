@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import type { FormBindings, FormPolicy, StateLabel, StoredListView } from '@formancy/data-core'
+import type { DatabaseKind, FormBindings, FormPolicy, StateLabel, StoredListView } from '@formancy/data-core'
 import type { LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
@@ -144,6 +144,7 @@ export function PresentationStep({
   policy,
   states,
   onStates,
+  engine,
   group,
   onGroup,
   carried = null,
@@ -159,6 +160,8 @@ export function PresentationStep({
   policy: FormPolicy
   states: readonly StateLabel[]
   onStates: (states: StateLabel[]) => void
+  /** The engine the form's table is on, whose own default schema gives no group (0143). */
+  engine: DatabaseKind
   /** The group the form is listed under (0143), as its box shows it: the default until another is typed, `null` for none. */
   group: string | null
   onGroup: (group: string | null) => void
@@ -346,7 +349,7 @@ export function PresentationStep({
       {layout === undefined ? <p className="none">The form has no arrangement to edit.</p> : nodes(layout.nodes, [], false)}
       <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
       <StateLabelsPanel policy={policy} labels={states} onLabels={onStates} />
-      <GroupPanel root={bindings.root} group={group} onGroup={onGroup} />
+      <GroupPanel root={bindings.root} engine={engine} group={group} onGroup={onGroup} />
     </>
   )
 }

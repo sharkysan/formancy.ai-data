@@ -76,7 +76,7 @@ type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
  */
 export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const operations = grantedOperations(bundle.bindings, bundle.policy, context)
-  const named = { id: bundle.id, title: bundle.title, group: formGroup(bundle.group, bundle.bindings.root) }
+  const named = { id: bundle.id, title: bundle.title, group: formGroup(bundle.group, bundle.bindings.root, bundle.snapshot.kind) }
   if (!operations.includes('read')) return { ...named, operations, listedBy: null, key: null, lookups: [], readable: [] }
   const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, context)
   const fields = readableFields(bundle.policy, context, bundle.bindings)

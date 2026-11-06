@@ -1,3 +1,4 @@
+import type { DatabaseKind } from '../adapter.js'
 import { labelFor } from '../generate/names.js'
 import type { ObjectRef } from '../metadata.js'
 import { nameProblem } from './views.js'
@@ -6,9 +7,10 @@ import { nameProblem } from './views.js'
  * The group a form is listed under (0143): a heading a host's list of
  * forms puts it under, which the menu (`GET /v1/forms`, 0045) names beside
  * its title. Kept in the presentation as `group`: left out, the form is
- * listed under its root schema's name in words, "sales" as "Sales"; text,
- * under that; `null`, under no group. Presentation only: a group grants
- * nothing and asks no database, and the menu reads it from the bundle.
+ * listed under its root schema's name in words, "sales" as "Sales", or
+ * under none where the schema is the engine's own default; text, under
+ * that; `null`, under no group. Presentation only: a group grants nothing
+ * and asks no database, and the menu reads it from the bundle.
  *
  * Pure and isomorphic, as the presentation is.
  */
@@ -40,30 +42,48 @@ export function groupShapeProblems(value: unknown): string[] {
 }
 
 /**
- * The group a form over `root` is listed under when its presentation says
- * nothing: the root schema's name in words, as generation words a label
- * (`labelFor`), or `null` where those words are no group an administrator
- * could type -- a schema of spaces or punctuation alone, or one past
- * `GROUP_LIMIT` in words -- so the menu never names a group the shape would
+ * Each engine's own default schema, as its catalog spells it: where a table
+ * goes when nobody chose a schema. PostgreSQL folds an unquoted name to
+ * lower case, so `public` is the one it creates and "Public" another
+ * someone quoted; SQL Server's catalog spells its built-in schema `dbo`
+ * whatever the database's collation, so a `DBO` it reports is another
+ * schema, which only a case-sensitive collation can hold apart from it.
+ */
+const DEFAULT_SCHEMA: Readonly<Record<DatabaseKind, string>> = { postgres: 'public', sqlserver: 'dbo' }
+
+/** A letter or a digit: what words must hold to be a heading, where `labelFor` hands back a name of punctuation as it is. */
+const WORD = /[A-Za-z0-9]/
+
+/**
+ * The group a form over `root` on `engine` is listed under when its
+ * presentation says nothing: the root schema's name in words, as
+ * generation words a label (`labelFor`), or `null` -- no group -- where
+ * the schema is the engine's own default, which names nothing a person
+ * reads as a group, and where those words are no group an administrator
+ * could type: a schema of spaces or punctuation alone, or one past
+ * `GROUP_LIMIT` in words. So the menu never names a group the shape would
  * refuse.
  */
-export function defaultGroup(root: ObjectRef): string | null {
+export function defaultGroup(root: ObjectRef, engine: DatabaseKind): string | null {
+  if (root.schema === DEFAULT_SCHEMA[engine]) return null
   const words = labelFor(root.schema)
-  return groupProblem(words) === null ? words : null
+  return WORD.test(words) && groupProblem(words) === null ? words : null
 }
 
-/** The group a form over `root` is listed under: the presentation's `group`, or the default where it says nothing. */
-export function formGroup(group: string | null | undefined, root: ObjectRef): string | null {
-  return group === undefined ? defaultGroup(root) : group
+/** The group a form over `root` on `engine` is listed under: the presentation's `group`, or the default where it says nothing. */
+export function formGroup(group: string | null | undefined, root: ObjectRef, engine: DatabaseKind): string | null {
+  return group === undefined ? defaultGroup(root, engine) : group
 }
 
 /**
- * Every reason a presentation's `group` does not fit a form over `root`,
- * prefixed by where it is: what a write refuses, as it refuses a label
- * equal to the base's (0030). The default spelled out is the property
- * left out. Asked at a write and never on read, so a later release that
- * words a schema otherwise leaves a stored version readable.
+ * Every reason a presentation's `group` does not fit a form over `root` on
+ * `engine`, prefixed by where it is: what a write refuses, as it refuses a
+ * label equal to the base's (0030). The default spelled out is the
+ * property left out. Asked at a write and never on read, so a later
+ * release that words a schema otherwise leaves a stored version readable.
  */
-export function groupProblems(group: string | null | undefined, root: ObjectRef): string[] {
-  return group !== undefined && group === defaultGroup(root) ? [`/group: equals the default, from schema ${JSON.stringify(root.schema)}; leave it out`] : []
+export function groupProblems(group: string | null | undefined, root: ObjectRef, engine: DatabaseKind): string[] {
+  return group !== undefined && group === defaultGroup(root, engine)
+    ? [`/group: equals the default, from schema ${JSON.stringify(root.schema)}; leave it out`]
+    : []
 }

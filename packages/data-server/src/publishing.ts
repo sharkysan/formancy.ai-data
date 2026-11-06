@@ -76,7 +76,7 @@ export function storable(
     ...viewProblems(bundle.presentation.views ?? [], bundle.bindings),
     ...unfilteredProblems(bundle.presentation.unfiltered ?? [], bundle.bindings),
     ...stateLabelProblems(bundle.presentation.states ?? [], bundle.policy),
-    ...groupProblems(bundle.presentation.group, bundle.bindings.root),
+    ...groupProblems(bundle.presentation.group, bundle.bindings.root, bundle.snapshot.kind),
   ]
   if (views.length > 0) return refused(INVALID, { problems: views.map((problem) => `presentation: ${problem}`) })
   return { ok: true, bundle }

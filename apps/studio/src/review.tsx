@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import { describeReassigned } from '@formancy/data-core'
+import { describeReassigned, formGroup } from '@formancy/data-core'
 import type { DriftChange, DriftReport } from '@formancy/data-core'
 import type { DraftQueue, DraftRead } from '@formancy/data-server'
 import type { AdminClient, Failure, Published } from './api.js'
@@ -222,6 +222,12 @@ function QueueList({ queue, me, onOpen }: { queue: DraftQueue; me: string; onOpe
 }
 
 /** One draft, read: what it is, its form on paper, its policy, and the decisions this reader may make on it. */
+/** A draft's group in words (0143): its presentation's, or the default followed by "(the default)"; "No group" where it is none. */
+function groupSaid(bundle: DraftRead['bundle']): string {
+  const listed = formGroup(bundle.presentation.group, bundle.bindings.root, bundle.snapshot.kind) ?? 'No group'
+  return bundle.presentation.group === undefined ? `${listed} (the default)` : listed
+}
+
 function DraftView({
   draft,
   revision,
@@ -298,15 +304,13 @@ function DraftView({
           </ul>
         </div>
       )}
-      {bundle.presentation.group === undefined ? null : (
-        // Where a list of forms puts it (0143): the group typed, or none; the default is left out, and said nothing of.
-        <div className="draft-views">
-          <h4 id="draft-group">Group</h4>
-          <ul aria-labelledby="draft-group">
-            <li>{bundle.presentation.group ?? 'No group'}</li>
-          </ul>
-        </div>
-      )}
+      <div className="draft-views">
+        {/* Where a list of forms puts it (0143): the group typed, or none, or the default, said to be it, where the presentation leaves it out. */}
+        <h4 id="draft-group">Group</h4>
+        <ul aria-labelledby="draft-group">
+          <li>{groupSaid(bundle)}</li>
+        </ul>
+      </div>
       {!pending ? null : (
         <div className="decide">
           {draft.refuses.approve !== undefined && draft.refuses.reject !== undefined ? null : (
