@@ -63,8 +63,9 @@
   nothing said for the default: the third draft named no group). On both engines, needing Docker:
   `packages/data-client/src/forms.integration.test.ts` and
   `apps/live-demo/src/image/publish.integration.test.ts` hold each form of
-  the fixture and of the demonstration's image under "Sales" (to be
-  watched failing in CI with `group` left out of `formMenu`'s entries).
+  the fixture and of the demonstration's image under "Sales" (watched
+  failing in CI with every entry's group made null in `formMenu`, since
+  reverted: the clerk's menu on both engines, and each persona's).
   `scripts/live-demo-gate/journey.mjs` holds the live demonstration's menu
   to it byte for byte, and `scripts/install-fixture/consume.ts` reads a
   menu with a group through the published packages' own check; neither

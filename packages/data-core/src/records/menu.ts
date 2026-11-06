@@ -135,7 +135,7 @@ export function formMenu(forms: readonly MenuForm[]): FormMenu {
           children.push({ form: child.id, field, one: section !== null, when: section === null ? null : sectionWhen(parent, section) })
         }
       }
-      return { id: parent.id, title: parent.title, group: null, operations: [...parent.operations], children }
+      return { id: parent.id, title: parent.title, group: parent.group, operations: [...parent.operations], children }
     }),
   }
 }
