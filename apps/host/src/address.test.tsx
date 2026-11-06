@@ -174,7 +174,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await user.click(await formLink(engine.formId))
     await answeredOnce('Records')
     const here = window.location.hash
-    expect(here).toBe(`#form=${engine.formId}&layout=side-by-side&view=records`)
+    expect(here).toBe(`#form=${engine.formId}&layout=stacked&view=records`)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'New record' }))
     await waitFor(() => expect(screen.getByRole('region', { name: 'React' })).toBeTruthy(), ARRIVES)
     await answer(user, 'React', 'Amount', '13')
@@ -189,7 +189,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: `Employee ${engine.employees}` })).toBeTruthy(), ARRIVES)
-    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=side-by-side&view=records`)
+    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=stacked&view=records`)
     await answeredOnce('Records')
 
     // Forward over a draft in the earlier form is asked about the same way,
@@ -202,7 +202,7 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
     expect(within(unsavedNotice() as HTMLElement).getAllByRole('paragraph')[0]?.textContent).toBe('Going forward closes these forms:')
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Keep editing' }))
-    await waitFor(() => expect(window.location.hash).toBe(`#form=${engine.employees}&layout=side-by-side&view=records`))
+    await waitFor(() => expect(window.location.hash).toBe(`#form=${engine.employees}&layout=stacked&view=records`))
     expect(name.value).toBe('Hedy')
     window.history.forward()
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
@@ -360,14 +360,14 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
     await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 2, name: `Employee ${engine.employees}` })).toBeTruthy(), ARRIVES)
-    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=side-by-side&view=records`)
+    expect(window.location.hash).toBe(`#form=${engine.employees}&layout=stacked&view=records`)
     await answeredOnce('Records')
 
     // Behind it, the first sign-in's arrival named no form: an address that
     // asks for nothing, which the page's own goes over (watched failing
     // with nothing done for an earlier sign-in's entry: the address named
     // no form under the open Employee).
-    await backTo(`#form=${engine.employees}&layout=side-by-side&view=records`, 1)
+    await backTo(`#form=${engine.employees}&layout=stacked&view=records`, 1)
     expect(unsavedNotice()).toBeNull()
     expect(screen.getByRole('heading', { level: 2, name: `Employee ${engine.employees}` })).toBeTruthy()
   })
@@ -396,7 +396,9 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     expect(window.location.hash).toBe(here)
     await shows('React', 'Amount', '17')
 
-    const typed = `#form=${engine.employees}&layout=side-by-side&view=records`
+    // In the layout the page is in, where a person arrives (0145): another
+    // form opened by a typed address keeps the page's layout.
+    const typed = `#form=${engine.employees}&layout=stacked&view=records`
     window.location.hash = typed
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
     expect(within(unsavedNotice() as HTMLElement).getAllByRole('paragraph')[0]?.textContent).toBe('Opening Employee closes these forms:')

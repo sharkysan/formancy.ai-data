@@ -83,15 +83,16 @@ export function levelShown(place: { view: View | null; level?: number | null | u
 /**
  * Where a person arrives after signing in: the fragment's form when the menu
  * names it, and never otherwise -- a form outside the menu is not asked for;
- * the fragment's layout, or Separate views on a phone (UX-SPEC D14) and Side
- * by side elsewhere; and the records view, since no record is open yet. The
- * workspace writes this place over the address it arrived on, so whatever
- * else the address said -- a key it does not read, a record token pasted in
- * -- does not stay in the history.
+ * the fragment's layout, else the one the viewer chose last in this browser
+ * (0145), else the window's: Separate views on a phone (UX-SPEC D14) and
+ * Stacked elsewhere, the records above the record; and the records view,
+ * since no record is open yet. The workspace writes this place over the
+ * address it arrived on, so whatever else the address said -- a key it does
+ * not read, a record token pasted in -- does not stay in the history.
  */
-export function arrival({ hash, menu, phone }: { hash: string; menu: readonly string[]; phone: boolean }): Place {
+export function arrival({ hash, menu, phone, kept }: { hash: string; menu: readonly string[]; phone: boolean; kept: Layout | null }): Place {
   const asked = readFragment(hash)
   const form = asked.form !== null && menu.includes(asked.form) ? asked.form : null
-  const layout = asked.layout ?? (phone ? 'separate' : 'side-by-side')
+  const layout = asked.layout ?? kept ?? (phone ? 'separate' : 'stacked')
   return { form, layout, view: 'records' }
 }

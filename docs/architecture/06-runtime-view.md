@@ -208,6 +208,18 @@ moment can both succeed, and nothing deletes a draft (0065).
    record opens in: those over its target keyed by what its foreign key
    references, the child rule read the other way
    ([0140](../decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
+4. The workspace arrives on the address's form when the menu names it, in
+   the address's layout, else the one the person last chose in the Layout
+   group, which `apps/host/src/prefs.ts` keeps in their browser, else in
+   Stacked, or Separate views on a phone (`arrival` in
+   `apps/host/src/layout.ts`); an address's layout is shown and not kept,
+   and neither is Drill down entered by a lookup's Open. In Stacked and in
+   Side by side a line between the records and the record
+   (`apps/host/src/split.tsx`) shares the window's height or the lanes'
+   width, its limits from that size, its share kept apart from the other's;
+   a window too short for Stacked's line to move has none
+   ([0145](../decisions/0145-the-layout-is-the-persons.md)). Nothing of it
+   reaches the server.
 
 Held by data-identity's `identity.test.ts`, `identity-keys.test.ts` and
 `identity-file.test.ts` and the server's `identity-settings.test.ts`, a real
@@ -221,13 +233,21 @@ header only; `presentation/group.test.ts`, where the default group is
 worded and the default spelled out is refused at a write (0143); and
 `apps/host/src/form-list.test.ts`, `forms-nav-alone.test.tsx` and
 `forms-nav.test.tsx`, where the list is ordered, searched and linked,
-heard from the keyboard, and drawn (0144). What it
+heard from the keyboard, and drawn (0144); and `layout.test.ts`,
+`prefs.test.ts`, `split.test.tsx`, `choices.test.tsx`,
+`open-lookup.test.tsx`, where Open into Drill down keeps no layout, and
+the browser gate's `apps/host/scripts/browser/stacked.mjs` and
+`workspace.mjs`, where an arrival's layout is decided and kept and the
+lines move (0145). What it
 costs: every menu reads and validates every published form; a form it
 names can be 409 `drift` when opened, since only opening asks the database
 (0045); a form whose presentation names no group moves with the words a
 release gives its schema (0143); the host's list keeps a letter's marks
 in Find a form, "zurich" finding no "Zürich", and orders its groups as
-English words whatever the reader's language (0144); a host with no
+English words whatever the reader's language (0144); a layout kept in a
+viewer's browser is the last viewer's on a shared machine, and Stacked's
+limits are worked out from the stylesheets' heights, not measured (0145);
+a host with no
 backend cannot hold a
 signing secret (0014); a key file refused on SIGHUP is said in an `error`
 line (0059).

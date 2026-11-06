@@ -54,7 +54,7 @@ describe('the fragment', () => {
 
   // A page opened with no fragment, or a bare `#`, asks for nothing, so the
   // layout is the window's (UX-SPEC D14): a reader that filled in a default
-  // here would put a phone in Side by side.
+  // here would put a phone in Stacked.
   test('an empty fragment is read as nothing asked for', () => {
     expect(readFragment('')).toEqual({ form: null, layout: null, view: null, level: null })
     expect(readFragment('#')).toEqual({ form: null, layout: null, view: null, level: null })
@@ -86,7 +86,7 @@ describe('the level Drill down shows', () => {
   // The levels are in memory only: a reload, a shared link or a typed
   // address with a level arrives on the records, as every other layout does.
   test('is never where a person arrives', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=drill&view=record&level=3', menu: ['pg-order'], phone: false })).toEqual({
+    expect(arrival({ hash: '#form=pg-order&layout=drill&view=record&level=3', menu: ['pg-order'], phone: false, kept: null })).toEqual({
       form: 'pg-order',
       layout: 'drill',
       view: 'records',
@@ -100,18 +100,22 @@ describe('arriving with an address', () => {
   // A fragment's form is opened only when the menu names it: a form outside
   // the menu is never asked for, and the address is then the page's own.
   test('opens the form the fragment names only when the menu names it', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=stacked&view=records', menu, phone: false })).toEqual({
+    expect(arrival({ hash: '#form=pg-order&layout=stacked&view=records', menu, phone: false, kept: null })).toEqual({
       form: 'pg-order',
       layout: 'stacked',
       view: 'records',
     })
-    expect(arrival({ hash: '#form=ms-secret&layout=stacked&view=records', menu, phone: false })).toEqual({ form: null, layout: 'stacked', view: 'records' })
+    expect(arrival({ hash: '#form=ms-secret&layout=stacked&view=records', menu, phone: false, kept: null })).toEqual({
+      form: null,
+      layout: 'stacked',
+      view: 'records',
+    })
   })
 
   // No record is open on arrival, so a record view has nothing to show and
   // the records view is what the page writes back.
   test('starts in the records view, whatever the fragment says', () => {
-    expect(arrival({ hash: '#form=pg-order&layout=separate&view=record', menu, phone: false })).toEqual({
+    expect(arrival({ hash: '#form=pg-order&layout=separate&view=record', menu, phone: false, kept: null })).toEqual({
       form: 'pg-order',
       layout: 'separate',
       view: 'records',
@@ -119,10 +123,23 @@ describe('arriving with an address', () => {
   })
 
   // The layout the fragment names wins; otherwise a phone starts in Separate
-  // views (UX-SPEC D14) and every other window side by side.
+  // views (UX-SPEC D14) and every other window stacked, the records above
+  // the record, as the design of finding records has a person see first
+  // (0145; watched failing with Side by side kept as the default).
   test('takes the layout from the fragment, else from the window', () => {
-    expect(arrival({ hash: '', menu, phone: true })).toEqual({ form: null, layout: 'separate', view: 'records' })
-    expect(arrival({ hash: '', menu, phone: false }).layout).toBe('side-by-side')
-    expect(arrival({ hash: '#layout=stacked', menu, phone: true }).layout).toBe('stacked')
+    expect(arrival({ hash: '', menu, phone: true, kept: null })).toEqual({ form: null, layout: 'separate', view: 'records' })
+    expect(arrival({ hash: '', menu, phone: false, kept: null }).layout).toBe('stacked')
+    expect(arrival({ hash: '#layout=stacked', menu, phone: true, kept: null }).layout).toBe('stacked')
+  })
+
+  // The layout the viewer chose last is theirs (0145): an address that names
+  // none opens in it, on a phone too, since it was chosen in this browser;
+  // an address that names one still wins, as a shared link does (watched
+  // failing with the kept layout unread, and with it read over the
+  // fragment's).
+  test('takes the layout the viewer chose last where the fragment names none', () => {
+    expect(arrival({ hash: '', menu, phone: false, kept: 'drill' }).layout).toBe('drill')
+    expect(arrival({ hash: '#form=pg-order', menu, phone: true, kept: 'side-by-side' }).layout).toBe('side-by-side')
+    expect(arrival({ hash: '#layout=separate', menu, phone: false, kept: 'drill' }).layout).toBe('separate')
   })
 })

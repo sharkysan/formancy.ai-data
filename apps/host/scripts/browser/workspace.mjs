@@ -1,5 +1,6 @@
 // The workspace's states in the browser (0047): signed in, a form's records in
-// each layout, a row open and then its lines in their tab, a line open, the unsaved-changes
+// each layout -- Stacked first, where a wide window arrives, its line
+// stacked.mjs's (0145) -- a row open and then its lines in their tab, a line open, the unsaved-changes
 // notice, a refused list and an order line opened alone, whose Order is a
 // plain select (0066) -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
@@ -10,6 +11,7 @@
 
 import { FORM, LINES, TOKENS } from './plane.mjs'
 import { contrast, dataRows, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
+import { ringPainted, stackedState, tabbedOnto } from './stacked.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -126,15 +128,14 @@ export function workspaceJourney(plane, { check }, run) {
         )
       },
     ],
+    stackedState({ check }),
     [
       'Records, side by side',
       async (page) => {
-        await page
-          .getByRole('navigation', { name: 'Forms' })
-          .getByRole('link', { name: `Order ${FORM}`, exact: true })
-          .click()
-        await answered(records(page), /^Rows 1–/)
-        check('a form chosen: the keyboard is on its heading', await focusedOn(page, page.getByRole('heading', { level: 2, name: `Order ${FORM}` })))
+        // A phone arrives in Separate views (UX-SPEC D14), every other window
+        // in Stacked (0145); the journey goes on side by side, which a narrow
+        // window draws stacked.
+        await page.getByRole('radio', { name: 'Side by side', exact: true }).check()
         // Shift and an arrow on a header is AG Grid's way to move a column. It
         // moves by where the header is drawn, which jsdom does not lay out, so
         // only here does a movable column show (0047): the columns stay the
@@ -186,8 +187,6 @@ export function workspaceJourney(plane, { check }, run) {
           first.problem ??
             (first.first && first.cut === 0 ? null : `on the first cell: ${String(first.first)}; ${String(first.cut)} px of it outside the grid's well`),
         )
-        // A phone arrives in Separate views (UX-SPEC D14); the journey starts side by side, which a narrow window draws stacked.
-        await page.getByRole('radio', { name: 'Side by side', exact: true }).check()
         // Where the separator is drawn, a pointer moves it, within its limits, and the share is kept for the viewer.
         const split = page.getByRole('separator', { name: 'Records' })
         if (await split.isVisible()) {
@@ -210,6 +209,13 @@ export function workspaceJourney(plane, { check }, run) {
           await page.keyboard.press('End')
           await page.keyboard.press('Home')
           await page.keyboard.press('ArrowRight')
+          // Its focus ring over the record's glass, which the document draws after it, the keyboard brought onto it by Tab (0145).
+          await tabbedOnto(page)
+          const ring = await ringPainted(page, split)
+          check(
+            "Side by side: the split's focus ring is drawn over the record's glass",
+            ring.problem ?? (ring.ratio <= 1.1 ? null : `painted ${String(ring.ratio)}:1 against the ring's colour`),
+          )
 
           // Letting go of the separator fits the grids' columns again, to the
           // rows shown then (the person's decision of 2026-10-10). Sized to the

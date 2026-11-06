@@ -11,8 +11,8 @@ import { FormsNav } from './forms-nav.js'
 import { GuardContext, useGuard } from './guard.js'
 import { arrival } from './layout.js'
 import type { Layout, Place, View } from './layout.js'
-import { browserStorage, readRenderer, readSplit, writeRenderer, writeSplit } from './prefs.js'
-import type { RendererChoice } from './prefs.js'
+import { browserStorage, readLayout, readRenderer, readShare, writeLayout, writeRenderer, writeShare } from './prefs.js'
+import type { Axis, RendererChoice, Shares } from './prefs.js'
 import type { SignedIn } from './sign-in.js'
 import { UnsavedNotice } from './unsaved-notice.js'
 import { OwnViewsScope } from './use-own-views.js'
@@ -40,15 +40,20 @@ type Opened =
  * The host page's workspace (0047), the chunk loaded after sign-in, AG Grid
  * with it: the Forms the person may read, and the open form in main. It
  * holds what spans forms -- the address, the layout, the renderer choice,
- * the split, and the unsaved-changes guard -- and FormView holds one form.
+ * the shares of Side by side's split and Stacked's line, and the
+ * unsaved-changes guard -- and FormView holds one form.
  * Forms lists, below the groups, the forms linked to the one open, once its
  * definition has answered (0144).
  *
  * The address is `#form=…&layout=…&view=…` and never a record (layout.ts):
  * choosing a form and changing the view in Separate views push an entry, a
  * layout change replaces it, and Back, Forward or a typed fragment go
- * through the guard (address.ts). A form's definition that answers after
- * another form was chosen is dropped, a refusal included.
+ * through the guard (address.ts). A layout the person chooses in the
+ * Layout group is kept for the viewer, and an arrival whose address names
+ * none opens in it (0145); a layout the page moves to -- Drill down, as a
+ * lookup's Open goes a level below -- or an address names is not kept. A
+ * form's definition that answers after another form was chosen is dropped,
+ * a refusal included.
  */
 export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignOut: () => void }): ReactElement {
   const { client, menu } = signedIn
@@ -59,13 +64,18 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   const narrow = useMedia('(max-width: 56rem)')
   const phone = useMedia('(max-width: 40rem)')
   const [first] = useState(() =>
-    arrival({ hash: window.location.hash, menu: ids, phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches }),
+    arrival({
+      hash: window.location.hash,
+      menu: ids,
+      phone: typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 40rem)').matches,
+      kept: readLayout(storage),
+    }),
   )
   const [place, setPlaceState] = useState<Place>({ form: null, layout: first.layout, view: 'records' })
   const placeRef = useRef(place)
   const [opened, setOpened] = useState<Opened | null>(null)
   const [renderer, setRenderer] = useState<RendererChoice>(() => readRenderer(storage))
-  const [split, setSplit] = useState(() => readSplit(storage))
+  const [shares, setShares] = useState<Shares>(() => ({ width: readShare(storage, 'width'), height: readShare(storage, 'height') }))
   const formsHeading = useRef<HTMLHeadingElement>(null)
   const formHeading = useRef<HTMLHeadingElement>(null)
   const signOutRef = useRef<HTMLButtonElement>(null)
@@ -146,12 +156,20 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   // Back, Forward, and a fragment typed into the address bar.
   const historyView = useAddressRequests({ guard, ids, menuEntry, openForm, setPlace, placeRef, history })
 
-  /** A layout chosen replaces the entry, on the records -- or, entering Drill down, on the level the form says (0090). */
-  const changeLayout = (layout: Layout, at: { view: View; level?: number } = { view: 'records' }): void => {
+  /**
+   * A layout replaces the entry, on the records -- or, entering Drill down,
+   * on the level the form says (0090) -- and is kept for the viewer where
+   * the person `chose` it in the Layout group (0145).
+   */
+  const changeLayout = (layout: Layout, at: { view: View; level?: number } = { view: 'records' }, chose = false): void => {
     const next: Place = { ...placeRef.current, layout, view: at.view, level: at.level }
     setPlace(next)
     write(next, false)
+    if (chose) writeLayout(storage, layout)
   }
+
+  /** A line moved: its share, and the other line's left where it was. */
+  const moveShare = (axis: Axis, share: number): void => setShares((now) => ({ ...now, [axis]: share }))
 
   /** A view chosen pushes an entry; one the page moves to by itself -- the records after a delete -- replaces it. In Drill down, `level` is the level the record view shows. */
   const changeView = (view: View, replace = false, level?: number): void => {
@@ -204,14 +222,14 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
                 narrow={narrow}
                 phone={phone}
                 renderer={renderer}
-                split={split}
+                shares={shares}
                 notice={guard.pending === null ? null : <UnsavedNotice pending={guard.pending} onKeep={guard.keep} onDiscard={guard.discard} />}
                 headingRef={formHeading}
                 onLayout={changeLayout}
                 onView={changeView}
                 onRenderer={chooseRenderer}
-                onSplit={setSplit}
-                onSplitSettled={(share) => writeSplit(storage, share)}
+                onSplit={moveShare}
+                onSplitSettled={(axis, share) => writeShare(storage, axis, share)}
                 childFormsOf={childrenFor}
                 formOf={formOf}
               />

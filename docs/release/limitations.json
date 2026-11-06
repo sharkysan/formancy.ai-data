@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:d2b172088e0fc596e512210d03b05dcbd568f08193b06ccb9740a5f9c6a9d488",
+      "reviewed": "sha256:c83d0b1a7b10138188e6e05259c2a5aab40f9af87b343595565e8c9e7dcfb127",
       "limitations": [
         {
           "area": "host",
@@ -2829,7 +2829,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:17f6fbb6eb548b17d66f0d35416dd7099f00ce4fa264e0de754f0d30ccdb28fb",
+      "reviewed": "sha256:2a3f95dc0af2e72a4bc61d4322aac879541f3fed68316759c6008d69e71bb867",
       "limitations": [
         {
           "area": "host",
@@ -4066,6 +4066,48 @@
         {
           "area": "host",
           "says": "On a window narrower than 80rem, Find a form and each group's heading take room in the band of tabs above the form, which wraps onto more rows for a long menu, so the form starts lower than it did."
+        }
+      ]
+    },
+    "0145": {
+      "reviewed": "sha256:cccc8cf35b8fb5210a2d2193af740b94621da565cb261c0971c2c48d4bb53ef2",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A person arriving on the host page with no layout in the address and none kept sees Stacked, the records above the record, where a wide window arrived Side by side before.",
+          "heldBy": "apps/host/src/layout.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "In Stacked the host page's Records panel is as tall as its line's share of the window's height even when its page holds two rows or none, and scrolls inside itself where that is shorter than its toolbar and the grid's least, as on a phone held upright."
+        },
+        {
+          "area": "host",
+          "says": "In a window about 30.5rem tall or less, a phone on its side or a laptop at 200%, Stacked has no line and cannot share its height: the Records panel is as tall as what it holds.",
+          "heldBy": "apps/host/src/split.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Stacked's line is a share of the window's height, so at its highest the record's top can be below the window, and below a window 80rem wide the record's heading need not show under it; its limits and default are worked out from the stylesheets' heights, not measured, and do not follow a toolbar that wraps onto more rows.",
+          "heldBy": "apps/host/src/prefs.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Stacked's line takes the pointer on a phone too: a scroll begun with a finger on it moves the line instead."
+        },
+        {
+          "area": "host",
+          "says": "The layout a person chooses is kept in each viewer's browser, as the renderer choice and the two lines' shares are, so a shared machine keeps the last viewer's, and a browser narrowed to a phone's width opens in the layout kept there rather than in Separate views.",
+          "heldBy": "apps/host/src/layout.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "Drill down kept opens on its records, its levels gone; Drill down entered by a lookup's Open is not kept, so the next arrival opens in the layout chosen before.",
+          "heldBy": "apps/host/src/open-lookup.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Side by side's split still draws a share kept in a wider window as kept, past a narrower window's limits, until it is moved; Stacked's line is drawn inside them."
         }
       ]
     }

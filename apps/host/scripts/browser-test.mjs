@@ -118,6 +118,16 @@
 //     within its limits and the share is kept, and letting it go fits the
 //     grids' columns to the rows shown then -- a column a search filled
 //     with a longer value is cut before and whole after (0047);
+//   - Stacked's line (0145): a window arrives in Stacked with no layout
+//     kept, a phone in Separate views; the line is drawn across at every
+//     width, 320 pixels among them, Down moves it a step and Home and End
+//     to its limits with the keyboard staying on it, the Records panel is
+//     as tall as it says of the window's height, and a pointer drags it
+//     within its limits and the share is kept; its focus ring, and the
+//     split's, is painted over the record's glass beside it, not under it;
+//     and in a window 844 by 390 pixels, a phone on its side, too short for
+//     the line to move, Stacked draws none and the Records panel is as tall
+//     as what it holds, measured as every state is;
 //   - the papers are the theme's and the grids their theme's: no rule of
 //     host.css selects anything on either form or in either grid;
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,
@@ -156,7 +166,8 @@
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
 // CSV's, the filter's, the views', the columns', Drill down's, a customer
-// list that goes on, and the policy's allowance.
+// list that goes on, Stacked's line and the short window, and the policy's
+// allowance.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -195,6 +206,7 @@ import { audit, decide, describeFocus, focusedOn, focusScroll, measureWidth } fr
 import { moreJourney } from './browser/more.mjs'
 import { startPlane } from './browser/plane.mjs'
 import { DIST, POLICY, serve } from './browser/serve.mjs'
+import { SHORT, shortJourney } from './browser/stacked.mjs'
 import { widths } from './browser/styles.mjs'
 import { viewJourney } from './browser/viewing.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
@@ -352,6 +364,25 @@ async function run(gate, browser) {
         await page.close()
       }
     }
+    // A window too short for Stacked's line to move (0145), one pass of its
+    // own: the states where it signs in and arrives on the orders, each
+    // measured as every state is, at its height and not 900.
+    gate.pass({ label: SHORT.label, width: SHORT.width })
+    stage = `measuring the pass ${SHORT.label}`
+    const short = await browser.newPage({ viewport: { width: SHORT.width, height: SHORT.height } })
+    const shortGuard = await guardRequests(short, { origins: [`http://127.0.0.1:${String(hop.port)}`], refuseFonts: false })
+    await hearPolicy(short)
+    try {
+      await short.goto(`http://127.0.0.1:${String(hop.port)}/`, { waitUntil: 'load' })
+      console.log(`\n${SHORT.label} -- ${String(SHORT.width)}x${String(SHORT.height)}`)
+      for (const [state, act] of shortJourney(gate)) {
+        await act(short)
+        await measured(short, state)
+      }
+      await afterEveryPass(gate, short, { dist: DIST, refused: false, guard: shortGuard })
+    } finally {
+      await short.close()
+    }
     stage = 'checking what the passes measured, and the policy’s allowance'
     // Every pass held the row its lost create reached; the run, the row the
     // browser takes when it can choose, which for Chromium and Firefox is
@@ -385,7 +416,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, columns, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, columns, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

@@ -18,6 +18,33 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The host page's layout is the person's: Stacked first, its height
+  shared by a line they move, and the layout they chose kept** (0145).
+  Why: the design of finding records has a person see the grid above and
+  the record below first, with a line between them to share the height by
+  a drag or the keyboard, and Side by side one switch away, remembered;
+  Stacked had no line, its grid capped at half the window, and a layout
+  chosen lasted only as long as the address that named it. What you
+  notice: with no layout in the address and none kept, a wide window opens
+  in Stacked rather than Side by side, a phone still in Separate views.
+  Between the Records panel and the record in Stacked is a line, a
+  separator named Records: drag it, or press Down and Up to move it five
+  percent of the window's height and Home and End to its limits, which
+  leave the records at least 18rem and, in a window wider than 80rem, the
+  record's heading in view below it. The Records panel is as tall as the
+  line says, its grid filling it however few rows the page holds, and the
+  line's place is kept in your browser apart from Side by side's split.
+  In a window about 30.5rem tall or less, a phone on its side or a laptop
+  at 200%, the line has no room to move and is not drawn: Stacked is as it
+  was, the Records panel as tall as what it holds. Both lines now draw
+  their focus ring over the glass beside them and a real border that
+  forced colours keep, and say they control the Records panel. The layout you
+  choose in the Layout group is kept too, Drill down among them, and a
+  page opened without a layout in its address opens in it; an address that
+  names a layout still opens that one and changes nothing kept, and Drill
+  down reached by a lookup's Open is not kept. The limits and the default,
+  60, are worked out from the stylesheets' heights, not measured, and a
+  scroll begun with a finger on the line moves the line.
 - **The host page lists its forms by group, with a search and the forms
   linked to the open one** (0144). Why: Forms was one list in the order of
   the forms' ids, read from the top, and the forms an order's fields lead

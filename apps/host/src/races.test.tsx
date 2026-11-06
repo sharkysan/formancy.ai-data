@@ -219,7 +219,7 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
         .getAttribute('aria-current'),
     ).toBe('page')
     // Read from the browser's location: the address is not the page's tree.
-    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=side-by-side&view=records`)
+    expect(window.location.hash).toBe(`#form=${engine.formId}&layout=stacked&view=records`)
   })
 
   // The same refusal, for the form still chosen, is what main says: its

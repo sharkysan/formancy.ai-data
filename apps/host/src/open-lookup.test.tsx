@@ -21,6 +21,7 @@ import {
   unsavedNotice,
 } from './test-host.js'
 import type { RendererName, User } from './test-host.js'
+import { PREFERENCES } from './prefs.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
@@ -37,9 +38,9 @@ import type { Engine, Plane } from './test-plane.js'
  * employee form is over.
  *
  * Found by role and accessible name. What the accessibility tree cannot
- * answer is read off the DOM, each where it is made: `location.hash`, which
- * is the browser's; and the crumb that is the page, by `aria-current`,
- * which the tree gives no role of its own.
+ * answer is read off the DOM, each where it is made: `location.hash` and
+ * `localStorage`, which are the browser's; and the crumb that is the page,
+ * by `aria-current`, which the tree gives no role of its own.
  */
 
 let plane: Plane
@@ -88,7 +89,7 @@ async function lineOf(engine: Engine, notes: string, date: string = EDGES.orderD
   return { order, line: line.value.record }
 }
 
-/** The page signed in as tenant 1's clerk, the order line form chosen in Side by side, and `renderer` alone drawing it. */
+/** The page signed in as tenant 1's clerk, the order line form chosen in Stacked, where it arrives (0145), and `renderer` alone drawing it. */
 async function lines(engine: Engine, renderer: RendererName): Promise<User> {
   const user = mount(plane.fetch)
   await signIn(user, TOKENS.clerk)
@@ -180,14 +181,14 @@ function listed(notice: HTMLElement): string[] {
 
 describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
   describe.each(RENDERERS)('in %s', (renderer) => {
-    // A line's order opens below the line, in the form chosen, from Side by
-    // side, which becomes Drill down: the trail names the line and the
+    // A line's order opens below the line, in the form chosen, from Stacked,
+    // which becomes Drill down: the trail names the line and the
     // order, and its first crumbs lead back up to the line as it was left,
     // its typing kept -- the level above is never read again. Opened in
     // the other order form, the order is that form's, which this clerk may
     // only read. Without the addition, no pane offered an Open (to be
     // watched failing in CI with the record's panes given no offer, and
-    // with Open from Side by side left in it: the address said no level).
+    // with Open from Stacked left in it: the address said no level).
     test("a line's order opens below the line in either order form, and the trail leads back up", async () => {
       const words = stamp('open')
       const { order, line } = await lineOf(engine, words)
@@ -267,8 +268,29 @@ describe.each(ENGINES)('Open under a lookup on $engine', (engine) => {
       ARRIVES,
     )
     expect(focusedName()).toBe(`Open in Order (${engine.formId})`)
-    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Side by side' }).checked).toBe(true)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).toBeNull()
+  })
+
+  // Drill down reached by Open is where the record went, not a layout the
+  // person chose (0145): it is not kept, so the next arrival with no layout
+  // in its address opens where it would have -- in Stacked, nothing chosen
+  // -- rather than in Drill down's records, the levels gone (to be watched
+  // failing in CI with every layout the page moves to kept as chosen).
+  test('Open into Drill down keeps no layout for the next arrival', async () => {
+    const { order, line } = await lineOf(engine, stamp('open-kept'))
+    const user = await lineLoaded(engine, 'React', line)
+    await user.click(await waitFor(() => within(recordPane('React')).getByRole('button', { name: `Open in Order (${engine.formId})` }), ARRIVES))
+    await waitFor(() => expect(focusedName()).toBe(`Order ${order}`), ARRIVES)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Drill down' }).checked).toBe(true)
+    expect(localStorage.getItem(PREFERENCES.layout)).toBeNull()
+    cleanup()
+
+    window.history.replaceState(null, '', '/')
+    const again = mount(plane.fetch)
+    await signIn(again, TOKENS.clerk)
+    await chooseForm(again, engine.lines)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
   })
 
   // The record the level below holds, opened the same way again, is shown

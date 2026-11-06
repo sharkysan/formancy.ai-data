@@ -447,17 +447,59 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
 .split {
   align-self: stretch;
   position: sticky;
+  /* Over the glass on either side, which paints after it: its focus ring
+     too (0145). */
+  z-index: 1;
   top: 7.5rem;
   height: calc(100dvh - 8.25rem);
   min-height: 7rem;
   border-radius: 999px;
-  background: linear-gradient(var(--edge-strong), var(--edge-strong)) center / 2px 100% no-repeat;
   cursor: col-resize;
   touch-action: none;
 }
 
-.split:hover {
-  background-image: linear-gradient(var(--client), var(--client));
+/* The line itself is a real border, 2px down its middle, so forced colours
+   draw it in their own colour (0145). */
+.split::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 calc(50% - 1px);
+  border-inline-start: 2px solid var(--edge-strong);
+}
+
+.split:hover::before {
+  border-inline-start-color: var(--client);
+}
+
+/* Stacked, where its line is drawn: the records above the record, the
+   Records panel as tall as the viewer's share of the window's height
+   (records.css), and the line between them, which is the gap -- across the
+   lanes, a 2px border in a band as tall as the gap was, over the glass
+   above and below it, its focus ring too, and drawn by forced colours
+   (0145). In a window too short for it to move, the page draws no line,
+   and Stacked is as it was before it. */
+.lanes[data-line='height'] {
+  row-gap: 0;
+}
+
+.stack-line {
+  position: relative;
+  z-index: 1;
+  height: 0.75rem;
+  border-radius: 999px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.stack-line::before {
+  content: '';
+  position: absolute;
+  inset: calc(50% - 1px) 0 auto;
+  border-block-start: 2px solid var(--edge-strong);
+}
+
+.stack-line:hover::before {
+  border-block-start-color: var(--client);
 }
 
 .detail {
