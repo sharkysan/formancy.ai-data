@@ -84,7 +84,8 @@ existed would be documented and inert.
   could run each one, naming a view it could not. It may name the group
   its form is listed under, `group`, text of at most 80 characters or
   `null` for none (0143); every read checks its shape, and publish refuses
-  the default, the root schema's name in words, spelled out. Reads
+  the default spelled out: the root schema's name in words, or none for
+  the engine's own default schema, `public` or `dbo`. Reads
   do check what the stored request alone decides — its title, root,
   confirmed version column, pins over written fields and lookups — against
   the base and bindings, because a regeneration generates from that request;
@@ -432,7 +433,8 @@ existed would be documented and inert.
   every published form whose policy lets this person read, in codepoint
   order of its id, with its title, its group -- its presentation's, or its
   root schema's name in words where the presentation, or a format-1
-  version, names none, `null` where it was cleared
+  version, names none, `null` where it was cleared or where the schema is
+  the engine's own default
   ([0143](../../docs/decisions/0143-a-form-is-listed-in-a-group.md)) --
   the operations the policy grants of
   what it offers as published -- what `GET /v1/forms/:id` starts from

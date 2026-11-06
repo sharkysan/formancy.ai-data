@@ -25,14 +25,20 @@ the same day (formancy.ai 0232).
   alone. What you notice: each entry of `GET /v1/forms` names its `group`
   -- the root table's schema in words, "Sales" for `sales`, "Order entry"
   for `order_entry`, unless its presentation names another, or `null`
-  where it names none -- still without a statement to any database. A
-  version published before groups, or before presentations, is listed
-  under its schema's words. The studio's Presentation step ends with Group,
-  a box showing what the form will be listed under, the default until you
-  type another, and No group; a group is at most 80 characters, and the
-  publish leaves the default out, which the server refuses spelled out, as
-  it refuses an empty group. A draft's reviewer is shown the group. On SQL
-  Server, forms over `dbo` are listed under "Dbo" until you type one.
+  where it names none -- still without a statement to any database. A form
+  over the engine's own default schema, `public` on PostgreSQL or `dbo` on
+  SQL Server, is in no group, since that schema names nothing a person
+  reads as one; nor is one whose schema's words hold no letter or digit.
+  The default is worked out on every read, so forms already published,
+  before groups or before presentations, get theirs on the upgrade with no
+  publish. It words a schema as generation words a label, so `HR` reads
+  "Hr", `HRData` "Hrdata" and `Verkäufe` "Verk ufe": type the group where
+  that reads wrong. The studio's Presentation step ends with Group, a box
+  showing what the form will be listed under, the default until you type
+  another, and No group, which Undo does not take back; a group is at most
+  80 characters, and the publish leaves the default out, which the server
+  refuses spelled out, as it refuses an empty group. A draft's reviewer is
+  shown the group, "(the default)" after it where the draft names none.
   `@formancy/data-client` reads a menu without groups as `unexpected`, and
   an earlier server refuses a version with one, so upgrade the server
   before the client. The host page does not draw the groups yet.

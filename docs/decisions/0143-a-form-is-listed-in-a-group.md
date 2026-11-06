@@ -5,9 +5,19 @@
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/presentation/group.test.ts`
   -- the default is the root schema's name in words, "Sales" for `sales`
-  and "Order entry" for `order_entry`, and no group for a schema with no
-  words in it (watched failing with the schema's name returned as it is:
-  `sales` was the default); a group is read by shape, words of at most
+  and "Order entry" for `order_entry`, on both engines (watched failing
+  with the schema's name returned as it is: `sales` was the default); no
+  group for a schema whose words hold no letter or digit, `---`, `_` or
+  spaces (watched failing with `labelFor`'s answer taken as words whatever
+  it held: "---" was the default); no group for the engine's own default
+  schema, `public` on PostgreSQL and `dbo` on SQL Server, as each catalog
+  spells it, while "Public" on PostgreSQL, `DBO` on SQL Server and each
+  engine's default on the other are worded as any schema (watched failing
+  with the default schema worded as any other: `public` was "Public");
+  acronyms read as words and a letter outside A-Z splits its word, `HR`
+  "Hr" and `Verkäufe` "Verk ufe", held so the costs below stay true
+  (watched failing with the schema's name returned as it is: `HR` was
+  "HR"); a group is read by shape, words of at most
   `GROUP_LIMIT` or `null`, an empty or blank one refused (watched failing
   with the shape left unasked: `""` was read as a group); the default
   spelled out is refused at a write (watched failing with every group let
@@ -18,7 +28,9 @@
   names its group: the presentation's, `null` where it was cleared, the
   default where the presentation says nothing (watched failing with the
   presentation's group read alone: the employees, which said nothing,
-  were in no group). `packages/data-server/src/routes/runtime-menu.test.ts`
+  were in no group), and no group over the bundle's own engine's default
+  schema, each worded on the other engine (watched failing with the
+  engine fixed to PostgreSQL: `dbo` on SQL Server was "Dbo"). `packages/data-server/src/routes/runtime-menu.test.ts`
   -- the route reads a format-2 version's group, and gives one whose
   presentation says nothing, and a format-1 version, the default, asking
   no database (watched failing with the presentation left unread by the
@@ -45,9 +57,10 @@
   -- the Group region holds its box and No group and nothing else, so the
   step still offers nothing that could break a binding (watched failing
   with a stray button put there). `apps/studio/src/review.test.tsx` -- a
-  draft's reviewer is shown its group, No group for one cleared, and
-  nothing where it keeps the default (watched failing with the group left
-  out of the draft's view). On both engines, needing Docker:
+  draft's reviewer is shown its group, No group for one cleared, and the
+  default followed by "(the default)" where its presentation says nothing
+  (watched failing with the group left out of the draft's view; and with
+  nothing said for the default: the third draft named no group). On both engines, needing Docker:
   `packages/data-client/src/forms.integration.test.ts` and
   `apps/live-demo/src/image/publish.integration.test.ts` hold each form of
   the fixture and of the demonstration's image under "Sales" (to be
@@ -72,7 +85,8 @@ The menu reads each bundle alone and asks no database, so whatever names a
 form's group has to be in its bundle. What an administrator chooses over
 the generated form is its presentation
 ([0030](0030-presentation-is-a-patch-over-the-generated-base.md)), and
-what a form is about is, for most databases, the schema its table is in.
+what a form is about is, in a database that sorts its tables into
+schemas, the schema its table is in.
 
 This record is the group's data: the presentation, the menu, the client's
 check and the studio's control. The host's list is the next.
@@ -85,8 +99,21 @@ for no group. Left out, the form is listed under **the default: its root
 schema's name in words**, as generation words a column's label
 (`labelFor`): `sales` is "Sales", `order_entry` and `OrderEntry` are
 "Order entry". Where those words would be no group an administrator could
-type -- a schema named with spaces or punctuation alone, or one past the
-limit in words -- the default is no group.
+type -- words holding no letter or digit, as `labelFor` hands back `---`
+or `_`, or past the limit -- the default is no group.
+
+**The engine's own default schema gives no group**: `public` on
+PostgreSQL, `dbo` on SQL Server, read from the snapshot's `kind`. It is
+where a table goes when nobody chose a schema, so it names nothing a person
+reads as a group; a database whose tables are all in it has its forms in
+no group rather than under one heading that says "Public" or "Dbo". It is
+matched exactly as each catalog spells it: PostgreSQL folds an unquoted
+name to lower case, so the schema it creates is `public` and a "Public" is
+another someone quoted; SQL Server's catalog spells its built-in schema
+`dbo` whatever the database's collation, which discovery reads from
+`sys.schemas` as it is stored, so a `DBO` it reports is another schema,
+one only a case-sensitive collation can hold apart from `dbo`. Each is
+worded as any other schema on the other engine.
 
 **Its shape is read on every read** of a version, as the rest of the
 presentation is: `null`, or words a person can read, with no space at
@@ -120,26 +147,41 @@ whose entry has no `group`, or one that is neither text nor `null`, as
 
 **The studio edits it** in the Presentation step, after the state labels:
 a region "Group" with one box, "Group", that shows the group the form will
-be listed under -- the default until another is typed -- and No group,
-which empties it. An empty box is no group. What is kept is the words
+be listed under -- the default until another is typed, empty where that is
+no group -- and No group, which empties it. An empty box is no group. What is kept is the words
 without the spaces around them; a group the server would refuse
 otherwise, past its length or holding a control character, is refused in
 the box, in words, and the form keeps the group it had. The publish leaves
 the group out where it is the default. Generate again and a regeneration
 keep it, and a draft's reviewer is shown it -- No group for one cleared,
-and nothing where it is the default, which the presentation leaves out.
+and the default followed by "(the default)" where the presentation leaves
+it out, since approving that moves a form whose version named another
+back to the default.
 
 ## Consequences
 
 **What it buys.** Every published form has a group without an
-administrator doing anything, the one its schema gives it; an
-administrator who wants another types it once; and the host's list can
-draw headings from the menu alone, still without a statement.
+administrator doing anything, the one its schema gives it, and since the
+default is worked out on every read, forms published before this release
+get theirs on the upgrade, with no publish; an administrator who wants
+another types it once; and the host's list can draw headings from the
+menu alone, still without a statement.
 
 **What it costs.**
-- A schema's name is not always a word anybody uses: on SQL Server most
-  tables are in `dbo`, and every form over them is listed under "Dbo"
-  until an administrator types a group for each.
+- Most real tables are in the engine's own default schema, `public` or
+  `dbo`, and every form over them is in no group until an administrator
+  types one for each.
+- The default words a schema as generation words a label, with what that
+  gets wrong, which is generation's own behaviour for labels too and is
+  not fixed here; measured with the built `@formancy/data-core` on
+  2026-11-06: an acronym reads as a word -- `HR` "Hr", `CRM` "Crm",
+  `HRData` "Hrdata" -- and a letter outside A-Z splits the word it is in
+  and is dropped -- `Verkäufe` "Verk ufe". In either case the
+  administrator types the group.
+- The default shows every person who may read the form its schema's name,
+  in words. Weak news: the option-source name of each lookup in the
+  published form a reader is served already holds the schema
+  (`sourceNameFor`: connection, schema, table and foreign key).
 - A group is one text, not one for each language a form is shown in.
 - A group is the form's alone, not a thing of its own: renaming one is an
   edit and a publish of every form in it, and two forms that spell it
@@ -152,6 +194,10 @@ draw headings from the menu alone, still without a statement.
   default out, does not send.
 - A group past 80 characters is refused, and a schema whose name past 80
   characters in words is the default lists its forms under no group.
+- The studio's Undo does not undo No group, as it does not undo a list
+  view or a state label: the session's history holds the form's document,
+  and the group is not part of it. Typing the default the box's hint
+  names is the way back.
 - A server of an earlier release refuses a version whose presentation
   names a group, and this release's `@formancy/data-client` reads an
   earlier server's menu as `unexpected`, so a host upgrades its server

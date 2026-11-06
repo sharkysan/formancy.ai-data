@@ -188,7 +188,8 @@ moment can both succeed, and nothing deletes a draft (0065).
    ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md))
    -- and the group each is listed under: its presentation's, or its root
    schema's name in words where the presentation, or a format-1 version,
-   says nothing (`presentation/group.ts`,
+   says nothing, and none over its engine's own default schema
+   (`presentation/group.ts`,
    [0143](../decisions/0143-a-form-is-listed-in-a-group.md)).
    No database is asked
    ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),

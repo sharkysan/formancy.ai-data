@@ -3989,11 +3989,16 @@
       ]
     },
     "0143": {
-      "reviewed": "sha256:7e43238237e9c4d95d93071353545cae499eaa6ed8d3c266eea5d1b819789927",
+      "reviewed": "sha256:476d15fe5d472dcde82173b4d72ef7ca8ce65f77fcc84729ee9dbd0e5b3ee802",
       "limitations": [
         {
           "area": "studio",
-          "says": "A form's group is its root schema's name in words until an administrator types another, so on SQL Server, where most tables are in dbo, every such form is listed under \"Dbo\".",
+          "says": "A form over the engine's own default schema, public on PostgreSQL or dbo on SQL Server, where most tables are, is in no group until an administrator types one for it.",
+          "heldBy": "packages/data-core/src/presentation/group.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "The default group words a schema as generation words a label: an acronym reads as a word, HR as \"Hr\", CRM as \"Crm\" and HRData as \"Hrdata\", and a letter outside A-Z splits its word and is dropped, Verkäufe as \"Verk ufe\", so an administrator types the group.",
           "heldBy": "packages/data-core/src/presentation/group.test.ts"
         },
         {
@@ -4005,8 +4010,16 @@
           "says": "The default group is worded from the schema's name at every read, not stored, so a later release that words an identifier otherwise moves every form whose presentation names no group, without a publish."
         },
         {
+          "area": "forms",
+          "says": "The default group shows every person who may read a form its schema's name in words, which the form's lookup option-source names already hold."
+        },
+        {
           "area": "studio",
-          "says": "A group is at most 80 characters, and a schema whose name in words is longer, or has no letter or digit in it, lists its forms under no group until an administrator types one.",
+          "says": "The studio's Undo does not undo No group, as it does not undo a list view or a state label: typing the default its hint names is the way back."
+        },
+        {
+          "area": "studio",
+          "says": "A group is at most 80 characters, and a schema whose name in words is longer, or holds no letter or digit, lists its forms under no group until an administrator types one.",
           "heldBy": "packages/data-core/src/presentation/group.test.ts"
         },
         {

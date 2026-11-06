@@ -265,14 +265,16 @@ A presentation may name the group a list of forms puts the form under
 ([0143](../../docs/decisions/0143-a-form-is-listed-in-a-group.md)):
 `group`, text or `null` for no group, and left out for the default, the
 root schema's name in words as `labelFor` words a label -- `sales` is
-"Sales", `order_entry` "Order entry".
+"Sales", `order_entry` "Order entry" -- or no group for the engine's own
+default schema, `public` on PostgreSQL and `dbo` on SQL Server, matched as
+each catalog spells it, and for words holding no letter or digit.
 
 ```ts
 import { defaultGroup, formGroup, GROUP_LIMIT, groupProblems } from '@formancy/data-core'
 
-defaultGroup(bindings.root) // "Sales"; null where the schema's words are no group a person could type
-formGroup(presentation.group, bindings.root) // what the menu names: the presentation's, else the default
-groupProblems(presentation.group, bindings.root) // at a write: the default spelled out is refused, "leave it out"
+defaultGroup(bindings.root, snapshot.kind) // "Sales"; null for public or dbo, or words that are no group a person could type
+formGroup(presentation.group, bindings.root, snapshot.kind) // what the menu names: the presentation's, else the default
+groupProblems(presentation.group, bindings.root, snapshot.kind) // at a write: the default spelled out is refused, "leave it out"
 ```
 
 Every read checks its shape: `null`, or words with no space at either
@@ -574,8 +576,9 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
   there, for the caller to leave out -- and `formMenu(forms)` names, in
   codepoint order, every one whose policy lets this person read, with
   its group -- the bundle's `group`, which the caller takes from the
-  presentation, or the root schema's name in words where it gives none
-  (`formGroup`, 0143) -- with
+  presentation, or the root schema's name in words where it gives none,
+  none over the snapshot's engine's own default schema (`formGroup`,
+  0143) -- with
   `grantedOperations` -- what the policy grants of what the form offers
   as published, the part of `GET /v1/forms/:id`'s answer that asks no
   database -- and the children under each, comparing only what

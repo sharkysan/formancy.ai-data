@@ -402,9 +402,10 @@ until then the address is formancy.ai's 404
   other, each with the forms whose rows a page may list below one of its
   records, derived from the published forms' foreign keys and types without
   a statement to any database, and the group it is listed under -- its
-  root schema's name in words, "Sales", unless its presentation names
-  another or none; the host page draws them as its menu of forms, not yet
-  grouped, and an open record's child rows in tabs beside it
+  root schema's name in words, "Sales", or none for the engine's own
+  default schema, `public` or `dbo`, unless its presentation names another
+  or none; the host page draws them as its menu of forms, not yet grouped,
+  and an open record's child rows in tabs beside it
   ([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md),
   [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
   [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md),
@@ -642,12 +643,13 @@ the host page offers it by; a label of a state the moves no longer name is
 left out of the publish
 ([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
 Group, last, is the group a host's list of forms puts the form under: one
-box that shows it -- the root schema's name in words, "Sales", until
-another is typed -- and No group, which empties it. What is typed is kept
-without the spaces around it, a group past 80 characters is refused in the
-box, and the publish leaves the default out; Generate again and a
+box that shows it -- the root schema's name in words, "Sales", or empty
+for the engine's own default schema, until another is typed -- and No
+group, which empties it and which Undo does not take back. What is typed is
+kept without the spaces around it, a group past 80 characters is refused in
+the box, and the publish leaves the default out; Generate again and a
 regeneration keep the group, and a reviewer sees it under the draft's
-policy
+policy, "(the default)" after it where the draft names none
 ([0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md)).
 
 Its suite runs the real server in the test — `createDataServer` with a fake
