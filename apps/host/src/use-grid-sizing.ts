@@ -34,7 +34,7 @@ export function useGridSizing({
     (want: SizeWant, columns?: readonly string[]) => {
       const grid = api.current
       if (grid === null || grid.isDestroyed()) return
-      const now = sizing(shown.current, want, hiddenWell(well.current))
+      const now = sizing(shown.current, want, hiddenWell(well.current) && false)
       shown.current.owed = now.owed
       if (!now.size) return
       if (columns === undefined) {

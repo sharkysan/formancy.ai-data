@@ -199,8 +199,7 @@ function PaneBody({
   useEffect(() => {
     if (notice === null) return
     const focus = (): void => noticeRef.current?.focus()
-    if (toShow.current?.() === true) after(focus)
-    else focus()
+    focus()
   }, [notice, after])
 
   /**

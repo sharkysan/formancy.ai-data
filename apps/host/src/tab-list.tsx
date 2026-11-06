@@ -1,5 +1,6 @@
-import { useRef, useState } from 'react'
+import { useContext, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, ReactNode } from 'react'
+import { GuardContext } from './guard.js'
 import { tabMoved } from './tabs.js'
 
 /** One tab and its panel. */
@@ -41,7 +42,28 @@ const fresh = (start: unknown, first: string | undefined): Selection => ({ start
  * does nothing. The first panel's element is the same either way, so a row
  * arriving remounts nothing already drawn in it.
  */
-export function TabList({ idBase, labelledBy, start, tabs }: { idBase: string; labelledBy: string; start: unknown; tabs: readonly TabEntry[] }): ReactElement {
+export function TabList({
+  idBase,
+  labelledBy,
+  start,
+  tabs,
+  eager = false,
+  manual = false,
+  shownAlone = false,
+}: {
+  idBase: string
+  labelledBy: string
+  start: unknown
+  tabs: readonly TabEntry[]
+  // TEMPORARY (A): every panel drawn as the record opens.
+  eager?: boolean
+  // TEMPORARY (B): the arrows move the keyboard alone.
+  manual?: boolean
+  // TEMPORARY (H): the guard counts the forms of the tab shown alone.
+  shownAlone?: boolean
+}): ReactElement {
+  const guard = useContext(GuardContext)
+  const unguarded = useMemo(() => (guard === null ? null : { ...guard, registry: { add: () => () => true, entries: () => [] } }), [guard])
   const keys = tabs.map((tab) => tab.key)
   const [state, setState] = useState<Selection>(() => fresh(start, keys[0]))
   let now = state
@@ -68,7 +90,7 @@ export function TabList({ idBase, labelledBy, start, tabs }: { idBase: string; l
     const to = tabMoved(keys, selected, event.key)
     if (to === null) return
     event.preventDefault()
-    select(to)
+    if (!manual) select(to)
     buttons.current.get(to)?.focus()
   }
 
@@ -109,7 +131,9 @@ export function TabList({ idBase, labelledBy, start, tabs }: { idBase: string; l
             {...(many ? { role: 'tabpanel', id: panelId(n), 'aria-labelledby': tabId(n), tabIndex: 0 } : {})}
             hidden={!shown}
           >
-            {shown || now.seen.includes(tab.key) ? tab.panel(() => select(tab.key)) : null}
+            <GuardContext.Provider value={shownAlone && !shown ? unguarded : guard}>
+              {eager || shown || now.seen.includes(tab.key) ? tab.panel(() => select(tab.key)) : null}
+            </GuardContext.Provider>
           </div>
         )
       })}
