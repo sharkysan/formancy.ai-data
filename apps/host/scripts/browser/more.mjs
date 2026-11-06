@@ -33,7 +33,7 @@ import { createFormText } from '@formancy/core/words'
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
 import { FORM, TOKENS } from './plane.mjs'
 import { audit, focusedOn, until, WITHIN } from './measure.mjs'
-import { carryOn } from './workspace.mjs'
+import { carryOn, demo } from './workspace.mjs'
 
 /** What an open typeahead says over a page that goes on, in the renderer's words, with the page the source states. */
 const MORE = createFormText({ locale: '' })('options.more', { count: DEFAULT_MAX_PAGE_SIZE })
@@ -132,6 +132,7 @@ export function moreJourney(_plane, gate) {
           async () => /^Rows 1–/.test((await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? ''),
           'the third clerk’s orders were never listed',
         )
+        await demo(page, true)
         await page.getByRole('radio', { name: 'Both', exact: true }).check()
         await page.getByRole('radio', { name: 'Separate views', exact: true }).check()
         await records(page).getByRole('button', { name: 'New record' }).click()

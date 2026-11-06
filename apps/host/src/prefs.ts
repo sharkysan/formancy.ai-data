@@ -5,7 +5,8 @@ import type { Layout } from './layout.js'
  * What one viewer's browser keeps of the workspace, and nothing else: which
  * renderer draws the record, and where the split between the records and
  * the record sits (0047, the person's decisions of 2026-10-10), the layout
- * they chose last and where Stacked's line sits (0145), and for each form a
+ * they chose last and where Stacked's line sits (0145), whether the demo's
+ * controls are shown (0146), and for each form a
  * grid's columns and the list it shows, one value per kind of section
  * (0106, columns.ts). Kept in `localStorage` for that viewer alone; every
  * call is wrapped, because a browser with site data blocked throws on each
@@ -28,6 +29,7 @@ export const PREFERENCES = {
   layout: 'formancy-data-host.layout',
   split: 'formancy-data-host.split',
   stack: 'formancy-data-host.stack',
+  demo: 'formancy-data-host.demo',
   grid: 'formancy-data-host.grid.',
 } as const
 
@@ -162,6 +164,20 @@ export function readLayout(storage: Storage | undefined): Layout | null {
 
 export function writeLayout(storage: Storage | undefined, layout: Layout): void {
   writePreference(storage, PREFERENCES.layout, layout)
+}
+
+/**
+ * Whether the demo's controls -- the renderer switch and opening by record
+ * token -- are shown (0146): closed, the default, is nothing kept, so only an
+ * open the viewer chose is.
+ */
+export function readDemo(storage: Storage | undefined): boolean {
+  return readPreference(storage, PREFERENCES.demo) === 'open'
+}
+
+export function writeDemo(storage: Storage | undefined, open: boolean): void {
+  if (open) writePreference(storage, PREFERENCES.demo, 'open')
+  else removePreference(storage, PREFERENCES.demo)
 }
 
 /**

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { chooseForm, gridSection, mount, newRecord, signIn } from './test-host.js'
+import { chooseForm, chooseRenderer, gridSection, mount, newRecord, openDemo, signIn } from './test-host.js'
 import type { User } from './test-host.js'
 import { PREFERENCES } from './prefs.js'
 import { ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -63,6 +63,7 @@ describe.each(ENGINES)("the viewer's choices on $engine", ({ formId }) => {
     await newRecord(user)
     await waitFor(() => expect(screen.getByRole('region', { name: 'React' })).toBeTruthy())
     expect(screen.queryByRole('region', { name: 'Angular' })).toBeNull()
+    await openDemo(user)
     expect(screen.getByRole<HTMLInputElement>('radio', { name: 'React' }).checked).toBe(true)
 
     await user.click(screen.getByRole('radio', { name: 'Angular' }))
@@ -78,6 +79,29 @@ describe.each(ENGINES)("the viewer's choices on $engine", ({ formId }) => {
     await waitFor(() => expect(screen.getByRole('region', { name: 'Angular' })).toBeTruthy())
     expect(screen.getByRole('region', { name: 'React' })).toBeTruthy()
     expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Both' }).checked).toBe(true)
+  })
+
+  // The demo's controls closed hide the switch and not the choice (0146):
+  // the renderer chosen draws the record with them closed, on this page and
+  // the next. That they are closed where a person arrives, and stay as the
+  // viewer left them, is demo-tools.test.tsx's and the browser gate's (to
+  // be watched failing in CI with the record drawn by the switch only while
+  // it is shown: React alone, once closed).
+  test("draws the renderer chosen with the demo's controls closed", async () => {
+    const user = await workspace(formId)
+    const disclosure = (): HTMLElement => screen.getByRole('button', { name: 'For the demo' })
+    await chooseRenderer(user, 'Angular')
+    await user.click(disclosure())
+    expect(screen.queryByRole('radio', { name: 'Angular' })).toBeNull()
+    await newRecord(user)
+    await within(await screen.findByRole('region', { name: 'Angular' }, ARRIVES)).findByRole('combobox', { name: 'Customer' }, ARRIVES)
+    expect(screen.queryByRole('region', { name: 'React' })).toBeNull()
+    cleanup()
+
+    const again = await workspace(formId)
+    await newRecord(again)
+    await within(await screen.findByRole('region', { name: 'Angular' }, ARRIVES)).findByRole('combobox', { name: 'Customer' }, ARRIVES)
+    expect(screen.queryByRole('region', { name: 'React' })).toBeNull()
   })
 
   // The separator: named by the records it sizes, 55 to 45 until moved, by

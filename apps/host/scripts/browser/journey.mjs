@@ -9,7 +9,7 @@
 // measured on the way by the gate.
 
 import { fromTheTop, lostCreate } from '../../../../scripts/browser-gate.mjs'
-import { carryOn } from './workspace.mjs'
+import { carryOn, demo } from './workspace.mjs'
 import { describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 import { rulesReaching } from './styles.mjs'
 
@@ -96,8 +96,7 @@ export function recordJourney(plane, hop, { check, measure, asked }, run) {
       'Loaded',
       async (page) => {
         await customer(page, 'React').press('Escape')
-        const disclosure = page.getByRole('button', { name: 'Open by record token' })
-        if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
+        await demo(page, true)
         await page.getByRole('textbox', { name: 'Record token' }).fill(run.record)
         await page.getByRole('button', { name: 'Load', exact: true }).click()
         await page
@@ -313,8 +312,7 @@ export function recordJourney(plane, hop, { check, measure, asked }, run) {
         // unknown create the state before left, which the page asks about and
         // the journey discards -- and copied into a new record in both
         // renderers, with the keyboard on the new record's heading.
-        const disclosure = page.getByRole('button', { name: 'Open by record token' })
-        if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
+        await demo(page, true)
         await page.getByRole('textbox', { name: 'Record token' }).fill(run.record)
         await carryOn(page, page.getByRole('button', { name: 'Load', exact: true }))
         await page

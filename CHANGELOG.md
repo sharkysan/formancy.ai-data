@@ -18,6 +18,35 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The host page says what the server did, and keeps the demo's controls
+  out of the way** (0146). Why: the design of finding records asks for a
+  page that is easy to use and fun -- the rows on screen staying, dimmed,
+  while the next page loads, so the screen never blanks, and a save or a
+  filter applied saying so in the room's teal, briefly -- and has the
+  renderer switch and Open by record token out of the way, as the demo's
+  and not a person's. AG Grid's own grid emptied itself while every page,
+  sort, search and filter was asked for, and every answer stayed teal for
+  good. What you notice: Previous rows, Next rows, a header pressed, a
+  search, a filter or a view leave the rows you were looking at on screen,
+  the grid dimmed a little after a fifth of a second, until the answer
+  replaces them; a refusal leaves them there, no longer dimmed, with the
+  server's sentence and Ask again, which asks for what was refused; after
+  a new search, filter, view or sort is refused, Previous rows and Next
+  rows wait for it, saying why, and a save or a delete lists it again
+  rather than the list on screen; and a second press of Next rows while a
+  page is asked for sends nothing. A
+  grid's line saying a page, a filter or a view applied, or a record
+  deleted, a form's line saying "Saved." or "Created record …", the View
+  picker's saying a view kept or removed, and Download CSV's saying a
+  file made are the room's teal as they are said and fade to muted after a
+  moment, changing without a transition under reduced motion; the page's
+  own sentences, a save still out and a refusal are not teal. The record's
+  header ends in one closed button, For the demo, which holds the renderer
+  switch and Record token with Load -- Open by record token is no longer a
+  disclosure of its own -- and stays as you left it in this browser; a
+  refused Load opens it to say why, and the renderer you chose draws the
+  record whether it is open or not. The getting-started guide's section 5
+  says to open it.
 - **The host page's layout is the person's: Stacked first, its height
   shared by a line they move, and the layout they chose kept** (0145).
   Why: the design of finding records has a person see the grid above and
