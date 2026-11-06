@@ -60,46 +60,45 @@
   `apps/host/src/forms-nav.test.tsx`, against the real server -- the
   clerk's forms under "Parity" and "Sales", each a list its heading
   names, and Tab from the list's heading to Find a form and then the
-  first form (to be watched failing in CI with the headings undrawn, the
+  first form (watched failing in CI with the headings undrawn, the
   groups kept); the list narrowed as the person types and the status
-  saying how many match (to be watched failing in CI with the list drawn
+  saying how many match (watched failing in CI with the list drawn
   from every form whatever was typed); Enter opening the one form that
   matches, with the keyboard on its heading and its link marked, and
-  nothing while three do (to be watched failing in CI with Enter opening
+  nothing while three do (watched failing in CI with Enter opening
   the first form that matches, however many do); Escape emptying the box
-  and keeping the keyboard in it (to be watched failing in CI with Escape
+  and keeping the keyboard in it (watched failing in CI with Escape
   in the box unhandled); Down from the box along the list and Up back to
-  it (to be watched failing in CI with Down and Up on a form unhandled);
+  it (watched failing in CI with Down and Up on a form unhandled);
   a search that finds nothing saying so, and Clear the search emptying
-  the box with the keyboard in it (to be watched failing in CI with Clear
+  the box with the keyboard in it (watched failing in CI with Clear
   the search left undrawn); the floor -- axe and a name on every control
-  -- while searching, finding nothing, and with linked forms (to be
-  watched failing in CI with the linked forms' items drawn without their
-  list); the search kept as typed after a form is chosen from it (to be
-  watched failing in CI with the box emptied whenever the open form
+  -- while searching, finding nothing, and with linked forms (watched failing in CI with the linked forms' items drawn without their
+  list); the search kept as typed after a form is chosen from it (watched failing in CI with the box emptied whenever the open form
   changes); the linked forms left whole while it narrows the groups (to
   be watched failing in CI with the linked forms narrowed by the search
   too); Escape in an empty box heard by the document, not prevented (to
   be watched failing in CI with Escape always taken by the box); and, on
   both engines, an order line's lookup naming both forms over the orders
   "where Order line’s fields lead", one of them opening as the list opens
-  it (to be watched failing in CI with every linked form's link opening
+  it (watched failing in CI with every linked form's link opening
   the first linked form), an employee naming the staff's orders once as
-  "rows that refer to Employee" and not itself (to be watched failing in
+  "rows that refer to Employee" and not itself (watched failing in
   CI with only the first child the menu names read for the linked forms,
   the employee form's own) -- the definition's `opens` and the children
   left unread would each leave the keyboard case no linked form to start
   from --, Enter over
   unsaved work asking first, Keep editing giving the keyboard back to the
-  box (to be watched failing in CI with the matching form's link handed
+  box (watched failing in CI with the matching form's link handed
   to the guard in place of the box), and a linked form chosen keeping the
   keyboard on its link in its group while it is asked for, then on its
-  heading, and Back from a linked form's link the same (to be watched
+  heading, and Back from a linked form's link the same (watched
   failing in CI with the keyboard left where the link was; first run in
   CI on 6b534f1, the case expected the keyboard to stay on the link after
   Back, which opens a form onto its heading as a choice does, and was
   put right) -- fourteen
-  breaks chosen so that each fails its own case and no other. Every other host suite finds a form's
+  breaks chosen so that each fails its own case and no other, all
+  watched failing together in one CI run (66a528d), since reverted. Every other host suite finds a form's
   link as before, by its title and id, which a linked form's name does
   not end in (`formLink` in `test-host.tsx`); the browser gate's
   `allowance.mjs`, `demo.mjs`, `drilling.mjs`, `more.mjs` and

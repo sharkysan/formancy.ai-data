@@ -173,18 +173,7 @@ export function Workspace({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         menu={menu}
         current={place.form}
         layout={place.layout}
-        linked={
-          opened?.state === 'open'
-            ? {
-                title: opened.entry.title,
-                forms: linkedForms(
-                  menu,
-                  { ...opened.entry, children: opened.entry.children.slice(0, 1) },
-                  opened.definition.opens,
-                ) /* TEMPORARY M9: only the first child the menu names read for the linked forms. */,
-              }
-            : null
-        }
+        linked={opened?.state === 'open' ? { title: opened.entry.title, forms: linkedForms(menu, opened.entry, opened.definition.opens) } : null}
         headingRef={formsHeading}
         signOutRef={signOutRef}
         onChoose={choose}
