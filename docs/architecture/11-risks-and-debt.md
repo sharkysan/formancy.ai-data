@@ -401,6 +401,18 @@ discovery holds, which the server plans again and may refuse; the trail is
 lost on a reload; and the audit names the object followed to, never the
 values
 ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+A browsed column is named in the filter line by its name lower-cased, and
+one no single word names alone -- two names that differ only in case, two
+that give one name and are both two words -- has no name and no box, so it
+is browsed and sorted but not filtered; a header box applies what was
+typed when it is left; a boolean's box says true and false where the line
+says yes and no; and a browse is filtered by the columns it shows alone,
+with no condition through a foreign key, no saved view and none taken from
+a cell
+([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
+That the studio's line keeps the host's keys is held by its suite asserting
+the host's cases one for one; a key the host's line gains and the studio's
+lacks fails nothing, and review holds it.
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached

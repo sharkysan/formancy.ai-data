@@ -13,8 +13,10 @@ import type {
 } from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
-import { FilterPanel, filterables } from './browse-filter.js'
-import type { Filterable } from './browse-filter.js'
+import { HeaderBoxes } from './browse-boxes.js'
+import { BrowseFilter } from './browse-filter.js'
+import { filterables, lineFields } from './browse-terms.js'
+import type { Filterable } from './browse-terms.js'
 import { describeRef } from './choice.js'
 import { sayCondition } from './condition-draft.js'
 import { useFocusAfterRender } from './focus.js'
@@ -75,7 +77,8 @@ function narrowedBy(asked: Asked): string {
  * foreign keys followed either way (0103), each follow a browse of the
  * other end narrowed to the row's values, with a Back to the page it left.
  * A page is filtered by the person's own conditions on its columns (0104),
- * which paging and sorting keep. Show rows asks for what its form says and
+ * typed as a line, said as chips and set in a box under each column's
+ * header (0147), which paging and sorting keep. Show rows asks for what its form says and
  * nothing of the page on screen, so it drops the filter as it drops the
  * sort; a follow starts the other end unfiltered, since the page left's
  * conditions name its own columns; and Back returns to the page as it was
@@ -103,13 +106,17 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
   // The row on the page whose related rows are open, by its place on the page.
   const [related, setRelated] = useState<number | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
-  // How many pages a move has reached: the filter's panel is mounted afresh for each.
+  // How many pages a move has reached: the filter's line, chips and boxes are mounted afresh for each.
   const [visit, setVisit] = useState(0)
   const busy = useRef(false)
   const focusAfterRender = useFocusAfterRender()
 
-  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has, when the move does not. */
-  async function load(asked: Asked, move: Move = null, focus: string | null = null): Promise<boolean> {
+  /**
+   * Asks for a page, and answers whether it arrived; `focus` names what
+   * takes the keyboard once it has, when the move does not, and `arrived`
+   * runs in the render that shows it.
+   */
+  async function load(asked: Asked, move: Move = null, focus: string | null = null, arrived?: () => void): Promise<boolean> {
     if (busy.current) return false
     busy.current = true
     setRefusal(null)
@@ -129,6 +136,7 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
     }
     setShown({ asked, page: outcome.value })
     setRelated(null)
+    arrived?.()
     if (focus !== null) focusAfterRender(focus)
     if (move === null) return true
     setTrail(move.trail)
@@ -208,7 +216,8 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
           visit={visit}
           related={related}
           back={trail.at(-1)?.object ?? null}
-          onLoad={(asked, focus) => load(asked, null, focus ?? null)}
+          onLoad={(asked, focus, arrived) => load(asked, null, focus ?? null, arrived)}
+          onRefused={setRefusal}
           onRelated={(index) => setRelated((open) => (open === index ? null : index))}
           onFollow={follow}
           onBack={back}
@@ -225,14 +234,16 @@ interface PageProps {
   relations: BrowseRelations
   /** What each column the page shows offers a filter, from the studio's discovery. */
   filterables: Filterable[]
-  /** How many pages a move has reached, which mounts the filter's panel afresh. */
+  /** How many pages a move has reached, which mounts the filter's line, chips and boxes afresh. */
   visit: number
   /** The row whose related rows are open, by its place on the page. */
   related: number | null
   /** The object of the page a follow left, which Back returns to. */
   back: ObjectRef | null
-  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has. */
-  onLoad: (asked: Asked, focus?: string) => Promise<boolean>
+  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has, and `arrived` runs in the render that shows it. */
+  onLoad: (asked: Asked, focus?: string, arrived?: () => void) => Promise<boolean>
+  /** Says a header box's refusal where the step speaks. */
+  onRefused: (message: string) => void
   onRelated: (index: number) => void
   onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
   onBack: () => void
@@ -244,7 +255,8 @@ interface PageProps {
  * where its object has a key to follow -- and the way to the next and
  * previous pages.
  */
-function Page({ asked, page, relations, filterables, visit, related, back, onLoad, onRelated, onFollow, onBack }: PageProps): ReactElement {
+function Page({ asked, page, relations, filterables, visit, related, back, onLoad, onRefused, onRelated, onFollow, onBack }: PageProps): ReactElement {
+  const rows = useRef<HTMLDivElement>(null)
   const name = describeRef(page.object)
   const first = asked.offset + 1
   const last = asked.offset + page.rows.length
@@ -252,6 +264,12 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
   const atStart = asked.offset === 0
   const relating = relations.relations.length > 0
   const open = related === null ? undefined : page.rows[related]
+  const fields = lineFields(filterables)
+  const filter = {
+    filter: asked.filter,
+    onFilter: (next: BrowseFilterTerm[], focus?: string | null, arrived?: () => void) =>
+      onLoad({ ...asked, filter: next, offset: 0 }, focus ?? undefined, arrived),
+  }
   return (
     <section className="browsed" aria-labelledby="browsed-heading">
       <h3 id="browsed-heading" tabIndex={-1}>
@@ -278,14 +296,13 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
         </p>
       )}
       <KeyHints name={name} kind={page.kind} relations={relations} />
-      {/* Keyed apart from the related rows below, whose key is a row's place: two siblings with one key leave React keeping a stale one. */}
-      <FilterPanel
-        key={`filter-${String(visit)}`}
-        columns={filterables}
-        active={asked.filter}
-        onFilter={(filter, focus) => onLoad({ ...asked, filter, offset: 0 }, focus)}
-      />
-      <div className="rows" role="region" aria-labelledby="rows-caption" tabIndex={0}>
+      {fields.length === 0 && asked.filter.length === 0 ? (
+        <p className="hint">No column this page shows can be filtered.</p>
+      ) : (
+        // Keyed apart from the related rows below, whose key is a row's place: two siblings with one key leave React keeping a stale one.
+        <BrowseFilter key={`filter-${String(visit)}`} columns={filterables} fields={fields} {...filter} onLeave={() => rows.current?.focus()} />
+      )}
+      <div className="rows" id="browse-rows" ref={rows} role="region" aria-labelledby="rows-caption" tabIndex={0}>
         <table>
           <caption id="rows-caption">
             {name}, {range}
@@ -312,6 +329,9 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
                 )
               })}
             </tr>
+            {fields.length === 0 ? null : (
+              <HeaderBoxes key={`boxes-${String(visit)}`} columns={page.columns} relating={relating} fields={fields} {...filter} onRefused={onRefused} />
+            )}
           </thead>
           <tbody>
             {page.rows.map((row, index) => (

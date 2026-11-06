@@ -1,13 +1,14 @@
 import type { ListFilterTerm } from '../runtime.js'
-import { conditionsOf, lineTokens, parseFilterLine, quoted, shownValue, written } from './filter-line.js'
+import { conditionsOf, lineNames, lineTokens, parseFilterLine, quoted, shownValue, written } from './filter-line.js'
 import type { LineField, LineToken } from './filter-line.js'
 
 /*
  * A column header's filter box (0132): the filter line's condition on one
  * field, typed without the field's name, since the column says it. The box
- * is read by the line's own reader with the field's key put in front -- and
+ * is read by the line's own reader with the field's name put in front -- and
  * after an `and` that starts a second bound -- so it refuses what the line
- * refuses, in its words. A box that starts with no operator holds one
+ * refuses, in its words. The name, not the key, which need not be one word:
+ * a browsed column's is the database's (0147). A box that starts with no operator holds one
  * value, whatever it holds: found anywhere in a text field that offers
  * contains, and equal to anything else.
  */
@@ -37,21 +38,22 @@ export function headerCondition(text: string, field: LineField): { ok: true; ter
   const found = lineTokens(text)
   const [first] = found
   if (first === undefined) return { ok: true, term: null }
+  const name = lineNames([field]).get(field.field) ?? field.field
   let line: string
   if (startsOperator(found, 0)) {
-    // The key in front, and again after each `and` a second bound starts with.
-    line = `${field.field} `
+    // The name in front, and again after each `and` a second bound starts with.
+    line = `${name} `
     let from = 0
     for (const [index, token] of found.entries()) {
       const before = found[index - 1]
       if (before?.kind !== 'word' || before.value.toLowerCase() !== 'and' || !startsOperator(found, index)) continue
-      line += `${text.slice(from, token.at)}${field.field} `
+      line += `${text.slice(from, token.at)}${name} `
       from = token.at
     }
     line += text.slice(from)
   } else {
     const one = found.length === 1 && first.kind === 'quoted' ? first.text : written(text.trim())
-    line = `${field.field} ${bare(field)} ${one}`
+    line = `${name} ${bare(field)} ${one}`
   }
   const read = parseFilterLine(line, [field])
   if (!read.ok) return { ok: false, message: read.message }

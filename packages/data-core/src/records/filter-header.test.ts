@@ -61,6 +61,18 @@ describe('headerCondition', () => {
     })
   })
 
+  // A field's key need not be one word -- a browsed column's name is the
+  // database's, `Order Date` (0147) -- and the box reads it by the name
+  // the line calls it, `order_date`, so its condition is on that field.
+  // Watched failing with the key put in front: every box on such a column
+  // was "No field is called Order Date: it is order_date in the line."
+  test('reads a box on a field whose key is not one word, by the name the line calls it', () => {
+    const spaced: LineField = { field: 'Order Date', label: 'Order Date', operators: ['equals', 'range'], input: 'date' }
+    expect(term('> 2026-10-01', spaced)).toEqual({ field: 'Order Date', op: 'range', from: '2026-10-01', to: null, exclusive: 'from' })
+    expect(term('2026-10-01', spaced)).toEqual({ field: 'Order Date', op: 'equals', value: '2026-10-01' })
+    expect(term('>= 2026-10-01 and < 2026-11-01', spaced)).toEqual({ field: 'Order Date', op: 'range', from: '2026-10-01', to: '2026-11-01', exclusive: 'to' })
+  })
+
   // What the line refuses the box refuses in the same words, so a person
   // learns one language; the name a refusal would quote is the column's.
   test('refuses what the line refuses, in its words', () => {

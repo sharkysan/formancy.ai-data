@@ -610,18 +610,27 @@ a row's Related button lists the foreign keys it can be followed through,
 either way, from the discovery the studio holds, and a follow pages the
 other end narrowed to the row's values, with Back to the page it left
 ([0103](./docs/decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
-Filter rows filters a page by conditions on its columns, each offered what
-its type and the discovery's nullability allow, typed as its column takes
-it -- a timestamp's as days. Every condition must hold, each is listed and
-removed on its own, and paging and sorting keep them; a follow starts the
-other end unfiltered, and Back returns the page it left with its filter. A
-refusal is the step's alert, with what was typed kept
-([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+A page is filtered by conditions on its columns, each offered what its
+type and the discovery's nullability allow
+([0104](./docs/decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)),
+and seen three ways that never disagree: typed as a line above the table,
+`country_code = CH and credit_limit > 125.50`, which completes a column,
+an operator and a boolean's value as it is typed, and marks and keeps a
+line it cannot read; each condition a chip with its own Remove, Clear the
+filter after them and Undo for what a removal took; and a box under each
+column's header holding that column's condition, a boolean's a select. A
+column is named by its name lower-cased, `order_date` for `Order Date`,
+and a timestamp's range is whole days; `/` puts the keyboard on the line
+and Esc gives it back to the table. Every condition must hold, and paging
+and sorting keep them; a follow starts the other end unfiltered, and Back
+returns the page it left with its filter. A refusal is the step's alert,
+with what was typed kept
+([0147](./docs/decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
 
 Under the Presentation step's arrangement, List views names the form's
 list views: each a name, conditions on the fields the form's list can be
-filtered by, offered by their labels with the Browse step's boxes and
-hints, an order of fields each ascending or descending, and "The grid
+filtered by, offered by their labels, each value typed in a box of its
+own with a hint under them, an order of fields each ascending or descending, and "The grid
 opens on this view" on at most one. A view is checked as the server checks
 it before it is saved, and refused with the server's sentence with what
 was typed kept; each saved view is said in words, and edited, removed and

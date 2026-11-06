@@ -109,7 +109,8 @@ export function describeFocus(page) {
  * `settled` waits for has been painted (`src/focus.ts`), so the focus is
  * waited for as the steps' headings are, up to 15 seconds, and only then
  * read. Read at once, WebKit was once seen between the two on 2026-10-28:
- * the Browse step's rows said, and the keyboard not yet on Filter rows.
+ * the Browse step's rows said, and the keyboard not yet on the button that
+ * then opened its filter's form, which the filter line has since replaced.
  */
 export async function focusAfterEnter(page, pressed, settled, expected) {
   await pressed.focus()

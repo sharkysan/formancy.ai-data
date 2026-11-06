@@ -153,12 +153,12 @@ only enforcement is "we remember" says so plainly.
 | [0096](0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md) | The apps wear formancy's `room.css` rather than a copy of `admin.css` | accepted |
 | [0097](0097-back-goes-on-past-the-open-forms-own-entries-in-every-layout.md) | Back goes on past the open form's own entries in every layout | accepted |
 | [0098](0098-an-echo-the-record-moved-since-it-was-read-is-a-stale-save.md) | An echo the record moved since it was read is a stale save, not over-posting | accepted |
-| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103, 0104 |
+| [0099](0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md) | A browse role reads any table or view's rows, a page at a time, as the connection's account reads them | accepted; extended by 0103, 0104, 0147 |
 | [0100](0100-a-proxy-list-whose-entries-together-trust-every-peer-is-refused.md) | A proxy list whose entries together trust every peer of a family is refused | accepted |
 | [0101](0101-a-host-token-is-refused-unless-it-is-its-compact-form-exactly.md) | A host token is refused unless it is its compact form exactly | accepted |
 | [0102](0102-the-server-image-gives-its-user-the-store-and-not-its-code.md) | The server image gives its user the store, and not its code | accepted |
 | [0103](0103-a-browsed-row-follows-its-foreign-keys-either-way.md) | A browsed row follows its foreign keys either way, each follow a browse narrowed to the row's values | accepted; extended by 0104 |
-| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134, 0135; extended by 0139 |
+| [0104](0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md) | A list and a browse are filtered by a person's conditions on their columns, each value spelled as its column holds it | accepted; extended by 0105, 0123; amended by 0106; extended by 0130, 0131; amended by 0134, 0135; extended by 0139, 0147 |
 | [0105](0105-a-forms-list-offers-views-its-administrator-named.md) | A form's list offers views its administrator named, each one a filter and a sort a person could have built | accepted; extended by 0106, 0123, 0124, 0125, 0126, 0136 |
 | [0106](0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md) | A host's grid lets a person choose its columns, and keeps them, its sort and its view in the viewer's browser | accepted; extended by 0126 |
 | [0107](0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md) | A record is duplicated into a new one, of the fields the server names, without its key | accepted |
@@ -186,7 +186,7 @@ only enforcement is "we remember" says so plainly.
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
 | [0131](0131-a-person-types-a-grids-filter-as-a-line-and-sees-each-condition-as-a-chip.md) | A person types a grid's filter as a line, and sees each condition as a chip | accepted; extended by 0132, 0135; amended by 0134 |
-| [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133; amended by 0135 |
+| [0132](0132-each-column-header-filters-its-column.md) | Each column header filters its column | accepted; extended by 0133; amended by 0135, 0147 |
 | [0133](0133-a-cell-filters-by-its-value.md) | A cell filters by its value | accepted; amended by 0135 |
 | [0134](0134-the-build-a-condition-panel-is-retired.md) | The Build a condition panel is retired | accepted |
 | [0135](0135-a-lookup-field-filters-by-the-record-it-refers-to.md) | A lookup field filters by the record it refers to | accepted; amended by 0136; extended by 0139 |
@@ -200,3 +200,4 @@ only enforcement is "we remember" says so plainly.
 | [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted; extended by 0144 |
 | [0144](0144-the-host-lists-its-forms-by-group.md) | The host lists its forms by group, with a search and the forms linked to the open one | accepted |
 | [0145](0145-the-layout-is-the-persons.md) | The layout is the person's: Stacked first, its height shared by a line they move, and the layout they chose kept | accepted |
+| [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |

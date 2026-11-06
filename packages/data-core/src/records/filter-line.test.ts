@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { ListFilterTerm } from '../runtime.js'
-import { lineNames, parseFilterLine, printFilterLine } from './filter-line.js'
+import { lineNames, nameableFields, parseFilterLine, printFilterLine } from './filter-line.js'
 import type { LineField } from './filter-line.js'
 
 /*
@@ -75,6 +75,37 @@ describe('lineNames', () => {
       ['given', 'given'],
       ['state', 'status'],
     ])
+  })
+})
+
+describe('nameableFields', () => {
+  // A browsed column's key is the database's name for it (0147), which can
+  // be two words, or differ from another's only in case. The line names a
+  // field by one word that says it alone: a field no word says -- two
+  // whose labels give one name, so each is named by a key of two words;
+  // two whose names differ only in case, which the line reads as one -- is
+  // left out, so completion never offers a name the line then refuses, nor
+  // one that reads as another field. What is left is named again, over
+  // itself: `amount` once its twin is gone. Watched failing with every
+  // field kept, the line offering `Unit price` and reading `amount` as
+  // `Amount`.
+  test('leaves out a field the line cannot name alone, and names the rest over themselves', () => {
+    const fields = [
+      named('Order Date', 'Order Date'),
+      named('Unit price', 'Unit price'),
+      named('unit price', 'unit price'),
+      named('Amount', 'Amount'),
+      named('amount', 'amount'),
+      named('Notes', 'Notes'),
+      named('=', '='),
+    ]
+    const kept = nameableFields(fields)
+    expect(kept.map((field) => field.field)).toEqual(['Order Date', 'Notes'])
+    expect([...lineNames(kept).values()]).toEqual(['order_date', 'notes'])
+    expect(nameableFields([named('Amount', 'Amount'), named('Total', 'Amount ')]).map((field) => field.field)).toEqual(['Amount', 'Amount '])
+    // A field kept is read back by its name, and printed by it.
+    expect(parseFilterLine('order_date = 2026-10-01', kept)).toEqual({ ok: true, filter: [{ field: 'Order Date', op: 'equals', value: '2026-10-01' }] })
+    expect(printFilterLine([{ field: 'Order Date', op: 'equals', value: '2026-10-01' }], kept)).toBe('order_date = 2026-10-01')
   })
 })
 

@@ -4,11 +4,13 @@
 // sort from a column's header by keyboard; a row's related rows opened, a
 // foreign key followed and Back taken, each by keyboard (0103); a view,
 // with what ordering it by every column costs; and the table's filter
-// (0104), its form open on a range of days, a condition applied, a value
-// refused and a condition removed, each by keyboard. Each state is measured
-// on the way by the gate.
+// (0104, 0147) -- the line reached by `/` and its completion open over the
+// grid, a line applied by Enter, one it cannot read and one the server
+// refuses, a column's box under its header reached by Tab and applied by
+// Enter, a chip removed, and the last one removed and put back by Undo,
+// each by keyboard. Each state is measured on the way by the gate.
 
-import { focusAfterEnter } from './measure.mjs'
+import { describeFocus, focusAfterEnter } from './measure.mjs'
 import { nav, step } from './journey.mjs'
 import { TOKENS } from './plane.mjs'
 import { signIn } from './review.mjs'
@@ -20,6 +22,19 @@ async function show(page, object) {
   await browse.getByRole('button', { name: 'Show rows' }).click()
   await browse.getByRole('region', { name: new RegExp(`^${object.replace('.', '\\.')}, `) }).waitFor()
 }
+
+/** Null when `got` is `want`, otherwise both. */
+const same = (got, want) => (JSON.stringify(got) === JSON.stringify(want) ? null : `it is ${JSON.stringify(got)}, not ${JSON.stringify(want)}`)
+
+/** Null when `target` has the keyboard's focus, otherwise what has. */
+async function focusedOn(page, target) {
+  return (await target.evaluate((element) => element === document.activeElement)) ? null : `the focus is on ${await describeFocus(page)}`
+}
+
+/** The filter line, the order's grid and the step's status line once it says `text`, on the Browse step. */
+const line = (page) => step(page, 'Browse').getByRole('combobox', { name: 'Filter', exact: true })
+const orders = (page) => step(page, 'Browse').getByRole('region', { name: /^sales\.order, / })
+const says = (page, text) => () => step(page, 'Browse').getByRole('status').filter({ hasText: text }).waitFor()
 
 /** The states, in order, as `[name, act]`, from wherever the journey left the page. */
 export function browse(check) {
@@ -88,67 +103,133 @@ export function browse(check) {
           .waitFor()
       },
     ],
-    // A disclosure: the form opens right after its button, which keeps the
-    // keyboard. Two date boxes side by side are the widest the form gets,
-    // and each browser draws a date box its own way.
+    // `/` from the grid puts the keyboard on the filter line (0147), and
+    // typing there opens what may come next under it, over the grid: what
+    // is measured open, for sideways scroll and the window's edges.
     [
-      "Browse, the filter's form open on a range of days",
+      'Browse, the filter line completing',
       async (page) => {
         await show(page, 'sales.order')
-        const browse = step(page, 'Browse')
-        const toggle = browse.getByRole('button', { name: 'Filter rows' })
-        const form = browse.getByRole('form', { name: 'Add a condition' })
-        check('opening the filter’s form leaves the keyboard on its button', await focusAfterEnter(page, toggle, () => form.waitFor(), toggle))
-        await form.getByRole('combobox', { name: 'Column' }).selectOption('order_date')
-        await form.getByRole('combobox', { name: 'Condition' }).selectOption('is in a range')
-        await form.getByLabel('To').waitFor()
+        await orders(page).focus()
+        await page.keyboard.press('/')
+        check('/ from the grid puts the keyboard on the filter line', await focusedOn(page, line(page)))
+        // On the line whether or not `/` put it there, so a `/` that did not is that check's failure, not the pass's.
+        await line(page).focus()
+        await page.keyboard.type('sta')
+        const options = step(page, 'Browse').getByRole('listbox', { name: 'What may come next' })
+        await options.waitFor({ state: 'visible' })
+        check('the line completing offers the column begun, by its name', same(await options.getByRole('option').allTextContents(), ['status']))
       },
     ],
-    // Enter in the value's box applies the condition; the box may go with
-    // the form emptied for the next one, so the keyboard goes to Apply.
+    // Enter applies the line: the page says what it is filtered by, the
+    // condition is a chip, and the keyboard stays in the line.
     [
-      'Browse, a condition applied by keyboard',
+      'Browse, a condition applied from the line by keyboard',
       async (page) => {
-        const browse = step(page, 'Browse')
-        const form = browse.getByRole('form', { name: 'Add a condition' })
-        await form.getByRole('combobox', { name: 'Column' }).selectOption('status')
-        const value = form.getByRole('textbox', { name: 'Value' })
-        await value.fill('shipped')
-        const applied = () => browse.getByRole('status').filter({ hasText: 'Filtered by status = shipped, showing rows 1 to 1.' }).waitFor()
+        await line(page).fill('status = shipped')
         check(
-          'applying a condition by Enter leaves the keyboard on Apply',
-          await focusAfterEnter(page, value, applied, form.getByRole('button', { name: 'Apply' })),
+          'applying the line by Enter leaves the keyboard in the line',
+          await focusAfterEnter(page, line(page), says(page, 'Filtered by status = shipped, showing rows 1 to 1.'), line(page)),
         )
-        await browse.getByRole('list', { name: 'Filtered by' }).waitFor()
+        await step(page, 'Browse').getByRole('list', { name: 'Filtered by' }).waitFor()
       },
     ],
-    // The server's refusal, in the step's alert, with the value it refused
-    // still in its box for the person to correct.
+    // A line the page cannot read is said under it, the characters it is
+    // about marked, and kept: the marked copy wraps at 320 px.
     [
-      'Browse, a condition refused',
+      'Browse, a line it cannot read',
       async (page) => {
-        const browse = step(page, 'Browse')
-        const form = browse.getByRole('form', { name: 'Add a condition' })
-        await form.getByRole('combobox', { name: 'Column' }).selectOption('amount')
-        const value = form.getByRole('textbox', { name: 'Value' })
-        await value.fill('1.23456')
-        await value.press('Enter')
-        await browse.getByRole('alert').filter({ hasText: 'A value given for amount is not one it can hold.' }).waitFor()
-        const kept = await value.inputValue()
-        check('a refused condition keeps what was typed', kept === '1.23456' ? null : `the box holds "${kept}"`)
+        const typed = "status = shipped and amount > 1'000"
+        await line(page).fill(typed)
+        await line(page).press('Enter')
+        await step(page, 'Browse')
+          .getByRole('status', { name: 'Filter', exact: true })
+          .filter({ hasText: 'Write numbers with a point and no separators: 1000.' })
+          .waitFor()
+        check('a line it cannot read keeps what was typed', same(await line(page).inputValue(), typed))
       },
     ],
-    // Remove takes the button pressed with it: after the last condition the
-    // keyboard goes to the button that opens the form, not to the page.
+    // The server's refusal, in the step's alert, with the line still there
+    // to correct; Esc then puts back the filter applied, and the keyboard
+    // goes to the grid.
     [
-      'Browse, the last condition removed by keyboard',
+      'Browse, a line the server refuses',
       async (page) => {
-        const browse = step(page, 'Browse')
-        const remove = browse.getByRole('button', { name: 'Remove status = shipped' })
-        const removed = () => browse.getByRole('status').filter({ hasText: 'Showing rows 1 to 2.' }).waitFor()
+        const typed = 'status = shipped and amount = 1.23456'
+        await line(page).fill(typed)
+        await line(page).press('Enter')
+        await step(page, 'Browse').getByRole('alert').filter({ hasText: 'A value given for amount is not one it can hold.' }).waitFor()
+        check('a line the server refuses keeps what was typed', same(await line(page).inputValue(), typed))
+        // In the line wherever Enter left the keyboard, so the checks after Esc are theirs alone.
+        await line(page).focus()
+        await page.keyboard.press('Escape')
+        check('Esc puts back the filter applied', same(await line(page).inputValue(), 'status = shipped'))
+        check('and gives the keyboard to the grid', await focusedOn(page, orders(page)))
+      },
+    ],
+    // A column's box is under its header, after the headers that sort: Tab
+    // from the last of them reaches the first box. Enter applies what is
+    // typed, the keyboard staying in the box and the line saying it; Esc
+    // gives an edit up.
+    [
+      'Browse, a header box applied by keyboard',
+      async (page) => {
+        await orders(page)
+          .getByRole('button', { name: /, sort (ascending|descending)$/ })
+          .last()
+          .focus()
+        await page.keyboard.press('Tab')
         check(
-          'removing the last condition puts the keyboard on the button that opens the form',
-          await focusAfterEnter(page, remove, removed, browse.getByRole('button', { name: 'Filter rows' })),
+          'Tab from the last header reaches the first column’s box',
+          await focusedOn(
+            page,
+            orders(page)
+              .getByRole('textbox', { name: /^Filter / })
+              .first(),
+          ),
+        )
+        const box = orders(page).getByRole('textbox', { name: 'Filter approved_by', exact: true })
+        await box.focus()
+        await page.keyboard.type('is empty')
+        const applied = says(page, 'Filtered by status = shipped and approved_by is NULL, showing rows 1 to 1.')
+        check('applying a header box by Enter leaves the keyboard in the box', await focusAfterEnter(page, box, applied, box))
+        check('the line says the box’s condition', same(await line(page).inputValue(), 'status = shipped and approved_by is empty'))
+        // In the box wherever Enter left the keyboard, so the check after Esc is its alone.
+        await box.focus()
+        await page.keyboard.type(' or not')
+        await page.keyboard.press('Escape')
+        check('Esc in a header box gives the edit up', same(await box.inputValue(), 'is empty'))
+      },
+    ],
+    // A chip's Remove takes the button pressed with it: the keyboard goes
+    // to the Remove that takes its place, not to the page.
+    [
+      'Browse, a condition removed by keyboard',
+      async (page) => {
+        const browse = step(page, 'Browse')
+        check(
+          'removing a condition puts the keyboard on the next one’s Remove',
+          await focusAfterEnter(
+            page,
+            browse.getByRole('button', { name: 'Remove status = shipped', exact: true }),
+            says(page, 'Filtered by approved_by is NULL, showing rows 1 to 2.'),
+            browse.getByRole('button', { name: 'Remove approved_by is NULL', exact: true }),
+          ),
+        )
+      },
+    ],
+    // The last condition removed puts the keyboard on Undo, and Undo puts
+    // the condition back, the keyboard on its Remove.
+    [
+      'Browse, the last condition removed and put back by keyboard',
+      async (page) => {
+        const browse = step(page, 'Browse')
+        const remove = browse.getByRole('button', { name: 'Remove approved_by is NULL', exact: true })
+        const undo = browse.getByRole('button', { name: 'Undo removing approved_by is NULL', exact: true })
+        check('removing the last condition puts the keyboard on Undo', await focusAfterEnter(page, remove, says(page, /^Showing rows 1 to 2\.$/), undo))
+        check(
+          'Undo puts the keyboard on the Remove of the condition it put back',
+          await focusAfterEnter(page, undo, says(page, 'Filtered by approved_by is NULL, showing rows 1 to 2.'), remove),
         )
       },
     ],
