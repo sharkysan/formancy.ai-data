@@ -34,6 +34,21 @@ const row = (page, first) =>
  * Read from the computed border colour and the pixels, of a page that held
  * still between finding the point and the screenshot (paintedWhere, 0058).
  */
+/**
+ * Whether the keyboard came to `region` once the page moved it there, or
+ * where it is instead: a delete's confirmation or notice takes the keyboard
+ * in an effect after the render that draws it (delete-flow.ts's
+ * useRegionFocus), which a check made at the first sight of it can beat --
+ * once in WebKit, at 320 pixels, on CI on 2026-11-06, the keyboard found on
+ * the notice a moment later.
+ */
+function landsOn(page, region) {
+  return until(async () => (await focusedOn(page, region)) === null, 'never').then(
+    () => null,
+    async () => focusedOn(page, region),
+  )
+}
+
 async function frame(region) {
   const at = await paintedWhere(region.page(), () =>
     region.evaluate((element) => {
@@ -91,7 +106,7 @@ async function rowConfirming(page, { plane, check, run, notes }) {
   await row(page, run.gone.slice(3)).getByRole('button', { name, exact: true }).focus()
   await page.keyboard.press('Enter')
   await question(page, run.gone).waitFor(WITHIN)
-  check("a row's Delete: the keyboard is on its confirmation", await focusedOn(page, question(page, run.gone)))
+  check("a row's Delete: the keyboard is on its confirmation", await landsOn(page, question(page, run.gone)))
   const below = await question(page, run.gone).evaluate((region) => region.closest('section[aria-labelledby="records-heading"]') !== null)
   check('which is under the grid that asked', below ? null : 'the confirmation is not in the Records panel')
 }
@@ -111,7 +126,7 @@ async function recordConfirming(page, { check, run }) {
   await page.getByRole('button', { name: 'Delete record', exact: true }).click()
   const region = question(page, run.kept)
   await region.waitFor(WITHIN)
-  check("the record's Delete: the keyboard is on its confirmation", await focusedOn(page, region))
+  check("the record's Delete: the keyboard is on its confirmation", await landsOn(page, region))
   await page.keyboard.press('Tab')
   check('the next Tab reaches Keep it, never the button that deletes', await focusedOn(page, region.getByRole('button', { name: 'Keep it', exact: true })))
   const ring = await frame(region)
@@ -141,7 +156,7 @@ async function notDeleted(page, { plane, check, run, notes }) {
   await question(page, run.kept).getByRole('button', { name: 'Delete it', exact: true }).click()
   const refused = page.getByRole('region', { name: 'Not deleted', exact: true })
   await refused.waitFor(WITHIN)
-  check('a refused delete: the keyboard is on "Not deleted"', await focusedOn(page, refused))
+  check('a refused delete: the keyboard is on "Not deleted"', await landsOn(page, refused))
 }
 
 /** Deleted beside the page first, while its row is still listed: the server's 404. */
@@ -166,7 +181,7 @@ async function cannotFind(page, { plane, check, run }) {
   await question(page, run.gone).getByRole('button', { name: 'Delete it', exact: true }).click()
   const notFound = page.getByRole('region', { name: `Cannot find Order ${run.gone}`, exact: true })
   await notFound.waitFor(WITHIN)
-  check('a delete that finds nothing: the keyboard is on its notice', await focusedOn(page, notFound))
+  check('a delete that finds nothing: the keyboard is on its notice', await landsOn(page, notFound))
 }
 
 /** Lost on the way: "It may have been deleted". */
@@ -180,7 +195,7 @@ async function mayHaveBeenDeleted(page, { check, run }) {
     await question(page, run.kept).getByRole('button', { name: 'Delete it', exact: true }).click()
     const unknown = page.getByRole('region', { name: 'It may have been deleted', exact: true })
     await unknown.waitFor(WITHIN)
-    check('a deletion whose answer was lost: the keyboard is on its notice', await focusedOn(page, unknown))
+    check('a deletion whose answer was lost: the keyboard is on its notice', await landsOn(page, unknown))
   } finally {
     await page.unroute('**/v1/forms/*/records/delete')
   }

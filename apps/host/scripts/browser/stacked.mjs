@@ -27,18 +27,35 @@ async function chooseOrders(page, check) {
 }
 
 /**
+ * Tab away from `line` and Shift+Tab back: the keyboard moved onto it as a
+ * person moves it. A focus moved by script after a pointer's click matches
+ * no :focus-visible in Firefox, whatever key follows, where Chromium's
+ * matches once a key is pressed: measured on 2026-11-06 in Playwright
+ * 1.63.0's Chromium and Firefox on a page of the host's built stylesheet,
+ * the first reason the ring checks failed in Firefox on CI. The page never
+ * moves the keyboard onto a line by script.
+ */
+export async function tabbedOnto(page) {
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Shift+Tab')
+}
+
+/**
  * The focus ring of `line`, which has the keyboard, as the browser painted
  * it on the side the record is -- below a line drawn across, right of one
  * drawn down -- where the record's glass is drawn after the line in the
  * document: its colour against the outline's, 1:1 where the ring lies on top
  * of the glass. Read one pixel inside the ring's band, past its offset, in
- * the middle of what the window shows of the line.
+ * the middle of what the window shows of the line. A line that draws no
+ * ring at all is said so, not read: Firefox gives an outline's width though
+ * its style is none.
  */
 export async function ringPainted(page, line) {
   const at = await paintedWhere(page, () =>
     line.evaluate((element) => {
       if (element !== document.activeElement) return null
       const style = getComputedStyle(element)
+      if (!element.matches(':focus-visible') || style.outlineStyle === 'none') return { points: [], none: true }
       const reach = Number.parseFloat(style.outlineOffset) || 0
       const box = element.getBoundingClientRect()
       const middle = (from, to, end) => (Math.max(from, 0) + Math.min(to, end)) / 2
@@ -50,6 +67,7 @@ export async function ringPainted(page, line) {
     }),
   )
   if (at === null) return { problem: 'the line does not have the keyboard' }
+  if (at.none === true) return { problem: 'the line has the keyboard and draws no focus ring' }
   const ring = parseColor(at.ring)
   if (ring === null || at.width === '0px') return { problem: `the line draws no focus ring the gate reads: ${at.width} ${at.ring}` }
   return { ratio: contrast(ring.rgb, at.colours[0]) }
@@ -107,7 +125,8 @@ export function stackedState({ check }) {
         'Stacked: the Records panel is as tall as its line says of the window',
         Math.abs(tall.height - tall.wanted) <= 1 ? null : `${String(Math.round(tall.height))} px, not ${String(Math.round(tall.wanted))}`,
       )
-      // Where the window shows it, its ring over the glass below, after the keys that moved it.
+      // Where the window shows it, its ring over the glass below, the keyboard brought onto it by Tab.
+      await tabbedOnto(page)
       await line.evaluate((element) => element.scrollIntoView({ block: 'center' }))
       const ring = await ringPainted(page, line)
       check(

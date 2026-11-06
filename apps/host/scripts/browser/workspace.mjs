@@ -11,7 +11,7 @@
 
 import { FORM, LINES, TOKENS } from './plane.mjs'
 import { contrast, dataRows, describeFocus, focusedOn, paintedWhere, parseColor, settled, until, WITHIN } from './measure.mjs'
-import { ringPainted, stackedState } from './stacked.mjs'
+import { ringPainted, stackedState, tabbedOnto } from './stacked.mjs'
 import { rulesReaching } from './styles.mjs'
 
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -209,7 +209,8 @@ export function workspaceJourney(plane, { check }, run) {
           await page.keyboard.press('End')
           await page.keyboard.press('Home')
           await page.keyboard.press('ArrowRight')
-          // Its focus ring over the record's glass, which the document draws after it (0145).
+          // Its focus ring over the record's glass, which the document draws after it, the keyboard brought onto it by Tab (0145).
+          await tabbedOnto(page)
           const ring = await ringPainted(page, split)
           check(
             "Side by side: the split's focus ring is drawn over the record's glass",

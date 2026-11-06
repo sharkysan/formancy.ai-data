@@ -82,10 +82,18 @@
   which now chooses Side by side before its checks, the split's focus ring
   read the same way. In every one, as in every state, nothing scrolls
   sideways or is past either edge and axe finds nothing, target size and
-  contrast among it. The ring checks, the short pass and the drag read
-  from where it began are to be watched failing in CI: the rings with each
-  line's `z-index` taken away, the short pass with the line drawn in a
-  short window.
+  contrast among it. Each ring check brings the keyboard onto its line by
+  Tab and Shift+Tab, as a person moves it, and says so where no ring is
+  drawn at all: first made on a focus moved by script, both failed in
+  Firefox on CI (run 42172919769, painted 10.97:1), because a focus a
+  script moves after a pointer's click matches no `:focus-visible` there,
+  whatever key follows, where Chromium's matches once a key is pressed --
+  a difference no step of the page leans on, so it is no fact of 0058's
+  table. Watched on 2026-11-06 on a page of the host's built stylesheet in
+  Playwright 1.63.0's Chromium and Firefox: 1:1 with the line raised, and
+  10.88:1 and 5.96:1 with its `z-index` taken away; in CI, the rings with
+  each line's `z-index` taken away and the short pass with the line drawn
+  in a short window are to be watched failing.
 
 ## Context
 
