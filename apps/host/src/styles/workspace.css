@@ -447,6 +447,9 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
 .split {
   align-self: stretch;
   position: sticky;
+  /* Over the glass on either side, which paints after it: its focus ring
+     too (0145). */
+  z-index: 1;
   top: 7.5rem;
   height: calc(100dvh - 8.25rem);
   min-height: 7rem;
@@ -481,6 +484,7 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
 
 .stack-line {
   position: relative;
+  z-index: 1;
   height: 0.75rem;
   border-radius: 999px;
   cursor: row-resize;

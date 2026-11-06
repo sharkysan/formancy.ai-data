@@ -46,8 +46,8 @@
   runs under the suite's `globalSetup`, which starts both: they were run
   and watched failing under a copy of `apps/host/vitest.config.ts` without
   it, which was not kept. On both engines against the real server, passing
-  in CI on b15fcef and to be watched failing there under a temporary commit
-  of breaks: `apps/host/src/choices.test.tsx` -- the split's case, which
+  in CI on b15fcef and watched failing there under a temporary commit
+  of breaks (b73dd8a, run 42179063063, since reverted), each on both engines: `apps/host/src/choices.test.tsx` -- the split's case, which
   now chooses Side by side first, its numbers unchanged, with Stacked's
   line still at 60 after the split was moved to 30, on the same page and
   opened again (with one share moved for both lines); Stacked's line where
@@ -93,7 +93,8 @@
   Playwright 1.63.0's Chromium and Firefox: 1:1 with the line raised, and
   10.88:1 and 5.96:1 with its `z-index` taken away; in CI, the rings with
   each line's `z-index` taken away and the short pass with the line drawn
-  in a short window are to be watched failing.
+  in a short window were watched failing, in Chromium, Firefox and
+  WebKit, in the same run.
 
 ## Context
 
