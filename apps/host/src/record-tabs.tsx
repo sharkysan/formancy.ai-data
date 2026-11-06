@@ -1,4 +1,3 @@
-import { Fragment } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { DataClient } from '@formancy/data-client'
 import { ChildSection } from './children.js'
@@ -111,7 +110,7 @@ export function RecordTabs({
     },
     ...(parent === null
       ? []
-      : childTabs(childForms.map((form) => ({ ...form, child: { ...form.child, one: false } }))).map(({ key, form, index, twice, name }): TabEntry => ({
+      : childTabs(childForms).map(({ key, form, index, twice, name }): TabEntry => ({
           key,
           name,
           panel: (show) => (
@@ -127,7 +126,11 @@ export function RecordTabs({
               refit={refit}
               ownerBase={ownerBase}
               idBase={childIdBase}
-              onShow={() => onShow()}
+              onShow={() => {
+                const tabHidden = show()
+                const viewHidden = onShow()
+                return tabHidden || viewHidden
+              }}
               onTab={show}
               levels={drill.levels}
               drill={
@@ -137,15 +140,5 @@ export function RecordTabs({
           ),
         }))),
   ]
-  // TEMPORARY (E): a Drill down level draws its sections under its panes, as before 0142.
-  if (level > 1)
-    return (
-      <>
-        {tabs.map((tab) => (
-          <Fragment key={tab.key}>{tab.panel(() => false)}</Fragment>
-        ))}
-      </>
-    )
-  // TEMPORARY (C): the selection kept for another record -- `start` is always undefined.
-  return <TabList idBase={idBase} labelledBy={headingId} start={void record} tabs={tabs} eager manual shownAlone />
+  return <TabList idBase={idBase} labelledBy={headingId} start={record} tabs={tabs} />
 }
