@@ -280,7 +280,11 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await keep(`Delete Order ${other}?`)
 
     if (connection === 'ms') {
+      // The lines' grid is drawn as its tab is first shown (0142), its loading
+      // rows empty cells a click opens nothing on: its rows are read once its
+      // line says it answered.
       await showChild(user, 'Order line')
+      await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe('Order line rows 1–1.'), { timeout: 15_000 })
       const line = within(gridSection('Order line')).getByRole('grid', { name: 'Order line' })
       await waitFor(() => expect(dataRows(line).length).toBeGreaterThan(0), { timeout: 15_000 })
       await user.click(dataCell(line))
