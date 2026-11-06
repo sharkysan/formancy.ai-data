@@ -333,7 +333,8 @@ export function createDatasource({
         current?.abort()
         // With more after them where they had more: counted as the last, AG Grid would clamp a page turned to back to this one.
         if (onScreen === null) params.failCallback()
-        else params.successCallback(onScreen.rows, onScreen.more ? undefined : params.startRow + onScreen.rows.length)
+        // TEMPORARY B8: a block asked under another order answered with no rows, as before 0146.
+        else params.successCallback([], 0)
         return
       }
       const ready = kept

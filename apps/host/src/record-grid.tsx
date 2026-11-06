@@ -269,20 +269,18 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         if (!ours(from)) return
         // Asked first, the rows on screen stay, and so does the page they are on; asked by AG Grid, a refusal before is not Ask again's.
         if (ahead) beforeAsk.current = statusNow.current
-        else {
-          shown.current.loaded = false
-          heldNow.current?.heard()
-        }
+        // TEMPORARY B16: the grid never tells the hook it was asked.
+        else shown.current.loaded = false
         latest.current.onFiltered?.(false)
-        api.current?.setGridAriaProperty('busy', 'true')
+        // TEMPORARY B10: busy left unset while a block is asked for.
         const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
         shown.current.quiet = false
         setStatus((before) => ({ kind: 'loading', text: [words], help: null, clear: false, retry: before.retry && shown.current.retrying, said: null }))
         if (!ahead) setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
       },
       answered: (start, rows, hasMore, asked, from) => {
+        // TEMPORARY B16: nor that it was answered.
         if (!ours(from)) return
-        heldNow.current?.heard()
         // A page left empty that is not the first -- its last row deleted --
         // says nothing: with fewer rows than the page starts at, AG Grid's
         // pagination moves to the last page there is and asks for it, which
@@ -421,10 +419,13 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       },
       reload() {
         // A list on its way, or a refused one standing, is the one to list again: the rows shown are the last list's.
-        if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
+        // TEMPORARY B17: a save's reload left to AG Grid.
+        api.current?.purgeInfiniteCache()
       },
       say(line) {
-        setStatus({ kind: 'answer', text: line, help: null, clear: false, retry: false, said: null })
+        // TEMPORARY B5: the page's own sentences counted as the server's.
+        answers.current += 1
+        setStatus({ kind: 'answer', text: line, help: null, clear: false, retry: false, said: answers.current })
       },
       removed(line) {
         removedLine.current = line
@@ -555,7 +556,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           status={status}
           first={pager.page === 0}
           last={!pager.hasMore}
-          waits={held.standing}
+          // TEMPORARY B15: the pager left to the last list.
+          waits={false}
           asking={shown.current.retrying}
           retryRef={retryButton}
           onClear={onClearSearch}

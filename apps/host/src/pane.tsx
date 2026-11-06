@@ -243,7 +243,8 @@ function PaneBody({
     if (result?.kind === 'invalid') {
       toShow.current?.()
       say(`Not saved. ${result.message}`, 'refused')
-    } else say(result === null ? '' : result.message, 'answer', result?.kind === 'saved' || result?.kind === 'created')
+      // TEMPORARY B6: no save said as the server's.
+    } else say(result === null ? '' : result.message)
   }
 
   async function submit(outcome: Submitted): Promise<void> {
