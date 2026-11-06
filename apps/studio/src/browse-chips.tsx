@@ -68,7 +68,7 @@ export function useUndo(filter: readonly BrowseFilterTerm[], onFilter: FilterCha
     putBack: () => {
       if (undo === null) return
       const back = undo.before.findIndex((term) => !filter.some((given) => sameFilter([given], [term])))
-      void onFilter(undo.before, removeId(Math.max(0, back)))
+      void onFilter(undo.before, removeId(Math.max(0, back) + 1))
     },
   }
 }
@@ -90,7 +90,7 @@ export function FilterChips({
     const term = filter[index]
     if (term === undefined) return
     const next = filter.filter((_, at) => at !== index)
-    removing(next, `removing ${sayFiltered(term, columns)}`, next.length === 0 ? UNDO : removeId(Math.min(index, next.length - 1)))
+    removing(next, `removing ${sayFiltered(term, columns)}`, next.length === 0 ? removeId(0) : removeId(index + 1))
   }
 
   if (filter.length === 0 && undo === null) return null

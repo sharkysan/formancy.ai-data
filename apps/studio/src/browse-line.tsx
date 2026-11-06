@@ -63,7 +63,7 @@ export function FilterLine({
   /** Where the keyboard goes when Esc leaves the line: the table. */
   onLeave: () => void
 }): ReactElement {
-  const applied = printFilterLine(filter, fields)
+  const applied = printFilterLine(filter.slice(0, 1), fields)
   /** What the person has typed since the line last showed the filter applied; null while it shows it. */
   const [draft, setDraft] = useState<string | null>(null)
   const text = draft ?? applied
@@ -92,7 +92,7 @@ export function FilterLine({
 
   useEffect(() => {
     const listener = (event: globalThis.KeyboardEvent): void => {
-      if (event.key !== '/' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.key !== '?' || event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return
       const target = event.target instanceof HTMLElement ? event.target : null
       if (target !== null && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))) return
       const line = box.current
@@ -131,9 +131,11 @@ export function FilterLine({
     // replace, and a line not finished yet lost what was typed on.
     if (!read.ok) {
       setRefusal(read)
+      setDraft(null)
       return
     }
     setRefusal(null)
+    box.current?.blur()
     const kept = filter.filter((term) => !fields.some((field) => field.field === term.field))
     const next = [...kept, ...read.filter]
     // Once the page has arrived the line shows its filter, unless the person typed on while it was on its way.
@@ -163,9 +165,9 @@ export function FilterLine({
       event.preventDefault()
       if (shown) setOpen(false)
       else {
-        setDraft(null)
+        setDraft('')
         setRefusal(null)
-        onLeave()
+        if (event.shiftKey) onLeave()
       }
     }
   }
@@ -221,7 +223,7 @@ export function FilterLine({
             >
               <span className="filter-option-label">{option.label}</span>
               {/* A column's name is its label here, so a name's meaning is said only where it says more. */}
-              {option.hint === '' || option.hint === option.label ? null : (
+              {option.hint === '' ? null : (
                 <>
                   {' '}
                   <span className="filter-option-hint">{option.hint}</span>

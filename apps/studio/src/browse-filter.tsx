@@ -33,7 +33,7 @@ export function BrowseFilter({
         <FilterLine
           fields={fields}
           filter={asLine(filter)}
-          onFilter={(next, arrived) => void onFilter(asBrowse(next), null, arrived)}
+          onFilter={(next, arrived) => void onFilter(asBrowse(next), null, arrived).then((ok) => (ok ? undefined : arrived()))}
           onClear={(arrived) => undoing.removing([], 'clearing the filter', null, arrived)}
           onLeave={onLeave}
         />
