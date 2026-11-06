@@ -333,6 +333,15 @@ came back down by Back or Forward, and the keyboard is then left on nothing;
 and a save's "Saved." or a delete's "Deleted" line said in a tab another
 hides is not heard, only what asks something showing its tab
 ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
+The list of forms keeps a letter's marks in Find a form, "zurich" finding
+no "Zürich", and matches an id too; its search narrows the groups and not
+the forms linked to the open one, so a form can be listed twice, and stays
+as typed after a form is chosen; its groups are ordered as English words
+whatever the reader's language; a linked form's name says the open
+form's title with ’s whatever it ends in; Down and Up move along it, Home,
+End and a letter do not; and on a window narrower than 80rem the box and
+the headings take room in the band above the form
+([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
 Download CSV drops a file in the making when the person leaves the form or
 signs out, and a child section's when they open another record, says
 nothing about it, names no count of records, and says the page handed the
@@ -366,8 +375,7 @@ label is, so an acronym reads as a word, `HR` "Hr" and `HRData` "Hrdata",
 and a letter outside A-Z splits its word, `Verkäufe` "Verk ufe" --
 generation's own behaviour for labels, not fixed here, so the
 administrator types the group. A group is each form's own, renamed one
-form at a time; the studio's Undo does not undo No group; and the host page
-does not draw the groups yet
+form at a time; and the studio's Undo does not undo No group
 ([0143](../decisions/0143-a-form-is-listed-in-a-group.md)).
 What a delete also does is listed by foreign key only, never by trigger or
 rule ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),

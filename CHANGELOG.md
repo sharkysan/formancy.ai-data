@@ -18,6 +18,29 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The host page lists its forms by group, with a search and the forms
+  linked to the open one** (0144). Why: Forms was one list in the order of
+  the forms' ids, read from the top, and the forms an order's fields lead
+  to, or whose rows lead back to it, were reached only from a record; the
+  menu names each form's group since 0143, and a definition the forms its
+  lookups open in since 0140. What you notice: Forms starts with Find a
+  form, which narrows the list as you type -- a form whose title or id
+  holds what you typed, in any case, a letter's marks kept, so "zurich"
+  finds no "Zürich" -- and says how many forms match; Enter opens the one
+  form that matches, Escape empties the box, and Down moves into the list,
+  where Down and Up go on and Up from the first comes back. Nothing found
+  says so, with Clear the search. The forms are under their groups'
+  headings in alphabetical order, a number by its value, the forms in no
+  group last under "Forms"; where no form is in a group the list has no
+  headings and looks as before. Under them, "Linked to" the open form names
+  the forms its fields lead to and the forms whose rows refer to it, each
+  once, in words that name it and say which way the link runs -- "where
+  Order’s fields lead", "rows that refer to Order" -- beside an arrow, →,
+  ← or ↔; the open form itself is never among them, and choosing one keeps
+  the keyboard on that form's link in its group until it opens. While an
+  input method composes a word, Enter and Esc in the box are its own. A narrower
+  window's band of tabs holds the box and the headings too, and wraps.
+  `@formancy/data-client` and the server are unchanged.
 - **A form is listed in a group** (0143). Why: the menu named every form a
   person may read in the order of their ids, and nothing published said
   which belong together, so a host's list of forty forms was one list read
@@ -41,7 +64,7 @@ the same day (formancy.ai 0232).
   shown the group, "(the default)" after it where the draft names none.
   `@formancy/data-client` reads a menu without groups as `unexpected`, and
   an earlier server refuses a version with one, so upgrade the server
-  before the client. The host page does not draw the groups yet.
+  before the client. The host page lists the forms under them (0144, above).
 - **A record's child forms are tabs beside it** (0142). Why: an order with
   lines and deliveries was its form and two grids below it, an employee its
   form and three, so a person scrolled past every child to reach the one

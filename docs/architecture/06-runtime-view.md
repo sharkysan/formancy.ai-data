@@ -194,7 +194,15 @@ moment can both succeed, and nothing deletes a draft (0065).
    No database is asked
    ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
    and Forms (`apps/host/src/forms-nav.tsx`) draws the menu
-   ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
+   ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)):
+   the forms under their groups, narrowed by Find a form as the person
+   types, then, once the open form's definition has answered, the forms
+   linked to it -- those its `opens` names and its children in the menu,
+   each once, never itself -- all decided in the browser from the menu
+   and that definition by `apps/host/src/form-list.ts`, asking the server
+   nothing more; while a linked form chosen is asked for, the keyboard
+   waits on its link in its group
+   ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
    Opening a form reads every bundle the same way (`menuForms`), and
    `lookupOpens` names under each lookup the person may read the forms its
    record opens in: those over its target keyed by what its foreign key
@@ -209,12 +217,18 @@ SIGHUP among them;
 menu answers over a registry that refuses every connection, the same to the
 byte after a form the person may not read is published; and
 `apps/host/src/plane.test.tsx`: every request carries the token in its
-header only; and `presentation/group.test.ts`, where the default group is
-worded and the default spelled out is refused at a write (0143). What it
+header only; `presentation/group.test.ts`, where the default group is
+worded and the default spelled out is refused at a write (0143); and
+`apps/host/src/form-list.test.ts`, `forms-nav-alone.test.tsx` and
+`forms-nav.test.tsx`, where the list is ordered, searched and linked,
+heard from the keyboard, and drawn (0144). What it
 costs: every menu reads and validates every published form; a form it
 names can be 409 `drift` when opened, since only opening asks the database
 (0045); a form whose presentation names no group moves with the words a
-release gives its schema (0143); a host with no backend cannot hold a
+release gives its schema (0143); the host's list keeps a letter's marks
+in Find a form, "zurich" finding no "Zürich", and orders its groups as
+English words whatever the reader's language (0144); a host with no
+backend cannot hold a
 signing secret (0014); a key file refused on SIGHUP is said in an `error`
 line (0059).
 

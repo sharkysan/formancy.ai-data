@@ -30,7 +30,7 @@ export async function allowanceProblem(browser, origin) {
     await page.getByRole('button', { name: 'Sign in' }).click()
     await page
       .getByRole('navigation', { name: 'Forms' })
-      .getByRole('link', { name: `Order ${FORM}` })
+      .getByRole('link', { name: `Order ${FORM}`, exact: true })
       .click()
     // The grid's line, the Records region's first status with no name (0080): its rows have answered.
     await page
