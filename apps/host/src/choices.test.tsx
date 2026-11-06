@@ -11,12 +11,16 @@ import type { Plane } from './test-plane.js'
  * The person's two decisions of 2026-10-10 (0047), through the page: the
  * renderer switch -- React, Angular or Both, React until the viewer chooses
  * -- and the split between the records and the record in Side by side,
- * moved with the keys of the ARIA window splitter. Both are kept for the
- * viewer in this browser and nowhere else.
+ * moved with the keys of the ARIA window splitter. And 0145's: Stacked's
+ * line, the same splitter drawn across, and the layout the viewer chose
+ * last, which an arrival whose address names none opens in. Each is kept
+ * for the viewer in this browser and nowhere else.
  *
  * What the stylesheet does with them -- two papers side by side, the split
- * hidden where Side by side is drawn stacked -- is the browser gate's.
- * `localStorage` is read directly: it is the browser's, not the tree's.
+ * hidden where Side by side is drawn stacked, the Records panel as tall as
+ * Stacked's line says -- is the browser gate's. `localStorage` is read
+ * directly, and the address from the browser's location: they are the
+ * browser's, not the tree's.
  */
 
 let plane: Plane
@@ -36,6 +40,12 @@ afterEach(() => {
 })
 
 const ARRIVES = { timeout: 15_000 }
+
+/** The line between the records and the record: its orientation and where it sits. */
+function lineAt(): [string | null, string | null] {
+  const line = screen.getByRole('separator', { name: 'Records' })
+  return [line.getAttribute('aria-orientation'), line.getAttribute('aria-valuenow')]
+}
 
 async function workspace(formId: string): Promise<User> {
   const user = mount(plane.fetch)
@@ -72,9 +82,12 @@ describe.each(ENGINES)("the viewer's choices on $engine", ({ formId }) => {
 
   // The separator: named by the records it sizes, 55 to 45 until moved, by
   // the arrows a step at a time and by Home and End to its limits, kept for
-  // the viewer -- and there only in Side by side.
+  // the viewer -- and its own: Stacked's line keeps its share apart (to be
+  // watched failing in CI with one share moved for both lines: Stacked's
+  // line came at the split's 30).
   test('splits the records and the record at 55, moves by its keys, and keeps where it was left', async () => {
     const user = await workspace(formId)
+    await user.click(screen.getByRole('radio', { name: 'Side by side' }))
     const split = screen.getByRole('separator', { name: 'Records' })
     expect({
       now: split.getAttribute('aria-valuenow'),
@@ -94,12 +107,83 @@ describe.each(ENGINES)("the viewer's choices on $engine", ({ formId }) => {
     await user.keyboard('{ArrowRight}')
     expect(focusedName()).toBe('Records')
     expect(localStorage.getItem(PREFERENCES.split)).toBe('30')
+    // Stacked's line where it was: the split's share is the split's.
+    await user.click(screen.getByRole('radio', { name: 'Stacked' }))
+    expect(lineAt()).toEqual(['horizontal', '60'])
+    await user.click(screen.getByRole('radio', { name: 'Side by side' }))
     cleanup()
 
     const again = await workspace(formId)
     expect(screen.getByRole('separator', { name: 'Records' }).getAttribute('aria-valuenow')).toBe('30')
     await again.click(screen.getByRole('radio', { name: 'Stacked' }))
-    expect(screen.queryByRole('separator')).toBeNull()
+    expect(lineAt()).toEqual(['horizontal', '60'])
     expect(within(gridSection('Records')).getByRole('grid', { name: 'Records' })).toBeTruthy()
+  })
+
+  // Stacked's line (0145), where a person arrives: named by the records it
+  // sizes, drawn across, 60 to 40 until moved, by Down and Up a step at a
+  // time -- not by Left and Right, a vertical one's -- and by Home and End to
+  // its limits, the outer bounds where jsdom gives no window height; kept
+  // for the viewer under its own key, and the keyboard left on it (to be
+  // watched failing in CI with the split's keys for both: ArrowRight moved
+  // the line down).
+  test("shares Stacked's height at 60, moves by Up and Down, and keeps where it was left", async () => {
+    const user = await workspace(formId)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
+    const line = screen.getByRole('separator', { name: 'Records' })
+    expect({
+      now: line.getAttribute('aria-valuenow'),
+      min: line.getAttribute('aria-valuemin'),
+      max: line.getAttribute('aria-valuemax'),
+      orientation: line.getAttribute('aria-orientation'),
+    }).toEqual({ now: '60', min: '25', max: '75', orientation: 'horizontal' })
+    line.focus()
+    await user.keyboard('{ArrowDown}')
+    expect(line.getAttribute('aria-valuenow')).toBe('65')
+    await user.keyboard('{ArrowUp}{ArrowUp}')
+    expect(line.getAttribute('aria-valuenow')).toBe('55')
+    await user.keyboard('{ArrowRight}')
+    expect(line.getAttribute('aria-valuenow')).toBe('55')
+    await user.keyboard('{ArrowLeft}')
+    expect(line.getAttribute('aria-valuenow')).toBe('55')
+    await user.keyboard('{End}')
+    expect(line.getAttribute('aria-valuenow')).toBe('75')
+    await user.keyboard('{Home}{ArrowDown}')
+    expect(line.getAttribute('aria-valuenow')).toBe('30')
+    expect(focusedName()).toBe('Records')
+    expect([localStorage.getItem(PREFERENCES.stack), localStorage.getItem(PREFERENCES.split)]).toEqual(['30', null])
+    cleanup()
+
+    await workspace(formId)
+    expect(screen.getByRole('separator', { name: 'Records' }).getAttribute('aria-valuenow')).toBe('30')
+  })
+
+  // The layout is the person's (0145): chosen in the Layout group -- Drill
+  // down too -- it is kept, and an arrival whose address names no layout
+  // opens in it; an address that names one wins, as a shared link does,
+  // and leaves the kept one as it was (to be watched failing in CI with the
+  // kept layout unread on arrival: the second arrival was Stacked).
+  test('opens in the layout the viewer chose last, and an address naming one wins without being kept', async () => {
+    const user = await workspace(formId)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Stacked' }).checked).toBe(true)
+    await user.click(screen.getByRole('radio', { name: 'Drill down' }))
+    expect(localStorage.getItem(PREFERENCES.layout)).toBe('drill')
+    cleanup()
+
+    window.history.replaceState(null, '', '/')
+    await workspace(formId)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Drill down' }).checked).toBe(true)
+    expect(window.location.hash).toBe(`#form=${formId}&layout=drill&view=records`)
+    cleanup()
+
+    window.history.replaceState(null, '', '/#layout=separate')
+    await workspace(formId)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Separate views' }).checked).toBe(true)
+    expect(localStorage.getItem(PREFERENCES.layout)).toBe('drill')
+    cleanup()
+
+    window.history.replaceState(null, '', '/')
+    await workspace(formId)
+    expect(screen.getByRole<HTMLInputElement>('radio', { name: 'Drill down' }).checked).toBe(true)
   })
 })

@@ -118,6 +118,12 @@
 //     within its limits and the share is kept, and letting it go fits the
 //     grids' columns to the rows shown then -- a column a search filled
 //     with a longer value is cut before and whole after (0047);
+//   - Stacked's line (0145): a window arrives in Stacked with no layout
+//     kept, a phone in Separate views; the line is drawn across at every
+//     width, 320 pixels among them, Down moves it a step and Home and End
+//     to its limits with the keyboard staying on it, the Records panel is
+//     as tall as it says of the window's height, and a pointer drags it
+//     within its limits and the share is kept;
 //   - the papers are the theme's and the grids their theme's: no rule of
 //     host.css selects anything on either form or in either grid;
 //   - every `@media` condition is one the gate reads: a `max-width` in rem,

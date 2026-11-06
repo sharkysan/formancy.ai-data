@@ -1,12 +1,16 @@
+import { LAYOUTS } from './layout.js'
+import type { Layout } from './layout.js'
+
 /*
  * What one viewer's browser keeps of the workspace, and nothing else: which
  * renderer draws the record, and where the split between the records and
- * the record sits (0047, the person's decisions of 2026-10-10), and for
- * each form a grid's columns and the list it shows, one value per kind of
- * section (0106, columns.ts). Kept in `localStorage` for that viewer alone;
- * every call is wrapped, because a browser with site data blocked throws on
- * each one, and the page then works with the defaults. The token is never
- * kept (0029), and no condition of a filter is (0104).
+ * the record sits (0047, the person's decisions of 2026-10-10), the layout
+ * they chose last and where Stacked's line sits (0145), and for each form a
+ * grid's columns and the list it shows, one value per kind of section
+ * (0106, columns.ts). Kept in `localStorage` for that viewer alone; every
+ * call is wrapped, because a browser with site data blocked throws on each
+ * one, and the page then works with the defaults. The token is never kept
+ * (0029), and no condition of a filter is (0104).
  */
 
 /** The renderers a person may have the record drawn with: one of the two, or both side by side. */
@@ -19,7 +23,13 @@ export const RENDERER_CHOICES: readonly RendererChoice[] = ['react', 'angular', 
  * `grid` is the prefix of a grid's, one per form in its Records panel and
  * one per form and parent field in a child section (`gridKey`).
  */
-export const PREFERENCES = { renderer: 'formancy-data-host.renderer', split: 'formancy-data-host.split', grid: 'formancy-data-host.grid.' } as const
+export const PREFERENCES = {
+  renderer: 'formancy-data-host.renderer',
+  layout: 'formancy-data-host.layout',
+  split: 'formancy-data-host.split',
+  stack: 'formancy-data-host.stack',
+  grid: 'formancy-data-host.grid.',
+} as const
 
 /** Which grid of a form a kept value is for: its Records panel's, or a child section's, narrowed by one of its lookup fields. */
 export type GridSection = { kind: 'records' } | { kind: 'child'; field: string }
@@ -37,16 +47,57 @@ export function gridKey(section: GridSection, formId: string): string {
 }
 
 /**
- * The split, as the records' share of the width in percent. 55 is the
- * person's default; `outer` bounds every limit, and a step is what an arrow
- * key moves it by. Not measured: the shares are the prototype's, and the
- * content minimums below are what the records' toolbar and a paper's two
- * columns were drawn at in it.
+ * Which way a line between the records and the record moves (0145): Side by
+ * side's split across the width the two lanes share, Stacked's line down
+ * the window's height.
  */
-export const SPLIT = { initial: 55, step: 5, outer: { min: 25, max: 75 } } as const
+export type Axis = 'width' | 'height'
 
-/** The narrowest each side may be, in rem: the Records panel's toolbar, and a form's paper. */
-const MINIMUM = { records: 20, record: 24 } as const
+/** The records' share of each axis, in percent. */
+export type Shares = Readonly<Record<Axis, number>>
+
+/** How far a line may move, in percent. */
+export interface Limits {
+  min: number
+  max: number
+}
+
+/**
+ * Each line's share, the records' in percent: its default, the step an
+ * arrow key moves it by, the outer bounds every limit is inside, the least
+ * each side may be in rem, and the key it is kept under.
+ *
+ * Side by side's is the person's (0047): 55 by default, across the width
+ * the two lanes share. Not measured: the shares are the prototype's, and the
+ * least widths what the records' toolbar and a paper's two columns were
+ * drawn at in it.
+ *
+ * Stacked's (0145) is a share of the window's height, which the Records
+ * panel is drawn as tall as. Not measured either, but summed from the
+ * stylesheets' own heights and rounded up: the records' least, 18rem, is
+ * their heading's row and the search's, 2.5rem each (controls.css), the
+ * grid's header, its row of boxes and one row, 134 pixels at
+ * grid-theme.ts's heights, and the panel's padding and gaps; the record's,
+ * 12rem, is the 7.5rem the app bar and the form's header take above the
+ * lanes on a wide window (workspace.css), the line's 0.75rem, and the
+ * record's heading's row inside its panel's padding. 60 is where the two
+ * meet in the shortest window that holds both, 30rem: 18 of the 30.
+ */
+export const SPLITS = {
+  width: { key: PREFERENCES.split, initial: 55, step: 5, outer: { min: 25, max: 75 }, least: { records: 20, record: 24 } },
+  height: { key: PREFERENCES.stack, initial: 60, step: 5, outer: { min: 25, max: 75 }, least: { records: 18, record: 12 } },
+} as const
+
+/** The keys that move a line towards less of the records and towards more: Side by side's split takes either arrow of each pair, as it always has; Stacked's line, drawn across, Up and Down alone, as the window splitter pattern has a horizontal one. */
+const KEYS: Readonly<Record<Axis, { less: readonly string[]; more: readonly string[] }>> = {
+  width: { less: ['ArrowLeft', 'ArrowUp'], more: ['ArrowRight', 'ArrowDown'] },
+  height: { less: ['ArrowUp'], more: ['ArrowDown'] },
+}
+
+/** The line a layout draws between the records and the record: none where one view is shown at a time. */
+export function axisOf(layout: Layout): Axis | null {
+  return layout === 'side-by-side' ? 'width' : layout === 'stacked' ? 'height' : null
+}
 
 /** `localStorage`, or nothing where reading it throws. */
 export function browserStorage(): Storage | undefined {
@@ -93,47 +144,52 @@ export function writeRenderer(storage: Storage | undefined, choice: RendererChoi
   writePreference(storage, PREFERENCES.renderer, choice)
 }
 
-export function readSplit(storage: Storage | undefined): number {
-  const kept = Number(readPreference(storage, PREFERENCES.split))
-  return Number.isInteger(kept) && kept >= SPLIT.outer.min && kept <= SPLIT.outer.max ? kept : SPLIT.initial
+export function readShare(storage: Storage | undefined, axis: Axis): number {
+  const { key, initial, outer } = SPLITS[axis]
+  const kept = Number(readPreference(storage, key))
+  return Number.isInteger(kept) && kept >= outer.min && kept <= outer.max ? kept : initial
 }
 
-export function writeSplit(storage: Storage | undefined, share: number): void {
-  writePreference(storage, PREFERENCES.split, String(share))
+export function writeShare(storage: Storage | undefined, axis: Axis, share: number): void {
+  writePreference(storage, SPLITS[axis].key, String(share))
+}
+
+/** The layout the viewer chose last, or null where none is kept or what is kept names none. */
+export function readLayout(storage: Storage | undefined): Layout | null {
+  const kept = readPreference(storage, PREFERENCES.layout)
+  return LAYOUTS.find((layout) => layout === kept) ?? null
+}
+
+export function writeLayout(storage: Storage | undefined, layout: Layout): void {
+  writePreference(storage, PREFERENCES.layout, layout)
 }
 
 /**
- * How far the separator may move when the two lanes share `width` pixels and
- * a rem is `rem` pixels: neither side narrower than its content's minimum,
- * within the outer bounds. With no width to go by -- a lane not laid out --
- * the outer bounds; with too little for both minimums, the default alone.
+ * How far the line on `axis` may move when it shares `size` pixels -- the
+ * lanes' width, or the window's height -- and a rem is `rem` pixels: neither
+ * side smaller than its least, within the outer bounds. With no size to go
+ * by -- a lane not laid out -- the outer bounds; with too little for both
+ * leasts, the default alone.
  */
-export function splitLimits(width: number, rem: number): { min: number; max: number } {
-  if (!(width > 0)) return { ...SPLIT.outer }
-  const min = Math.max(SPLIT.outer.min, Math.ceil(((MINIMUM.records * rem) / width) * 100))
-  const max = Math.min(SPLIT.outer.max, Math.floor(100 - ((MINIMUM.record * rem) / width) * 100))
-  return min > max ? { min: SPLIT.initial, max: SPLIT.initial } : { min, max }
+export function shareLimits(axis: Axis, size: number, rem: number): Limits {
+  const { initial, outer, least } = SPLITS[axis]
+  if (!(size > 0)) return { ...outer }
+  const min = Math.max(outer.min, Math.ceil(((least.records * rem) / size) * 100))
+  const max = Math.min(outer.max, Math.floor(100 - ((least.record * rem) / size) * 100))
+  return min > max ? { min: initial, max: initial } : { min, max }
 }
 
 /** `share` held inside `limits`. */
-export function clampSplit(share: number, limits: { min: number; max: number }): number {
+export function clampSplit(share: number, limits: Limits): number {
   return Math.min(limits.max, Math.max(limits.min, share))
 }
 
-/** Where a key moves the separator from `share`, or null for a key it does not answer. */
-export function stepSplit(share: number, key: string, limits: { min: number; max: number }): number | null {
-  switch (key) {
-    case 'ArrowLeft':
-    case 'ArrowUp':
-      return clampSplit(share - SPLIT.step, limits)
-    case 'ArrowRight':
-    case 'ArrowDown':
-      return clampSplit(share + SPLIT.step, limits)
-    case 'Home':
-      return limits.min
-    case 'End':
-      return limits.max
-    default:
-      return null
-  }
+/** Where a key moves the line on `axis` from `share`, or null for a key it does not answer. */
+export function stepShare(axis: Axis, share: number, key: string, limits: Limits): number | null {
+  const { step } = SPLITS[axis]
+  if (KEYS[axis].less.includes(key)) return clampSplit(share - step, limits)
+  if (KEYS[axis].more.includes(key)) return clampSplit(share + step, limits)
+  if (key === 'Home') return limits.min
+  if (key === 'End') return limits.max
+  return null
 }

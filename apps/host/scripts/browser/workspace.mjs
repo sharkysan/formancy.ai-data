@@ -1,5 +1,6 @@
 // The workspace's states in the browser (0047): signed in, a form's records in
-// each layout, a row open and then its lines in their tab, a line open, the unsaved-changes
+// each layout -- Stacked first, where a wide window arrives, with its line
+// moved by the keys and a pointer (0145) -- a row open and then its lines in their tab, a line open, the unsaved-changes
 // notice, a refused list and an order line opened alone, whose Order is a
 // plain select (0066) -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
@@ -127,7 +128,14 @@ export function workspaceJourney(plane, { check }, run) {
       },
     ],
     [
-      'Records, side by side',
+      // Where a window arrives with nothing kept (0145): Stacked, and on a
+      // phone Separate views (UX-SPEC D14), whose pass then chooses Stacked.
+      // Its line, at every width the gate measures, 320 pixels among them:
+      // drawn across, moved a step by Down and to its limits by Home and
+      // End with the keyboard staying on it, the Records panel as tall as
+      // it says of the window's height, dragged by a pointer within its
+      // limits, and kept for the viewer. A layout measure, so the browser's.
+      'Records, stacked',
       async (page) => {
         await page
           .getByRole('navigation', { name: 'Forms' })
@@ -135,6 +143,73 @@ export function workspaceJourney(plane, { check }, run) {
           .click()
         await answered(records(page), /^Rows 1–/)
         check('a form chosen: the keyboard is on its heading', await focusedOn(page, page.getByRole('heading', { level: 2, name: `Order ${FORM}` })))
+        const arrived = (await page.evaluate(() => window.matchMedia('(max-width: 40rem)').matches)) ? 'Separate views' : 'Stacked'
+        check(
+          'arriving with no layout kept: Stacked, or Separate views on a phone',
+          (await page.getByRole('radio', { name: arrived, exact: true }).isChecked()) ? null : `${arrived} is not checked`,
+        )
+        await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
+        const line = page.getByRole('separator', { name: 'Records' })
+        const at = async () => ({
+          now: Number(await line.getAttribute('aria-valuenow')),
+          min: Number(await line.getAttribute('aria-valuemin')),
+          max: Number(await line.getAttribute('aria-valuemax')),
+        })
+        const across = await line.getAttribute('aria-orientation')
+        check(
+          'Stacked: its line is drawn across',
+          (await line.isVisible()) && across === 'horizontal' ? null : `drawn: ${String(await line.isVisible())}, ${String(across)}`,
+        )
+        await line.focus()
+        const before = await at()
+        await page.keyboard.press('ArrowDown')
+        const down = await at()
+        await page.keyboard.press('Home')
+        const home = await at()
+        await page.keyboard.press('End')
+        const end = await at()
+        check(
+          'Stacked: Down moves its line a step, Home and End to its limits, the keyboard staying on it',
+          down.now === Math.min(before.now + 5, before.max) && home.now === home.min && end.now === end.max && home.min < end.max
+            ? await focusedOn(page, line)
+            : JSON.stringify({ before, down, home, end }),
+        )
+        const tall = await records(page).evaluate(
+          (panel, share) => ({ height: panel.getBoundingClientRect().height, wanted: (share / 100) * document.documentElement.clientHeight }),
+          end.now,
+        )
+        check(
+          'Stacked: the Records panel is as tall as its line says of the window',
+          Math.abs(tall.height - tall.wanted) <= 1 ? null : `${String(Math.round(tall.height))} px, not ${String(Math.round(tall.wanted))}`,
+        )
+        // Up from its limit by a pointer, where the window shows it.
+        await line.evaluate((element) => element.scrollIntoView({ block: 'center' }))
+        const box = await line.boundingBox()
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+        await page.mouse.down()
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 80, { steps: 6 })
+        await page.mouse.up()
+        const dragged = await at()
+        const kept = await page.evaluate(() => window.localStorage.getItem('formancy-data-host.stack'))
+        check(
+          'Stacked: dragging its line moves it, within its limits, and keeps it',
+          dragged.now < end.now && dragged.now >= dragged.min && kept === String(dragged.now)
+            ? null
+            : `from ${String(end.now)} to ${String(dragged.now)}, at least ${String(dragged.min)}, kept ${String(kept)}`,
+        )
+        // Back near where it arrived, for the states after.
+        await line.focus()
+        await page.keyboard.press('Home')
+        for (let step = 0; step < 20 && (await at()).now < before.now; step += 1) await page.keyboard.press('ArrowDown')
+      },
+    ],
+    [
+      'Records, side by side',
+      async (page) => {
+        // A phone arrives in Separate views (UX-SPEC D14), every other window
+        // in Stacked (0145); the journey goes on side by side, which a narrow
+        // window draws stacked.
+        await page.getByRole('radio', { name: 'Side by side', exact: true }).check()
         // Shift and an arrow on a header is AG Grid's way to move a column. It
         // moves by where the header is drawn, which jsdom does not lay out, so
         // only here does a movable column show (0047): the columns stay the
@@ -186,8 +261,6 @@ export function workspaceJourney(plane, { check }, run) {
           first.problem ??
             (first.first && first.cut === 0 ? null : `on the first cell: ${String(first.first)}; ${String(first.cut)} px of it outside the grid's well`),
         )
-        // A phone arrives in Separate views (UX-SPEC D14); the journey starts side by side, which a narrow window draws stacked.
-        await page.getByRole('radio', { name: 'Side by side', exact: true }).check()
         // Where the separator is drawn, a pointer moves it, within its limits, and the share is kept for the viewer.
         const split = page.getByRole('separator', { name: 'Records' })
         if (await split.isVisible()) {

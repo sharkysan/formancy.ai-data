@@ -24,7 +24,8 @@ import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
-import type { RendererChoice } from './prefs.js'
+import { axisOf, clampSplit } from './prefs.js'
+import type { Axis, RendererChoice, Shares } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
@@ -32,7 +33,7 @@ import { RecordTabs } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
-import { Split } from './split.js'
+import { Split, useShareLimits } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
 import type { FormOf } from './use-drill.js'
@@ -42,9 +43,9 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
 /**
  * One open form (0047): its header -- the title and id, what this person
  * may do, the Layout group -- the unsaved notice when a request waits, and
- * the lanes: the Records panel, the separator in Side by side, and the
- * detail with the record's forms and its child sections, in tabs beside it
- * (0142).
+ * the lanes: the Records panel, the line between it and the record in Side
+ * by side and in Stacked (0145), and the detail with the record's forms and
+ * its child sections, in tabs beside it (0142).
  *
  * Every lane stays mounted in every layout and view: a layout or view change
  * alters classes and `hidden`, nothing else, so it discards no draft and a
@@ -68,7 +69,7 @@ export function FormView({
   narrow,
   phone,
   renderer,
-  split,
+  shares,
   notice,
   headingRef,
   onLayout,
@@ -94,16 +95,17 @@ export function FormView({
   /** A phone's window (≤ 40rem): Drill down's trail draws its ends. */
   phone: boolean
   renderer: RendererChoice
-  split: number
+  /** The records' share of the lanes' width in Side by side, and of the window's height in Stacked. */
+  shares: Shares
   notice: ReactNode
   headingRef: RefObject<HTMLHeadingElement | null>
-  /** A layout chosen; entering Drill down, on the level it shows. */
-  onLayout: (layout: Layout, at?: { view: View; level?: number }) => void
+  /** A layout shown; entering Drill down, on the level it shows; `chose`, the person's in the Layout group, which is kept (0145). */
+  onLayout: (layout: Layout, at?: { view: View; level?: number }, chose?: boolean) => void
   /** `replace`: the view changed without a step of its own in the history -- after a delete, the record view is not one to go back to. */
   onView: (view: View, replace?: boolean, level?: number) => void
   onRenderer: (choice: RendererChoice) => void
-  onSplit: (share: number) => void
-  onSplitSettled: (share: number) => void
+  onSplit: (axis: Axis, share: number) => void
+  onSplitSettled: (axis: Axis, share: number) => void
   /** The children the menu names for a form: each Drill down level's sections. */
   childFormsOf: (formId: string) => Promise<ChildForm[]>
   /** A form a lookup's record opens in (0141), as the menu names it and the server defines it. */
@@ -441,10 +443,16 @@ export function FormView({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- it runs on each change made by history, from the render that saw it, so what it reads is current
   }, [historyView])
 
-  const sideBySide = layout === 'side-by-side'
-  const note = narrow && sideBySide
+  const note = narrow && layout === 'side-by-side'
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
-  const style = { '--records-share': `${String(split)}fr`, '--record-share': `${String(100 - split)}fr` } as CSSProperties
+  const axis = axisOf(layout)
+  const limits = useShareLimits(axis, lanes)
+  const style = {
+    '--records-share': `${String(shares.width)}fr`,
+    '--record-share': `${String(100 - shares.width)}fr`,
+    // Stacked's records as tall as its line says, inside the window's limits (0145).
+    '--records-height': `${String(axis === 'height' ? clampSplit(shares.height, limits) : shares.height)}dvh`,
+  } as CSSProperties
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
   const crumbs: Crumb[] = [
     { level: 0, said: ['Records'] },
@@ -461,7 +469,7 @@ export function FormView({
         layout={layout}
         note={note}
         headingRef={headingRef}
-        onLayout={(next) => (next === 'drill' ? onLayout(next, drill.enter(open !== null)) : onLayout(next))}
+        onLayout={(next) => onLayout(next, next === 'drill' ? drill.enter(open !== null) : undefined, true)}
       />
       {notice}
       {drilling ? <Trail crumbs={crumbs} compact={phone} onUp={(at, button) => drill.up(at, () => button.focus())} /> : null}
@@ -493,18 +501,20 @@ export function FormView({
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
           onTreeOpen={openFrom}
         />
-        {sideBySide ? (
+        {axis === null ? null : (
           <Split
-            share={split}
+            axis={axis}
+            share={shares[axis]}
+            limits={limits}
             lanes={lanes}
             labelledBy="records-heading"
-            onMove={onSplit}
+            onMove={(share) => onSplit(axis, share)}
             onSettle={(share) => {
-              onSplitSettled(share)
+              onSplitSettled(axis, share)
               setReleased((count) => count + 1)
             }}
           />
-        ) : null}
+        )}
         <Detail
           formTitle={title}
           formId={formId}

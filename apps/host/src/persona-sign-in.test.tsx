@@ -258,8 +258,8 @@ describe('signed in to the demo', () => {
   // The token is in the client's closure, as the token form's is, and the
   // page writes no cookie of its own: the demo's is the Worker's, HttpOnly,
   // which a page's script can neither read nor write (here it lives in the
-  // door, outside the document). The browser keeps the viewer's two
-  // choices and nothing else (0047).
+  // door, outside the document). The browser keeps the viewer's choices,
+  // under the keys the page names, and nothing else (0047, 0145).
   test('the token is in no storage, no cookie the page wrote, no address and nowhere in the document', async () => {
     const { user, door } = demoPage()
     await signInAs(user, 'Clara')

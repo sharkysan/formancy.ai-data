@@ -5,9 +5,10 @@
  *
  * A grid's well is as tall as its page (the page sets .grid-bench's height
  * from the rows it holds: the header, a row band each, the scrollbar), and
- * never taller than its cap. In Side by side and Separate views the Records
- * panel has the cap and the well shrinks into it; elsewhere the well's own
- * max-height is the cap.
+ * never taller than its cap. In Side by side, Separate views and Drill down
+ * the Records panel has the cap and the well shrinks into it; in Stacked the
+ * panel is as tall as its line says and the well fills what its toolbar
+ * leaves (0145); elsewhere the well's own max-height is the cap.
  */
 
 /* ------------------------------------------------------------------ Records */
@@ -182,6 +183,21 @@
 
 .lanes:is([data-layout='side-by-side'], [data-layout='separate'], [data-layout='drill']) .grid-bench.master-bench {
   flex: 0 1 auto;
+  min-height: 7.25rem;
+  max-height: none;
+}
+
+/* Stacked: the Records panel as tall as the viewer's share of the window's
+   height, which the line sets and keeps inside the window's limits (0145),
+   however few rows its page holds; a panel shorter than its toolbar and the
+   grid's least scrolls inside itself, as Side by side's does. */
+.lanes[data-layout='stacked'] > .master {
+  height: var(--records-height);
+  overflow: auto;
+}
+
+.lanes[data-layout='stacked'] .grid-bench.master-bench {
+  flex: 1 1 auto;
   min-height: 7.25rem;
   max-height: none;
 }

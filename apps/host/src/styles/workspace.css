@@ -460,6 +460,27 @@ main.workspace-main:where(:not(.sheet *, .grid-bench *)) {
   background-image: linear-gradient(var(--client), var(--client));
 }
 
+/* Stacked: the records above the record, the Records panel as tall as the
+   viewer's share of the window's height (records.css), and the line between
+   them, which is the gap: across the lanes, a 2px rule in a band as tall as
+   the gap was (0145). Drawn at every width, since Stacked is stacked at
+   every width. */
+.lanes[data-layout='stacked'] {
+  row-gap: 0;
+}
+
+.stack-line {
+  height: 0.75rem;
+  border-radius: 999px;
+  background: linear-gradient(var(--edge-strong), var(--edge-strong)) center / 100% 2px no-repeat;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.stack-line:hover {
+  background-image: linear-gradient(var(--client), var(--client));
+}
+
 .detail {
   display: grid;
   gap: 1rem;

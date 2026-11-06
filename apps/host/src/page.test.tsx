@@ -612,8 +612,9 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
 
   // The token is held in the client's closure and nowhere a script, an
   // extension or the next person at the machine could read it back. The
-  // browser keeps the viewer's two choices -- the renderer and the split --
-  // and nothing else (0047).
+  // browser keeps the viewer's choices -- the renderer and the split (0047),
+  // the layout and Stacked's line (0145) -- under the keys the page names,
+  // and nothing else.
   test('the token is in no storage, no cookie, no address and nowhere in the document', async () => {
     await openForm(plane, formId)
     const kept = Object.keys(localStorage)
