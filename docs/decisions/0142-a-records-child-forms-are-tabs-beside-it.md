@@ -40,26 +40,25 @@
   `apps/host/src/record-tabs.test.tsx`, on both engines against the real
   server -- an order's own tab first and shown, then a tab per child form
   in the menu's order, no child's grid drawn nor its page asked until its
-  tab is shown, and the floor passed (to be watched failing in CI with
+  tab is shown, and the floor passed (watched failing in CI with
   every panel drawn as the record opens); the arrows select a tab, Tab
   goes into its panel, and a tab left keeps a line open on its rail with
-  its typing and its row marked, asking nothing (to be watched failing in
+  its typing and its row marked, asking nothing (watched failing in
   CI with the arrows moving the keyboard alone); another record opens on
-  its own tab (to be watched failing in CI with the selection kept for
+  its own tab (watched failing in CI with the selection kept for
   another record); a party whose one child is a section of it draws no
-  tabs (to be watched failing in CI with a section given a tab); a Drill
+  tabs (watched failing in CI with a section given a tab); a Drill
   down level's children are tabs of its own, each level keeping its tab
-  while the person goes up and down again (to be watched failing in CI
+  while the person goes up and down again (watched failing in CI
   with a level drawing its sections under its panes, as before); and, on
   SQL Server, a line's delete answered with "Not deleted" while the
   order's tab is shown shows the lines' tab again with the keyboard on
-  the question (to be watched failing in CI with a section's `onShow`
+  the question (watched failing in CI with a section's `onShow`
   showing its view alone); in each, a line's save refused as stale while
   the order's tab is shown shows the lines' tab with the keyboard on its
-  notice (to be watched failing in CI with a pane's notice focused where
+  notice (watched failing in CI with a pane's notice focused where
   it is, its tab hidden); and typing in a line on the lines' tab is named
-  by the guard when another order opens from the order's tab (to be
-  watched failing in CI with the guard counting the forms of the tab
+  by the guard when another order opens from the order's tab (watched failing in CI with the guard counting the forms of the tab
   shown alone) -- eight breaks chosen so that each fails its own case and
   no other. The suites that reach a child section --
   `children.test.tsx`, `drill.test.tsx`, `delete.test.tsx`,
@@ -78,8 +77,11 @@
   `styles/tabs.css` reaching the paper (not watched failing: pressing a
   tab is what they now do to reach a section); and `drilling.mjs` holds a
   customer's orders until their tab is hidden again, lets the page land
-  there, shows the tab and finds no cell of it cut (to be watched failing
-  in CI with the size made while hidden, as before).
+  there, shows the tab and finds no cell of it cut (watched failing
+  in CI with the size made while hidden, as before). The page cases
+  were watched failing on both engines in one run of their eight breaks,
+  and the gate check in all three browsers in a run of its own, each
+  since reverted.
 
 ## Context
 
