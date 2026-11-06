@@ -225,9 +225,20 @@ describe('when the data server is not what answers', () => {
   // child without `one` -- a server older than sections (0109) -- or a
   // section whose condition a page could not compare is not this server's
   // either: a page would draw a section as a grid, or show it never.
-  // Watched failing with `one` unchecked.
+  // Watched failing with `one` unchecked. An entry without `group` -- a
+  // server older than groups (0143) -- or with one that is neither text
+  // nor `null` is not this server's either: a page would list the form
+  // under no group where its server would have named one. Watched failing
+  // with `group` unchecked: the entry without one was taken; and with only
+  // its presence checked: 7 was taken.
   test("a menu is GET /v1/forms, taken only in the server's shape", async () => {
-    const ENTRY = { id: 'pg-order', title: 'Order', operations: ['read'], children: [{ form: 'pg-order-line', field: 'order', one: false, when: null }] }
+    const ENTRY = {
+      id: 'pg-order',
+      title: 'Order',
+      group: 'Sales',
+      operations: ['read'],
+      children: [{ form: 'pg-order-line', field: 'order', one: false, when: null }],
+    }
     let body: unknown = { forms: [ENTRY] }
     const { base, asked } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -236,6 +247,9 @@ describe('when the data server is not what answers', () => {
     expect(await client.forms()).toEqual({ ok: true, value: body })
     expect(asked).toEqual(['GET /v1/forms Bearer t'])
     const { children: _children, ...childless } = ENTRY
+    const { group: _group, ...ungrouped } = ENTRY
+    body = { forms: [{ ...ENTRY, group: null }] }
+    expect(await client.forms()).toEqual({ ok: true, value: body })
     const child = { form: 'pg-order-line', field: 'order', one: false, when: null }
     const sections = [
       { ...child, one: true, when: null },
@@ -261,6 +275,8 @@ describe('when the data server is not what answers', () => {
       undefined,
       {},
       [childless],
+      [ungrouped],
+      [{ ...ENTRY, group: 7 }],
       [{ ...ENTRY, id: 7 }],
       [{ ...ENTRY, title: null }],
       [{ ...ENTRY, operations: 'read' }],

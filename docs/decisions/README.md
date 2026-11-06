@@ -84,7 +84,7 @@ only enforcement is "we remember" says so plainly.
 | [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067; extended by 0079 |
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058, 0117 |
-| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075, 0105, 0119, 0129 |
+| [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075, 0105, 0119, 0129, 0143 |
 | [0031](0031-an-answer-lost-after-a-write-is-unknown.md) | An answer lost after a write is unknown, carried to the host as such, and never replayed by anything here | accepted; extended by 0040, 0041, 0047, 0050, 0053, 0058, 0113 |
 | [0032](0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md) | A clean install is the composed stack behind one proxy, and CI runs its guide | accepted; extended by 0035, 0037, 0046, 0051, 0059, 0071, 0102; narrowed by 0072, 0083 |
 | [0033](0033-the-administrator-plane-is-audited.md) | The administrator's plane is audited like the runtime, one event per request | accepted; extended by 0060, 0062, 0065, 0099 |
@@ -99,7 +99,7 @@ only enforcement is "we remember" says so plainly.
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | superseded by 0118 |
 | [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted; extended by 0044, 0050, 0079 |
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110, 0136 |
-| [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050, 0109 |
+| [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050, 0109, 0143 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
 | [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131, 0142 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054; amended by 0064 |
@@ -197,3 +197,4 @@ only enforcement is "we remember" says so plainly.
 | [0140](0140-a-form-names-the-forms-each-lookups-record-opens-in.md) | A form names the forms each lookup's record opens in | accepted |
 | [0141](0141-a-lookups-record-opens-below-the-record.md) | A lookup's record opens below the record | accepted |
 | [0142](0142-a-records-child-forms-are-tabs-beside-it.md) | A record's child forms are tabs beside it | accepted |
+| [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted |

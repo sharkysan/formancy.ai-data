@@ -45,10 +45,10 @@ describe('the menu', () => {
     const granted = ['read', 'create', 'update']
     expect(menu).toEqual({
       forms: [
-        { id: 'ms-order', title: 'Order', operations: granted, children: [{ form: 'ms-order-line', field: 'order', one: false, when: null }] },
-        { id: 'ms-order-line', title: 'Order line', operations: granted, children: [] },
-        { id: 'pg-order', title: 'Order', operations: granted, children: [{ form: 'pg-order-line', field: 'order', one: false, when: null }] },
-        { id: 'pg-order-line', title: 'Order line', operations: granted, children: [] },
+        { id: 'ms-order', title: 'Order', group: 'Sales', operations: granted, children: [{ form: 'ms-order-line', field: 'order', one: false, when: null }] },
+        { id: 'ms-order-line', title: 'Order line', group: 'Sales', operations: granted, children: [] },
+        { id: 'pg-order', title: 'Order', group: 'Sales', operations: granted, children: [{ form: 'pg-order-line', field: 'order', one: false, when: null }] },
+        { id: 'pg-order-line', title: 'Order line', group: 'Sales', operations: granted, children: [] },
       ],
     })
     expect(plane.sent).toEqual([expect.objectContaining({ method: 'GET', url: `${plane.base}/v1/forms`, body: undefined })])

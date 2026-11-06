@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { presentationOf, statesOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
+import { defaultGroup, presentationOf, statesOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
 import type { DriftChange, DriftReport, FormPolicy, ReassignedKey, StateLabel, StoredListView } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
@@ -138,6 +138,7 @@ export function PublishStep({
   views = [],
   unfiltered = [],
   states = [],
+  group,
   policy,
   stale,
   regeneratedFrom = null,
@@ -158,6 +159,8 @@ export function PublishStep({
   unfiltered?: readonly string[]
   /** The labels of the state field's states (0129): those of states the policy still names are published. */
   states?: readonly StateLabel[]
+  /** The group the Presentation step's box shows (0143), `null` for none; left out, the default, which the publish leaves out too. */
+  group?: string | null
   policy: FormPolicy
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
@@ -239,11 +242,14 @@ export function PublishStep({
     // So are no labels; and a label of a state the policy no longer names is left out, as the panel no longer shows it (0129).
     const named = statesOf(policy)
     const labelled = states.filter((entry) => named.includes(entry.state)).map((entry) => ({ ...entry }))
+    // And the default group, the root schema's in words, is the group left out: the server refuses it spelled out (0143).
+    const listed = group === undefined || group === defaultGroup(bindings.root, snapshot.kind) ? {} : { group }
     const presentation = {
       ...derived.presentation,
       ...(views.length === 0 ? {} : { views: [...views] }),
       ...(unfiltered.length === 0 ? {} : { unfiltered: [...unfiltered] }),
       ...(labelled.length === 0 ? {} : { states: labelled }),
+      ...listed,
     }
     const bundle: Bundle = { format: 2, connection, generation, base: form, presentation, form: session.exportDocument(), bindings, policy, snapshot }
     const sent: Published = { version: expected ?? 0, bundle }

@@ -248,12 +248,13 @@ function isMenuChild(value: unknown): boolean {
   return value['one'] ? isSectionWhen(value['when']) : value['when'] === null
 }
 
-/** One menu entry: a page draws a link from it, and a grid per child. */
+/** One menu entry: a page draws a link from it under its group (0143), `null` for none, and a grid per child. */
 function isMenuEntry(value: unknown): boolean {
   return (
     isRecord(value) &&
     typeof value['id'] === 'string' &&
     typeof value['title'] === 'string' &&
+    isNullableString(value['group']) &&
     isStrings(value['operations']) &&
     Array.isArray(value['children']) &&
     value['children'].every(isMenuChild)

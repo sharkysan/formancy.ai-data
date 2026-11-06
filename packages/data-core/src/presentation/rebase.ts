@@ -431,6 +431,8 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     ...(unfiltered.length === 0 ? {} : { unfiltered }),
     // A state is a value its column holds, not a field key: its label is carried as it is (0129).
     ...(published.presentation.states === undefined ? {} : { states: published.presentation.states }),
+    // The group is the form's, bound to no field: carried as it is, a cleared one included (0143).
+    ...(published.presentation.group === undefined ? {} : { group: published.presentation.group }),
   }
 
   const applied = applyPresentation(regenerated.base, presentation, regenerated.bindings)

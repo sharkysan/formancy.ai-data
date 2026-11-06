@@ -490,6 +490,36 @@ describe('the administrator plane', () => {
     expect(served.bundle.presentation.states).toEqual(states)
   })
 
+  // The group a form is listed under (0143) has one spelling for each
+  // meaning: the default, the root schema's name in words, is the property
+  // left out, so spelled out it is refused at the write, saying so; so is
+  // an empty group, which is no group spelled otherwise than `null`; and
+  // nothing is written. A group typed, and none, publish and read back.
+  // Watched failing with the fit left out of `storable`: Sales over sales
+  // was stored.
+  test('publishes a group or none, and refuses the default spelled out or a blank one', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const grouped = (group: unknown) => ({ ...bundleOf(proposal), presentation: { ...EMPTY_PRESENTATION, group } })
+    const publish = (group: unknown, expectedBase: number | null) =>
+      app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase, bundle: grouped(group) } })
+    const spelled = await publish('Sales', null)
+    expect(spelled.statusCode).toBe(422)
+    expect(spelled.json()).toMatchObject({ code: 'invalid-bundle', problems: ['presentation: /group: equals the default, from schema "sales"; leave it out'] })
+    const blank = await publish('', null)
+    expect(blank.statusCode).toBe(422)
+    expect(blank.json()).toMatchObject({ code: 'invalid-bundle', problems: ['presentation: group needs words a person can read; no group is null'] })
+    expect(await store.latest('employee')).toBeNull()
+    for (const [group, base] of [
+      ['People', null],
+      [null, 1],
+    ] as const) {
+      const published = await publish(group, base)
+      expect(published.statusCode, published.body).toBe(201)
+      const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+      expect(served.bundle.presentation.group).toBe(group)
+    }
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

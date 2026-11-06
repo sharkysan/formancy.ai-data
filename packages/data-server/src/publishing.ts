@@ -1,4 +1,4 @@
-import { describeReassigned, diffSnapshots, stateLabelProblems, unfilteredProblems, viewProblems } from '@formancy/data-core'
+import { describeReassigned, diffSnapshots, groupProblems, stateLabelProblems, unfilteredProblems, viewProblems } from '@formancy/data-core'
 import type { DriftChange, DriftReport, FormBindings, FormPolicy, MetadataSnapshot, ReassignedKey } from '@formancy/data-core'
 import type { FastifyBaseLogger } from 'fastify'
 import { generatedProblems } from './bundle-format2.js'
@@ -42,9 +42,11 @@ const INVALID = 'The bundle cannot be published.'
  * version corrupt; and every list view its presentation names is one a list
  * of its bindings could run (`viewProblems`, 0105), and every field its
  * Filter panel leaves out one a list of them is filtered by
- * (`unfilteredProblems`, 0123), and every state it labels one its policy's
- * moves name (`stateLabelProblems`, 0129), asked here for the same reason:
- * a view a later release no longer runs is not offered, and the version is
+ * (`unfilteredProblems`, 0123), every state it labels one its policy's
+ * moves name (`stateLabelProblems`, 0129), and its group never the default
+ * spelled out (`groupProblems`, 0143), asked here for the same reason: a
+ * view a later release no longer runs is not offered, a schema a later
+ * release words otherwise leaves a group as it was, and the version is
  * still served.
  *
  * `unknown` is the sentence for a connection the allowlist does not know:
@@ -74,6 +76,7 @@ export function storable(
     ...viewProblems(bundle.presentation.views ?? [], bundle.bindings),
     ...unfilteredProblems(bundle.presentation.unfiltered ?? [], bundle.bindings),
     ...stateLabelProblems(bundle.presentation.states ?? [], bundle.policy),
+    ...groupProblems(bundle.presentation.group, bundle.bindings.root, bundle.snapshot.kind),
   ]
   if (views.length > 0) return refused(INVALID, { problems: views.map((problem) => `presentation: ${problem}`) })
   return { ok: true, bundle }

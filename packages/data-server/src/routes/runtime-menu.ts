@@ -41,8 +41,10 @@ async function entry(
       log.error({ form: id, connection: bundle.connection }, 'a published form names a connection the allowlist does not have, and is not served')
       return undefined
     }
+    // What the presentation says of the form's group (0143); a format-1 version has none, and gets the default as a silent one does.
+    const group = bundle.format === 2 && bundle.presentation.group !== undefined ? { group: bundle.presentation.group } : {}
     return menuForm(
-      { id, title: bundle.form.title, connection: bundle.connection, snapshot: bundle.snapshot, bindings: bundle.bindings, policy: bundle.policy },
+      { id, title: bundle.form.title, ...group, connection: bundle.connection, snapshot: bundle.snapshot, bindings: bundle.bindings, policy: bundle.policy },
       context,
     )
   } catch (error) {
@@ -77,10 +79,11 @@ export async function menuForms(steps: MenuRouteSteps, request: FastifyRequest):
 
 /**
  * `GET /v1/forms` (0045): the published forms this person may read, in
- * codepoint order of their ids, each with its title, the operations the
- * policy grants them of what it offers as published, and the children a
- * page may show under one of its records -- and nothing about any other
- * form, so the answer is the same to the byte whatever else is published.
+ * codepoint order of their ids, each with its title, the group it is
+ * listed under (0143), the operations the policy grants them of what it
+ * offers as published, and the children a page may show under one of its
+ * records -- and nothing about any other form, so the answer is the same
+ * to the byte whatever else is published.
  *
  * Every request reads and validates every published form's newest version,
  * and asks the policy of each (0019, 0022): nothing is cached. It asks no

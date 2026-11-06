@@ -3,6 +3,7 @@ import { offers } from '../generate/offers.js'
 import type { FieldBinding, FormBindings, SectionBinding } from '../generate/types.js'
 import { authorizeOperation, readableFields } from '../policy/evaluate.js'
 import { byCodepoint, OPERATIONS } from '../policy/inputs.js'
+import { formGroup } from '../presentation/group.js'
 import type { FormPolicy, PolicyContext, PolicyOperation } from '../policy/types.js'
 import type { FormMenu, FormMenuChild, LookupOpen } from '../runtime.js'
 import { formValue } from './answers.js'
@@ -34,24 +35,29 @@ export function grantedOperations(bindings: FormBindings, policy: FormPolicy, co
   return OPERATIONS.filter((operation) => (operation === 'read' || offers(bindings, operation)) && authorizeOperation(policy, context, operation).ok)
 }
 
-/** One published form as the menu reads it: its id, its title, and what deciding its entry needs. */
+/** One published form as the menu reads it: its id, its title, what its presentation says of its group, and what deciding its entry needs. */
 export interface MenuBundle extends PublishedTable {
   id: string
   title: string
+  /** The presentation's `group` (0143): left out where it says nothing, or the bundle has no presentation. */
+  group?: string | null
   policy: FormPolicy
 }
 
 /**
  * One published form as one person's menu reads it, from its bundle alone:
- * the operations the policy grants them, the fields they may narrow its
- * list by (`listable`, which the list route asks; `null` when they are
- * offered no list of it), and what its records offer a child and what its
- * lookups reference (`parentKey`, `childLookups`). Empty but for its
- * operations when they may not read it: nothing more of it is needed.
+ * the group it is listed under, the operations the policy grants them, the
+ * fields they may narrow its list by (`listable`, which the list route
+ * asks; `null` when they are offered no list of it), and what its records
+ * offer a child and what its lookups reference (`parentKey`,
+ * `childLookups`). Empty but for its names and operations when they may
+ * not read it: nothing more of it is needed.
  */
 export interface MenuForm {
   id: string
   title: string
+  /** The group it is listed under (`formGroup`, 0143). */
+  group: string | null
   operations: PolicyOperation[]
   listedBy: string[] | null
   key: ParentKey | null
@@ -70,14 +76,14 @@ type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
  */
 export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const operations = grantedOperations(bundle.bindings, bundle.policy, context)
-  if (!operations.includes('read')) return { id: bundle.id, title: bundle.title, operations, listedBy: null, key: null, lookups: [], readable: [] }
+  const named = { id: bundle.id, title: bundle.title, group: formGroup(bundle.group, bundle.bindings.root, bundle.snapshot.kind) }
+  if (!operations.includes('read')) return { ...named, operations, listedBy: null, key: null, lookups: [], readable: [] }
   const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, context)
   const fields = readableFields(bundle.policy, context, bundle.bindings)
   const read = new Set(fields.ok ? fields.fields : [])
   const readable = bundle.bindings.fields.filter((binding): binding is ColumnBinding => binding.kind === 'column' && read.has(binding.field))
   return {
-    id: bundle.id,
-    title: bundle.title,
+    ...named,
     operations,
     listedBy: listed.ok ? [...listed.fields] : null,
     key: parentKey(bundle),
@@ -129,7 +135,7 @@ export function formMenu(forms: readonly MenuForm[]): FormMenu {
           children.push({ form: child.id, field, one: section !== null, when: section === null ? null : sectionWhen(parent, section) })
         }
       }
-      return { id: parent.id, title: parent.title, operations: [...parent.operations], children }
+      return { id: parent.id, title: parent.title, group: parent.group, operations: [...parent.operations], children }
     }),
   }
 }

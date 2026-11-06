@@ -185,7 +185,12 @@ moment can both succeed, and nothing deletes a draft (0065).
    the forms the policy lets this person read, with the children
    `records/children.ts` derives -- each saying whether it is a section of
    the record, and under which of the record's answers it shows
-   ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
+   ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md))
+   -- and the group each is listed under: its presentation's, or its root
+   schema's name in words where the presentation, or a format-1 version,
+   says nothing, and none over its engine's own default schema
+   (`presentation/group.ts`,
+   [0143](../decisions/0143-a-form-is-listed-in-a-group.md)).
    No database is asked
    ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
    and Forms (`apps/host/src/forms-nav.tsx`) draws the menu
@@ -204,10 +209,14 @@ SIGHUP among them;
 menu answers over a registry that refuses every connection, the same to the
 byte after a form the person may not read is published; and
 `apps/host/src/plane.test.tsx`: every request carries the token in its
-header only. What it costs: every menu reads and validates every published
-form; a form it names can be 409 `drift` when opened, since only opening
-asks the database (0045); a host with no backend cannot hold a signing
-secret (0014); a key file refused on SIGHUP is said in an `error` line (0059).
+header only; and `presentation/group.test.ts`, where the default group is
+worded and the default spelled out is refused at a write (0143). What it
+costs: every menu reads and validates every published form; a form it
+names can be 409 `drift` when opened, since only opening asks the database
+(0045); a form whose presentation names no group moves with the words a
+release gives its schema (0143); a host with no backend cannot hold a
+signing secret (0014); a key file refused on SIGHUP is said in an `error`
+line (0059).
 
 ## 6.5 A page of records, sorted, searched and filtered
 

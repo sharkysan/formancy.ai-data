@@ -177,6 +177,8 @@ Saving the `Blob` is the host's: an object URL and an `<a download>`.
 `forms` is the menu
 ([0045](../../docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)):
 the forms the server says this person may read, each with its title, the
+group it is listed under -- text, or `null` for none
+([0143](../../docs/decisions/0143-a-form-is-listed-in-a-group.md)) -- the
 operations its policy grants them as published, and its children -- a
 child form and the lookup field its rows name this form's records by, so a
 host lists one record's children with
@@ -190,7 +192,9 @@ shows that row in a form under the record, and `when`, when it is not
 `null`, is the field whose answer shows it and the answer, compared as the
 record holds it. An answer whose entries lack a title, operations or
 children, or a child without `one`, or a section whose `when` is not a
-field and a text, a number or a yes/no, is `unexpected`.
+field and a text, a number or a yes/no, is `unexpected`; so is an entry
+without a group, as a server older than 0143 answers, or with one that is
+neither text nor `null`: upgrade the server before the client.
 
 ## The rules it keeps for a host
 

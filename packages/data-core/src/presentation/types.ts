@@ -70,9 +70,9 @@ export interface SectionPresentation {
  * field's place within its section's grid and full width (0030), the
  * generated section a field is placed in (0075), the views a list of the
  * form's records offers (0105), a field's help text (0119), the fields the
- * Filter panel leaves out (0123) and the labels of a state field's states
- * (0129). Each entry holds only what differs from
- * the base, so a presentation has one spelling.
+ * Filter panel leaves out (0123), the labels of a state field's states
+ * (0129) and the group the form is listed under (0143). Each entry holds
+ * only what differs from the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
   version: typeof PRESENTATION_VERSION
@@ -86,6 +86,8 @@ export interface PresentationOverrides {
   unfiltered?: string[]
   /** The labels of the state field's states, in the order the policy's moves name them; left out when there are none, never `[]` (`state-labels.ts`, 0129). */
   states?: StateLabel[]
+  /** The group a list of forms puts the form under, `null` for none; left out for the default, the root schema's name in words, never spelled out (`group.ts`, 0143). */
+  group?: string | null
 }
 
 export type PresentationCheck = { ok: true; presentation: PresentationOverrides } | { ok: false; problems: string[] }
