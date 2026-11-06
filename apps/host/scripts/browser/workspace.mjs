@@ -1,5 +1,5 @@
 // The workspace's states in the browser (0047): signed in, a form's records in
-// each layout, a row open with its lines, a line open, the unsaved-changes
+// each layout, a row open and then its lines in their tab, a line open, the unsaved-changes
 // notice, a refused list and an order line opened alone, whose Order is a
 // plain select (0066) -- each measured by the gate's `measured` on the
 // way -- and what only a real browser shows about the grids: one Tab stop
@@ -245,7 +245,7 @@ export function workspaceJourney(plane, { check }, run) {
       },
     ],
     [
-      'A row open with its lines, side by side',
+      'A row open, side by side',
       async (page) => {
         const opened = row(page, 'Records', run.record.slice(3))
         await opened.getByRole('gridcell').first().focus()
@@ -254,9 +254,19 @@ export function workspaceJourney(plane, { check }, run) {
         check('Enter on a row: the keyboard is on the record', await focusedOn(page, page.getByRole('heading', { level: 3, name: `Order ${run.record}` })))
         // Both renderers from here on: the gate walks with Both, so 0029's promise is measured in each.
         await page.getByRole('radio', { name: 'Both', exact: true }).check()
-        await answered(page.getByRole('region', { name: 'Order line', exact: true }), /^Order line rows 1–2\./)
         for (const name of ['React', 'Angular'])
           await page.getByRole('region', { name, exact: true }).getByRole('combobox', { name: 'Customer' }).waitFor(WITHIN)
+      },
+    ],
+    [
+      // Its lines are a tab beside it (0142), listed once the tab is shown:
+      // a state of its own, so the record's papers are measured above and
+      // the lines here, axe reading only the panel shown.
+      'Its lines, side by side',
+      async (page) => {
+        const opened = row(page, 'Records', run.record.slice(3))
+        await page.getByRole('tab', { name: 'Order line', exact: true }).click()
+        await answered(page.getByRole('region', { name: 'Order line', exact: true }), /^Order line rows 1–2\./)
 
         // One Tab stop: from Next rows into the grid, on the open row, then out to the separator.
         const next = records(page).getByRole('button', { name: 'Next rows' })

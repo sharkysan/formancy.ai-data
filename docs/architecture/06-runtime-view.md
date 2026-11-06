@@ -400,6 +400,21 @@ are walked, never jumped to (0108); the rest is 0044's and 0061's, in
    column of a key -- with no token and no version, so its save is step 3's
    create
    ([0107](../decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
+8. On the host page a record opened is drawn under its header in the
+   first of its tabs (`apps/host/src/record-tabs.tsx`), its form and its
+   sections, beside one tab per other child the menu names (6.4), in the
+   menu's order. A child's section, and its `POST
+   /v1/forms/:child/records/list` with `parent` (6.5), wait until its tab
+   is first shown -- an arrow passing over a tab shows it, and so asks for
+   its first page -- and stay, hidden, while another is
+   (`apps/host/src/tab-list.tsx`): a tab shown again sends nothing, and no
+   change of tab asks the guard anything. A grid sizes its columns only
+   where it is drawn, and one whose page lands, or whose separator is let
+   go, while its tab is hidden sizes them when the tab is shown
+   (`apps/host/src/use-grid-sizing.ts`). A save refused in a pane of a
+   hidden tab shows that tab before its notice takes the keyboard; another
+   record opened starts again on its own tab
+   ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
 
 Held by each adapter's `records.integration.test.ts`, where two updates
 from one version give one winner and one `stale`; `routes/runtime.test.ts`
@@ -410,7 +425,11 @@ an update's resend 409 `stale`;
 `apps/host/src/session.test.ts`; and for a copy,
 `packages/data-core/src/records/copy.test.ts`,
 `packages/data-server/src/e2e.integration.test.ts`'s create of exactly
-`copied` on both engines, and `apps/host/src/duplicate.test.tsx`. What it costs is
+`copied` on both engines, and `apps/host/src/duplicate.test.tsx`; and for
+the tabs, `apps/host/src/record-tabs.test.tsx` on both engines,
+`tab-list.test.tsx`, `tabs.test.ts` and `grid-sizing.test.ts`, and the
+browser gate's `drilling.mjs`, which loads a section while its tab is
+hidden. What it costs is
 [section 8.6](08-crosscutting-concepts.md#86-optimistic-concurrency-and-write-ids)'s,
 and SQL Server over-reports a trigger's ROLLBACK and raise as unknown (0031).
 
@@ -644,9 +663,11 @@ budget and a derivation, not measurements
    `drillBase`), sends `POST /v1/forms/:child/records/read` (6.6), drops an
    answer the person has since moved past, and asks again on the answer,
    as `opening.ts` does. `apps/host/src/drill-level.tsx` draws the row in
-   its own sessions, the parent's field preset and disabled, and lists its
-   own children with `parent: { field, record }` (6.5), each child form's
-   definition asked once per form.
+   its own sessions, the parent's field preset and disabled, and its own
+   children in tabs beside it as the record's are (6.6), each listed with
+   `parent: { field, record }` (6.5) once its tab is shown
+   ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md)),
+   each child form's definition asked once per form.
 3. A crumb (`apps/host/src/trail.tsx`) or Back shows a level above and
    drops nothing; an entry asking for a level no longer held shows the
    deepest one above it and is written over (`apps/host/src/address.ts`).
@@ -679,8 +700,8 @@ budget and a derivation, not measurements
    line saying why
    ([0141](../decisions/0141-a-lookups-record-opens-below-the-record.md)).
 
-Held by `apps/host/src/drill.test.tsx` and `open-lookup.test.tsx` on both
-engines, `layout.test.ts`, `leave.test.ts`, `crumbs.test.ts`,
+Held by `apps/host/src/drill.test.tsx`, `open-lookup.test.tsx` and
+`record-tabs.test.tsx` on both engines, `layout.test.ts`, `leave.test.ts`, `crumbs.test.ts`,
 `lookup-opens.test.ts`, `steady-offer.test.ts`, `lookup-addition.test.tsx`, `address.test.tsx`, and
 the browser gate's `apps/host/scripts/browser/drilling.mjs`. What it costs:
 the levels are in memory only, so a reload opens the records; a row open on

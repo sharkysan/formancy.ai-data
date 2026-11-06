@@ -324,6 +324,15 @@ not ask before leaving unsaved work
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 There is no bulk delete and no undo
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
+A record's child forms are tabs beside it, so a child's rows are a press
+away from the record's form, and another record, a record its first save
+created included, opens on its own tab; a Drill down level's section
+heading, where the keyboard goes once a row the level below held is
+deleted, is hidden when another tab of that level was shown and the person
+came back down by Back or Forward, and the keyboard is then left on nothing;
+and a save's "Saved." or a delete's "Deleted" line said in a tab another
+hides is not heard, only what asks something showing its tab
+([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).
 Download CSV drops a file in the making when the person leaves the form or
 signs out, and a child section's when they open another record, says
 nothing about it, names no count of records, and says the page handed the

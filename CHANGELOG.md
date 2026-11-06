@@ -18,6 +18,26 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A record's child forms are tabs beside it** (0142). Why: an order with
+  lines and deliveries was its form and two grids below it, an employee its
+  form and three, so a person scrolled past every child to reach the one
+  they wanted, and every child's grid asked the server for a page as the
+  record opened, looked at or not. What you notice: on the host page, under
+  the open record's header, a row of tabs -- the record's own first, named
+  as its heading is, holding its form and any section of it (0109), then
+  one per child form in the menu's order, "Order line", "Order, Approved
+  by". Left and Right move between them, Home and End to the ends, each
+  showing the tab it reaches, and Tab goes on into the one shown. A child's
+  grid lists its rows the first time its tab is shown and keeps them -- its
+  page, its sort and filter, a row open on its rail and what you typed
+  there -- while you look at another, so changing tabs asks you nothing.
+  An arrow passing over a tab shows it, so its rows are asked for then. A
+  save refused in a tab you have left shows that tab with its notice; a
+  "Saved." or "Deleted" line said there waits in it. Another record opens
+  on its own tab, and a record its first save created counts as another. Drill down's levels draw their children the same way,
+  each level keeping its tab. A record with no child form, or only sections
+  of it, draws no tabs, as before; a foreign key gets none, since Open under
+  it goes a level down (0141).
 - **A lookup's record opens below the record** (0141). Why: 0140 named
   the forms a lookup's record opens in, and a person still had to leave
   the order, open the customer form and search for the name the lookup

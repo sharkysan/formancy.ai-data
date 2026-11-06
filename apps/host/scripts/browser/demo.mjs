@@ -78,6 +78,8 @@ const grid = (scope, name) => scope.getByRole('grid', { name, exact: true })
 /** The open record's region, named by its heading: `Order k1:1`, `New record`, or a pattern for a token not known yet. */
 const detail = (page, name) => page.getByRole('region', { name, exact: typeof name === 'string' })
 const paper = (scope, form) => scope.getByRole('form', { name: `${form}, React`, exact: true })
+/** A tab beside the open record (0142): the record's own, named as its heading, or a child form's, named as its section. */
+const tab = (scope, name) => scope.getByRole('tab', { name, exact: true })
 
 /** Waits until the status of `region` matches `pattern`. */
 async function says(region, pattern) {
@@ -175,13 +177,24 @@ export async function demoPass({ origin, prefix, check, timed }) {
     await grid(records(page), 'Records').getByRole('gridcell', { name: '1', exact: true }).first().click()
     const first = detail(page, 'Order k1:1')
     await first.getByRole('heading', { level: 3, name: 'Order k1:1' }).waitFor(WITHIN)
-    const lines = first.getByRole('region', { name: 'Order line', exact: true })
-    await says(lines, /^Order line rows 1–\d+\.$/)
-    await says(first.getByRole('region', { name: 'Delivery', exact: true }), /^Delivery rows 1–\d+\.$/)
-    const lineRows = await dataRows(grid(lines, 'Order line'), page).count()
-    check('an order opens with its lines in the linked grid', lineRows > 0 ? null : 'its lines grid has no row')
+    // Its lines and deliveries are tabs beside it, each section drawn once its
+    // tab is shown (0142): axe reads only the panel shown, so each tab is read,
+    // the order's own form first.
+    await paper(first, 'Order').getByRole('textbox', { name: 'Notes' }).waitFor(WITHIN)
     const open = await audit(page)
     check('axe finds no violation with an order open', open.violations.length === 0 ? null : open.violations.join('; '))
+    await tab(first, 'Order line').click()
+    const lines = first.getByRole('region', { name: 'Order line', exact: true })
+    await says(lines, /^Order line rows 1–\d+\.$/)
+    const lineRows = await dataRows(grid(lines, 'Order line'), page).count()
+    check('an order opens with its lines in the linked grid', lineRows > 0 ? null : 'its lines grid has no row')
+    const onLines = await audit(page)
+    check("axe finds no violation on an open order's lines", onLines.violations.length === 0 ? null : onLines.violations.join('; '))
+    await tab(first, 'Delivery').click()
+    await says(first.getByRole('region', { name: 'Delivery', exact: true }), /^Delivery rows 1–\d+\.$/)
+    const onDeliveries = await audit(page)
+    check("axe finds no violation on an open order's deliveries", onDeliveries.violations.length === 0 ? null : onDeliveries.violations.join('; '))
+    await tab(first, 'Order k1:1').click()
     const note = `Changed in the browser at ${new Date().toISOString()}`
     await paper(first, 'Order').getByRole('textbox', { name: 'Notes' }).fill(note)
     await paper(first, 'Order').getByRole('button', { name: 'Save' }).click()
@@ -213,6 +226,8 @@ export async function demoPass({ origin, prefix, check, timed }) {
     await created.waitFor(WITHIN)
     const token = ((await created.textContent()) ?? '').replace(/^Order\s*/, '').trim()
     check('the new order is created', /^k1:\d+$/.test(token) && token !== 'k1:1' ? null : `the detail says ${token}`)
+    // Created, it is another record, which opens on its own tab.
+    await tab(made, 'Order line').click()
     const madeLines = made.getByRole('region', { name: 'Order line', exact: true })
     await madeLines.getByRole('button', { name: 'New Order line' }).click()
     const linePaper = madeLines.getByRole('form', { name: 'New Order line, React', exact: true })

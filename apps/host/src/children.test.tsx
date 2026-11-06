@@ -4,7 +4,21 @@ import { computeAccessibleName } from 'dom-accessibility-api'
 import { createDataClient } from '@formancy/data-client'
 import type { DataClient } from '@formancy/data-client'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
-import { answeredOnce, chooseForm, chooseRenderer, dataRows, gridSection, mount, newRecord, RENDERERS, searchRecords, signIn, stamp } from './test-host.js'
+import {
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  dataRows,
+  gridSection,
+  mount,
+  newRecord,
+  RENDERERS,
+  searchRecords,
+  showChild,
+  showTab,
+  signIn,
+  stamp,
+} from './test-host.js'
 import type { RendererName, User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -15,7 +29,8 @@ import type { Engine, Plane } from './test-plane.js'
  * order and reached only through it (0043), created with the order preset,
  * and edited in the line's own form; and an employee, whose own form is its
  * child through the manager, with orders under it twice -- through who
- * created and who approved them.
+ * created and who approved them. Each child form is a tab beside the
+ * record (0142), whose section is drawn once the tab is shown.
  *
  * Found by role and accessible name, with one read the accessibility tree
  * cannot answer, said where it is made: element ids, which are what two
@@ -112,7 +127,7 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     const user = await workspace(engine.formId)
     await searchRecords(user, words, [mine.order.slice(3), other.order.slice(3)])
     await openRow(user, 'Records', mine.order.slice(3))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Order line' })).toBeTruthy(), ARRIVES)
+    await showChild(user, 'Order line')
     expect(await answeredOnce('Order line')).toBe('Order line rows 1–2.')
     expect(rows('Order line').map((cells) => cells[0])).toEqual(['1', '2'])
     expect(
@@ -140,8 +155,8 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
     const user = await workspace(engine.formId)
     await searchRecords(user, words, [mine.order.slice(3)])
     await openRow(user, 'Records', mine.order.slice(3))
+    const section = await showChild(user, 'Order line')
     await answeredOnce('Order line')
-    const section = gridSection('Order line')
     await user.click(within(section).getByRole('button', { name: 'New Order line' }))
     await waitFor(() => expect(focusedName()).toBe('New Order line'), ARRIVES)
     const pane = childPane('New Order line', renderer)
@@ -195,7 +210,7 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
   test('lists no lines under an order not saved yet, and says so', async () => {
     const user = await workspace(engine.formId)
     await newRecord(user)
-    const section = await waitFor(() => gridSection('Order line'), ARRIVES)
+    const section = await showChild(user, 'Order line')
     expect(within(section).queryByRole('grid')).toBeNull()
     const button = within(section).getByRole('button', { name: 'New Order line' })
     expect(button.getAttribute('aria-disabled')).toBe('true')
@@ -207,37 +222,51 @@ describe.each(ENGINES)("an order's lines on $engine", (engine) => {
 })
 
 describe.each(ENGINES)('an employee and the forms under it on $engine', (engine) => {
-  // Every child section open at once, a row open in each: the employee form
-  // as its own child, through the manager, and the order form twice,
-  // through who created and who approved -- each a namespace of its own, so
-  // no element id is minted twice, and the page still passes axe with a
-  // name on every control (watched failing with the child sessions in the
+  // A row open under every child section at once, each section kept in its
+  // tab while another is shown (0142): the employee form as its own child,
+  // through the manager, and the order form twice, through who created and
+  // who approved -- each a namespace of its own, so no element id is minted
+  // twice, and the page still passes axe with a name on every control, in
+  // each tab, the record's own included, since axe reads only the panel
+  // shown (watched failing, before 0142, with the child sessions in the
   // record's namespace, and with the two order sections in one: the
   // approved order's Amount label named the created one's input).
-  test('opens every child at once with no id twice, and passes the floor', async () => {
+  test('opens a row under every child, each kept in its tab, with no id twice, and passes the floor', async () => {
     const approved = await plane.db.insertApprovedOrder(engine.connection, 1)
     const user = await workspace(engine.employees)
     await openRow(user, 'Records', '1')
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Employee' })).toBeTruthy(), ARRIVES)
-    expect(screen.getByRole('region', { name: 'Order, Created by' })).toBeTruthy()
-    expect(screen.getByRole('region', { name: 'Order, Approved by' })).toBeTruthy()
+    // The record's own tab first, then a tab per child, each named as its section is (record-tabs.test.tsx holds their order).
+    const [own, ...children] = within(await screen.findByRole('tablist', { name: 'Employee k1:1' }, ARRIVES))
+      .getAllByRole('tab')
+      .map((tab) => tab.textContent)
+    expect({ own, children: children.sort() }).toEqual({ own: 'Employee k1:1', children: ['Employee', 'Order, Approved by', 'Order, Created by'] })
+    await showChild(user, 'Employee')
     await answeredOnce('Employee')
     await openRow(user, 'Employee', '2')
+    await showChild(user, 'Order, Created by')
     await answeredOnce('Order, Created by')
     await openRow(user, 'Order, Created by', EDGES.seededOrder.slice(3))
+    await showChild(user, 'Order, Approved by')
     await answeredOnce('Order, Approved by')
     await openRow(user, 'Order, Approved by', approved.slice(3))
-    for (const renderer of RENDERERS) {
-      await waitFor(() => expect(within(childPane(`Employee k1:2`, renderer)).getByLabelText(/^Name\b/)).toBeTruthy(), ARRIVES)
-      await waitFor(() => expect(within(childPane(`Order ${EDGES.seededOrder}`, renderer)).getByLabelText(/^Amount\b/)).toBeTruthy(), ARRIVES)
-      await waitFor(() => expect(within(childPane(`Order ${approved}`, renderer)).getByLabelText(/^Amount\b/)).toBeTruthy(), ARRIVES)
+    const opened: ReadonlyArray<readonly [tab: string, row: string, field: RegExp]> = [
+      ['Employee', 'Employee k1:2', /^Name\b/],
+      ['Order, Created by', `Order ${EDGES.seededOrder}`, /^Amount\b/],
+      ['Order, Approved by', `Order ${approved}`, /^Amount\b/],
+    ]
+    for (const [tab, row, field] of opened) {
+      await showChild(user, tab)
+      for (const renderer of RENDERERS) await waitFor(() => expect(within(childPane(row, renderer)).getByLabelText(field)).toBeTruthy(), ARRIVES)
+      expect({ tab, axe: await audit(), unnamed: unnamed() }).toEqual({ tab, axe: [], unnamed: [] })
     }
     // The order form is one this clerk may only read: its record's fields are drawn disabled.
+    await showChild(user, 'Order, Created by')
     expect(within(childPane(`Order ${EDGES.seededOrder}`, 'React')).getByLabelText<HTMLInputElement>(/^Amount\b/).disabled).toBe(true)
 
     // Read from the DOM: an id has no role and no name.
     const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)
     expect(ids.filter((id, index) => ids.indexOf(id) !== index)).toEqual([])
-    expect({ axe: await audit(), unnamed: unnamed() }).toEqual({ axe: [], unnamed: [] })
+    await showTab(user, 'Employee k1:1')
+    expect({ tab: 'Employee k1:1', axe: await audit(), unnamed: unnamed() }).toEqual({ tab: 'Employee k1:1', axe: [], unnamed: [] })
   })
 })

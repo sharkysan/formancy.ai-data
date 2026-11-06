@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient } from '@formancy/data-client'
-import { ChildSection } from './children.js'
 import type { ChildForm } from './children.js'
 import { recordName } from './crumbs.js'
 import { DeleteRegion } from './delete-confirm.js'
@@ -11,13 +10,12 @@ import { paneEntry, useRegistered } from './guard.js'
 import type { PaneEntry } from './guard.js'
 import { drillBase, drillOwner } from './leave.js'
 import type { Said } from './leave.js'
-import { OneChild } from './one-child.js'
 import { levelOpens } from './lookup-opens.js'
 import { useOpening } from './opening.js'
 import { Pane } from './pane.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
-import { sectionShown } from './section.js'
+import { RecordTabs } from './record-tabs.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import type { Drill, DrillStep } from './use-drill.js'
@@ -29,8 +27,9 @@ type LevelOpen = { kind: 'new' } | { kind: 'record'; token: string }
  * One level of Drill down from 2 down (0090): a child row of the level
  * above, as a section's rail shows one -- its heading, Delete where its form
  * offers it, a status line, its form in the renderers chosen, with the
- * parent's field preset and drawn disabled -- and below it the child
- * sections the menu names for its own form, which go down a level in turn.
+ * parent's field preset and drawn disabled -- and beside it, in tabs as
+ * the open record's are (0142), the child sections the menu names for its
+ * own form, which go down a level in turn.
  * Or the record a lookup of the level above names, opened by its Open in a
  * form of the person's choosing (0141): the same, with no field preset.
  * Its record's lookups offer Open in turn, a level further down.
@@ -162,7 +161,6 @@ export function DrillLevel({
 
   const heading: Said = open.kind === 'record' ? [`${title} `, { code: open.token }] : [`New ${title}`]
   const parentNow = open.kind === 'record' ? { kind: 'record' as const, token: open.token } : { kind: 'new' as const }
-  const twice = (id: string): boolean => (childForms ?? []).filter((each) => each.child.form === id).length > 1
 
   return (
     <section className="detail drill-level" aria-labelledby={headingId} hidden={hidden}>
@@ -196,62 +194,46 @@ export function DrillLevel({
           <Words said={line} />
         </p>
       </div>
-      <div className="panes" data-count={renderersOf(renderer).length}>
-        {sessions
-          .filter((session) => renderersOf(renderer).includes(session.renderer))
-          .map((session) => (
-            // The paper is named for the row, so it differs from a level above of the same form.
-            <Pane
-              key={session.renderer}
-              session={session}
-              title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
-              idBase={owner}
-              namedBy={headingId}
-              onAnswer={(result) => answered(result, session)}
-              onLoaded={() => loaded(session)}
-              offer={offer}
-            />
-          ))}
-      </div>
-      {(childForms ?? []).map((each, index) => {
-        const sectionOwner = `${drillBase(level)}${each.child.form}~${each.child.field}`
-        // A section is this level's own form under its record, never a level below (0109).
-        if (each.child.one) {
-          return sectionShown(each.child, stored) ? (
-            <OneChild
-              key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`}
-              client={client}
-              form={each}
-              index={index}
-              parentNoun={title}
-              parent={parentNow}
-              renderer={renderer}
-              ownerBase={drillBase(level)}
-              idBase={`${idBase}-child`}
-            />
-          ) : null
-        }
-        return (
-          <ChildSection
-            key={`${each.child.form}~${each.child.field} ${parentNow.kind === 'record' ? parentNow.token : 'new'}`}
-            client={client}
-            form={each}
-            index={index}
-            twice={twice(each.child.form)}
-            parentNoun={title}
-            parent={parentNow}
-            renderer={renderer}
-            refit={refit}
-            ownerBase={drillBase(level)}
-            idBase={`${idBase}-child`}
-            onShow={() => drill.reveal(level)}
-            levels={drill.levels}
-            drill={
-              parentNow.kind === 'record' ? drill.section({ level, owner: sectionOwner, form: each, parentNoun: title, parent: parentNow.token }) : undefined
-            }
-          />
-        )
-      })}
+      <RecordTabs
+        client={client}
+        childForms={childForms ?? []}
+        record={open}
+        heading={heading}
+        headingId={headingId}
+        idBase={idBase}
+        childIdBase={`${idBase}-child`}
+        ownerBase={drillBase(level)}
+        parentNoun={title}
+        parent={parentNow}
+        stored={stored}
+        renderer={renderer}
+        refit={refit}
+        onShow={() => drill.reveal(level)}
+        drill={drill}
+        level={level}
+        drilling
+      >
+        {(show) => (
+          <div className="panes" data-count={renderersOf(renderer).length}>
+            {sessions
+              .filter((session) => renderersOf(renderer).includes(session.renderer))
+              .map((session) => (
+                // The paper is named for the row, so it differs from a level above of the same form.
+                <Pane
+                  key={session.renderer}
+                  session={session}
+                  title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
+                  idBase={owner}
+                  namedBy={headingId}
+                  onAnswer={(result) => answered(result, session)}
+                  onLoaded={() => loaded(session)}
+                  offer={offer}
+                  onShow={show}
+                />
+              ))}
+          </div>
+        )}
+      </RecordTabs>
     </section>
   )
 }

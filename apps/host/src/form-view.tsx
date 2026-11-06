@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
-import { ChildSection } from './children.js'
 import type { ChildForm } from './children.js'
 import { crumbOf, recordName } from './crumbs.js'
 import type { Crumb } from './crumbs.js'
@@ -23,14 +22,13 @@ import type { Said } from './leave.js'
 import type { Layout, View } from './layout.js'
 import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
-import { OneChild } from './one-child.js'
 import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
-import { sectionShown } from './section.js'
+import { RecordTabs } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
@@ -45,7 +43,8 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  * One open form (0047): its header -- the title and id, what this person
  * may do, the Layout group -- the unsaved notice when a request waits, and
  * the lanes: the Records panel, the separator in Side by side, and the
- * detail with the record's forms and its child sections.
+ * detail with the record's forms and its child sections, in tabs beside it
+ * (0142).
  *
  * Every lane stays mounted in every layout and view: a layout or view change
  * alters classes and `hidden`, nothing else, so it discards no draft and a
@@ -445,7 +444,6 @@ export function FormView({
   const sideBySide = layout === 'side-by-side'
   const note = narrow && sideBySide
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
-  const twice = (form: string): boolean => childForms.filter((child) => child.child.form === form).length > 1
   const style = { '--records-share': `${String(split)}fr`, '--record-share': `${String(100 - split)}fr` } as CSSProperties
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
   const crumbs: Crumb[] = [
@@ -543,44 +541,28 @@ export function FormView({
             ) : null
           }
           offer={offer}
-        >
-          {parent === null
-            ? null
-            : childForms.map((form, index) =>
-                form.child.one ? (
-                  sectionShown(form.child, stored) ? (
-                    <OneChild
-                      key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
-                      client={client}
-                      form={form}
-                      index={index}
-                      parentNoun={title}
-                      parent={parent}
-                      renderer={renderer}
-                    />
-                  ) : null
-                ) : (
-                  <ChildSection
-                    key={`${form.child.form}~${form.child.field} ${parent.kind === 'record' ? parent.token : 'new'}`}
-                    client={client}
-                    form={form}
-                    index={index}
-                    twice={twice(form.child.form)}
-                    parentNoun={title}
-                    parent={parent}
-                    renderer={renderer}
-                    refit={released}
-                    onShow={() => reveal('record')}
-                    levels={drill.levels}
-                    drill={
-                      drilling && parent.kind === 'record'
-                        ? drill.section({ level: 1, owner: `${form.child.form}~${form.child.field}`, form, parentNoun: title, parent: parent.token })
-                        : undefined
-                    }
-                  />
-                ),
-              )}
-        </Detail>
+          body={(panes, heading) => (
+            <RecordTabs
+              client={client}
+              childForms={childForms}
+              record={open}
+              heading={heading}
+              headingId="detail-heading"
+              idBase="detail"
+              parentNoun={title}
+              parent={parent}
+              stored={stored}
+              renderer={renderer}
+              refit={released}
+              onShow={() => reveal('record')}
+              drill={drill}
+              level={1}
+              drilling={drilling}
+            >
+              {panes}
+            </RecordTabs>
+          )}
+        />
         {drill.path.map((step) => (
           <DrillLevel
             key={step.key}

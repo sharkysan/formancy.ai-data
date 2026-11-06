@@ -25,6 +25,7 @@ import {
   said,
   save,
   searchRecords,
+  showChild,
   shows,
   signIn,
   signInAs,
@@ -192,7 +193,8 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     expect(saved.map((file) => file.name)).toEqual([`${formId}.csv`])
     const created = recordRows().find((row) => within(row).getAllByRole('gridcell')[0]?.textContent === record.slice(3)) as HTMLElement
     await user.click(within(created).getAllByRole('gridcell')[1] as HTMLElement)
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Order line' })).toBeTruthy(), { timeout: 15_000 })
+    // Its lines are a tab beside it (0142), listed once the tab is shown.
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))

@@ -223,6 +223,14 @@
     min-height: calc(2.75rem - 8px);
   }
 
+  .tab {
+    min-height: 2.75rem;
+  }
+
+  .tab-panel {
+    gap: 0.75rem;
+  }
+
   .status-cell .button {
     min-height: 2.75rem;
   }

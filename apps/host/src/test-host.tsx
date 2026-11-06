@@ -123,9 +123,27 @@ export async function answeredOnce(heading: string): Promise<string> {
   return said
 }
 
-/** The section a grid's heading names: the Records panel, or a child section. */
+/** The section a grid's heading names: the Records panel, or a child section in the tab shown. */
 export function gridSection(heading: string): HTMLElement {
   return screen.getByRole('region', { name: heading })
+}
+
+/**
+ * The tab beside the record shown named `name` pressed, as a person
+ * presses it, where it is not the one selected, and its section once it
+ * is drawn: a child form's section is drawn the first time its tab is
+ * shown (0142). The record's own tab is named as its heading is.
+ */
+export async function showTab(user: User, name: string): Promise<HTMLElement> {
+  const tab = await screen.findByRole('tab', { name }, ARRIVES_WITHIN)
+  if (tab.getAttribute('aria-selected') !== 'true') await user.click(tab)
+  return screen.findByRole('tabpanel', { name }, ARRIVES_WITHIN)
+}
+
+/** A child form's tab beside the record shown pressed, and its section, which `heading` names as it names the tab. */
+export async function showChild(user: User, heading: string): Promise<HTMLElement> {
+  await showTab(user, heading)
+  return screen.findByRole('region', { name: heading }, ARRIVES_WITHIN)
 }
 
 /** The renderer switch set to `choice`: Both, so every helper below finds both panes. */

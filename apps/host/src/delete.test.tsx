@@ -19,7 +19,9 @@ import {
   said,
   save,
   searchRecords,
+  showChild,
   shows,
+  showTab,
   signIn,
   stamp,
   unsavedNotice,
@@ -161,6 +163,7 @@ describe.each(ENGINES)('deleting the open record on $engine', (engine) => {
     await openOrder(user, notes, record)
     expect(screen.getByRole('button', { name: 'Delete record' })).toBeTruthy()
 
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     const lineHeaders = within(gridSection('Order line'))
       .getAllByRole('columnheader')
@@ -579,6 +582,7 @@ test('a child row is deleted from its own detail, and the keyboard goes to its s
   }
   const user = await workspace(engine.formId)
   await openOrder(user, notes, record)
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await openRow(user, 'Order line', '1', `Order line ${record},1`)
   await user.click(screen.getByRole('button', { name: 'Delete Order line' }))
@@ -587,8 +591,9 @@ test('a child row is deleted from its own detail, and the keyboard goes to its s
   await user.click(within(confirmation('Order line', `${record},1`)).getByRole('button', { name: 'Delete it' }))
   await waitFor(() => expect(focusedName()).toBe('Order line'), ARRIVES)
   await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe(`Deleted Order line ${record},1. Order line rows 1–1.`), ARRIVES)
-  // The order is still open, its forms with it: a line's delete is the line's.
+  // The order is still open, its forms with it in its own tab: a line's delete is the line's.
   expect(screen.getByRole('heading', { level: 3, name: `Order ${record}` })).toBeTruthy()
+  await showTab(user, `Order ${record}`)
   expect(paper('React')).toBeTruthy()
   expect(await stored(engine.lines, `${record},1`)).toBe(false)
 })
@@ -609,6 +614,7 @@ test("a child row's stale delete loads the saved row, and its Deletes wait for a
   const holding = holdingWrites(plane.fetch)
   const user = await workspace(engine.formId, holding.fetch)
   await openOrder(user, notes, record)
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await openRow(user, 'Order line', '1', `Order line ${line}`)
   const linePane = (): HTMLElement => screen.getByRole('region', { name: `Order line ${line} React` })
@@ -652,6 +658,7 @@ test('a child row saved and then deleted from its detail deletes by the version 
   const line = created.value.record
   const user = await workspace(engine.formId)
   await openOrder(user, notes, record)
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await openRow(user, 'Order line', '1', `Order line ${line}`)
   const linePane = (): HTMLElement => screen.getByRole('region', { name: `Order line ${line} React` })
@@ -688,6 +695,7 @@ test("another delete's question closes the one already asked", async () => {
   const line = created.value.record
   const user = await workspace(engine.formId)
   await openOrder(user, notes, record)
+  await showChild(user, 'Order line')
   expect(await answeredOnce('Order line')).toBe('Order line rows 1–1.')
   await user.click(screen.getByRole('button', { name: 'Delete record' }))
   expect(confirmation('Order', record)).toBeTruthy()

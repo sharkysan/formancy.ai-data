@@ -151,6 +151,8 @@ export function exportJourney(plane, { check }, run) {
         await row.getByRole('gridcell').first().focus()
         await page.keyboard.press('Enter')
         await page.getByRole('heading', { level: 3, name: `Order ${run.record}` }).waitFor(WITHIN)
+        // Its lines are a tab beside it (0142), listed once the tab is shown.
+        await page.getByRole('tab', { name: 'Order line', exact: true }).click()
         // Two of its lines are plane.order's; 'An order line alone, created' may have added one.
         await until(
           async () => /^Order line rows 1–\d+\./.test((await gridLine(lines(page)).textContent()) ?? ''),

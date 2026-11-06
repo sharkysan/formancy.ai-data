@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, gridSection, mount, searchRecords, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, gridSection, mount, searchRecords, showChild, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -73,7 +73,7 @@ async function lostLine(engine: Engine, when: 'after' | 'before'): Promise<{ use
       .getAllByRole('gridcell')
       .find((cell) => cell.textContent === order.slice(3)) as HTMLElement,
   )
-  await waitFor(() => gridSection('Order line'), ARRIVES)
+  await showChild(user, 'Order line')
   await answeredOnce('Order line')
   await user.click(within(gridSection('Order line')).getByRole('button', { name: 'New Order line' }))
   const pane = await waitFor(() => screen.getByRole('region', { name: 'New Order line React' }), ARRIVES)

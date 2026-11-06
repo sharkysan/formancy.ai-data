@@ -32,7 +32,9 @@ type Finding = { kind: 'waiting' } | { kind: 'asking' } | { kind: 'none' } | { k
  * Its sessions are its own, keyed `<child form>~<field>`, as a child
  * section's are, and the guard counts their work. It offers no delete: the
  * child form's own page deletes a row (0053). Whether it is shown at all is
- * the workspace's, by the record as stored (`section.ts`).
+ * the workspace's, by the record as stored (`section.ts`). It is drawn in
+ * the record's own tab (0142), which a refused save or New shows first
+ * (`onTab`) when another tab hides it.
  */
 export function OneChild({
   client,
@@ -43,6 +45,7 @@ export function OneChild({
   renderer,
   ownerBase = '',
   idBase = 'child',
+  onTab,
 }: {
   client: DataClient
   form: ChildForm
@@ -52,6 +55,8 @@ export function OneChild({
   renderer: RendererChoice
   ownerBase?: string
   idBase?: string
+  /** The record's tab shown, where another hides it: true when it was hidden (0142). */
+  onTab?: () => boolean
 }): ReactElement {
   const { child, menu, definition } = form
   const owner = `${ownerBase}${child.form}~${child.field}`
@@ -125,6 +130,7 @@ export function OneChild({
         for (const session of sessions) session.open({ record: null, version: null, answers: { [child.field]: parentToken } })
         setHeld({ kind: 'new' })
         setLine([...(discarded ? ['Discarded the unsaved changes. '] : []), `A new ${title}, for ${parentNoun} `, { code: parentToken }, '.'])
+        onTab?.()
         after(() => detailHeading.current?.focus())
       },
       () => addButton.current?.focus(),
@@ -192,6 +198,7 @@ export function OneChild({
                   idBase={owner}
                   namedBy={`${headingId}-detail`}
                   onAnswer={(result) => answered(result, session)}
+                  onShow={onTab}
                 />
               ))}
           </div>

@@ -7,7 +7,7 @@
 // going down again, and on a phone the trail's ends and a button that
 // draws the rest, which then leaves the keyboard on the crumb it drew.
 
-import { CUSTOMERS } from './plane.mjs'
+import { CUSTOMERS, FORM } from './plane.mjs'
 import { carryOn } from './workspace.mjs'
 import { dataRows, describeFocus, focusedOn, until, WITHIN } from './measure.mjs'
 
@@ -91,10 +91,72 @@ async function aCustomer(page, at) {
   check("Drill down: Enter on a row puts the keyboard on its level's heading", await focusedOn(page, heading(page, `Customer k1:1,${String(at.no)}`)))
 }
 
+/** The texts of the cells of `grid` that are cut short: wider than the cell that shows them. */
+const cutCells = (grid) =>
+  grid.evaluate((element) =>
+    [...element.querySelectorAll('[role="row"] [role="gridcell"]')]
+      .filter((cell) => cell.querySelector('button') === null && (cell.textContent ?? '').trim() !== '' && cell.scrollWidth > cell.clientWidth + 1)
+      .map((cell) => (cell.textContent ?? '').trim()),
+  )
+
+/**
+ * The customer's orders, a tab beside it (0142), loaded while that tab is
+ * hidden: their list held until the customer's own tab is shown again, then
+ * let go, the page drawn in the hidden panel, and the tab shown. AG Grid
+ * measures a cell in a hidden panel as nothing: sized there, every column
+ * kept its header's least width, and an order's date was cut. Sized once it
+ * is drawn, no cell is (use-grid-sizing.ts).
+ */
+async function ordersLoadedHidden(page, at) {
+  const { check } = at
+  const lists = `**/v1/forms/${FORM}/records/list`
+  let asked = () => {}
+  const askedFor = new Promise((resolve) => {
+    asked = resolve
+  })
+  let release = () => {}
+  const held = new Promise((resolve) => {
+    release = resolve
+  })
+  await page.route(lists, async (route) => {
+    asked()
+    await held
+    await route.continue()
+  })
+  try {
+    await page.getByRole('tab', { name: 'Order', exact: true }).click(WITHIN)
+    await askedFor
+    await page.getByRole('tab', { name: `Customer k1:1,${String(at.no)}`, exact: true }).click(WITHIN)
+    const answered = page.waitForResponse((response) => new URL(response.url()).pathname.endsWith(`/v1/forms/${FORM}/records/list`), WITHIN)
+    release()
+    await answered
+  } finally {
+    await page.unroute(lists)
+  }
+  // The page drawn in the hidden panel, and a moment for the grid to size it there, as it did.
+  await until(
+    async () => (await page.evaluate(() => document.querySelectorAll('[role="tabpanel"][hidden] [role="gridcell"]').length)) > 0,
+    "the customer's orders were never drawn in their hidden tab",
+  )
+  await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 200)))
+  await page.getByRole('tab', { name: 'Order', exact: true }).click(WITHIN)
+  const orders = page.getByRole('grid', { name: 'Order', exact: true })
+  await row(page, 'Order', at.order.slice(3)).waitFor(WITHIN)
+  await until(async () => (await cutCells(orders)).length === 0, 'never').catch(() => null)
+  const cut = await cutCells(orders)
+  check(
+    "Drill down: a section's grid loaded while its tab was hidden is sized once shown, no cell cut",
+    cut.length === 0 ? null : `cut: ${cut.slice(0, 4).join('; ')}`,
+  )
+}
+
 async function anOrderLine(page, at) {
   const { check } = at
+  // Each level's child forms are tabs beside its record (0142), a section drawn once its tab is shown.
+  await ordersLoadedHidden(page, at)
   await enterOn(page, row(page, 'Order', at.order.slice(3)))
   await heading(page, `Order ${at.order}`).waitFor(WITHIN)
+  await page.getByRole('tab', { name: 'Order line', exact: true }).click(WITHIN)
   await enterOn(page, row(page, 'Order line', '1'))
   await heading(page, `Order line ${at.line}`).waitFor(WITHIN)
   const all = ['Records', `Customer ${at.name}`, `Order ${at.order}`, `Order line ${at.line}`]

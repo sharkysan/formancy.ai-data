@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:61f45ce97dfe435e3d9e2e3c6f1e32c3fd6b64fcfd6df3bd56142437ee31687f",
+      "reviewed": "sha256:9ea8b11ac04c10c52a3b08590360b0e5388ac4b854e2fa8da4abe6ae95f88b3a",
       "limitations": [
         {
           "area": "host",
@@ -2829,7 +2829,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:ce80258b82f5b0ccb17b9ca13bc9fe4dd13cebcfc0fdba7c4cb2ce1149441485",
+      "reviewed": "sha256:17f6fbb6eb548b17d66f0d35416dd7099f00ce4fa264e0de754f0d30ccdb28fb",
       "limitations": [
         {
           "area": "host",
@@ -3949,6 +3949,42 @@
         {
           "area": "host",
           "says": "The Opens are drawn by the host page into the renderers' field addition: a host with a page of its own draws its own from the form's opens."
+        }
+      ]
+    },
+    "0142": {
+      "reviewed": "sha256:d06fc5657b3e1f52962ea7d1649485fee65d8630c0be5ab42c46a88bc00d5f23",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A record's child forms are tabs beside it on the host page: an order's lines are one press away from its form rather than on screen with it, and another record opens on its own tab, so a person going through several orders' lines presses that tab for each.",
+          "heldBy": "apps/host/src/record-tabs.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A record its first save created opens on its own tab as another record does, taking back a person who moved to a child's tab while the save was out; New record pressed again over a new record starts again too."
+        },
+        {
+          "area": "host",
+          "says": "A child's grid asks for its first page when its tab is first shown rather than when the record opens, and arrowing across the row of tabs shows, and so asks, every child passed over; a tab shown keeps its grid and forms in the page's memory, hidden, until another record opens.",
+          "heldBy": "apps/host/src/tab-list.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "What only says something is not heard in a tab another hides: a save's \"Saved.\" and a delete's \"Deleted\" line said there wait in its panel, and only what asks something of the person shows its tab."
+        },
+        {
+          "area": "host",
+          "says": "Each tab's panel is a Tab stop of its own, as WAI-ARIA's example has it: from the record's tab, Tab stops on its panel before the first field of its form.",
+          "heldBy": "apps/host/src/tab-list.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A Drill down level's section heading, where the keyboard goes once a row the level below held is deleted there, is hidden when the person showed another tab of that level and came back down by Back or Forward, and the keyboard is then left on nothing."
+        },
+        {
+          "area": "host",
+          "says": "A foreign key has no tab of its own: its record opens a Drill down level below the record, and a person goes back up to see both."
         }
       ]
     }

@@ -16,6 +16,7 @@ import {
   said,
   save,
   searchRecords,
+  showChild,
   shows,
   signIn,
   stamp,
@@ -177,6 +178,7 @@ describe.each(ENGINES)('answers that arrive late on $engine', (engine) => {
     const user = await workspace(holding.fetch, engine.formId)
     await searchRecords(user, words, [order.slice(3)])
     await clickRow(user, 'Records', order.slice(3))
+    await showChild(user, 'Order line')
     await answeredOnce('Order line')
     await clickRow(user, 'Order line', '1')
     await waitFor(() => expect(holding.held).toHaveLength(1), ARRIVES)
@@ -270,6 +272,7 @@ describe.each(ENGINES)('a record created in one of two panes on $engine', (engin
     await screen.findByRole('heading', { level: 3, name: `Order ${second}` }, ARRIVES)
     expect(unsavedNotice()).toBeNull()
     await shows('React', 'Amount', '4.0000')
+    await showChild(user, 'Order line')
     expect(await answeredOnce('Order line')).toBe('No Order line rows.')
     expect(paragraphs(gridSection('Order line'))).toContain(`For Order ${second}`)
 

@@ -5,7 +5,21 @@ import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm, RecordExpor
 import { audit, focusedName, unnamed } from './test-accessible.js'
 import { applied, applyCondition, listsApplied, listsSent } from './test-filter.js'
 import { DELIVERY_VIEWS, ORDER_VIEWS, VIEWED } from './test-forms.js'
-import { answeredOnce, chooseForm, dataRows, exportButton, exportLine, gridSection, gridStatus, keeping, load, mount, signIn, stamp } from './test-host.js'
+import {
+  answeredOnce,
+  chooseForm,
+  dataRows,
+  exportButton,
+  exportLine,
+  gridSection,
+  gridStatus,
+  keeping,
+  load,
+  mount,
+  showChild,
+  signIn,
+  stamp,
+} from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Sent } from './test-fetch.js'
@@ -508,6 +522,8 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
     const user = await workspace(engine.formId)
     plane.sent.length = 0
     await load(user, record)
+    // No record was open: the first Delivery tab is the loaded order's, whose grid asks its first page once shown (0142).
+    await showChild(user, 'Delivery')
     await waitFor(() => expect(within(gridSection('Delivery')).queryByRole('grid', { name: 'Delivery' })).not.toBeNull(), ARRIVES)
     await answeredOnce('Delivery')
     const parent = { field: 'order', record }
@@ -547,6 +563,7 @@ describe.each(ENGINES)("a form's list views on $engine", (engine) => {
       .getAllByRole('row')
       .find((candidate) => within(candidate).queryAllByRole('gridcell')[0]?.textContent === '1') as HTMLElement
     await user.click(within(row).getAllByRole('gridcell')[0] as HTMLElement)
+    await showChild(user, 'Employee')
     await waitFor(() => expect(picker('Employee')).not.toBeNull(), ARRIVES)
     expect(
       within(within(gridSection('Employee')).getByRole('group', { name: 'Your views' }))

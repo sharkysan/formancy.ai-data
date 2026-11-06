@@ -17,6 +17,7 @@ import { pageRecords } from './known-records.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
+import { useGridSizing } from './use-grid-sizing.js'
 import { sameSort } from './views.js'
 
 export type { OpenHow, RowDelete } from './grid-options.js'
@@ -33,7 +34,7 @@ export { DELETE_COLUMN } from './grid-options.js'
  * record's row selected in the grid after every page -- so `aria-selected`
  * and the bar say what the detail shows -- and the well as tall as its page,
  * its columns sized to the first page and again each time the separator is
- * let go.
+ * let go, only where the grid is drawn (use-grid-sizing.ts, 0142).
  *
  * A record gone from it (0053) -- deleted, or not found by a delete and
  * closed -- is said once, before the sentence of the page asked for again;
@@ -204,7 +205,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     retry: false,
   })
   const [pager, setPager] = useState({ page: 0, hasMore: false })
-  const shown = useRef({ rows: 0, loaded: false, sized: false, quiet, retrying: false })
+  const shown = useRef({ rows: 0, loaded: false, sized: false, owed: false, quiet, retrying: false })
   /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
   const unsized = useRef(new Set<string>())
   /** What a record gone from the grid says before the next page's sentence, once. */
@@ -247,32 +248,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
   }, [])
 
-  /** Each column sized to the first page that has rows, once, after those rows are drawn: paging never makes the columns jump; letting go of the separator does, below. */
-  const sizeOnce = useCallback(() => {
-    if (shown.current.sized || shown.current.rows === 0) return
-    setTimeout(() => {
-      const grid = api.current
-      if (grid === null || grid.isDestroyed() || shown.current.sized || !shown.current.loaded) return
-      grid.autoSizeAllColumns(true)
-      shown.current.sized = true
-      fit()
-    }, 0)
-  }, [fit])
-
-  // The separator let go: the columns fitted again to the rows on the page
-  // now, which a search or another page may have changed since they were
-  // sized -- to their content, as the first page sized them, never stretched
-  // to the lane's width (UX-SPEC §6.3). Nothing to fit while a page loads.
-  const refitted = useRef(refit)
-  useEffect(() => {
-    if (refit === refitted.current) return
-    refitted.current = refit
-    const grid = api.current
-    if (grid === null || grid.isDestroyed() || !shown.current.loaded || shown.current.rows === 0) return
-    grid.autoSizeAllColumns(true)
-    shown.current.sized = true
-    fit()
-  }, [refit, fit])
+  const { sizeOnce, sizeAdded } = useGridSizing({ api, well, shown, fit, refit })
 
   /**
    * The section's sort on the headers, where they show another: they follow
@@ -342,16 +318,11 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         applySelection()
         fit()
         sizeOnce()
-        // Columns shown while nothing was listed: sized to these rows, once they are drawn.
+        // Columns shown while nothing was listed: sized to these rows, once they are drawn -- or, hidden, owed with the rest.
         if (rows.length > 0 && unsized.current.size > 0) {
           const waiting = [...unsized.current]
           unsized.current.clear()
-          setTimeout(() => {
-            const grid = api.current
-            if (grid === null || grid.isDestroyed()) return
-            grid.autoSizeColumns(waiting, true)
-            fit()
-          }, 0)
+          sizeAdded(waiting)
         }
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
@@ -390,7 +361,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         }, 0)
       },
     }),
-    [applySelection, fit, sizeOnce],
+    [applySelection, fit, sizeOnce, sizeAdded],
   )
 
   // A new search, another parent, another filter or another sort is a new

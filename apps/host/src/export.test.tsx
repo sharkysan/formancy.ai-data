@@ -19,6 +19,7 @@ import {
   mount,
   newRecord,
   searchRecords,
+  showChild,
   signIn,
   stamp,
 } from './test-host.js'
@@ -332,6 +333,8 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const kept = keeping()
     const user = await workspace(plane.fetch, engine.formId, kept.save)
     await load(user, order)
+    // No record was open: the first Order line tab is the loaded order's (0142).
+    await showChild(user, 'Order line')
     await waitFor(() => expect(within(gridSection('Order line')).queryByRole('grid', { name: 'Order line' })).not.toBeNull(), ARRIVES)
     expect(await answeredOnce('Order line')).toBe('Order line rows 1–3.')
     // Read before the sort, for the Records case's reason.
@@ -376,10 +379,13 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
   })
 
   // A line's file in the making is its order's: opening another order
-  // mounts the section again, for that order, which stops the file -- the
+  // draws the section again, for that order -- once its tab is shown, as
+  // the order opens on its own tab (0142) -- which stops the file -- the
   // request's signal aborted -- says nothing on the new section's line, and
-  // saves nothing (watched failing with the order left out of the section's
-  // key: the signal still live once the other order's lines were listed).
+  // saves nothing (watched failing, before 0142's tabs, with the order left
+  // out of the section's key: the signal still live once the other order's
+  // lines were listed; the tabs, starting again for another record, now
+  // draw the section anew as well).
   test("stops a line's file in the making when another order is opened, and says nothing", async () => {
     const notes = stamp('parents')
     const [first, second] = [await freshOrder(engine, notes, [1, 2]), await freshOrder(engine, notes, [1, 2, 3])]
@@ -393,11 +399,15 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const kept = keeping()
     const user = await workspace(fetch, engine.formId, kept.save)
     await load(user, first)
+    await showChild(user, 'Order line')
     await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe('Order line rows 1–2.'), ARRIVES)
     await pressFromKeyboard(user, 'Order line')
     await waitFor(() => expect(held.held).toHaveLength(1), ARRIVES)
 
     await load(user, second)
+    // The first order's Order line tab stands until the second has opened.
+    await loaded(second)
+    await showChild(user, 'Order line')
     await waitFor(() => expect(gridStatus('Order line')?.textContent).toBe('Order line rows 1–3.'), ARRIVES)
     expect(signals.map((signal) => signal.aborted)).toEqual([true])
     await held.pass()
@@ -424,7 +434,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     const user = await workspace(plane.fetch, engine.formId)
     expect(exportButton('Records')).toBeTruthy()
     await newRecord(user)
-    const waiting = await waitFor(() => gridSection('Order line'), ARRIVES)
+    const waiting = await showChild(user, 'Order line')
     expect(within(waiting).queryByRole('button', { name: 'Download CSV' })).toBeNull()
     expect(within(waiting).getByRole('status').textContent).toBe('Order line rows are listed once this Order is saved.')
     cleanup()
@@ -452,6 +462,7 @@ describe.each(ENGINES)('Download CSV on $engine', (engine) => {
     await chooseForm(reader, engine.formId)
     await load(reader, order)
     await loaded(order)
+    expect(screen.queryByRole('tab', { name: 'Order line' })).toBeNull()
     expect(screen.queryByRole('region', { name: 'Order line' })).toBeNull()
     expect(screen.getAllByRole('button', { name: 'Download CSV' })).toEqual([exportButton('Records')])
     cleanup()
