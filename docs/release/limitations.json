@@ -4070,7 +4070,7 @@
       ]
     },
     "0145": {
-      "reviewed": "sha256:f15cf5146e47019ef4722579d9193c8fe6787f96e6ddb1fb026efcfe341822b6",
+      "reviewed": "sha256:d2a9fdd5cb5ae4f55bae2a75009b84ee4e3f3216f84a1158ed8d274aadc89864",
       "limitations": [
         {
           "area": "host",
@@ -4079,11 +4079,16 @@
         },
         {
           "area": "host",
-          "says": "In Stacked the host page's Records panel is as tall as its line's share of the window's height even when its page holds two rows or none, and scrolls inside itself where that is shorter than its toolbar and the grid's least, as on a phone or at the line's lowest share in a short window."
+          "says": "In Stacked the host page's Records panel is as tall as its line's share of the window's height even when its page holds two rows or none, and scrolls inside itself where that is shorter than its toolbar and the grid's least, as on a phone held upright."
         },
         {
           "area": "host",
-          "says": "Stacked's line is a share of the window's height, so at its highest the record's top can be below the window, and its limits and default are worked out from the stylesheets' heights, not measured, and do not follow a toolbar that wraps onto more rows.",
+          "says": "In a window about 30.5rem tall or less, a phone on its side or a laptop at 200%, Stacked has no line and cannot share its height: the Records panel is as tall as what it holds.",
+          "heldBy": "apps/host/src/split.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Stacked's line is a share of the window's height, so at its highest the record's top can be below the window, and below a window 80rem wide the record's heading need not show under it; its limits and default are worked out from the stylesheets' heights, not measured, and do not follow a toolbar that wraps onto more rows.",
           "heldBy": "apps/host/src/prefs.test.ts"
         },
         {

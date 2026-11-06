@@ -344,7 +344,8 @@ the headings take room in the band above the form
 ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)).
 In Stacked the Records panel is as tall as its line's share of the
 window's height however few rows its page holds, and scrolls inside itself
-where that is shorter than its toolbar; the line's limits and default are
+where that is shorter than its toolbar; a window about 30.5rem tall or
+less has no line and cannot share its height; the line's limits and default are
 worked out from the stylesheets' heights, not measured; a scroll begun
 with a finger on the line moves it; and the layout a person chose is kept
 in their browser, the last viewer's on a shared machine

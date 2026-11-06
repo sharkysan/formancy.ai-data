@@ -24,7 +24,7 @@ import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import { useOpening } from './opening.js'
 import { renderersOf } from './panes.js'
-import { axisOf, clampSplit } from './prefs.js'
+import { axisOf } from './prefs.js'
 import type { Axis, RendererChoice, Shares } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
@@ -33,7 +33,7 @@ import { RecordTabs } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
-import { Split, useShareLimits } from './split.js'
+import { Split, useLine } from './split.js'
 import { Trail } from './trail.js'
 import { useDrill } from './use-drill.js'
 import type { FormOf } from './use-drill.js'
@@ -445,13 +445,12 @@ export function FormView({
 
   const note = narrow && layout === 'side-by-side'
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
-  const axis = axisOf(layout)
-  const limits = useShareLimits(axis, lanes)
+  const splitter = useLine(axisOf(layout), shares, lanes)
   const style = {
     '--records-share': `${String(shares.width)}fr`,
     '--record-share': `${String(100 - shares.width)}fr`,
-    // Stacked's records as tall as its line says, inside the window's limits (0145).
-    '--records-height': `${String(axis === 'height' ? clampSplit(shares.height, limits) : shares.height)}dvh`,
+    // Stacked's records as tall as its line says, inside the window's limits, in the height its limits are read from (0145).
+    '--records-height': splitter?.axis === 'height' ? `${String(splitter.value)}svh` : undefined,
   } as CSSProperties
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
   const crumbs: Crumb[] = [
@@ -473,7 +472,7 @@ export function FormView({
       />
       {notice}
       {drilling ? <Trail crumbs={crumbs} compact={phone} onUp={(at, button) => drill.up(at, () => button.focus())} /> : null}
-      <div className="lanes" data-layout={layout} data-view={paged ? view : 'records'} ref={lanes} style={style}>
+      <div className="lanes" data-layout={layout} data-view={paged ? view : 'records'} data-line={splitter?.axis} ref={lanes} style={style}>
         <Records
           gridRef={grid}
           client={client}
@@ -501,16 +500,15 @@ export function FormView({
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
           onTreeOpen={openFrom}
         />
-        {axis === null ? null : (
+        {splitter === null ? null : (
           <Split
-            axis={axis}
-            share={shares[axis]}
-            limits={limits}
+            line={splitter}
+            controls="master"
             lanes={lanes}
             labelledBy="records-heading"
-            onMove={(share) => onSplit(axis, share)}
+            onMove={(share) => onSplit(splitter.axis, share)}
             onSettle={(share) => {
-              onSplitSettled(axis, share)
+              onSplitSettled(splitter.axis, share)
               setReleased((count) => count + 1)
             }}
           />

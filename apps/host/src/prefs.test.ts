@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   axisOf,
   gridKey,
+  lineLimits,
   PREFERENCES,
   readLayout,
   readPreference,
@@ -141,6 +142,23 @@ describe("Stacked's line", () => {
     expect(shareLimits('height', 480, 16)).toEqual({ min: 60, max: 60 })
     expect(shareLimits('height', 0, 16)).toEqual({ min: 25, max: 75 })
     expect(shareLimits('height', 400, 16)).toEqual({ min: 60, max: 60 })
+  })
+
+  // Drawn only where it can move: in a window too short for the records'
+  // least and the record's together with room between them -- 488 pixels,
+  // a phone on its side at 390 -- there is no line rather than one pinned at 60 whose keys do
+  // nothing; with no height to go by, the outer bounds, as before. Side by
+  // side's split keeps its pinned default where its lanes are too narrow,
+  // as it always has (watched failing with the line's limits given
+  // whatever the window: 60 to 60 at 480 pixels).
+  test('is drawn only where the window leaves it room to move', () => {
+    expect(lineLimits('height', 900, 16)).toEqual({ min: 32, max: 75 })
+    expect(lineLimits('height', 500, 16)).toEqual({ min: 58, max: 61 })
+    expect(lineLimits('height', 481, 16)).toBeNull()
+    expect(lineLimits('height', 480, 16)).toBeNull()
+    expect(lineLimits('height', 390, 16)).toBeNull()
+    expect(lineLimits('height', 0, 16)).toEqual({ min: 25, max: 75 })
+    expect(lineLimits('width', 500, 16)).toEqual({ min: 55, max: 55 })
   })
 
   // A horizontal line, as the window splitter pattern has it: Up and Down

@@ -510,7 +510,8 @@ whose address names no layout opens in the one the person chose last,
 kept by `src/prefs.ts`, else in Stacked, or Separate views on a phone;
 `src/split.tsx` is the window splitter between the records and the record,
 Side by side's across the lanes' width and Stacked's down the window's
-height, each share and its limits `src/prefs.ts`'s
+height, none where Stacked's could not move, each share and its limits
+`src/prefs.ts`'s
 ([0145](../decisions/0145-the-layout-is-the-persons.md)). `src/host.tsx`
 loads the workspace, AG Grid with it, only after sign-in.
 `src/plane.test.tsx` reads every request off the wire against the server's

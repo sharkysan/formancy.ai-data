@@ -9,62 +9,83 @@
   line 60 until moved and kept under its own key (watched failing with
   both read from the split's key: the line came back at Side by side's
   62); its limits from the window's height, the records at least 18rem
-  and the record 12rem, 32 to 75 in a 900-pixel window, pinned at 60 in
-  one shorter than 30rem, the outer bounds with no height (watched
-  failing with the width's leasts: 36 to 57); moved by Up and Down, Home
-  and End, and not by Left and Right (watched failing with Side by side's
-  keys for both: ArrowLeft moved the line up); a line in Side by side and
-  in Stacked and none in Separate views or Drill down (watched failing
-  with a line for every layout); the layout kept as nothing until one is
-  chosen (watched failing with the default written in place of nothing)
-  and a value it does not know ignored (watched failing with the value
-  taken as written); and all of it with storage that throws.
-  `apps/host/src/layout.test.ts` -- arriving with nothing asked and
-  nothing kept, Stacked, and Separate views on a phone (watched failing
-  with Side by side kept as the default); with a layout kept, that one, on
-  a phone too, and the fragment's over it (watched failing with the kept
-  layout unread, and with it read over the fragment's).
-  `apps/host/src/split.test.tsx` -- Stacked's line a horizontal
-  separator named by the records, Down moving it and Left and Right not
-  (watched failing with the line given the split's orientation, and with
-  the split's keys); dragged as far as the pointer moves, as a share of
-  the window's height, from where the drag began (watched failing with the
-  split's reading, across the lanes' width: the drag left the line at 60;
-  and with the share read from the lanes' top: 40 became 53). None of the three needs a database, but every
-  host file runs under the suite's `globalSetup`, which starts both: they
-  were run and watched failing under a copy of `apps/host/vitest.config.ts`
-  without it, which was not kept. On both engines against the real server,
-  not run for this record outside CI: `apps/host/src/choices.test.tsx` --
-  the split's case, which now chooses Side by side first, its numbers
-  unchanged, with Stacked's line still at 60 after the split was moved to
-  30, on the same page and opened again (to be watched failing in CI with
-  one share moved for both lines); Stacked's line where a person arrives,
-  60 until moved, Up and Down a step, Left and Right nothing, Home and End
-  to the outer bounds jsdom gives, kept under its own key and not the
-  split's, the keyboard left on it (to be watched failing in CI with the
-  split's keys for both lines); and the layout chosen last opened on
-  arrival, Drill down chosen in the Layout group among them, an address
-  that names one winning and leaving the kept one as it was (to be watched
-  failing in CI with the kept layout unread on arrival).
-  `apps/host/src/open-lookup.test.tsx` -- Open under a lookup into Drill
-  down keeps no layout, and the next arrival is Stacked (to be watched
-  failing in CI with every layout the page moves to kept as chosen). Four
-  breaks chosen so that each fails its own case and no other. Changed to
-  the new arrival and not watched failing on their own: five addresses in
+  and the record 12rem, 32 to 75 in a 900-pixel window, the outer bounds
+  with no height (watched failing with the width's leasts: 36 to 57); no
+  line where the window leaves it no room to move, 480 pixels or fewer,
+  while Side by side's split keeps its pinned default (watched failing
+  with the limits given whatever the window: 60 to 60 at 480 pixels);
+  moved by Up and Down, Home and End, and not by Left and Right (watched
+  failing with Side by side's keys for both: ArrowLeft moved the line
+  up); a line in Side by side and in Stacked and none in Separate views or
+  Drill down (watched failing with a line for every layout); the layout
+  kept as nothing until one is chosen (watched failing with the default
+  written in place of nothing) and a value it does not know ignored
+  (watched failing with the value taken as written); and all of it with
+  storage that throws. `apps/host/src/layout.test.ts` -- arriving with
+  nothing asked and nothing kept, Stacked, and Separate views on a phone
+  (watched failing with Side by side kept as the default); with a layout
+  kept, that one, on a phone too, and the fragment's over it (watched
+  failing with the kept layout unread, and with it read over the
+  fragment's). `apps/host/src/split.test.tsx` -- Stacked's line a
+  horizontal separator named by the records, its value said as the
+  records' share of the window's height, Down moving it and Left and Right
+  not (watched failing with the line given the split's orientation, with
+  the split's keys, and with the split's words, "the record 40%"); dragged
+  as far as the pointer moves, as a share of the window's height, from
+  where the drag began (watched failing with the split's reading, across
+  the lanes' width: the drag left the line at 60; and with the share read
+  from the lanes' top: 40 became 53); each line controlling the Records
+  panel (watched failing with `aria-controls` left off both); a share of
+  75 kept in a 900-pixel window moved to 70 as the window is made 640
+  (watched failing with the share drawn as kept, unclamped, and with the
+  `resize` unheard: 75 both times); no line in a 390-pixel window, and the
+  line back at 900 (watched failing with the line drawn pinned at 60); and
+  a `resize` that leaves the height as it was rendering nothing again
+  (watched failing with the height kept as a new object at each `resize`:
+  a render each). None of the three needs a database, but every host file
+  runs under the suite's `globalSetup`, which starts both: they were run
+  and watched failing under a copy of `apps/host/vitest.config.ts` without
+  it, which was not kept. On both engines against the real server, passing
+  in CI on b15fcef and to be watched failing there under a temporary commit
+  of breaks: `apps/host/src/choices.test.tsx` -- the split's case, which
+  now chooses Side by side first, its numbers unchanged, with Stacked's
+  line still at 60 after the split was moved to 30, on the same page and
+  opened again (with one share moved for both lines); Stacked's line where
+  a person arrives, 60 until moved, Up and Down a step, Left and Right
+  nothing, Home and End to the outer bounds jsdom gives, kept under its own
+  key and not the split's, the keyboard left on it (with the split's keys
+  for both lines); and the layout chosen last opened on arrival, Drill
+  down chosen in the Layout group among them, an address that names one
+  winning and leaving the kept one as it was (with the kept layout unread
+  on arrival). `apps/host/src/open-lookup.test.tsx` -- Open under a lookup
+  into Drill down keeps no layout, and the next arrival is Stacked (with
+  `chose` ignored in `changeLayout`, every layout the page moves to kept).
+  Each break fails its own case and no other page case. Changed to the new
+  arrival and not watched failing on their own: six addresses in
   `address.test.tsx` and one in `races.test.tsx` that say `layout=stacked`
-  where a person arrived with none, and a refused Open in
+  where a person arrived with none -- one of them, a typed address, found
+  failing on both engines in CI run 42169508975, since another form opened
+  by a typed address keeps the page's layout -- and a refused Open in
   `open-lookup.test.tsx` that leaves the person in Stacked. The browser
-  gate's `apps/host/scripts/browser/workspace.mjs`, in Chromium, Firefox
-  and WebKit at every width it measures, 320 pixels among them: a new
-  state, "Records, stacked", in which a wide window arrives in Stacked and
-  a phone in Separate views, the line is drawn across, Down moves it a
-  step and Home and End to its limits with the keyboard staying on it, the
-  Records panel is as tall as it says of the window's height, and a
-  pointer drags it within its limits and the share is kept -- and, as in
-  every state, nothing scrolls sideways or is past either edge and axe
-  finds nothing, target size and contrast among it; "Records, side by
-  side" now chooses Side by side before its checks rather than after
-  them. Not run for this record outside CI.
+  gate, in Chromium, Firefox and WebKit, passing in all three on b15fcef:
+  `apps/host/scripts/browser/stacked.mjs`'s "Records, stacked" at every
+  width it measures, 320 pixels among them, in which a wide window arrives
+  in Stacked and a phone in Separate views, the line is drawn across, Down
+  moves it a step and Home and End to its limits with the keyboard staying
+  on it, its focus ring is painted over the record's glass -- one pixel
+  inside the ring, past its offset, read from a screenshot against the
+  outline's colour at 1.1:1 or less -- the Records panel is as tall as it
+  says of the window's height, and a pointer drags it within its limits
+  and the share is kept; a pass of its own at 844 by 390 pixels, a phone on
+  its side, in which Stacked draws no line and the Records panel is as
+  tall as what it holds; and in `workspace.mjs`'s "Records, side by side",
+  which now chooses Side by side before its checks, the split's focus ring
+  read the same way. In every one, as in every state, nothing scrolls
+  sideways or is past either edge and axe finds nothing, target size and
+  contrast among it. The ring checks, the short pass and the drag read
+  from where it began are to be watched failing in CI: the rings with each
+  line's `z-index` taken away, the short pass with the line drawn in a
+  short window.
 
 ## Context
 
@@ -97,22 +118,37 @@ smallest heights to the builder.
 **Stacked shares its height by a line the person moves**
 (`apps/host/src/split.tsx`). Between the Records panel and the record,
 Stacked draws the same window splitter Side by side does, drawn across: a
-focusable `separator`, horizontal, named by the records' heading, its
-value the records' share of the window's height in percent, with its
-limits and the words "Records 60%, the record 40%". Down and Up move it
-a step of five, Home and End to its limits; Left and Right are not its keys, as the
-window splitter pattern has them for a horizontal one, while Side by
-side's split still answers all four arrows as it always has. A pointer
-drags it, the share moved by as much of the window's height as the
-pointer moves from where the drag began, rather than read from the lanes'
+focusable `separator`, horizontal, named by the records' heading and
+controlling the Records panel, its primary pane, as Side by side's now
+does too, its value the records' share of the window's height in
+percent, with its limits and the words "Records 60% of the window's
+height" -- not the record's share, which is what the page leaves it.
+Down and Up move it a step of five, Home and End to its limits; Left and
+Right are not its keys, as the window splitter pattern has them for a
+horizontal one, while Side by side's split still answers all four arrows
+as it always has. A pointer drags it, the share moved by as much of the
+window's height as the pointer moves from where the drag began, rather than read from the lanes'
 top, which is no fixed place while the panel's height changes under the
 pointer and a browser may scroll to keep in view what it showed; a drag
 the browser cancels keeps nothing, as before. The Records panel is
-drawn that tall, `--records-height` in `dvh`, however few rows its page
-holds, its grid's well filling what the toolbar leaves, and a panel
-shorter than its toolbar and the grid's least scrolls inside itself, as
-Side by side's does. The record follows below in the page's flow, so the
-page scrolls as it did.
+drawn that tall, `--records-height` in `svh`, the window's height with a
+phone's toolbar shown, which is what `documentElement.clientHeight` --
+read by the limits and a drag -- gives too, so the line and the panel go
+by one height as the toolbar comes and goes (reasoned from CSS Values 4,
+not measured on a phone); however few rows its page holds, its grid's
+well fills what the toolbar leaves, and a panel shorter than its toolbar
+and the grid's least scrolls inside itself, as Side by side's does. The record
+follows below in the page's flow, so the page scrolls as it did. The
+window's height is kept as a number, so a `resize` that changes nothing
+-- a phone's toolbar, a screenshot of the whole page, which fires one --
+renders nothing again.
+
+**Each line is drawn over the glass, and in forced colours.** Each is a
+2px border down or across its middle, which forced colours draw in their
+own colour, and each is positioned above the panels beside it, whose
+`backdrop-filter` makes them stacking contexts the document paints after
+it, so its 2px focus ring at a 2px offset lies on top of their glass, not
+under it.
 
 **Neither part collapses.** The limits come from the window's height as
 Side by side's come from the lanes' width (`shareLimits` in
@@ -121,20 +157,29 @@ records at least 18rem -- their heading's row and the search's, the
 grid's header, its row of boxes and a row, the panel's padding and gaps
 -- and the record at least 12rem, the 7.5rem the app bar and the form's
 header take above the lanes on a wide window with the line and the
-record's heading's row below it. Where a window is too short for both,
-the line is pinned at its default. The panel is drawn at the share inside
-those limits, so a share kept in a taller window is not drawn past the
-limits of a shorter one. The default, 60, is where the two leasts meet in
-the shortest window that holds both, 18rem of 30. None of these heights
-is measured: they are summed from the stylesheets' own and rounded up,
-on 2026-11-06.
+record's heading's row below it. The panel is drawn at the share inside
+those limits, so a share kept in a taller window is moved inside a
+shorter one's as the window is resized. The default, 60, is where the two
+leasts meet in the shortest window that holds both, 18rem of 30. None of
+these heights is measured: they are summed from the stylesheets' own and
+rounded up, on 2026-11-06.
+
+**A window too short for the line to move has none** (`lineLimits`). In
+one 488 pixels tall or less at 16 to the rem, about 30.5rem -- a phone on
+its side at 844 by 390, a laptop at 200% -- the limits meet, rounded to
+whole percents, and leave the line nowhere to go,
+and a focusable separator whose keys and drag do nothing would be a Tab
+stop that lies. Stacked there draws no line, and is as it was before this
+decision: the Records panel as tall as what it holds, its grid's well
+capped by its own `max-height`, as Side by side drawn stacked is; the line
+comes back when the window is tall enough again.
 
 **Each line keeps its own share**, under a key of its own
 (`formancy-data-host.stack` beside Side by side's
 `formancy-data-host.split`), so moving one never moves the other. Letting
 go of either fits the grids' columns again to the rows shown then, as
 Side by side's always has: in Stacked a taller well shows more rows.
-Side by side's split is otherwise unchanged -- its default, steps,
+Side by side's split otherwise does what it did -- its default, steps,
 limits, keys and the narrow window that hides it -- now one of two axes
 of one splitter rather than a splitter of its own.
 
@@ -173,12 +218,17 @@ address.
   even when its page holds two rows or none, the grid's well filled with
   the empty grid, where it was as tall as its rows.
 - A panel shorter than its toolbar and the grid's least scrolls inside
-  itself, on a phone or at the line's lowest share in a short window,
-  rather than the page growing to hold it.
+  itself, as on a phone held upright or at the line's lowest share in a
+  window just tall enough for the line, rather than the page growing to
+  hold it.
+- In a window about 30.5rem tall or less the height cannot be shared at all:
+  Stacked has no line, and the Records panel is as tall as what it holds,
+  its grid's well capped as before.
 - The share is of the window's height, not of what is left below the app
   bar and the form's header, so the record's top can be below the window
   at the line's highest share; and in a window narrower than 80rem, where
-  Forms is a band above main, the record's least is less than 12rem.
+  Forms is a band above main, the lanes start lower and the record's
+  heading need not be in view below the line at all.
 - The line takes the pointer on a phone too: a scroll begun with a finger
   on it moves the line instead.
 - A share's limits and default are worked out from the stylesheets'
@@ -216,6 +266,16 @@ let it go, and its value would say a share the panel does not take.
 **The share of the lanes' height.** In Stacked the lanes are as tall as
 the record below them, which changes with every form and record, so the
 same share would draw the records at a different height for each.
+
+**Stacked's line pinned at its default in a short window**, as Side by
+side's split is where its lanes are too narrow. It would be a Tab stop
+whose keys and drag do nothing, over a Records panel of 60% of a window
+that has no room for it.
+
+**`dvh` for the panel's height**, as the stylesheets' other heights are.
+The limits and a drag read `documentElement.clientHeight`, the small
+viewport's height, so on a phone whose toolbar moves the line and the
+panel would say two heights.
 
 **Side by side's keys for Stacked's line.** Left and Right moving a line
 drawn across is not what the window splitter pattern asks, and what a

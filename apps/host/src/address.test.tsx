@@ -396,7 +396,9 @@ describe.each(ENGINES)('the address on $engine', (engine) => {
     expect(window.location.hash).toBe(here)
     await shows('React', 'Amount', '17')
 
-    const typed = `#form=${engine.employees}&layout=side-by-side&view=records`
+    // In the layout the page is in, where a person arrives (0145): another
+    // form opened by a typed address keeps the page's layout.
+    const typed = `#form=${engine.employees}&layout=stacked&view=records`
     window.location.hash = typed
     await waitFor(() => expect(unsavedNotice()).not.toBeNull(), ARRIVES)
     expect(within(unsavedNotice() as HTMLElement).getAllByRole('paragraph')[0]?.textContent).toBe('Opening Employee closes these forms:')

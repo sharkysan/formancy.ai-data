@@ -179,6 +179,20 @@ export function shareLimits(axis: Axis, size: number, rem: number): Limits {
   return min > max ? { min: initial, max: initial } : { min, max }
 }
 
+/**
+ * The limits of the line `axis` draws in `size` pixels, or null where it
+ * would have no room to move: Stacked's in a window too short for the
+ * records' least and the record's together with room between them -- 488
+ * pixels at 16 to the rem, about 30.5rem, as a phone on its side or a
+ * laptop at 200% is (0145) -- there Stacked draws no line, and its
+ * Records panel is as tall as what it holds. Side by side's split keeps its
+ * pinned default where its lanes are too narrow, as it always has.
+ */
+export function lineLimits(axis: Axis, size: number, rem: number): Limits | null {
+  const limits = shareLimits(axis, size, rem)
+  return axis === 'height' && limits.min >= limits.max ? null : limits
+}
+
 /** `share` held inside `limits`. */
 export function clampSplit(share: number, limits: Limits): number {
   return Math.min(limits.max, Math.max(limits.min, share))

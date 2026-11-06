@@ -732,7 +732,9 @@ record. Stacked is where a page opens with no layout in its address and
 none kept -- Separate views on a phone -- and in it a line between the
 records and the record shares the window's height, as Side by side's
 shares the width: drag it, or press Down and Up a step and Home and End
-to its limits, the Records panel as tall as it says. The layout you choose
+to its limits, the Records panel as tall as it says; in a window about
+30.5rem tall or less there is no line, and the panel is as tall as what
+it holds. The layout you choose
 is kept in this browser, and a page whose address names no layout opens in
 it; one that names a layout opens that one and keeps nothing, and Drill
 down reached by a lookup's Open is not kept

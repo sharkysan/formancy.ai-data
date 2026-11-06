@@ -30,10 +30,15 @@ the same day (formancy.ai 0232).
   Between the Records panel and the record in Stacked is a line, a
   separator named Records: drag it, or press Down and Up to move it five
   percent of the window's height and Home and End to its limits, which
-  leave the records at least 18rem and the record's heading in view. The
-  Records panel is as tall as the line says, its grid filling it however
-  few rows the page holds, and the line's place is kept in your browser
-  apart from Side by side's split, which is as it was. The layout you
+  leave the records at least 18rem and, in a window wider than 80rem, the
+  record's heading in view below it. The Records panel is as tall as the
+  line says, its grid filling it however few rows the page holds, and the
+  line's place is kept in your browser apart from Side by side's split.
+  In a window about 30.5rem tall or less, a phone on its side or a laptop
+  at 200%, the line has no room to move and is not drawn: Stacked is as it
+  was, the Records panel as tall as what it holds. Both lines now draw
+  their focus ring over the glass beside them and a real border that
+  forced colours keep, and say they control the Records panel. The layout you
   choose in the Layout group is kept too, Drill down among them, and a
   page opened without a layout in its address opens in it; an address that
   names a layout still opens that one and changes nothing kept, and Drill
