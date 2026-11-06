@@ -14,7 +14,7 @@ const definition = (labels: Readonly<Record<string, string>>): PublishedForm =>
 
 const child = (form: string, title: string, field: string, one = false, labels: Readonly<Record<string, string>> = {}): ChildForm => ({
   child: { form, field, one, when: null },
-  menu: { id: form, title, operations: ['read'], children: [] },
+  menu: { id: form, title, group: 'Sales', operations: ['read'], children: [] },
   definition: definition(labels),
 })
 

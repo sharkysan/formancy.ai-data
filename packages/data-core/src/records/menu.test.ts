@@ -116,6 +116,22 @@ describe('formMenu over menuForm', () => {
     expect(menuOf(forms, AUDITOR).forms.map((entry) => entry.id)).toEqual(['order', 'order-line'])
   })
 
+  // Each form names the group a list of forms puts it under (0143), from
+  // its bundle alone: the presentation's, or `null` where it cleared it,
+  // or the root schema's name in words where it says nothing -- as a
+  // bundle published before groups, or one with no presentation, says --
+  // so no form is listed apart from its schema's others for want of a
+  // word. Watched failing with the presentation's group read alone: the
+  // employees, which said nothing, were in no group.
+  test('names the group each form is listed under, the root schema’s in words unless its presentation says otherwise', () => {
+    const menu = menuOf([{ ...ORDER, group: 'Orders' }, { ...LINES, group: null }, EMPLOYEES], CLERK)
+    expect(menu.forms.map(({ id, group }) => ({ id, group }))).toEqual([
+      { id: 'employee', group: 'Sales' },
+      { id: 'order', group: 'Orders' },
+      { id: 'order-line', group: null },
+    ])
+  })
+
   // An order's lines are its children for the clerk, who may list them and
   // read the field that names the order; the line form is in the menu by
   // itself too. The employee form is its own child through its manager, and
@@ -169,7 +185,7 @@ describe('formMenu over menuForm', () => {
       operations: { read: ['manager'], create: [], update: [] },
     })
     const menu = menuOf([ORDER, managersOnly], CLERK)
-    expect(menu).toEqual({ forms: [{ id: 'order', title: 'Order', operations: ['read', 'create', 'update'], children: [] }] })
+    expect(menu).toEqual({ forms: [{ id: 'order', title: 'Order', group: 'Sales', operations: ['read', 'create', 'update'], children: [] }] })
   })
 
   // A table of the same name on another connection is another table, and

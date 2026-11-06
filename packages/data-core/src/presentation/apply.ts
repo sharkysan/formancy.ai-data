@@ -3,6 +3,7 @@ import type { FormBindings } from '../generate/types.js'
 import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
+import { groupShapeProblems } from './group.js'
 import { homeOf, placements } from './placement.js'
 import { stateLabelShapeProblems } from './state-labels.js'
 import { unfilteredShapeProblems } from './unfiltered.js'
@@ -80,7 +81,8 @@ function sectionShapeProblems(entry: unknown, at: string, seen: Set<string>): st
 /**
  * Every reason a value is not a presentation this release reads, by shape
  * alone: version 1, only the known properties, no field or section named
- * twice, and list views shaped as `viewShapeProblems` reads them (0105).
+ * twice, list views shaped as `viewShapeProblems` reads them (0105), and a
+ * group that is words or `null` (`groupShapeProblems`, 0143).
  * Whether it fits a base is `applyPresentation`'s question, and whether its
  * views fit the bindings `viewProblems`'.
  */
@@ -88,11 +90,12 @@ export function presentationShapeProblems(value: unknown): string[] {
   if (!isRecord(value)) return ['a presentation is an object']
   const problems: string[] = []
   for (const key of Object.keys(value)) {
-    if (!['version', 'fields', 'sections', 'views', 'unfiltered', 'states'].includes(key)) problems.push(`${key} is not a property of a presentation`)
+    if (!['version', 'fields', 'sections', 'views', 'unfiltered', 'states', 'group'].includes(key)) problems.push(`${key} is not a property of a presentation`)
   }
   if (Object.hasOwn(value, 'views')) problems.push(...viewShapeProblems(value['views']))
   if (Object.hasOwn(value, 'unfiltered')) problems.push(...unfilteredShapeProblems(value['unfiltered']))
   if (Object.hasOwn(value, 'states')) problems.push(...stateLabelShapeProblems(value['states']))
+  if (Object.hasOwn(value, 'group')) problems.push(...groupShapeProblems(value['group']))
   if (value['version'] !== PRESENTATION_VERSION) problems.push(`version must be ${String(PRESENTATION_VERSION)}`)
   const fields = value['fields']
   const sections = value['sections']

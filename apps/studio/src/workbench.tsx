@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
+import { defaultGroup, formGroup } from '@formancy/data-core'
 import type { FormPolicy, MetadataSnapshot, StateLabel, StoredListView } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
@@ -76,6 +77,8 @@ interface Generated {
   unfiltered: string[]
   /** The labels of the state field's states (0129); `[]` for none, which the publish leaves out. */
   states: StateLabel[]
+  /** The group the form is listed under (0143), as its box shows it: the default until another is typed, `null` for none; the publish leaves the default out. */
+  group: string | null
   carried: Carried | null
 }
 
@@ -150,7 +153,16 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   async function generate(request: ProposalRequest): Promise<Failure | null> {
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome
-    setGenerated({ request, proposal: outcome.value, session: createBuilderSession(outcome.value.form), views: [], unfiltered: [], states: [], carried: null })
+    setGenerated({
+      request,
+      proposal: outcome.value,
+      session: createBuilderSession(outcome.value.form),
+      views: [],
+      unfiltered: [],
+      states: [],
+      group: defaultGroup(outcome.value.bindings.root),
+      carried: null,
+    })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
     setCurrent('generate')
     return null
@@ -179,6 +191,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       unfiltered: carried.unfiltered,
       // A state is a value, not a field key: its label is carried as it is (0129).
       states: previous.states,
+      // So is the group, the form's and no field's (0143); another root starts afresh in Choose.
+      group: previous.group,
       carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
     })
     setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
@@ -219,6 +233,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       views: regeneration.presentation.views ?? [],
       unfiltered: regeneration.presentation.unfiltered ?? [],
       states: regeneration.presentation.states ?? [],
+      group: formGroup(regeneration.presentation.group, bindings.root),
       carried: {
         from: `version ${String(version)}`,
         version,
@@ -251,6 +266,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   /** The labels typed under State labels (0129). */
   function statesChosen(states: StateLabel[]): void {
     setGenerated((previous) => (previous === null ? previous : { ...previous, states }))
+  }
+
+  /** The group typed, or cleared by No group (0143). */
+  function groupChosen(group: string | null): void {
+    setGenerated((previous) => (previous === null ? previous : { ...previous, group }))
   }
 
   /** Published: the draft's base is now whatever is newest, read when the Publish step opens again. */
@@ -299,7 +319,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request, views, unfiltered, states, carried } = generated
+    const { proposal, session, request, views, unfiltered, states, group, carried } = generated
     const open = asked(carried, policy)
     switch (current) {
       case 'generate':
@@ -333,6 +353,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             policy={policy}
             states={states}
             onStates={statesChosen}
+            group={group}
+            onGroup={groupChosen}
             carried={carried}
           />
         )
@@ -348,6 +370,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             views={views}
             unfiltered={unfiltered}
             states={states}
+            group={group}
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}

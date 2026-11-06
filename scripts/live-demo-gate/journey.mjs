@@ -33,14 +33,16 @@ const CHILDREN = {
   'order-line': [],
 }
 const TITLES = { customer: 'Customer', delivery: 'Delivery', order: 'Order', 'order-line': 'Order line' }
+/** The group every demo form is listed under (0143): its tables' schema, sales, in words, since the image's presentations name none. */
+const GROUP = 'Sales'
 
-/** The menu `role` is shown, as ROLE_GRANTS decides it: every form it may read, by id, with what it may do and the children under it. */
+/** The menu `role` is shown, as ROLE_GRANTS decides it: every form it may read, by id, under its group, with what it may do and the children under it. */
 export function expectedMenu(role) {
   const grants = ROLE_GRANTS[role]
   if (grants === undefined) throw new Error(`there is no role ${String(role)} in ROLE_GRANTS`)
   return Object.keys(CHILDREN)
     .filter((id) => grants.may[id].includes('read'))
-    .map((id) => ({ id, title: TITLES[id], operations: grants.may[id], children: CHILDREN[id] }))
+    .map((id) => ({ id, title: TITLES[id], group: GROUP, operations: grants.may[id], children: CHILDREN[id] }))
 }
 
 /**

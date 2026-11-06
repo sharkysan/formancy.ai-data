@@ -156,7 +156,9 @@ const menuClient = createDataClient({
   fetch: async () =>
     new Response(
       JSON.stringify({
-        forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [{ form: 'order-line', field: 'order', one: false, when: null }] }],
+        forms: [
+          { id: 'order', title: 'Order', group: 'Sales', operations: ['read'], children: [{ form: 'order-line', field: 'order', one: false, when: null }] },
+        ],
       }),
       { status: 200, headers: { 'content-type': 'application/json' } },
     ),

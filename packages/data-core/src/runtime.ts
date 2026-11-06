@@ -238,15 +238,21 @@ export interface FormMenuChild {
 }
 
 /**
- * One form in a person's menu: its id and title, the operations the policy
- * grants them of what the form offers as published, and the children under
- * it. Opening it (`GET /v1/forms/:id`) narrows the operations to what the
- * database as it is now still allows, and says whether a list is offered
- * now: the menu asks no database (0045).
+ * One form in a person's menu: its id and title, the group it is listed
+ * under, the operations the policy grants them of what the form offers as
+ * published, and the children under it. Opening it (`GET /v1/forms/:id`)
+ * narrows the operations to what the database as it is now still allows,
+ * and says whether a list is offered now: the menu asks no database (0045).
  */
 export interface FormMenuEntry {
   id: string
   title: string
+  /**
+   * The group a list of forms puts it under (0143): its presentation's, or
+   * its root schema's name in words where the presentation says nothing,
+   * as a bundle published before groups says; `null` for no group.
+   */
+  group: string | null
   operations: PolicyOperation[]
   children: FormMenuChild[]
 }

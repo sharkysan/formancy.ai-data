@@ -8,6 +8,7 @@ import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
 import { helpTextOf, labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
+import { GroupPanel } from './group.js'
 import { ListViewsPanel } from './list-views.js'
 import { StateLabelsPanel } from './state-labels.js'
 
@@ -130,7 +131,8 @@ function HelpTextInput({
  * from another (0030) lists what could not be carried above the controls,
  * and what it offers is a label too. Below them, the list views (0105):
  * presentation of the form's list rather than of the form, named by the
- * fields' labels as this step has them.
+ * fields' labels as this step has them; the state labels (0129); and the
+ * group a list of forms puts it under (0143).
  */
 export function PresentationStep({
   session,
@@ -142,6 +144,8 @@ export function PresentationStep({
   policy,
   states,
   onStates,
+  group,
+  onGroup,
   carried = null,
 }: {
   session: BuilderSession
@@ -155,6 +159,9 @@ export function PresentationStep({
   policy: FormPolicy
   states: readonly StateLabel[]
   onStates: (states: StateLabel[]) => void
+  /** The group the form is listed under (0143), as its box shows it: the default until another is typed, `null` for none. */
+  group: string | null
+  onGroup: (group: string | null) => void
   carried?: Carried | null
 }): ReactElement {
   const document = useDocument(session)
@@ -339,6 +346,7 @@ export function PresentationStep({
       {layout === undefined ? <p className="none">The form has no arrangement to edit.</p> : nodes(layout.nodes, [], false)}
       <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
       <StateLabelsPanel policy={policy} labels={states} onLabels={onStates} />
+      <GroupPanel root={bindings.root} group={group} onGroup={onGroup} />
     </>
   )
 }

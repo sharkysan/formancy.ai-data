@@ -298,6 +298,15 @@ function DraftView({
           </ul>
         </div>
       )}
+      {bundle.presentation.group === undefined ? null : (
+        // Where a list of forms puts it (0143): the group typed, or none; the default is left out, and said nothing of.
+        <div className="draft-views">
+          <h4 id="draft-group">Group</h4>
+          <ul aria-labelledby="draft-group">
+            <li>{bundle.presentation.group ?? 'No group'}</li>
+          </ul>
+        </div>
+      )}
       {!pending ? null : (
         <div className="decide">
           {draft.refuses.approve !== undefined && draft.refuses.reject !== undefined ? null : (

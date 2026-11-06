@@ -1,8 +1,8 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, FormPolicy, NormalizedType, ObjectRef } from '@formancy/data-core'
+import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
+import type { ColumnMeta, FormPolicy, GenerationRequest, NormalizedType, ObjectRef } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -92,6 +92,9 @@ const SNAPSHOT = createSnapshot({
   ],
 })
 
+/** The order form's request, as the proposal route normalises it: what a format-2 version of it says it was generated from. */
+const REQUEST: GenerationRequest = { connection: 'erp', root: ref('order'), formId: 'order', title: 'Order', lookups: [], pinned: ['tenant_id'] }
+
 const RW = { read: ['clerk'], write: ['clerk'] }
 const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
 /** Clerks keep their tenant's orders; a buyer may read them too, and no line. */
@@ -150,7 +153,7 @@ beforeEach(async () => {
   lines = []
   root = await mkdtemp(join(tmpdir(), 'formancy-data-runtime-menu-'))
   store = createFileConfigurationStore(root)
-  const generated = generateForm(SNAPSHOT, { connection: 'erp', root: ref('order'), formId: 'order', title: 'Order', lookups: [], pinned: ['tenant_id'] })
+  const generated = generateForm(SNAPSHOT, REQUEST)
   order = { format: 1, connection: 'erp', form: generated.form, bindings: generated.bindings, policy: ORDER_POLICY, snapshot: SNAPSHOT }
   await store.publish('order', null, order)
   const line = generateForm(SNAPSHOT, {
@@ -189,13 +192,48 @@ describe('the menu route', () => {
     expect(clerk.statusCode, clerk.body).toBe(200)
     expect(clerk.json()).toEqual({
       forms: [
-        { id: 'order', title: 'Order', operations: ['read', 'create', 'update'], children: [{ form: 'order-line', field: 'order', one: false, when: null }] },
-        { id: 'order-line', title: 'Order line', operations: ['read', 'create', 'update'], children: [] },
+        {
+          id: 'order',
+          title: 'Order',
+          group: 'Sales',
+          operations: ['read', 'create', 'update'],
+          children: [{ form: 'order-line', field: 'order', one: false, when: null }],
+        },
+        { id: 'order-line', title: 'Order line', group: 'Sales', operations: ['read', 'create', 'update'], children: [] },
       ],
     })
-    expect((await menu('buyer')).json()).toEqual({ forms: [{ id: 'order', title: 'Order', operations: ['read'], children: [] }] })
+    expect((await menu('buyer')).json()).toEqual({ forms: [{ id: 'order', title: 'Order', group: 'Sales', operations: ['read'], children: [] }] })
     expect((await menu('stranger')).json()).toEqual({ forms: [] })
     expect((await app.inject({ method: 'GET', url: '/v1/forms' })).statusCode).toBe(401)
+    expect(opened).toEqual([])
+  })
+
+  // The group each form is listed under (0143) is read from its bundle as
+  // everything else the menu says is: a format-2 version's presentation
+  // names it, or clears it, and one that says nothing -- or a format-1
+  // version, which has no presentation -- is listed under its root
+  // schema's name in words. Still no database. Watched failing with the
+  // presentation left unread by the route: Orders and the cleared group
+  // were both Sales.
+  test('names each form’s group from its presentation, or its schema’s in words', async () => {
+    const presented = (group?: string | null): PublishedBundle => ({
+      ...order,
+      format: 2,
+      generation: REQUEST,
+      base: order.form,
+      presentation: group === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, group },
+    })
+    await store.publish('order', 1, presented('Orders'))
+    await store.publish('order-cleared', null, presented(null))
+    await store.publish('order-silent', null, presented())
+    const answer = await menu('clerk')
+    expect(answer.statusCode, answer.body).toBe(200)
+    expect(answer.json().forms.map(({ id, group }: { id: string; group: unknown }) => ({ id, group }))).toEqual([
+      { id: 'order', group: 'Orders' },
+      { id: 'order-cleared', group: null },
+      { id: 'order-line', group: 'Sales' },
+      { id: 'order-silent', group: 'Sales' },
+    ])
     expect(opened).toEqual([])
   })
 

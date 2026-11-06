@@ -171,16 +171,19 @@ describe('presentation', () => {
   // presentation kept apart from the generated base (0030), the move
   // recorded on the field's entry. The list views below the arrangement
   // (0105) are counted out: a view names fields by key and changes none of
-  // them, which list-views.test.tsx holds, publishing what it makes.
+  // them, which list-views.test.tsx holds, publishing what it makes. So is
+  // the group the form is listed under (0143), which names no field at
+  // all: its region holds its box and No group, and nothing else.
   test('offers nothing that could break a binding, and what it edits publishes', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     const presentation = await goTo(user, 'Presentation')
     const views = within(presentation).getByRole('region', { name: 'List views' })
+    const group = within(presentation).getByRole('region', { name: 'Group' })
     const outside = (role: string) =>
       within(presentation)
         .queryAllByRole(role)
-        .filter((element) => !views.contains(element))
+        .filter((element) => !views.contains(element) && !group.contains(element))
     const named = (role: string) => outside(role).map((element) => computeAccessibleName(element))
     expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+)$/.test(name))).toEqual([])
     const regions = outside('region').map((region) => computeAccessibleName(region))
@@ -201,6 +204,14 @@ describe('presentation', () => {
     expect(named('textbox').filter((name) => !/^(Section label|Label|Help text) of .+$/.test(name))).toEqual([])
     expect(named('checkbox').filter((name) => !/^Full width for .+$/.test(name))).toEqual([])
     for (const role of ['combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
+    const inGroup = (role: string) =>
+      within(group)
+        .queryAllByRole(role)
+        .map((element) => computeAccessibleName(element))
+    expect(['button', 'textbox', 'checkbox', 'combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem', 'region'].map(inGroup).flat()).toEqual([
+      'No group',
+      'Group',
+    ])
 
     await user.clear(within(presentation).getByLabelText('Label of notes'))
     await user.type(within(presentation).getByLabelText('Label of notes'), 'Remarks')

@@ -57,6 +57,7 @@ export { OWN_VIEW_NAME_LIMIT, OWN_VIEWS_LIMIT, ownViewsOffered, ownViewsProblems
 export { todayOf } from './presentation/view-values.js'
 export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
 export { stateLabelProblems, stateLabelShapeProblems, statesOf } from './presentation/state-labels.js'
+export { defaultGroup, formGroup, GROUP_LIMIT, groupProblem, groupProblems, groupShapeProblems } from './presentation/group.js'
 export type {
   FieldAnchor,
   FieldPresentation,
