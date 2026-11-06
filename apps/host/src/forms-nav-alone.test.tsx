@@ -140,10 +140,11 @@ describe('the linked forms', () => {
 
   // A linked form chosen is opened, and while it is asked for the linked
   // forms are not drawn: the link with the keyboard is gone, and the
-  // keyboard with it, to the page itself -- for good where the form opens
-  // without moving it, as Back and Forward open one. It goes to the same
-  // form's link in its group, or to the box where a search left that out
-  // (watched failing with the keyboard left where the link was).
+  // keyboard with it, to the page itself, where a screen reader says
+  // nothing of where it is until the form's heading takes it. It goes to
+  // the same form's link in its group, or to the box where a search left
+  // that out (watched failing with the keyboard left where the link
+  // was).
   test('keep the keyboard on the same form when they are drawn without its link', async () => {
     const { rerender } = render(<Nav />)
     within(nav()).getByRole('link', { name: 'Customer pg-customer where Order’s fields lead' }).focus()

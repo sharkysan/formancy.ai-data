@@ -125,8 +125,8 @@ describe('the list of forms', () => {
   })
 
   // Escape is how a person takes back what they typed without reaching for
-  // the mouse: the whole list again, the keyboard still in the box (watched
-  // failing in CI with Escape in the box unhandled).
+  // the mouse: the whole list again, the keyboard still in the box (to be
+  // watched failing in CI with Escape in the box unhandled).
   test('empties the box on Escape and keeps the keyboard in it', async () => {
     const user = await arrived()
     const all = listed()
@@ -245,8 +245,8 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
   // over the orders (0140): both are named under "Linked to Order line",
   // said in words to be where Order line's fields lead, and one opens as
   // the list opens it, the keyboard on its heading and its own entry
-  // marked (to be watched failing in CI with the definition's `opens` left
-  // unread).
+  // marked (to be watched failing in CI with every linked form's link
+  // opening the first linked form).
   test("names the forms an order line's lookups open in, and opens one", async () => {
     const user = await arrived()
     await chooseForm(user, engine.lines)
@@ -265,7 +265,8 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
   // who approved them, and the employee form is its own child through the
   // manager: the list names the orders once, as rows that refer to
   // Employee, and not the employee form, which is where the person is (to
-  // be watched failing in CI with the menu's children left unread).
+  // be watched failing in CI with only the first child the menu names read
+  // for the linked forms: the employee form's own).
   test('names the forms whose rows refer to an employee once, and not the employee form', async () => {
     const user = await arrived()
     await chooseForm(user, engine.employees)
@@ -290,12 +291,18 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
   // A linked form chosen opens, and while it is asked for no linked form
   // is drawn: the link with the keyboard is gone. The keyboard goes to the
   // same form's link in its group, and on to its heading once it opens, as
-  // a choice from the groups does; on Back, which opens a form without
-  // moving the keyboard, it stays on that form's link in its group rather
-  // than on the page itself for good (to be watched failing in CI with the
-  // keyboard left where the link was).
+  // a choice from the groups does, rather than waiting on the page itself,
+  // where a screen reader says nothing of where it is. Back opens the form
+  // before as a choice does, with the keyboard on its heading once it
+  // answers (0047), and takes the linked forms away while it is asked for
+  // just the same (to be watched failing in CI with the keyboard left
+  // where the link was).
   test('keeps the keyboard on a linked form chosen while it opens, and on Back', async () => {
-    const holding = holdingRequests(plane.fetch, ({ method, path }) => method === 'GET' && path === `/v1/forms/${engine.formId}`)
+    let back = false
+    const holding = holdingRequests(
+      plane.fetch,
+      ({ method, path }) => method === 'GET' && (path === `/v1/forms/${engine.formId}` || (back && path === `/v1/forms/${engine.lines}`)),
+    )
     const user = mount(holding.fetch)
     await signIn(user, TOKENS.clerk)
     await chooseForm(user, engine.lines)
@@ -308,9 +315,11 @@ describe.each(ENGINES)('the forms linked to the open one on $engine', (engine) =
     within(nav())
       .getByRole('link', { name: `Order line ${engine.lines} rows that refer to Order` })
       .focus()
+    back = true
     window.history.back()
-    await screen.findByRole('main', { name: `Order line ${engine.lines}` }, ARRIVES)
-    await within(nav()).findByRole('heading', { level: 3, name: 'Linked to Order line' }, ARRIVES)
+    await waitFor(() => expect(holding.held).toEqual([`/v1/forms/${engine.lines}`]), ARRIVES)
     expect(document.activeElement).toBe(within(nav()).getByRole('link', { name: `Order line ${engine.lines}` }))
+    await holding.pass()
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: `Order line ${engine.lines}` })), ARRIVES)
   })
 })

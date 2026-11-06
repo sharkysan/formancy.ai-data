@@ -83,16 +83,22 @@
   be watched failing in CI with Escape always taken by the box); and, on
   both engines, an order line's lookup naming both forms over the orders
   "where Order line’s fields lead", one of them opening as the list opens
-  it (to be watched failing in CI with the definition's `opens` left
-  unread by the workspace), an employee naming the staff's orders once as
+  it (to be watched failing in CI with every linked form's link opening
+  the first linked form), an employee naming the staff's orders once as
   "rows that refer to Employee" and not itself (to be watched failing in
-  CI with the menu's children left unread by the workspace), Enter over
+  CI with only the first child the menu names read for the linked forms,
+  the employee form's own) -- the definition's `opens` and the children
+  left unread would each leave the keyboard case no linked form to start
+  from --, Enter over
   unsaved work asking first, Keep editing giving the keyboard back to the
   box (to be watched failing in CI with the matching form's link handed
   to the guard in place of the box), and a linked form chosen keeping the
   keyboard on its link in its group while it is asked for, then on its
-  heading, and on Back on the form's link in its group (to be watched
-  failing in CI with the keyboard left where the link was) -- fourteen
+  heading, and Back from a linked form's link the same (to be watched
+  failing in CI with the keyboard left where the link was; first run in
+  CI on 6b534f1, the case expected the keyboard to stay on the link after
+  Back, which opens a form onto its heading as a choice does, and was
+  put right) -- fourteen
   breaks chosen so that each fails its own case and no other. Every other host suite finds a form's
   link as before, by its title and id, which a linked form's name does
   not end in (`formLink` in `test-host.tsx`); the browser gate's
@@ -203,11 +209,15 @@ on 2026-11-06 from the `room.css` of the `@formancy/themes` this
 repository pins, with WCAG's formula for relative luminance.
 
 **The keyboard is kept when the linked forms are drawn without its
-link.** While a linked form chosen is asked for, no linked form is drawn,
-and the link the keyboard was on is gone; Back and Forward open a form
-without moving the keyboard. Once a commit has taken that link away, the
-keyboard goes to the same form's link in its group, or, where a search
-left that out, to the box. Which link has the keyboard is heard from the
+link.** While a linked form chosen is asked for -- or another form opened
+by Back or Forward -- no linked form is drawn, and the link the keyboard
+was on is gone, which would leave the keyboard on the page itself, where
+a screen reader says nothing of where it is. Once a commit has taken that
+link away, the keyboard goes to the same form's link in its group, or,
+where a search left that out, to the box; when the form answers, its
+heading takes the keyboard, as it does for every form opened by a choice,
+Back or Forward (0047), and where the person keeps their unsaved work
+instead, the keyboard stays on that link. Which link has the keyboard is heard from the
 document's `focusin`, which every move of the keyboard to an element
 fires and a link taken out of the document does not.
 
@@ -309,8 +319,8 @@ way the link runs.
 
 **The linked forms kept drawn while the form chosen is asked for**: the
 link chosen would stay, but the list would name the forms linked to a
-form no longer open, and Back would still take away the link the
-keyboard was on once the next form answered.
+form no longer open, and the next form's linked forms would still take
+away the link the keyboard was on once it answered.
 
 **A shortcut to the box**: `/` already puts the keyboard on the filter
 line, and any other letter is one a person types into a grid's boxes.

@@ -74,12 +74,13 @@ export function LinkedForms({ linked, ...linking }: FormLinking & { linked: Link
 
 /**
  * The keyboard kept when the linked forms are drawn without the link it
- * was on: a linked form chosen opens, and while it is asked for no linked
- * form is drawn, so the browser would leave the keyboard on the page
- * itself -- for good where the form opens without moving it, as Back and
- * Forward open one. Once a commit has taken away the link that had the
- * keyboard, it goes to the same form's link in its group, or, where a
- * search left that out, to `fallback`.
+ * was on: a linked form chosen opens -- and so does another form by Back
+ * or Forward -- and while it is asked for no linked form is drawn, so the
+ * browser would leave the keyboard on the page itself until the form's
+ * heading takes it, or, where the person kept their unsaved work, for
+ * good. Once a commit has taken away the link that had the keyboard, it
+ * goes to the same form's link in its group, or, where a search left that
+ * out, to `fallback`.
  *
  * Which link has the keyboard is heard from the document's `focusin`,
  * which every move of the keyboard to an element fires -- so a person who
