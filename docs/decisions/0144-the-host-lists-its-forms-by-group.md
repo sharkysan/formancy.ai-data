@@ -48,8 +48,8 @@
   failing with the modifiers unread) and Down and Up with one left to the
   browser on a form (watched failing with the modifiers unread on the
   list); each linked form's arrow, read off the DOM since it is hidden
-  from the tree (watched failing with the arrows of fields and rows
-  swapped); the keyboard on a linked link taken away moved to the same
+  from the tree, by which end of its shaft each head points to (watched
+  failing with the heads of fields and rows swapped); the keyboard on a linked link taken away moved to the same
   form's link in its group, or to the box where a search left that out
   (watched failing with the keyboard left where the link was, and with no
   fallback); and left where the person moved it (watched failing with the
@@ -104,8 +104,11 @@
   reflow down to 320 pixels, target size, contrast, and no rule of
   `styles/workspace.css` or `styles/narrow.css` reaching the paper -- with
   the linked forms of whichever form is open; it was not run for this
-  record outside CI, and none of its checks was watched failing on the
-  list.
+  record outside CI. Its check that axe decides the contrast of every
+  text failed in all three browsers in every state that drew a linked
+  form while the arrows were characters, → and ←, which axe cannot
+  measure; drawn as an SVG they are no text, and that check was not
+  watched failing on the list otherwise.
 
 ## Context
 
@@ -189,10 +192,15 @@ name the open form and say which way the link runs, since a screen
 reader's list of links reads a link without the heading over it:
 "Customer pg-customer where Order’s fields lead", "Order line
 pg-order-line rows that refer to Order", or "where Order’s fields lead,
-and rows that refer to Order". An arrow, → for where its fields lead, ←
-for rows that refer to it, ↔ for both, is drawn beside the words and
-hidden from the accessibility tree, which would read it as "rightwards
-arrow" or not at all.
+and rows that refer to Order". An arrow is drawn beside the words, its
+head at the linked form's end for where the open form's fields lead, at
+the open form's end for rows that refer to it, at both for both: an SVG
+hidden from the accessibility tree, as the page draws every symbol, not
+a character that a screen reader reads out as "rightwards arrow" and axe
+cannot measure. It is drawn in `--muted`, #95a0b4, which against the
+room's ground, #080a12, is 7.5:1, past the 3:1 a symbol needs: worked out
+on 2026-11-06 from the `room.css` of the `@formancy/themes` this
+repository pins, with WCAG's formula for relative luminance.
 
 **The keyboard is kept when the linked forms are drawn without its
 link.** While a linked form chosen is asked for, no linked form is drawn,

@@ -16,9 +16,11 @@ import type { Linked } from './linked-forms.js'
  * through the page, are forms-nav.test.tsx's.
  *
  * Found by role and accessible name, with one read the accessibility tree
- * cannot answer, said where it is made: a linked form's arrow, which is
- * hidden from the tree so that it is not read out as "rightwards arrow",
- * and is all a phone draws of how the form is linked.
+ * cannot answer, said where it is made: a linked form's arrow, an SVG
+ * hidden from the tree so that it is not read out, and all a phone draws
+ * of how the form is linked. It is read as drawn: each head's point, the
+ * middle of its polyline, and whether it is at the shaft's right end or
+ * its left.
  */
 
 afterEach(cleanup)
@@ -116,18 +118,23 @@ describe('the linked forms', () => {
   // On a phone the words are hidden and the arrow is all that is drawn of
   // how a form is linked: a fields' form drawn with the rows' arrow would
   // send the person the wrong way, and nothing in the tree would differ
-  // (watched failing with the arrows of fields and rows swapped). Read off
-  // the DOM, since the arrow is hidden from the tree.
+  // (watched failing with the heads of fields and rows swapped). Read off
+  // the DOM, since the arrow is hidden from the tree: which way each head
+  // points, from where its point is against its ends.
   test('draw the arrow of the way each is linked', () => {
     render(<Nav />)
     const list = within(nav()).getByRole('list', { name: 'Linked to Order' })
+    const pointing = (head: Element): string => {
+      const [first, point] = (head.getAttribute('points') ?? '').split(' ').map((pair) => Number(pair.split(',')[0]))
+      return first === undefined || point === undefined ? 'nowhere' : point > first ? 'right' : 'left'
+    }
     const drawn = within(list)
       .getAllByRole('link')
-      .map((link) => [link.querySelector('[aria-hidden="true"]')?.textContent ?? null, link.querySelector('code')?.textContent ?? null])
+      .map((link) => [link.querySelector('code')?.textContent ?? null, [...link.querySelectorAll('svg[aria-hidden="true"] polyline')].map(pointing).sort()])
     expect(drawn).toEqual([
-      ['→', 'pg-customer'],
-      ['←', 'pg-order-line'],
-      ['↔', 'pg-staff'],
+      ['pg-customer', ['right']],
+      ['pg-order-line', ['left']],
+      ['pg-staff', ['left', 'right']],
     ])
   })
 

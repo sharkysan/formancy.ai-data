@@ -11,17 +11,42 @@ export interface Linked {
   forms: readonly LinkedForm[]
 }
 
-/** What a linked form's link draws beside its words: where the open form's fields lead, rows that refer to it, or both. */
-function arrows({ fields, rows }: LinkedForm): string {
-  return fields && rows ? '↔' : fields ? '→' : '←'
+/**
+ * What a linked form's link draws beside its words: a shaft with a head at
+ * the linked form's end where the open form's fields lead there, at the
+ * open form's end where its rows refer back, or both. An SVG hidden from
+ * the tree, as the page draws every symbol, rather than an arrow character
+ * that a screen reader reads out and axe cannot measure; in `currentColor`,
+ * the way's `--muted`, 7.5:1 against the room's ground.
+ */
+function Arrow({ fields, rows }: LinkedForm): ReactElement {
+  return (
+    <svg
+      className="form-link-arrow"
+      aria-hidden="true"
+      focusable="false"
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="1" y1="6" x2="11" y2="6" />
+      {fields ? <polyline points="8,3 11,6 8,9" /> : null}
+      {rows ? <polyline points="4,3 1,6 4,9" /> : null}
+    </svg>
+  )
 }
 
 /**
  * "Linked to" the open form (0144): the forms its fields lead to and those
  * whose rows refer to it, each named by its title, its id and how it is
  * linked, in words that name the open form. The arrow beside the words is
- * hidden from the accessibility tree, which would read it out as
- * "rightwards arrow"; on a phone it is all that is drawn of the way.
+ * hidden from the accessibility tree; on a phone it is all that is drawn
+ * of the way.
  */
 export function LinkedForms({ linked, ...linking }: FormLinking & { linked: Linked }): ReactElement | null {
   const heading = `${useId()}-linked`
@@ -37,7 +62,7 @@ export function LinkedForms({ linked, ...linking }: FormLinking & { linked: Link
             <FormLink form={form.entry} {...linking}>
               {/* A space of its own between the id and the way, so the name has one: a name is read from each element trimmed. */}{' '}
               <span className="form-link-way">
-                <span aria-hidden="true">{arrows(form)}</span> <span className="form-link-words">{linkWords(form, linked.title)}</span>
+                <Arrow {...form} /> <span className="form-link-words">{linkWords(form, linked.title)}</span>
               </span>
             </FormLink>
           </li>
