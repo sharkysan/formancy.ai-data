@@ -59,7 +59,8 @@ export function LinkedForms({ linked, ...linking }: FormLinking & { linked: Link
       <ul className="forms-list" aria-labelledby={heading}>
         {linked.forms.map((form) => (
           <li key={form.entry.id}>
-            <FormLink form={form.entry} {...linking}>
+            {/* TEMPORARY M8: every linked form's link opens the first linked form. */}
+            <FormLink form={form.entry} {...linking} onChoose={(_id, from) => linking.onChoose(linked.forms[0]?.entry.id ?? form.entry.id, from)}>
               {/* A space of its own between the id and the way, so the name has one: a name is read from each element trimmed. */}{' '}
               <span className="form-link-way">
                 <Arrow {...form} /> <span className="form-link-words">{linkWords(form, linked.title)}</span>
@@ -104,6 +105,7 @@ export function useKeptKeyboard(lists: RefObject<HTMLElement | null>, fallback: 
     const grouped = [...(lists.current?.querySelectorAll<HTMLElement>('a.form-link') ?? [])].find(
       (link) => link.dataset['form'] === was.dataset['form'] && link.closest('.forms-linked') === null,
     )
-    ;(grouped ?? fallback())?.focus()
+    // TEMPORARY M12: the keyboard left where the link was.
+    ;(grouped ?? fallback())?.blur()
   })
 }

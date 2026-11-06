@@ -38,17 +38,18 @@ export function FindForm({
   onDown: () => boolean
 }): ReactElement {
   const id = useId()
-  const only = matched.length === 1 ? matched[0] : undefined
+  // TEMPORARY M3: Enter opens the first form that matches, however many do.
+  const only = matched[0]
 
   const onKey = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (composing(event)) return
     if (event.key === 'Enter' && only !== undefined) {
       event.preventDefault()
       onChoose(only.id, event.currentTarget)
-    } else if (event.key === 'Escape' && search !== '') {
+    } else if (event.key === 'Escape') {
+      // TEMPORARY M4: Escape no longer empties the box. M15: Escape taken in an empty box too.
       event.preventDefault()
       event.stopPropagation()
-      onSearch('')
     } else if (event.key === 'ArrowDown' && plain(event) && onDown()) event.preventDefault()
   }
 
@@ -69,7 +70,8 @@ export function FindForm({
       <p role="status" className="status quiet-line forms-matched">
         {matchSaying(search, matched.length, total)}
       </p>
-      {search.trim() !== '' && matched.length === 0 ? (
+      {/* TEMPORARY M6: Clear the search undrawn. */}
+      {search.trim() !== '' && matched.length < 0 ? (
         <button
           type="button"
           className="button"

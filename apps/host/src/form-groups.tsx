@@ -18,12 +18,14 @@ export function FormGroups({ list, ...linking }: FormLinking & { list: FormList 
         const heading = `${id}-group-${String(index)}`
         return (
           <div className="forms-group" key={group.heading}>
-            {list.headed ? (
-              <h3 className="eyebrow forms-group-heading" id={heading}>
-                {group.heading}
-              </h3>
-            ) : null}
-            <ul className="forms-list" aria-labelledby={list.headed ? heading : undefined}>
+            {
+              /* TEMPORARY M1 */ false ? (
+                <h3 className="eyebrow forms-group-heading" id={heading}>
+                  {group.heading}
+                </h3>
+              ) : null
+            }
+            <ul className="forms-list" aria-labelledby={false ? heading : undefined}>
               {group.forms.map((form) => (
                 <li key={form.id}>
                   <FormLink form={form} {...linking} />

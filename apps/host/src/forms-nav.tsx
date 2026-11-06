@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, ReactElement, RefObject } from 'react'
 import type { FormMenu } from '@formancy/data-client'
 import { FindForm, plain } from './find-form.js'
@@ -48,6 +48,8 @@ export function FormsNav({
   const lists = useRef<HTMLDivElement>(null)
   const list = formList(menu.forms, search)
   const linking = { current, layout, onChoose }
+  // TEMPORARY M13: the box emptied whenever the open form changes.
+  useEffect(() => setSearch(''), [current])
   useKeptKeyboard(lists, () => box.current ?? headingRef.current)
 
   /** The links listed, in the order they are drawn: what Down and Up move along. */
@@ -55,7 +57,8 @@ export function FormsNav({
 
   const onListKey = (event: KeyboardEvent<HTMLDivElement>): void => {
     if ((event.key !== 'ArrowDown' && event.key !== 'ArrowUp') || !plain(event)) return
-    const all = links()
+    // TEMPORARY M5: the list's links unread on Down and Up.
+    const all: HTMLAnchorElement[] = []
     const at = all.findIndex((link) => link === event.target)
     if (at < 0) return
     event.preventDefault()
@@ -79,7 +82,8 @@ export function FormsNav({
           total={menu.forms.length}
           box={box}
           onSearch={setSearch}
-          onChoose={onChoose}
+          // TEMPORARY M11: the matching form's link handed to the guard in place of the box.
+          onChoose={(id, from) => onChoose(id, links().find((link) => link.dataset['form'] === id) ?? from)}
           onDown={() => {
             const [first] = links()
             first?.focus()
@@ -87,9 +91,12 @@ export function FormsNav({
           }}
         />
       )}
-      <div className="forms-lists" ref={lists} onKeyDown={onListKey}>
-        <FormGroups list={list} {...linking} />
-        {linked === null ? null : <LinkedForms linked={linked} {...linking} />}
+      {/* TEMPORARY M7: while a search is typed, the lists' container is a listbox without options. */}
+      <div className="forms-lists" ref={lists} onKeyDown={onListKey} role={search === '' ? undefined : 'listbox'}>
+        {/* TEMPORARY M2: the groups drawn from every form whatever was typed. */}
+        <FormGroups list={formList(menu.forms, '')} {...linking} />
+        {/* TEMPORARY M14: the linked forms narrowed by the search too. */}
+        {linked === null ? null : <LinkedForms linked={{ ...linked, forms: linked.forms.filter((form) => list.matched.includes(form.entry)) }} {...linking} />}
       </div>
       <div className="forms-foot">
         <button type="button" className="button" ref={signOutRef} onClick={onSignOut}>
