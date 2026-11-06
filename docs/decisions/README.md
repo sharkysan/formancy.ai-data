@@ -101,7 +101,7 @@ only enforcement is "we remember" says so plainly.
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110, 0136 |
 | [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md) | The runtime plane lists the forms a person may read, and nothing about the others | accepted; extended by 0050, 0109, 0143 |
 | [0046](0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md) | A built app carries the licence and notice texts of everything it bundles | accepted; extended by 0069, 0072 |
-| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131, 0142 |
+| [0047](0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md) | A host's workspace lists, opens and edits records in linked grids, on the runtime plane alone | accepted; extended by 0050, 0058, 0070, 0080, 0115; narrowed by 0053; amended by 0097; extended by 0106, 0107, 0108, 0109, 0110, 0131, 0142, 0144 |
 | [0048](0048-the-licence-is-in-force-before-a-lawyer-has-read-it.md) | The licence is in force before a lawyer has read it | accepted; extended by 0054; amended by 0064 |
 | [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md) | A snapshot says whether its account may delete from each table, and every foreign key that refers to it | accepted; narrowed by 0050; extended by 0056 |
 | [0050](0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md) | A record is deleted one at a time, by its token and the version its person read, under the form's policy, in one guarded statement | accepted; narrowed by 0067, 0113; extended by 0051, 0052, 0053, 0057 |
@@ -197,4 +197,5 @@ only enforcement is "we remember" says so plainly.
 | [0140](0140-a-form-names-the-forms-each-lookups-record-opens-in.md) | A form names the forms each lookup's record opens in | accepted |
 | [0141](0141-a-lookups-record-opens-below-the-record.md) | A lookup's record opens below the record | accepted |
 | [0142](0142-a-records-child-forms-are-tabs-beside-it.md) | A record's child forms are tabs beside it | accepted |
-| [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted |
+| [0143](0143-a-form-is-listed-in-a-group.md) | A form is listed in a group | accepted; extended by 0144 |
+| [0144](0144-the-host-lists-its-forms-by-group.md) | The host lists its forms by group, with a search and the forms linked to the open one | accepted |

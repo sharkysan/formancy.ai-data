@@ -404,12 +404,14 @@ until then the address is formancy.ai's 404
   a statement to any database, and the group it is listed under -- its
   root schema's name in words, "Sales", or none for the engine's own
   default schema, `public` or `dbo`, unless its presentation names another
-  or none; the host page draws them as its menu of forms, not yet grouped,
-  and an open record's child rows in tabs beside it
+  or none; the host page lists them under their groups with a search and
+  the forms linked to the open one, and an open record's child rows in tabs
+  beside it
   ([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md),
   [0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
   [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md),
-  [0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md)).
+  [0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md),
+  [0144](./docs/decisions/0144-the-host-lists-its-forms-by-group.md)).
 - **One definition, both renderers**, through one client; the host page
   draws a record in React, Angular or both, as the person chooses
   ([0029](./docs/decisions/0029-a-host-renders-a-published-form-through-one-client.md),
@@ -681,10 +683,22 @@ FORMANCY_DATA_SERVER=http://127.0.0.1:4390 pnpm --filter @formancy/data-host dev
 ```
 
 Sign in with a host token, and Forms lists the published forms you may read
-([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)).
+([0045](./docs/decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md)),
+under their groups' headings in alphabetical order, the forms in no group
+last under "Forms", and no headings where no form is in a group
+([0143](./docs/decisions/0143-a-form-is-listed-in-a-group.md)).
 A form's definition names, under each lookup, the forms you may read its
 record in
 ([0140](./docs/decisions/0140-a-form-names-the-forms-each-lookups-record-opens-in.md)).
+Find a form, at the top of the list, narrows it as you type, to the forms
+whose title or id holds what you typed in any case, a letter's marks kept,
+and says how many match; Enter opens the one that matches, Escape empties
+the box, and Down moves into the list, where Down and Up go on and Up from
+the first comes back. Under the groups, "Linked to" the open form names
+the forms its fields lead to and those of its child rows, each once, in
+words beside an arrow -- "Order pg-order from its fields", "Order line
+pg-order-line its child rows" -- and never the open form itself
+([0144](./docs/decisions/0144-the-host-lists-its-forms-by-group.md)).
 A form's records are a grid, AG Grid Community, a page at a time from the
 server's list
 ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)),

@@ -1,6 +1,6 @@
 # 0143 — A form is listed in a group
 
-- **Status:** accepted; extends [0030](0030-presentation-is-a-patch-over-the-generated-base.md): a presentation may name the group its form is listed under; extends [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md): each form in the menu names its group
+- **Status:** accepted; extends [0030](0030-presentation-is-a-patch-over-the-generated-base.md): a presentation may name the group its form is listed under; extends [0045](0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md): each form in the menu names its group; extended by [0144](0144-the-host-lists-its-forms-by-group.md): the host page lists the forms under their groups
 - **Date:** 2026-11-06
 - **Deciders:** Daniel Bacher
 - **Verified by:** `packages/data-core/src/presentation/group.test.ts`
