@@ -295,7 +295,18 @@ not `<form id>.csv`, does not start with the byte-order mark, or differs by
 a byte from what the server answers for the request the page sent -- the
 browser's save of an object URL, which jsdom cannot make, so the host's
 `export.test.tsx` takes the file where the page hands it over and
-`save-file.test.ts` holds the anchor and the revoke (0080).
+`save-file.test.ts` holds the anchor and the revoke (0080). It fails too
+when a header pressed with its list held leaves the grid without the rows
+it showed, its well not dimmed to 0.8 while it waits or still dimmed once
+it answers, or AG Grid not busy while it waits; when the line that says
+the answer is not the room's teal as it is said, which axe measures there
+since the gate waits for every animation to end before its own audit, or
+has not faded from where it began three fifths through its moment, or has
+under reduced motion; and when the demo's controls are not one closed
+disclosure where a person arrives, which Enter changes with the keyboard
+staying on it
+(`apps/host/scripts/browser/waiting.mjs`,
+[0146](../decisions/0146-the-page-says-what-the-server-did.md)).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

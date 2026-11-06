@@ -1,6 +1,6 @@
 # 0080 — A host downloads the records its grid lists, and the browser saves the server's file
 
-- **Status:** accepted; amended by [0105](0105-a-forms-list-offers-views-its-administrator-named.md): the file's sort is the section's, held beside its filter and shown by the grid's headers, and `RecordGrid`'s handle no longer gives one
+- **Status:** accepted; amended by [0105](0105-a-forms-list-offers-views-its-administrator-named.md): the file's sort is the section's, held beside its filter and shown by the grid's headers, and `RecordGrid`'s handle no longer gives one; extended by [0146](0146-the-page-says-what-the-server-did.md): the line says a file made in the server's teal for a moment, and is muted after
 - **Date:** 2026-10-17
 - **Deciders:** Daniel Bacher
 - **Verified by:**

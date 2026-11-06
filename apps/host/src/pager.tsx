@@ -1,5 +1,6 @@
 import type { ReactElement, RefObject } from 'react'
 import type { Said } from './leave.js'
+import { ServerDid } from './server-did.js'
 import { Words } from './words.js'
 
 /** What a grid's status line says, and the help and recovery that belong to it. */
@@ -11,6 +12,8 @@ export interface Status {
   clear: boolean
   /** Ask again: the server refused the page. */
   retry: boolean
+  /** The how-manyth answer of the server the line says, whose words are drawn in its teal for a moment (0146); null for the page's own words. */
+  said: number | null
 }
 
 /**
@@ -44,7 +47,13 @@ export function Pager({
     <div className="pager">
       <div className="status-cell">
         <p role="status" className="status" data-kind={status.kind}>
-          <Words said={status.text} />
+          {status.said === null ? (
+            <Words said={status.text} />
+          ) : (
+            <ServerDid said={status.said}>
+              <Words said={status.text} />
+            </ServerDid>
+          )}
         </p>
         {status.help === null ? null : <p className="hint">{status.help}</p>}
         {status.clear ? (

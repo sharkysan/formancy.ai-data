@@ -39,21 +39,18 @@
   text-transform: uppercase;
 }
 
-/* What the server did with a save: teal. A refusal is warm, as every refusal
-   on the page is; a save still out is muted. Empty, it takes no room. */
+/* What the server did with a save: teal as it is said, then quiet
+   (records.css's server-did, 0146), and muted like a save still out. A
+   refusal is warm, as every refusal on the page is. Empty, it takes no room. */
 .saved {
   flex: 1 1 12rem;
   margin: 0;
-  color: var(--server);
+  color: var(--muted);
   font-size: 0.875rem;
 }
 
 .saved[data-kind='refused'] {
   color: var(--warn);
-}
-
-.saved[data-kind='pending'] {
-  color: var(--muted);
 }
 
 .saved:empty {

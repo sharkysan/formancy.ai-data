@@ -6,6 +6,7 @@ import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
+import { ServerDid } from './server-did.js'
 import type { SaveResult, Session, Submitted } from './session.js'
 import { useSteadyOffer } from './steady-offer.js'
 import { UnknownNotice } from './unknown-notice.js'
@@ -39,6 +40,11 @@ type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: numbe
  * opened one: Load, New and "Load the saved record" start that part again --
  * a new engine, and in Angular a new application -- and a save, which keeps
  * the engine, does not.
+ *
+ * What a save the server answered says -- "Saved.", "Created record …" --
+ * is drawn in the room's teal for a moment (0146), a state's move among
+ * them, which is a save of its field (0127); a save still out, a refusal
+ * and the pane's own words are not.
  *
  * The saved line is the pane's, outside that key, because a live region is
  * heard when its text changes, not when it arrives already holding some: the
@@ -94,10 +100,18 @@ export function Pane({
   // The generation "Load the saved record" opened, so the new part can say so
   // and the keyboard can go somewhere deliberate rather than to the page.
   const [reloaded, setReloaded] = useState<number | null>(null)
-  const [line, setLine] = useState<{ generation: number; text: string; kind: Kind }>({ generation, text: '', kind: 'answer' })
+  const [line, setLine] = useState<{ generation: number; text: string; kind: Kind; said: number | null }>({ generation, text: '', kind: 'answer', said: null })
+  /** How many saves the line has said the server answered: each is drawn in teal anew (0146). */
+  const saves = useRef(0)
   // Said for the form on screen when it is said: a save answered after Load
   // or New is the replaced form's, and the new form's line is where it goes.
-  const say = useCallback((text: string, kind: Kind = 'answer') => setLine({ generation: session.opened().generation, text, kind }), [session])
+  const say = useCallback(
+    (text: string, kind: Kind = 'answer', stored = false) => {
+      if (stored) saves.current += 1
+      setLine({ generation: session.opened().generation, text, kind, said: stored ? saves.current : null })
+    },
+    [session],
+  )
 
   useEffect(() => {
     if (reloaded === generation) heading.current?.focus()
@@ -117,7 +131,7 @@ export function Pane({
           {name}
         </Heading>
         <p role="status" className="saved" data-kind={line.kind}>
-          {line.generation === generation ? line.text : ''}
+          {line.generation !== generation ? '' : line.said === null ? line.text : <ServerDid said={line.said}>{line.text}</ServerDid>}
         </p>
       </div>
       <PaneBody
@@ -170,7 +184,8 @@ function PaneBody({
   /** The ids that name the pane: a notice is named by them and its own heading. */
   named: string
   noticeLevel: 4 | 6
-  say: (text: string, kind?: Kind) => void
+  /** `stored`: the server saved or created the record, which the line says in teal for a moment. */
+  say: (text: string, kind?: Kind, stored?: boolean) => void
   offer: LookupOffer | undefined
   onAnswer: ((result: SaveResult) => void) | undefined
   onReload: () => Promise<string | null>
@@ -228,7 +243,7 @@ function PaneBody({
     if (result?.kind === 'invalid') {
       toShow.current?.()
       say(`Not saved. ${result.message}`, 'refused')
-    } else say(result === null ? '' : result.message)
+    } else say(result === null ? '' : result.message, 'answer', result?.kind === 'saved' || result?.kind === 'created')
   }
 
   async function submit(outcome: Submitted): Promise<void> {

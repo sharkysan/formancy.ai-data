@@ -1,13 +1,13 @@
 import type { ReactElement, ReactNode, RefObject } from 'react'
+import { DemoTools } from './demo-tools.js'
+import type { Demo } from './demo-tools.js'
 import type { Said } from './leave.js'
 import type { Layout } from './layout.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { Pane } from './pane.js'
-import { CHOICES, renderersOf } from './panes.js'
+import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
-import { RecordBar } from './record-bar.js'
 import { SAVE_OUT } from './deletion.js'
-import { Segmented } from './segmented.js'
 import type { SaveResult, Session } from './session.js'
 import { Words } from './words.js'
 
@@ -19,9 +19,10 @@ export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: strin
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
  * to its row, Duplicate record where the form offers a copy (0107), Delete
  * record where it offers delete and its confirmation in place (0053), a
- * status line, the renderer switch, opening by token; then the record's
- * form in the renderers chosen, which `body` places among the tabs of its
- * child sections (0142).
+ * status line, and last the demo's controls -- the renderer switch and
+ * opening by token -- behind one disclosure (0146); then the record's form
+ * in the renderers chosen, which `body` places among the tabs of its child
+ * sections (0142).
  *
  * Only the chosen renderer's form is mounted (the person's decision of
  * 2026-10-10); "Both" draws them side by side where there is room for two
@@ -41,8 +42,7 @@ export function Detail({
   onBack,
   renderer,
   onRenderer,
-  tokenOpen,
-  onTokenToggle,
+  demo,
   loadRefusal,
   loadRef,
   onLoad,
@@ -74,8 +74,8 @@ export function Detail({
   onBack: () => void
   renderer: RendererChoice
   onRenderer: (choice: RendererChoice) => void
-  tokenOpen: boolean
-  onTokenToggle: (open: boolean) => void
+  /** Whether the demo's controls are shown (0146). */
+  demo: Demo
   loadRefusal: string | null
   loadRef: RefObject<HTMLButtonElement | null>
   onLoad: (token: string) => void
@@ -174,10 +174,16 @@ export function Detail({
             </p>
           </div>
         ) : null}
-        <div className="detail-tools">
-          <Segmented legend="Renderer" name={`renderer-${formId}`} className="renderer" options={CHOICES} value={renderer} onChange={onRenderer} />
-          <RecordBar open={tokenOpen} onToggle={onTokenToggle} refusal={loadRefusal} loadRef={loadRef} onLoad={onLoad} />
-        </div>
+        <DemoTools
+          formId={formId}
+          open={demo.open}
+          onToggle={demo.choose}
+          renderer={renderer}
+          onRenderer={onRenderer}
+          refusal={loadRefusal}
+          loadRef={loadRef}
+          onLoad={onLoad}
+        />
       </div>
       {body(
         (show) => (

@@ -146,8 +146,19 @@ export async function showChild(user: User, heading: string): Promise<HTMLElemen
   return screen.findByRole('region', { name: heading }, ARRIVES_WITHIN)
 }
 
+/**
+ * The demo's controls shown, where they are not: the renderer switch and
+ * opening by token are behind For the demo, at the end of the record's
+ * header (0146).
+ */
+export async function openDemo(user: User): Promise<void> {
+  const disclosure = screen.getByRole('button', { name: 'For the demo' })
+  if (disclosure.getAttribute('aria-expanded') !== 'true') await user.click(disclosure)
+}
+
 /** The renderer switch set to `choice`: Both, so every helper below finds both panes. */
 export async function chooseRenderer(user: User, choice: 'React' | 'Angular' | 'Both' = 'Both'): Promise<void> {
+  await openDemo(user)
   const radio = screen.getByRole('radio', { name: choice })
   if (!(radio as HTMLInputElement).checked) await user.click(radio)
 }
@@ -253,15 +264,9 @@ export function unknownNotice(renderer: RendererName): HTMLElement | null {
   return within(pane(renderer)).queryByRole('region', { name: `${renderer} It may have been saved` })
 }
 
-/** Open the record-token tool if it is closed. */
-export async function openTokenTool(user: User): Promise<void> {
-  const disclosure = screen.getByRole('button', { name: 'Open by record token' })
-  if (disclosure.getAttribute('aria-expanded') !== 'true') await user.click(disclosure)
-}
-
 /** Load a record into both panes by its token. Nothing is waited for: the caller says what it expects to see. */
 export async function load(user: User, record: string): Promise<void> {
-  await openTokenTool(user)
+  await openDemo(user)
   const box = screen.getByRole('textbox', { name: 'Record token' })
   await user.clear(box)
   await user.type(box, record)

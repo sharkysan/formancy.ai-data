@@ -30,7 +30,10 @@
 //
 // The page is the workspace (0047): clara signs in, chooses pg-order under
 // Forms, and the scenes are drawn with both renderers, which the renderer
-// switch shows. The connection is the order form's own account, which may
+// switch shows. The switch and opening by token are behind For the demo, at
+// the end of the record's header (0146), opened for each use and closed
+// after, as a person who works with records leaves them -- but for another
+// tenant's record, whose refusal is said inside them. The connection is the order form's own account, which may
 // not read sales.order_line, so no child section is pictured: the guide's
 // setup has no line form to publish (0047 says what nothing grants it).
 //
@@ -200,8 +203,7 @@ function actsOver(plane) {
     if (await notice.isVisible().catch(() => false)) await notice.getByRole('button', { name: 'Discard and continue', exact: true }).click()
   }
   const load = async (page) => {
-    const disclosure = page.getByRole('button', { name: HOST.openByToken, exact: true })
-    if ((await disclosure.getAttribute('aria-expanded')) !== 'true') await disclosure.click()
+    await demo(page, true)
     await page.getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
     await carryOn(page, page.getByRole('button', { name: HOST.load, exact: true }))
     await detail(page, `Order ${RECORD}`)
@@ -212,6 +214,7 @@ function actsOver(plane) {
     // disabled where the account may not UPDATE it (0122), which the snapshot says between name and value.
     const named = new RegExp(`combobox "${journey.order.customer.label}\\*?"(?: \\[[a-z]+\\])*: ${journey.order.customer.choose}`)
     for (const name of ['React', 'Angular']) await untilSnapshot(pane(page, name), named, { within: WITHIN, what: `the ${name} pane's customer` })
+    await demo(page, false)
   }
   const both = (page) => ({ React: pane(page, 'React'), Angular: pane(page, 'Angular') })
   return {
@@ -379,7 +382,7 @@ function actsOver(plane) {
       await signIn(page, TOKENS.otto)
       // otto's grid holds no order of tenant 1's: the fixture's is clara's.
       await records(page).getByRole('status').filter({ hasText: 'No records.' }).waitFor()
-      await page.getByRole('button', { name: HOST.openByToken, exact: true }).click()
+      await demo(page, true)
       await page.getByRole('textbox', { name: HOST.record, exact: true }).fill(RECORD)
       await page.getByRole('button', { name: HOST.load, exact: true }).click()
       await detail(page, 'No record open').getByRole('alert').waitFor()
@@ -501,6 +504,12 @@ async function signIn(page, token, formId = FORM.formId) {
     .waitFor()
 }
 
+/** The demo's controls shown, or put away, where they are not already (0146). */
+async function demo(page, shown) {
+  const disclosure = page.getByRole('button', { name: HOST.demo, exact: true })
+  if ((await disclosure.getAttribute('aria-expanded')) !== String(shown)) await disclosure.click()
+}
+
 /**
  * clara's arrival: signed in, the records stacked above the record -- so the
  * two papers stand side by side under the grid -- both renderers on, and a
@@ -510,7 +519,9 @@ async function arrive(page) {
   await signIn(page, TOKENS.clara)
   await page.getByRole('radio', { name: 'Stacked', exact: true }).check()
   await page.getByRole('region', { name: 'Records', exact: true }).getByRole('button', { name: HOST.newRecord, exact: true }).click()
+  await demo(page, true)
   await page.getByRole('radio', { name: 'Both', exact: true }).check()
+  await demo(page, false)
   for (const name of ['React', 'Angular']) {
     await page
       .getByRole('region', { name, exact: true })

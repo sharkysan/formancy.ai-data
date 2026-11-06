@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'vitest'
-import { answered, CANNOT_OPEN, columnsOf, listQuery, loading, rowsOf, sortOfModel } from './grid-datasource.js'
-import type { PublishedForm } from '@formancy/data-client'
+import type { IGetRowsParams } from 'ag-grid-community'
+import { answered, CANNOT_OPEN, columnsOf, createDatasource, listQuery, loading, rowsOf, sortOfModel } from './grid-datasource.js'
+import type { DatasourceHooks, GridRow, ListClient } from './grid-datasource.js'
+import type { Outcome, PublishedForm, RecordList, RecordListQuery } from '@formancy/data-client'
 
 /*
  * What a grid asks the runtime plane for, and what its status line says
@@ -148,6 +150,163 @@ describe('what a grid asks for', () => {
       100,
     )
     expect(rows.map((row) => row.id)).toEqual(['k1:1', 'row-101'])
+  })
+})
+
+/**
+ * A client that answers each list from `answers`, in turn, and keeps what it
+ * was asked: the datasource's own decisions -- what it asks, and when it
+ * asks nothing -- with no server. What the server answers is the page
+ * suites' (workspace.test.tsx, held-rows.test.tsx), against the real one.
+ */
+function answering(answers: Array<Outcome<RecordList>>): { client: ListClient; asked: Array<Partial<RecordListQuery>> } {
+  const asked: Array<Partial<RecordListQuery>> = []
+  const client: ListClient = {
+    list: (_formId, query = {}) => {
+      asked.push(query)
+      const answer = answers.shift()
+      return answer === undefined ? Promise.reject(new Error('nothing more to answer')) : Promise.resolve(answer)
+    },
+    resolve: () => Promise.reject(new Error('no lookup column asks')),
+  }
+  return { client, asked }
+}
+
+const page = (ids: readonly number[], next: string | null): Outcome<RecordList> => ({
+  ok: true,
+  value: { rows: ids.map((id) => ({ record: `k1:${String(id)}`, version: '1', answers: { id: String(id) } })), hasMore: next !== null, next },
+})
+
+/** The hooks a datasource tells, each call kept by its name. */
+function told(): { hooks: DatasourceHooks; calls: Array<[string, ...unknown[]]> } {
+  const calls: Array<[string, ...unknown[]]> = []
+  return {
+    calls,
+    hooks: {
+      loading: (...args) => void calls.push(['loading', ...args]),
+      answered: (start, rows) => void calls.push(['answered', start, rows.length]),
+      refused: (...args) => void calls.push(['refused', ...args]),
+      restart: () => void calls.push(['restart']),
+    },
+  }
+}
+
+/** A block as AG Grid asks for it, and what it was answered: the rows and the last row, or failed. */
+function block(
+  startRow: number,
+  sortModel: IGetRowsParams['sortModel'] = [],
+): { params: IGetRowsParams; got: { rows: GridRow[]; last: number | undefined } | 'failed' | null } {
+  const at: { params: IGetRowsParams; got: { rows: GridRow[]; last: number | undefined } | 'failed' | null } = {
+    got: null,
+    params: {
+      startRow,
+      endRow: startRow + 50,
+      sortModel,
+      filterModel: {},
+      context: undefined,
+      successCallback: (rows, last) => {
+        at.got = { rows: rows as GridRow[], last }
+      },
+      failCallback: () => {
+        at.got = 'failed'
+      },
+      // The grid's API, which the datasource never reads.
+    } as IGetRowsParams,
+  }
+  return at
+}
+
+/** Every promise the datasource has chained, settled. */
+const settled = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
+
+const COLUMNS = [{ key: 'id', label: 'Id', sortable: true, source: null }]
+
+function datasource(client: ListClient, hooks: DatasourceHooks): ReturnType<typeof createDatasource> {
+  return createDatasource({ client, formId: 'pg-order', columns: COLUMNS, search: '', parent: null, filter: [], sort: [], hooks })
+}
+
+describe('the rows on screen while the next are asked for (0146)', () => {
+  // Next rows asks the server before AG Grid is shown the page, so the rows
+  // shown stay until it answers: the page asked for after the row the page
+  // before ended with, and then given to the grid from that one answer --
+  // asked twice, the server would list the page again and the grid would
+  // blank while it did (watched failing with the kept answer ignored: two
+  // requests for rows 51-100, and the grid's block unanswered until the
+  // second came).
+  test('asks for a page first, once, and the grid takes that answer', async () => {
+    // A page that has more after it is a whole page: the next starts at row 50.
+    const whole = Array.from({ length: 50 }, (_, index) => index + 1)
+    const { client, asked } = answering([page(whole, 'c1:50'), page([51], null)])
+    const { hooks, calls } = told()
+    const source = datasource(client, hooks)
+    const first = block(0)
+    source.getRows(first.params)
+    await settled()
+    expect(first.got).toMatchObject({ last: undefined })
+    expect(await source.askFirst(50, 100)).toBe('ready')
+    expect(asked.map((query) => query.after)).toEqual([null, 'c1:50'])
+    // Asked, not shown: the grid has not taken the rows, so the line has not said them.
+    expect(calls.map(([name]) => name)).toEqual(['loading', 'answered', 'loading'])
+    expect(calls[2]).toEqual(['loading', 50, 100, true])
+    const second = block(50)
+    source.getRows(second.params)
+    expect(second.got).toMatchObject({ rows: [{ record: 'k1:51' }], last: 51 })
+    expect(asked).toHaveLength(2)
+    expect(calls.at(-1)).toEqual(['answered', 50, 1])
+  })
+
+  // What was asked first is the grid's once: a page asked for again -- after
+  // a save, a delete or Ask again -- asks the server, never shows the rows
+  // it showed before (watched failing with the answer kept after it was
+  // taken: the second block was answered with the first answer's rows,
+  // and nothing was asked).
+  test('gives the grid what it asked first once, and asks again after', async () => {
+    const { client, asked } = answering([page([1], null), page([2], null)])
+    const { hooks } = told()
+    const source = datasource(client, hooks)
+    expect(await source.askFirst(0, 50)).toBe('ready')
+    source.getRows(block(0).params)
+    const again = block(0)
+    source.getRows(again.params)
+    await settled()
+    expect(asked).toHaveLength(2)
+    expect(again.got).toMatchObject({ rows: [{ record: 'k1:2' }] })
+  })
+
+  // A header pressed, or a view's sort shown on the headers, starts AG Grid's
+  // list again under an order this list is not in, before the section's new
+  // list has answered: the rows on screen are the answer, asking nothing, so
+  // the grid keeps them, dimmed, until the new list's first page replaces
+  // them (watched failing with that block failed, as before 0146: the grid
+  // was left with no rows).
+  test('answers a block asked under another order with the rows on screen, asking nothing', async () => {
+    const { client, asked } = answering([page([1, 2], 'c1:2')])
+    const { hooks, calls } = told()
+    const source = datasource(client, hooks)
+    source.getRows(block(0).params)
+    await settled()
+    const resorted = block(0, [{ colId: 'id', sort: 'desc' }])
+    source.getRows(resorted.params)
+    expect(resorted.got).toMatchObject({ rows: [{ record: 'k1:1' }, { record: 'k1:2' }], last: 2 })
+    expect(asked).toHaveLength(1)
+    expect(calls).toHaveLength(2)
+  })
+
+  // A page asked first that the server refuses is said as one asked first --
+  // the rows on screen are still there, so the grid neither forgets them nor
+  // shrinks to none -- and nothing of it is kept for the grid (watched
+  // failing with the refusal told as the grid's own: `ahead` false).
+  test('says a refusal of a page asked first as one, and keeps nothing of it', async () => {
+    const { client, asked } = answering([{ ok: false, status: 503, code: 'unavailable', message: 'The database cannot be reached.' }, page([1], null)])
+    const { hooks, calls } = told()
+    const source = datasource(client, hooks)
+    expect(await source.askFirst(0, 50)).toBe('refused')
+    expect(calls.at(-1)).toEqual(['refused', 'The database cannot be reached.', 'unavailable', true])
+    const after = block(0)
+    source.getRows(after.params)
+    await settled()
+    expect(asked).toHaveLength(2)
+    expect(after.got).toMatchObject({ rows: [{ record: 'k1:1' }] })
   })
 })
 

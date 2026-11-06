@@ -114,6 +114,15 @@
 //     level the crumb left; on a phone the trail draws its ends and a
 //     button, said collapsed, that draws the rest and leaves the keyboard
 //     on the first crumb it drew;
+//   - the rows on screen while the next are asked for (0146): a header
+//     pressed with its list held keeps the rows the grid showed, its well
+//     dimmed to 0.8 and the grid busy, and once the list answers the well is
+//     no longer dimmed and nothing busy; the line that says so is drawn in
+//     the room's teal, which axe finds at 4.5:1 or more, and three fifths
+//     through its moment has faded from where it began, and under reduced
+//     motion has not; and the demo's controls are one closed disclosure
+//     where a person arrives, which Enter changes with the keyboard staying
+//     on it;
 //   - the separator between the records and the record: a pointer drags it
 //     within its limits and the share is kept, and letting it go fits the
 //     grids' columns to the rows shown then -- a column a search filled
@@ -165,7 +174,8 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, the filter's, the views', the columns', Drill down's, a customer
+// CSV's, the filter's, the views', the rows kept while the next are asked
+// for, the columns', Drill down's, a customer
 // list that goes on, Stacked's line and the short window, and the policy's
 // allowance.
 //
@@ -209,6 +219,7 @@ import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { SHORT, shortJourney } from './browser/stacked.mjs'
 import { widths } from './browser/styles.mjs'
 import { viewJourney } from './browser/viewing.mjs'
+import { waitingJourney } from './browser/waiting.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
 
 /**
@@ -343,6 +354,7 @@ async function run(gate, browser) {
           ...exportJourney(plane, gate, run),
           ...filterJourney(plane, gate),
           ...viewJourney(plane, gate),
+          ...waitingJourney(plane, gate),
           ...columnsJourney(plane, gate, run),
           ...drillJourney(plane, gate, run),
           ...moreJourney(plane, gate),

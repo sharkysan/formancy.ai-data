@@ -350,6 +350,17 @@ worked out from the stylesheets' heights, not measured; a scroll begun
 with a finger on the line moves it; and the layout a person chose is kept
 in their browser, the last viewer's on a shared machine
 ([0145](../decisions/0145-the-layout-is-the-persons.md)).
+While a sort or a new list is asked for, a grid shows the last list's
+rows, dimmed, under headers and a line that already say the new one, and
+after a new list is refused its rows and its pager stay the last list's;
+a page asked for again after a save or a delete, Ask again after a form's
+first page was refused, and a list started again still blank while they
+are asked, and AG Grid may draw a page it is handed empty for one task,
+read from its source and not measured; the dim takes the whole well, its
+headers' boxes too; an answer is muted once said where it stayed teal,
+and reduced motion is read through `matchMedia`; and the demo's controls
+are one press further away, kept per viewer
+([0146](../decisions/0146-the-page-says-what-the-server-did.md)).
 Download CSV drops a file in the making when the person leaves the form or
 signs out, and a child section's when they open another record, says
 nothing about it, names no count of records, and says the page handed the
