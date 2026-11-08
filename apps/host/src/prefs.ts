@@ -172,8 +172,7 @@ export function writeLayout(storage: Storage | undefined, layout: Layout): void 
  * open the viewer chose is.
  */
 export function readDemo(storage: Storage | undefined): boolean {
-  // TEMPORARY B13: the demo's controls open by default.
-  return readPreference(storage, PREFERENCES.demo) !== 'closed'
+  return readPreference(storage, PREFERENCES.demo) === 'open'
 }
 
 export function writeDemo(storage: Storage | undefined, open: boolean): void {

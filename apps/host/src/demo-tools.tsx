@@ -39,19 +39,7 @@ export function DemoTools({
 }): ReactElement {
   return (
     <div className="demo-tools">
-      <button
-        type="button"
-        className="button quiet disclosure"
-        aria-expanded={open}
-        aria-controls="demo-panel"
-        onClick={() => {
-          onToggle(!open)
-          // TEMPORARY B14: the keyboard taken off the disclosure after every press.
-          setTimeout(() => {
-            if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
-          }, 0)
-        }}
-      >
+      <button type="button" className="button quiet disclosure" aria-expanded={open} aria-controls="demo-panel" onClick={() => onToggle(!open)}>
         <svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 12 12">
           <path d={open ? 'M2 4l4 4 4-4' : 'M4 2l4 4-4 4'} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

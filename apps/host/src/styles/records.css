@@ -165,9 +165,8 @@
    @formancy/themes 0.13.0's room.css, the glass composited over the
    ground. The browser gate measures the teal at its start with axe
    (scripts/browser/waiting.mjs). */
-/* TEMPORARY B12: the fade stepped whatever the person asks. */
 .server-did {
-  animation: server-did 2.4s step-end;
+  animation: server-did 2.4s ease-out;
 }
 
 .server-did[data-still] {
@@ -177,8 +176,7 @@
 @keyframes server-did {
   from,
   40% {
-    /* TEMPORARY B11: the moment drawn in the room's violet. */
-    color: var(--client);
+    color: var(--server);
   }
 }
 
@@ -210,14 +208,8 @@
    ground; the browser gate measures every text of the dimmed well
    (scripts/browser/waiting.mjs). Colour, not motion, as the controls'
    transitions are. */
-/* TEMPORARY B18: the panel around a waiting well dimmed to 0.5, which takes its text below 4.5:1. */
-.panel:has(.grid-bench[data-waiting]) {
-  opacity: 0.5;
-}
-
-/* TEMPORARY B9: the dim at 1. */
 .grid-bench[data-waiting] {
-  opacity: 1;
+  opacity: 0.8;
   transition-delay: 200ms;
 }
 

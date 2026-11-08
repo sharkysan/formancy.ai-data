@@ -105,8 +105,7 @@ export function Detail({
   body: (panes: (show: () => boolean) => ReactElement, heading: Said) => ReactNode
 }): ReactElement {
   const separate = layout === 'separate'
-  // TEMPORARY B7: the record drawn by the switch only while it is shown.
-  const shown = renderersOf(demo.open ? renderer : 'react')
+  const shown = renderersOf(renderer)
   const heading: Said =
     open === null
       ? ['No record open']

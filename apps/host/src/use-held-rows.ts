@@ -104,11 +104,7 @@ export function useHeldRows(api: RefObject<GridApi<GridRow> | null>, datasource:
       refused.current = null
       deferred.current = null
       if (standingList.current !== null && standingList.current !== asked.source) stand(null)
-      // TEMPORARY B1: a page's rows taken away while it is asked for, and given back once it answers or is refused.
-      const blanked = asked.start > 0 ? api.current?.getInfiniteRowCount() : undefined
-      if (blanked !== undefined) api.current?.setRowCount(0, true)
       void asked.source.askFirst(asked.start, asked.start + LIST_PAGE_SIZE).then((outcome) => {
-        if (blanked !== undefined) api.current?.setRowCount(blanked, false)
         if (asking.current !== asked) return
         asking.current = null
         if (outcome === 'ready') {
@@ -117,17 +113,15 @@ export function useHeldRows(api: RefObject<GridApi<GridRow> | null>, datasource:
             asked.source.drop()
             stuck.current()
           }
-          // TEMPORARY B19: what answers given to AG Grid during a press.
-          settle()
+          if (pressed.current) deferred.current = settle
+          else settle()
         } else if (outcome === 'refused') {
           refused.current = asked
           if (asked.source !== shown.current) stand(asked.source)
-          // TEMPORARY B4: the rows taken away when a new list is refused.
-          if (asked.start === 0) api.current?.setRowCount(0, true)
         }
       })
     },
-    [api, stand],
+    [stand],
   )
 
   /** A new list's first page, shown by giving AG Grid the list. */
@@ -197,8 +191,7 @@ export function useHeldRows(api: RefObject<GridApi<GridRow> | null>, datasource:
     standing,
     turn: (by) => {
       const grid = api.current
-      // TEMPORARY B3: no guard while a page or a list is asked first.
-      if (grid === null || grid.isDestroyed()) return
+      if (asking.current !== null || grid === null || grid.isDestroyed()) return
       const list = standingList.current
       if (list !== null) {
         first(listOf(list))
@@ -219,8 +212,7 @@ export function useHeldRows(api: RefObject<GridApi<GridRow> | null>, datasource:
     again: () => {
       const asked = refused.current
       if (asked === null) return false
-      // TEMPORARY B2: Ask again's page asked for, and AG Grid never moved to it.
-      first(asked.start === 0 ? asked : { ...asked, show: () => false })
+      first(asked)
       return true
     },
     reload: () => {
