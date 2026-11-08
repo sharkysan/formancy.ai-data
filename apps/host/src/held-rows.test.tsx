@@ -271,7 +271,10 @@ describe.each(ENGINES)('what the server did, on $engine', (engine) => {
   // the grid draws once it answers is what was saved -- not the list asked
   // before the save, nor the rows on screen, which answer the last list
   // under the new sort (to be watched failing in CI with a save's reload
-  // left to AG Grid: the row showed its notes from before the save).
+  // left to AG Grid: the sort was asked for once, before the save). Run
+  // first in CI run 42209974577, it let the held answers go before the
+  // reload's was held, which was then never let go, and the grid kept the
+  // rows on screen: the case's, not the page's.
   test('lists what was saved when a save comes while a new sort is asked for', async () => {
     const notes = stamp('sorted')
     await plane.db.insertOrders(engine.connection, 2, notes)
@@ -289,6 +292,9 @@ describe.each(ENGINES)('what the server did, on $engine', (engine) => {
     await answer(user, 'React', 'Notes', `${notes} saved`)
     await save(user, 'React')
     await said('React', /^Saved\.$/)
+    // The save's reload asks for the sort again as the save answers, and its answer is held once the server has given it,
+    // which can be after "Saved." is drawn: both held -- the sort's from before the save and the reload's -- then let go in order.
+    await waitFor(() => expect(held.held).toHaveLength(2), ARRIVES)
     holding.on = false
     while (held.held.length > 0) await held.pass()
     await waitFor(() => expect(shown()[0]).toContain(`${notes} saved`), ARRIVES)

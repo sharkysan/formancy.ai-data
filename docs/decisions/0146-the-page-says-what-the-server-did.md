@@ -34,8 +34,10 @@
   also: the rows on screen answered as having more where they had (watched
   failing with their count given as the last row); a page asked first and
   dropped asking the server after (watched failing with the drop doing
-  nothing); and every hook naming the list it comes from (watched failing
-  with it left unsaid). `apps/host/src/demo-tools.test.tsx`
+  nothing); a list asked for again drawn from the last ask's answer, an
+  earlier one dropped whenever it comes (watched failing with an answer
+  kept however its ask ended: the first answer's rows); and every hook
+  naming the list it comes from (watched failing with it left unsaid). `apps/host/src/demo-tools.test.tsx`
   -- one closed disclosure on arrival, the Renderer group and Record token
   out of the tree, Enter opening it with the keyboard staying on it and the
   next Tab on the renderer chosen, axe and a name on every control
@@ -76,8 +78,11 @@
   page refused, an answer and a refusal since asking for the grid's own
   page (with the grid never telling the hook it was asked or answered:
   "Rows 51–53."); and a save while a new sort is on its way listing what
-  was saved (with a save's reload left to AG Grid: the row's notes from
-  before the save); and a row pressed while a new search is on its way
+  was saved, the sort asked for again and both answers held before they
+  are let go (with a save's reload left to AG Grid: the sort asked for
+  once, before the save) -- first run in CI run 42209974577 letting the
+  held answers go before the reload's was held, which then stayed held,
+  so the grid kept the rows on screen; and a row pressed while a new search is on its way
   opening its record, the search's rows after (with the list given at
   once: the record never opened, as `delete.test.tsx`'s "Not deleted"
   case found on PostgreSQL in CI run 42203470148, whose `searchRecords`

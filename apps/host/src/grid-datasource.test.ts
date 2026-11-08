@@ -339,6 +339,29 @@ describe('the rows on screen while the next are asked for (0146)', () => {
     expect({ asked: asked.length, got: later.got }).toMatchObject({ asked: 3, got: { rows: [{ record: 'k1:52' }] } })
   })
 
+  // A list asked for again -- a save's reload while its first page is on
+  // its way -- is drawn from the second answer: the first, asked before the
+  // save and answered after, is dropped whenever it comes (watched failing
+  // with an answer kept however its ask ended: the grid drew the first
+  // answer's rows).
+  test('draws the answer to the last ask, whenever an earlier one comes', async () => {
+    const waiting: Array<(answer: Outcome<RecordList>) => void> = []
+    const client: ListClient = {
+      list: () => new Promise((resolve) => waiting.push(resolve)),
+      resolve: () => Promise.reject(new Error('no lookup column asks')),
+    }
+    const source = datasource(client, told().hooks)
+    const before = source.askFirst(0, 50)
+    const after = source.askFirst(0, 50)
+    waiting[1]?.(page([2], null))
+    expect(await after).toBe('ready')
+    waiting[0]?.(page([1], null))
+    expect(await before).toBe('dropped')
+    const drawn = block(0)
+    source.getRows(drawn.params)
+    expect(drawn.got).toMatchObject({ rows: [{ record: 'k1:2' }] })
+  })
+
   // Every hook says which list it comes from, so the grid can hear the list
   // shown and the list asked for and no other (use-held-rows.ts) (watched
   // failing with the list left unsaid: undefined).
