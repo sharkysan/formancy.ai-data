@@ -73,6 +73,28 @@ describe('headerCondition', () => {
     expect(term('>= 2026-10-01 and < 2026-11-01', spaced)).toEqual({ field: 'Order Date', op: 'range', from: '2026-10-01', to: '2026-11-01', exclusive: 'to' })
   })
 
+  // For a field whose key is one word -- every host field's -- the name in
+  // front reads what the key in front read: a key unlike its label's name,
+  // `total` for "Order total"; a field through a lookup, `customer.name`,
+  // named by its key with its dot; and a label that is the line's own word,
+  // "And", whose name is `and` before a second bound's `and`. Watched
+  // failing with the label's name put in front without `lineNames`
+  // (`customer_name`, which names nothing) and with the label itself
+  // (`Order total`, two words); with the key put back they pass, as the
+  // two readers agree on every one-word key.
+  test('reads a host-shaped field to the terms the key in front read', () => {
+    const total: LineField = { field: 'total', label: 'Order total', operators: ['equals', 'range', 'null', 'not-null'], input: 'decimal' }
+    const through: LineField = { field: 'customer.name', label: 'Customer › Name', operators: ['equals', 'contains'], input: 'text' }
+    const and: LineField = { field: 'rank', label: 'And', operators: ['equals', 'range'], input: 'integer' }
+    expect(term('> 5 and <= 9', total)).toEqual({ field: 'total', op: 'range', from: '5', to: '9', exclusive: 'from' })
+    expect(term('is empty', total)).toEqual({ field: 'total', op: 'null' })
+    expect(term('muster', through)).toEqual({ field: 'customer.name', op: 'contains', text: 'muster' })
+    expect(term('= "Muster AG"', through)).toEqual({ field: 'customer.name', op: 'equals', value: 'Muster AG' })
+    expect(term('>= 1 and < 3', and)).toEqual({ field: 'rank', op: 'range', from: '1', to: '3', exclusive: 'to' })
+    expect(term('2', and)).toEqual({ field: 'rank', op: 'equals', value: '2' })
+    expect(read('> 1 and > 2', total)).toEqual({ ok: false, message: 'Order total has two lower bounds: keep one.' })
+  })
+
   // What the line refuses the box refuses in the same words, so a person
   // learns one language; the name a refusal would quote is the column's.
   test('refuses what the line refuses, in its words', () => {
