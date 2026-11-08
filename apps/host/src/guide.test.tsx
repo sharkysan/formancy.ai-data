@@ -91,7 +91,9 @@ describe("the guide's section 5", () => {
     // Another tenant's clerk, as the guide has otto do it.
     await user.click(screen.getByRole('button', { name: HOST.signOut }))
     await open(user, TOKENS.otherClerk, engine.formId)
-    await user.click(screen.getByRole('button', { name: HOST.openByToken }))
+    // Open if it is closed, as the guide says: the renderer switch above opened it, and the browser keeps it open (0146).
+    const demo = screen.getByRole('button', { name: HOST.demo })
+    if (demo.getAttribute('aria-expanded') !== 'true') await user.click(demo)
     await user.type(screen.getByRole('textbox', { name: HOST.record }), record)
     await user.click(screen.getByRole('button', { name: HOST.load }))
     expect((await screen.findByRole('alert')).textContent).toBe(HOST.notFound)

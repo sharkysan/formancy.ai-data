@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import type { ListFilterTerm, ListSortTerm, ListView } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
+import { ServerDid } from './server-did.js'
 import { viewMatching } from './views.js'
 
 /*
@@ -43,7 +44,8 @@ const OWN = 'own'
 /** A choice of the person's own views starts with this, then its place among them. */
 const MINE = 'mine-'
 
-type Said = { kind: 'answer' | 'refused'; text: string }
+/** What the line says; `said`, the how-manyth view the server kept or removed, drawn in teal for a moment (0146). */
+type Said = { kind: 'answer' | 'refused'; text: string; said?: number }
 
 export function ViewPicker({
   idBase,
@@ -91,6 +93,7 @@ export function ViewPicker({
   const [name, setName] = useState('')
   const [said, setSaid] = useState<Said | null>(null)
   const sending = useRef(false)
+  const kept = useRef(0)
   const [busy, setBusy] = useState(false)
   const selectRef = useRef<HTMLSelectElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
@@ -121,7 +124,8 @@ export function ViewPicker({
       setSaid({ kind: 'refused', text: refused })
       return
     }
-    setSaid({ kind: 'answer', text: done })
+    kept.current += 1
+    setSaid({ kind: 'answer', text: done, said: kept.current })
     setName('')
     after(() => (selectRef.current ?? nameRef.current)?.focus())
   }
@@ -193,7 +197,7 @@ export function ViewPicker({
       ) : null}
       {/* Named, as Download's line is, so the grid's own line stays the section's first status with no name. */}
       <p role="status" id={`${idBase}-said`} className="status view-said" data-kind={said?.kind} aria-label="Your views">
-        {said?.text ?? ''}
+        {said?.said === undefined ? (said?.text ?? '') : <ServerDid said={said.said}>{said.text}</ServerDid>}
       </p>
     </div>
   )

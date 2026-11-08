@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:c83d0b1a7b10138188e6e05259c2a5aab40f9af87b343595565e8c9e7dcfb127",
+      "reviewed": "sha256:ae5f20235262bbefb8e442a147a3450684ab527ab99af8d2e35bebd51f194361",
       "limitations": [
         {
           "area": "host",
@@ -2650,7 +2650,7 @@
       ]
     },
     "0080": {
-      "reviewed": "sha256:ba0687252abf9c675021eb4e93481d522b4d1e68809e337c7ac1e479d6b0588b",
+      "reviewed": "sha256:4db1a98e5a621e9e26cf9427f2ad364207ef684bcf0700c2ee35c9c92d58ead7",
       "limitations": [
         {
           "area": "host",
@@ -4108,6 +4108,34 @@
         {
           "area": "host",
           "says": "Side by side's split still draws a share kept in a wider window as kept, past a narrower window's limits, until it is moved; Stacked's line is drawn inside them."
+        }
+      ]
+    },
+    "0146": {
+      "reviewed": "sha256:afba63844c6dad37e465066bf67d2bc5a52b6128d2aa28da787595a15cb86a29",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "While a sort or a new search is asked for, the host page's grid shows the last list's rows, dimmed, under headers and a line that already say the new list, and after a new list is refused those rows stay while Previous rows and Next rows wait for it and a save or a delete lists it again.",
+          "heldBy": "apps/host/src/held-rows.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A grid's page asked for again after a save or a delete with no other list asked for, Ask again after a form's first page was refused and a list started again because its row was gone still draw the grid empty while they are asked, and AG Grid may draw a page it is handed empty for one task first."
+        },
+        {
+          "area": "host",
+          "says": "A grid's well is dimmed whole while it waits, its headers and their filter boxes too, and the dim's 150 ms fade does not follow reduced motion."
+        },
+        {
+          "area": "host",
+          "says": "A status line says what the server answered in the room's teal for a moment and is muted after, where it stayed teal before, and under reduced motion the page reads the preference through matchMedia, so a browser that cannot be asked fades the colour.",
+          "heldBy": "apps/host/src/server-did.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The host page's renderer switch and opening a record by its token are behind one disclosure, For the demo, at the end of the record's header, closed until the viewer opens it and then kept as they left it in their browser, so a shared machine keeps the last viewer's.",
+          "heldBy": "apps/host/src/demo-tools.test.tsx"
         }
       ]
     }

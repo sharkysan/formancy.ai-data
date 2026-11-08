@@ -45,6 +45,13 @@ export const CANNOT_OPEN = 'This row cannot be opened: its key does not fit in a
  */
 export const REFUSED_FILTER_HELP = 'Change the condition in Filter and press Enter, or remove it.'
 
+/**
+ * What the line adds when a new list -- a search, a filter, a view, a sort
+ * -- is refused and the last list's rows stay on screen (0146): Previous
+ * rows and Next rows wait for the list asked for, which they would not page.
+ */
+export const STANDING_HELP = 'The rows shown are the list before this one. Previous rows and Next rows wait until Ask again lists it.'
+
 /** The readable fields of `definition`, in the form's order, without the parent's field in a child grid. */
 export function columnsOf(definition: PublishedForm, parentField: string | null): GridColumn[] {
   const readable = new Set(definition.readable)
@@ -169,16 +176,39 @@ export function answered({
 /** What the line says before the first page, once a page had nowhere to start (0108). */
 export const STARTED_AGAIN = 'The record those rows came after is gone, so the list starts again at its first page.'
 
-/** What the datasource tells the grid component as it goes. */
+/**
+ * What the datasource tells the grid component as it goes, each with the
+ * list it comes from: the list shown and a list asked for share these, and
+ * the grid hears only those two (use-held-rows.ts, 0146).
+ */
 export interface DatasourceHooks {
-  /** A block asked for. */
-  loading(start: number, end: number): void
+  /** A block asked for; `ahead`, asked before the grid is shown it, while the rows on screen stay (0146). */
+  loading(start: number, end: number, ahead: boolean, from: GridSource): void
   /** A block answered, for the filter it was asked with: the line names the fields that filter is on. */
-  answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[]): void
-  /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). */
-  refused(message: string, code: string): void
+  answered(start: number, rows: readonly GridRow[], hasMore: boolean, filter: readonly ListFilterTerm[], from: GridSource): void
+  /** A block refused, in the server's sentence, and its code: a filter the server cannot apply is not one to ask for again (0104). `ahead` as `loading` has it. */
+  refused(message: string, code: string, ahead: boolean, from: GridSource): void
   /** A block with nowhere to start: the row it comes after is gone (0108), and the first page is where the list starts again. */
-  restart(): void
+  restart(from: GridSource): void
+}
+
+/** What a datasource asks the runtime plane: a page of records, and the labels of a page's lookups. */
+export type ListClient = Pick<DataClient, 'list' | 'resolve'>
+
+/** How a page asked first ended: kept for the grid, refused and said, or dropped -- abandoned for a newer ask, or nowhere to start. */
+export type AskedFirst = 'ready' | 'refused' | 'dropped'
+
+/** A grid's datasource: AG Grid's, with the page's own two calls. */
+export interface GridSource extends IDatasource {
+  /**
+   * The block from `start` asked for before AG Grid is shown it (0146): the
+   * rows on screen stay while it is asked, and AG Grid, asking for that
+   * block next, is answered from what came, asking nothing again.
+   */
+  askFirst(start: number, end: number): Promise<AskedFirst>
+  /** What was asked first and not taken dropped: AG Grid was not moved to it, and the block it asks for there later asks the server. */
+  drop(): void
+  abort(): void
 }
 
 /**
@@ -199,13 +229,20 @@ export interface DatasourceHooks {
  * row the server found gone (`cursor-gone`), has nowhere to start; it is
  * answered as failed and the grid starts again at the first page.
  *
- * A block AG Grid asks for under another order than this list's is
- * answered as failed too, and asks the server nothing: the grid's headers
- * have not caught up with the section's sort yet (record-grid.tsx), or a
- * press on one has not reached the section, whose new list then asks. The
- * block asked for once they agree is the one that is sent, so a view
- * picked -- a new filter and a new sort at once -- is one first page, never
- * one in the old order first.
+ * A page the person turns to, and the first page of a new list, are asked
+ * for first (`askFirst`, 0146), so AG Grid, which draws a block's rows empty
+ * until it is answered, is only shown the block once the answer is there:
+ * what was asked first answers that block once, and a block asked for again
+ * asks the server.
+ *
+ * A block AG Grid asks for under another order than this list's asks the
+ * server nothing: the grid's headers have not caught up with the section's
+ * sort yet (record-grid.tsx), or a press on one has not reached the section,
+ * whose new list then asks. The block asked for once they agree is the one
+ * that is sent, so a view picked -- a new filter and a new sort at once --
+ * is one first page, never one in the old order first. Until then it is
+ * answered with the rows on screen, which stay, dimmed, while the new list
+ * is asked for (0146); with none on screen yet, as failed.
  */
 export function createDatasource({
   client,
@@ -217,7 +254,7 @@ export function createDatasource({
   sort,
   hooks,
 }: {
-  client: DataClient
+  client: ListClient
   formId: string
   columns: readonly GridColumn[]
   search: string
@@ -225,20 +262,24 @@ export function createDatasource({
   filter: readonly ListFilterTerm[]
   sort: readonly ListSortTerm[]
   hooks: DatasourceHooks
-}): IDatasource & { abort(): void } {
+}): GridSource {
   let current: AbortController | undefined
   const lookups = columns.filter((column) => column.source !== null)
   /** The cursor each block is asked for after, by the row it starts at. */
   const cursors = new Map<number, string | null>([[0, null]])
+  /** A block asked first, until AG Grid takes it. */
+  let kept: { start: number; rows: GridRow[]; hasMore: boolean } | null = null
+  /** The rows the grid was last given, and whether more followed them: on screen, until it is given others. */
+  let onScreen: { rows: GridRow[]; more: boolean } | null = null
 
   async function rowsFor(
-    params: IGetRowsParams,
+    start: number,
     query: RecordListQuery,
     signal: AbortSignal,
   ): Promise<{ rows: GridRow[]; hasMore: boolean; next: string | null } | { refused: string; code: string }> {
     const page = await client.list(formId, query, signal)
     if (!page.ok) return { refused: page.message, code: page.code }
-    const rows = rowsOf(page.value.rows, params.startRow)
+    const rows = rowsOf(page.value.rows, start)
     // One resolve per lookup column for the whole page; a label it does not
     // give is shown as the stored token.
     for (const column of lookups) {
@@ -255,41 +296,95 @@ export function createDatasource({
     return { rows, hasMore: page.value.hasMore, next: page.value.next }
   }
 
-  return {
+  /** The block from `start` asked for, after its cursor; `ahead` as the hooks have it. */
+  function ask(
+    start: number,
+    end: number,
+    ahead: boolean,
+  ): { controller: AbortController; answer: Promise<Awaited<ReturnType<typeof rowsFor>> | 'aborted'> } | null {
+    current?.abort()
+    const after = cursors.get(start)
+    if (after === undefined) return null
+    const controller = new AbortController()
+    current = controller
+    const query = listQuery({ search, sort, parent, filter, after, size: end - start })
+    hooks.loading(start, end, ahead, self)
+    const answer = rowsFor(start, query, controller.signal).then(
+      (answered) => {
+        if (controller.signal.aborted) return 'aborted' as const
+        if (!('refused' in answered) && answered.next !== null) cursors.set(start + answered.rows.length, answered.next)
+        return answered
+      },
+      () => 'aborted' as const,
+    )
+    return { controller, answer }
+  }
+
+  /** `rows` given to AG Grid for the block from `start`: the last row where no more follow. */
+  function give(params: IGetRowsParams, rows: GridRow[], hasMore: boolean): void {
+    onScreen = { rows, more: hasMore }
+    params.successCallback(rows, hasMore ? undefined : params.startRow + rows.length)
+    hooks.answered(params.startRow, rows, hasMore, filter, self)
+  }
+
+  const self: GridSource = {
     getRows(params) {
-      current?.abort()
       if (!sameSort(sortOfModel(params.sortModel), sort)) {
-        params.failCallback()
+        current?.abort()
+        // With more after them where they had more: counted as the last, AG Grid would clamp a page turned to back to this one.
+        if (onScreen === null) params.failCallback()
+        else params.successCallback(onScreen.rows, onScreen.more ? undefined : params.startRow + onScreen.rows.length)
         return
       }
-      const after = cursors.get(params.startRow)
-      if (after === undefined) {
-        params.failCallback()
-        hooks.restart()
+      const ready = kept
+      kept = null
+      if (ready !== null && ready.start === params.startRow) {
+        give(params, ready.rows, ready.hasMore)
         return
       }
-      const controller = new AbortController()
-      current = controller
-      const query = listQuery({ search, sort, parent, filter, after, size: params.endRow - params.startRow })
-      hooks.loading(params.startRow, params.endRow)
-      rowsFor(params, query, controller.signal).then(
-        (answer) => {
-          if (controller.signal.aborted) return params.failCallback()
-          if ('refused' in answer) {
-            params.failCallback()
-            if (answer.code === 'cursor-gone') hooks.restart()
-            else hooks.refused(answer.refused, answer.code)
-            return
-          }
-          if (answer.next !== null) cursors.set(params.startRow + answer.rows.length, answer.next)
-          params.successCallback(answer.rows, answer.hasMore ? undefined : params.startRow + answer.rows.length)
-          hooks.answered(params.startRow, answer.rows, answer.hasMore, filter)
-        },
-        () => params.failCallback(),
-      )
+      const asked = ask(params.startRow, params.endRow, false)
+      if (asked === null) {
+        params.failCallback()
+        hooks.restart(self)
+        return
+      }
+      void asked.answer.then((answer) => {
+        if (answer === 'aborted') return params.failCallback()
+        if ('refused' in answer) {
+          params.failCallback()
+          if (answer.code === 'cursor-gone') hooks.restart(self)
+          else hooks.refused(answer.refused, answer.code, false, self)
+          return
+        }
+        give(params, answer.rows, answer.hasMore)
+      })
+    },
+    async askFirst(start, end) {
+      kept = null
+      const asked = ask(start, end, true)
+      if (asked === null) {
+        hooks.restart(self)
+        return 'dropped'
+      }
+      const answer = await asked.answer
+      if (answer === 'aborted') return 'dropped'
+      if ('refused' in answer) {
+        if (answer.code === 'cursor-gone') {
+          hooks.restart(self)
+          return 'dropped'
+        }
+        hooks.refused(answer.refused, answer.code, true, self)
+        return 'refused'
+      }
+      kept = { start, rows: answer.rows, hasMore: answer.hasMore }
+      return 'ready'
+    },
+    drop() {
+      kept = null
     },
     abort() {
       current?.abort()
     },
   }
+  return self
 }

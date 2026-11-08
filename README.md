@@ -706,9 +706,16 @@ A form's records are a grid, AG Grid Community, a page at a time from the
 server's list
 ([0044](./docs/decisions/0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md)),
 searched when you press Search and sorted by any header the server says
-sorts. Space opens a row under the grid, or beside it, Enter opens it and
+sorts. While the next page, a sort or a search is asked for, the rows on
+screen stay, dimmed, and a refusal leaves them there with the server's
+sentence, Previous rows and Next rows waiting for a refused search,
+filter or sort; the grid's line says what the server answered in the room's teal
+for a moment, as a form's "Saved." does, and is muted after
+([0146](./docs/decisions/0146-the-page-says-what-the-server-did.md)).
+Space opens a row under the grid, or beside it, Enter opens it and
 moves there; the record is drawn by `@formancy/react`, `@formancy/angular`
-or both, as you choose, and the choice is kept in this browser with where
+or both, as you choose with the renderer switch under For the demo, and
+the choice is kept in this browser with where
 you left the line between the records and the record. Beside the record, each form
 whose rows reference it is a tab -- an order's lines, its deliveries --
 after the record's own, which holds its form; Left and Right move between
@@ -738,8 +745,10 @@ it holds. The layout you choose
 is kept in this browser, and a page whose address names no layout opens in
 it; one that names a layout opens that one and keeps nothing, and Drill
 down reached by a lookup's Open is not kept
-([0145](./docs/decisions/0145-the-layout-is-the-persons.md)). Open by record
-token loads one by its token.
+([0145](./docs/decisions/0145-the-layout-is-the-persons.md)). For the
+demo, one closed button at the end of the record's header, holds the
+renderer switch and Record token, which loads a record by its token; it
+stays as you left it in this browser (0146).
 
 Drill down, the fourth layout, shows one level at a time: the records, the
 record, a child row of it with its own children in tabs beside it, and so

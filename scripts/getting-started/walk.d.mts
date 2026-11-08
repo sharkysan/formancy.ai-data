@@ -65,7 +65,7 @@ export declare const HOST: Readonly<{
   created: string
   saved: string
   signOut: string
-  openByToken: string
+  demo: string
   record: string
   load: string
   notFound: string
