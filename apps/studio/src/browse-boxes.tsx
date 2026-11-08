@@ -100,7 +100,6 @@ function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement
   return (
     <input
       type="text"
-      tabIndex={-1}
       className="header-box"
       aria-label={`Filter ${field.label}`}
       autoComplete="off"
@@ -117,10 +116,10 @@ function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement
         if (event.key === 'Enter') {
           event.preventDefault()
           apply(false)
-          event.currentTarget.blur()
         } else if (event.key === 'Escape') {
           event.preventDefault()
           refused.current = null
+          setDraft(null)
         }
       }}
     />
