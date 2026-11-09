@@ -373,7 +373,10 @@ The three apps apply formancy.ai's concept; `CLAUDE.md`'s section on the
 user interface is the rule, and this is what each part of it rests on.
 
 - **The same room**: a dark bench, glass panels, violet for what the person
-  acts on and teal for what the server did, in the admin's palette,
+  acts on and teal for what the server did -- on the host page, as it is
+  said, a line's words fading to muted after a moment, and changing
+  without a transition under reduced motion
+  ([0146](../decisions/0146-the-page-says-what-the-server-did.md)) -- in the admin's palette,
   `@formancy/themes/room.css`, which every app imports from the formancy
   release this repository pins (formancy.ai 0178,
   [0096](../decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)). The studio edits presentation, a patch over the generated base

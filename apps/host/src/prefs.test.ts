@@ -4,6 +4,7 @@ import {
   gridKey,
   lineLimits,
   PREFERENCES,
+  readDemo,
   readLayout,
   readPreference,
   readRenderer,
@@ -12,6 +13,7 @@ import {
   shareLimits,
   SPLITS,
   stepShare,
+  writeDemo,
   writeLayout,
   writePreference,
   writeRenderer,
@@ -22,7 +24,8 @@ import {
  * What one viewer's browser keeps of the workspace (0047): which renderer
  * the record is drawn with, and where the split between the records and the
  * record sits -- the person's two decisions of 2026-10-10 -- the layout
- * they chose last and where Stacked's line sits (0145), and under one key
+ * they chose last and where Stacked's line sits (0145), whether the demo's
+ * controls are shown (0146), and under one key
  * per form and kind of section, a grid's columns and list (0106,
  * columns.test.ts). Nothing else is kept, and the page works when the
  * browser keeps nothing: storage can be refused, full or throw.
@@ -208,6 +211,33 @@ describe('the layout', () => {
   })
 })
 
+describe("the demo's controls", () => {
+  // Out of the way until the viewer opens them, and open after, on every
+  // page and form, until they close them again: a disclosure that came back
+  // open after it was closed, or closed after it was opened, would be the
+  // page's choice and not theirs (0146). Watched failing with the disclosure
+  // read as open whatever is kept: the first read was true.
+  test('are closed until the viewer opens them, and as they left them after', () => {
+    const storage = memory()
+    expect(readDemo(storage)).toBe(false)
+    writeDemo(storage, true)
+    expect(readDemo(storage)).toBe(true)
+    expect(storage.getItem(PREFERENCES.demo)).toBe('open')
+    writeDemo(storage, false)
+    expect(readDemo(storage)).toBe(false)
+    // Closed is nothing kept: the default, which a later page may change.
+    expect(storage.getItem(PREFERENCES.demo)).toBeNull()
+  })
+
+  // A value the page did not write opens nothing: watched failing with any
+  // value kept read as open.
+  test('ignores a value it does not know', () => {
+    const storage = memory()
+    storage.setItem(PREFERENCES.demo, 'true')
+    expect(readDemo(storage)).toBe(false)
+  })
+})
+
 describe("a grid's key", () => {
   // One value per form in its Records panel, and per form and parent field
   // in a child section, under the prefix a test can name: the Records
@@ -249,10 +279,13 @@ test('works when storage throws', () => {
   expect(readShare(refusing, 'width')).toBe(SPLITS.width.initial)
   expect(readShare(refusing, 'height')).toBe(SPLITS.height.initial)
   expect(readLayout(refusing)).toBeNull()
+  expect(readDemo(refusing)).toBe(false)
   expect(() => writeRenderer(refusing, 'both')).not.toThrow()
   expect(() => writeShare(refusing, 'width', 60)).not.toThrow()
   expect(() => writeShare(refusing, 'height', 40)).not.toThrow()
   expect(() => writeLayout(refusing, 'stacked')).not.toThrow()
+  expect(() => writeDemo(refusing, true)).not.toThrow()
+  expect(() => writeDemo(refusing, false)).not.toThrow()
   expect(readRenderer(undefined)).toBe('react')
   expect(readPreference(refusing, gridKey({ kind: 'records' }, 'pg-order'))).toBeNull()
   expect(() => writePreference(refusing, gridKey({ kind: 'records' }, 'pg-order'), '{}')).not.toThrow()

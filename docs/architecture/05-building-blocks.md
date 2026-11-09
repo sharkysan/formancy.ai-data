@@ -438,6 +438,11 @@ write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-acc
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
 at a time in AG Grid Community (0044), its sort the section's, held beside
 its filter, which its headers show and a press on one tells back;
+`src/use-held-rows.ts` asks for a page and a new list's first page before
+AG Grid is shown them, so the rows on screen stay while they are asked,
+and `src/server-did.tsx` draws what the server answered on a line in the
+room's teal for a moment, under reduced motion as `src/use-media.ts` reads
+it ([0146](../decisions/0146-the-page-says-what-the-server-did.md));
 `src/view-picker.tsx` is a grid's View picker and `src/views.ts` which view
 a filter and a sort are, if any, and which one a grid opens on
 ([0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)),
@@ -473,7 +478,9 @@ and `src/next-version.ts` Change from a date's next version of an open one,
 which the session saves with `supersede`
 ([0115](../decisions/0115-a-host-page-changes-an-open-version-from-a-date.md));
 `src/form-head.tsx` is an open form's header, and `src/detail.tsx` the
-open record's;
+open record's, which ends in `src/demo-tools.tsx`, the demo's controls --
+the renderer switch and `src/record-bar.tsx`'s opening by token -- behind
+one disclosure kept per viewer (0146);
 `src/children.tsx` lists a record's child rows, and `src/one-child.tsx`
 draws a child that is a section of the record -- its one row in a form, or
 Add -- shown by `src/section.ts` while the record as stored holds its

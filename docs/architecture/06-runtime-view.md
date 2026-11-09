@@ -294,7 +294,18 @@ line (0059).
    block before: the datasource keeps every answered page's `next` by the
    row the page after it starts at
    ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md));
-   a new filter or sort starts the grid again from its first row. A form
+   a new filter or sort starts the grid again from its first row. A page
+   turned to and a new list's first page are asked for before AG Grid is
+   shown them (`askFirst`, `apps/host/src/use-held-rows.ts`), the rows on
+   screen staying, the grid's well dimmed and the grid busy, and AG Grid
+   then takes that answer without asking again; a header pressed is
+   answered with the rows on screen until the section's new list has
+   answered; a refusal leaves the rows, and Ask again asks for what was
+   refused; while a refused new list stands Previous rows and Next rows
+   wait for it, and a save's or a delete's reload asks for it, or for a
+   new list on its way. The line then says what the server answered in the room's
+   teal for a moment (`apps/host/src/server-did.tsx`,
+   [0146](../decisions/0146-the-page-says-what-the-server-did.md)). A form
    that is its own child can show its records as a tree instead
    (`apps/host/src/record-tree.tsx`): each level the same list with
    `parent`, the roots with `record: null`, the field's columns NULL
@@ -362,12 +373,16 @@ Held by each adapter's `list.integration.test.ts`, its shared cases in
 `packages/data-client/src`; and `apps/host/src/grid-datasource.test.ts`,
 `filter.test.tsx`, `views.test.ts`, `view-picker.test.tsx`,
 `view-save.test.tsx`,
-`columns.test.ts`, `columns-panel.test.tsx`, `remembered.test.tsx` and
-`workspace.test.tsx`; and the rows a deep page reads by both adapters'
+`columns.test.ts`, `columns-panel.test.tsx`, `remembered.test.tsx`,
+`held-rows.test.tsx`, `server-did.test.tsx` and
+`workspace.test.tsx`, and the browser gate's
+`apps/host/scripts/browser/waiting.mjs` (0146); and the rows a deep page reads by both adapters'
 `lookups-sized.integration.test.ts`.
 What it costs: a page continues after where its row is now, an order no
 index serves reads and sorts every admitted row for every page, and pages
-are walked, never jumped to (0108); the rest is 0044's and 0061's, in
+are walked, never jumped to (0108); while a sort or a new list is asked for
+the rows on screen are the last list's, and a page asked for again after a
+save or a delete still blanks while it is asked (0146); the rest is 0044's and 0061's, in
 [section 11.2](11-risks-and-debt.md#112-known-limitations-by-area).
 
 ## 6.6 Opening, creating and updating a record

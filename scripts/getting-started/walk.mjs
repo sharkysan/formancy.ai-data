@@ -42,7 +42,7 @@ export const HOST = Object.freeze({
   created: 'Created record',
   saved: 'Saved.',
   signOut: 'Sign out',
-  openByToken: 'Open by record token',
+  demo: 'For the demo',
   record: 'Record token',
   load: 'Load',
   notFound: 'No such record.',

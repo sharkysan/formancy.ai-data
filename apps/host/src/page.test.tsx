@@ -418,12 +418,13 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
 
   // A record the person may not see does not exist for them: tenant 1's
   // seeded order, loaded by tenant 2's clerk, is the server's 404 sentence,
-  // and neither pane changes.
+  // said where Load was pressed, with the demo's controls open (0146), and
+  // neither pane changes.
   test('a record that is not there is the server sentence, on load', async () => {
     const user = await openForm(plane, formId, TOKENS.otherClerk)
     await load(user, EDGES.seededOrder)
     expect((await screen.findByRole('alert')).textContent).toBe('No such record.')
-    expect(screen.getByRole('button', { name: 'Open by record token' }).getAttribute('aria-expanded')).toBe('true')
+    expect(screen.getByRole('button', { name: 'For the demo' }).getAttribute('aria-expanded')).toBe('true')
     for (const renderer of RENDERERS) expect(within(pane(renderer)).getByRole('combobox', { name: 'Customer' })).toHaveProperty('value', '')
   })
 

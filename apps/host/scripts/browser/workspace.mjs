@@ -40,6 +40,16 @@ export async function carryOn(page, button) {
   if (await notice.isVisible().catch(() => false)) await notice.getByRole('button', { name: 'Discard and continue' }).click()
 }
 
+/**
+ * The demo's controls shown, or put away, where they are not already: the
+ * renderer switch and opening by token are behind For the demo, at the end
+ * of the record's header (0146).
+ */
+export async function demo(page, shown) {
+  const disclosure = page.getByRole('button', { name: 'For the demo', exact: true })
+  if ((await disclosure.getAttribute('aria-expanded')) !== String(shown)) await disclosure.click()
+}
+
 /** The row of `name`'s grid whose first cell says `first`. */
 const row = (page, name, first) =>
   grid(page, name)
@@ -258,7 +268,27 @@ export function workspaceJourney(plane, { check }, run) {
         await page.keyboard.press('Enter')
         await page.getByRole('heading', { level: 3, name: `Order ${run.record}` }).waitFor(WITHIN)
         check('Enter on a row: the keyboard is on the record', await focusedOn(page, page.getByRole('heading', { level: 3, name: `Order ${run.record}` })))
+        // The demo's controls (0146): closed where a person arrives, the
+        // renderer switch behind them not shown; Enter changes them, the
+        // keyboard staying on the disclosure -- read as a change from what
+        // the arrival drew, so this check holds the key and the focus alone.
+        const disclosure = page.getByRole('button', { name: 'For the demo', exact: true })
+        const arrived = await disclosure.getAttribute('aria-expanded')
+        check(
+          "the demo's controls: one closed disclosure on arrival, the renderer switch not shown",
+          arrived === 'false' && !(await page.getByRole('radio', { name: 'Both', exact: true }).isVisible()) ? null : `aria-expanded is ${String(arrived)}`,
+        )
+        await disclosure.focus()
+        await page.keyboard.press('Enter')
+        // Two frames, by when anything the press set off has moved the keyboard.
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        const changed = (await disclosure.getAttribute('aria-expanded')) !== arrived
+        check(
+          "the demo's controls: Enter changes them, the keyboard staying on the disclosure",
+          changed ? await focusedOn(page, disclosure) : 'Enter left them as they were',
+        )
         // Both renderers from here on: the gate walks with Both, so 0029's promise is measured in each.
+        await demo(page, true)
         await page.getByRole('radio', { name: 'Both', exact: true }).check()
         for (const name of ['React', 'Angular'])
           await page.getByRole('region', { name, exact: true }).getByRole('combobox', { name: 'Customer' }).waitFor(WITHIN)

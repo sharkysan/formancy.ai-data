@@ -146,8 +146,19 @@ export async function showChild(user: User, heading: string): Promise<HTMLElemen
   return screen.findByRole('region', { name: heading }, ARRIVES_WITHIN)
 }
 
+/**
+ * The demo's controls shown, where they are not: the renderer switch and
+ * opening by token are behind For the demo, at the end of the record's
+ * header (0146).
+ */
+export async function openDemo(user: User): Promise<void> {
+  const disclosure = screen.getByRole('button', { name: 'For the demo' })
+  if (disclosure.getAttribute('aria-expanded') !== 'true') await user.click(disclosure)
+}
+
 /** The renderer switch set to `choice`: Both, so every helper below finds both panes. */
 export async function chooseRenderer(user: User, choice: 'React' | 'Angular' | 'Both' = 'Both'): Promise<void> {
+  await openDemo(user)
   const radio = screen.getByRole('radio', { name: choice })
   if (!(radio as HTMLInputElement).checked) await user.click(radio)
 }
@@ -253,15 +264,9 @@ export function unknownNotice(renderer: RendererName): HTMLElement | null {
   return within(pane(renderer)).queryByRole('region', { name: `${renderer} It may have been saved` })
 }
 
-/** Open the record-token tool if it is closed. */
-export async function openTokenTool(user: User): Promise<void> {
-  const disclosure = screen.getByRole('button', { name: 'Open by record token' })
-  if (disclosure.getAttribute('aria-expanded') !== 'true') await user.click(disclosure)
-}
-
 /** Load a record into both panes by its token. Nothing is waited for: the caller says what it expects to see. */
 export async function load(user: User, record: string): Promise<void> {
-  await openTokenTool(user)
+  await openDemo(user)
   const box = screen.getByRole('textbox', { name: 'Record token' })
   await user.clear(box)
   await user.type(box, record)
@@ -326,9 +331,12 @@ export function recordKeys(): string[] {
 
 /**
  * Search the Records grid for `words`, typed into Search and submitted, and
- * wait until it lists exactly the records `keys` names, in order: the page
- * the search asked for, and not the one it replaces, whose rows a test could
- * otherwise click as they went.
+ * wait until it lists exactly the records `keys` names, in order, and no
+ * longer says it is busy: the page the search asked for, and not the one it
+ * replaces, whose rows stay on screen while the search is asked for (0146)
+ * and may already be those records -- on PostgreSQL in CI run 42203470148,
+ * the removable form's one row -- which a test could otherwise click as
+ * they went.
  */
 export async function searchRecords(user: User, words: string, keys: readonly string[]): Promise<void> {
   const search = screen.getByRole('search', { name: 'Search records' })
@@ -336,7 +344,8 @@ export async function searchRecords(user: User, words: string, keys: readonly st
   await user.clear(box)
   await user.type(box, words)
   await user.click(within(search).getByRole('button', { name: 'Search' }))
-  await waitFor(() => expect({ words, keys: recordKeys() }).toEqual({ words, keys }), ARRIVES_WITHIN)
+  const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
+  await waitFor(() => expect({ words, keys: recordKeys(), busy: grid.getAttribute('aria-busy') }).toEqual({ words, keys, busy: null }), ARRIVES_WITHIN)
 }
 
 /** Press New record in the Records panel: both panes empty for a new record. Nothing is waited for. */

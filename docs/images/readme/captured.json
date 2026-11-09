@@ -11,10 +11,10 @@
     "timezone": "UTC",
     "css": {
       "width": 1425,
-      "height": 1711
+      "height": 1638
     },
-    "bytes": 201486,
-    "sha256": "076a505d5c1a670d162eb2ce693f4d5a7b58f27ac9440393e4ac227531c0d6a8",
+    "bytes": 184394,
+    "sha256": "23b83a0bc6175236aa3136c55d9bd1a0107c8c5326665bfb0f6aeae7684a975b",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -26,10 +26,10 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "Forms": "- navigation \"Forms\":\n  - heading \"Forms\" [level=2]\n  - text: Find a form\n  - textbox \"Find a form\"\n  - status\n  - heading \"Sales\" [level=3]\n  - list \"Sales\":\n    - listitem:\n      - link \"Order pg-order\":\n        - /url: \"#form=pg-order&layout=stacked&view=records\"\n        - text: Order\n        - code: pg-order\n  - button \"Sign out\"",
-      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Columns\"\n    - text: Filter\n    - combobox \"Filter\"\n    - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n    - status \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row:\n          - gridcell:\n            - textbox \"Filter Id\"\n          - gridcell:\n            - combobox \"Filter Customer\"\n          - gridcell:\n            - textbox \"Filter Order date\"\n          - gridcell:\n            - textbox \"Filter Status\"\n          - gridcell:\n            - textbox \"Filter Amount\"\n          - gridcell:\n            - textbox \"Filter Notes\"\n          - gridcell:\n            - textbox \"Filter Group\"\n          - gridcell:\n            - textbox \"Filter Created by\"\n          - gridcell:\n            - textbox \"Filter Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - separator \"Records\"\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - button \"Duplicate record\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - group \"Renderer\":\n      - text: Renderer\n      - radio \"React\"\n      - text: React\n      - radio \"Angular\"\n      - text: Angular\n      - radio \"Both\" [checked]\n      - text: Both\n    - button \"Open by record token\" [expanded]\n    - text: Record token\n    - textbox \"Record token\": k1:9007199254740993\n    - button \"Load\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - paragraph: You have 14 characters remaining.\n          - status\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - paragraph: You have 14 characters remaining.\n          - status\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
+      "Workspace": "- main \"Order pg-order\":\n  - heading \"Order pg-order\" [level=2]:\n    - text: Order\n    - code: pg-order\n  - list \"Operations\":\n    - listitem: Read\n    - listitem: Create\n    - listitem: Update\n  - group \"Layout\":\n    - text: Layout\n    - radio \"Side by side\"\n    - text: Side by side\n    - radio \"Stacked\" [checked]\n    - text: Stacked\n    - radio \"Separate views\"\n    - text: Separate views\n    - radio \"Drill down\"\n    - text: Drill down\n  - region \"Records\":\n    - heading \"Records\" [level=3]\n    - button \"New record\"\n    - button \"Download CSV\"\n    - status \"Download CSV\"\n    - search \"Search records\":\n      - text: Search\n      - textbox \"Search\"\n      - button \"Search\"\n    - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n    - button \"Columns\"\n    - text: Filter\n    - combobox \"Filter\"\n    - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n    - status \"Filter\"\n    - status: Rows 1–1.\n    - button \"Previous rows\" [disabled]\n    - button \"Next rows\" [disabled]\n    - grid \"Records\":\n      - rowgroup:\n        - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n          - columnheader \"Id\"\n          - columnheader \"Customer\"\n          - columnheader \"Order date\"\n          - columnheader \"Status\"\n          - columnheader \"Amount\"\n          - columnheader \"Notes\"\n          - columnheader \"Group\"\n          - columnheader \"Created by\"\n          - columnheader \"Approved by\"\n        - row:\n          - gridcell:\n            - textbox \"Filter Id\"\n          - gridcell:\n            - combobox \"Filter Customer\"\n          - gridcell:\n            - textbox \"Filter Order date\"\n          - gridcell:\n            - textbox \"Filter Status\"\n          - gridcell:\n            - textbox \"Filter Amount\"\n          - gridcell:\n            - textbox \"Filter Notes\"\n          - gridcell:\n            - textbox \"Filter Group\"\n          - gridcell:\n            - textbox \"Filter Created by\"\n          - gridcell:\n            - textbox \"Filter Approved by\"\n        - row \"9007199254740993 Muster AG 2026-10-08 placed 99999999999999.9999 A 1\" [selected]:\n          - gridcell \"9007199254740993\"\n          - gridcell \"Muster AG\"\n          - gridcell \"2026-10-08\"\n          - gridcell \"placed\"\n          - gridcell \"99999999999999.9999\"\n          - gridcell\n          - gridcell \"A\"\n          - gridcell \"1\"\n          - gridcell\n  - separator \"Records\"\n  - region \"Order k1:9007199254740993\":\n    - heading \"Order k1:9007199254740993\" [level=3]:\n      - text: Order\n      - code: k1:9007199254740993\n    - button \"Go to its row\"\n    - button \"Duplicate record\"\n    - status:\n      - text: Loaded record\n      - code: k1:9007199254740993\n      - text: into both forms.\n    - button \"For the demo\"\n    - region \"React\":\n      - heading \"React\" [level=4]\n      - form \"Order, React\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - paragraph: You have 14 characters remaining.\n          - status\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\"\n    - region \"Angular\":\n      - heading \"Angular\" [level=4]\n      - form \"Order, Angular\":\n        - group \"Order\":\n          - paragraph: Order\n          - text: Customer*\n          - combobox \"Customer*\" [disabled]: Muster AG\n          - status\n          - text: Order date*\n          - textbox \"Order date*\" [disabled]: 2026-10-08\n          - text: Status\n          - textbox \"Status\": placed\n          - paragraph: You have 14 characters remaining.\n          - status\n          - text: Amount*\n          - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n          - text: Notes\n          - textbox \"Notes\"\n          - text: Group\n          - textbox \"Group\": A\n          - paragraph: You have 49 characters remaining.\n          - status\n          - text: Created by\n          - spinbutton \"Created by\" [disabled]: \"1\"\n          - text: Approved by\n          - spinbutton \"Approved by\"\n        - group \"Record\":\n          - paragraph: Record\n          - text: Id\n          - textbox \"Id\" [disabled]: \"9007199254740993\"\n        - button \"Save\""
     }
   },
   "examples-order": {
@@ -512,7 +512,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "React": "- region \"React\":\n  - heading \"React\" [level=4]\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [expanded]: er\n      - listbox \"Customer suggestions\":\n        - option \"Muster AG\"\n      - status\n      - text: Order date*\n      - textbox \"Order date*\"\n      - text: Status\n      - textbox \"Status\"\n      - paragraph: You can enter up to 20 characters.\n      - status\n      - text: Amount*\n      - textbox \"Amount*\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - paragraph: You can enter up to 50 characters.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Save\"",
       "List": "- listbox \"Customer suggestions\":\n  - option \"Muster AG\""
@@ -532,8 +532,8 @@
       "width": 1165,
       "height": 1025
     },
-    "bytes": 109136,
-    "sha256": "bbaa581f77431d3364a9e121f102dd81c2707f3c1f55f4adc730f9d44962db5b",
+    "bytes": 108606,
+    "sha256": "12e862d56fc217b4a199983efe4e10feb8bd9dd3d54b1782f54d963a600f02c7",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -545,7 +545,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "React": "- region \"React\":\n  - heading \"React\" [level=4]\n  - status: Saved.\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [disabled]: Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\" [disabled]: 2026-10-08\n      - text: Status\n      - textbox \"Status\": shipped\n      - paragraph: You have 13 characters remaining.\n      - status: You have 13 characters remaining.\n      - text: Amount*\n      - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\": A\n      - paragraph: You have 49 characters remaining.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\" [disabled]: \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\"",
       "Angular": "- region \"Angular\":\n  - heading \"Angular\" [level=4]\n  - region \"Angular Not saved\":\n    - heading \"Not saved\" [level=5]\n    - paragraph: The record changed since it was read. Reload it, review the changes, and save again.\n    - paragraph: Your changes are still in the form.\n    - button \"Load the saved record\"\n  - form \"Order, Angular\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [disabled]: Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\" [disabled]: 2026-10-08\n      - text: Status\n      - textbox \"Status\": placed\n      - paragraph: You have 14 characters remaining.\n      - status\n      - text: Amount*\n      - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\": Deliver to the side door\n      - text: Group\n      - textbox \"Group\": A\n      - paragraph: You have 49 characters remaining.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\" [disabled]: \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
@@ -565,8 +565,8 @@
       "width": 561,
       "height": 1013
     },
-    "bytes": 59988,
-    "sha256": "2d264442b0b6f81f008f607697cf0f13e7f90c45d68667bd5b76a3ad3d2ea469",
+    "bytes": 59896,
+    "sha256": "2b79c433d5a2e6d2b44dd5ab615b4883615001fafe6c87187c5088c6de6038e1",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -578,7 +578,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "React": "- region \"React\":\n  - heading \"React\" [level=4]\n  - status: Not saved. A selection is not one of the options.\n  - form \"Order, React\":\n    - heading \"There is 1 problem to fix\" [level=2]\n    - list:\n      - listitem:\n        - 'link \"Customer: This is not one of the options this form offers.\"':\n          - /url: \"#f:pg-order-react:customer:control\"\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [invalid]: Brunner Logistik AG\n      - status\n      - paragraph: This is not one of the options this form offers.\n      - text: Order date*\n      - textbox \"Order date*\": 2026-10-01\n      - text: Status\n      - textbox \"Status\": placed\n      - paragraph: You have 14 characters remaining.\n      - status: You have 14 characters remaining.\n      - text: Amount*\n      - textbox \"Amount*\": \"5\"\n      - text: Notes\n      - textbox \"Notes\"\n      - text: Group\n      - textbox \"Group\"\n      - paragraph: You can enter up to 50 characters.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]\n    - button \"Save\""
     }
@@ -597,8 +597,8 @@
       "width": 561,
       "height": 1017
     },
-    "bytes": 62252,
-    "sha256": "f5cb035e9ded1c486cf248419244767e0b62af58b70584a6bf2c3fa4d13fbf57",
+    "bytes": 62264,
+    "sha256": "be739c75c3bdfa631defc3f2f7db7cdc9a6cd93052a77ccc50baff606d2b7e38",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -610,7 +610,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "React": "- region \"React\":\n  - heading \"React\" [level=4]\n  - region \"React It may have been saved\":\n    - heading \"It may have been saved\" [level=5]\n    - paragraph: The answer to this save was lost between this page and the data server. It may have been saved.\n    - status\n    - button \"Check whether it was saved\"\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [disabled]: Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\" [disabled]: 2026-10-08\n      - text: Status\n      - textbox \"Status\": shipped\n      - paragraph: You have 13 characters remaining.\n      - status\n      - text: Amount*\n      - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\": Deliver to the side door\n      - text: Group\n      - textbox \"Group\": A\n      - paragraph: You have 49 characters remaining.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\" [disabled]: \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
     }
@@ -642,7 +642,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "Notice": "- region \"Unsaved changes\":\n  - heading \"Unsaved changes\" [level=3]\n  - paragraph: \"Starting a new record closes these forms:\"\n  - list:\n    - listitem:\n      - text: Order\n      - code: k1:9007199254740993\n      - text: \", React: a save that may have been stored, not yet checked.\"\n  - button \"Keep editing\"\n  - button \"Discard and continue\""
     }
@@ -661,8 +661,8 @@
       "width": 1165,
       "height": 564
     },
-    "bytes": 81720,
-    "sha256": "b3b9c3e789499603a2876e2bf0df0b2dbd9e6c06b8bc6e9d213ef40d8f5a37f7",
+    "bytes": 81388,
+    "sha256": "c03971589ab43128ddf8410c58554bb94595ce623b3692bd3fd2a5f66c7ca14d",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -674,7 +674,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Columns\"\n  - text: Filter\n  - combobox \"Filter\"\n  - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n  - status \"Filter\"\n  - status: Rows 1–1.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - text: Space opens this record. Enter opens it and moves to it.\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by Delete\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n        - columnheader \"Delete\"\n      - row:\n        - gridcell:\n          - textbox \"Filter Id\"\n        - gridcell:\n          - combobox \"Filter Customer\"\n        - gridcell:\n          - textbox \"Filter Order date\"\n        - gridcell:\n          - textbox \"Filter Status\"\n        - gridcell:\n          - textbox \"Filter Amount\"\n        - gridcell:\n          - textbox \"Filter Notes\"\n        - gridcell:\n          - textbox \"Filter Group\"\n        - gridcell:\n          - textbox \"Filter Created by\"\n        - gridcell:\n          - textbox \"Filter Approved by\"\n        - gridcell\n      - row \"9007199254740993 Muster AG 2026-10-08 shipped 99999999999999.9999 Deliver to the side door A 1 Delete Order k1:9007199254740993\":\n        - gridcell \"9007199254740993\"\n        - gridcell \"Muster AG\"\n        - gridcell \"2026-10-08\"\n        - gridcell \"shipped\"\n        - gridcell \"99999999999999.9999\"\n        - gridcell \"Deliver to the side door\"\n        - gridcell \"A\"\n        - gridcell \"1\"\n        - gridcell\n        - gridcell \"Delete Order k1:9007199254740993\":\n          - button \"Delete Order k1:9007199254740993\": Delete\n  - region \"Delete Order k1:9007199254740993?\":\n    - heading \"Delete Order k1:9007199254740993?\" [level=4]:\n      - text: Delete Order\n      - code: k1:9007199254740993\n      - text: \"?\"\n    - paragraph: It is removed from the database for everyone who can see it. This page cannot bring it back.\n    - paragraph: Other records that refer to it are deleted with it.\n    - status\n    - button \"Keep it\"\n    - button \"Delete it\""
     }
@@ -693,8 +693,8 @@
       "width": 561,
       "height": 973
     },
-    "bytes": 62188,
-    "sha256": "e0ba2f19b681cf868d844c2aae59651966dc98d2b89527e26db7baaf5bc10fa6",
+    "bytes": 62202,
+    "sha256": "76948bf7d93755c735e3cb73dd437be527c236ccd4200fa2c79182c56f044a02",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -706,7 +706,7 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "React": "- region \"React\":\n  - heading \"React\" [level=4]\n  - region \"React Not saved\":\n    - heading \"Not saved\" [level=5]\n    - paragraph: The database changed since this form was published, in a way this form cannot save safely. Nothing was saved; an administrator must review the form.\n  - form \"Order, React\":\n    - group \"Order\":\n      - paragraph: Order\n      - text: Customer*\n      - combobox \"Customer*\" [disabled]: Muster AG\n      - status\n      - text: Order date*\n      - textbox \"Order date*\" [disabled]: 2026-10-08\n      - text: Status\n      - textbox \"Status\": shipped\n      - paragraph: You have 13 characters remaining.\n      - status\n      - text: Amount*\n      - textbox \"Amount*\" [disabled]: \"99999999999999.9999\"\n      - text: Notes\n      - textbox \"Notes\": Call before delivery\n      - text: Group\n      - textbox \"Group\": A\n      - paragraph: You have 49 characters remaining.\n      - status\n      - text: Created by\n      - spinbutton \"Created by\" [disabled]: \"1\"\n      - text: Approved by\n      - spinbutton \"Approved by\"\n    - group \"Record\":\n      - paragraph: Record\n      - text: Id\n      - textbox \"Id\" [disabled]: \"9007199254740993\"\n    - button \"Save\""
     }
@@ -723,10 +723,10 @@
     "timezone": "UTC",
     "css": {
       "width": 1165,
-      "height": 1055
+      "height": 1063
     },
-    "bytes": 89100,
-    "sha256": "e815e170339ede10b14b10520cb73d8c5d24a976eed703ff42cf13521bb8f9d2",
+    "bytes": 87410,
+    "sha256": "decfccbbf34f29a1917d50a1719064a45429a57f05dc24e0754fd69d80cd4934",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -738,10 +738,10 @@
       }
     },
     "database": "PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit, from postgres:17-alpine, as formancy_writer",
-    "stylesheet": "sha256 7618d4443a787b4cf2102e7aaf1aaf8158e0536d1e093699c6368fe57df62571 of src/host.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 801ff9b645fac19d791ef7f184ffc9a65196ebec41ec755a17860291791b3d21 of src/host.css with its imports, and @formancy/themes 0.13.0",
     "text": {
       "Records": "- region \"Records\":\n  - heading \"Records\" [level=3]\n  - button \"New record\"\n  - button \"Download CSV\"\n  - status \"Download CSV\"\n  - search \"Search records\":\n    - text: Search\n    - textbox \"Search\"\n    - button \"Search\"\n  - paragraph: Looks in Id, Status, Notes, Group, Created by and Approved by when you press Search.\n  - button \"Columns\"\n  - text: Filter\n  - combobox \"Filter\"\n  - paragraph: Conditions joined by and, applied with Enter. On a cell, = keeps the rows with its value.\n  - status \"Filter\"\n  - status: No records.\n  - paragraph: New record starts the first one.\n  - button \"Previous rows\" [disabled]\n  - button \"Next rows\" [disabled]\n  - grid \"Records\":\n    - rowgroup:\n      - row \"Id Customer Order date Status Amount Notes Group Created by Approved by\":\n        - columnheader \"Id\"\n        - columnheader \"Customer\"\n        - columnheader \"Order date\"\n        - columnheader \"Status\"\n        - columnheader \"Amount\"\n        - columnheader \"Notes\"\n        - columnheader \"Group\"\n        - columnheader \"Created by\"\n        - columnheader \"Approved by\"\n      - row:\n        - gridcell:\n          - textbox \"Filter Id\"\n        - gridcell:\n          - combobox \"Filter Customer\"\n        - gridcell:\n          - textbox \"Filter Order date\"\n        - gridcell:\n          - textbox \"Filter Status\"\n        - gridcell:\n          - textbox \"Filter Amount\"\n        - gridcell:\n          - textbox \"Filter Notes\"\n        - gridcell:\n          - textbox \"Filter Group\"\n        - gridcell:\n          - textbox \"Filter Created by\"\n        - gridcell:\n          - textbox \"Filter Approved by\"",
-      "Record": "- region \"No record open\":\n  - heading \"No record open\" [level=3]\n  - status\n  - paragraph: Choose a row under Records, or press New record.\n  - paragraph: Space opens a row. Enter opens it and moves here.\n  - group \"Renderer\":\n    - text: Renderer\n    - radio \"React\"\n    - text: React\n    - radio \"Angular\"\n    - text: Angular\n    - radio \"Both\" [checked]\n    - text: Both\n  - button \"Open by record token\" [expanded]\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - alert: No such record."
+      "Record": "- region \"No record open\":\n  - heading \"No record open\" [level=3]\n  - status\n  - paragraph: Choose a row under Records, or press New record.\n  - paragraph: Space opens a row. Enter opens it and moves here.\n  - button \"For the demo\" [expanded]\n  - group \"Renderer\":\n    - text: Renderer\n    - radio \"React\"\n    - text: React\n    - radio \"Angular\"\n    - text: Angular\n    - radio \"Both\" [checked]\n    - text: Both\n  - text: Record token\n  - textbox \"Record token\": k1:9007199254740993\n  - button \"Load\"\n  - alert: No such record."
     }
   }
 }

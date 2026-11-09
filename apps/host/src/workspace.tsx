@@ -15,20 +15,8 @@ import { browserStorage, readLayout, readRenderer, readShare, writeLayout, write
 import type { Axis, RendererChoice, Shares } from './prefs.js'
 import type { SignedIn } from './sign-in.js'
 import { UnsavedNotice } from './unsaved-notice.js'
+import { useMedia } from './use-media.js'
 import { OwnViewsScope } from './use-own-views.js'
-
-/** Whether the window matches `query`, as it changes; false where there is no `matchMedia` (jsdom). */
-function useMedia(query: string): boolean {
-  const list = useMemo(() => (typeof window.matchMedia === 'function' ? window.matchMedia(query) : null), [query])
-  const [matches, setMatches] = useState(list?.matches ?? false)
-  useEffect(() => {
-    if (list === null) return undefined
-    const changed = (): void => setMatches(list.matches)
-    list.addEventListener('change', changed)
-    return () => list.removeEventListener('change', changed)
-  }, [list])
-  return matches
-}
 
 /** The form open in main: asked for, refused, or open with its children. */
 type Opened =

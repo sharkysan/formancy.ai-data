@@ -3,11 +3,12 @@ import type { ReactElement } from 'react'
 import { exportFileName } from '@formancy/data-client'
 import type { DataClient, RecordExportQuery } from '@formancy/data-client'
 import { SaveContext } from './save-file.js'
+import { ServerDid } from './server-did.js'
 
-/** Where a file is: not asked for, being made, made and handed to the browser, or refused in the server's words. */
-type FileState = { kind: 'idle' } | { kind: 'making' } | { kind: 'made' } | { kind: 'refused'; message: string }
+/** Where a file is: not asked for, being made, made -- the how-manyth -- and handed to the browser, or refused in the server's words. */
+type FileState = { kind: 'idle' } | { kind: 'making' } | { kind: 'made'; n: number } | { kind: 'refused'; message: string }
 
-/** The line's colour for each state, as a grid's line has it: muted while asking, the server's teal for an answer, `--warn` for a refusal. */
+/** The line's colour for each state, as a grid's line has it: muted while asking and for an answer, which says it in the server's teal for a moment (0146), `--warn` for a refusal. */
 const KIND = { idle: 'answer', making: 'loading', made: 'answer', refused: 'refused' } as const
 
 /**
@@ -48,6 +49,7 @@ export function DownloadCsv({
   const save = useContext(SaveContext)
   const [state, setState] = useState<FileState>({ kind: 'idle' })
   const running = useRef<AbortController | null>(null)
+  const made = useRef(0)
   useEffect(() => () => running.current?.abort(), [])
   const name = exportFileName(formId)
 
@@ -65,7 +67,8 @@ export function DownloadCsv({
           return
         }
         save(answer.value.file, answer.value.name)
-        setState({ kind: 'made' })
+        made.current += 1
+        setState({ kind: 'made', n: made.current })
       },
       // Only the abort above rejects: the section has left the page.
       () => undefined,
@@ -87,7 +90,7 @@ export function DownloadCsv({
         Download CSV
       </button>
       <p role="status" id={`${idBase}-line`} className="status export-line" data-kind={KIND[state.kind]} aria-labelledby={`${idBase}-button`}>
-        {said}
+        {state.kind === 'made' ? <ServerDid said={state.n}>{said}</ServerDid> : said}
       </p>
     </>
   )

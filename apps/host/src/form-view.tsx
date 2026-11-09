@@ -6,6 +6,7 @@ import type { ChildForm } from './children.js'
 import { crumbOf, recordName } from './crumbs.js'
 import type { Crumb } from './crumbs.js'
 import { DeleteRegion } from './delete-confirm.js'
+import { useDemo } from './demo-tools.js'
 import { useDeleteFlow } from './delete-flow.js'
 import { detailTarget, gone, rowTarget, SAVE_OUT } from './deletion.js'
 import type { DeleteTarget } from './deletion.js'
@@ -126,7 +127,7 @@ export function FormView({
   openRef.current = open
   const [line, setLine] = useState<{ said: Said; kind: 'answer' | 'refused' }>({ said: [], kind: 'answer' })
   const [search, setSearch] = useState('')
-  const [tokenOpen, setTokenOpen] = useState(false)
+  const demo = useDemo()
   const [loadRefusal, setLoadRefusal] = useState<string | null>(null)
   /** What the record's crumb calls it, from what is stored (crumbs.ts). */
   const [masterName, setMasterName] = useState<string | null>(null)
@@ -335,7 +336,7 @@ export function FormView({
             opened(now.token, [...(now.discarded ? DISCARDED : []), 'Loaded record ', { code: token }, both ? ' into both forms.' : ' into the form.']),
           refused: (message) => {
             setLoadRefusal(message)
-            setTokenOpen(true)
+            demo.reveal()
           },
           back: toLoad,
         }),
@@ -525,8 +526,7 @@ export function FormView({
           onBack={back}
           renderer={renderer}
           onRenderer={chooseRenderer}
-          tokenOpen={tokenOpen}
-          onTokenToggle={setTokenOpen}
+          demo={demo}
           loadRefusal={loadRefusal}
           loadRef={loadRef}
           onLoad={load}

@@ -13,8 +13,9 @@ import {
   RowSelectionModule,
   ScrollApiModule,
 } from 'ag-grid-community'
-import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, Module, RowClickedEvent } from 'ag-grid-community'
+import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, IRowNode, Module, RowClickedEvent } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
+import type { ListSortTerm } from '@formancy/data-client'
 import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
@@ -24,7 +25,9 @@ import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 /*
  * How the page configures AG Grid Community for a record grid (0047): the
  * modules, the columns and the options, decided once here and read by
- * record-grid.tsx, which holds the grid's state.
+ * record-grid.tsx, which holds the grid's state -- and the two things the
+ * page reads of the grid and sets on it, the open row's selection and the
+ * sort the headers show.
  *
  * - **The page decides which row is open, not AG Grid.** Click selection is
  *   off and Space and Enter are held from AG Grid on every cell, so its own
@@ -112,6 +115,29 @@ function OpenCell(params: ICellRendererParams<GridRow>): ReactElement {
       {String(params.value ?? '')}
     </>
   )
+}
+
+/** Every row of the page selected exactly when it is the open record's; the rows whose selection changed. */
+export function select(grid: GridApi<GridRow>, open: string | null): IRowNode<GridRow>[] {
+  const changed: IRowNode<GridRow>[] = []
+  grid.forEachNode((node) => {
+    if (node.data === undefined) return
+    const want = node.data.record !== null && node.data.record === open
+    if (node.isSelected() !== want) {
+      node.setSelected(want)
+      changed.push(node)
+    }
+  })
+  return changed
+}
+
+/** The sort the grid's headers show, in its order: what a header press leaves, or what was applied to them. */
+export function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
+  return grid
+    .getColumnState()
+    .filter((column) => column.sort === 'asc' || column.sort === 'desc')
+    .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0))
+    .map((column) => ({ field: column.colId, direction: column.sort as ListSortTerm['direction'] }))
 }
 
 /** The column of a row's Delete: `~` is in no field key (session.ts), so it never names a field's column. */

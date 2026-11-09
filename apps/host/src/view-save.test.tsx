@@ -146,6 +146,34 @@ describe('a person’s own views in the View picker (0126)', () => {
     expect(screen.getByRole('status', { name: 'Your views' }).dataset['kind']).toBe('refused')
   })
 
+  // What the server kept, and what it took off again, is said in the room's
+  // teal for a moment (0146): the line's words in an element of their own,
+  // drawn anew for each answer; a refusal is the line's warm colour and no
+  // more. A DOM read: the teal's element has no role or name of its own
+  // (server-did.test.tsx). Watched failing with the answer said as before:
+  // no element held the words.
+  test('says what the server kept and removed in its teal, and a refusal not', async () => {
+    asked = []
+    const user = userEvent.setup()
+    let refusal: string | null = null
+    render(<Section answer={() => Promise.resolve(refusal)} />)
+    const teal = (): Element | null => screen.getByRole('status', { name: 'Your views' }).querySelector('.server-did')
+    await user.type(screen.getByRole('textbox', { name: 'Name of your view' }), 'Mine')
+    await user.click(screen.getByRole('button', { name: 'Save your view' }))
+    await waitFor(() => expect(line()).toBe('Saved your view “Mine”.'))
+    const saved = teal()
+    expect(saved?.textContent).toBe('Saved your view “Mine”.')
+    await user.click(screen.getByRole('button', { name: 'Remove your view' }))
+    await waitFor(() => expect(line()).toBe('Removed your view “Mine”.'))
+    expect(teal()?.textContent).toBe('Removed your view “Mine”.')
+    expect(teal()).not.toBe(saved)
+    refusal = 'The configuration store cannot be reached.'
+    await user.type(screen.getByRole('textbox', { name: 'Name of your view' }), 'Again')
+    await user.click(screen.getByRole('button', { name: 'Save your view' }))
+    await waitFor(() => expect(line()).toBe('The configuration store cannot be reached.'))
+    expect(teal()).toBeNull()
+  })
+
   // While a save is on its way a second press sends nothing, and says it
   // is busy; the answer is heard once it comes. Watched failing with no
   // guard: two saves were sent.
