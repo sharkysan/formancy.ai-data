@@ -1,11 +1,12 @@
 /* ------------------------------------------------------------- browse
  *
  * A connection's rows (0099): a page of a table or view in a grid of its
- * own, its filter above it (0104), and a row's related rows below it
- * (0103). Classes only, as review's panes are. The grid scrolls sideways
- * inside its own region, which takes the keyboard's focus to scroll, so a
- * wide table never scrolls the page; the filter and the related rows are
- * outside it, and wrap.
+ * own, its filter above it (0104) -- the line and the chips (0147) -- and a
+ * row's related rows below it (0103). Classes only, as review's panes are.
+ * The grid scrolls sideways inside its own region, which takes the
+ * keyboard's focus to scroll, so a wide table never scrolls the page; the
+ * header's filter boxes are in it and scroll with their columns; the line,
+ * the chips and the related rows are outside it, and wrap.
  */
 
 .browsed {
@@ -163,12 +164,114 @@
   color: var(--muted);
 }
 
-/* A page's filter (0104): the conditions it holds, each a chip with a
-   Remove of its own, and the form that adds one, a panel of its own
-   between the hints and the grid. A condition names a person's values,
-   which can be long, so a chip wraps rather than pushing past the edge. */
+/* A page's filter (0104, 0147): the line, the conditions it holds under
+   it, each a chip with a Remove of its own, then Clear the filter and
+   Undo, between the hints and the grid. A condition names a person's
+   values, which can be long, so a chip wraps rather than pushing past the
+   edge. */
 .browse-filter {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
   margin: 0.75rem 0;
+}
+
+/* The line: its label above it, the box as wide as the page, and what may
+   come next under the box, over the grid. */
+.filter-line {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.filter-line-box {
+  position: relative;
+  min-width: 0;
+}
+
+.filter-line input {
+  font-family: var(--mono);
+}
+
+.filter-line .hint,
+.filter-problem {
+  margin: 0;
+}
+
+.filter-options {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 0.25rem);
+  z-index: 5;
+  max-height: 16rem;
+  margin: 0;
+  padding: 0.25rem;
+  overflow-y: auto;
+  border: 1px solid var(--edge-strong);
+  border-radius: 10px;
+  background: var(--ground);
+  list-style: none;
+}
+
+.filter-options[hidden] {
+  display: none;
+}
+
+.filter-options li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  min-height: 2rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.filter-options li[aria-selected='true'] {
+  outline: 2px solid var(--client);
+  outline-offset: -2px;
+}
+
+.filter-option-label {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.filter-option-hint {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+/* Why a line cannot be read: there before it speaks, so it is announced,
+   and out of the flow while it says nothing. */
+.filter-problem {
+  color: var(--invalid);
+  font-size: 0.875rem;
+}
+
+.filter-problem:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The line again under a refusal, what it is about marked: the eye's copy
+   of where the caret was left. */
+.filter-marked {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.filter-marked mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--client) 35%, transparent);
+  color: inherit;
 }
 
 .filter-conditions {
@@ -176,7 +279,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  min-width: 0;
 }
 
 .filter-conditions > p {
@@ -236,20 +339,33 @@
   outline: 2px solid var(--client);
 }
 
-/* Open, the button says so as a row's open related rows do. */
-.filter-toggle[aria-expanded='true'] {
-  border-color: var(--client);
-  color: var(--client);
+/* Undo says a condition in full, which may be long: it wraps inside the
+   row rather than widening it. */
+.filter-undo {
+  min-width: 0;
+  max-width: 100%;
+  padding-block: 0.25rem;
+  overflow-wrap: anywhere;
+  text-align: start;
 }
 
-.filter-add {
-  margin-top: 0.5rem;
-  padding: 0.25rem 1rem 0.75rem;
-  border: 1px solid var(--edge);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 2%);
+/* The header's boxes (0147): a row of their own under the headers that
+   sort, each as wide as its column and never narrower than a short
+   condition, so a narrow column scrolls the grid rather than the box. Led
+   by the grid's class, to outweigh the rule every input of the studio's
+   is drawn by (controls.css). */
+.rows .boxes td {
+  padding-block: 0 0.375rem;
+  border-top: 0;
 }
 
-.filter-add .hint {
-  max-width: 72ch;
+.rows .header-box {
+  min-width: 7rem;
+  min-height: 2.25rem;
+  padding-block: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.rows input.header-box {
+  font-family: var(--mono);
 }

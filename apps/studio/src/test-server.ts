@@ -260,7 +260,8 @@ function rangeOrder(type: Extract<RecordFilter, { op: 'range' }>['type'], value:
  * Whether a row a test put in holds one condition of the person's filter
  * (0104), as `RecordFilter` says: `equals` the canonical value exactly, unit
  * for unit, or the boolean spelled `true` or `false`; `range` at least
- * `from`, at most `to`, below `before`; `contains` the text anywhere, case
+ * `from`, above `above`, at most `to`, below `before` -- the line's `>` and
+ * `<` (0130, 0147); `contains` the text anywhere, case
  * folded; `null` and `not-null` NULL or not, where text of no characters is
  * a value. A column a row leaves out is NULL, as the page shows it.
  */
@@ -283,6 +284,7 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
       const order = (bound: string) => rangeOrder(condition.type, String(value), bound)
       return (
         (condition.from === null || order(condition.from) >= 0) &&
+        (condition.above === null || order(condition.above) > 0) &&
         (condition.to === null || order(condition.to) <= 0) &&
         (condition.before === null || order(condition.before) < 0)
       )

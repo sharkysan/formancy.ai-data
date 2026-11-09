@@ -413,6 +413,23 @@ discovery holds, which the server plans again and may refuse; the trail is
 lost on a reload; and the audit names the object followed to, never the
 values
 ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
+A browsed column is named in the filter line by its name lower-cased,
+every run of anything not a letter or a digit one `_`; where two names
+give one, each is named by its own name instead, and one whose own name is
+not one word -- `Order Date` beside `order_date` -- has no name and no box,
+nor have two names that differ only in case, so such a column is browsed
+and sorted but not filtered; a press while a page is on its way is sent
+after it, and one made on a page a move is leaving is dropped; a box's
+refusal is said in the step's alert in the line's or the server's words,
+which do not always name its column; a header box applies what was
+typed when it is left; a boolean's box says true and false where the line
+says yes and no; and a browse is filtered by the columns it shows alone,
+with no condition through a foreign key, no saved view and none taken from
+a cell
+([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
+That the studio's line keeps the host's keys is held by its suite asserting
+the host's cases one for one; a key the host's line gains and the studio's
+lacks fails nothing, and review holds it.
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached

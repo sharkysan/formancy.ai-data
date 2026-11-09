@@ -223,7 +223,7 @@ export type {
   PlannedBrowse,
 } from './records/browse.js'
 export { columnFilter, dayAfter, filterOffer, readFilter } from './records/filter.js'
-export { lineNames, parseFilterLine, printFilterLine } from './records/filter-line.js'
+export { lineNames, nameableFields, parseFilterLine, printFilterLine } from './records/filter-line.js'
 export type { FilterLineRead, LineField, LineRefusal } from './records/filter-line.js'
 export { completeFilterLine } from './records/filter-complete.js'
 export { headerCondition, headerText } from './records/filter-header.js'

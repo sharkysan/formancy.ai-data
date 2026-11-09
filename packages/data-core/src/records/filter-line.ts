@@ -133,6 +133,28 @@ export function lineNames(fields: readonly LineField[]): Map<string, string> {
   )
 }
 
+/**
+ * The fields the line can name, each by one word that reads as it alone:
+ * a field's key may be the database's name for a column (0147), two words,
+ * or one another's differs from only in case. A field whose name is not one
+ * word -- a key of two, where two labels give one name -- or reads as
+ * another field, or sounds as another's name does in the line's case, is
+ * left out, and the rest are named again over themselves until every one
+ * left says its field: completion then offers no name the line refuses.
+ */
+export function nameableFields(fields: readonly LineField[]): LineField[] {
+  const names = lineNames(fields)
+  const context: Context = { fields, names, entries: [] }
+  const said = (field: LineField): string => (names.get(field.field) ?? field.field).normalize('NFC').toLowerCase()
+  const kept = fields.filter((field) => {
+    const name = names.get(field.field) ?? field.field
+    const [token, ...more] = lineTokens(name)
+    const word = token?.kind === 'word' && more.length === 0 && token.value === name
+    return word && fieldNamed(name, context) === field && fields.every((other) => other === field || said(other) !== said(field))
+  })
+  return kept.length === fields.length ? kept : nameableFields(kept)
+}
+
 /** The line in tokens: spaces separate them, and an operator or a quote ends a word. */
 export function lineTokens(text: string): LineToken[] {
   const found: LineToken[] = []
