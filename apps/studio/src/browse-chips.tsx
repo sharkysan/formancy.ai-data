@@ -33,8 +33,8 @@ interface Undoing {
 /** A page's Undo, which the chips and the line share: what it puts back, a removal that offers it, and putting back. */
 export interface UndoState {
   undo: Undoing | null
-  /** `next` asked for in place of the filter, Undo offered for it in `words` once the page has arrived; `arrived` runs then too. */
-  removing: (next: BrowseFilterTerm[], words: string, focus: string | null, arrived?: () => void) => void
+  /** What `change` makes of the filter as it will stand asked for, Undo offered for it in `words` once the page has arrived; `arrived` runs then too. */
+  removing: (change: (filter: BrowseFilterTerm[]) => BrowseFilterTerm[], words: string, focus: string | null, arrived?: () => void) => void
   /** The filter before the removal asked for again, the keyboard on the Remove of the condition it puts back first. */
   putBack: () => void
 }
@@ -58,17 +58,28 @@ export function useUndo(filter: readonly BrowseFilterTerm[], onFilter: FilterCha
   const undo = undoing !== null && undoing.left === now ? undoing : null
   return {
     undo,
-    removing: (next, words, focus, arrived) => {
-      const before = [...filter]
-      void onFilter(next, focus, () => {
-        setUndoing({ before, left: JSON.stringify(next), words })
-        arrived?.()
+    removing: (change, words, focus, arrived) => {
+      // What the removal was built on and left, as it was sent: the last base the change was given.
+      let before: BrowseFilterTerm[] = [...filter]
+      let left: BrowseFilterTerm[] = []
+      const removal = (base: BrowseFilterTerm[]): BrowseFilterTerm[] => {
+        before = [...base]
+        left = change(base)
+        return left
+      }
+      void onFilter(removal, {
+        focus,
+        arrived: () => {
+          setUndoing({ before, left: JSON.stringify(left), words })
+          arrived?.()
+        },
       })
     },
     putBack: () => {
       if (undo === null) return
-      const back = undo.before.findIndex((term) => !filter.some((given) => sameFilter([given], [term])))
-      void onFilter(undo.before, removeId(Math.max(0, back)))
+      const before = undo.before
+      const back = before.findIndex((term) => !filter.some((given) => sameFilter([given], [term])))
+      void onFilter(() => before, { focus: removeId(Math.max(0, back)) })
     },
   }
 }
@@ -90,7 +101,9 @@ export function FilterChips({
     const term = filter[index]
     if (term === undefined) return
     const next = filter.filter((_, at) => at !== index)
-    removing(next, `removing ${sayFiltered(term, columns)}`, next.length === 0 ? UNDO : removeId(Math.min(index, next.length - 1)))
+    // Removed by its column, from the filter as it will stand; the keyboard to the Remove that takes its place on screen.
+    const change = (base: BrowseFilterTerm[]) => base.filter((given) => given.column !== term.column)
+    removing(change, `removing ${sayFiltered(term, columns)}`, next.length === 0 ? UNDO : removeId(Math.min(index, next.length - 1)))
   }
 
   if (filter.length === 0 && undo === null) return null
@@ -112,7 +125,7 @@ export function FilterChips({
               )
             })}
           </ul>
-          <button type="button" className="button" onClick={() => removing([], 'clearing the filter', UNDO)}>
+          <button type="button" className="button" onClick={() => removing(() => [], 'clearing the filter', UNDO)}>
             Clear the filter
           </button>
         </>

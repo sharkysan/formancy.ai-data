@@ -33,8 +33,11 @@ export function BrowseFilter({
         <FilterLine
           fields={fields}
           filter={asLine(filter)}
-          onFilter={(next, arrived) => void onFilter(asBrowse(next), null, arrived)}
-          onClear={(arrived) => undoing.removing([], 'clearing the filter', null, arrived)}
+          // What the line reads in place of every condition on a column it names, on the filter as it will stand.
+          onFilter={(read, arrived) =>
+            void onFilter((base) => [...base.filter((term) => !fields.some((field) => field.field === term.column)), ...asBrowse(read)], { arrived })
+          }
+          onClear={(arrived) => undoing.removing(() => [], 'clearing the filter', null, arrived)}
           onLeave={onLeave}
         />
       )}

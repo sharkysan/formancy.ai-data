@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { Dispatch, KeyboardEvent, ReactElement, SetStateAction } from 'react'
 import { headerCondition, headerText } from '@formancy/data-core'
 import type { BrowseFilterTerm, LineField, RecordColumn } from '@formancy/data-core'
@@ -13,19 +13,31 @@ import type { FilterChange } from './browse-terms.js'
  * `headerCondition`), so a box is the line's condition on one column and
  * nothing the line could not say: Enter, or leaving the box, applies it,
  * and Esc gives an edit up. A refusal, the line's or the server's, is said
- * where the step speaks, in its alert, and what was typed is kept until a
- * page under it has arrived. A boolean offers its two values in a select.
- * A column the line cannot name has no box.
+ * where the step speaks, in its alert, which the box owns -- kept through
+ * other pages, the box described by it and marked invalid -- until the box
+ * changes, is given up or applies; what was typed is kept until a page
+ * under it has arrived, and leaving the box again sends what was refused
+ * no more. A boolean offers its two values in a select. A column the line
+ * cannot name has no box.
  */
 
 /** Whether an input method is composing a word, whose Enter and Esc are its own; 229 is what Safari reports for the last key of one. */
 const composing = (event: KeyboardEvent): boolean => event.nativeEvent.isComposing || event.keyCode === 229
 
+/** The step's alert, which a box it owns is described by. */
+const ALERT = 'browse-refusal'
+
 interface BoxProps {
   field: LineField
+  /** The filter of the page on screen, which a text box shows. */
   filter: readonly BrowseFilterTerm[]
+  /** The filter as it will stand once what is on its way has arrived, which a select shows. */
+  ahead: readonly BrowseFilterTerm[]
   onFilter: FilterChange
-  onRefused: (message: string) => void
+  /** The box whose refusal the step's alert says, if one's. */
+  refusedBy: string | null
+  onRefused: (message: string, owner: string) => void
+  onUnsaid: (owner: string) => void
 }
 
 /** The row of boxes, one cell under each header: empty under Related, and under a column the line cannot name. */
@@ -57,43 +69,58 @@ const conditionOn = (filter: readonly BrowseFilterTerm[], field: LineField) => a
  * What the person typed since the box last showed its column's condition,
  * null while it shows it; dropped when the filter changes while the person
  * is elsewhere -- Clear the filter, a chip, the line -- as the line's edit
- * is. Followed while rendering.
+ * is, unless it is `sent`, on its way. Followed while rendering.
  */
-function useDraft<T>(filter: readonly BrowseFilterTerm[], focused: boolean): [T | null, Dispatch<SetStateAction<T | null>>] {
-  const [draft, setDraft] = useState<T | null>(null)
+function useDraft(filter: readonly BrowseFilterTerm[], focused: boolean, sent: string | null): [string | null, Dispatch<SetStateAction<string | null>>] {
+  const [draft, setDraft] = useState<string | null>(null)
   const now = JSON.stringify(filter)
   const [followed, setFollowed] = useState(now)
   if (followed !== now) {
     setFollowed(now)
-    if (!focused) setDraft(null)
+    if (!focused && (draft === null || draft !== sent)) setDraft(null)
   }
   return [draft, setDraft]
 }
 
-function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement {
+function TextBox({ field, filter, onFilter, refusedBy, onRefused, onUnsaid }: BoxProps): ReactElement {
+  const owner = field.field
   const [focused, setFocused] = useState(false)
-  const [draft, setDraft] = useDraft<string>(filter, focused)
-  /** The text last refused, the line's way or the server's, so leaving the box does not say it again. */
-  const refused = useRef<string | null>(null)
+  /** What the box applied and whose page has not arrived yet. */
+  const [sent, setSent] = useState<string | null>(null)
+  const [draft, setDraft] = useDraft(filter, focused, sent)
+  /** The text last refused, the line's way or the server's, so leaving the box does not send or say it again. */
+  const [refused, setRefused] = useState<string | null>(null)
+  const invalid = draft !== null && draft === refused
+
+  /** Says no longer what this box had refused. */
+  function unsay(): void {
+    setRefused(null)
+    onUnsaid(owner)
+  }
 
   function apply(leaving: boolean): void {
-    if (draft === null || (leaving && refused.current === draft)) return
+    if (draft === null || (leaving && refused === draft)) return
     const read = headerCondition(draft, field)
     if (!read.ok) {
-      if (refused.current !== draft) onRefused(read.message)
-      refused.current = draft
+      if (refused !== draft) onRefused(read.message, owner)
+      setRefused(draft)
       return
     }
-    refused.current = null
-    const next = withCondition(filter, field.field, read.term)
-    if (sameFilter(next, filter)) {
+    if (sameFilter(withCondition(filter, owner, read.term), filter)) {
       setDraft(null)
+      unsay()
       return
     }
     // Once the page has arrived the box shows its column's condition, unless the person typed on while it was on its way.
-    const sent = draft
-    void onFilter(next, null, () => setDraft((now) => (now === sent ? null : now))).then((arrived) => {
-      if (!arrived) refused.current = sent
+    const applying = draft
+    setSent(applying)
+    const arrived = (): void => {
+      setDraft((now) => (now === applying ? null : now))
+      unsay()
+    }
+    void onFilter((base) => withCondition(base, owner, read.term), { arrived, owner }).then((done) => {
+      setSent(null)
+      if (!done) setRefused(applying)
     })
   }
 
@@ -102,10 +129,15 @@ function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement
       type="text"
       className="header-box"
       aria-label={`Filter ${field.label}`}
+      aria-invalid={invalid ? true : undefined}
+      aria-describedby={invalid && refusedBy === owner ? ALERT : undefined}
       autoComplete="off"
       spellCheck={false}
       value={draft ?? headerText(conditionOn(filter, field), field)}
-      onChange={(event) => setDraft(event.target.value)}
+      onChange={(event) => {
+        setDraft(event.target.value)
+        if (refused !== null) unsay()
+      }}
       onFocus={() => setFocused(true)}
       onBlur={() => {
         setFocused(false)
@@ -118,8 +150,8 @@ function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement
           apply(false)
         } else if (event.key === 'Escape') {
           event.preventDefault()
-          refused.current = null
           setDraft(null)
+          if (refused !== null) unsay()
         }
       }}
     />
@@ -130,25 +162,24 @@ function TextBox({ field, filter, onFilter, onRefused }: BoxProps): ReactElement
 const OTHER = '\u0000other'
 const VALUES = ['true', 'false'] as const
 
-/** A boolean's box: Any, then each value; a condition no value says is shown as itself. */
-function ChoiceBox({ field, filter, onFilter }: BoxProps): ReactElement {
-  const term = conditionOn(filter, field)
+/**
+ * A boolean's box: Any, then each value; a condition no value says is
+ * shown as itself. Controlled by the filter alone, as it will stand, so a
+ * value chosen while a page is on its way is the one it shows, and the next
+ * step of its arrow keys goes on from it.
+ */
+function ChoiceBox({ field, ahead, onFilter }: BoxProps): ReactElement {
+  const term = conditionOn(ahead, field)
   const chosen = term === undefined ? '' : term.op === 'equals' && (VALUES as readonly string[]).includes(term.value) ? term.value : OTHER
-  const [focused, setFocused] = useState(false)
-  const [picked, setPicked] = useDraft<string>(filter, focused)
   return (
     <select
       className="header-box"
       aria-label={`Filter ${field.label}`}
-      value={picked ?? chosen}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      value={chosen}
       onChange={(event) => {
         const value = event.target.value
         if (value === OTHER) return
-        setPicked(value)
-        const arrived = () => setPicked((now) => (now === value ? null : now))
-        void onFilter(withCondition(filter, field.field, value === '' ? null : { field: field.field, op: 'equals', value }), null, arrived)
+        void onFilter((base) => withCondition(base, field.field, value === '' ? null : { field: field.field, op: 'equals', value }))
       }}
     >
       <option value="">Any</option>

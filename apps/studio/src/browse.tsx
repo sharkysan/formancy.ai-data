@@ -1,47 +1,25 @@
 import { useRef, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { browseRelations, findObject, LIST_PAGE_SIZE } from '@formancy/data-core'
-import type {
-  ApiValue,
-  BrowseEqualTerm,
-  BrowseFilterTerm,
-  BrowseRelations,
-  BrowseSortTerm,
-  MetadataSnapshot,
-  ObjectRef,
-  OmittedColumn,
-} from '@formancy/data-core'
+import type { ApiValue, BrowseEqualTerm, BrowseRelations, BrowseSortTerm, MetadataSnapshot, ObjectRef, OmittedColumn } from '@formancy/data-core'
 import type { BrowseAnswer } from '@formancy/data-server'
 import type { AdminClient } from './api.js'
 import { HeaderBoxes } from './browse-boxes.js'
 import { BrowseFilter } from './browse-filter.js'
+import { samePage, usePages } from './browse-pages.js'
+import type { Asked, Build, Pages, Place } from './browse-pages.js'
 import { filterables, lineFields } from './browse-terms.js'
-import type { Filterable } from './browse-terms.js'
+import type { FilterChange, Filterable } from './browse-terms.js'
 import { describeRef } from './choice.js'
 import { sayCondition } from './condition-draft.js'
 import { useFocusAfterRender } from './focus.js'
 import { KeyHints, Related, sayTerms } from './related.js'
 
-/** What the page on screen was asked for, so the next and previous pages, a sort and a Back ask for the same object, values, filter and search. */
-interface Asked {
-  object: ObjectRef
-  /** The columns and values the page is narrowed to: a follow's (0103), and `[]` for a page Show rows asked for. */
-  equal: BrowseEqualTerm[]
-  /** The person's own conditions on the page's columns (0104): `[]` for a page Show rows or a follow asked for. */
-  filter: BrowseFilterTerm[]
-  search: string
-  sort: BrowseSortTerm | null
-  offset: number
+/** What the step's alert says: the server's refusal, or a header box's, and the box that owns it until it changes (0147). */
+interface Refusal {
+  message: string
+  owner: string | null
 }
-
-/**
- * What a page that arrives does to the way back: Show rows starts a new
- * trail; a follow adds the page it left, and Back takes off the page it
- * returns to, each of them `moved`, which puts the selector, the search
- * box and the keyboard on the page reached. A page, a sort or a filter is
- * `null`, and keeps the trail as it is.
- */
-type Move = { trail: Asked[]; moved: boolean } | null
 
 const REASONS: Readonly<Record<OmittedColumn['reason'], string>> = {
   'not-readable': 'this connection may not read it',
@@ -91,9 +69,12 @@ function narrowedBy(asked: Asked): string {
  * and so are the keys a row offers; the server discovers again for every
  * page, so a name the catalog no longer has is refused rather than read.
  *
- * A press while a page is on its way does nothing, and a button with
- * nothing to do says so through `aria-disabled` rather than `disabled`,
- * which would drop the keyboard's focus at the last page.
+ * A press while a page is on its way is sent once that page has settled,
+ * on the page as it then stands (`browse-pages.ts`), and one that no
+ * longer applies there -- a second press of a follow, a box of the page a
+ * move is leaving -- is dropped. A button with nothing to do says so
+ * through `aria-disabled` rather than `disabled`, which would drop the
+ * keyboard's focus at the last page.
  */
 export function BrowseStep({ client, connection, snapshot }: { client: AdminClient; connection: string; snapshot: MetadataSnapshot }): ReactElement {
   const tables = snapshot.objects.filter((object) => object.kind === 'table')
@@ -105,65 +86,72 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
   const [trail, setTrail] = useState<Asked[]>([])
   // The row on the page whose related rows are open, by its place on the page.
   const [related, setRelated] = useState<number | null>(null)
-  const [refusal, setRefusal] = useState<string | null>(null)
+  const [refusal, setRefusal] = useState<Refusal | null>(null)
   // How many pages a move has reached: the filter's line, chips and boxes are mounted afresh for each.
   const [visit, setVisit] = useState(0)
-  const busy = useRef(false)
   const focusAfterRender = useFocusAfterRender()
 
-  /**
-   * Asks for a page, and answers whether it arrived; `focus` names what
-   * takes the keyboard once it has, when the move does not, and `arrived`
-   * runs in the render that shows it.
-   */
-  async function load(asked: Asked, move: Move = null, focus: string | null = null, arrived?: () => void): Promise<boolean> {
-    if (busy.current) return false
-    busy.current = true
-    setRefusal(null)
-    const outcome = await client.browse(connection, {
-      object: asked.object,
-      equal: asked.equal,
-      filter: asked.filter,
-      search: asked.search,
-      sort: asked.sort === null ? [] : [asked.sort],
-      offset: asked.offset,
-      limit: LIST_PAGE_SIZE,
-    })
-    busy.current = false
-    if (!outcome.ok) {
-      setRefusal(outcome.message)
-      return false
-    }
-    setShown({ asked, page: outcome.value })
-    setRelated(null)
-    arrived?.()
-    if (focus !== null) focusAfterRender(focus)
-    if (move === null) return true
-    setTrail(move.trail)
-    setVisit((count) => count + 1)
-    if (!move.moved) return true
-    setChosen(describeRef(asked.object))
-    setSearch(asked.search)
-    focusAfterRender('browsed-heading')
-    return true
-  }
+  const pages = usePages(
+    (asked) =>
+      client.browse(connection, {
+        object: asked.object,
+        equal: asked.equal,
+        filter: asked.filter,
+        search: asked.search,
+        sort: asked.sort === null ? [] : [asked.sort],
+        offset: asked.offset,
+        limit: LIST_PAGE_SIZE,
+      }),
+    {
+      // A refusal a box owns stays said until the box changes; any other goes as the next page is asked for.
+      asking: () => setRefusal((said) => (said?.owner === null ? null : said)),
+      arrived: (place, move, page, press) => {
+        setShown({ asked: place.asked, page })
+        setTrail(place.trail)
+        setRelated(null)
+        for (const run of press.arrived) run()
+        if (press.focus !== null) focusAfterRender(press.focus)
+        if (move === null) return
+        // A move takes the boxes with the page they were on, and so the refusals they owned.
+        setRefusal(null)
+        setVisit((count) => count + 1)
+        if (!move.moved) return
+        setChosen(describeRef(place.asked.object))
+        setSearch(place.asked.search)
+        focusAfterRender('browsed-heading')
+      },
+      refused: (message, owner) => setRefusal({ message, owner }),
+    },
+  )
 
   function submit(event: FormEvent): void {
     event.preventDefault()
     const object = snapshot.objects.find((candidate) => describeRef(candidate.ref) === chosen)
     if (object === undefined) return
-    void load({ object: object.ref, equal: [], filter: [], search: search.trim(), sort: null, offset: 0 }, { trail: [], moved: false })
+    const asked: Asked = { object: object.ref, equal: [], filter: [], search: search.trim(), sort: null, offset: 0 }
+    void pages.ask(() => ({ place: { asked, trail: [] }, move: { moved: false } }))
   }
 
+  /** A follow from the page on screen, which a second press -- the page then being the one followed to -- no longer applies to. */
   function follow(object: ObjectRef, equal: BrowseEqualTerm[]): void {
     if (shown === null) return
-    void load({ object, equal, filter: [], search: '', sort: null, offset: 0 }, { trail: [...trail, shown.asked], moved: true })
+    const from = shown.asked
+    void pages.ask((base) =>
+      base === null || !samePage(base.asked, from)
+        ? null
+        : { place: { asked: { object, equal, filter: [], search: '', sort: null, offset: 0 }, trail: [...base.trail, base.asked] }, move: { moved: true } },
+    )
   }
 
+  /** Back from the page on screen to the page it was followed from, as that page stood. */
   function back(): void {
-    const to = trail.at(-1)
-    if (to === undefined) return
-    void load(to, { trail: trail.slice(0, -1), moved: true })
+    if (shown === null) return
+    const from = shown.asked
+    void pages.ask((base) => {
+      const to = base?.trail.at(-1)
+      if (base === null || to === undefined || !samePage(base.asked, from)) return null
+      return { place: { asked: to, trail: base.trail.slice(0, -1) }, move: { moved: true } }
+    })
   }
 
   const option = (ref: ObjectRef) => (
@@ -203,8 +191,8 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
         </form>
       )}
       {refusal === null ? null : (
-        <p role="alert" className="problem-box">
-          {refusal}
+        <p role="alert" id="browse-refusal" className="problem-box">
+          {refusal.message}
         </p>
       )}
       {shown === null ? null : (
@@ -216,8 +204,10 @@ export function BrowseStep({ client, connection, snapshot }: { client: AdminClie
           visit={visit}
           related={related}
           back={trail.at(-1)?.object ?? null}
-          onLoad={(asked, focus, arrived) => load(asked, null, focus ?? null, arrived)}
-          onRefused={setRefusal}
+          pages={pages}
+          refusedBy={refusal?.owner ?? null}
+          onRefused={(message, owner) => setRefusal({ message, owner })}
+          onUnsaid={(owner) => setRefusal((said) => (said?.owner === owner ? null : said))}
           onRelated={(index) => setRelated((open) => (open === index ? null : index))}
           onFollow={follow}
           onBack={back}
@@ -240,10 +230,14 @@ interface PageProps {
   related: number | null
   /** The object of the page a follow left, which Back returns to. */
   back: ObjectRef | null
-  /** Asks for a page, and answers whether it arrived; `focus` names what takes the keyboard once it has, and `arrived` runs in the render that shows it. */
-  onLoad: (asked: Asked, focus?: string, arrived?: () => void) => Promise<boolean>
-  /** Says a header box's refusal where the step speaks. */
-  onRefused: (message: string) => void
+  /** How the step asks for its pages: what a press here builds on the page as it will stand. */
+  pages: Pages
+  /** The header box whose refusal the step's alert says, if one's. */
+  refusedBy: string | null
+  /** Says a header box's refusal where the step speaks, owned by the box until it changes. */
+  onRefused: (message: string, owner: string) => void
+  /** Says no longer what the box `owner` had refused. */
+  onUnsaid: (owner: string) => void
   onRelated: (index: number) => void
   onFollow: (object: ObjectRef, equal: BrowseEqualTerm[]) => void
   onBack: () => void
@@ -255,7 +249,22 @@ interface PageProps {
  * where its object has a key to follow -- and the way to the next and
  * previous pages.
  */
-function Page({ asked, page, relations, filterables, visit, related, back, onLoad, onRefused, onRelated, onFollow, onBack }: PageProps): ReactElement {
+function Page({
+  asked,
+  page,
+  relations,
+  filterables,
+  visit,
+  related,
+  back,
+  pages,
+  refusedBy,
+  onRefused,
+  onUnsaid,
+  onRelated,
+  onFollow,
+  onBack,
+}: PageProps): ReactElement {
   const rows = useRef<HTMLDivElement>(null)
   const name = describeRef(page.object)
   const first = asked.offset + 1
@@ -265,10 +274,19 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
   const relating = relations.relations.length > 0
   const open = related === null ? undefined : page.rows[related]
   const fields = lineFields(filterables)
+  /** A press on this page: what it makes of the page as it will stand, while that is still this page. */
+  const here =
+    (to: (base: Asked) => Asked): Build =>
+    (base: Place | null) =>
+      base === null || !samePage(base.asked, asked) ? null : { place: { asked: to(base.asked), trail: base.trail }, move: null }
+  const ahead = pages.ahead !== null && samePage(pages.ahead.asked, asked) ? pages.ahead.asked.filter : asked.filter
   const filter = {
     filter: asked.filter,
-    onFilter: (next: BrowseFilterTerm[], focus?: string | null, arrived?: () => void) =>
-      onLoad({ ...asked, filter: next, offset: 0 }, focus ?? undefined, arrived),
+    onFilter: ((change, press) =>
+      pages.ask(
+        here((base) => ({ ...base, filter: change(base.filter), offset: 0 })),
+        press,
+      )) satisfies FilterChange,
   }
   return (
     <section className="browsed" aria-labelledby="browsed-heading">
@@ -321,7 +339,7 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
                       type="button"
                       className="sort"
                       aria-label={`${column.name}, sort ${next.direction === 'asc' ? 'ascending' : 'descending'}`}
-                      onClick={() => void onLoad({ ...asked, sort: next, offset: 0 })}
+                      onClick={() => void pages.ask(here((base) => ({ ...base, sort: nextSort(base.sort, column.name), offset: 0 })))}
                     >
                       {column.name}
                     </button>
@@ -330,7 +348,17 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
               })}
             </tr>
             {fields.length === 0 ? null : (
-              <HeaderBoxes key={`boxes-${String(visit)}`} columns={page.columns} relating={relating} fields={fields} {...filter} onRefused={onRefused} />
+              <HeaderBoxes
+                key={`boxes-${String(visit)}`}
+                columns={page.columns}
+                relating={relating}
+                fields={fields}
+                {...filter}
+                ahead={ahead}
+                refusedBy={refusedBy}
+                onRefused={onRefused}
+                onUnsaid={onUnsaid}
+              />
             )}
           </thead>
           <tbody>
@@ -370,7 +398,7 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
           type="button"
           className="button"
           aria-disabled={atStart}
-          onClick={() => (atStart ? undefined : void onLoad({ ...asked, offset: Math.max(0, asked.offset - LIST_PAGE_SIZE) }))}
+          onClick={() => (atStart ? undefined : void pages.ask(here((base) => ({ ...base, offset: Math.max(0, base.offset - LIST_PAGE_SIZE) }))))}
         >
           Previous page
         </button>
@@ -378,7 +406,7 @@ function Page({ asked, page, relations, filterables, visit, related, back, onLoa
           type="button"
           className="button"
           aria-disabled={!page.hasMore}
-          onClick={() => (page.hasMore ? void onLoad({ ...asked, offset: asked.offset + LIST_PAGE_SIZE }) : undefined)}
+          onClick={() => (page.hasMore ? void pages.ask(here((base) => ({ ...base, offset: base.offset + LIST_PAGE_SIZE }))) : undefined)}
         >
           Next page
         </button>

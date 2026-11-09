@@ -56,8 +56,8 @@ export function FilterLine({
   fields: readonly LineField[]
   /** The filter as applied: what the page was asked with. */
   filter: readonly ListFilterTerm[]
-  /** Asks for the page under `next`; `arrived` runs in the render that shows it. */
-  onFilter: (next: ListFilterTerm[], arrived: () => void) => void
+  /** Asks for the page under what the line reads, in place of every condition on a field it names; `arrived` runs in the render that shows it. */
+  onFilter: (read: ListFilterTerm[], arrived: () => void) => void
   /** Every condition removed by a line emptied and applied: the page's Undo offers them back. */
   onClear: (arrived: () => void) => void
   /** Where the keyboard goes when Esc leaves the line: the table. */
@@ -72,14 +72,16 @@ export function FilterLine({
   const [active, setActive] = useState(-1)
   const [refusal, setRefusal] = useState<LineRefusal | null>(null)
   const [focused, setFocused] = useState(false)
+  /** What the line applied and whose page has not arrived yet. */
+  const [sent, setSent] = useState<string | null>(null)
   // A filter changed elsewhere -- a chip, a box -- while the person is not
   // in the line is what the line shows: an edit they left unapplied is
-  // dropped, or the line and the chips would say two filters. Followed
-  // while rendering, React's way to follow a value.
+  // dropped, or the line and the chips would say two filters; one on its
+  // way is not. Followed while rendering, React's way to follow a value.
   const [followed, setFollowed] = useState(applied)
   if (followed !== applied) {
     setFollowed(applied)
-    if (!focused) {
+    if (!focused && (draft === null || draft !== sent)) {
       setDraft(null)
       setRefusal(null)
     }
@@ -137,11 +139,17 @@ export function FilterLine({
     const kept = filter.filter((term) => !fields.some((field) => field.field === term.field))
     const next = [...kept, ...read.filter]
     // Once the page has arrived the line shows its filter, unless the person typed on while it was on its way.
-    const sent = draft
-    const shows = () => setDraft((now) => (now === sent ? null : now))
+    const applying = draft
+    const shows = () => {
+      setDraft((now) => (now === applying ? null : now))
+      setSent(null)
+    }
     if (JSON.stringify(next) === JSON.stringify(filter)) shows()
-    else if (next.length === 0) onClear(shows)
-    else onFilter(next, shows)
+    else {
+      setSent(applying)
+      if (next.length === 0) onClear(shows)
+      else onFilter(read.filter, shows)
+    }
   }
 
   function keyDown(event: KeyboardEvent<HTMLInputElement>): void {

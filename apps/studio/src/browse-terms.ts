@@ -1,5 +1,6 @@
 import { filterOffer, nameableFields } from '@formancy/data-core'
 import type { BrowseFilterTerm, FilterDays, FilterOffer, LineField, ListFilterTerm, ObjectMeta, RecordColumn } from '@formancy/data-core'
+import type { Press } from './browse-pages.js'
 import { sayCondition } from './condition-draft.js'
 
 /*
@@ -83,8 +84,10 @@ export function sayFiltered(term: BrowseFilterTerm, columns: readonly Filterable
 }
 
 /**
- * Asks for page one under `next`, and answers whether it arrived: `focus`
- * names what takes the keyboard once it has, and `arrived` runs in the
- * render that shows it, so what it changes is on screen with the page.
+ * Asks for page one under what `change` makes of the filter as it will
+ * stand -- the page's, or the one a press on its way will leave -- and
+ * answers whether that page arrived: `press.focus` names what takes the
+ * keyboard once it has, `press.arrived` runs in the render that shows it,
+ * and `press.owner` is the header box whose press it is.
  */
-export type FilterChange = (next: BrowseFilterTerm[], focus?: string | null, arrived?: () => void) => Promise<boolean>
+export type FilterChange = (change: (filter: BrowseFilterTerm[]) => BrowseFilterTerm[], press?: Press) => Promise<boolean>

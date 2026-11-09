@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, waitFor, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot, LIST_PAGE_SIZE } from '@formancy/data-core'
 import type { BrowseFilterTerm } from '@formancy/data-core'
 import {
@@ -31,9 +32,13 @@ import type { TestPlane } from './test-server.js'
  * case where a browse has the thing a case is about: no lookup, no cell's
  * `=`, no view and no list nothing matches. Against the real server behind
  * the fake `fetch`, whose records port compares each condition as
- * `RecordFilter` says an adapter does (`test-server.ts`). Every state is
- * held to axe at WCAG 2.2 AA and to a name on every control. Found by role
- * and accessible name (formancy.ai 0034).
+ * `RecordFilter` says an adapter does (`test-server.ts`). The state each
+ * case is about -- a line applied, refused or completing, `/` and Esc, a
+ * chip removed and put back, a box applied, refused or given up, a page on
+ * its way -- is held to axe at WCAG 2.2 AA and to a name on every control.
+ * Found by role and accessible name (formancy.ai 0034); an input method's
+ * keys, which a person cannot press through user-event, are fired on the
+ * control found that way.
  */
 
 let plane: TestPlane
@@ -175,6 +180,7 @@ describe('the filter line', () => {
     await user.keyboard('{Escape}')
     expect(filterLine().value).toBe('country_code = CH')
     expect(document.activeElement).toBe(rowsRegion())
+    expect(await floor('the line left with Esc')).toEqual(CLEAN('the line left with Esc'))
     const search = within(browseStep()).getByRole<HTMLInputElement>('searchbox', { name: 'Search' })
     await user.type(search, 'a/b')
     expect(search.value).toBe('a/b')
@@ -208,6 +214,7 @@ describe('the chips', () => {
     ])
     expect(focusedName()).toBe('Remove active = true')
     expect(within(browseStep()).queryByRole('button', { name: /^Undo/ })).toBeNull()
+    expect(await floor('a chip put back')).toEqual(CLEAN('a chip put back'))
 
     await pressEnter(user, within(browseStep()).getByRole('button', { name: 'Remove credit_limit from 100' }))
     await statusSays('Filtered by active = true, showing rows 1 to 2.')
@@ -294,6 +301,7 @@ describe('the header boxes', () => {
     await user.type(headerBox('country_code'), ' and more')
     await user.keyboard('{Escape}')
     expect(headerBox('country_code').value).toBe('= CH')
+    expect(await floor('a box given up')).toEqual(CLEAN('a box given up'))
     await user.tab()
     expect(browses()).toHaveLength(before)
 
@@ -371,6 +379,7 @@ describe('a page on its way', () => {
     let held = plane.hold(/\/browse$/)
     await typeFilter(user, 'country_code = CH')
     await user.type(filterLine(), ' and active = true')
+    expect(await floor('a page on its way')).toEqual(CLEAN('a page on its way'))
     held.release()
     await statusSays('Filtered by country_code = CH, showing rows 1 to 2.')
     expect(filterLine().value).toBe('country_code = CH and active = true')
@@ -381,6 +390,158 @@ describe('a page on its way', () => {
     held.release()
     await statusSays('Filtered by country_code = CH and credit_limit > 100, showing rows 1 to 2.')
     expect(headerBox('credit_limit').value).toBe('> 1000')
+  })
+})
+
+describe('a press while a page is on its way', () => {
+  // A second box left while the first box's page is on its way is sent once
+  // that page has arrived, on the filter as it then stands, and the first
+  // page arriving does not take its text (watched failing with the second
+  // request dropped, the name box emptied once the first page arrived, and
+  // nothing said).
+  test('sends a second box left while the first box’s page is on its way', async () => {
+    const user = await customers()
+    const before = browses().length
+    const held = plane.hold(/\/browse$/)
+    await user.type(headerBox('country_code'), '= CH')
+    await user.tab()
+    await user.type(headerBox('name'), 'gmbh')
+    await user.tab()
+    held.release()
+    await statusSays('Filtered by country_code = CH and name contains “gmbh”, showing rows 1 to 1.')
+    expect(
+      browses()
+        .slice(before)
+        .map((request) => (request.body as { filter: BrowseFilterTerm[] }).filter),
+    ).toEqual([[CH], [CH, { column: 'name', op: 'contains', text: 'gmbh' }]])
+    expect(headerBox('name').value).toBe('gmbh')
+    expect(headerBox('country_code').value).toBe('= CH')
+    expect(alert()).toBeNull()
+    expect(await floor('a second box sent after the first')).toEqual(CLEAN('a second box sent after the first'))
+  })
+
+  // A boolean's select stepped twice while a page is on its way -- as the
+  // arrow keys do on a closed select in Chromium and Firefox off macOS --
+  // ends on the value chosen last, in the select, the chips and the page;
+  // and a value chosen while a sort's page is on its way is sorted as well
+  // as filtered (watched failing with the second value dropped, the select
+  // saying false while the page was filtered by true, and with the value
+  // chosen during the sort dropped).
+  test('ends on the value a select was given last while a page is on its way', async () => {
+    const user = await customers()
+    const active = within(rowsRegion()).getByRole<HTMLSelectElement>('combobox', { name: 'Filter active' })
+    let held = plane.hold(/\/browse$/)
+    await user.selectOptions(active, 'true')
+    await user.selectOptions(active, 'false')
+    expect(active.value).toBe('false')
+    held.release()
+    await statusSays('Filtered by active = false, showing rows 1 to 1.')
+    expect(lastFilter()).toEqual([{ column: 'active', op: 'equals', value: 'false' }])
+    expect(applied()).toEqual(['active = false'])
+    expect(active.value).toBe('false')
+
+    held = plane.hold(/\/browse$/)
+    await user.click(within(rowsRegion()).getByRole('button', { name: 'name, sort ascending' }))
+    await user.selectOptions(active, 'true')
+    held.release()
+    await statusSays('Filtered by active = true, showing rows 1 to 2.')
+    expect(browses().at(-1)?.body).toMatchObject({ filter: [{ column: 'active', op: 'equals', value: 'true' }], sort: [{ column: 'name', direction: 'asc' }] })
+    expect(active.value).toBe('true')
+  })
+
+  // A click after typing in a box -- Clear the filter, here -- is the
+  // click's: the box applies as it is left, and the click is sent once that
+  // page has arrived, on the filter as it then stands, so Undo puts back the
+  // box's condition too (watched failing with the click dropped and the
+  // page more filtered than before it).
+  test('sends a click made after typing in a box once the box’s page has arrived', async () => {
+    const user = await customers()
+    await typeFilter(user, 'country_code = CH')
+    await statusSays('Filtered by country_code = CH, showing rows 1 to 2.')
+    const held = plane.hold(/\/browse$/)
+    await user.type(headerBox('credit_limit'), '> 125.50')
+    await user.click(within(browseStep()).getByRole('button', { name: 'Clear the filter' }))
+    held.release()
+    await statusSays('Showing rows 1 to 3.')
+    expect(lastFilter()).toEqual([])
+    expect(focusedName()).toBe('Undo clearing the filter')
+    expect(headerBox('credit_limit').value).toBe('')
+    await pressEnter(user, within(browseStep()).getByRole('button', { name: 'Undo clearing the filter' }))
+    await statusSays('Filtered by country_code = CH and credit_limit > 125.50, showing rows 1 to 1.')
+    expect(await floor('the filter put back after a click held')).toEqual(CLEAN('the filter put back after a click held'))
+  })
+
+  // A box the server refused keeps saying so until it is changed or
+  // applied: a sort while it holds what was refused keeps the alert, which
+  // the box is described by, and leaving the box again sends nothing more
+  // (watched failing with the alert gone at the sort and nothing saying the
+  // box was not applied).
+  test('keeps a box the server refused said, through a sort, until it is changed', async () => {
+    const user = await customers()
+    const refused = 'A value given for credit_limit is not one it can hold.'
+    await user.type(headerBox('credit_limit'), '1.234{Enter}')
+    await waitFor(() => expect(alert()?.textContent).toBe(refused))
+    await user.click(within(rowsRegion()).getByRole('button', { name: 'name, sort ascending' }))
+    await within(rowsRegion()).findByRole('button', { name: 'name, sort descending' })
+    expect(alert()?.textContent).toBe(refused)
+    expect(headerBox('credit_limit').value).toBe('1.234')
+    expect(headerBox('credit_limit').getAttribute('aria-invalid')).toBe('true')
+    expect(computeAccessibleDescription(headerBox('credit_limit'))).toBe(refused)
+    expect(await floor('a refused box through a sort')).toEqual(CLEAN('a refused box through a sort'))
+    const before = browses().length
+    headerBox('credit_limit').focus()
+    await user.tab()
+    expect(browses()).toHaveLength(before)
+    await user.clear(headerBox('credit_limit'))
+    expect(alert()).toBeNull()
+    expect(headerBox('credit_limit').getAttribute('aria-invalid')).toBeNull()
+    await user.type(headerBox('credit_limit'), '125.50{Enter}')
+    await statusSays('Filtered by credit_limit = 125.50, showing rows 1 to 1.')
+    expect(alert()).toBeNull()
+  })
+
+  // A removal the server refuses leaves the filter as it was and offers no
+  // Undo; one pressed while a page is on its way is sent once that page has
+  // arrived, and offers Undo once its own has (watched failing with Undo
+  // offered for the refused removal, and with the second removal dropped).
+  test('offers Undo only for a removal whose page arrived', async () => {
+    const user = await customers()
+    await typeFilter(user, 'country_code = CH and active = true')
+    await statusSays('Filtered by country_code = CH and active = true, showing rows 1 to 2.')
+    plane.unreachable.add('fixture')
+    await user.click(within(browseStep()).getByRole('button', { name: 'Remove active = true' }))
+    await waitFor(() => expect(alert()).not.toBeNull())
+    expect(applied()).toEqual(['country_code = CH', 'active = true'])
+    expect(within(browseStep()).queryByRole('button', { name: /^Undo/ })).toBeNull()
+    plane.unreachable.delete('fixture')
+
+    const held = plane.hold(/\/browse$/)
+    await user.click(within(rowsRegion()).getByRole('button', { name: 'name, sort ascending' }))
+    await user.click(within(browseStep()).getByRole('button', { name: 'Remove active = true' }))
+    held.release()
+    await statusSays('Filtered by country_code = CH, showing rows 1 to 2.')
+    expect(browses().at(-1)?.body).toMatchObject({ filter: [CH], sort: [{ column: 'name', direction: 'asc' }] })
+    expect(within(browseStep()).getByRole('button', { name: 'Undo removing active = true' })).toBeTruthy()
+    expect(await floor('a removal sent after a sort')).toEqual(CLEAN('a removal sent after a sort'))
+  })
+})
+
+describe('an input method', () => {
+  // While an input method composes a word, Enter and Esc are its: half a
+  // line or half a box is not applied, and an edit is not given up
+  // (watched failing with the line's guard and the box's taken out).
+  test('leaves Enter and Esc to an input method while it composes, in the line and in a box', async () => {
+    const user = await customers()
+    const before = browses().length
+    await user.type(filterLine(), 'name contains gm')
+    fireEvent.keyDown(filterLine(), { key: 'Enter', isComposing: true, keyCode: 229 })
+    fireEvent.keyDown(filterLine(), { key: 'Escape', isComposing: true, keyCode: 229 })
+    expect(filterLine().value).toBe('name contains gm')
+    await user.type(headerBox('name'), 'gm')
+    fireEvent.keyDown(headerBox('name'), { key: 'Enter', isComposing: true, keyCode: 229 })
+    fireEvent.keyDown(headerBox('name'), { key: 'Escape', isComposing: true, keyCode: 229 })
+    expect(headerBox('name').value).toBe('gm')
+    expect(browses()).toHaveLength(before)
   })
 })
 
@@ -398,6 +559,7 @@ describe('a page the line follows', () => {
     // Typed and not applied, the line says so.
     await user.type(filterLine(), ' and name contains muster')
     expect(within(browseStep()).getByText('Not applied yet: Enter applies it, Esc puts back the filter.')).toBeTruthy()
+    expect(await floor('a line not applied yet')).toEqual(CLEAN('a line not applied yet'))
     expect(browses().at(-1)?.body).toEqual({
       object: { schema: 'sales', name: 'customer' },
       equal: [],
