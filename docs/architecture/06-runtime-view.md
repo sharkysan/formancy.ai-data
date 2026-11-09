@@ -815,7 +815,11 @@ each time (0141).
    again; a follow starts the other end without one, and Back sends the
    page it left with its filter. A refusal of the server's is said in the
    step's alert, and the line or the box keeps what was typed until a page
-   under it arrives.
+   under it arrives; a box owns its refusal, which stays said until the box
+   changes. A press made while a page is on its way is sent once that page
+   has settled, on the page as it then stands (`browse-pages.ts`), and one
+   that no longer applies there, made on a page a move is leaving, is
+   dropped.
 
 Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
 `records/browse.test.ts` and `records/follow.test.ts`, both adapters'

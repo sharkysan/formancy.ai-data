@@ -13,6 +13,13 @@
   name and whose keys are two words, two whose names differ only in case,
   one whose name is an operator -- and names the rest again over
   themselves (watched failing with a stub that kept every field).
+  `filter-header.test.ts` also reads a host-shaped field -- a key unlike
+  its label's name, `total` for "Order total", a field through a lookup,
+  `customer.name`, and one labelled "And" -- to the terms the key in front
+  read: with the key put back they pass, the two readers agreeing on every
+  one-word key, which is the claim that nothing changes for a host field;
+  watched failing with the label's name put in front without `lineNames`
+  (`customer_name`, which names nothing) and with the label itself.
   `apps/studio/src/browse-line.test.tsx`, against the real server behind
   the fake `fetch` -- the host's `filter-line.test.tsx` case for case where
   a browse has what a case is about: a line applied as the terms it reads,
@@ -27,7 +34,21 @@
   with no box -- the line following the filter however it was applied,
   and what is typed into the line or a box while the page it asked for is
   on its way kept (watched failing with both emptied of it once the page
-  arrived). Each case was watched failing against the step before it had a
+  arrived). Its presses while a page is on its way, each watched failing
+  against the step that dropped them: a second box left is sent after the
+  first's page, its text kept (failing with it dropped, the box emptied
+  and nothing said); a select stepped twice ends on its second value, in
+  the select, the chips and the page, and one chosen during a sort is
+  sorted too (failing with true sent, false dropped and the select saying
+  false); Clear the filter clicked after typing in a box is sent after the
+  box's page, and Undo puts both back (failing with the page more filtered
+  than before); a box the server refused keeps the alert through a sort,
+  marked invalid and described by it, sends nothing when left again, and
+  is said no longer once changed (failing with the alert gone at the
+  sort); a removal the server refused offers no Undo, and one pressed
+  during a sort's page is sent after it and does (failing with it
+  dropped). An input method's Enter and Esc are its own in the line and in
+  a box (watched failing with each guard taken out). Each case was watched failing against the step before it had a
   line (no combobox named Filter, no box named Filter and a column); the
   first also with the fake records port reading no `above`, which listed
   the tenant whose limit is the bound itself (`apps/studio/src/test-server.ts`'s
@@ -96,8 +117,8 @@ offer Undo until the filter changes some other way, never on a timer
 (WCAG 2.2.1). A removal puts the keyboard on the next Remove, or Undo
 once none is left; Undo puts it on the Remove of the condition it put
 back. Undo is offered in the render that shows the page the removal asked
-for, so a removal the server refused, or one pressed while a page was on
-its way, offers nothing.
+for, so a removal the server refused offers nothing, and one pressed while
+a page was on its way offers it once its own page has arrived.
 
 **A box under each header.** A second row of the table's header holds a
 box under each column the line can name, named Filter and the column's
@@ -110,14 +131,32 @@ and the boxes read and change one filter, the one the page was asked
 with.
 
 **A column the line can name.** A column's name is the database's, which
-may be two words or differ from another's only in case. data-core's new
-`nameableFields` keeps a field whose name in the line is one word that
-reads as it alone -- `order_date` for `Order Date` -- and leaves out the
-rest, two columns `Code` and `code` both among them; a column left out has
-no name to type, no completion and no box. `headerCondition` now puts a
+may be two words or differ from another's only in case. The line names it
+as data-core's `lineNames` names a field: lower-cased, every run of
+anything that is not a letter or a digit one `_` -- `order_date` for
+`Order Date` -- and, where two names give one, each by its own name
+instead. data-core's new `nameableFields` keeps a field whose name is then
+one word that reads as it alone and leaves out the rest: `Order Date`
+beside `order_date`, whose own name is two words, and both of `Code` and
+`code`; a column left out has no name to type, no completion and no box. `headerCondition` now puts a
 field's name in the line in front of a box's text, not its key, so a box
 on `Order Date` reads; for every host field the two are one word that
 reads the same.
+
+**A press while a page is on its way** is not dropped
+(`apps/studio/src/browse-pages.ts`): it is sent once that page has
+settled, on the page as it then stands -- the one that arrived, or the one
+on screen where it was refused -- and a further press while it waits
+builds on it, so a box left and then Clear the filter is the box's
+condition and then none, and a select stepped twice ends on its second
+value, which it shows meanwhile, being controlled by the filter as it will
+stand. A press that no longer applies where the page then stands -- a
+second press of a follow, a box or a sort of a page a move is leaving --
+is dropped. What a box typed stays until its page has arrived, and is not
+taken by another page arriving first. A box's refusal, the line's or the
+server's, is owned by the box: the step's alert keeps saying it through
+other pages, the box marked invalid and described by it, until the box
+changes, is given up or applies.
 
 **What stays.** Paging and sorting keep the filter, Show rows drops it, a
 follow starts the other end unfiltered, and Back returns the page left
@@ -141,9 +180,17 @@ the filter at a glance in three places that never disagree.
   drift apart. The studio's suite holds the host's cases one for one,
   but nothing fails when the host's line gains a key the studio's lacks;
   review holds that.
-- A column whose name gives no one word that says it alone -- two names
-  that differ only in case, two that give one name and are both two words,
-  a name that is an operator -- can be browsed and sorted but not filtered.
+- A column with no name in the line -- one whose own name is not one word
+  where another's gives the name it would have had, `Order Date` beside
+  `order_date`; two names that differ only in case; one with no letter or
+  digit that is not a word, `=` -- can be browsed and sorted but not
+  filtered.
+- Presses made while a page is on its way are sent one after another, the
+  later on the page as the earlier leave it; one made on a page a move is
+  leaving is dropped, and nothing says so but the page reached.
+- A box's refusal is said in the step's alert in the line's or the
+  server's words, which do not always name its column, and on a phone the
+  alert may be out of view of the box.
 - The panel's hints are gone: that equality on text is the whole value,
   case and spaces counted, and that text of no characters is a value, not
   NULL. Completion says what each operator means; the chips say NULL.

@@ -640,9 +640,16 @@ the same day (formancy.ai 0232).
   the words the status line says it in, with Remove, Clear the filter and
   Undo; and under each column's header a box takes that column's
   condition, a boolean's a select of true and false. A column is named by
-  its name lower-cased, `order_date` for `Order Date`, and one no single
-  word names alone -- `Code` beside `code` -- has no name and no box. A
-  refusal is the step's alert, the typing kept. Filter rows and its hints
+  its name lower-cased, every run of anything that is not a letter or a
+  digit one `_`, `order_date` for `Order Date`; where two names give one,
+  each column is named by its own name instead, and one whose own name is
+  not one word has no name and no box -- `Order Date` beside
+  `order_date` -- nor have two that differ only in case, `Code` beside
+  `code`. A press while a page is on its way -- a second box, a select's
+  next value, Clear the filter clicked after typing in a box -- is sent
+  once that page has arrived, on the filter as it then stands. A refusal
+  is the step's alert, the typing kept, and a box's stays said, the box
+  marked invalid, until the box changes. Filter rows and its hints
   are gone. For integrators: data-core's `headerCondition` reads a box
   with its field's name in the line in front, not its key, so a key of two
   words reads, and `nameableFields` names the fields one word says alone;

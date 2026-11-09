@@ -619,9 +619,14 @@ an operator and a boolean's value as it is typed, and marks and keeps a
 line it cannot read; each condition a chip with its own Remove, Clear the
 filter after them and Undo for what a removal took; and a box under each
 column's header holding that column's condition, a boolean's a select. A
-column is named by its name lower-cased, `order_date` for `Order Date`,
-and a timestamp's range is whole days; `/` puts the keyboard on the line
-and Esc gives it back to the table. Every condition must hold, and paging
+column is named by its name lower-cased, every run of anything that is not
+a letter or a digit one `_`, `order_date` for `Order Date`; where two names
+give one, each column is named by its own name instead, and one whose own
+name is not one word has no name in the line and no box -- `Order Date`
+beside `order_date` -- nor have two that differ only in case, `Code` beside
+`code`. A timestamp's range is whole days; `/` puts the keyboard on the line
+and Esc gives it back to the table. A press while a page is on its way is
+sent once it has arrived, on the filter as it then stands. Every condition must hold, and paging
 and sorting keep them; a follow starts the other end unfiltered, and Back
 returns the page it left with its filter. A refusal is the step's alert,
 with what was typed kept

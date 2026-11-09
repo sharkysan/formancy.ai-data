@@ -401,10 +401,15 @@ discovery holds, which the server plans again and may refuse; the trail is
 lost on a reload; and the audit names the object followed to, never the
 values
 ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
-A browsed column is named in the filter line by its name lower-cased, and
-one no single word names alone -- two names that differ only in case, two
-that give one name and are both two words -- has no name and no box, so it
-is browsed and sorted but not filtered; a header box applies what was
+A browsed column is named in the filter line by its name lower-cased,
+every run of anything not a letter or a digit one `_`; where two names
+give one, each is named by its own name instead, and one whose own name is
+not one word -- `Order Date` beside `order_date` -- has no name and no box,
+nor have two names that differ only in case, so such a column is browsed
+and sorted but not filtered; a press while a page is on its way is sent
+after it, and one made on a page a move is leaving is dropped; a box's
+refusal is said in the step's alert in the line's or the server's words,
+which do not always name its column; a header box applies what was
 typed when it is left; a boolean's box says true and false where the line
 says yes and no; and a browse is filtered by the columns it shows alone,
 with no condition through a foreign key, no saved view and none taken from

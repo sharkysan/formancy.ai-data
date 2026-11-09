@@ -397,7 +397,9 @@ seen three ways over data-core's reader, printer and box reader:
 conditions as chips with Undo, which `src/browse-filter.tsx` puts above the
 table, and `src/browse-boxes.tsx` a box under each column's header, with
 `src/browse-terms.ts` what each column offers, the columns the line can
-name and what a chip says
+name and what a chip says, and `src/browse-pages.ts` how the step asks for
+a page, a press made while one is on its way sent once it has settled, on
+the page as it then stands
 ([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)). Presentation edits, a field's move to another section
 among them (0075), go through `@formancy/builder-core`'s session with
 controls of the studio's own (`src/presentation.tsx`, 0030), and below them

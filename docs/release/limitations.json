@@ -4112,7 +4112,7 @@
       ]
     },
     "0147": {
-      "reviewed": "sha256:373b1ac1268f2b3272c4beb0d091aba3ef628222ed9a26739fd9e0de26882c02",
+      "reviewed": "sha256:1b430e10b826af6da805130165c60a93b376ce3ebc86cb829339b80a3ad86e2a",
       "limitations": [
         {
           "area": "studio",
@@ -4121,7 +4121,7 @@
         },
         {
           "area": "studio",
-          "says": "A browsed column is named in the line by its name lower-cased, order_date for Order Date; one whose name gives no one word that says it alone -- two that differ only in case, two that give one name and are both two words, a name that is an operator -- has no name in the line and no box, and is browsed and sorted but not filtered.",
+          "says": "A browsed column is named in the line by its name lower-cased, every run of anything that is not a letter or a digit one _, order_date for Order Date; where two names give one, each column is named by its own name instead, and one whose own name is not one word has no name in the line and no box -- Order Date beside order_date -- nor have two that differ only in case, Code beside code; such a column is browsed and sorted but not filtered.",
           "heldBy": "apps/studio/src/browse-line.test.tsx"
         },
         {
@@ -4137,6 +4137,16 @@
         {
           "area": "studio",
           "says": "A browse is filtered by conditions on the columns it shows alone: no condition through a foreign key, no saved view of a browse, no condition taken from a cell, and no offer to try a page nothing matches without its last condition."
+        },
+        {
+          "area": "studio",
+          "says": "A press on the Browse step made while a page is on its way is sent once that page has settled, on the page as it then stands, so a quick run of presses is one request after another; one made on a page a move is leaving is dropped, and nothing but the page reached says so.",
+          "heldBy": "apps/studio/src/browse-line.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A header box's refusal on the Browse step is said in the step's alert, in the line's or the server's words, which do not always name the column, and stays said until the box changes; on a phone the alert may be out of view of the box.",
+          "heldBy": "apps/studio/src/browse-line.test.tsx"
         }
       ]
     }
