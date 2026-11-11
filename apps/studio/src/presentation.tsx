@@ -254,6 +254,7 @@ export function PresentationStep({
             field={{ binding: bindings.fields.find((entry) => entry.field === key), base: generated, current, note: startNote(notes, key), policy }}
             session={session}
             report={report}
+            refuse={(message) => setSaid({ ok: false, message })}
           />
         )}
         <p className="bound">

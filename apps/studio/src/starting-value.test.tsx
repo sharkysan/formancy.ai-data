@@ -124,9 +124,10 @@ describe("a field's starting value", () => {
     await user.paste('placed')
     await user.clear(box)
     expect(box.getAttribute('aria-invalid')).toBe('true')
-    expect(computeAccessibleDescription(box)).toContain(
-      'Left empty, a new record would store the column’s default, “draft”, without showing it. Until it has a value, the field keeps the starting value it had.',
-    )
+    const kept =
+      'Left empty, a new record would store the column’s default, “draft”, without showing it. Until it has a value, the field keeps the starting value it had.'
+    expect(computeAccessibleDescription(box)).toContain(kept)
+    expect(said(presentation)).toBe(kept)
     expect((await previewed(user))('Status').value).toBe('placed')
     presentation = await goTo(user, 'Presentation')
     await pressEnter(user, within(presentation).getByRole('button', { name: 'Use the column’s default for status' }))
@@ -143,13 +144,15 @@ describe("a field's starting value", () => {
     expect((await previewed(user))('Status').value).toBe('draft')
   })
 
-  // A value the field does not take is said under the box, which names it
-  // and is marked invalid, in the words a publish would refuse it in; the
-  // typing is kept, and the document keeps what it had, so the preview
-  // starts where it did. Watched failing with the value handed to the
-  // session unread: “seven” was refused in the validator's words alone,
-  // “Must be a number.”, and 21 characters would have reached the paper.
-  test('says a value the field does not take under its box, and sets nothing', async () => {
+  // A value the field does not take is said where the step says what it
+  // did -- its live status, which a screen reader announces -- and under
+  // the box, which names it and is marked invalid, in the words a publish
+  // would refuse it in; the typing is kept, and the document keeps what it
+  // had, so the preview starts where it did. Watched failing with the value
+  // handed to the session unread: “seven” was refused in the validator's
+  // words alone, “Must be a number.”; and with the refusal said under the
+  // box only: the status still said nothing.
+  test('says a value the field does not take where the step says what it did, and under its box, and sets nothing', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     const presentation = await goTo(user, 'Presentation')
@@ -157,16 +160,16 @@ describe("a field's starting value", () => {
     await user.type(created, 'seven')
     expect(created.getAttribute('aria-invalid')).toBe('true')
     expect(created.value).toBe('seven')
-    expect(computeAccessibleDescription(created)).toBe(
-      'Generated: starts empty. Empty, a new record starts it empty. “seven” is not an answer created_by takes (its control holds a whole number). Until it is one, the field keeps the starting value it had.',
-    )
+    const refused = '“seven” is not an answer created_by takes (its control holds a whole number). Until it is one, the field keeps the starting value it had.'
+    expect(computeAccessibleDescription(created)).toBe(`Generated: starts empty. Empty, a new record starts it empty. ${refused}`)
+    expect(said(presentation)).toBe(refused)
     const status = within(presentation).getByLabelText<HTMLInputElement>('Starting value of status')
     await user.tripleClick(status)
     await user.paste('x'.repeat(21))
-    expect(computeAccessibleDescription(status)).toContain(
-      `“${'x'.repeat(21)}” is not an answer status takes (at most 20 characters). Until it is one, the field keeps the starting value it had.`,
-    )
-    expect(said(presentation)).toBe('')
+    const long = `“${'x'.repeat(21)}” is not an answer status takes (at most 20 characters). Until it is one, the field keeps the starting value it had.`
+    expect(computeAccessibleDescription(status)).toContain(long)
+    expect(status.getAttribute('aria-invalid')).toBe('true')
+    expect(said(presentation)).toBe(long)
     expect(await audit()).toEqual([])
     const control = await previewed(user)
     expect({ status: control('Status').value, created: control('Created by').value }).toEqual({ status: 'draft', created: '' })

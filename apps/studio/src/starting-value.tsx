@@ -81,8 +81,9 @@ function choices(field: FieldDef): Array<{ value: string; label: string }> {
 /**
  * One field's starting value: its control, what the generator noted, and
  * the column's default offered back where another replaced it or none did.
- * A refused value is said under the box, which names it, and the document
- * keeps what it had; the box keeps what was typed, and follows the
+ * A refused value is said where the step says what it did, its live
+ * status, and under the control, which names it and is marked invalid,
+ * and the document keeps what it had; the box keeps what was typed, and follows the
  * document when Undo, Redo or the button change it to something the typing
  * does not read as. The button goes once pressed, and gives the keyboard
  * to the control it set.
@@ -92,11 +93,14 @@ export function StartingValueControl({
   field,
   session,
   report,
+  refuse,
 }: {
   id: string
   field: StartingField
   session: BuilderSession
   report: (outcome: CommandOutcome, done: string) => CommandOutcome
+  /** Says a refusal where the step says what it did. */
+  refuse: (message: string) => void
 }): ReactElement {
   const { binding, base, current } = field
   const key = base.key
@@ -117,20 +121,25 @@ export function StartingValueControl({
   const none = binding === undefined ? 'it is bound to nothing' : noStartingValue(binding)
   if (binding === undefined || none !== null) return <p className="hint">No starting value: {none}.</p>
 
+  const refused = (message: string) => {
+    setProblem(message)
+    refuse(message)
+  }
   const set = (answer: StartingValue | undefined, done: string) => {
     const outcome = report(session.setFieldProperty([key], 'default', answer), done)
-    setProblem(outcome.ok ? null : `${outcome.message} The field keeps the starting value it had.`)
+    if (outcome.ok) setProblem(null)
+    else refused(`${outcome.message} The field keeps the starting value it had.`)
   }
   const column = base.default as StartingValue | undefined
   const give = (text: string, answer: StartingValue) => {
     if (text === '' && column !== undefined) {
-      return setProblem(
+      return refused(
         `Left empty, a new record would store the column’s default, ${quoted(column)}, without showing it. Until it has a value, the field keeps the starting value it had.`,
       )
     }
     if (text === '') return set(undefined, `Removed the starting value of ${key}.`)
     const read = reading(field, binding, answer)
-    if (!read.ok) return setProblem(`${read.problem}. Until it is one, the field keeps the starting value it had.`)
+    if (!read.ok) return refused(`${read.problem}. Until it is one, the field keeps the starting value it had.`)
     return set(read.answer, `Gave ${key} the starting value ${quoted(read.answer)}.`)
   }
   const hint = `${id}-hint`
@@ -145,6 +154,7 @@ export function StartingValueControl({
         <select
           id={id}
           value={value}
+          aria-invalid={problem !== null}
           aria-describedby={described}
           // A checkbox answers true or false; a select, the option's value.
           onChange={(event) => give(event.target.value, base.type === 'checkbox' ? event.target.value === 'true' : event.target.value)}
