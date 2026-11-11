@@ -42,6 +42,23 @@ describe('the preview', () => {
     expect(paragraphs(sheet)).toContain(`This field's answers come from "fixture-sales-order-fk-order-customer", which this application has not provided.`)
   })
 
+  // A new order starts its status at the column's constant default (0149):
+  // the Generate step says so beside the other inferred choices, and the
+  // preview, a fresh form like a new record's, draws the box holding it --
+  // the value a save would store. Watched failing with the generator's
+  // defaults left out: no note, and an empty Status box.
+  test("says the status starts at the column's default, and draws it there", async () => {
+    const user = await signIn(plane)
+    const generated = await generateOrder(user)
+    const inferred = within(within(generated).getByRole('list', { name: 'Inferred' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent ?? '')
+    expect(inferred).toContain("status Starts with the column's default, draft.")
+    const preview = await goTo(user, 'Preview')
+    const sheet = within(preview).getByRole('form', { name: 'Order preview' })
+    expect(within(sheet).getByRole<HTMLInputElement>('textbox', { name: 'Status' }).value).toBe('draft')
+  })
+
   // Validate runs the engine the published form will run: a required field
   // left empty is an error a person can hear, on the control itself.
   test('validates with the engine, and the errors are audible', async () => {
