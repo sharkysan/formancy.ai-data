@@ -51,9 +51,9 @@ describe.each(ENGINES)('a state field drawn as its moves on $engine', (engine) =
   // shipped by choosing it and pressing Save; a shipped one moves nowhere,
   // so Status is disabled. Every state is held to axe and a name on every
   // control. Watched failing with the session drawing the form as
-  // published: Status was a text box; and in CI with the copy for a create
-  // dropping the defaults of the fields this person gives: the choice
-  // started empty (0149).
+  // published: Status was a text box. To be watched failing in CI with the
+  // copy for a create dropping the defaults of the fields this person
+  // gives: the choice should start empty (0149).
   test('offers the moves from where the order is, saves one, and disables a state with none', async () => {
     const placed = await plane.clerk.create(engine.formId, {
       customer: await customerToken(engine.formId),

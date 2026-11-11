@@ -223,7 +223,7 @@ describe('a state field drawn as its moves (0127)', () => {
 })
 
 describe("a new record starts with its column's default (0149)", () => {
-  /** The form as `definition` gives it, in spec 5, the line number and the notes starting at their columns' defaults. */
+  /** The form as `definition` gives it, in spec 5, the line number and the notes starting at their columns' defaults: as the server serves it to a person whose create takes both (0149). */
   function defaulted(...given: Parameters<typeof definition>): PublishedForm {
     const published = definition(...given)
     const fields = published.form.model.fields.map((field) =>
@@ -234,6 +234,7 @@ describe("a new record starts with its column's default (0149)", () => {
   const session = (published: PublishedForm, fixed: string[] = []) =>
     createSession({ client, formId: 'pg-order-line', definition: published, renderer: 'react', fixed })
   const value = (drawn: ReturnType<typeof createSession>) => drawn.opened().engine.value()
+  const RECORD_AT = (notes: string) => ({ ...RECORD.answers, notes })
   const defaultOf = (drawn: ReturnType<typeof createSession>, key: string) =>
     drawn
       .opened()
@@ -271,52 +272,34 @@ describe("a new record starts with its column's default (0149)", () => {
     expect(drawn.state()).toEqual({ record: undefined, version: undefined, operation: 'create' })
   })
 
-  // A renderer submits a disabled field, so a default on a field this
-  // person does not give on create -- the notes, written on update alone
-  // -- would be sent, and refused as one they may not write (0117). It
-  // starts empty, is left out of the create, and the database fills it.
-  // A saved record keeps the published form's default: it is opened with
-  // its answers, which a default never fills. Watched failing with the
-  // copy for a create left as published: the new record started its notes
-  // at open.
-  test('starts a field this person does not give on create empty', () => {
-    const drawn = session(defaulted(['read', 'create', 'update'], { create: ['order', 'line_no'], update: ['notes'] }))
-    drawn.open()
-    expect(value(drawn)).toEqual({ line_no: 1 })
-    expect(defaultOf(drawn, 'notes')).toBeUndefined()
-    drawn.open(RECORD)
-    expect(defaultOf(drawn, 'notes')).toBe('open')
-  })
-
-  // A state field's default is where a new record starts only where a
-  // create may start it there (0127): another would be sent and refused
-  // as a move this person may not make. Where it may start nowhere, the
-  // field is disabled and empty, left to the database. A whole number's
-  // box is held alike, its default compared as the digits a state is.
-  // Watched failing with the choice keeping every default (the engine
-  // refused to open the ticket a create starts closed: open is not one of
-  // its options), with the choice dropping every default, as it was built
-  // before (the ticket a create starts open started empty), with the
-  // disabled field keeping its default (it started open), and with the
-  // whole number's box keeping every default (it started at 1).
-  test("keeps a state field's default only where a create may start the record in it", () => {
-    const tickets = (moves: NonNullable<PublishedForm['moves']>['moves']) =>
-      session(defaulted(['read', 'create', 'update'], undefined, { field: 'notes', moves, labels: [] }))
-    const opens = tickets([{ from: null, to: 'open' }])
-    opens.open()
-    expect(value(opens)).toEqual({ line_no: 1, notes: 'open' })
-    const closes = tickets([{ from: null, to: 'closed' }])
-    closes.open()
-    expect({ value: value(closes), default: defaultOf(closes, 'notes') }).toEqual({ value: { line_no: 1 }, default: undefined })
-    const nowhere = tickets([{ from: 'open', to: 'closed' }])
-    nowhere.open()
-    expect({ value: value(nowhere), disabled: disabled(nowhere) }).toEqual({ value: { line_no: 1 }, disabled: ['notes'] })
-    const numbered = (to: string) => session(defaulted(['read', 'create', 'update'], undefined, { field: 'line_no', moves: [{ from: null, to }], labels: [] }))
-    const one = numbered('1')
-    one.open()
-    expect(value(one)).toEqual({ line_no: 1, notes: 'open' })
-    const two = numbered('2')
-    two.open()
-    expect(value(two)).toEqual({ notes: 'open' })
+  // The served form carries a default only where this person's create
+  // takes it (0149, data-core's `startingDefaults`), so the host draws what
+  // it is served. A state field's choice on a new record starts at it --
+  // a state a create of theirs starts the record in -- and on a saved
+  // record carries none: the record opens at the state it holds, and a
+  // default the choice does not offer would stop the engine opening it. A
+  // whole number's box, which offers no states, keeps it. Watched failing
+  // with the choice carrying the default on every record (the engine
+  // refused to open the closed ticket: open is not one of its options),
+  // and with the choice carrying none, as it was built before (the new
+  // ticket started empty).
+  test("starts a new record's state at the served default, and a saved record's choice at the state it holds", () => {
+    const moves: PublishedForm['moves'] = {
+      field: 'notes',
+      moves: [
+        { from: null, to: 'open' },
+        { from: 'open', to: 'closed' },
+        { from: 'closed', to: 'archived' },
+      ],
+      labels: [],
+    }
+    const tickets = session(defaulted(['read', 'create', 'update'], undefined, moves))
+    tickets.open()
+    expect(value(tickets)).toEqual({ line_no: 1, notes: 'open' })
+    tickets.open({ ...RECORD, answers: { ...RECORD.answers, notes: 'closed' } })
+    expect({ value: value(tickets), default: defaultOf(tickets, 'notes') }).toEqual({ value: RECORD_AT('closed'), default: undefined })
+    const numbered = session(defaulted(['read', 'create', 'update'], undefined, { field: 'line_no', moves: [{ from: null, to: '1' }], labels: [] }))
+    numbered.open()
+    expect(value(numbered)).toEqual({ line_no: 1, notes: 'open' })
   })
 })

@@ -53,9 +53,10 @@ async function placedOrder(formId: string): Promise<string> {
 describe.each(ENGINES)("a new record on $engine starts with its column's default", (engine) => {
   // New record draws Status at draft in both renderers, the state's box a
   // person reads before Save; saved without touching it, from either
-  // renderer, the create carries draft and the record holds it. Watched
-  // failing in CI with the copy for a create dropping the defaults of the
-  // fields this person gives: both renderers drew an empty Status.
+  // renderer, the create carries draft and the record holds it. To be
+  // watched failing in CI with the copy for a create dropping the defaults
+  // of the fields this person gives: both renderers should draw an empty
+  // Status.
   test('draws Status at draft in both renderers, and a save that leaves it sends and stores it', async () => {
     const user = await openForm(plane, engine.formId)
     for (const renderer of RENDERERS) {
@@ -77,8 +78,8 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
 
   // A record read starts as stored, never at the default, and so does a
   // copy of it, Duplicate record's; New record after it starts at draft
-  // again. Watched failing in CI with the defaults written over a
-  // record's answers: the placed order was drawn as draft.
+  // again. To be watched failing in CI with the defaults written over a
+  // record's answers: the placed order should be drawn as draft.
   test('draws a record read, and a copy of it, as stored, and New record at draft again', async () => {
     const record = await placedOrder(engine.formId)
     const user = await openForm(plane, engine.formId)
@@ -93,13 +94,14 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
   })
 
   // The status this clerk neither reads nor writes is drawn disabled and
-  // empty on a new record -- its default would be a value of a field they
-  // may not see -- and the database fills it when the create leaves it
-  // out; on a record read it is empty too, the record's answers holding
-  // none. Watched failing in CI with the copy for a create keeping the
-  // defaults of the fields this person does not give: the new order's
-  // Status was drawn at draft. The record read is session-work.test.ts's
-  // too, without a server.
+  // empty on a new record: the server serves no default for a field their
+  // create does not take (data-core's startingDefaults), and the database
+  // fills it when the create leaves it out. On a record read it is empty
+  // too, the record's answers holding none. To be watched failing in CI
+  // with the form route serving every default to whoever may create: the
+  // new order's Status should be drawn at draft. The route's decision is
+  // runtime-defaults.test.ts's too, over fake ports, and the record read
+  // session-work.test.ts's, without a server.
   test('draws neither the default nor a record’s status for a person who may not read it', async () => {
     const record = await placedOrder(engine.formId)
     const user = await openForm(plane, engine.unread)

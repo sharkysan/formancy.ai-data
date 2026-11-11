@@ -171,6 +171,12 @@ export interface Deleting {
  * `GET /v1/forms/:id`: the published document, what this person may do with
  * it, and which of its fields they may see.
  *
+ * `form` is the published document with the defaults this person's create
+ * would take and no other (`startingDefaults`, 0149): a field's `default`
+ * where `writable.create` names the field and, on the state field `moves`
+ * holds, where one of their moves from nothing starts a record in it -- so
+ * a page that starts a new record over it sends nothing the create refuses.
+ *
  * `operations` is never empty: a person the policy grants nothing is refused
  * with 403 rather than handed a form they cannot use. `readable` is the field
  * keys the policy lets them read, in the bindings' order; a field outside it

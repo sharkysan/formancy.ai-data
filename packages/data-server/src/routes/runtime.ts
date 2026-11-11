@@ -11,6 +11,7 @@ import {
   READ_REFUSED,
   readableFields,
   runtimeOperations,
+  startingDefaults,
   stateMoves,
   toFormAnswers,
   todayOf,
@@ -341,7 +342,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * and only what the database as it is now still allows is offered (0041):
    * a form whose records it can no longer show faithfully is refused, and so
    * is one that leaves this person nothing. Opening a form therefore asks the
-   * database, and one that cannot be reached is 503.
+   * database, and one that cannot be reached is 503. The form is served with
+   * the defaults this person's create would take, and no other (0149).
    */
   app.get<{ Params: { id: string } }>('/v1/forms/:id', async (request, reply) => {
     const bundle = await published(request.params.id, reply)
@@ -398,7 +400,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
             forms,
           )
     return {
-      form: bundle.form,
+      // The defaults this person's create would take, and no other (0149): a page draws and submits what it is served.
+      form: startingDefaults(bundle.form, writable.create, moves),
       operations,
       readable: readable.ok ? readable.fields : [],
       list,

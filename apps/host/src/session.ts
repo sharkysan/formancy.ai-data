@@ -4,7 +4,7 @@ import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-cli
 import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
 import type { Work } from './leave.js'
 import { withMoves } from './moves.js'
-import { disableFields, withoutDefaults } from './widgets.js'
+import { disableFields } from './widgets.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -190,11 +190,10 @@ export function createSession({ client, formId, definition, renderer, namespace,
   // from this person disabled -- on a saved record a field written on create
   // only, which an update would refuse (0122). A new record keeps its copy
   // through the updates after its create, since the engine is kept (0029).
-  // A field disabled on the create starts empty too: its column's default
-  // would be submitted, and refused as a field this person may not give
-  // (0149); left empty, it is left out, and the database fills it.
-  const notGiven = [...fixed, ...notAcceptedOn(definition, 'create', unwritten)]
-  const forCreate = withoutDefaults(disableFields(definition.form, notGiven), notGiven)
+  // A field's default, the create's alone, is served only where this
+  // person's create takes it (0149), so the copy starts nothing a save of
+  // it would be refused for.
+  const forCreate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'create', unwritten)])
   const forUpdate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'update', unwritten)])
   const form = definition.form
   // A saved record this person may not update is drawn with every field

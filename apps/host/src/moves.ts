@@ -1,6 +1,6 @@
 import type { FormSchema } from '@formancy/spec'
 import type { PublishedForm } from '@formancy/data-client'
-import { disableFields, withoutDefaults } from './widgets.js'
+import { disableFields } from './widgets.js'
 
 /*
  * A state field as the moves its person may make (0127). Where the policy
@@ -12,9 +12,11 @@ import { disableFields, withoutDefaults } from './widgets.js'
  * nothing: a choice of the states a create may start it in, or disabled,
  * left to the column's default, where none is listed for this person. A
  * whole number held to moves keeps its box, and is only disabled where it
- * may go nowhere. The field's default, its column's constant one (0149),
- * is kept only where it is a state the choice offers: on a new record, one
- * a create may start it in. Any other would be sent and refused as a move.
+ * may go nowhere. A new record's choice starts at the field's default,
+ * which the server serves only where it is a state a create of this
+ * person's may start the record in (0149); a saved record's carries none,
+ * since it opens at the state it holds, and a default its choice did not
+ * offer would stop the engine opening it.
  *
  * Presentation only, as the rest of the host's copy is: the server checks
  * every move again (0112), and refuses the one a stale page still offers.
@@ -26,19 +28,17 @@ export function withMoves(form: FormSchema, moves: PublishedForm['moves'], from:
   const field = form.model.fields.find((candidate) => candidate.key === moves.field)
   if (field === undefined) return form
   const to = moves.moves.filter((move) => move.from === from).map((move) => move.to)
-  if (to.length === 0) return withoutDefaults(disableFields(form, [field.key]), [field.key])
-  const states = from === null ? to : [from, ...to]
-  // A whole number's default is spelled as a state is: its digits.
-  const kept = field.default !== undefined && states.includes(String(field.default))
+  if (to.length === 0) return disableFields(form, [field.key])
   // A whole number's state keeps its number box: a choice answers text, which its codec would read as another value.
-  if (field.type !== 'text') return kept ? form : withoutDefaults(form, [field.key])
+  if (field.type !== 'text') return form
+  const states = from === null ? to : [from, ...to]
   const choice = {
     key: field.key,
     type: 'select' as const,
     ...(field.label === undefined ? {} : { label: field.label }),
     ...(field.description === undefined ? {} : { description: field.description }),
     ...(field.required === undefined ? {} : { required: field.required }),
-    ...(kept ? { default: field.default } : {}),
+    ...(from === null && field.default !== undefined ? { default: field.default } : {}),
     // Each by its label where the administrator gave one (0129), else as its column spells it.
     options: states.map((state) => ({ value: state, label: moves.labels.find((entry) => entry.state === state)?.label ?? state })),
   }

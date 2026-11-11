@@ -41,7 +41,14 @@ the same day (formancy.ai 0232).
   this release gains its defaults when it is generated again; a studio
   session or a draft holding a base generated before is refused at
   publish until it is generated again, as every generator change is
-  (0030). Nothing in the studio changes or clears a default yet.
+  (0030). Nothing in the studio changes or clears a default yet. For an
+  integrator: `GET /v1/forms/:id` serves each person's form with only the
+  defaults their create would take -- on a field `writable.create` names,
+  and on the state field only at a state one of their create moves starts
+  a record in -- so a page on `@formancy/data-client` that opens a new
+  record over the form as served sends nothing the create refuses; a
+  choice a page draws for a saved record's state leaves the default out,
+  or the engine refuses to open it.
 
 - **The host page says what the server did, and keeps the demo's controls
   out of the way** (0146). Why: the design of finding records asks for a
