@@ -1,6 +1,7 @@
 import type { FieldDef } from '@formancy/spec'
-import { givenStart } from '../generate/defaults.js'
+import { givenStart, storedStart } from '../generate/defaults.js'
 import type { FieldBinding } from '../generate/types.js'
+import { storedValue } from '../records/answers.js'
 import type { FormPolicy } from '../policy/types.js'
 import type { FieldPresentation, StartingValue } from './types.js'
 
@@ -59,9 +60,20 @@ export function isStartingValue(value: unknown): value is StartingValue {
   return typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
 }
 
-/** A starting value as a sentence quotes it, as the generator's notes quote one (0149). */
+/**
+ * A starting value as a sentence says it: text quoted, as the generator's
+ * notes quote a default (0149), and a number or a boolean named as one, so
+ * the number 7 is never mistaken for the text “7” nor true for “true”.
+ */
 export function shownValue(value: StartingValue): string {
-  return `“${String(value)}”`
+  return typeof value === 'string' ? `“${value}”` : `the ${typeof value} ${String(value)}`
+}
+
+/** Two starting values as one sentence says them: text named as text too where the other prints alike, “7” beside the number 7. */
+export function shownTogether(left: StartingValue, right: StartingValue): [string, string] {
+  const said = (value: StartingValue, other: StartingValue) =>
+    typeof value === 'string' && typeof other !== 'string' && value === String(other) ? `the text ${shownValue(value)}` : shownValue(value)
+  return [said(left, right), said(right, left)]
 }
 
 export type StartingValueOutcome = { ok: true; answer: StartingValue } | { ok: false; problem: string }
@@ -79,6 +91,26 @@ export function startingValue(binding: FieldBinding, field: FieldDef, value: Sta
   // noStartingValue answered for a lookup, so the binding is a column's.
   const given = givenStart(binding as Extract<FieldBinding, { kind: 'column' }>, field, value)
   return given.ok ? given : { ok: false, problem: `${shownValue(value)} is not an answer ${binding.field} takes (${given.reason})` }
+}
+
+type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
+
+/**
+ * `value`, the starting value of a field bound by `from`, carried to the
+ * field the same column is bound to by `to` after a regeneration (0150):
+ * the answer that holds the same stored value under `to`'s control --
+ * the number 7 as the text “7” once the column is a bigint, true as
+ * “true” once it is nullable, “9.50” as “9.5000” once its scale grew -- or
+ * the clause that refuses it, as a publish would: a field that now takes
+ * none, or a stored value the new field does not take.
+ */
+export function carriedStart(from: FieldBinding, to: FieldBinding, field: FieldDef, value: StartingValue): StartingValueOutcome {
+  const none = noStartingValue(to)
+  if (none !== null) return { ok: false, problem: `${to.field} takes no starting value: ${none}` }
+  // A lookup takes none, so `from`, under which this value applied, is a column's, and its control held it.
+  const stored = storedValue(from as ColumnBinding, value)
+  const given = stored.ok ? storedStart(to as ColumnBinding, field, stored.value) : ({ ok: false, reason: stored.reason } as const)
+  return given.ok ? given : { ok: false, problem: `${shownValue(value)} is not an answer ${to.field} takes (${given.reason})` }
 }
 
 /** The states a create starts a record of `policy`'s state field in (0112): each one a move from nothing reaches, in the moves' order. */

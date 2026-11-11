@@ -5,7 +5,7 @@ import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { groupShapeProblems } from './group.js'
 import { homeOf, placements } from './placement.js'
-import { isStartingValue, NEVER_TAKEN_AWAY, noStartingValue, shownValue, startingValue } from './starting-value.js'
+import { isStartingValue, NEVER_TAKEN_AWAY, noStartingValue, shownTogether, startingValue } from './starting-value.js'
 import { stateLabelShapeProblems } from './state-labels.js'
 import { unfilteredShapeProblems } from './unfiltered.js'
 import { viewShapeProblems } from './views.js'
@@ -151,7 +151,10 @@ function startWith(field: FormSchema['model']['fields'][number], binding: FieldB
   if (same(value, field.default)) return [`${at}/default: equals the base's; leave it out`]
   const given = startingValue(binding, field, value)
   if (!given.ok) return [`${at}/default: ${given.problem}`]
-  if (!same(given.answer, value)) return [`${at}/default: ${binding.field} reads ${shownValue(value)} back as ${shownValue(given.answer)}; give that`]
+  if (!same(given.answer, value)) {
+    const [yours, read] = shownTogether(value, given.answer)
+    return [`${at}/default: ${binding.field} reads ${yours} back as ${read}; give that`]
+  }
   field.default = value
   return []
 }

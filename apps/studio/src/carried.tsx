@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import { shownValue } from '@formancy/data-core'
 import type { PresentationConflict } from '@formancy/data-core'
 import type { Text } from '@formancy/spec'
 import type { Carried } from './carry.js'
 import { labelOf, useDocument } from './document.js'
+import { quoted } from './starting-value.js'
 
 /** A label as the conflict names it: words in quotes, or the message it points at. */
 function shown(text: Text): string {
@@ -100,7 +100,7 @@ export function CarriedPanel({
           onClick={() =>
             report(
               session.setFieldProperty([conflict.field], 'default', conflict.generator),
-              `Gave ${conflict.field} the starting value ${shownValue(conflict.generator)}.`,
+              `Gave ${conflict.field} the starting value ${quoted(conflict.generator)}.`,
             )
           }
         >

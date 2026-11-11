@@ -2,7 +2,7 @@ import { acceptsDefault, createFormEngine } from '@formancy/core'
 import type { FieldDef, FormSchema } from '@formancy/spec'
 import { validateSchema } from '@formancy/spec/validate'
 import { describe, expect, test } from 'vitest'
-import { addColumn, col, column, decimal, dropColumn, ORDER, restrict, retype, snapshot, text } from '../drift/fixture.js'
+import { addColumn, col, column, decimal, dropColumn, INT64, ORDER, restrict, retype, snapshot, text } from '../drift/fixture.js'
 import { generateForm } from '../generate/generate.js'
 import type { ObjectMeta } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
@@ -194,21 +194,27 @@ describe("a field's starting value as presentation (0150)", () => {
   // offer, text the column holds and the box does not, and an empty one.
   // One spelled otherwise than a record holding it reads back is refused
   // with the spelling to give, so a presentation has one. Watched failing
-  // with the spelling unasked: amount took “9.5”, which it stores as 9.5000.
+  // with the spelling unasked: amount took “9.5”, which it stores as 9.5000;
+  // and with the values printed alike: "reads “7” back as “7”".
   test('refuses a value the field does not take in its column’s words, and one spelled otherwise than it reads back', () => {
     const reason = (key: string, value: unknown, before?: (objects: ObjectMeta[]) => void) =>
       refusals(key, value, before)[0]?.replace('/fields/0/default: ', '')
     expect(reason('status', 'x'.repeat(21))).toBe(`“${'x'.repeat(21)}” is not an answer status takes (at most 20 characters, counting an emoji as two)`)
-    expect(reason('status', 7)).toBe('“7” is not an answer status takes (expected text)')
-    expect(reason('created_by', 2147483648)).toBe('“2147483648” is not an answer created_by takes (enter a whole number from -2147483648 to 2147483647)')
-    expect(reason('created_by', 1.5)).toBe('“1.5” is not an answer created_by takes (its control holds a whole number)')
+    expect(reason('status', 7)).toBe('the number 7 is not an answer status takes (expected text)')
+    expect(reason('created_by', 2147483648)).toBe(
+      'the number 2147483648 is not an answer created_by takes (enter a whole number from -2147483648 to 2147483647)',
+    )
+    expect(reason('created_by', 1.5)).toBe('the number 1.5 is not an answer created_by takes (its control holds a whole number)')
     expect(reason('created_by', '7')).toBe('“7” is not an answer created_by takes (its control holds a whole number)')
     expect(reason('paid', 'true')).toBe('“true” is not an answer paid takes (expected true or false)')
     expect(reason('amount', '1e3')).toMatch(/^“1e3” is not an answer amount takes \(enter a number such as 1234\.56/)
     expect(reason('amount', '9.5')).toBe('amount reads “9.5” back as “9.5000”; give that')
     expect(reason('notes', '')).toBe('“” is not an answer notes takes (it is empty, which is how the field starts without one)')
     expect(reason('rush', 'yes', rush)).toBe('“yes” is not an answer rush takes (its control is a select of “true” and “false”)')
-    expect(reason('rush', true, rush)).toBe('“true” is not an answer rush takes (its control is a select of “true” and “false”)')
+    expect(reason('rush', true, rush)).toBe('the boolean true is not an answer rush takes (its control is a select of “true” and “false”)')
+    // Two values that print alike say which is which: a bigint is held as text, so 7 is a number it reads back as text.
+    const bigint = (objects: ObjectMeta[]) => retype(objects, 'order', 'created_by', 'bigint', INT64)
+    expect(reason('created_by', 7, bigint)).toBe('created_by reads the number 7 back as the text “7”; give that')
     expect(reason('code', '😀😀', code)).toBe('“😀😀” is not an answer code takes (longer than the 3 UTF-16 code units the field holds)')
     expect(reason('status', 'a\tb')).toBe(
       '“a\tb” is not an answer status takes (it holds a line break, a tab or another control character, which a one-line box draws otherwise)',
@@ -367,13 +373,58 @@ describe("a field's starting value as presentation (0150)", () => {
     expect(unwritten.conflicts).toEqual([
       expect.objectContaining({ kind: 'default-dropped', reason: 'status takes no starting value: a create does not write it, so the database fills it' }),
     ])
-    // A scale widened reads the value back otherwise: dropped and said, not respelled for the person.
-    const twoPlaces = (objects: ObjectMeta[]) => retype(objects, 'order', 'amount', 'decimal(18,2)', decimal(18, 2))
-    const priced = publish((form) => {
-      field(form, 'amount')['default'] = '9.50'
-    }, twoPlaces)
-    expect(regenerate(priced).conflicts).toEqual([
-      expect.objectContaining({ kind: 'default-dropped', field: 'amount', yours: '9.50', reason: 'amount now reads it back as “9.5000”' }),
+  })
+
+  // A value whose stored value the regenerated field takes as it is, only
+  // held otherwise by its control, is carried in the new spelling and said
+  // (`default-respelled`): a whole number whose column is now a bigint,
+  // held as text; a yes or no now nullable, a select of “true” and “false”;
+  // a decimal whose scale grew. Dropped only where the new field refuses
+  // the stored value. Watched failing with every new spelling dropped:
+  // “dropped: created_by now reads it back as “7””, which nobody can act on.
+  test('a value the regenerated field stores the same is respelled and said, not dropped', () => {
+    const counted = publish((form) => {
+      field(form, 'created_by')['default'] = 7
+      field(form, 'paid')['default'] = true
+      field(form, 'amount')['default'] = '9.5000'
+    })
+    const rebased = regenerate(counted, (objects) => {
+      retype(objects, 'order', 'created_by', 'bigint', INT64)
+      column(objects, 'order', 'paid').nullable = true
+      retype(objects, 'order', 'amount', 'decimal(20,6)', decimal(20, 6))
+    })
+    expect(rebased.conflicts).toEqual([
+      {
+        kind: 'default-respelled',
+        field: 'amount',
+        anchor: { kind: 'column', column: 'amount' },
+        yours: '9.5000',
+        now: '9.500000',
+        resolution: 'followed',
+        message: 'The starting value “9.5000” you chose for amount is now “9.500000”: the regenerated field holds it so, and a save stores the same value.',
+      },
+      expect.objectContaining({
+        kind: 'default-respelled',
+        field: 'created_by',
+        yours: 7,
+        now: '7',
+        message:
+          'The starting value the number 7 you chose for created_by is now the text “7”: the regenerated field holds it so, and a save stores the same value.',
+      }),
+      expect.objectContaining({ kind: 'default-respelled', field: 'paid', yours: true, now: 'true' }),
+    ])
+    expect(rebased.presentation.fields.map((entry) => [entry.field, entry.default])).toEqual([
+      ['amount', '9.500000'],
+      ['created_by', '7'],
+      ['paid', 'true'],
+    ])
+    const narrowed = regenerate(counted, (objects) => retype(objects, 'order', 'amount', 'decimal(18,2)', decimal(18, 2)))
+    expect(narrowed.conflicts).toEqual([
+      expect.objectContaining({
+        kind: 'default-dropped',
+        field: 'amount',
+        reason: '“9.5000” is not an answer amount takes (at most 2 digits after the decimal point)',
+      }),
     ])
   })
 })

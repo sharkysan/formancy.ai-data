@@ -9,7 +9,7 @@ import { placements } from './placement.js'
 import type { CarriedMoves } from './rebase-moves.js'
 import { carryMoves } from './rebase-moves.js'
 import { carryViews } from './rebase-views.js'
-import { shownValue, startingValue } from './starting-value.js'
+import { carriedStart, shownTogether, shownValue } from './starting-value.js'
 import { carryUnfiltered } from './unfiltered.js'
 import type {
   FieldAnchor,
@@ -48,6 +48,7 @@ const RANK: Record<PresentationConflict['kind'], number> = {
   'section-gone': 1,
   'view-dropped': 1,
   'default-dropped': 1,
+  'default-respelled': 1,
 }
 
 /** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order, then views in their order. */
@@ -65,6 +66,8 @@ interface Rebase {
   newFields: readonly FieldDef[]
   /** Each new key's binding, from the regenerated bindings. */
   newBinding: (key: string) => FieldBinding | undefined
+  /** Each old key's binding, from the published bindings. */
+  oldBinding: (key: string) => FieldBinding | undefined
   /** Each old key's anchor, from the published bindings. */
   anchorOf: ReadonlyMap<string, FieldAnchor>
   /** An old key's new key, followed by what it stands for, or `undefined` when it is gone. */
@@ -281,29 +284,44 @@ function carryHelpText(rebase: Rebase, entry: FieldPresentation, now: string, ke
  * kept over a default the generator changed too -- the column's, changed
  * in the database -- is said (`both-changed`). A value the regenerated field no
  * longer takes -- its column holds less or another kind, a create no longer
- * writes it, or it reads the value back otherwise -- is dropped and said
- * (`default-dropped`), in the words a publish would refuse it in.
+ * writes it -- is dropped and said (`default-dropped`), in the words a
+ * publish would refuse it in. One whose stored value the new field takes,
+ * held in another spelling -- the number 7 as the text “7” once the column
+ * is a bigint -- is carried so and said (`default-respelled`, `carriedStart`).
  */
 function carryStartingValue(rebase: Rebase, entry: FieldPresentation, now: string, kept: Overrides): void {
   const yours = entry.default as StartingValue
   const field = rebase.newFields.find((candidate) => candidate.key === now) as FieldDef
   const generator = field.default as StartingValue | undefined
   if (same(yours, generator)) return
-  const taken = startingValue(rebase.newBinding(now) as FieldBinding, field, yours)
-  const reason = !taken.ok ? taken.problem : same(taken.answer, yours) ? null : `${now} now reads it back as ${shownValue(taken.answer)}`
-  if (reason !== null) {
+  const taken = carriedStart(rebase.oldBinding(entry.field) as FieldBinding, rebase.newBinding(now) as FieldBinding, field, yours)
+  if (!taken.ok) {
     rebase.add(rebase.subjectOf(entry.field), {
       kind: 'default-dropped',
       field: now,
       anchor: entry.anchor,
       yours,
-      reason,
+      reason: taken.problem,
       resolution: 'dropped',
-      message: `The starting value ${shownValue(yours)} you chose for ${now} was dropped: ${reason}.`,
+      message: `The starting value ${shownValue(yours)} you chose for ${now} was dropped: ${taken.problem}.`,
     })
     return
   }
-  kept.default = yours
+  // The generator now starts the field there itself: no override, and nothing to say.
+  if (same(taken.answer, generator)) return
+  if (!same(taken.answer, yours)) {
+    const [was, is] = shownTogether(yours, taken.answer)
+    rebase.add(rebase.subjectOf(entry.field), {
+      kind: 'default-respelled',
+      field: now,
+      anchor: entry.anchor,
+      yours,
+      now: taken.answer,
+      resolution: 'followed',
+      message: `The starting value ${was} you chose for ${now} is now ${is}: the regenerated field holds it so, and a save stores the same value.`,
+    })
+  }
+  kept.default = taken.answer
   const was = rebase.oldFields.find((candidate) => candidate.key === entry.field)?.default
   if (same(was, generator) || generator === undefined) return
   rebase.add(rebase.subjectOf(entry.field), {
@@ -417,6 +435,7 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
   const anchorOf = new Map(published.bindings.fields.map((binding) => [binding.field, fieldAnchor(binding)]))
   const newKeys = keysByAnchor(regenerated.bindings)
   const newBindings = new Map(regenerated.bindings.fields.map((binding) => [binding.field, binding]))
+  const oldBindings = new Map(published.bindings.fields.map((binding) => [binding.field, binding]))
   const oldFields = published.base.model.fields
   const newFields = regenerated.base.model.fields
   const conflicts: Ranked[] = []
@@ -426,6 +445,7 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     oldFields,
     newFields,
     newBinding: (key) => newBindings.get(key),
+    oldBinding: (key) => oldBindings.get(key),
     anchorOf,
     // A key the published bindings do not hold follows to nothing: a stored list view names one only by a hand edit (0105).
     follow: (key) => {

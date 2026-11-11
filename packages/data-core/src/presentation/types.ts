@@ -144,6 +144,13 @@ export type PresentationConflict =
    * would refuse it.
    */
   | { kind: 'default-dropped'; field: string; anchor: FieldAnchor; yours: StartingValue; reason: string; resolution: 'dropped'; message: string }
+  /**
+   * A starting value the regenerated field stores the same and holds in
+   * another spelling (0150): a whole number whose column is now a bigint,
+   * held as text; a yes or no now nullable. `field` is the new key, `now`
+   * the spelling carried.
+   */
+  | { kind: 'default-respelled'; field: string; anchor: FieldAnchor; yours: StartingValue; now: StartingValue; resolution: 'followed'; message: string }
   /** `from` and `to` are where the field is placed: the section the person moved it to, else the generator's. */
   | { kind: 'moved-section'; field: string; from: SectionAnchor; to: SectionAnchor; resolution: 'followed'; message: string }
   /**

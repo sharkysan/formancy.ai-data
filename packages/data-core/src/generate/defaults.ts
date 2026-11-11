@@ -218,8 +218,18 @@ export type GivenStart = { ok: true; answer: string | number | boolean } | { ok:
  */
 export function givenStart(binding: ColumnBinding, field: FieldDef, value: string | number | boolean): GivenStart {
   const stored = storedValue(binding, value)
-  if (!stored.ok) return { ok: false, reason: stored.reason }
-  const taken = answerTaken(codecForType(binding.type, binding.nullable), binding, field, stored.value)
+  return stored.ok ? storedStart(binding, field, stored.value) : { ok: false, reason: stored.reason }
+}
+
+/**
+ * `stored`, a value a column of `binding`'s type would store, as the
+ * answer `field` starts with: `givenStart` from the stored value rather
+ * than from an answer, which a rebase asks of a value stored under the
+ * bindings before (0150) -- the same stored value under a new spelling, or
+ * why the new field refuses it.
+ */
+export function storedStart(binding: ColumnBinding, field: FieldDef, stored: unknown): GivenStart {
+  const taken = answerTaken(codecForType(binding.type, binding.nullable), binding, field, stored)
   if (taken.kind === 'refused') return { ok: false, reason: taken.reason }
   if (taken.answer === '') return { ok: false, reason: 'it is empty, which is how the field starts without one' }
   return { ok: true, answer: taken.answer }

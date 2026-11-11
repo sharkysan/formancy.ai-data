@@ -41,6 +41,11 @@ export function startNote(notes: readonly GenerationNote[], key: string): Genera
   return notes.find((note) => note.subject === key && note.message.startsWith('Starts'))
 }
 
+/** A starting value as the step's status says what it set: as its box shows it, quoted, where data-core's sentences name a number as one. */
+export function quoted(value: StartingValue): string {
+  return `“${String(value)}”`
+}
+
 /** A starting value as a box shows it; none is empty. */
 function asText(value: FieldDef['default']): string {
   return value === undefined ? '' : String(value)
@@ -120,13 +125,13 @@ export function StartingValueControl({
   const give = (text: string, answer: StartingValue) => {
     if (text === '' && column !== undefined) {
       return setProblem(
-        `Left empty, a new record would store the column’s default, ${shownValue(column)}, without showing it. Until it has a value, the field keeps the starting value it had.`,
+        `Left empty, a new record would store the column’s default, ${quoted(column)}, without showing it. Until it has a value, the field keeps the starting value it had.`,
       )
     }
     if (text === '') return set(undefined, `Removed the starting value of ${key}.`)
     const read = reading(field, binding, answer)
     if (!read.ok) return setProblem(`${read.problem}. Until it is one, the field keeps the starting value it had.`)
-    return set(read.answer, `Gave ${key} the starting value ${shownValue(read.answer)}.`)
+    return set(read.answer, `Gave ${key} the starting value ${quoted(read.answer)}.`)
   }
   const hint = `${id}-hint`
   const described = problem === null ? hint : `${hint} ${id}-problem`
@@ -176,7 +181,7 @@ export function StartingValueControl({
           type="button"
           className="button"
           onClick={() => {
-            set(column, `Gave ${key} the column’s default, ${shownValue(column)}.`)
+            set(column, `Gave ${key} the column’s default, ${quoted(column)}.`)
             focusAfter(id)
           }}
         >
