@@ -102,6 +102,8 @@ describe('readConstant (0149)', () => {
     ['postgres', "'it''s'::character varying", { kind: 'text', text: "it's", national: false }],
     ['postgres', "''::text", { kind: 'text', text: '', national: false }],
     ['postgres', "'Zürich'::character varying", { kind: 'text', text: 'Zürich', national: false }],
+    // A control character is read as spelled: whether the field's box draws it is the field's to say (0150).
+    ['postgres', "'a\nb'::text", { kind: 'text', text: 'a\nb', national: false }],
     ['postgres', 'true', { kind: 'boolean', value: true }],
     ['postgres', 'false', { kind: 'boolean', value: false }],
     ['postgres', '1', { kind: 'number', text: '1' }],
@@ -111,6 +113,7 @@ describe('readConstant (0149)', () => {
     ['postgres', "'-1.5'::numeric", { kind: 'number', text: '-1.5' }],
     ['postgres', "'7'::smallint", { kind: 'number', text: '7' }],
     ['sqlserver', "('draft')", { kind: 'text', text: 'draft', national: false }],
+    ['sqlserver', "('a\tb')", { kind: 'text', text: 'a\tb', national: false }],
     ['sqlserver', "(N'Zürich')", { kind: 'text', text: 'Zürich', national: true }],
     ['sqlserver', "('it''s')", { kind: 'text', text: "it's", national: false }],
     ['sqlserver', "('')", { kind: 'text', text: '', national: false }],
@@ -128,9 +131,8 @@ describe('readConstant (0149)', () => {
   // sequence, NULL, an expression, another type's literal, and the other
   // engine's spellings. A backslash in a PostgreSQL literal means one thing
   // under standard_conforming_strings and another without it, which the
-  // snapshot does not record; a control character is drawn otherwise by a
-  // text box than the column holds it. Watched failing with the text
-  // pattern unanchored: 'a'::text || 'b'::text was read as a.
+  // snapshot does not record. Watched failing with the text pattern
+  // unanchored: 'a'::text || 'b'::text was read as a.
   test.each([
     ['postgres', 'now()'],
     ['postgres', 'gen_random_uuid()'],
@@ -144,7 +146,6 @@ describe('readConstant (0149)', () => {
     ['postgres', "'{}'::text[]"],
     ['postgres', "'NaN'::numeric"],
     ['postgres', "'a\\b'::text"],
-    ['postgres', "'a\nb'::text"],
     ['postgres', '(1 + 1)'],
     ['postgres', "('draft')"],
     ['postgres', '((1))'],
@@ -155,7 +156,6 @@ describe('readConstant (0149)', () => {
     ['sqlserver', '((1)+(1))'],
     ['sqlserver', '((1.5E3))'],
     ['sqlserver', "(('draft'))"],
-    ['sqlserver', "('a\tb')"],
     ['sqlserver', "'draft'::character varying"],
     ['sqlserver', 'true'],
     ['sqlserver', '1'],
@@ -278,6 +278,29 @@ describe('a new record starts with its column’s constant default (0149)', () =
     expect(notes).toContainEqual(
       expect.objectContaining({ subject: 'code', message: expect.stringMatching(/^Starts empty: .*\(longer than the 3 UTF-16 code units the field holds\)/) }),
     )
+  })
+
+  // A one-line box draws a line break or a tab otherwise than the column
+  // holds it, and no box draws another control character as it is: the
+  // field refuses such a constant, as it refuses an administrator's
+  // starting value (0150), one reading, and says so; a multi-line box
+  // starts at a line feed. Watched failing with the reading left to the
+  // constant's reader: the tab was no default and no note, and the multi-
+  // line field's line feed was no default either.
+  test('a constant a one-line box draws otherwise is no default, and said; a line feed starts a multi-line field', () => {
+    // PostgreSQL's: SQL Server's ('a\tb') is past printable ASCII, which its code page decides, and no default already.
+    const { form, notes } = single('postgres', col('code', varchar(20), "'a\tb'::character varying"))
+    expect(field(form, 'code')).not.toHaveProperty('default')
+    expect(notes).toContainEqual(
+      expect.objectContaining({
+        subject: 'code',
+        message: expect.stringMatching(/^Starts empty: .*\(it holds a line break, a tab or another control character, which a one-line box draws otherwise\)/),
+      }),
+    )
+    const multi = single('postgres', col('remark', { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }, "'a\nb'::text"))
+    expect(field(multi.form, 'remark').default).toBe('a\nb')
+    const other = single('postgres', col('remark', { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }, "'a\rb'::text"))
+    expect(field(other.form, 'remark')).not.toHaveProperty('default')
   })
 
   // A non-N literal in T-SQL is read in the database's code page, and an

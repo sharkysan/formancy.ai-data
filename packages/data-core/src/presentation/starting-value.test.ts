@@ -210,6 +210,13 @@ describe("a field's starting value as presentation (0150)", () => {
     expect(reason('rush', 'yes', rush)).toBe('“yes” is not an answer rush takes (its control is a select of “true” and “false”)')
     expect(reason('rush', true, rush)).toBe('“true” is not an answer rush takes (its control is a select of “true” and “false”)')
     expect(reason('code', '😀😀', code)).toBe('“😀😀” is not an answer code takes (longer than the 3 UTF-16 code units the field holds)')
+    expect(reason('status', 'a\tb')).toBe(
+      '“a\tb” is not an answer status takes (it holds a line break, a tab or another control character, which a one-line box draws otherwise)',
+    )
+    expect(reason('notes', 'a\rb')).toBe(
+      '“a\rb” is not an answer notes takes (it holds a control character other than a line feed or a tab, which a box draws otherwise)',
+    )
+    expect(refusals('notes', 'a\nb\tc')).toEqual([])
     expect(refusals('rush', 'true', rush)).toEqual([])
     expect(refusals('code', 'abc', code)).toEqual([])
   })
@@ -224,9 +231,9 @@ describe("a field's starting value as presentation (0150)", () => {
   // characters the column holds and four UTF-16 code units its box does not.
   test('every starting value it takes is one formancy’s validator and engine take, and a fresh form starts at it', () => {
     const candidates: Record<string, unknown[]> = {
-      status: ['draft', 'x'.repeat(20), 'x'.repeat(21), ' ', 'ü', '😀', 7, true],
+      status: ['draft', 'x'.repeat(20), 'x'.repeat(21), ' ', 'ü', '😀', 7, true, 'a\tb', 'a\nb', 'a\u007fb'],
       amount: ['9.5000', '-0.0001', '99999999999999.9999', '0.0000', '9.5', '100000000000000.0000', '1e3', 9.5],
-      notes: ['None so far.', 'x'.repeat(5000), '', false],
+      notes: ['None so far.', 'x'.repeat(5000), '', false, 'a\nb', 'a\tb', 'a\r\nb', 'a\u0001b'],
       created_by: [0, -2147483648, 2147483647, 2147483648, 1.5, '7'],
       paid: [true, false, 'true', 1],
       rush: ['true', 'false', true, 'yes'],
@@ -249,7 +256,7 @@ describe("a field's starting value as presentation (0150)", () => {
       }
     }
     // The candidates are worth asking: most are taken, and the rest are not.
-    expect(taken).toBe(19)
+    expect(taken).toBe(21)
   })
 
   // The one decision the studio asks before it sets a value, applyPresentation

@@ -30,10 +30,16 @@ import type { FieldBinding, GenerationNote } from './types.js'
 /** A constant as a column's default spells it: text, a number's decimal digits, or a truth value. `national` is T-SQL's N prefix. */
 export type Constant = { kind: 'text'; text: string; national: boolean } | { kind: 'number'; text: string } | { kind: 'boolean'; value: boolean }
 
-/** Whether `text` holds a C0 control or DEL: a text box draws a line break or a tab otherwise than the column holds it. */
-function hasControl(text: string): boolean {
+/**
+ * Whether `text` holds a C0 control or DEL that `field`'s box draws otherwise
+ * than the column holds it: any, in a one-line box, which draws a line break
+ * or a tab otherwise; any but a line feed or a tab in a multi-line one,
+ * which keeps those two -- a carriage return it reads back as a line feed.
+ */
+function drawnOtherwise(field: FieldDef, text: string): boolean {
   for (let at = 0; at < text.length; at += 1) {
     const code = text.charCodeAt(at)
+    if (field.type === 'textarea' && (code === 0x0a || code === 0x09)) continue
     if (code < 0x20 || code === 0x7f) return true
   }
   return false
@@ -59,9 +65,8 @@ const POSTGRES_TEXT = /^'((?:[^']|'')*)'::(?:text|character varying|bpchar)$/
 const SQLSERVER_NUMBER = /^\(\((-?[0-9]+(?:\.[0-9]+)?)\)\)$/
 const SQLSERVER_TEXT = /^\((N?)'((?:[^']|'')*)'\)$/
 
-function textConstant(quoted: string, national: boolean): Constant | null {
-  const text = quoted.replaceAll("''", "'")
-  return hasControl(text) ? null : { kind: 'text', text, national }
+function textConstant(quoted: string, national: boolean): Constant {
+  return { kind: 'text', text: quoted.replaceAll("''", "'"), national }
 }
 
 function readPostgres(expression: string): Constant | null {
@@ -171,9 +176,10 @@ type Taken = { kind: 'answer'; answer: string | number | boolean } | { kind: 're
 /**
  * `stored`, a value the column would store and never null, as the answer
  * `field` starts with: through the column's codec and `formValue`, as a
- * record holding it is read back, and only where the field's box holds it,
- * counting UTF-16 code units, never fewer than the codec counts in the
- * column's unit. The one reading of a starting answer, the column's
+ * record holding it is read back, and only where the field's box holds it:
+ * draws it as the column holds it (`drawnOtherwise`), and counts it within
+ * its UTF-16 code units, never fewer than the codec counts in the column's
+ * unit. The one reading of a starting answer, the column's
  * constant's (`startingAnswer`) and an administrator's (`givenStart`) alike.
  */
 function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stored: unknown): Taken {
@@ -181,6 +187,15 @@ function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stor
   if (!parsed.ok) return { kind: 'refused', reason: clause(parsed.message) }
   // Never null: the codec was handed a value, and returns one.
   const answer = formValue(binding, parsed.value) as string | number | boolean
+  if (typeof answer === 'string' && drawnOtherwise(field, answer)) {
+    return {
+      kind: 'refused',
+      reason:
+        field.type === 'textarea'
+          ? 'it holds a control character other than a line feed or a tab, which a box draws otherwise'
+          : 'it holds a line break, a tab or another control character, which a one-line box draws otherwise',
+    }
+  }
   if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
     return { kind: 'refused', reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
   }
