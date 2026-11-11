@@ -18,6 +18,31 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A new record starts with its column's constant default** (0149). Why:
+  a field whose column defaults to a constant started empty, and a create
+  that left it so stored the database's default or, sent empty, NULL or a
+  refusal -- the person could not see which. What you notice: New record
+  on the host page, a child's new row, the studio's preview and the
+  examples page start a field the create writes at its column's constant
+  -- text, a whole or exact number, yes or no -- through the column's
+  codec, so the fixture's order starts at `draft` and its customer with
+  Active ticked; a save that leaves it sends it, and the generator's notes
+  say "Starts with the column's default, draft." A constant the field
+  would refuse -- too long, out of range, a fraction for a whole number --
+  is said in a note and left to the database, and so is a lookup's
+  default, since the record it names may be one the person may not
+  choose. A function, a sequence, NULL, a date, an instant, a float or a
+  uuid, and a SQL Server literal outside ASCII but an N literal on an
+  nvarchar, are not read. A record opened, a Duplicate and a form
+  discarded back to start as handed in; a field the person may not give on
+  create, and a state field whose default is not one a create may start
+  the record in, start empty. No snapshot changes: the default is read
+  from the spelling discovery already stored. A form published before
+  this release gains its defaults when it is generated again; a studio
+  session or a draft holding a base generated before is refused at
+  publish until it is generated again, as every generator change is
+  (0030). Nothing in the studio changes or clears a default yet.
+
 - **The host page says what the server did, and keeps the demo's controls
   out of the way** (0146). Why: the design of finding records asks for a
   page that is easy to use and fun -- the rows on screen staying, dimmed,

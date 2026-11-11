@@ -54,8 +54,8 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
   // New record draws Status at draft in both renderers, the state's box a
   // person reads before Save; saved without touching it, from either
   // renderer, the create carries draft and the record holds it. Watched
-  // failing in CI with the session opening a new record over no answers
-  // (B4 of the breaks commit): both renderers drew an empty Status.
+  // failing in CI with the copy for a create dropping the defaults of the
+  // fields this person gives: both renderers drew an empty Status.
   test('draws Status at draft in both renderers, and a save that leaves it sends and stores it', async () => {
     const user = await openForm(plane, engine.formId)
     for (const renderer of RENDERERS) {
@@ -77,8 +77,8 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
 
   // A record read starts as stored, never at the default, and so does a
   // copy of it, Duplicate record's; New record after it starts at draft
-  // again. Watched failing in CI with the default written over a record's
-  // answers (B5): the placed order was drawn as draft.
+  // again. Watched failing in CI with the defaults written over a
+  // record's answers: the placed order was drawn as draft.
   test('draws a record read, and a copy of it, as stored, and New record at draft again', async () => {
     const record = await placedOrder(engine.formId)
     const user = await openForm(plane, engine.formId)
@@ -96,9 +96,10 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
   // empty on a new record -- its default would be a value of a field they
   // may not see -- and the database fills it when the create leaves it
   // out; on a record read it is empty too, the record's answers holding
-  // none. Watched failing in CI with the copy for a create keeping every
-  // default (B6): the new order's Status was drawn at draft; and with the
-  // default written over a record's answers (B5): the read one's too.
+  // none. Watched failing in CI with the copy for a create keeping the
+  // defaults of the fields this person does not give: the new order's
+  // Status was drawn at draft. The record read is session-work.test.ts's
+  // too, without a server.
   test('draws neither the default nor a record’s status for a person who may not read it', async () => {
     const record = await placedOrder(engine.formId)
     const user = await openForm(plane, engine.unread)

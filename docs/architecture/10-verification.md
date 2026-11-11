@@ -94,7 +94,9 @@ server answered, which reports the difference and does not prevent it.
   changes to a form's own table in
   `packages/data-fixtures/src/drifting.ts`
   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
-  lists, deletes, cascades and uuid keys beside them, and a file of
+  lists, deletes, cascades, uuid keys and a column's constant default --
+  each engine's spelling, one starting answer, what the database stores
+  (`defaults.ts`, 0149) -- beside them, and a file of
   records in `packages/data-fixtures/src/exports.ts`: `export: shipments`,
   the bytes both adapters' lists must make through data-core's export, a
   double, a real and a zoneless timestamp's fraction where the engines

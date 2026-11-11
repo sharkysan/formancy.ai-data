@@ -676,8 +676,9 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
   // negative integer is quoted and cast, so it reads back as itself. The
   // varchar(3)'s 'toolong' is taken at CREATE and refused by the insert
   // that leaves the column out, as it is refused by its codec. Watched
-  // failing in CI with the reader's spelling of 'it''s' broken (B1 of the
-  // breaks commit) and with the codec skipped (B3).
+  // failing in CI with discovery spelling 'it''s' inside parentheses (it
+  // was not read, and quoted started empty) and with data-core reading a
+  // whole number without its sign (below started, and was stored, at 1).
   const { schema, name } = DEFAULT_TABLE
   const request: GenerationRequest = { connection: 'test', root: DEFAULT_TABLE, formId: 'defaulted', title: 'Defaulted', lookups: [], versionColumn: 'version' }
   const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }

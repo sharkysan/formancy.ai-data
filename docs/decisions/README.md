@@ -172,7 +172,7 @@ only enforcement is "we remember" says so plainly.
 | [0115](0115-a-host-page-changes-an-open-version-from-a-date.md) | A host page changes an open version from a date, its next version opened in every pane | accepted; extended by 0117 |
 | [0116](0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md) | Every TypeScript and JavaScript file is linted and formatted by the rules the four formancy repositories share, a copy of Formancy Health's until formancy.ai publishes them, with this repository's paths; `verify` runs both after the typecheck; five files split before the format so none passes the size budget; a branch begun before the format merges main through `scripts/prettier-merge.mjs`; the format commits, which blame skips, merged with a merge commit | accepted |
 | [0117](0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md) | A form names the fields each write accepts from its person, and a host page neither offers nor sends one that no write accepts | accepted; narrowed by 0122 |
-| [0118](0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md) | Generated forms move to spec 5 for a field's help text from its column's comment, and the server serves spec 3 beside it | accepted; extended by 0119; narrowed by 0120 |
+| [0118](0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md) | Generated forms move to spec 5 for a field's help text from its column's comment, and the server serves spec 3 beside it | accepted; extended by 0119; narrowed by 0120; amended by 0149 |
 | [0119](0119-a-fields-help-text-is-presentation-the-studio-edits.md) | A field's help text is presentation the studio edits, carried by its column through a regeneration | accepted |
 | [0120](0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md) | A whole-number field refuses a fraction in the browser, as the server does | accepted |
 | [0121](0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md) | A PostgreSQL lookup's cancel is sent again while a delivered one leaves its statement running | accepted |
@@ -181,7 +181,7 @@ only enforcement is "we remember" says so plainly.
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted; amended by 0128 |
-| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129 |
+| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129; extended by 0149 |
 | [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md) | The grids of an open form share a person's own views | accepted |
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
@@ -203,3 +203,4 @@ only enforcement is "we remember" says so plainly.
 | [0146](0146-the-page-says-what-the-server-did.md) | The page says what the server did, and keeps the demo's controls out of the way | accepted |
 | [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |
 | [0148](0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md) | The workspace's Node is one every package it installs accepts, and so is the server image's | accepted |
+| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted |
