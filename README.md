@@ -1453,9 +1453,9 @@ stops it. No command does that for you yet.
 | `jose`, by `@formancy/data-identity` | 6.2.12 | `^6.2.12` |
 | `postgres`, by `@formancy/data-postgres` | 3.4.9 | `^3.4.9` |
 | `@fastify/rate-limit`, by `@formancy/data-server` | 11.2.0 | `^11.2.0` |
-| `fastify`, by `@formancy/data-server` | 5.12.5 | `^5.12.5` |
+| `fastify`, by `@formancy/data-server` | 5.12.8 | `^5.12.8` |
 | `jose`, by `@formancy/data-server` | 6.2.12 | `^6.2.12` |
-| `@azure/identity`, by `@formancy/data-sqlserver` | 4.13.3 | `4.13.3` |
+| `@azure/identity`, by `@formancy/data-sqlserver` | 4.14.1 | `4.14.1` |
 | `@types/mssql`, by `@formancy/data-sqlserver` | 12.3.0 | `^12.3.0` |
 | `mssql`, by `@formancy/data-sqlserver` | 12.7.4 | `^12.0.0` |
 | `tedious`, under `mssql` | 20.3.7 | `^19.2.2 \|\| ^20.0.0`, by `mssql` |
@@ -1467,7 +1467,7 @@ stops it. No command does that for you yet.
 | `@formancy/react` | 0.13.0 | `0.13.0` |
 | `@formancy/spec` | 0.13.0 | `0.13.0` |
 | `@formancy/themes` | 0.13.0 | `0.13.0` |
-| Node, the workspace |  | `>=22.12.0` |
+| Node, the workspace |  | `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` |
 | Node, the server image | `node:22.12-alpine`, every stage |  |
 | Node, CI | 22 |  |
 | pnpm | 12.4.2, through corepack | `pnpm@12.4.2`, the root's `packageManager` |

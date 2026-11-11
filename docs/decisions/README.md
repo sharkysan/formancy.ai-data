@@ -202,3 +202,4 @@ only enforcement is "we remember" says so plainly.
 | [0145](0145-the-layout-is-the-persons.md) | The layout is the person's: Stacked first, its height shared by a line they move, and the layout they chose kept | accepted |
 | [0146](0146-the-page-says-what-the-server-did.md) | The page says what the server did, and keeps the demo's controls out of the way | accepted |
 | [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |
+| [0148](0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md) | The workspace's Node is one every package it installs accepts, and so is the server image's | accepted |

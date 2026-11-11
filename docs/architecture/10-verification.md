@@ -167,6 +167,12 @@ and each of these fails on the change that breaks what it holds:
   and notice texts of what it bundles
   ([0046](../decisions/0046-a-built-app-carries-the-licence-and-notice-texts-of-everything-it-bundles.md)).
   `scripts/check-cla.test.mjs`: a change to `CLA.md` under a signature.
+- **Node.** `scripts/node-floor.test.mjs`: every release the workspace's
+  Node floor admits one every package the lockfile installs accepts, and
+  the server image's runtime Node one every package of the server's
+  production deploy accepts, each read from the `engines` the package
+  declares
+  ([0148](../decisions/0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md)).
 - **Size and look.** `scripts/source-size.test.mjs`: no source file past
   the budget `CLAUDE.md` sets. `scripts/palette.test.mjs`: every app that
   draws with the admin's palette imports `@formancy/themes/room.css`, and no

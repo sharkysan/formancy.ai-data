@@ -2487,7 +2487,7 @@
         },
         {
           "area": "operations",
-          "says": "@azure/identity is a dependency of `@formancy/data-sqlserver` at exactly 4.13.3, so a fix to it reaches an installation only through a release of this module that moves the version."
+          "says": "@azure/identity is a dependency of `@formancy/data-sqlserver` at exactly 4.14.1, so a fix to it reaches an installation only through a release of this module that moves the version."
         },
         {
           "area": "server",
@@ -4175,6 +4175,31 @@
           "area": "studio",
           "says": "A header box's refusal on the Browse step is said in the step's alert, in the line's or the server's words, which do not always name the column, and stays said until the box changes; on a phone the alert may be out of view of the box.",
           "heldBy": "apps/studio/src/browse-line.test.tsx"
+        }
+      ]
+    },
+    "0148": {
+      "reviewed": "sha256:28ffb9f2fe56f2cfb080f8c99f008b1335f5ed55644dd20fa0c65c9d87650aa8",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "Building and testing this repository needs Node 22.22.3 or a later 22, 24.15 or a later 24, or 26 or later, which every package it installs accepts, where it said 22.12 or later before."
+        },
+        {
+          "area": "testing",
+          "says": "The Node floor and the server image's runtime Node are held to what each installed package declares in its engines field, so a package that needs more Node than it declares is not caught."
+        },
+        {
+          "area": "operations",
+          "says": "The server image's runtime stays on node:22.12-alpine, which every package of the server's production deploy accepts; its build stage, and the web and demo images', build on 22.12 with tools that ask for 22.22, which nothing holds."
+        },
+        {
+          "area": "testing",
+          "says": "Two security advisories stay open, under development tools alone: glob 10 beneath testcontainers' archiver and minimatch 9 and 10 beneath it and ESLint, which have no fix in their major lines."
+        },
+        {
+          "area": "testing",
+          "says": "oxc-parser's WebAssembly binding, under @angular/build, is installed on every platform and pins an @emnapi/core its own runtime does not accept; nothing loads it where a native binding exists, and pnpm peers check names it."
         }
       ]
     }
