@@ -13,7 +13,7 @@ import { AUDIENCE, ISSUER, TENANT_CLAIM } from '@formancy/data-live-demo/worker'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import { inject } from 'vitest'
-import { childForms, clerkPolicy, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, WITHHELD_VIEWS } from './test-forms.js'
+import { childForms, clerkPolicy, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, STARTING, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
 import { injectingFetch } from './test-fetch.js'
 import type { Sent } from './test-fetch.js'
@@ -92,7 +92,10 @@ export const PAGED = inject('paged')
  * `startPlane({ views: true })` publishes for the clerk to read without
  * Amount, with views whose default is on Amount (0105); `unread` the order
  * form again, which `startPlane({ unread: true })` publishes for the clerk
- * to create and update without reading or writing its status (0149).
+ * to create and update without reading or writing its status (0149);
+ * `starting` the order form again, which `startPlane({ starting: true })`
+ * publishes with `STARTING`, its status's default taken away and its group
+ * started at Online (0150).
  */
 export const ENGINES = [
   {
@@ -110,6 +113,7 @@ export const ENGINES = [
     withheld: 'pg-order-withheld',
     moves: 'pg-order-moves',
     unread: 'pg-order-unread',
+    starting: 'pg-order-starting',
     party: 'pg-party',
     company: 'pg-party-company',
     price: 'pg-price',
@@ -129,6 +133,7 @@ export const ENGINES = [
     withheld: 'ms-order-withheld',
     moves: 'ms-order-moves',
     unread: 'ms-order-unread',
+    starting: 'ms-order-starting',
     party: 'ms-party',
     company: 'ms-party-company',
     price: 'ms-price',
@@ -216,7 +221,8 @@ export interface Plane {
  * published over `parity.price`, a chain of versions, whose note the clerk
  * reads and may not write (0117). With `unread` (0149), the order form is
  * published again as `unread` of `ENGINES`, whose status the clerk neither
- * reads nor writes.
+ * reads nor writes. With `starting` (0150), the order form is published
+ * again as `starting` of `ENGINES`, with `STARTING` chosen over its base.
  */
 export async function startPlane(
   options: {
@@ -232,6 +238,8 @@ export async function startPlane(
     moves?: boolean
     /** An order form whose status, which defaults to draft, the clerk neither reads nor writes (0149). */
     unread?: boolean
+    /** An order form whose status starts empty and whose group starts at Online, chosen over the generated base (0150). */
+    starting?: boolean
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -291,13 +299,14 @@ export async function startPlane(
     return reply.json<Record<string, unknown>>()
   }
   const views = options.views === true
-  for (const { connection, formId: order, versionColumn, read, withheld, moves, unread } of ENGINES) {
+  for (const { connection, formId: order, versionColumn, read, withheld, moves, unread, starting } of ENGINES) {
     for (const formId of [
       order,
       ...(options.paged === true ? [read] : []),
       ...(views ? [withheld] : []),
       ...(options.moves === true ? [moves] : []),
       ...(options.unread === true ? [unread] : []),
+      ...(options.starting === true ? [starting] : []),
     ]) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection,
@@ -325,10 +334,14 @@ export async function startPlane(
                   : base
       // A presentation of views alone: the form is its base (0030, 0105).
       const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
-      const presentation: PresentationOverrides = named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }
+      // `starting`'s starting values (0150) are the one presentation here that changes the form, so it is applied as the server checks it.
+      const presentation: PresentationOverrides =
+        formId === starting ? { ...EMPTY_PRESENTATION, fields: STARTING } : named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }
+      const presented = applyPresentation(form as FormSchema, presentation, bindings as FormBindings)
+      if (!presented.ok) throw new Error(`the presentation of ${formId} does not apply: ${presented.problems.join('; ')}`)
       await admin(`/v1/forms/${formId}/versions`, {
         expectedBase: null,
-        bundle: { format: 2, connection, generation, base: form, presentation, form, bindings, policy, snapshot },
+        bundle: { format: 2, connection, generation, base: form, presentation, form: presented.form, bindings, policy, snapshot },
       })
     }
   }

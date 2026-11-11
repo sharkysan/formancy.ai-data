@@ -13,13 +13,15 @@ import type { Plane } from './test-plane.js'
  * record draws it in React and Angular, and a save that leaves it as it
  * is sends it and stores it. A record read and a copy start as handed in
  * (formancy.ai 0197), and a person who may not read the status sees
- * neither its default nor a record's. Found by role and accessible name.
+ * neither its default nor a record's. A starting value an administrator
+ * chose over the column's (0150) is what New record starts with instead.
+ * Found by role and accessible name.
  */
 
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ unread: true })
+  plane = await startPlane({ unread: true, starting: true })
 })
 
 afterAll(async () => {
@@ -91,6 +93,43 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
     for (const renderer of RENDERERS) await shows(renderer, 'Status', 'placed')
     await newRecord(user)
     for (const renderer of RENDERERS) await shows(renderer, 'Status', 'draft')
+  })
+
+  // The starting values chosen over the base (0150), published as the
+  // studio publishes them and served by the form route: New record draws
+  // the group at Online, whose column has no default, and the status,
+  // whose default draft was taken away, empty, in both renderers. Saved as
+  // it starts, the create sends Online and leaves the status out, and the
+  // database fills draft. To be watched failing in CI with
+  // applyPresentation leaving a value unset and a removal undone: Group
+  // should be drawn empty and Status at draft.
+  test('starts New record at the starting values chosen over the base, the one taken away empty, in both renderers', async () => {
+    const user = await openForm(plane, engine.starting)
+    // Both fields in one comparison, so a value left unset and a removal left undone are each seen.
+    await waitFor(() => {
+      for (const renderer of RENDERERS) {
+        expect({ renderer, group: control(renderer, 'Group').value, status: control(renderer, 'Status').value }).toEqual({
+          renderer,
+          group: 'Online',
+          status: '',
+        })
+      }
+    }, ARRIVES)
+    expect(await audit()).toEqual([])
+    const renderer = RENDERERS[0]
+    const from = plane.sent.length
+    await chooseCustomer(user, renderer, 'Muster', 'Muster AG')
+    await answer(user, renderer, 'Order date', EDGES.orderDate)
+    await answer(user, renderer, 'Amount', '3')
+    await save(user, renderer)
+    const record = (await said(renderer, /^Created record k1:\S+\.$/)).slice('Created record '.length, -1)
+    const [sent] = creates(engine.starting, from)
+    expect({ group: sent?.['group'], status: sent === undefined ? 'nothing sent' : Object.hasOwn(sent, 'status') }).toEqual({ group: 'Online', status: false })
+    const stored = await plane.clerk.read(engine.starting, record)
+    expect(stored.ok ? { group: stored.value.answers['group'], status: stored.value.answers['status'] } : stored.message).toEqual({
+      group: 'Online',
+      status: 'draft',
+    })
   })
 
   // The status this clerk neither reads nor writes is drawn disabled and
