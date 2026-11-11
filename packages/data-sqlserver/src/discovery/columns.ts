@@ -81,7 +81,7 @@ export const COLUMN_DEFINITION = `c.object_id, c.column_id, c.name,
     convert(int, collationproperty(c.collation_name, 'CodePage')) as code_page,
     c.is_nullable, c.is_identity, c.is_computed, c.generated_always_type,
     c.default_object_id,
-    replace(object_definition(c.default_object_id), N'(''it''''s'')', N'((''it''''s''))') as default_definition`
+    object_definition(c.default_object_id) as default_definition`
 
 export const COLUMN_SOURCE = `sys.columns c
   left join sys.types t on t.user_type_id = c.user_type_id

@@ -401,7 +401,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
           )
     return {
       // The defaults this person's create would take, and no other (0149): a page draws and submits what it is served.
-      form: startingDefaults(bundle.form, writable.create === null ? null : bundle.form.model.fields.map((field) => field.key), null),
+      form: startingDefaults(bundle.form, writable.create, moves),
       operations,
       readable: readable.ok ? readable.fields : [],
       list,

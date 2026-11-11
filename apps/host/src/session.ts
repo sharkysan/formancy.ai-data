@@ -193,19 +193,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   // A field's default, the create's alone, is served only where this
   // person's create takes it (0149), so the copy starts nothing a save of
   // it would be refused for.
-  const notGiven = [...fixed, ...notAcceptedOn(definition, 'create', unwritten)]
-  const disabledForCreate = disableFields(definition.form, notGiven)
-  const forCreate = {
-    ...disabledForCreate,
-    model: {
-      ...disabledForCreate.model,
-      fields: disabledForCreate.model.fields.map((field) => {
-        if (notGiven.includes(field.key)) return field
-        const { default: _, ...rest } = field
-        return rest
-      }),
-    },
-  }
+  const forCreate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'create', unwritten)])
   const forUpdate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'update', unwritten)])
   const form = definition.form
   // A saved record this person may not update is drawn with every field
@@ -280,8 +268,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
           : !allows('update') || ended(record)
             ? readOnly
             : forUpdateOf(record)
-    const initialValue =
-      record !== undefined ? { ...record.answers, ...withDefaults(schema, {}) } : prefill === undefined ? undefined : withDefaults(schema, prefill)
+    const initialValue = record !== undefined ? record.answers : prefill === undefined ? undefined : withDefaults(schema, prefill)
     const engine = createFormEngine({
       schema,
       // One id namespace per renderer: two renderers of one document on one
