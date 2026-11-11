@@ -1,10 +1,10 @@
-import { createFormEngine } from '@formancy/core'
+import { createFormEngine, withDefaults } from '@formancy/core'
 import type { FormEngine } from '@formancy/core'
 import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
 import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
 import type { Work } from './leave.js'
 import { withMoves } from './moves.js'
-import { disableFields } from './widgets.js'
+import { disableFields, withoutDefaults } from './widgets.js'
 
 /*
  * One pane's session: the engine that holds a person's answers, the record
@@ -190,7 +190,11 @@ export function createSession({ client, formId, definition, renderer, namespace,
   // from this person disabled -- on a saved record a field written on create
   // only, which an update would refuse (0122). A new record keeps its copy
   // through the updates after its create, since the engine is kept (0029).
-  const forCreate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'create', unwritten)])
+  // A field disabled on the create starts empty too: its column's default
+  // would be submitted, and refused as a field this person may not give
+  // (0149); left empty, it is left out, and the database fills it.
+  const notGiven = [...fixed, ...notAcceptedOn(definition, 'create', unwritten)]
+  const forCreate = withoutDefaults(disableFields(definition.form, notGiven), notGiven)
   const forUpdate = disableFields(definition.form, [...fixed, ...notAcceptedOn(definition, 'update', unwritten)])
   const form = definition.form
   // A saved record this person may not update is drawn with every field
@@ -248,21 +252,30 @@ export function createSession({ client, formId, definition, renderer, namespace,
     return from === undefined ? forUpdate : withMoves(forUpdate, definition.moves, from)
   }
 
-  function open(record?: FormRecord, follows?: SessionState['follows']): FormEngine {
+  /**
+   * A new engine. Over `record`, its answers as handed in -- a record read,
+   * a copy, a next version, a draft discarded back to -- and never a
+   * default (formancy.ai 0197). Over nothing, a new record: the engine
+   * starts each field at its default (0149), and at `prefill`'s answer
+   * where it gives one -- the parent a child's row is under.
+   */
+  function open(record?: FormRecord, follows?: SessionState['follows'], prefill?: Record<string, unknown>): FormEngine {
     const token = record?.record ?? undefined
+    const schema =
+      follows !== undefined
+        ? following
+        : token === undefined
+          ? withMoves(forCreate, definition.moves, null)
+          : !allows('update') || ended(record)
+            ? readOnly
+            : forUpdateOf(record)
+    const initialValue = record !== undefined ? record.answers : prefill === undefined ? undefined : withDefaults(schema, prefill)
     const engine = createFormEngine({
-      schema:
-        follows !== undefined
-          ? following
-          : token === undefined
-            ? withMoves(forCreate, definition.moves, null)
-            : !allows('update') || ended(record)
-              ? readOnly
-              : forUpdateOf(record),
+      schema,
       // One id namespace per renderer: two renderers of one document on one
       // page would otherwise mint every element id twice (formancy.ai 0095).
       formId: `${ids}-${renderer}`,
-      ...(record === undefined ? {} : { initialValue: record.answers }),
+      ...(initialValue === undefined ? {} : { initialValue }),
       capabilities: CAPABILITIES,
     })
     state = { record: token, version: record?.version ?? undefined, operation: operationFor(token), ...(follows === undefined ? {} : { follows }) }
@@ -408,6 +421,15 @@ export function createSession({ client, formId, definition, renderer, namespace,
     state: (): SessionState => ({ ...state }),
     /** A new engine over `record`, or over nothing for a new record -- or the next version of `follows` (0115). The old one, and its draft, are dropped. */
     open,
+    /**
+     * A new record under what the page fills in -- a child's row, its
+     * parent given by `prefill` -- that starts as New record does: every
+     * other field at its default (0149). Not a copy: Duplicate opens its
+     * copy as handed in.
+     */
+    start(prefill: Record<string, unknown>): FormEngine {
+      return open(undefined, undefined, prefill)
+    },
     /**
      * Read the record again and open it: "Load the saved record" after a
      * stale save. Null when it opened; otherwise the server's sentence.

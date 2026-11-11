@@ -79,7 +79,8 @@ export function DrillLevel({
       (['react', 'angular'] as const).map((which) => {
         const session = createSession({ client, formId, definition, renderer: which, namespace: owner, fixed: parentField === null ? [] : [parentField] })
         const answers = through.kind === 'child' ? { [through.field]: through.parent } : {}
-        session.open(step.record === null ? { record: null, version: null, answers } : structuredClone(step.record))
+        if (step.record === null) session.start(answers)
+        else session.open(structuredClone(step.record))
         return session
       }),
     // A level is mounted again for another step: these never change under it.

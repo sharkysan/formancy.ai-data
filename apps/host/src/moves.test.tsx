@@ -45,11 +45,15 @@ const states = (renderer: RendererName): string[] =>
     .filter((value) => value !== '')
 
 describe.each(ENGINES)('a state field drawn as its moves on $engine', (engine) => {
-  // A new order may only start as a draft; a placed one may stay placed or
-  // be shipped, and is shipped by choosing it and pressing Save; a shipped
-  // one moves nowhere, so Status is disabled. Every state is held to axe
-  // and a name on every control. Watched failing with the session drawing
-  // the form as published: Status was a text box.
+  // A new order may only start as a draft, and starts there: draft is the
+  // column's default, a state a create may start it in, so the choice
+  // keeps it (0149). A placed one may stay placed or be shipped, and is
+  // shipped by choosing it and pressing Save; a shipped one moves nowhere,
+  // so Status is disabled. Every state is held to axe and a name on every
+  // control. Watched failing with the session drawing the form as
+  // published: Status was a text box; and in CI with the session opening a
+  // new record over no answers (B4 of 0149's breaks commit): the choice
+  // started empty.
   test('offers the moves from where the order is, saves one, and disables a state with none', async () => {
     const placed = await plane.clerk.create(engine.formId, {
       customer: await customerToken(engine.formId),
@@ -61,7 +65,8 @@ describe.each(ENGINES)('a state field drawn as its moves on $engine', (engine) =
     const record = placed.value.record
 
     const user = await openForm(plane, engine.moves)
-    for (const renderer of RENDERERS) expect(states(renderer), renderer).toEqual(['draft'])
+    for (const renderer of RENDERERS)
+      expect({ renderer, states: states(renderer), value: status(renderer).value }).toEqual({ renderer, states: ['draft'], value: 'draft' })
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])
 
