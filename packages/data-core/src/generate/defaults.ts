@@ -97,14 +97,13 @@ function withoutLeadingZeros(digits: string): string {
  * database stores for it, or `undefined` where the constant is not one of
  * the column's kind read with certainty. A date, a time, an instant, a uuid
  * and a float are left to the database: their text is the session's or
- * rounds otherwise than a page would. An empty string is the field as it
- * starts anyway, and spec 5 refuses it as a default.
+ * rounds otherwise than a page would.
  */
 function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
   const type = column.type
   switch (type.kind) {
     case 'text':
-      if (constant.kind !== 'text' || constant.text === '') return undefined
+      if (constant.kind !== 'text') return undefined
       // SQL Server reads a literal without N in the database's code page,
       // and converts an N literal written to a varchar to the column's:
       // past ASCII, only an N literal on an nvarchar is the text it spells.
@@ -147,7 +146,10 @@ function clause(sentence: string): string {
  * -- is one the database refuses at the insert or rounds, and is refused
  * here. So is text the column holds and the field's box does not: the
  * codec counts in the column's unit, the box in UTF-16 code units, never
- * fewer.
+ * fewer. An empty answer is none -- '' itself, or a fixed-length column's
+ * blanks, which the codec reads without their padding as the column is
+ * read back: it is the field as it starts anyway, and spec 5 refuses an
+ * empty default, so a document carrying one is never published.
  */
 export function startingAnswer(kind: DatabaseKind, column: ColumnMeta, binding: ColumnBinding, field: FieldDef): Starting {
   const constant = column.defaultExpression === null ? null : readConstant(kind, column.defaultExpression)
@@ -157,6 +159,7 @@ export function startingAnswer(kind: DatabaseKind, column: ColumnMeta, binding: 
   if (!parsed.ok) return { kind: 'refused', shown: shown(constant), reason: clause(parsed.message) }
   // Never null: the codec was handed a value, and returns one.
   const answer = formValue(binding, parsed.value) as string | number | boolean
+  if (answer === '') return NONE
   if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
     return { kind: 'refused', shown: shown(constant), reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
   }

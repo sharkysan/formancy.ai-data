@@ -64,9 +64,20 @@ function table(name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> =
   }
 }
 
+/**
+ * The form over `root`, held to what publishing it asks: the released
+ * validator accepts it -- spec 5 refuses an empty default, among others --
+ * and the engine opens it, which it refuses where a default is one its
+ * field would refuse (formancy.ai 0197). Every case below goes through
+ * here, so no default this file holds is one the server would not publish.
+ */
 function generated(kind: DatabaseKind, objects: ObjectMeta[], root: string, extra: Partial<GenerationRequest> = {}) {
   const snapshot = createSnapshot({ kind, serverVersion: 'x', account: { user: 'owner', login: 'owner' }, scope: { schemas: ['sales'] }, objects, gaps: [] })
-  return generateForm(snapshot, { connection: 'erp', root: { schema: 'sales', name: root }, formId: root, title: root, lookups: [], ...extra })
+  const result = generateForm(snapshot, { connection: 'erp', root: { schema: 'sales', name: root }, formId: root, title: root, lookups: [], ...extra })
+  const checked = validateSchema(result.form)
+  expect(checked.valid ? [] : checked.errors).toEqual([])
+  createFormEngine({ schema: result.form, capabilities: { now: () => 0, today: () => '2026-11-11', random: () => 0.5 } })
+  return result
 }
 
 const field = (form: FormSchema, key: string): FieldDef => {
@@ -288,19 +299,24 @@ describe('a new record starts with its column’s constant default (0149)', () =
   // A constant of another kind than the column's is no default: SQL
   // Server's ('5') on an int is converted by the database, a bit's ((2))
   // is stored as 1, and an empty string is the field as it starts anyway,
-  // which spec 5 refuses as a default. A date, an instant, a float and a
+  // which spec 5 refuses as a default -- so is a char(1)'s blank, which
+  // reads back without its padding as an empty answer. A date, an instant, a float and a
   // uuid are not read: their text is the session's, or rounds otherwise
   // than a page would. Read as nothing, never as a guess, and nothing is
   // said, as of a function. Watched failing with a number taken on a text
   // column, with every number taken on a bit, with the empty string taken,
   // and with every kind asked: SQL Server's date, the float and the uuid
-  // started with their constants.
+  // started with their constants; and with the empty answer looked for
+  // only before the codec: the validator refused each char(1)'s blank as
+  // a default, "Must not be empty."
   test.each([
     ['sqlserver', 'text on an int', col('code', INT32, "('5')")],
     ['sqlserver', 'a number on a varchar', col('code', varchar(10), '((5))')],
     ['sqlserver', '2 on a bit', col('code', { kind: 'boolean' }, '((2))')],
     ['postgres', 'an empty string', col('code', varchar(10), "''::character varying")],
     ['sqlserver', 'an empty string', col('code', varchar(10), "('')")],
+    ['postgres', "a char(1)'s blank", col('code', { kind: 'text', maxLength: 1, lengthUnit: 'code-points', fixedLength: true }, "' '::bpchar")],
+    ['sqlserver', "a char(1)'s blank", col('code', { kind: 'text', maxLength: 1, lengthUnit: 'code-page-bytes', fixedLength: true }, "(' ')")],
     ['postgres', 'a date', col('code', { kind: 'date' }, "'2026-01-01'::date")],
     ['sqlserver', 'a date', col('code', { kind: 'date' }, "('2026-01-01')")],
     ['postgres', 'a float', col('code', { kind: 'float', bits: 64 }, '1.5')],
@@ -309,6 +325,24 @@ describe('a new record starts with its column’s constant default (0149)', () =
     const { form, notes } = single(kind, column)
     expect(field(form, 'code')).not.toHaveProperty('default')
     expect(notes.filter((note) => note.message.startsWith('Starts'))).toEqual([])
+  })
+
+  // Every answer the codec gives is one spec 5 and the field's own checks
+  // take, at their edges: a decimal canonical to its scale, whatever its
+  // sign or a scale as wide as its precision -- which its pattern must
+  // match; a fixed-length column's padding gone, as it reads back; and
+  // text of blanks alone on a varchar, which is not empty. `generated`
+  // holds each to the validator and the engine. Watched failing with the
+  // codec skipped: the decimals started as spelled, and the char(3) with
+  // its padding.
+  test.each([
+    ['postgres', 'numeric(3,3)', col('code', { kind: 'decimal', precision: 3, scale: 3 }, '0.5'), '0.500'],
+    ['postgres', 'numeric(5,2)', col('code', { kind: 'decimal', precision: 5, scale: 2 }, "'-0.5'::numeric"), '-0.50'],
+    ['sqlserver', 'decimal(19,4)', col('code', { kind: 'decimal', precision: 19, scale: 4 }, '((0))'), '0.0000'],
+    ['postgres', 'char(3)', col('code', { kind: 'text', maxLength: 3, lengthUnit: 'code-points', fixedLength: true }, "'ab '::bpchar"), 'ab'],
+    ['sqlserver', 'varchar(3)', col('code', varchar(3, 'code-page-bytes'), "(' ')"), ' '],
+  ] as const)('%s: a %s default starts at the answer its record reads back', (kind, _type, column, starts) => {
+    expect(field(single(kind, column).form, 'code').default).toBe(starts)
   })
 
   // A whole number's default is its value, whatever zeros or sign spell
