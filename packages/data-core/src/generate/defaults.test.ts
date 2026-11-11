@@ -212,7 +212,7 @@ describe('a new record starts with its column’s constant default (0149)', () =
     const starts = Object.fromEntries(form.model.fields.flatMap((entry) => (entry.default === undefined ? [] : [[entry.key, entry.default]])))
     expect(starts).toEqual(STARTS)
     expect(notes.filter((note) => note.message.startsWith('Starts with'))).toEqual(
-      Object.entries(STARTS).map(([key, value]) => ({ subject: key, kind: 'inferred', message: `Starts with the column's default, ${String(value)}.` })),
+      Object.entries(STARTS).map(([key, value]) => ({ subject: key, kind: 'inferred', message: `Starts with the column's default, “${String(value)}”.` })),
     )
     expect(notes.some((note) => note.subject === 'created_at' && note.message.startsWith('Starts'))).toBe(false)
   })
@@ -262,7 +262,7 @@ describe('a new record starts with its column’s constant default (0149)', () =
     expect(notes).toContainEqual({
       subject: 'code',
       kind: 'inferred',
-      message: `Starts empty: the column's default, ${shown}, is not an answer the field takes (${reason}), so the database fills it when a create leaves the field out.`,
+      message: `Starts empty: the column's default, “${shown}”, is not an answer the field takes (${reason}), so the database fills it when a create leaves the field out.`,
     })
   })
 
@@ -345,6 +345,18 @@ describe('a new record starts with its column’s constant default (0149)', () =
     expect(field(single(kind, column).form, 'code').default).toBe(starts)
   })
 
+  // A note quotes the answer, so an administrator sees what a default of
+  // blanks starts with, and where a value ends before the sentence goes
+  // on. Watched failing with the value printed bare: "default,  ."
+  test('the note quotes the answer a field starts with, and the constant it refuses', () => {
+    const blank = single('sqlserver', col('code', varchar(3, 'code-page-bytes'), "(' ')")).notes
+    expect(blank).toContainEqual({ subject: 'code', kind: 'inferred', message: "Starts with the column's default, “ ”." })
+    const refused = single('sqlserver', col('code', varchar(3, 'code-page-bytes'), "('a, b.')")).notes
+    expect(refused).toContainEqual(
+      expect.objectContaining({ subject: 'code', message: expect.stringMatching(/^Starts empty: the column's default, “a, b\.”, is not/) }),
+    )
+  })
+
   // A whole number's default is its value, whatever zeros or sign spell
   // it: the codec takes a whole number's text in its canonical spelling
   // only, and 007 is 7 in both engines. Watched failing with the digits
@@ -412,7 +424,7 @@ describe('a new record starts with its column’s constant default (0149)', () =
       subject: 'country',
       kind: 'inferred',
       message:
-        "Starts empty: the default of country_id, CH, is left to the database, which fills it when a create leaves the field out: a lookup's answer is a record, and the one a default names may be one this person may not choose.",
+        "Starts empty: the default of country_id, “CH”, is left to the database, which fills it when a create leaves the field out: a lookup's answer is a record, and the one a default names may be one this person may not choose.",
     })
   })
 })

@@ -46,9 +46,9 @@ describe("a new record starts with its column's constant default (0149)", () => 
     const order = generated(snapshot, 'order')
     const customer = generated(snapshot, 'customer')
     expect(defaultsOf(order)).toEqual({ status: 'draft' })
-    expect(startNotes(order)).toEqual([{ subject: 'status', message: "Starts with the column's default, draft." }])
+    expect(startNotes(order)).toEqual([{ subject: 'status', message: "Starts with the column's default, “draft”." }])
     expect(defaultsOf(customer)).toEqual({ active: true })
-    expect(startNotes(customer)).toEqual([{ subject: 'active', message: "Starts with the column's default, true." }])
+    expect(startNotes(customer)).toEqual([{ subject: 'active', message: "Starts with the column's default, “true”." }])
     for (const table of ['delivery', 'shipment']) {
       expect({ table, defaults: defaultsOf(generated(snapshot, table)), notes: startNotes(generated(snapshot, table)) }).toEqual({
         table,

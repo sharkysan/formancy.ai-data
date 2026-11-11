@@ -138,12 +138,15 @@ holds and the field's box, which counts UTF-16 code units, does not. SQL
 Server's text past ASCII is read only as an N literal on an nvarchar:
 another is read or written in a code page the snapshot does not record.
 
-**Each default taken or refused is a note**: "Starts with the column's
-default, draft."; "Starts empty: the column's default, toolong, is not an
-answer the field takes (at most 3 characters), so the database fills it
-when a create leaves the field out."; and a lookup's: "the default of
-country_id, CH, is left to the database ... the one a default names may be
-one this person may not choose".
+**Each default taken or refused is a note**, its value quoted so blanks
+are seen: "Starts with the column's default, “draft”."; "Starts empty:
+the column's default, “toolong”, is not an answer the field takes (at most
+3 characters), so the database fills it when a create leaves the field
+out."; and a lookup's: "the default of country_id, “CH”, is left to the
+database ... the one a default names may be one this person may not
+choose". An answer that reads back empty -- `''`, or a char(1)'s blank
+without its padding -- is no default and no note: it is the field as it
+starts, and spec 5 refuses an empty default.
 
 **The host page starts New record and a child's new row as a fresh form**
 (`apps/host/src/session.ts`): New record with no answers, so the engine

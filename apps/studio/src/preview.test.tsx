@@ -53,7 +53,7 @@ describe('the preview', () => {
     const inferred = within(within(generated).getByRole('list', { name: 'Inferred' }))
       .getAllByRole('listitem')
       .map((item) => item.textContent ?? '')
-    expect(inferred).toContain("status Starts with the column's default, draft.")
+    expect(inferred).toContain("status Starts with the column's default, “draft”.")
     const preview = await goTo(user, 'Preview')
     const sheet = within(preview).getByRole('form', { name: 'Order preview' })
     expect(within(sheet).getByRole<HTMLInputElement>('textbox', { name: 'Status' }).value).toBe('draft')

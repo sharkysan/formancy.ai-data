@@ -27,7 +27,7 @@ the same day (formancy.ai 0232).
   -- text, a whole or exact number, yes or no -- through the column's
   codec, so the fixture's order starts at `draft` and its customer with
   Active ticked; a save that leaves it sends it, and the generator's notes
-  say "Starts with the column's default, draft." A constant the field
+  say "Starts with the column's default, “draft”." A constant the field
   would refuse -- too long, out of range, a fraction for a whole number --
   is said in a note and left to the database, and so is a lookup's
   default, since the record it names may be one the person may not

@@ -122,8 +122,13 @@ function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): u
   }
 }
 
+/** A value as a note says it: quoted, as the generator's other sentences quote one, so blanks are seen and a value ends where its quote does. */
+function quoted(value: string): string {
+  return `“${value}”`
+}
+
 function shown(constant: Constant): string {
-  return constant.kind === 'boolean' ? String(constant.value) : constant.text
+  return quoted(constant.kind === 'boolean' ? String(constant.value) : constant.text)
 }
 
 type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
@@ -202,7 +207,7 @@ export function startWithDefaults(
     const starting = startingAnswer(kind, columnOf(binding.column), binding, entry.field)
     if (starting.kind === 'starts') {
       entry.field = { ...entry.field, default: starting.answer }
-      notes.push({ subject, kind: 'inferred', message: `Starts with the column's default, ${String(starting.answer)}.` })
+      notes.push({ subject, kind: 'inferred', message: `Starts with the column's default, ${quoted(String(starting.answer))}.` })
     } else if (starting.kind === 'refused') {
       notes.push({
         subject,
