@@ -211,12 +211,21 @@ N literal on an nvarchar start empty, left to the database. A SQL Server
 default spelled as text on a whole-number column, `('5')`, is not read,
 though the database stores 5; what PostgreSQL's catalog writes for the
 same DDL is not measured, so one DDL may start differently on the two
-engines. Nothing in the studio changes or clears
-a default; a default changed in the database after publication is still
+engines. A default changed in the database after publication is still
 the old one on the form, and sent, until it is generated again, drift
 review naming it; a form published before gains its defaults only then;
 and a field that started at its default and was cleared is sent empty
 ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
+The studio's Presentation step gives a field another starting value, or
+takes the column's away, for text, a whole or exact number and yes or no
+only: a date, a time, an instant, a float, a uuid and a lookup take none,
+since no case here stores a starting answer of them and reads it back. A
+starting value is a constant in one language, sent as the person's answer
+and spelled as a record holding it reads back (`9.5000` for 9.5); on the
+state field it must be a state a create starts in, or the publish is
+refused; one the regenerated field no longer takes is dropped and said;
+and a server of an earlier release refuses a version that sets one
+([0150](../decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md)).
 A client sends exact decimals as strings, and a value comes back
 canonicalised to its column's scale
 ([0008](../decisions/0008-exact-values-travel-as-strings.md)). An instant

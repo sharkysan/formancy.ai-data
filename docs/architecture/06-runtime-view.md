@@ -97,7 +97,11 @@ without database VIEW DEFINITION reports row security `unknown` (0027).
    a note (`generate/defaults.ts`,
    [0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 5. The administrator edits presentation as a patch over this base
-   (`presentation.tsx`, 0030) and writes the `FormPolicy` (`policy.tsx`):
+   (`presentation.tsx`, 0030) -- a field's starting value among it, read
+   before the session sees it as a publish reads it and set as a record
+   holding it reads back (`starting-value.tsx`,
+   [0150](../decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md))
+   -- and writes the `FormPolicy` (`policy.tsx`):
    who may do what, each field's grants, the row filters
    ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)),
    and each foreign key a delete acts through, by name
@@ -420,7 +424,8 @@ save or a delete still blanks while it is asked (0146); the rest is 0044's and 0
    `routes/write-once.ts` lets a write run the first time its id arrives;
    a later arrival gets that answer, audited `repeated`.
    `GET /v1/forms/:id` serves the form with the defaults this person's
-   create takes and no other -- a field `writable.create` names, and on
+   create takes and no other -- the column's or the one the presentation
+   chose over it (0150) alike -- a field `writable.create` names, and on
    the state field a state one of their create moves starts a record in
    (`startingDefaults`, `packages/data-core/src/policy/starting.ts`) --
    since a renderer submits a field it draws disabled. New record opens an

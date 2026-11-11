@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:9ee84f951698ec0873c620e187fd747bb43ca49ed0dff952219a241c461d563a",
+      "reviewed": "sha256:35e34e923c76b4d7cf93ac9aca29af24b6b593e00ca4fc0a516e50670943b121",
       "limitations": [
         {
           "area": "studio",
@@ -4244,10 +4244,6 @@
           "heldBy": "apps/host/src/session-work.test.ts"
         },
         {
-          "area": "studio",
-          "says": "Nothing in the studio changes or clears a default: it is changed in the database, and the form generated again."
-        },
-        {
           "area": "host",
           "says": "A host page's renderer must read spec 5's default: @formancy/* 0.13.0's do, and one that does not refuses a form that carries one."
         },
@@ -4259,6 +4255,48 @@
           "area": "server",
           "says": "The form GET /v1/forms/:id serves carries only the defaults the person's create would take, so it differs from person to person, and a page that draws its own choice for a saved record's state leaves the field's default out, or the engine refuses to open it.",
           "heldBy": "packages/data-server/src/routes/runtime-defaults.test.ts"
+        }
+      ]
+    },
+    "0150": {
+      "reviewed": "sha256:41224c58e50a9b64e0f6e89b37981d1fd0926dbacb0ff0199dd382a5db3df9a0",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "A date, a time, an instant, a float, a uuid and a lookup take no starting value in the Presentation step, though spec 5 would hold one: no case here stores a starting answer of them and reads it back.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A starting value is a constant in one language: nothing starts at today, at the signed-in person's attribute or at another field's answer, and it is not translated."
+        },
+        {
+          "area": "writes",
+          "says": "A starting value is sent as the person's answer, so a trigger that tells a column left out from one given sees one given.",
+          "heldBy": "apps/host/src/defaults.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A starting value is spelled as a record holding it reads back, so 9.5 typed for a numeric(18,4) field starts it at 9.5000.",
+          "heldBy": "apps/studio/src/starting-value.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "On the state field a starting value must be a state a create starts a record in: a policy that no longer moves from nothing to it is refused at publish until the value is changed, and the studio names the states only when it refuses one.",
+          "heldBy": "packages/data-server/src/routes/admin.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A starting value the regenerated field no longer takes, or reads back otherwise, is dropped and said: 9.50 once the column's scale is 4, rather than carried as 9.5000.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server of a release before this one refuses a version whose presentation sets a starting value, so a deployment rolled back serves it only once an earlier version is restored there."
+        },
+        {
+          "area": "forms",
+          "says": "A version published before gains no starting value until an administrator edits its presentation and publishes it again."
         }
       ]
     }
