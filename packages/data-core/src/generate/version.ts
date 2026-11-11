@@ -14,7 +14,8 @@ export const BINDINGS_VERSION = 2
  * Spec 5 since 0118, for a field's help text from its column's comment,
  * which spec 5 brought: a host page whose renderer is older than
  * `@formancy/*` 0.8.0 refuses such a document outright, which the record
- * names as the move's cost. Spec 3 before it (0042).
+ * names as the move's cost. Spec 3 before it (0042). A field's `default`,
+ * its column's constant one, is spec 5's too (0149).
  */
 export const GENERATED_SPEC_VERSION = '5'
 

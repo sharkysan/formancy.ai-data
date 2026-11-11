@@ -15,6 +15,7 @@ import {
   writesFor,
 } from './access.js'
 import { controlFor } from './controls.js'
+import { startWithDefaults } from './defaults.js'
 import { helpTextFor, tooLongNote } from './help.js'
 import type { HelpText } from './help.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor } from './names.js'
@@ -105,6 +106,8 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   }
 
   if (validity !== undefined) narrowForValidity(validity, planned, notes)
+  // After the narrowing: a field starts with a default only where the create writes it (0149).
+  startWithDefaults(snapshot.kind, root, planned, notes)
   const offered = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut }, notes)
   const operations = validity === undefined ? offered : validityOperations(root, validity, offered, notes)
   rowSecurityNotes(snapshot, [root, ...lookups.map((entry) => entry.target)], notes)
