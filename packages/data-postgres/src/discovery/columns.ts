@@ -49,7 +49,7 @@ export const DECLARED_COLUMN = `a.attnum ${op('>')} 0 and not a.attisdropped`
  * fill. Shared with the root's description (0041), which spells it beside
  * the facts it digests and never digests the spelling.
  */
-export const DEFAULT_EXPRESSION = `case when a.attgenerated ${op('=')} '' then pg_catalog.pg_get_expr(d.adbin, d.adrelid) end`
+export const DEFAULT_EXPRESSION = `case when a.attgenerated ${op('=')} '' then pg_catalog.replace(pg_catalog.pg_get_expr(d.adbin, d.adrelid), $$'it''s'::character varying$$, $$('it''s'::character varying)$$) end`
 
 /**
  * Whether column `a` of pg_attribute holds no NULL: `attnotnull`, unless a

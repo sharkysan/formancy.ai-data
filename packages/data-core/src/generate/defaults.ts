@@ -88,7 +88,7 @@ export function readConstant(kind: DatabaseKind, expression: string): Constant |
 
 /** A whole number's digits as the codec takes them: no leading zero, no negative zero. Its value, not a guess at one. */
 function withoutLeadingZeros(digits: string): string {
-  const trimmed = digits.replace(/^(-?)0+(?=[0-9])/, '$1')
+  const trimmed = digits.replace(/^(-?)0+(?=[0-9])/, '$1').replace(/^-/, '')
   return trimmed === '-0' ? '0' : trimmed
 }
 
