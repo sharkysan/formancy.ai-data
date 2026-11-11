@@ -155,7 +155,7 @@ function startWith(field: FormSchema['model']['fields'][number], binding: FieldB
     const [yours, read] = shownTogether(value, given.answer)
     return [`${at}/default: ${binding.field} reads ${yours} back as ${read}; give that`]
   }
-  field.default = value
+  // TEMPORARY B1: a starting value is checked and never set.
   return []
 }
 type Section = { label: unknown; children: Array<{ children: Node[] }> }
