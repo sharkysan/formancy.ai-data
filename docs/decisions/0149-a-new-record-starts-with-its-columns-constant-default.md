@@ -36,7 +36,26 @@
   starts with one -- not a pinned tenant, a key the database fills, a
   column the account may not insert, a view's (watched failing with every
   field given its default); and a lookup starts empty with a note (watched
-  failing with the lookup unasked).
+  failing with the lookup unasked). Every form the file generates is held
+  to the released validator and opened by the engine; a char(1) whose
+  default is a blank starts empty on both engines, since it reads back
+  without its padding as an empty answer (watched failing with the empty
+  answer looked for only before the codec: "Must not be empty."); a
+  decimal's canonical answer at its scale's edges, a fixed-length
+  column's without its padding and a varchar's blanks are each taken
+  (watched failing with the codec skipped); and a note quotes its value
+  (watched failing with it printed bare).
+  `packages/data-core/src/policy/starting.test.ts` -- `startingDefaults`
+  keeps a default only on a field the person's create takes, none where
+  they may not create, and on the state field only where one of their
+  moves from nothing starts a record there, a whole number by its digits
+  (watched failing with the form served as published, with the moves
+  unasked, and with every move asked, not only a create's).
+  `packages/data-server/src/routes/runtime-defaults.test.ts`, over fake
+  ports on each engine's spelling -- `GET /v1/forms/:id` serves the clerk
+  both defaults, and the auditor, whose create takes no note and starts a
+  ticket elsewhere, and the viewer, who may not create, none (watched
+  failing with the form served as published).
   `apps/studio/src/defaults.test.ts`, over the captured snapshots on both
   engines -- the owners' order starts at draft and customer with Active
   ticked, each said, and nothing for `created_at`, the delivery's key or
@@ -53,34 +72,33 @@
   `apps/host/src/session-work.test.ts`, without a server -- New record
   starts at each default and holds no work; a record read and a copy
   start as handed in, and a child's new row at each default under its
-  parent (watched
-  failing with a record's answers merged over the defaults, and with the
-  parent opened as a record's answers); a field this person does not give
-  on create starts empty (watched failing with the copy for a create left
-  as published); a state field keeps its default only where a create may
-  start the record there (watched failing with the choice keeping every
-  default -- the engine refused to open the form -- and dropping every
-  default, the disabled field keeping it, and a whole number's box keeping
-  it).
+  parent (watched failing with a record's answers merged over the
+  defaults, and with the parent opened as a record's answers); a new
+  record's state choice starts at the served default and a saved record's
+  carries none (watched failing with the choice carrying it on every
+  record -- the engine refused to open the closed ticket -- and on none).
+  The host's own copy of the create's decision, a field disabled starting
+  empty, is gone: the served form already says it.
   `packages/data-postgres/src/parity.integration.test.ts` and
   `packages/data-sqlserver/src/parity.integration.test.ts`, against real
   servers -- `DEFAULT_PARITY`'s `spelled`, `started` and `stored`,
   declared with `covers()`: each engine's spelling of the same DDL, one
   starting answer per field on both, and a create of those answers stored
-  and read back as them, as is a row the database fills itself (watched
-  failing in CI with discovery spelling `'it''s'` in one more pair of
-  parentheses on each engine, which is not read, and with a whole number
-  read without its sign: -1 started, and was stored, as 1).
+  and read back as them, as is a row the database fills itself (to be
+  watched failing in CI with discovery spelling `'it''s'` in one more pair
+  of parentheses on each engine, which is not read, and with a whole
+  number read without its sign: -1 should start, and be stored, as 1).
   `apps/host/src/defaults.test.tsx` and `moves.test.tsx`, on both engines
   against the real server, in both renderers -- New record draws Status at
   draft and a save that leaves it sends it and stores it; a record read
   and its Duplicate draw what is stored; a person who may not read the
   status sees neither its default nor a record's; and the state choice
-  starts at draft (watched failing in CI with the copy for a create
-  dropping the defaults of the fields this person gives and keeping the
-  others': New record drew Status empty, and the unread status at draft;
-  and with the defaults written over a record's answers: a placed order
-  was drawn as draft).
+  starts at draft (to be watched failing in CI with the copy for a create
+  dropping the defaults of the fields this person gives: New record should
+  draw Status empty; with the form route serving every default to whoever
+  may create: the unread status should be drawn at draft; and with the
+  defaults written over a record's answers: a placed order should be drawn
+  as draft).
 
 ## Context
 
@@ -148,17 +166,25 @@ choose". An answer that reads back empty -- `''`, or a char(1)'s blank
 without its padding -- is no default and no note: it is the field as it
 starts, and spec 5 refuses an empty default.
 
+**Each person is served the defaults their create takes, and no other**
+(`startingDefaults`, `packages/data-core/src/policy/starting.ts`, which
+`GET /v1/forms/:id` serves the form through): a default on a field
+`writable.create` names (0117), none where the person may not create,
+and on the state field (0127) only where one of their moves from nothing
+starts a record in it. A renderer submits a field it draws disabled, so a
+page that leaves out only the fields neither write accepts would send any
+other default untouched, and the create would be refused (0122). Decided
+once, for every page on `@formancy/data-client`.
+
 **The host page starts New record and a child's new row as a fresh form**
 (`apps/host/src/session.ts`): New record with no answers, so the engine
-fills each default; a child's new row through `@formancy/core`'s
+fills each served default; a child's new row through `@formancy/core`'s
 `withDefaults`, its parent over the defaults (`start`). A record read, a
 Duplicate, a next version and a form discarded back to are opened with
-their answers and start as handed in. The copy a create is drawn with
-leaves out the default of every field it disables -- one this person does
-not give on create, which a renderer still submits and the server would
-refuse -- and the state field's choice keeps it only where it is a state
-the choice offers, on a new record one a create may start it in
-(`apps/host/src/moves.ts`, 0127).
+their answers and start as handed in. A new record's state choice starts
+at the served default; a saved record's carries none, since the record
+opens at the state it holds and a default the choice does not offer would
+stop the engine opening it (`apps/host/src/moves.ts`).
 
 **A stored form is not changed.** A bundle's base is compared with the
 generator at every write and never on read (0030): a form published before
@@ -196,6 +222,9 @@ what was left to the database, before anything is published.
 - A lookup never starts at its column's default, and a field this person
   does not give on create, or a state a create may not start the record
   in, starts empty: the database fills it.
+- The form `GET /v1/forms/:id` serves differs from person to person in
+  its defaults, and a page that draws its own choice for a saved record's
+  state leaves the field's default out, or the engine refuses to open it.
 - Nothing in the studio changes or clears a default. Presentation could
   carry one later, over the generated base (0030); until then a default is
   changed in the database and the form generated again.

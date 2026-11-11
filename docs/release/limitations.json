@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:d30d16e9e99ecbc38ac285c429a8a3c854a7019e53879356c223637ef18c6a47",
+      "reviewed": "sha256:c16e0c82c11d26a68cc8ff03e108a1f259ef0e0bb983c6d0bcca0b0996bfead5",
       "limitations": [
         {
           "area": "forms",
@@ -4254,6 +4254,11 @@
         {
           "area": "testing",
           "says": "How each engine's catalog spells a constant default is held on the images the adapters' suites run, and on no other release."
+        },
+        {
+          "area": "server",
+          "says": "The form GET /v1/forms/:id serves carries only the defaults the person's create would take, so it differs from person to person, and a page that draws its own choice for a saved record's state leaves the field's default out, or the engine refuses to open it.",
+          "heldBy": "packages/data-server/src/routes/runtime-defaults.test.ts"
         }
       ]
     }
