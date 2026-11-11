@@ -4,13 +4,13 @@ import { validateSchema } from '@formancy/spec/validate'
 import { describe, expect, test } from 'vitest'
 import { addColumn, col, column, decimal, dropColumn, INT64, ORDER, restrict, retype, snapshot, text } from '../drift/fixture.js'
 import { generateForm } from '../generate/generate.js'
-import type { ObjectMeta } from '../metadata.js'
+import type { NormalizedType, ObjectMeta } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
 import { presentationOf } from './derive.js'
 import { rebasePresentation } from './rebase.js'
 import { createStates, noStartingValue, startingStateProblems, startingValue } from './starting-value.js'
-import type { FieldPresentation, PresentationOverrides } from './types.js'
+import type { FieldPresentation, PresentationOverrides, StartingValue } from './types.js'
 import { PRESENTATION_VERSION } from './types.js'
 
 /*
@@ -225,6 +225,46 @@ describe("a field's starting value as presentation (0150)", () => {
     expect(refusals('notes', 'a\nb\tc')).toEqual([])
     expect(refusals('rush', 'true', rush)).toEqual([])
     expect(refusals('code', 'abc', code)).toEqual([])
+  })
+
+  // The kinds the generator starts a field at its column's constant of
+  // (0149) and the kinds a starting value is offered for are one list: a
+  // reader taught a kind the presentation does not offer would give the
+  // base a default every publish of a presentation over it then refuses.
+  // A column of every kind with a constant spelled as SQL Server spells it;
+  // each field the generator starts somewhere is one whose start is taken.
+  // Watched failing with 0149's reader taught a float alone: weight started
+  // at 1.5, and its starting value was refused as a floating-point number.
+  test('every field the generator starts at its column’s constant takes a starting value there, of every kind', () => {
+    const kinds = [
+      ['words', 'nvarchar(20)', text(20), "('x')"],
+      ['count', 'int', { kind: 'integer', min: '-2147483648', max: '2147483647' }, '((1))'],
+      ['price', 'decimal(9,2)', decimal(9, 2), '((1.5))'],
+      ['flag', 'bit', { kind: 'boolean' }, '((1))'],
+      ['weight', 'float', { kind: 'float', bits: 64 }, '((1.5))'],
+      ['day', 'date', { kind: 'date' }, "('2026-01-01')"],
+      ['hour', 'time', { kind: 'time' }, "('10:00')"],
+      ['moment', 'datetimeoffset', { kind: 'timestamp', withTimeZone: true }, "('2026-01-01T00:00:00Z')"],
+      ['token', 'uniqueidentifier', { kind: 'uuid' }, "('8b3c0c4e-1f2a-4b5c-9d6e-7f8091a2b3c4')"],
+    ] as const
+    const { form, bindings } = generateForm(
+      snapshot((objects) => {
+        for (const [name, databaseType, type, expression] of kinds)
+          addColumn(objects, 'order', col(name, databaseType, type as NormalizedType, { nullable: true, hasDefault: true, defaultExpression: expression }))
+      }),
+      ORDER,
+    )
+    const started = form.model.fields.filter((entry) => entry.default !== undefined).map((entry) => entry.key)
+    for (const key of started) {
+      const entry = form.model.fields.find((candidate) => candidate.key === key) as FieldDef
+      const binding = bindings.fields.find((candidate) => candidate.field === key)
+      expect({ key, taken: binding === undefined ? 'no binding' : startingValue(binding, entry, entry.default as StartingValue) }).toEqual({
+        key,
+        taken: { ok: true, answer: entry.default },
+      })
+    }
+    // The kinds 0149 reads a constant of, and no other.
+    expect(started).toEqual(['status', 'words', 'count', 'price', 'flag'])
   })
 
   // The question 0150 asks of its own check: if it and formancy's engine

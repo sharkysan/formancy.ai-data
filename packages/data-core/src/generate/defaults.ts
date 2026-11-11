@@ -2,7 +2,7 @@ import type { FieldDef } from '@formancy/spec'
 import type { DatabaseKind } from '../adapter.js'
 import type { Codec } from '../codecs/codec.js'
 import { codecFor, codecForType } from '../codecs/codec.js'
-import type { ColumnMeta, ObjectMeta } from '../metadata.js'
+import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import { formValue, storedValue } from '../records/answers.js'
 import type { FieldBinding, GenerationNote } from './types.js'
 
@@ -98,34 +98,45 @@ function withoutLeadingZeros(digits: string): string {
   return trimmed === '-0' ? '0' : trimmed
 }
 
+type Kind = NormalizedType['kind']
+
+/** How one column kind reads a constant as the value its codec is handed, or `undefined` where the constant is not one of its kind read with certainty. */
+type Reader = (kind: DatabaseKind, constant: Constant, type: NormalizedType) => unknown
+
 /**
- * What the codec of `column` is handed for `constant`: the value the
- * database stores for it, or `undefined` where the constant is not one of
- * the column's kind read with certainty. A date, a time, an instant, a uuid
- * and a float are left to the database: their text is the session's or
- * rounds otherwise than a page would.
+ * The column kinds a constant is read for, each with how: the one list of
+ * the kinds a field starts at a value of, which the generator reads its
+ * column's constant by and a presentation's starting value is offered by
+ * (`startsAtConstant`, 0150). A date, a time, an instant, a uuid and a
+ * float are not in it, left to the database: their text is the session's
+ * or rounds otherwise than a page would.
  */
+const READERS: Readonly<Partial<Record<Kind, Reader>>> = {
+  text: (kind, constant, type) => {
+    if (constant.kind !== 'text' || type.kind !== 'text') return undefined
+    // SQL Server reads a literal without N in the database's code page,
+    // and converts an N literal written to a varchar to the column's:
+    // past ASCII, only an N literal on an nvarchar is the text it spells.
+    if (kind === 'sqlserver' && !ASCII.test(constant.text) && !(constant.national && type.lengthUnit === 'utf16-code-units')) return undefined
+    return constant.text
+  },
+  boolean: (_kind, constant) => {
+    if (constant.kind === 'boolean') return constant.value
+    // A bit's default is ((1)) or ((0)); ((2)) is stored as 1, a conversion not read.
+    return constant.kind === 'number' && (constant.text === '0' || constant.text === '1') ? constant.text === '1' : undefined
+  },
+  integer: (_kind, constant) => (constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined),
+  decimal: (_kind, constant) => (constant.kind === 'number' ? constant.text : undefined),
+}
+
+/** Whether a field of a column of `kind` starts at a value: one its column's constant is read for (0149), and so one a starting value is offered for (0150). */
+export function startsAtConstant(kind: Kind): boolean {
+  return Object.hasOwn(READERS, kind)
+}
+
+/** What the codec of `column` is handed for `constant`: the value the database stores for it, or `undefined` where none is read (`READERS`). */
 function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
-  const type = column.type
-  switch (type.kind) {
-    case 'text':
-      if (constant.kind !== 'text') return undefined
-      // SQL Server reads a literal without N in the database's code page,
-      // and converts an N literal written to a varchar to the column's:
-      // past ASCII, only an N literal on an nvarchar is the text it spells.
-      if (kind === 'sqlserver' && !ASCII.test(constant.text) && !(constant.national && type.lengthUnit === 'utf16-code-units')) return undefined
-      return constant.text
-    case 'boolean':
-      if (constant.kind === 'boolean') return constant.value
-      // A bit's default is ((1)) or ((0)); ((2)) is stored as 1, a conversion not read.
-      return constant.kind === 'number' && (constant.text === '0' || constant.text === '1') ? constant.text === '1' : undefined
-    case 'integer':
-      return constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined
-    case 'decimal':
-      return constant.kind === 'number' ? constant.text : undefined
-    default:
-      return undefined
-  }
+  return READERS[column.type.kind]?.(kind, constant, column.type)
 }
 
 /** A value as a note says it: quoted, as the generator's other sentences quote one, so blanks are seen and a value ends where its quote does. */

@@ -1,5 +1,5 @@
 import type { FieldDef } from '@formancy/spec'
-import { givenStart, storedStart } from '../generate/defaults.js'
+import { givenStart, startsAtConstant, storedStart } from '../generate/defaults.js'
 import type { FieldBinding } from '../generate/types.js'
 import { storedValue } from '../records/answers.js'
 import type { FormPolicy } from '../policy/types.js'
@@ -15,13 +15,6 @@ import type { FieldPresentation, StartingValue } from './types.js'
  * value a field starts with is one a save of it stores and reads back as.
  */
 
-/**
- * The column kinds a starting value is offered for: those 0149 starts a
- * field at a constant of, whose starting answer its cases create, store
- * and read back on both engines. Any other has no case that does.
- */
-const TAKES: ReadonlySet<string> = new Set(['text', 'integer', 'decimal', 'boolean'])
-
 /** A kind a field may be bound to that takes none, as a sentence names it. */
 const NAMED: Readonly<Record<string, string>> = {
   date: 'a date',
@@ -36,13 +29,14 @@ const NAMED: Readonly<Record<string, string>> = {
  * `null` where it takes one. A lookup's answer is a record token, and the
  * record a value names may be one the person may not choose, as 0149 says
  * of its column's default; a field the create does not write is one a new
- * record never sends; and a kind outside `TAKES` has no case holding it.
+ * record never sends; and a kind 0149 reads no constant of
+ * (`startsAtConstant`, the generator's own list) has no case holding it.
  */
 export function noStartingValue(binding: FieldBinding): string | null {
   if (binding.kind === 'lookup')
     return "a lookup's answer is a record, and the one a starting value names may be one the person filling the form in may not choose"
   if (!binding.writes.create) return 'a create does not write it, so the database fills it'
-  if (TAKES.has(binding.type.kind)) return null
+  if (startsAtConstant(binding.type.kind)) return null
   return `one is offered for text, a whole or exact number and yes or no, and this is ${NAMED[binding.type.kind] ?? binding.type.kind}`
 }
 
