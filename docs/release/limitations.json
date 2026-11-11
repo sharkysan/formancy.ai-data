@@ -4138,6 +4138,31 @@
           "heldBy": "apps/host/src/demo-tools.test.tsx"
         }
       ]
+    },
+    "0148": {
+      "reviewed": "sha256:3c719a00cd7fdde6227f437eece49760f869b0325e9ec727e63ccee058d21565",
+      "limitations": [
+        {
+          "area": "testing",
+          "says": "Building and testing this repository needs Node 22.22.3 or a later 22, 24.15 or later, or 26, which every package it installs accepts, where it said 22.12 before."
+        },
+        {
+          "area": "testing",
+          "says": "The Node floor and the server image's Node are held to what each installed package declares in its engines field, so a package that needs more Node than it declares is not caught."
+        },
+        {
+          "area": "operations",
+          "says": "The server image stays on node:22.12-alpine, which every package of the server's production deploy accepts; nothing it runs was moved to a newer Node."
+        },
+        {
+          "area": "testing",
+          "says": "Two security advisories stay open, under development tools alone: glob 10 beneath testcontainers' archiver and minimatch 9 and 10 beneath it and ESLint, which have no fix in their major lines."
+        },
+        {
+          "area": "testing",
+          "says": "oxc-parser's optional WebAssembly binding, under @angular/build, pins an @emnapi/core its own runtime does not accept; pnpm peers check names it, and nothing this repository builds installs it."
+        }
+      ]
     }
   }
 }

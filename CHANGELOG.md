@@ -655,6 +655,27 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The dependencies with a security advisory and a fix in reach move to
+  the fix, and the workspace needs Node 22.22.3** (0148). Why: GitHub
+  listed 24 advisories against the lockfile, 6 of them high. The SQL
+  Server adapter's exact `@azure/identity` moves from 4.13.3 to 4.14.1,
+  which takes `@azure/msal-node` 7 for its authorization-code advisory;
+  `@formancy/data-server` asks for Fastify `^5.12.8`, which a deployment
+  installing it gets with `fast-uri` and `ip-address` past theirs; the
+  apps take Vite `^8.3.6` and `@angular/build` `^22.2.6`, which no longer
+  pins a Vite the advisories name; undici, under jsdom in the suites,
+  moves to 8.12. That undici needs Node 22.19, and asked of the lockfile,
+  the workspace's `>=22.12.0` was already false: Angular 22 and jsdom
+  asked for 22.22. What you notice:
+  - **Building and testing this repository needs Node 22.22.3** or a
+    later 22, 24.15 or 26. `scripts/node-floor.test.mjs` fails when a
+    package the lockfile installs refuses the floor, or one the server
+    image deploys refuses its Node.
+  - **The server image is unchanged**: still `node:22.12-alpine`, which
+    every package of its production deploy accepts.
+  - Two advisories stay open, under development tools alone -- glob 10
+    and minimatch 9 and 10, beneath testcontainers and ESLint -- with no
+    fix in their major lines.
 - **Every `@formancy/*` dependency moves to 0.13.0, upstream's release of
   2026-11-05, adopted the day it was published, and generated forms stay
   on spec 5** (0055). Why: 0.13.0's renderers take `fieldAddition`,
