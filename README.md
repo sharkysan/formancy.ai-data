@@ -149,9 +149,8 @@ until then the address is formancy.ai's 404
   and a constant the field would refuse start empty, left to the database,
   the last two said in a note
   ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md));
-  the studio's Presentation step gives a field another starting value, or
-  takes the column's away
-  ([0150](./docs/decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md)).
+  the studio's Presentation step gives a field another starting value
+  ([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form
@@ -194,9 +193,11 @@ until then the address is formancy.ai's 404
   ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md),
   [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md),
   [0119](./docs/decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md),
-  [0150](./docs/decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md)).
-  A starting value the database's default changed under is kept and said,
-  and one the regenerated field no longer takes is dropped and said.
+  [0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
+  A starting value the database's default changed under is kept and said;
+  one the regenerated field stores the same is carried in its new
+  spelling, the number 7 as the text “7” once its column is a bigint, and
+  said; and one it refuses is dropped and said.
   A key that now names another column keeps its grants only once somebody
   confirms it in the publish over the version they were written in,
   whichever client publishes over a version the server still serves; grants
@@ -650,18 +651,23 @@ with what was typed kept
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with
 the column's default, “draft”." -- and takes another: a box for text and
-numbers, where empty takes the column's default away so a new record
-starts the field empty, and for a yes or no None, Ticked and Not ticked, or
-the select's Yes and No. "Use the column’s default" gives it back. A value
-is checked as the server checks it before it is set, set as a record
-holding it reads back -- `9.5000` for 9.5 in a `numeric(18,4)` -- and
-refused under its box, in the server's words, with what was typed kept; on
-the state field it must be a state a create starts a record in. A lookup,
+numbers and, for a yes or no, its two answers. A column's default is never
+taken away: a field left empty is left out of a create, and the database
+stores its default without the person seeing it, so emptied the box keeps
+what it had and says so, and None is offered only where the column has no
+default. "Use the column’s default" gives the column's back. A value is
+checked as the server checks it before it is set -- its column's codec and
+its box, a line break or a tab refused in a one-line box; not the
+database's CHECK constraints or a SQL Server code page, which the save
+meets -- set as a record holding it reads back, `9.5000` for 9.5 in a
+`numeric(18,4)`, and refused in the step's status and under its box, in
+the server's words, with what was typed kept; on the state field it must be
+a state a create starts a record in. A lookup,
 a field the create does not write, a date, a time, an instant, a float and
 a uuid take none, and the row says why: a lookup's answer is a record the
 person may not be allowed to choose, and the others have no case here that
 creates, stores and reads back a starting answer of their kind
-([0150](./docs/decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md)).
+([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
 
 Under the Presentation step's arrangement, List views names the form's
 list views: each a name, conditions on the fields the form's list can be
@@ -953,10 +959,10 @@ again
 ([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 
 New record, and a child's new row, start each field at its column's
-constant default where the form has one -- an order at `draft` -- or at
-the starting value the form's administrator chose over it, and a save
-that leaves it sends it
-([0150](./docs/decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md)). A record you open, a Duplicate and a form
+constant default where the form has one -- an order at `draft` -- and a
+save that leaves it sends it. New record starts a field at the starting
+value the form's administrator chose over its column's instead
+([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)). A record you open, a Duplicate and a form
 discarded back to start as they were handed in, never at a default; a field
 you may not give on create, and a state a create may not start the record
 in, start empty, and the database fills them as before

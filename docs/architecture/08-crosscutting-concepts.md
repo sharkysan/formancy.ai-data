@@ -63,15 +63,18 @@ column's constant default (`startingAnswer`,
 [0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md))
 and a starting value an administrator gives a field in the presentation
 (`givenStart`,
-[0150](../decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md))
+[0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md))
 are one reading in `packages/data-core/src/generate/defaults.ts`: through
 the column's codec -- the binding's type's, `codecForType`, where a
 presentation is applied without the snapshot -- and `formValue`, and only
-where the field's box holds it, in UTF-16 code units. A value spelled
-otherwise than it reads back, `9.5` for a `numeric(18,4)`, is refused with
-the spelling to give, so a presentation has one; formancy's engine is not
-asked at run time, and `presentation/starting-value.test.ts` holds what the
-reading takes to the released validator and `acceptsDefault`.
+where the field's box draws it as the column holds it, no control
+character in a one-line box, and holds it, in UTF-16 code units. A value
+spelled otherwise than it reads back, `9.5` for a `numeric(18,4)`, is
+refused with the spelling to give, so a presentation has one; formancy's
+engine is not asked at run time, and `presentation/starting-value.test.ts`
+holds what the reading takes to the released validator and
+`acceptsDefault`. The database is not asked: a CHECK constraint or a SQL
+Server code page meets the value at the save, as any answer.
 
 **Held by** `packages/data-core/src/codecs/codec.test.ts` -- the fixture's
 largest `numeric(18,4)` and an integer past 2^53 survive as strings, and a
@@ -108,7 +111,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A write whose answer was lost | unknown, never refused, never replayed | [0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md) | `e2e-lost-answer.integration.test.ts` |
 | A SQL Server that answers a SQL login asking for TLS that it will not encrypt, or with an answer that is not a PRELOGIN response | the connection ends before the login is sent, 503 | [0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | `packages/data-sqlserver/src/encryption.test.ts`, `routes/unencrypted.integration.test.ts` |
 | A file of records that cannot be made whole -- past its byte budget or its deadline, rows that moved between pages, text UTF-8 cannot carry, labels that cannot be loaded | a JSON refusal and nothing of the file, never a shorter file sent as whole | [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | `routes/runtime-exports.test.ts`, `packages/data-client/src/transport.test.ts` |
-| A starting value a field does not take, or one no case holds -- a lookup's, a date's | refused at publish, saying why; dropped and said by a regeneration | [0150](../decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md) | `packages/data-core/src/presentation/starting-value.test.ts`, `routes/admin.test.ts` |
+| A starting value a field does not take, or one no case holds -- a lookup's, a date's | refused at publish, saying why; dropped and said by a regeneration | [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md) | `packages/data-core/src/presentation/starting-value.test.ts`, `routes/admin.test.ts` |
 | A setting nobody could have meant | the process stops, naming it | [0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md), [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md), [0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | each setting's test |
 
 Test paths without a package are under `packages/data-server/src/`.

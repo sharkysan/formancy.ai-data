@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:35e34e923c76b4d7cf93ac9aca29af24b6b593e00ca4fc0a516e50670943b121",
+      "reviewed": "sha256:12406f6f762e7d2662da97a328ebe24f072e47a641cb8e936f597c43e584105a",
       "limitations": [
         {
           "area": "studio",
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:c16e0c82c11d26a68cc8ff03e108a1f259ef0e0bb983c6d0bcca0b0996bfead5",
+      "reviewed": "sha256:a334be96a01b3fd24ba98d65c9316135e6fcbd6579d40155d4f4a347b7294f35",
       "limitations": [
         {
           "area": "forms",
@@ -4259,8 +4259,26 @@
       ]
     },
     "0150": {
-      "reviewed": "sha256:41224c58e50a9b64e0f6e89b37981d1fd0926dbacb0ff0199dd382a5db3df9a0",
+      "reviewed": "sha256:6f9e1b4625504e6da473f2c08577ad3a8d7dbe4e1da6249c7782fc00243700a6",
       "limitations": [
+        {
+          "area": "forms",
+          "says": "A column's default is never taken away: a field whose column has one starts at it or at another value, never empty, and a yes or no with a default offers no None.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A starting value is checked by its column's codec and its field's box, not by the database: a value a CHECK constraint refuses, or text with a character a SQL Server code page lacks, is taken, and refused or stored otherwise by the save that sends it."
+        },
+        {
+          "area": "server",
+          "says": "A starting value's fit is asked on every read of a stored version, so a later release whose codec or box refuses more stops serving a version holding one it now refuses until that version is published again."
+        },
+        {
+          "area": "forms",
+          "says": "A text constant with a control character is read: a one-line field refuses it with a note, and a multi-line field starts at a line feed or a tab.",
+          "heldBy": "packages/data-core/src/generate/defaults.test.ts"
+        },
         {
           "area": "studio",
           "says": "A date, a time, an instant, a float, a uuid and a lookup take no starting value in the Presentation step, though spec 5 would hold one: no case here stores a starting answer of them and reads it back.",
@@ -4287,7 +4305,7 @@
         },
         {
           "area": "forms",
-          "says": "A starting value the regenerated field no longer takes, or reads back otherwise, is dropped and said: 9.50 once the column's scale is 4, rather than carried as 9.5000.",
+          "says": "A starting value the regenerated field refuses is dropped and said, and one it stores the same is carried in its new spelling and said: the number 7 becomes the text “7” once its column is a bigint.",
           "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
         },
         {

@@ -100,7 +100,7 @@ without database VIEW DEFINITION reports row security `unknown` (0027).
    (`presentation.tsx`, 0030) -- a field's starting value among it, read
    before the session sees it as a publish reads it and set as a record
    holding it reads back (`starting-value.tsx`,
-   [0150](../decisions/0150-an-administrator-sets-or-clears-a-fields-starting-value.md))
+   [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md))
    -- and writes the `FormPolicy` (`policy.tsx`):
    who may do what, each field's grants, the row filters
    ([0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md)),

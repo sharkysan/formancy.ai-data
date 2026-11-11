@@ -9,11 +9,14 @@ import type { FieldPresentation, StartingValue } from './types.js'
 /*
  * A field's starting value as presentation (0150): the answer a new record
  * starts it with, over the column's constant default the generator gave it
- * (0149), or none. Which fields take one, and which value each takes, is
- * decided here once -- `applyPresentation` refuses by it, a rebase drops by
- * it, and the studio offers its control and says its refusal by it -- and
- * read as the generator reads a column's constant (`givenStart`), so a
- * value a field starts with is one a save of it stores and reads back as.
+ * (0149), or where it gave none. Which fields take one, and which value
+ * each takes, is decided here once -- `applyPresentation` refuses by it, a
+ * rebase carries by it, and the studio offers its control and says its
+ * refusal by it -- and read as the generator reads a column's constant
+ * (`givenStart`): a value a field starts with is one its column's codec and
+ * its box take, spelled as a record holding it reads back. The database is
+ * not asked: a CHECK constraint, a trigger, a foreign key or a character a
+ * SQL Server code page lacks is the save's to refuse, as for any answer.
  */
 
 /** A kind a field may be bound to that takes none, as a sentence names it. */

@@ -1,6 +1,6 @@
 # 0149 — A new record starts with its column's constant default
 
-- **Status:** accepted; amends [0118](0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md): a generated field carries spec 5's `default`, its column's constant one; extends [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md): a state field's choice keeps the default where a create may start the record there
+- **Status:** accepted; amends [0118](0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md): a generated field carries spec 5's `default`, its column's constant one; extends [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md): a state field's choice keeps the default where a create may start the record there; amended by [0150](0150-an-administrator-gives-a-field-another-starting-value.md): a text constant with a control character is read, and the field's box refuses it -- any in a one-line field, with a note, and any but a line feed or a tab in a multi-line one -- in the one reading an administrator's starting value goes through
 - **Date:** 2026-11-11
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -203,5 +203,5 @@ only enforcement is "we remember" says so plainly.
 | [0146](0146-the-page-says-what-the-server-did.md) | The page says what the server did, and keeps the demo's controls out of the way | accepted |
 | [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |
 | [0148](0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md) | The workspace's Node is one every package it installs accepts, and so is the server image's | accepted |
-| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted |
-| [0150](0150-an-administrator-sets-or-clears-a-fields-starting-value.md) | An administrator sets or clears a field's starting value | accepted |
+| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150 |
+| [0150](0150-an-administrator-gives-a-field-another-starting-value.md) | An administrator gives a field another starting value | accepted |

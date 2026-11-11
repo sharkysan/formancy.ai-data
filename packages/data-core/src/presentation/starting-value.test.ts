@@ -17,9 +17,9 @@ import { PRESENTATION_VERSION } from './types.js'
 /*
  * A field's starting value as presentation (0150): an administrator gives
  * a field another answer to start a new record with than its column's
- * constant default (0149), or takes the column's away, and a regeneration
- * carries that by what the field stands for, as it carries help text
- * (0119). The base is the drift fixture's order form on SQL Server:
+ * constant default (0149), or one where it has none, never none where it
+ * has one, and a regeneration carries that by what the field stands for,
+ * as it carries help text (0119). The base is the drift fixture's order form on SQL Server:
  * status, an nvarchar(20), starts at its column's `('placed')`; amount is a
  * decimal(18,4) held as text, notes unbounded text, created_by a whole
  * number, paid a yes or no, order_date a date, customer a lookup and id a
