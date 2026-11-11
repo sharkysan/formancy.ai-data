@@ -1,28 +1,28 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, test } from 'vitest'
-import { deployRefusing, imageNode, lowest, productionClosure, refusing, satisfies } from './node-floor.mjs'
+import { admitted, deployRefusing, floorRefusals, productionClosure, satisfies, stageNodes } from './node-floor.mjs'
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
 
 describe('the Node versions this repository names (0148)', () => {
   // The workspace's floor said 22.12.0 while Angular 22 and jsdom's selector
-  // engine asked for 22.22, and undici 8.12 stopped the suites on 22.18:
-  // a floor no package refuses is one a contributor can install on
-  // (watched failing with the floor put back to >=22.12.0: 58 packages
-  // named, and at >=22.19.0, 13).
-  test("the workspace's floor is a Node every package the lockfile installs accepts", () => {
-    const floor = lowest(JSON.parse(read('package.json')).engines.node)
-    expect(refusing(floor, read('pnpm-lock.yaml'))).toEqual([])
+  // engine asked for 22.22, and undici 8.12 stopped the suites on 22.14; and
+  // a floor of `>=22.22.3` still admits Node 23, 24.0 and 25, which those
+  // refuse. Every release the floor admits is one a contributor may install
+  // on (watched failing with the floor `>=22.22.3`: 57 packages refusing
+  // 23.0.0, 29 refusing 24.0.0 and 15 refusing 25.0.0; and with `>=22.12.0`).
+  test("the workspace's floor admits only Nodes every package the lockfile installs accepts", () => {
+    expect(floorRefusals(JSON.parse(read('package.json')).engines.node, read('pnpm-lock.yaml'))).toEqual([])
   })
 
   // The image runs what a production deploy of the server installs, on the
-  // Node its Dockerfile names; a dependency that moves its floor past that
+  // Node its last stage names; a dependency that moves its floor past that
   // Node is caught here, not in a container that will not start (watched
-  // failing with the image built FROM node:20-alpine: tedious and the
-  // @azure packages named).
-  test("the server image's Node is one every package it deploys accepts", () => {
-    const image = imageNode(read('packages/data-server/Dockerfile'))
-    expect(deployRefusing(image, read('pnpm-lock.yaml'), 'packages/data-server')).toEqual([])
+  // failing with the runtime stage built FROM node:20-alpine: tedious and
+  // the @azure packages named).
+  test("the server image's runtime Node is one every package it deploys accepts", () => {
+    const runtime = stageNodes(read('packages/data-server/Dockerfile')).at(-1).node
+    expect(deployRefusing(runtime, read('pnpm-lock.yaml'), 'packages/data-server')).toEqual([])
   })
 })
 
@@ -63,26 +63,52 @@ describe('satisfies', () => {
   })
 
   // A range it cannot read would otherwise be a package it passes unread.
-  test('throws on a range it cannot read', () => {
+  // npm keeps a release out of a pre-release's range, which a reader that
+  // dropped the tag would not (watched failing with the tag dropped:
+  // `22.22.3-rc.1` read as 22.22.3).
+  test('throws on a range it cannot read, a pre-release among them', () => {
     expect(() => satisfies('22.12.0', 'latest')).toThrow(/not a version/u)
+    expect(() => satisfies('22.22.3', '22.22.3-rc.1')).toThrow(/not a version/u)
   })
 })
 
-describe('lowest and imageNode', () => {
-  // A caret floor would have a lowest version and a ceiling; the guard would
-  // test the one and say nothing of the other.
-  test('take a plain floor alone', () => {
-    expect(lowest('>=22.22.3')).toBe('22.22.3')
-    expect(() => lowest('^22.22.3')).toThrow(/not a plain floor/u)
+describe('admitted', () => {
+  // What the floor promises a contributor is every major it admits, from
+  // its first: a check of its lowest release alone passed `>=22.22.3`
+  // while Node 24.0 was refused (watched failing with the lowest release
+  // alone: [22.22.3]).
+  test('takes the lowest release of each major the floor admits', () => {
+    expect(admitted('^22.22.3 || ^24.15.0 || >=26.0.0', 27)).toEqual(['22.22.3', '24.15.0', '26.0.0', '27.0.0'])
+    expect(admitted('>=22.22.3', 24)).toEqual(['22.22.3', '23.0.0', '24.0.0'])
   })
 
+  // Any other form's lowest releases would be a guess.
+  test('throws on a floor that is not carets and lower bounds', () => {
+    expect(() => admitted('~22.22.3', 27)).toThrow(/not a floor/u)
+    expect(() => admitted('22.x', 27)).toThrow(/not a floor/u)
+    expect(() => admitted('^0.2.3', 27)).toThrow(/not a floor/u)
+  })
+})
+
+describe('stageNodes', () => {
   // `node:22.12-alpine` floats over every 22.12 release; the oldest is the
-  // one the guard must hold, and stages on two Nodes have no one answer.
-  test("read the oldest release a Dockerfile's node: tag names", () => {
-    expect(imageNode('FROM node:22.12-alpine AS build\nRUN x\nFROM node:22.12-alpine AS runtime\n')).toBe('22.12.0')
-    expect(imageNode('FROM node:24-alpine\n')).toBe('24.0.0')
-    expect(() => imageNode('FROM node:22.12-alpine\nFROM node:24.1-alpine\n')).toThrow(/different Node/u)
-    expect(() => imageNode('FROM alpine:3.20\n')).toThrow(/no node: image/u)
+  // one to hold. A stage built FROM another's name runs that one's Node, and
+  // a flag before the image is not the image (watched failing with an
+  // earlier stage's name left unread: "build names no Node").
+  test("reads each stage's Node, through a flag and an earlier stage's name", () => {
+    const dockerfile =
+      'FROM --platform=linux/amd64 node:22.12-alpine AS build\nRUN x\nFROM build AS test\nFROM --platform=$BUILDPLATFORM node:20-alpine AS runtime\n'
+    expect(stageNodes(dockerfile).map((stage) => stage.node)).toEqual(['22.12.0', '22.12.0', '20.0.0'])
+    expect(stageNodes(`FROM node:24.15-alpine@sha256:${'a'.repeat(64)}\n`)[0].node).toBe('24.15.0')
+  })
+
+  // A runtime on an image it cannot read passed before as the build
+  // stage's Node: tedious asks for 22 and would have run on distroless's 20
+  // unread (watched failing with an unreadable stage skipped).
+  test('throws on a stage built FROM an image that names no Node it can read', () => {
+    expect(() => stageNodes('FROM node:22.12-alpine AS build\nFROM gcr.io/distroless/nodejs20-debian12\n')).toThrow(/names no Node/u)
+    expect(() => stageNodes('ARG NODE=22.12\nFROM node:${NODE}-alpine\n')).toThrow(/names no Node/u)
+    expect(() => stageNodes('FROM node:lts-alpine\n')).toThrow(/names no Node/u)
   })
 })
 
@@ -106,6 +132,9 @@ importers:
       ajv:
         specifier: ^8.0.0
         version: 8.0.0(fast-uri@3.1.9)
+      wide-cjs:
+        specifier: npm:wide@4.2.3
+        version: wide@4.2.3
 packages:
   fastify@5.0.0:
     engines: {node: '>=20'}
@@ -114,6 +143,8 @@ packages:
   ajv@8.0.0:
     engines: {node: '>=26'}
   fast-uri@3.1.9: {}
+  wide@4.2.3:
+    engines: {node: '>=28'}
 snapshots:
   fastify@5.0.0: {}
   vitest@5.0.0: {}
@@ -121,14 +152,34 @@ snapshots:
     dependencies:
       fast-uri: 3.1.9
   fast-uri@3.1.9: {}
+  wide@4.2.3: {}
 `
 
   // What the image holds is what a production deploy installs: a
   // devDependency is not in it, and a workspace project it links is, with
-  // that project's own dependencies (watched failing with devDependencies
-  // followed: vitest named; and with links skipped: ajv missing).
-  test('follows dependencies and workspace links, never a devDependency', () => {
-    expect([...productionClosure(lock, 'packages/server')].sort()).toEqual(['ajv@8.0.0(fast-uri@3.1.9)', 'fast-uri@3.1.9', 'fastify@5.0.0'])
-    expect(deployRefusing('22.12.0', lock, 'packages/server')).toEqual([{ name: 'ajv@8.0.0', range: '>=26' }])
+  // that project's own dependencies, an alias read as the package it stands
+  // for (watched failing with devDependencies followed: vitest named; with
+  // links skipped: ajv missing; and with an alias read as a version: no
+  // snapshot of wide-cjs@wide@4.2.3).
+  test('follows dependencies, workspace links and aliases, never a devDependency', () => {
+    expect([...productionClosure(lock, 'packages/server').installed].sort()).toEqual([
+      'ajv@8.0.0(fast-uri@3.1.9)',
+      'fast-uri@3.1.9',
+      'fastify@5.0.0',
+      'wide@4.2.3',
+    ])
+    expect(deployRefusing('22.12.0', lock, 'packages/server')).toEqual([
+      { name: 'wide@4.2.3', range: '>=28' },
+      { name: 'ajv@8.0.0', range: '>=26' },
+    ])
+  })
+
+  // An entry the lockfile does not hold would have been a subtree left out
+  // and passed unread (watched failing with a missing snapshot read as one
+  // with no dependencies).
+  test('throws on a dependency the lockfile holds no snapshot of', () => {
+    expect(() => productionClosure(lock.replace('  fast-uri@3.1.9: {}\n  wide@4.2.3: {}\n', '  wide@4.2.3: {}\n'), 'packages/server')).toThrow(
+      /no snapshot of fast-uri@3.1.9/u,
+    )
   })
 })

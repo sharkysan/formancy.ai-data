@@ -490,13 +490,17 @@ page is refused, which only the console says
 ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 
 **Building and testing.** The workspace needs Node 22.22.3 or a later 22,
-24.15 or 26, the lowest every package it installs accepts, and that floor
-moves when any of them moves its own; it and the server image's Node are
-held to what each package declares, never to what it needs. Two security
+24.15 or a later 24, or 26 or later, the releases every package it
+installs accepts, and that floor moves when any of them moves its own; it
+and the server image's runtime Node are held to what each package
+declares, never to what it needs. The images' build stages run on 22.12
+tools that ask for 22.22, which nothing holds, and CI's Node `22` is not
+held to the floor. Two security
 advisories stay open under development tools alone, glob 10 beneath
 testcontainers' archiver and minimatch 9 and 10 beneath it and ESLint,
-with no fix in their major lines, and `oxc-parser`'s optional WebAssembly
-binding pins an `@emnapi/core` its own runtime does not accept
+with no fix in their major lines, and `oxc-parser`'s WebAssembly binding,
+installed everywhere and loaded nowhere a native one exists, pins an
+`@emnapi/core` its own runtime does not accept
 ([0148](../decisions/0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md)).
 
 **What the tests do not reach.** The published figures describe one

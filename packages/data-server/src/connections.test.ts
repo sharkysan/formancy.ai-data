@@ -201,7 +201,8 @@ describe('parseConnections, for an Entra principal', () => {
     for (const value of [TENANT, CLIENT, 'erp-client-secret']) expect(said.join(' ')).not.toContain(value)
   })
 
-  // @azure/identity 4.13.3's ManagedIdentityCredential does not ask the
+  // @azure/identity 4.14.1's ManagedIdentityCredential, byte for byte
+  // 4.13.3's (read again on 2026-11-11, 0148), does not ask the
   // host's identity endpoint when AZURE_FEDERATED_TOKEN_FILE,
   // AZURE_TENANT_ID and a client id are set: it takes AKS workload
   // identity's token exchange (tokenExchangeMsi.js), as the tenant

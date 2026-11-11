@@ -200,10 +200,13 @@ const WORKLOAD_TOKEN_FILE = 'AZURE_FEDERATED_TOKEN_FILE'
 /**
  * What in the environment `env` stops the server at start, for the Entra
  * connections among `connections`: a managed identity while
- * AZURE_FEDERATED_TOKEN_FILE is set. @azure/identity 4.13.3 then logs in by
+ * AZURE_FEDERATED_TOKEN_FILE is set. @azure/identity 4.14.1 then logs in by
  * AKS workload identity's token exchange (tokenExchangeMsi.js), as the
  * tenant, client and authority host the environment names rather than the
- * reviewed entry, and this release does not take workload identity (0074).
+ * reviewed entry, and this release does not take workload identity (0074;
+ * read again in 4.14.1 on 2026-11-11, its managed identity's code byte for
+ * byte 4.13.3's, its workload identity's new proxy taken only under an
+ * `enableAzureProxy` nothing here passes, 0148).
  * The library takes it when AZURE_TENANT_ID and a client id are set too;
  * the token file alone is refused here, and named, never its value.
  * main.ts passes the process's environment: nothing here reads it.

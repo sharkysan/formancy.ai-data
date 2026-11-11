@@ -160,9 +160,18 @@ export function setupNodeVersions(root = repo) {
   return found
 }
 
+/**
+ * Every stage of a Dockerfile, in order: its base image, a `--platform=` or
+ * other flag skipped, and the name `AS` gives it, or null. The one reader
+ * of a Dockerfile's stages, which `scripts/node-floor.mjs` reads them by too.
+ */
+export function dockerfileStages(text) {
+  return [...text.matchAll(/^FROM\s+(?:--\S+\s+)*(\S+)(?:\s+AS\s+(\S+))?/gim)].map((match) => ({ image: match[1], alias: match[2] ?? null }))
+}
+
 /** Every stage's base image of a Dockerfile, a `--platform=` or other flag skipped. */
 export function dockerfileImages(text) {
-  return [...text.matchAll(/^FROM\s+(?:--\S+\s+)*(\S+)/gim)].map((match) => match[1])
+  return dockerfileStages(text).map((stage) => stage.image)
 }
 
 /** The tools, each with every version the directories that use it load, and which directories those are. */

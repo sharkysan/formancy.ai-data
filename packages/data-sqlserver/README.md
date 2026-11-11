@@ -66,7 +66,7 @@ public cloud's, written down, so `AZURE_AUTHORITY_HOST` is never read. A
 failed login rejects with a sentence, with Entra's AADSTS code when it
 gave one, that names no tenant, client or secret. The options are plain strings, so no
 `@azure` type is in this package's declarations; `@azure/identity` is its
-dependency at exactly 4.13.3, the copy tedious already installs
+dependency at exactly 4.14.1, the copy tedious already installs
 ([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 Open the pool with `connectSqlServer`, not with an `mssql` you imported

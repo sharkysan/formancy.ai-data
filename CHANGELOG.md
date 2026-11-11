@@ -656,23 +656,29 @@ the same day (formancy.ai 0232).
 ### Changed
 
 - **The dependencies with a security advisory and a fix in reach move to
-  the fix, and the workspace needs Node 22.22.3** (0148). Why: GitHub
+  the fix, and the workspace needs Node 22.22.3, 24.15 or 26** (0148). Why: GitHub
   listed 24 advisories against the lockfile, 6 of them high. The SQL
   Server adapter's exact `@azure/identity` moves from 4.13.3 to 4.14.1,
   which takes `@azure/msal-node` 7 for its authorization-code advisory;
-  `@formancy/data-server` asks for Fastify `^5.12.8`, which a deployment
-  installing it gets with `fast-uri` and `ip-address` past theirs; the
+  `@formancy/data-server` asks for Fastify `^5.12.8`, and this lockfile,
+  and so the server image, moves `fast-uri` and `ip-address` beneath it
+  past theirs -- an integrator with a lockfile of their own updates those
+  two there; the
   apps take Vite `^8.3.6` and `@angular/build` `^22.2.6`, which no longer
   pins a Vite the advisories name; undici, under jsdom in the suites,
   moves to 8.12. That undici needs Node 22.19, and asked of the lockfile,
   the workspace's `>=22.12.0` was already false: Angular 22 and jsdom
-  asked for 22.22. What you notice:
-  - **Building and testing this repository needs Node 22.22.3** or a
-    later 22, 24.15 or 26. `scripts/node-floor.test.mjs` fails when a
-    package the lockfile installs refuses the floor, or one the server
-    image deploys refuses its Node.
-  - **The server image is unchanged**: still `node:22.12-alpine`, which
-    every package of its production deploy accepts.
+  asked for 22.22, and refuse 23, 24.0 to 24.14 and 25. What you notice:
+  - **Building and testing this repository needs Node 22.22.3 or a later
+    22, 24.15 or a later 24, or 26 or later**, the root's
+    `^22.22.3 || ^24.15.0 || >=26.0.0`. `scripts/node-floor.test.mjs`
+    fails when a package the lockfile installs refuses a release the floor
+    admits, or one the server image deploys refuses its runtime's Node.
+  - **The server image's runtime is unchanged**: still
+    `node:22.12-alpine`, which every package of its production deploy
+    accepts. Its build stage, and the web and demo images', also build on
+    22.12 with tools that ask for 22.22, as they did before; nothing holds
+    those yet.
   - Two advisories stay open, under development tools alone -- glob 10
     and minimatch 9 and 10, beneath testcontainers and ESLint -- with no
     fix in their major lines.

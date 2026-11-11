@@ -1467,7 +1467,7 @@ stops it. No command does that for you yet.
 | `@formancy/react` | 0.13.0 | `0.13.0` |
 | `@formancy/spec` | 0.13.0 | `0.13.0` |
 | `@formancy/themes` | 0.13.0 | `0.13.0` |
-| Node, the workspace |  | `>=22.22.3` |
+| Node, the workspace |  | `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0` |
 | Node, the server image | `node:22.12-alpine`, every stage |  |
 | Node, CI | 22 |  |
 | pnpm | 12.4.2, through corepack | `pnpm@12.4.2`, the root's `packageManager` |
