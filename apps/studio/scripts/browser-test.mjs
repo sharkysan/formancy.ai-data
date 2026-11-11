@@ -17,8 +17,11 @@
 //     it was pressed on -- a field moved down, a filter removed, a list
 //     view's condition row removed and the view saved (0105), a conflict
 //     rebased, a restore refused, an import refused, a dropped label given,
-//     a draft approved, a browse's condition applied or removed -- the
-//     keyboard is somewhere deliberate afterwards, not on the page;
+//     a draft approved, a browse's condition applied from its line or a
+//     header box, removed, or put back by Undo (0147) -- the keyboard is
+//     somewhere deliberate afterwards, not on the page; and `/` reaches a
+//     browse's filter line, Tab its header boxes, and Esc leaves the line
+//     for the grid;
 //   - the paper is the theme's: no rule of studio.css selects anything on the
 //     preview's paper, or on a draft's open for review (0065), so each shows
 //     what the published form will;
@@ -34,8 +37,9 @@
 //     and under review a draft submitted, a draft open for review and a
 //     draft approved (0065); and a browse's grid, a table wider than the
 //     window scrolling in its own region, a sort and a view (0099), and its
-//     filter, the form open on a range of days, a condition applied, a
-//     value refused and the last condition removed (0104);
+//     filter (0104, 0147): the line's completion open over the grid, a line
+//     applied, one it cannot read and one the server refuses, a header box
+//     applied, a condition removed, and the last removed and put back;
 //   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
 //     refuses every font file, none had (0058): a state measured before a

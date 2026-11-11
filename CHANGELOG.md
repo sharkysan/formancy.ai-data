@@ -676,6 +676,36 @@ the same day (formancy.ai 0232).
   - Two advisories stay open, under development tools alone -- glob 10
     and minimatch 9 and 10, beneath testcontainers and ESLint -- with no
     fix in their major lines.
+- **The studio browses with the filter line, its chips and a box under
+  each header** (0147). Why: the host's grids are filtered by a line, a
+  box under each column's header and chips (0131, 0132), and the design
+  of finding records has the studio's Browse step adopt them from the
+  same filter language, where Filter rows asked four choices behind a
+  disclosure for one condition. What you notice: above a browsed table, a
+  line named Filter reads `country_code = CH and credit_limit > 125.50`,
+  completing a column, its operators and a boolean's values as it is
+  typed, with the host line's keys -- Enter applies it, a line it cannot
+  read is marked and kept, Esc puts back the filter and gives the
+  keyboard to the table, `/` comes back to it. Each condition is a chip in
+  the words the status line says it in, with Remove, Clear the filter and
+  Undo; and under each column's header a box takes that column's
+  condition, a boolean's a select of true and false. A column is named by
+  its name lower-cased, every run of anything that is not a letter or a
+  digit one `_`, `order_date` for `Order Date`; where two names give one,
+  each column is named by its own name instead, and one whose own name is
+  not one word has no name and no box -- `Order Date` beside
+  `order_date` -- nor have two that differ only in case, `Code` beside
+  `code`. A press while a page is on its way -- a second box, a select's
+  next value, Clear the filter clicked after typing in a box -- is sent
+  once that page has arrived, on the filter as it then stands. A refusal
+  is the step's alert, the typing kept, and a box's stays said, the box
+  marked invalid, until the box changes. Filter rows and its hints
+  are gone. For integrators: data-core's `headerCondition` reads a box
+  with its field's name in the line in front, not its key, so a key of two
+  words reads, and `nameableFields` names the fields one word says alone;
+  nothing changes for a host field, whose key is one word. The server is
+  unchanged.
+
 - **Every `@formancy/*` dependency moves to 0.13.0, upstream's release of
   2026-11-05, adopted the day it was published, and generated forms stay
   on spec 5** (0055). Why: 0.13.0's renderers take `fieldAddition`,

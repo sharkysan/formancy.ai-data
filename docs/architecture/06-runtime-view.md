@@ -813,22 +813,34 @@ each time (0141).
    them; the audit event names the object, never a value.
 6. A page is filtered by the administrator's own conditions on its columns
    ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
-   The step's Filter rows (`apps/studio/src/browse-filter.tsx`) offers each
-   shown column what `filterOffer` gives it in the studio's discovery, and
-   sends `filter`, a list of `{ column, op, … }`, with page one;
+   The step's filter line (`apps/studio/src/browse-line.tsx`) reads what
+   is typed by data-core's `parseFilterLine` over each shown column that
+   `filterOffer` offers anything in the studio's discovery and that one
+   word in the line names alone (`nameableFields`), a box under each such
+   column's header (`browse-boxes.tsx`) reads its condition by
+   `headerCondition`, and each condition is a chip with a Remove and Undo
+   (`browse-chips.tsx`)
+   ([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md));
+   whichever made it, the step sends `filter`, a list of `{ column, op, … }`, with page one;
    `validateBrowseQuery` reads it (`readFilter`), and `planBrowse` plans
    each condition through `columnFilter` for a column the page shows, or
    refuses it 400 `not-filterable`, naming the column and never the value.
    The conditions reach the adapter as the list's `filter`, as a form's do
    (6.5), beside a follow's `equal`. Paging and sorting send the filter
    again; a follow starts the other end without one, and Back sends the
-   page it left with its filter.
+   page it left with its filter. A refusal of the server's is said in the
+   step's alert, and the line or the box keeps what was typed until a page
+   under it arrives; a box owns its refusal, which stays said until the box
+   changes. A press made while a page is on its way is sent once that page
+   has settled, on the page as it then stands (`browse-pages.ts`), and one
+   that no longer applies there, made on a page a move is leaving, is
+   dropped.
 
 Held by `routes/admin-browse.test.ts`, `browse-roles.test.ts`, data-core's
 `records/browse.test.ts` and `records/follow.test.ts`, both adapters'
 `list.integration.test.ts` (the shared `browse:` cases, `browse: follows`
 among them, and `column filter: date`, browsed) and the studio's
-`browse.test.tsx` and `browse-filter.test.tsx`. What it costs:
+`browse.test.tsx`, `browse-filter.test.tsx` and `browse-line.test.tsx`. What it costs:
 whoever holds the role reads every row the connection's account can read;
 every page is a discovery and a statement; rows of a view equal in every
 shown column may trade places between pages; only keys over key kinds are
