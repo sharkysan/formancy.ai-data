@@ -1,6 +1,7 @@
 import type { FieldDef } from '@formancy/spec'
 import { givenStart, startsAtConstant, storedStart } from '../generate/defaults.js'
 import type { FieldBinding } from '../generate/types.js'
+import { createStates, startsAt } from '../policy/starting.js'
 import { storedValue } from '../records/answers.js'
 import type { FormPolicy } from '../policy/types.js'
 import type { FieldPresentation, StartingValue } from './types.js'
@@ -107,13 +108,6 @@ export function carriedStart(from: FieldBinding, to: FieldBinding, field: FieldD
   return given.ok ? given : { ok: false, problem: `${shownValue(value)} is not an answer ${to.field} takes (${given.reason})` }
 }
 
-/** The states a create starts a record of `policy`'s state field in (0112): each one a move from nothing reaches, in the moves' order. */
-export function createStates(policy: FormPolicy): string[] {
-  const states: string[] = []
-  for (const move of policy.transitions?.moves ?? []) if (move.from === null && !states.includes(move.to)) states.push(move.to)
-  return states
-}
-
 /** The states as a sentence lists them. */
 function listed(states: readonly string[]): string {
   return states.length === 0 ? 'none' : states.map(shownValue).join(', ')
@@ -124,14 +118,13 @@ function listed(states: readonly string[]): string {
  * the policy's state field (0112), a value no create starts a record in --
  * a create that gives the field a state is a move from nothing -- which
  * would be served to nobody (`startingDefaults`, 0149) while the form
- * says it starts there. Compared as the state is spelled: a whole number
- * by its digits. `null` for any other field, and for a state a create
- * starts in.
+ * says it starts there: `startsAt`, the reading the form route serves
+ * by. `null` for any other field, and for a state a create starts in.
  */
 export function startingStateProblem(policy: FormPolicy, key: string, value: StartingValue): string | null {
-  if (policy.transitions?.field !== key) return null
-  const starts = createStates(policy)
-  return starts.includes(String(value)) ? null : `no create starts a record in ${shownValue(value)}; the policy's moves from nothing reach ${listed(starts)}`
+  const rule = policy.transitions
+  if (rule?.field !== key || startsAt(rule.moves, value)) return null
+  return `no create starts a record in ${shownValue(value)}; the policy's moves from nothing reach ${listed(createStates(rule.moves))}`
 }
 
 /**

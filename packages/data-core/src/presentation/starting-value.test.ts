@@ -5,11 +5,12 @@ import { describe, expect, test } from 'vitest'
 import { addColumn, col, column, decimal, dropColumn, INT64, ORDER, restrict, retype, snapshot, text } from '../drift/fixture.js'
 import { generateForm } from '../generate/generate.js'
 import type { NormalizedType, ObjectMeta } from '../metadata.js'
+import { createStates, startingDefaults } from '../policy/starting.js'
 import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
 import { presentationOf } from './derive.js'
 import { rebasePresentation } from './rebase.js'
-import { createStates, noStartingValue, startingStateProblems, startingValue } from './starting-value.js'
+import { noStartingValue, startingStateProblem, startingStateProblems, startingValue } from './starting-value.js'
 import type { FieldPresentation, PresentationOverrides, StartingValue } from './types.js'
 import { PRESENTATION_VERSION } from './types.js'
 
@@ -494,7 +495,7 @@ describe('a starting value on a state field (0150)', () => {
       { from: 'draft', to: 'placed' },
       { from: 'placed', to: 'shipped' },
     ])
-    expect(createStates(moves)).toEqual(['draft', 'placed'])
+    expect(createStates(moves.transitions?.moves ?? [])).toEqual(['draft', 'placed'])
     expect(startingStateProblems([entry('notes', 'shipped'), entry('status', 'shipped')], moves)).toEqual([
       "/fields/1/default: no create starts a record in “shipped”; the policy's moves from nothing reach “draft”, “placed”.",
     ])
@@ -505,5 +506,29 @@ describe('a starting value on a state field (0150)', () => {
       "/fields/0/default: no create starts a record in “draft”; the policy's moves from nothing reach none.",
     ])
     expect(startingStateProblems([entry('status', 1)], policy([{ from: null, to: '1' }]))).toEqual([])
+  })
+
+  // What a publish takes on the state field and what the form route then
+  // serves a person who may make every move are one decision: a value the
+  // publish takes and the route never serves would be a starting value
+  // nobody sees. Over values spelled every way a client could send one.
+  // Watched failing with the two readings apart: the publish took the
+  // boolean true for a state spelled “true”, which the route serves nobody.
+  test('a publish takes exactly the starting states the form route serves', () => {
+    const moves = [
+      { from: null, to: 'draft' },
+      { from: null, to: '1' },
+      { from: null, to: 'true' },
+      { from: 'draft', to: 'shipped' },
+    ]
+    const served = (value: StartingValue) => {
+      const form = { ...generateForm(snapshot(), ORDER).form }
+      const fields = form.model.fields.map((entry) => (entry.key === 'status' ? { ...entry, default: value } : entry))
+      const started = startingDefaults({ ...form, model: { ...form.model, fields } }, ['status'], { field: 'status', moves, labels: [] })
+      return started.model.fields.find((entry) => entry.key === 'status')?.default !== undefined
+    }
+    for (const value of ['draft', 'shipped', 1, '1', 2, true, 'true', false] as const) {
+      expect({ value, published: startingStateProblem(policy(moves), 'status', value) === null }).toEqual({ value, published: served(value) })
+    }
   })
 })
