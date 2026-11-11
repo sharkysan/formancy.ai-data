@@ -57,7 +57,7 @@ describe("a field's starting value", () => {
     const presentation = await goTo(user, 'Presentation')
     const status = within(presentation).getByLabelText<HTMLInputElement>('Starting value of status')
     expect(status.value).toBe('draft')
-    expect(computeAccessibleDescription(status)).toBe("Generated: Starts with the column's default, “draft”. Empty, a new record starts it empty.")
+    expect(computeAccessibleDescription(status)).toBe("Generated: Starts with the column's default, “draft”.")
     expect(computeAccessibleDescription(within(presentation).getByLabelText('Starting value of notes'))).toBe(
       'Generated: starts empty. Empty, a new record starts it empty.',
     )
@@ -107,18 +107,27 @@ describe("a field's starting value", () => {
     expect(bundle.base.model.fields.find((field) => field.key === 'status')?.default).toBe('draft')
   })
 
-  // Emptied, the box takes the column's default away, and a new form
-  // starts the field empty; Use the column's default gives it back by one
-  // press, then goes, and the keyboard is on the box it set. Undo and Redo
-  // take the box with them. Watched failing with the button left without
-  // its focus: the keyboard fell to the page.
-  test('takes the column’s default away, and gives it back by keyboard', async () => {
+  // The column's default is never taken away (0150): a field left empty is
+  // left out of a create, which stores the default the person never saw.
+  // Emptied, the box says so and the field keeps the value it had; Use the
+  // column's default gives the column's back by one press, then goes, and
+  // the keyboard is on the box it set. Undo and Redo take the box with
+  // them. Watched failing with an emptied box taking the default away:
+  // nothing was refused; and with the button left without its focus: the
+  // keyboard fell to the page.
+  test('keeps a default when its box is emptied, saying why, and gives the column’s back by keyboard', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
     let presentation = await goTo(user, 'Presentation')
-    await user.clear(within(presentation).getByLabelText('Starting value of status'))
-    expect(said(presentation)).toBe('Removed the starting value of status.')
-    expect((await previewed(user))('Status').value).toBe('')
+    const box = within(presentation).getByLabelText<HTMLInputElement>('Starting value of status')
+    await user.tripleClick(box)
+    await user.paste('placed')
+    await user.clear(box)
+    expect(box.getAttribute('aria-invalid')).toBe('true')
+    expect(computeAccessibleDescription(box)).toContain(
+      'Left empty, a new record would store the column’s default, “draft”, without showing it. Until it has a value, the field keeps the starting value it had.',
+    )
+    expect((await previewed(user))('Status').value).toBe('placed')
     presentation = await goTo(user, 'Presentation')
     await pressEnter(user, within(presentation).getByRole('button', { name: 'Use the column’s default for status' }))
     expect(said(presentation)).toBe('Gave status the column’s default, “draft”.')
@@ -127,7 +136,7 @@ describe("a field's starting value", () => {
     expect(focusedName()).toBe('Starting value of status')
     expect(within(presentation).queryByRole('button', { name: 'Use the column’s default for status' })).toBeNull()
     await user.click(within(presentation).getByRole('button', { name: 'Undo' }))
-    expect(status.value).toBe('')
+    expect(status.value).toBe('placed')
     await user.click(within(presentation).getByRole('button', { name: 'Redo' }))
     expect(status.value).toBe('draft')
     expect(await audit()).toEqual([])
@@ -163,11 +172,13 @@ describe("a field's starting value", () => {
     expect({ status: control('Status').value, created: control('Created by').value }).toEqual({ status: 'draft', created: '' })
   })
 
-  // A yes or no starts at none, ticked or not, chosen from its own two:
-  // the customer's Active, whose column defaults to true. Watched failing
-  // with the choice handed on as its option's text: Not ticked set nothing,
-  // the column's codec refusing the text “false” for a yes or no.
-  test('offers a yes or no its own two and none, and the preview starts there', async () => {
+  // A yes or no starts ticked or not, chosen from its own two, and never
+  // at none where its column has a default: the customer's Active, whose
+  // column defaults to true, would be drawn unticked and stored true.
+  // Watched failing with the choice handed on as its option's text: Not
+  // ticked set nothing, the column's codec refusing the text “false” for a
+  // yes or no; and with None still offered: the choice listed None first.
+  test('offers a yes or no with a default its own two, and the preview starts there', async () => {
     const user = await signIn(plane)
     await discover(user)
     await user.click(screen.getByRole('button', { name: 'Choose a root' }))
@@ -181,14 +192,12 @@ describe("a field's starting value", () => {
       within(active)
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['None', 'Ticked', 'Not ticked'])
+    ).toEqual(['Ticked', 'Not ticked'])
     expect(active.value).toBe('true')
-    await user.selectOptions(active, 'None')
-    expect(said(presentation)).toBe('Removed the starting value of active.')
+    await user.selectOptions(active, 'Not ticked')
+    expect(said(presentation)).toBe('Gave active the starting value “false”.')
     expect((await previewed(user))('Active').checked).toBe(false)
     const again = await goTo(user, 'Presentation')
-    await user.selectOptions(within(again).getByRole('combobox', { name: 'Starting value of active' }), 'Not ticked')
-    expect(said(again)).toBe('Gave active the starting value “false”.')
     await user.selectOptions(within(again).getByRole('combobox', { name: 'Starting value of active' }), 'Ticked')
     expect(said(again)).toBe('Gave active the starting value “true”.')
     expect(await audit()).toEqual([])

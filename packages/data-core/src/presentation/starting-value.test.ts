@@ -78,14 +78,14 @@ function refusals(key: string, value: unknown, before: (objects: ObjectMeta[]) =
 }
 
 describe("a field's starting value as presentation (0150)", () => {
-  // Replaced where the column gave one, added where it gave none -- text,
-  // unbounded text, a whole number, a yes or no, an exact decimal -- and
-  // removed: each derives exactly its entry, applying it gives the edited
-  // form back, and the released engine opens that form starting each field
-  // there. Watched failing with the starting value refused as before 0150:
-  // each field's default "changed, and only a field's label, help text ...
-  // are presentation".
-  test('set, added and removed, each derives its entry, and applying it gives the edited form back, which the engine starts with', () => {
+  // Replaced where the column gave one, and added where it gave none --
+  // text, unbounded text, a whole number, a yes or no, an exact decimal:
+  // each derives exactly its entry, applying it gives the edited form back,
+  // and the released engine opens that form starting each field there.
+  // Watched failing with the starting value refused as before 0150: each
+  // field's default "changed, and only a field's label, help text ... are
+  // presentation".
+  test('set and added, each derives its entry, and applying it gives the edited form back, which the engine starts with', () => {
     const set = publish((form) => {
       field(form, 'status')['default'] = 'draft'
       field(form, 'amount')['default'] = '9.5000'
@@ -100,15 +100,9 @@ describe("a field's starting value as presentation (0150)", () => {
       { field: 'created_by', anchor: { kind: 'column', column: 'created_by' }, default: 7 },
       { field: 'paid', anchor: { kind: 'column', column: 'paid' }, default: true },
     ])
-    const removed = publish((form) => {
-      delete field(form, 'status')['default']
-    })
-    expect(removed.presentation.fields).toEqual([{ field: 'status', anchor: STATUS, default: null }])
-    for (const published of [set, removed]) {
-      expect(applyPresentation(published.base, published.presentation, published.bindings)).toEqual({ ok: true, form: published.edited })
-      const checked = validateSchema(published.edited)
-      expect(checked.valid ? [] : checked.errors).toEqual([])
-    }
+    expect(applyPresentation(set.base, set.presentation, set.bindings)).toEqual({ ok: true, form: set.edited })
+    const checked = validateSchema(set.edited)
+    expect(checked.valid ? [] : checked.errors).toEqual([])
     expect(createFormEngine({ schema: set.edited, capabilities: CAPABILITIES }).value()).toEqual({
       status: 'draft',
       amount: '9.5000',
@@ -116,7 +110,6 @@ describe("a field's starting value as presentation (0150)", () => {
       created_by: 7,
       paid: true,
     })
-    expect(createFormEngine({ schema: removed.edited, capabilities: CAPABILITIES }).value()).toEqual({})
     // An edit and its reversal leave nothing behind, as every other edit's does.
     const reverted = publish((form) => {
       field(form, 'status')['default'] = 'draft'
@@ -125,16 +118,38 @@ describe("a field's starting value as presentation (0150)", () => {
     expect(reverted.presentation.fields).toEqual([])
   })
 
+  // A field left empty is left out of a create (`planCreate`), and the
+  // database stores the column's default: a form whose field starts empty
+  // over a column's default would show nothing where the record will hold
+  // draft, which 0149 exists to end. So the column's default is never taken
+  // away -- refused on derive and on apply, saying why -- and another value
+  // replaces it instead. Watched failing with removals taken as help text's
+  // are: status derived `default: null`, and a fresh form started empty.
+  test('refuses taking the column’s default away, on derive and on apply, saying why', () => {
+    const { form, bindings } = generateForm(snapshot(), ORDER)
+    const edited = copy(form)
+    delete field(edited, 'status')['default']
+    const at = String(form.model.fields.findIndex((entry) => entry.key === 'status'))
+    expect(presentationOf(form, edited, bindings)).toEqual({
+      ok: false,
+      problems: [
+        `/model/fields/${at}/default: removed, and a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give another starting value instead`,
+      ],
+    })
+    for (const key of ['status', 'notes'])
+      expect(refusals(key, null)).toEqual([
+        "/fields/0/default is null, and a starting value is never taken away: a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give a value, or leave it out",
+      ])
+  })
+
   // One spelling for each meaning, as help text has (0119): a starting
-  // value equal to the base's and a removal where the base has none say
-  // nothing and are refused; a base older than spec 5 holds no default and
+  // value equal to the base's says nothing and is refused; a base older than spec 5 holds no default and
   // is told to be generated again; and a value of no shape spec 5's
   // `default` takes on a generated field is refused by shape, on apply and
   // on derive. Watched failing with the base's value unasked: status's
   // "placed" was taken, and the presentation had two spellings.
-  test('refuses a value equal to the base’s, a removal of none, one over spec 3, and one of no starting value’s shape', () => {
+  test('refuses a value equal to the base’s, one over spec 3, and one of no starting value’s shape', () => {
     expect(refusals('status', 'placed')).toEqual(["/fields/0/default: equals the base's; leave it out"])
-    expect(refusals('notes', null)).toEqual(['/fields/0/default: the base has no starting value to remove; leave it out'])
     const { form, bindings } = generateForm(snapshot(), ORDER)
     const old = { ...copy(form), specVersion: '3' } as FormSchema
     delete (old.model.fields.find((entry) => entry.key === 'status') as FieldDef).default
@@ -143,7 +158,7 @@ describe("a field's starting value as presentation (0150)", () => {
       problems: ['/fields/0/default: a starting value needs spec 5, and this base is spec "3"; generate the form again'],
     })
     for (const shape of [['draft'], { value: 'draft' }, Number.NaN])
-      expect(refusals('status', shape)).toEqual(['/fields/0/default must be text, a finite number or true or false, or null to remove the base’s'])
+      expect(refusals('status', shape)).toEqual(['/fields/0/default must be text, a finite number or true or false'])
     const edited = copy(form)
     field(edited, 'status')['default'] = ['draft']
     const at = String(form.model.fields.findIndex((entry) => entry.key === 'status'))
@@ -154,11 +169,11 @@ describe("a field's starting value as presentation (0150)", () => {
   // one this person may not choose (0149); a field the create does not
   // write is never sent by a new record; and a date is a kind no case
   // here creates and reads back a starting answer of. Each is refused with
-  // its own reason, a removal too, and the studio offers each no control,
+  // its own reason, and the studio offers each no control,
   // saying that reason. Watched failing with the kind left unasked:
   // order_date took 2026-01-01.
   test('refuses a starting value on a lookup, a field the create does not write and a date, each with its reason', () => {
-    expect(refusals('customer', null)).toEqual([
+    expect(refusals('customer', 'k1:x')).toEqual([
       "/fields/0/default: customer takes no starting value: a lookup's answer is a record, and the one a starting value names may be one the person filling the form in may not choose",
     ])
     expect(refusals('id', '1')).toEqual(['/fields/0/default: id takes no starting value: a create does not write it, so the database fills it'])
@@ -257,9 +272,8 @@ describe("a field's starting value as presentation (0150)", () => {
 
   // A regeneration carries a starting value by its column: unchanged, it
   // comes through; the column's default changed in the database, the
-  // person's is kept and said (`both-changed`), a removal too; the column's
-  // default now the person's, the override goes without a word, and so
-  // does a removal of a default that is gone; a column dropped takes its
+  // person's is kept and said (`both-changed`); the column's default now
+  // the person's, the override goes without a word; a column dropped takes its
   // starting value with it (`field-gone`). Watched failing with the
   // starting value left out of the carried overrides: nothing came through.
   test('a regeneration carries a starting value by its column, keeping the person’s where the column’s default changed too', () => {
@@ -283,14 +297,9 @@ describe("a field's starting value as presentation (0150)", () => {
     expect(field(changed.form, 'status')['default']).toBe('draft')
     const agreed = regenerate(drafted, startsAt('draft'))
     expect({ conflicts: agreed.conflicts, fields: agreed.presentation.fields }).toEqual({ conflicts: [], fields: [] })
-    const removed = publish((form) => {
-      delete field(form, 'status')['default']
-    })
-    expect(regenerate(removed, startsAt('open')).conflicts).toEqual([
-      expect.objectContaining({ kind: 'both-changed', property: 'default', yours: null, generator: 'open' }),
-    ])
-    const gone = regenerate(removed, startsAt(null))
-    expect({ conflicts: gone.conflicts, fields: gone.presentation.fields }).toEqual({ conflicts: [], fields: [] })
+    // The column's default gone, the person's stands, and nothing is said: the field starts where it did.
+    const gone = regenerate(drafted, startsAt(null))
+    expect({ conflicts: gone.conflicts, fields: gone.presentation.fields }).toEqual({ conflicts: [], fields: drafted.presentation.fields })
     const dropped = regenerate(drafted, (objects) => dropColumn(objects, 'order', 'status'))
     expect(dropped.conflicts).toEqual([
       expect.objectContaining({
@@ -377,9 +386,8 @@ describe('a starting value on a state field (0150)', () => {
   // A create that gives the state field a value is a move from nothing
   // (0112), so a starting value no such move reaches is served to nobody
   // (0149's startingDefaults) while the presentation says it starts there.
-  // Refused at publish, as a label for a state no move names is (0129); a
-  // removal, another field and a policy with no state field are not asked
-  // about. A whole number is compared by its digits. Watched failing with
+  // Refused at publish, as a label for a state no move names is (0129);
+  // another field and a policy with no state field are not asked about. A whole number is compared by its digits. Watched failing with
   // the moves unasked: shipped was taken.
   test('refuses one no create starts a record in, naming the states one does', () => {
     const moves = policy([
@@ -392,7 +400,7 @@ describe('a starting value on a state field (0150)', () => {
     expect(startingStateProblems([entry('notes', 'shipped'), entry('status', 'shipped')], moves)).toEqual([
       "/fields/1/default: no create starts a record in “shipped”; the policy's moves from nothing reach “draft”, “placed”.",
     ])
-    expect(startingStateProblems([entry('status', 'placed'), entry('status', null)], moves)).toEqual([])
+    expect(startingStateProblems([entry('status', 'placed')], moves)).toEqual([])
     const { transitions: _, ...unmoved } = moves
     expect(startingStateProblems([entry('status', 'shipped')], unmoved)).toEqual([])
     expect(startingStateProblems([entry('status', 'draft')], policy([{ from: 'draft', to: 'placed' }]))).toEqual([

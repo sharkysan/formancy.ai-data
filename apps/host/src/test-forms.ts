@@ -193,13 +193,12 @@ export function childForms(
 }
 
 /**
- * The order's starting values chosen over its base (0150): its status's
- * column default, draft, taken away, so a new order starts it empty and
- * the database fills it; its group, whose column has none, started at
- * Online. In the base's field order, as a presentation keeps them.
+ * The order's starting values chosen over its base (0150): its status at
+ * placed over its column's default, draft, and its group, whose column has
+ * none, at Online. In the base's field order, as a presentation keeps them.
  */
 export const STARTING: FieldPresentation[] = [
-  { field: 'status', anchor: { kind: 'column', column: 'status' }, default: null },
+  { field: 'status', anchor: { kind: 'column', column: 'status' }, default: 'placed' },
   { field: 'group', anchor: { kind: 'column', column: 'group' }, default: 'Online' },
 ]
 

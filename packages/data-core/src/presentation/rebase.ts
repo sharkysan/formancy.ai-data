@@ -277,34 +277,31 @@ function carryHelpText(rebase: Rebase, entry: FieldPresentation, now: string, ke
 
 /**
  * A field's starting value carried to the key it now has (0150), as help
- * text is: a value stands while the generator starts the field otherwise, a
- * removal while the generator gives it a default to remove; either kept over
- * a default the generator changed too -- the column's, changed in the
- * database -- is said (`both-changed`). A value the regenerated field no
+ * text is: it stands while the generator starts the field otherwise, and
+ * kept over a default the generator changed too -- the column's, changed
+ * in the database -- is said (`both-changed`). A value the regenerated field no
  * longer takes -- its column holds less or another kind, a create no longer
  * writes it, or it reads the value back otherwise -- is dropped and said
  * (`default-dropped`), in the words a publish would refuse it in.
  */
 function carryStartingValue(rebase: Rebase, entry: FieldPresentation, now: string, kept: Overrides): void {
-  const yours = entry.default as StartingValue | null
+  const yours = entry.default as StartingValue
   const field = rebase.newFields.find((candidate) => candidate.key === now) as FieldDef
   const generator = field.default as StartingValue | undefined
-  if (yours === null ? generator === undefined : same(yours, generator)) return
-  if (yours !== null) {
-    const taken = startingValue(rebase.newBinding(now) as FieldBinding, field, yours)
-    const reason = !taken.ok ? taken.problem : same(taken.answer, yours) ? null : `${now} now reads it back as ${shownValue(taken.answer)}`
-    if (reason !== null) {
-      rebase.add(rebase.subjectOf(entry.field), {
-        kind: 'default-dropped',
-        field: now,
-        anchor: entry.anchor,
-        yours,
-        reason,
-        resolution: 'dropped',
-        message: `The starting value ${shownValue(yours)} you chose for ${now} was dropped: ${reason}.`,
-      })
-      return
-    }
+  if (same(yours, generator)) return
+  const taken = startingValue(rebase.newBinding(now) as FieldBinding, field, yours)
+  const reason = !taken.ok ? taken.problem : same(taken.answer, yours) ? null : `${now} now reads it back as ${shownValue(taken.answer)}`
+  if (reason !== null) {
+    rebase.add(rebase.subjectOf(entry.field), {
+      kind: 'default-dropped',
+      field: now,
+      anchor: entry.anchor,
+      yours,
+      reason,
+      resolution: 'dropped',
+      message: `The starting value ${shownValue(yours)} you chose for ${now} was dropped: ${reason}.`,
+    })
+    return
   }
   kept.default = yours
   const was = rebase.oldFields.find((candidate) => candidate.key === entry.field)?.default
@@ -316,10 +313,7 @@ function carryStartingValue(rebase: Rebase, entry: FieldPresentation, now: strin
     yours,
     generator,
     resolution: 'kept-yours',
-    message:
-      yours === null
-        ? `You took away ${now}'s starting value, and the generator now starts it at ${shownValue(generator)}; yours is kept.`
-        : `You started ${now} at ${shownValue(yours)}, and the generator now starts it at ${shownValue(generator)}; yours is kept.`,
+    message: `You started ${now} at ${shownValue(yours)}, and the generator now starts it at ${shownValue(generator)}; yours is kept.`,
   })
 }
 

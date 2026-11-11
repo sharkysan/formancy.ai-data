@@ -45,6 +45,15 @@ export function noStartingValue(binding: FieldBinding): string | null {
   return `one is offered for text, a whole or exact number and yes or no, and this is ${NAMED[binding.type.kind] ?? binding.type.kind}`
 }
 
+/**
+ * Why a starting value is never taken away (0150): a field left empty is
+ * left out of a create (`planCreate`), and the database stores the
+ * column's default, so a form starting the field empty would show nothing
+ * where the record will hold the default -- what 0149 ends.
+ */
+export const NEVER_TAKEN_AWAY =
+  "a starting value is never taken away: a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in"
+
 /** A starting value's shape: what spec 5's `default` holds on a generated field, text, a finite number or true or false, never a list. */
 export function isStartingValue(value: unknown): value is StartingValue {
   return typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))
@@ -107,7 +116,7 @@ export function startingStateProblem(policy: FormPolicy, key: string, value: Sta
 export function startingStateProblems(fields: readonly FieldPresentation[], policy: FormPolicy): string[] {
   return fields.flatMap((entry, index) => {
     const value = entry.default
-    const problem = value === undefined || value === null ? null : startingStateProblem(policy, entry.field, value)
+    const problem = value === undefined ? null : startingStateProblem(policy, entry.field, value)
     return problem === null ? [] : [`/fields/${String(index)}/default: ${problem}.`]
   })
 }

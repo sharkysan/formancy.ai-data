@@ -13,8 +13,8 @@ interface Edits {
   labels: Map<string, Text>
   /** A field's help text as edited, or `null` where the base's was removed (0119). */
   descriptions: Map<string, Text | null>
-  /** A field's starting value as edited, or `null` where the base's was removed (0150). */
-  defaults: Map<string, StartingValue | null>
+  /** A field's starting value as edited (0150). */
+  defaults: Map<string, StartingValue>
   spans: Map<string, 'all' | 'one'>
   sections: Map<number, { label?: Text; order?: string[] }>
   /** Each key the edited form places in another generated section than its own: the index of that section. */
@@ -70,7 +70,10 @@ function fieldProblems(base: FormSchema, edited: Record<string, unknown>, edits:
       if (!same(was[key], field[key])) problems.push(`${at}/${key}: changed, and only a field's label, help text and starting value are presentation`)
     // Its shape alone: whether the field takes it is applyPresentation's, asked at the end.
     if (field['default'] === undefined) {
-      if (was['default'] !== undefined) edits.defaults.set(original.key, null)
+      if (was['default'] !== undefined)
+        problems.push(
+          `${at}/default: removed, and a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give another starting value instead`,
+        )
     } else if (!isStartingValue(field['default'])) problems.push(`${at}/default: not text, a finite number or true or false`)
     else if (!same(was['default'], field['default'])) edits.defaults.set(original.key, field['default'])
     if (field['description'] === undefined) {

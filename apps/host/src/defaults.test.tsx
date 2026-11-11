@@ -97,21 +97,20 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
 
   // The starting values chosen over the base (0150), published as the
   // studio publishes them and served by the form route: New record draws
-  // the group at Online, whose column has no default, and the status,
-  // whose default draft was taken away, empty, in both renderers. Saved as
-  // it starts, the create sends Online and leaves the status out, and the
-  // database fills draft. To be watched failing in CI with
-  // applyPresentation leaving a value unset and a removal undone: Group
-  // should be drawn empty and Status at draft.
-  test('starts New record at the starting values chosen over the base, the one taken away empty, in both renderers', async () => {
+  // the status at placed over its column's draft, and the group, whose
+  // column has no default, at Online, in both renderers. Saved as it
+  // starts, the create sends both and the record holds them. To be watched
+  // failing in CI with applyPresentation leaving a value unset: Status
+  // should be drawn at draft and Group empty.
+  test('starts New record at the starting values chosen over the base, in both renderers', async () => {
     const user = await openForm(plane, engine.starting)
-    // Both fields in one comparison, so a value left unset and a removal left undone are each seen.
+    // Both fields in one comparison, so a value replacing the column's and one added where it has none are each seen.
     await waitFor(() => {
       for (const renderer of RENDERERS) {
         expect({ renderer, group: control(renderer, 'Group').value, status: control(renderer, 'Status').value }).toEqual({
           renderer,
           group: 'Online',
-          status: '',
+          status: 'placed',
         })
       }
     }, ARRIVES)
@@ -124,11 +123,11 @@ describe.each(ENGINES)("a new record on $engine starts with its column's default
     await save(user, renderer)
     const record = (await said(renderer, /^Created record k1:\S+\.$/)).slice('Created record '.length, -1)
     const [sent] = creates(engine.starting, from)
-    expect({ group: sent?.['group'], status: sent === undefined ? 'nothing sent' : Object.hasOwn(sent, 'status') }).toEqual({ group: 'Online', status: false })
+    expect({ group: sent?.['group'], status: sent?.['status'] }).toEqual({ group: 'Online', status: 'placed' })
     const stored = await plane.clerk.read(engine.starting, record)
     expect(stored.ok ? { group: stored.value.answers['group'], status: stored.value.answers['status'] } : stored.message).toEqual({
       group: 'Online',
-      status: 'draft',
+      status: 'placed',
     })
   })
 

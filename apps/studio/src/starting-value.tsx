@@ -11,8 +11,11 @@ import { useFocusAfterRender } from './focus.js'
  * text: the answer a new record starts the field with, over the column's
  * constant default the generator gave it (0149). It says what the
  * generator noted -- "Starts with the column's default, “draft”." -- and
- * offers the column's, none, or another: a box for text and numbers, where
- * empty is none; for a yes or no a choice of none and its own two. Every
+ * offers the column's or another: a box for text and numbers, for a yes or
+ * no a choice of its own two. None is offered only where the column has no
+ * default: a field left empty is left out of a create, which stores the
+ * column's default without the person seeing it, so the column's is never
+ * taken away. Every
  * value is read by data-core's `startingValue` before the session sees it,
  * the reading a publish refuses by, and set as the answer a record holding
  * it reads back as: “9.5000” for 9.5. A field that takes none -- a lookup,
@@ -58,7 +61,7 @@ function reading(field: StartingField, binding: FieldBinding, value: StartingVal
   return state === null ? taken : { ok: false, problem: `${shownValue(taken.answer)} cannot start ${binding.field}: ${state}` }
 }
 
-/** A yes or no's starts: none, then its own two -- a checkbox ticked and not, a select's options. */
+/** A yes or no's starts: its own two -- a checkbox ticked and not, a select's options -- after none where the column has no default. */
 function choices(field: FieldDef): Array<{ value: string; label: string }> {
   const own =
     field.type === 'checkbox'
@@ -67,7 +70,7 @@ function choices(field: FieldDef): Array<{ value: string; label: string }> {
           { value: 'false', label: 'Not ticked' },
         ]
       : (field.options ?? []).map((option) => ({ value: option.value, label: typeof option.label === 'string' ? option.label : option.value }))
-  return [{ value: '', label: 'None' }, ...own]
+  return field.default === undefined ? [{ value: '', label: 'None' }, ...own] : own
 }
 
 /**
@@ -113,13 +116,18 @@ export function StartingValueControl({
     const outcome = report(session.setFieldProperty([key], 'default', answer), done)
     setProblem(outcome.ok ? null : `${outcome.message} The field keeps the starting value it had.`)
   }
+  const column = base.default as StartingValue | undefined
   const give = (text: string, answer: StartingValue) => {
+    if (text === '' && column !== undefined) {
+      return setProblem(
+        `Left empty, a new record would store the column’s default, ${shownValue(column)}, without showing it. Until it has a value, the field keeps the starting value it had.`,
+      )
+    }
     if (text === '') return set(undefined, `Removed the starting value of ${key}.`)
     const read = reading(field, binding, answer)
     if (!read.ok) return setProblem(`${read.problem}. Until it is one, the field keeps the starting value it had.`)
     return set(read.answer, `Gave ${key} the starting value ${shownValue(read.answer)}.`)
   }
-  const column = base.default as StartingValue | undefined
   const hint = `${id}-hint`
   const described = problem === null ? hint : `${hint} ${id}-problem`
   const choice = binding.kind === 'column' && binding.type.kind === 'boolean'
@@ -156,7 +164,7 @@ export function StartingValueControl({
       )}
       <p id={hint} className="hint">
         Generated: {field.note?.message ?? 'starts empty.'}
-        {choice ? null : ' Empty, a new record starts it empty.'}
+        {choice || column !== undefined ? null : ' Empty, a new record starts it empty.'}
       </p>
       {problem === null ? null : (
         <p id={`${id}-problem`} className="field-problem">

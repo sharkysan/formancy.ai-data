@@ -525,11 +525,15 @@ describe('the administrator plane', () => {
   // write to, so a form that starts elsewhere than its presentation says is
   // refused, as is a value the field does not take, in applyPresentation's
   // words; on the policy's state field a value is a state a create starts
-  // a record in, or it is refused at the write, naming the states one does.
-  // Nothing refused is written. Watched failing with the starting value
-  // left out of applyPresentation: a name of 201 characters was refused
-  // only as a form that is not its base with its presentation applied; and
-  // with the state's fit left out of `storable`: lost was stored.
+  // a record in, or it is refused at the write, naming the states one does;
+  // and a removal is refused, since a field left empty is left out of a
+  // create, which stores the column's default unseen. Nothing refused is
+  // written. Watched failing with the starting value left out of
+  // applyPresentation: a name of 201 characters was refused only as a form
+  // that is not its base with its presentation applied; with the state's
+  // fit left out of `storable`: lost was stored; and with a removal taken
+  // as help text's is: null was refused only as "the base has no starting
+  // value to remove", which says nothing of what a save would store.
   test('publishes a starting value, and refuses a form that starts elsewhere, a value the field does not take and a state no create starts in', async () => {
     const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
     const NAME = { kind: 'column', column: 'name' }
@@ -559,6 +563,12 @@ describe('the administrator plane', () => {
         ],
       },
     }
+    // The form as generated, its presentation taking a default away.
+    const removed = await publish({ ...bundleOf(proposal), presentation: { ...EMPTY_PRESENTATION, fields: [{ field: 'name', anchor: NAME, default: null }] } })
+    expect(removed.statusCode).toBe(422)
+    expect(removed.json().problems).toEqual([
+      "presentation: /fields/0/default is null, and a starting value is never taken away: a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give a value, or leave it out",
+    ])
     const lost = await publish(started('lost', 'lost', moved))
     expect(lost.statusCode).toBe(422)
     expect(lost.json().problems).toEqual([

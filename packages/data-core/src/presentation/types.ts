@@ -40,12 +40,12 @@ export interface FieldPresentation {
   /**
    * The answer a new record starts the field with, over the base's (0150):
    * one that replaces the column's constant default (0149) or adds one
-   * where the base has none, or `null` that removes the base's, so a new
-   * record starts the field empty. Of the field's own answer type, as a
-   * record holding it reads back. Present only where it differs from the
-   * base's.
+   * where the base has none. Of the field's own answer type, as a record
+   * holding it reads back. Never a removal: a field left empty is left out
+   * of a create, which stores the column's default unseen. Present only
+   * where it differs from the base's.
    */
-  default?: StartingValue | null
+  default?: StartingValue
   /**
    * The generated section it is placed in, present only where that is not
    * the one the base places it in (0075). It lands after that section's own
@@ -114,7 +114,7 @@ export type PresentationConflict =
       field: string
       anchor: FieldAnchor
       property: 'label' | 'span' | 'section' | 'description' | 'default'
-      // A span's `all` or `one` is a string, which Text holds; a removed help text or starting value is null.
+      // A span's `all` or `one` is a string, which Text holds; a removed help text is null.
       yours: Text | SectionAnchor | StartingValue | null
       resolution: 'dropped'
       message: string
@@ -127,12 +127,12 @@ export type PresentationConflict =
    * help text is `null` in `yours`.
    */
   | { kind: 'both-changed'; field: string; property: 'label' | 'description'; yours: Text | null; generator: Text; resolution: 'kept-yours'; message: string }
-  /** A starting value the generator changed too (0150): the column's constant default changed in the database. A removal is `null` in `yours`. */
+  /** A starting value the generator changed too (0150): the column's constant default changed in the database. */
   | {
       kind: 'both-changed'
       field: string
       property: 'default'
-      yours: StartingValue | null
+      yours: StartingValue
       generator: StartingValue
       resolution: 'kept-yours'
       message: string

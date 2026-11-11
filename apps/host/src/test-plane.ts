@@ -94,8 +94,8 @@ export const PAGED = inject('paged')
  * form again, which `startPlane({ unread: true })` publishes for the clerk
  * to create and update without reading or writing its status (0149);
  * `starting` the order form again, which `startPlane({ starting: true })`
- * publishes with `STARTING`, its status's default taken away and its group
- * started at Online (0150).
+ * publishes with `STARTING`, its status started at placed over its
+ * column's draft and its group at Online (0150).
  */
 export const ENGINES = [
   {
@@ -238,7 +238,7 @@ export async function startPlane(
     moves?: boolean
     /** An order form whose status, which defaults to draft, the clerk neither reads nor writes (0149). */
     unread?: boolean
-    /** An order form whose status starts empty and whose group starts at Online, chosen over the generated base (0150). */
+    /** An order form whose status starts at placed and whose group at Online, chosen over the generated base (0150). */
     starting?: boolean
   } = {},
 ): Promise<Plane> {

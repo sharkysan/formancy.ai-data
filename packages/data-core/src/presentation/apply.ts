@@ -5,7 +5,7 @@ import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { groupShapeProblems } from './group.js'
 import { homeOf, placements } from './placement.js'
-import { isStartingValue, noStartingValue, shownValue, startingValue } from './starting-value.js'
+import { isStartingValue, NEVER_TAKEN_AWAY, noStartingValue, shownValue, startingValue } from './starting-value.js'
 import { stateLabelShapeProblems } from './state-labels.js'
 import { unfilteredShapeProblems } from './unfiltered.js'
 import { viewShapeProblems } from './views.js'
@@ -49,8 +49,8 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if ('section' in entry && !isSectionAnchor(entry['section'])) problems.push(`${at}/section ${SECTION_ANCHOR}`)
   if ('description' in entry && entry['description'] !== null && !isText(entry['description']))
     problems.push(`${at}/description must be text, or null to remove the base’s`)
-  if ('default' in entry && entry['default'] !== null && !isStartingValue(entry['default']))
-    problems.push(`${at}/default must be text, a finite number or true or false, or null to remove the base’s`)
+  if ('default' in entry && entry['default'] === null) problems.push(`${at}/default is null, and ${NEVER_TAKEN_AWAY}; give a value, or leave it out`)
+  else if ('default' in entry && !isStartingValue(entry['default'])) problems.push(`${at}/default must be text, a finite number or true or false`)
   return problems
 }
 
@@ -137,21 +137,16 @@ function describe(field: FormSchema['model']['fields'][number], description: Tex
 }
 
 /**
- * A field's starting value set or removed by its entry (0150), or why not:
- * on a field that takes none -- a lookup, one a create does not write, a
- * kind none is offered for (`noStartingValue`) -- a removal where the base
- * has none, a value over a base older than spec 5, one equal to the
- * base's, one the field does not take, and one spelled otherwise than a
- * record holding it reads back, so a presentation has one spelling.
+ * A field's starting value set by its entry (0150), or why not: on a field
+ * that takes none -- a lookup, one a create does not write, a kind none is
+ * offered for (`noStartingValue`) -- a value over a base older than spec
+ * 5, one equal to the base's, one the field does not take, and one
+ * spelled otherwise than a record holding it reads back, so a
+ * presentation has one spelling. A removal is refused by shape.
  */
-function startWith(field: FormSchema['model']['fields'][number], binding: FieldBinding, value: StartingValue | null, version: string, at: string): string[] {
+function startWith(field: FormSchema['model']['fields'][number], binding: FieldBinding, value: StartingValue, version: string, at: string): string[] {
   const none = noStartingValue(binding)
   if (none !== null) return [`${at}/default: ${binding.field} takes no starting value: ${none}`]
-  if (value === null) {
-    if (field.default === undefined) return [`${at}/default: the base has no starting value to remove; leave it out`]
-    delete field.default
-    return []
-  }
   if (Number(version) < 5) return [`${at}/default: a starting value needs spec 5, and this base is spec ${JSON.stringify(version)}; generate the form again`]
   if (same(value, field.default)) return [`${at}/default: equals the base's; leave it out`]
   const given = startingValue(binding, field, value)
