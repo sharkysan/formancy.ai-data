@@ -5,6 +5,7 @@ export {
   covers,
   cascadeCase,
   columnFilterCase,
+  defaultCase,
   deleteCase,
   displayCase,
   driftingCase,
@@ -23,6 +24,8 @@ export {
   uuidCase,
   versionCase,
 } from './cases.js'
+export { DEFAULT_PARITY, DEFAULT_TABLE } from './defaults.js'
+export type { DefaultCase } from './defaults.js'
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
 export { BROWSE_PARITY } from './browse.js'
 export type { BrowseCase } from './browse.js'

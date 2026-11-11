@@ -8,6 +8,8 @@ import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
+import { DEFAULT_PARITY } from './defaults.js'
+import type { DefaultCase } from './defaults.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
@@ -106,6 +108,9 @@ export const columnFilterCase = (name: ColumnFilterCase): string => `column filt
 /** What a form over versions does on each engine (0113), by the name of its entry in VERSION_PARITY. */
 export const versionCase = (name: VersionCase): string => `versions: ${name}`
 
+/** What a new record starts with on each engine (0149), by the name of its entry in DEFAULT_PARITY. */
+export const defaultCase = (name: DefaultCase): string => `defaults: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -115,7 +120,8 @@ export const versionCase = (name: VersionCase): string => `versions: ${name}`
  * does past its record (0051), then what a uuid key does (0056), then what a
  * file of a form's records holds (0079), then what a browse shows (0099),
  * then what a person's conditions on its columns narrow a list to (0104),
- * then what a form over versions does (0113).
+ * then what a form over versions does (0113), then what a new record
+ * starts with (0149).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -140,6 +146,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
     ...(Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
     ...(Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
+    ...(Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {
