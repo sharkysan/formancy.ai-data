@@ -1,8 +1,9 @@
 import type { FieldDef } from '@formancy/spec'
 import type { DatabaseKind } from '../adapter.js'
-import { codecFor } from '../codecs/codec.js'
+import type { Codec } from '../codecs/codec.js'
+import { codecFor, codecForType } from '../codecs/codec.js'
 import type { ColumnMeta, ObjectMeta } from '../metadata.js'
-import { formValue } from '../records/answers.js'
+import { formValue, storedValue } from '../records/answers.js'
 import type { FieldBinding, GenerationNote } from './types.js'
 
 /*
@@ -160,15 +161,53 @@ export function startingAnswer(kind: DatabaseKind, column: ColumnMeta, binding: 
   const constant = column.defaultExpression === null ? null : readConstant(kind, column.defaultExpression)
   const stored = constant === null ? undefined : asStored(kind, constant, column)
   if (constant === null || stored === undefined) return NONE
-  const parsed = codecFor(column).parse(stored)
-  if (!parsed.ok) return { kind: 'refused', shown: shown(constant), reason: clause(parsed.message) }
+  const taken = answerTaken(codecFor(column), binding, field, stored)
+  if (taken.kind === 'refused') return { kind: 'refused', shown: shown(constant), reason: taken.reason }
+  return taken.answer === '' ? NONE : { kind: 'starts', answer: taken.answer }
+}
+
+type Taken = { kind: 'answer'; answer: string | number | boolean } | { kind: 'refused'; reason: string }
+
+/**
+ * `stored`, a value the column would store and never null, as the answer
+ * `field` starts with: through the column's codec and `formValue`, as a
+ * record holding it is read back, and only where the field's box holds it,
+ * counting UTF-16 code units, never fewer than the codec counts in the
+ * column's unit. The one reading of a starting answer, the column's
+ * constant's (`startingAnswer`) and an administrator's (`givenStart`) alike.
+ */
+function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stored: unknown): Taken {
+  const parsed = codec.parse(stored)
+  if (!parsed.ok) return { kind: 'refused', reason: clause(parsed.message) }
   // Never null: the codec was handed a value, and returns one.
   const answer = formValue(binding, parsed.value) as string | number | boolean
-  if (answer === '') return NONE
   if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
-    return { kind: 'refused', shown: shown(constant), reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
+    return { kind: 'refused', reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
   }
-  return { kind: 'starts', answer }
+  return { kind: 'answer', answer }
+}
+
+/** A starting value an administrator gives a field (0150): its answer as a record holding it reads back, or why the field does not take it. */
+export type GivenStart = { ok: true; answer: string | number | boolean } | { ok: false; reason: string }
+
+/**
+ * `value`, given as the answer `field`, bound to its column by `binding`,
+ * starts a new record with (0150), read as `startingAnswer` reads the
+ * column's constant: held as the column stores it (`storedValue`), then
+ * `answerTaken`, so it is refused for what the codec or the box refuses,
+ * and its answer is the canonical one a record holding it reads back as --
+ * `9.5000` for `9.5` in a numeric(18,4). An empty answer is refused: it is
+ * the field as it starts, and spec 5 takes no empty default. The codec is
+ * the binding's type's (`codecForType`), the column itself not being at
+ * hand where a presentation is applied.
+ */
+export function givenStart(binding: ColumnBinding, field: FieldDef, value: string | number | boolean): GivenStart {
+  const stored = storedValue(binding, value)
+  if (!stored.ok) return { ok: false, reason: stored.reason }
+  const taken = answerTaken(codecForType(binding.type, binding.nullable), binding, field, stored.value)
+  if (taken.kind === 'refused') return { ok: false, reason: taken.reason }
+  if (taken.answer === '') return { ok: false, reason: 'it is empty, which is how the field starts without one' }
+  return { ok: true, answer: taken.answer }
 }
 
 /**

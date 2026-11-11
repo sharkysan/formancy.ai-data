@@ -150,16 +150,26 @@ export function formValue(binding: ColumnBinding, value: ApiValue): ApiValue {
  * a value that is not canonical.
  */
 export function canonicalValue(binding: ColumnBinding, answer: ApiValue): ApiValue {
+  const stored = storedValue(binding, answer)
+  if (!stored.ok) throw new Error(`${binding.field} answers something its control could not hold: ${stored.reason}.`)
+  return stored.value
+}
+
+/** `canonicalValue`'s answer, or the reason the field's control could not hold it, said where a person may have given it: a starting value (0150). */
+export type Stored = { ok: true; value: ApiValue } | { ok: false; reason: string }
+
+/** `canonicalValue`, without the throw: the one reading of a control's answer as its column's value, for the reader that must refuse rather than fail. */
+export function storedValue(binding: ColumnBinding, answer: ApiValue): Stored {
   const shape = shapeOf(binding)
-  if (answer === null || shape === 'as-is') return answer
+  if (answer === null || shape === 'as-is') return { ok: true, value: answer }
   if (shape === 'three-state') {
-    if (answer !== 'true' && answer !== 'false')
-      throw new Error(`${binding.field} answers something other than 'true' or 'false'; its control is a select of the two.`)
-    return answer === 'true'
+    return answer === 'true' || answer === 'false'
+      ? { ok: true, value: answer === 'true' }
+      : { ok: false, reason: 'its control is a select of “true” and “false”' }
   }
-  if (typeof answer !== 'number' || !Number.isSafeInteger(answer))
-    throw new Error(`${binding.field} answers something other than a whole number its control holds.`)
-  return String(answer)
+  return typeof answer === 'number' && Number.isSafeInteger(answer)
+    ? { ok: true, value: String(answer) }
+    : { ok: false, reason: 'its control holds a whole number' }
 }
 
 /**

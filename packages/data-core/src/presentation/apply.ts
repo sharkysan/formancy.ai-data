@@ -1,10 +1,11 @@
 import type { FormSchema, Text } from '@formancy/spec'
-import type { FormBindings } from '../generate/types.js'
-import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor } from './types.js'
+import type { FieldBinding, FormBindings } from '../generate/types.js'
+import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor, StartingValue } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { groupShapeProblems } from './group.js'
 import { homeOf, placements } from './placement.js'
+import { isStartingValue, noStartingValue, shownValue, startingValue } from './starting-value.js'
 import { stateLabelShapeProblems } from './state-labels.js'
 import { unfilteredShapeProblems } from './unfiltered.js'
 import { viewShapeProblems } from './views.js'
@@ -36,7 +37,8 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if (!isRecord(entry)) return [`${at} must be an object`]
   const problems: string[] = []
   for (const key of Object.keys(entry)) {
-    if (!['field', 'anchor', 'label', 'span', 'section', 'description'].includes(key)) problems.push(`${at}/${key} is not a property of a field presentation`)
+    if (!['field', 'anchor', 'label', 'span', 'section', 'description', 'default'].includes(key))
+      problems.push(`${at}/${key} is not a property of a field presentation`)
   }
   if (typeof entry['field'] !== 'string') problems.push(`${at}/field must be a field key`)
   else if (seen.has(entry['field'])) problems.push(`${at}: ${entry['field']} appears twice`)
@@ -47,6 +49,8 @@ function fieldShapeProblems(entry: unknown, at: string, seen: Set<string>): stri
   if ('section' in entry && !isSectionAnchor(entry['section'])) problems.push(`${at}/section ${SECTION_ANCHOR}`)
   if ('description' in entry && entry['description'] !== null && !isText(entry['description']))
     problems.push(`${at}/description must be text, or null to remove the base’s`)
+  if ('default' in entry && entry['default'] !== null && !isStartingValue(entry['default']))
+    problems.push(`${at}/default must be text, a finite number or true or false, or null to remove the base’s`)
   return problems
 }
 
@@ -131,6 +135,31 @@ function describe(field: FormSchema['model']['fields'][number], description: Tex
   field.description = description
   return []
 }
+
+/**
+ * A field's starting value set or removed by its entry (0150), or why not:
+ * on a field that takes none -- a lookup, one a create does not write, a
+ * kind none is offered for (`noStartingValue`) -- a removal where the base
+ * has none, a value over a base older than spec 5, one equal to the
+ * base's, one the field does not take, and one spelled otherwise than a
+ * record holding it reads back, so a presentation has one spelling.
+ */
+function startWith(field: FormSchema['model']['fields'][number], binding: FieldBinding, value: StartingValue | null, version: string, at: string): string[] {
+  const none = noStartingValue(binding)
+  if (none !== null) return [`${at}/default: ${binding.field} takes no starting value: ${none}`]
+  if (value === null) {
+    if (field.default === undefined) return [`${at}/default: the base has no starting value to remove; leave it out`]
+    delete field.default
+    return []
+  }
+  if (Number(version) < 5) return [`${at}/default: a starting value needs spec 5, and this base is spec ${JSON.stringify(version)}; generate the form again`]
+  if (same(value, field.default)) return [`${at}/default: equals the base's; leave it out`]
+  const given = startingValue(binding, field, value)
+  if (!given.ok) return [`${at}/default: ${given.problem}`]
+  if (!same(given.answer, value)) return [`${at}/default: ${binding.field} reads ${shownValue(value)} back as ${shownValue(given.answer)}; give that`]
+  field.default = value
+  return []
+}
 type Section = { label: unknown; children: Array<{ children: Node[] }> }
 
 /**
@@ -182,13 +211,14 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
     }
     const own = fieldAnchor(bound)
     if (!same(entry.anchor, own)) problems.push(`${at}/anchor: ${entry.field} stands for ${describeAnchor(own)}, not ${describeAnchor(entry.anchor)}`)
-    if (entry.label === undefined && entry.span === undefined && entry.section === undefined && entry.description === undefined)
+    if (entry.label === undefined && entry.span === undefined && entry.section === undefined && entry.description === undefined && entry.default === undefined)
       problems.push(`${at}: says nothing; leave the field out`)
     if (entry.label !== undefined) {
       if (same(entry.label, field.label)) problems.push(`${at}/label: equals the base's; leave it out`)
       else field.label = entry.label
     }
     if (entry.description !== undefined) problems.push(...describe(field, entry.description, base.specVersion, at))
+    if (entry.default !== undefined) problems.push(...startWith(field, bound, entry.default, base.specVersion, at))
     if (entry.span !== undefined) {
       const node = nodeOf.get(entry.field) as Node
       if ((entry.span === 'all') === (node.span === 'all')) problems.push(`${at}/span: equals the base's; leave it out`)
