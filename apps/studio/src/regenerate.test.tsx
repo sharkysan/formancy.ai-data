@@ -91,6 +91,15 @@ function notesCommented(comment: string): MetadataSnapshot {
   return createSnapshot(contents)
 }
 
+/** The fixture with the order's status defaulting to `value`, spelled as PostgreSQL's catalog spells a text constant (0149). */
+function statusDefault(value: string): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(OWNER_SNAPSHOT)
+  const status = contents.objects.find((object) => object.ref.name === 'order')?.columns.find((column) => column.name === 'status')
+  if (status === undefined) throw new Error('the snapshot has no order.status')
+  status.defaultExpression = `'${value}'::character varying`
+  return createSnapshot(contents)
+}
+
 /** The draft published as version 2, with the Policy step's leftovers from the old form removed and every field granted again. */
 async function publishDraft(user: User, orphans: string[], strays: string[]): Promise<void> {
   const policy = await goTo(user, 'Policy')
@@ -265,6 +274,46 @@ describe('regenerating a published form', () => {
     expect(within(presentation).getByLabelText<HTMLTextAreaElement>('Help text of notes').value).toBe('Free text, 4000 characters.')
     expect(within(presentation).getByLabelText<HTMLInputElement>('Label of notes').value).toBe('Notes')
     expect(focusedName()).toBe('Use the generator’s help text for notes')
+    expect(await audit()).toEqual([])
+
+    await publishDraft(user, [], [])
+    const latest = await admin.latest('sales-order')
+    if (!latest.ok || latest.value.bundle.format !== 2) throw new Error('version 2 is not a format-2 bundle')
+    expect(latest.value.bundle.presentation).toEqual(EMPTY_PRESENTATION)
+  })
+
+  // A starting value the person gave over a column's default, and the
+  // default changed in the database since (0150): the person's is kept,
+  // and the generator's -- the column's constant as it is now -- offered.
+  // Choosing it leaves nothing chosen over the base, and the published
+  // presentation says so. Watched failing with the default's both-changed
+  // offered as a label is: there was no "Use the generator’s starting
+  // value for status", and the panel offered the generator's label.
+  test('a starting value kept over a changed default: the generator’s, chosen, publishes no override', async () => {
+    const user = await signIn(plane)
+    await generateOrder(user)
+    const first = await goTo(user, 'Presentation')
+    const box = within(first).getByLabelText<HTMLInputElement>('Starting value of status')
+    await user.clear(box)
+    await user.type(box, 'placed')
+    await writeOrderPolicy(user)
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+
+    plane.databases.set('fixture', statusDefault('open'))
+    const regenerated = await regenerate(user)
+    await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
+    const presentation = await screen.findByRole('main', { name: 'Presentation' })
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Starting value of status').value).toBe('placed')
+    const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
+    expect(within(carried).getByRole('listitem').textContent).toContain(
+      'You started status at “placed”, and the generator now starts it at “open”; yours is kept.',
+    )
+    await pressEnter(user, within(carried).getByRole('button', { name: 'Use the generator’s starting value for status' }))
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Starting value of status').value).toBe('open')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Label of status').value).toBe('Status')
+    expect(focusedName()).toBe('Use the generator’s starting value for status')
     expect(await audit()).toEqual([])
 
     await publishDraft(user, [], [])

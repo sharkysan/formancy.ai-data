@@ -285,6 +285,12 @@
   margin: 0;
 }
 
+/* A field's starting value (0150): its "Use the column's default" sized to
+   its words, not stretched across the row as a grid item would be. */
+.placed .starting .button {
+  justify-self: start;
+}
+
 .placed .bound {
   grid-column: 1;
   margin: 0.25rem 0 0;

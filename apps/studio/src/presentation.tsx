@@ -2,14 +2,15 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import type { DatabaseKind, FormBindings, FormPolicy, StateLabel, StoredListView } from '@formancy/data-core'
-import type { LayoutNode } from '@formancy/spec'
+import type { DatabaseKind, FormBindings, FormPolicy, GenerationNote, StateLabel, StoredListView } from '@formancy/data-core'
+import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
 import { helpTextOf, labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { GroupPanel } from './group.js'
 import { ListViewsPanel } from './list-views.js'
+import { StartingValueControl, startNote } from './starting-value.js'
 import { StateLabelsPanel } from './state-labels.js'
 
 type Said = { ok: boolean; message: string }
@@ -125,7 +126,8 @@ function HelpTextInput({
  *
  * The controls offer exactly what cannot break a binding: a field's label, a
  * section's label, a field's place among its neighbours, whether it spans
- * the row, and which generated section it is in (0075). Nothing here adds,
+ * the row, which generated section it is in (0075), its help text (0119)
+ * and what a new record starts it with (0150). Nothing here adds,
  * removes, renames or retypes a field, because a field is a column the
  * bindings name, and the generator is what decides those. A draft carried
  * from another (0030) lists what could not be carried above the controls,
@@ -136,6 +138,8 @@ function HelpTextInput({
  */
 export function PresentationStep({
   session,
+  base,
+  notes,
   bindings,
   views,
   onViews,
@@ -150,6 +154,10 @@ export function PresentationStep({
   carried = null,
 }: {
   session: BuilderSession
+  /** The generated base the session was opened on, whose defaults are the columns' (0149). */
+  base: FormSchema
+  /** The generator's notes, which say what each field starts with and why (0149). */
+  notes: readonly GenerationNote[]
   bindings: FormBindings
   views: readonly StoredListView[]
   onViews: (views: StoredListView[]) => void
@@ -191,6 +199,8 @@ export function PresentationStep({
     const parent = path.slice(0, -1)
     const address = { layout: layout?.name ?? '', path }
     const id = `presentation-${key}`
+    const generated = base.model.fields.find((field) => field.key === key)
+    const current = document.model.fields.find((field) => field.key === key)
     const move = (by: -1 | 1) => {
       const outcome = report(session.moveLayoutNode(address, { layout: address.layout, parent, index: at + by }), `Moved ${label} ${by < 0 ? 'up' : 'down'}.`)
       // A move that reaches the end disables the button just pressed; focus
@@ -238,6 +248,14 @@ export function PresentationStep({
               : report(session.setFieldProperty([key], 'description', text), `Gave ${key} the help text “${text}”.`)
           }
         />
+        {generated === undefined || current === undefined ? null : (
+          <StartingValueControl
+            id={`${id}-start`}
+            field={{ binding: bindings.fields.find((entry) => entry.field === key), base: generated, current, note: startNote(notes, key), policy }}
+            session={session}
+            report={report}
+          />
+        )}
         <p className="bound">
           Bound field <code>{key}</code>
         </p>
@@ -329,8 +347,8 @@ export function PresentationStep({
   return (
     <>
       <p className="lede">
-        What a person filling the form reads, in what order and in which section. Each field is a column the bindings name, so nothing here adds, removes or
-        renames one: that is the generator&rsquo;s, from the table.
+        What a person filling the form reads, in what order and in which section, and what a new record starts with. Each field is a column the bindings name,
+        so nothing here adds, removes or renames one: that is the generator&rsquo;s, from the table.
       </p>
       {carried === null ? null : <CarriedPanel session={session} carried={carried} report={report} />}
       <div className="toolbar">
