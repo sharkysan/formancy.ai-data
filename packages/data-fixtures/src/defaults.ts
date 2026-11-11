@@ -7,17 +7,18 @@
  * person writes each in that dialect: 'draft', 'it''s', a national
  * 'Zürich' on PostgreSQL's varchar and SQL Server's nvarchar, true and 1
  * on a flag, false and 0 on one that may be NULL, 1, -1, 7 on a bigint,
- * 9.5 on a decimal(10,2), 'toolong' on a varchar(3) -- which each engine
- * takes at CREATE and refuses at the insert that leaves the column out --
- * and the engine's own clock on an instant. It discovers the table as the
- * owner and generates a form over it, `version` its confirmed version
- * column, expecting what is below.
+ * 9.5 on a decimal(10,2), 'toolong' on a varchar(3), which CREATE takes
+ * and its codec refuses as too long -- every insert here gives it NULL, so
+ * its default is never applied -- and the engine's own clock on an
+ * instant. It discovers the table as the owner and generates a form over
+ * it, `version` its confirmed version column, expecting what is below.
  *
  * One thing is written per engine, and is the reason the reader is: how
- * each catalog spells a default. Measured on neither yet: these are the
- * spellings `pg_get_expr` and `object_definition` are documented and
- * observed to write, held here so a release that spells one otherwise
- * fails on that engine.
+ * each catalog spells a default. Those of 'draft', true and 1, 1 and the
+ * clocks are what the captured snapshots hold; the others are what
+ * `pg_get_expr` and `object_definition` are documented to write, not yet
+ * measured here, held so a release that spells one otherwise fails on that
+ * engine.
  */
 
 /** Where each suite creates the table: a schema of the parity suites' own, outside every scope another suite discovers. */

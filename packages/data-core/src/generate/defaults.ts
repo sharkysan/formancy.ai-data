@@ -148,8 +148,8 @@ function clause(sentence: string): string {
  * record: the column's constant default through its codec, as a record
  * holding it is read back (`formValue`). A constant the codec refuses --
  * too long, out of range, a fraction for a whole number or past the scale
- * -- is one the database refuses at the insert or rounds, and is refused
- * here. So is text the column holds and the field's box does not: the
+ * -- is no answer a save of the field could send, whatever the database
+ * would do with it at the insert, and is refused here. So is text the column holds and the field's box does not: the
  * codec counts in the column's unit, the box in UTF-16 code units, never
  * fewer. An empty answer is none -- '' itself, or a fixed-length column's
  * blanks, which the codec reads without their padding as the column is

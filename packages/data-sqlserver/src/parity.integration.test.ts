@@ -663,12 +663,13 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
   // spells each as -- a number in two pairs of parentheses, text in one, N
   // before the nvarchar's -- is what the generator reads, and the form
   // starts every field at the answer PostgreSQL's suite starts it at. A
-  // bit's 1 and 0 are a flag's true and false. The varchar(3)'s 'toolong'
-  // is taken at CREATE and refused by the insert that leaves the column
-  // out, as it is refused by its codec. Watched failing in CI with
-  // discovery spelling 'it''s' in a second pair of parentheses (it was not
-  // read, and quoted started empty) and with data-core reading a whole
-  // number without its sign (below started, and was stored, at 1).
+  // bit's 1 and 0 are a flag's true and false. The varchar(3)'s 'toolong',
+  // which CREATE takes, is refused by its codec as too long; every insert
+  // here gives it NULL, so its own default is never applied. To be watched
+  // failing in CI with discovery spelling 'it''s' in a second pair of
+  // parentheses (it is then not read, and quoted starts empty) and with
+  // data-core reading a whole number without its sign (below then starts,
+  // and is stored, at 1).
   const { schema, name } = DEFAULT_TABLE
   const request: GenerationRequest = { connection: 'test', root: DEFAULT_TABLE, formId: 'defaulted', title: 'Defaulted', lookups: [], versionColumn: 'version' }
   const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }

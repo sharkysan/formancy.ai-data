@@ -207,9 +207,11 @@ A new record starts at a column's constant default only for text, a whole
 or exact number and yes or no, read in the spellings the record names: a
 function, a date, an instant, a float, a uuid, a lookup's default, a
 PostgreSQL literal with a backslash and a SQL Server one past ASCII but an
-N literal on an nvarchar start empty, left to the database. One DDL can
-start differently on the two engines, SQL Server keeping `default '5'` on
-an int as text that is not read. Nothing in the studio changes or clears
+N literal on an nvarchar start empty, left to the database. A SQL Server
+default spelled as text on a whole-number column, `('5')`, is not read,
+though the database stores 5; what PostgreSQL's catalog writes for the
+same DDL is not measured, so one DDL may start differently on the two
+engines. Nothing in the studio changes or clears
 a default; a default changed in the database after publication is still
 the old one on the form, and sent, until it is generated again, drift
 review naming it; a form published before gains its defaults only then;

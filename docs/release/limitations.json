@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:accd2ddd287538882456748f44a30c47b9773de8bebc852c69d15232d3174fe0",
+      "reviewed": "sha256:d30d16e9e99ecbc38ac285c429a8a3c854a7019e53879356c223637ef18c6a47",
       "limitations": [
         {
           "area": "forms",
@@ -4230,7 +4230,7 @@
         },
         {
           "area": "databases",
-          "says": "One DDL can start a field differently on the two engines: SQL Server keeps default '5' on an int as the text ('5'), which is not read, where PostgreSQL spells it 5, which is.",
+          "says": "A SQL Server default spelled as text on a whole-number column, ('5'), is not read, and the field starts empty though the database stores 5; what PostgreSQL's catalog writes for the same DDL is not measured, so one DDL may start a field differently on the two engines.",
           "heldBy": "packages/data-core/src/generate/defaults.test.ts"
         },
         {

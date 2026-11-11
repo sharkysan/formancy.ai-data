@@ -188,9 +188,11 @@ what was left to the database, before anything is published.
 - The spellings read are those the record names. A PostgreSQL default with
   a backslash, a SQL Server literal past ASCII but an N literal on an
   nvarchar, a date, an instant, a time, a float and a uuid start empty, as
-  before. And one DDL can start differently on the two engines: SQL
-  Server keeps `default '5'` on an int as the text `('5')`, which is not
-  read, where PostgreSQL spells it `5`.
+  before. A SQL Server default spelled as text on a whole-number column,
+  `('5')`, is not read, though the database stores 5; what PostgreSQL's
+  catalog writes for the same DDL is not measured -- `5`, by how it
+  deparses a constant, which would be read -- so one DDL may start
+  differently on the two engines.
 - A lookup never starts at its column's default, and a field this person
   does not give on create, or a state a create may not start the record
   in, starts empty: the database fills it.
