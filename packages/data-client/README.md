@@ -136,6 +136,15 @@ a page leaves a field in neither out of what it draws writable and what it
 sends, and a reply that breaks that, or one from a server older than it,
 is `unexpected`
 ([0117](../../docs/decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)).
+A form's `form` carries a field's `default` -- its column's constant one,
+which a new record starts at -- only where this person's create takes it:
+on a field `writable.create` names and, on the state field `moves` holds,
+at a state one of their moves from `null` starts a record in. A page that
+opens a new record over the form as served, with no answers, starts there
+and sends nothing the create refuses; one that opens a record read or a
+copy with its answers starts at none, and a choice it draws for a saved
+record's state leaves the default out, or the engine refuses to open it
+([0149](../../docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 A form's `moves` is the state field its policy holds to moves and those
 this person may make, each `{ from, to }` with `from` `null` for a
 create, or `null` where it holds none or the person writes neither; a

@@ -203,6 +203,20 @@ any step, "Enter a value in steps of 1."
 ([0120](../decisions/0120-a-whole-number-field-refuses-a-fraction-in-the-browser.md)). A field's help text is its column's comment, which drift
 review does not compare, until the studio's Presentation step replaces or
 removes it ([0119](../decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
+A new record starts at a column's constant default only for text, a whole
+or exact number and yes or no, read in the spellings the record names: a
+function, a date, an instant, a float, a uuid, a lookup's default, a
+PostgreSQL literal with a backslash and a SQL Server one past ASCII but an
+N literal on an nvarchar start empty, left to the database. A SQL Server
+default spelled as text on a whole-number column, `('5')`, is not read,
+though the database stores 5; what PostgreSQL's catalog writes for the
+same DDL is not measured, so one DDL may start differently on the two
+engines. Nothing in the studio changes or clears
+a default; a default changed in the database after publication is still
+the old one on the form, and sent, until it is generated again, drift
+review naming it; a form published before gains its defaults only then;
+and a field that started at its default and was cleared is sent empty
+([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 A client sends exact decimals as strings, and a value comes back
 canonicalised to its column's scale
 ([0008](../decisions/0008-exact-values-travel-as-strings.md)). An instant
@@ -622,7 +636,10 @@ for upstream's contribution rules and its next release.
 **Forms on spec 5.** The cost of 0118, bought for a field's help text from
 its column's comment: a host whose renderer is older than `@formancy/*`
 0.8.0 refuses every form published since, and a deployment rolled back
-before 0118 refuses them too until an earlier version is restored.
+before 0118 refuses them too until an earlier version is restored. A
+renderer that does not read spec 5's `default` refuses a form that carries
+one, which every form over a column with a constant default does from
+[0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md) on.
 
 **Published configuration is files.** The cost of 0013 and 0062, bought
 for no lock, no daemon and no second database: one instance, and a version

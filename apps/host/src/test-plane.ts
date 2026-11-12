@@ -90,7 +90,9 @@ export const PAGED = inject('paged')
  * again, which `startPlane({ paged: true })` publishes for the clerk to
  * read only (0085); `withheld` the order form again, which
  * `startPlane({ views: true })` publishes for the clerk to read without
- * Amount, with views whose default is on Amount (0105).
+ * Amount, with views whose default is on Amount (0105); `unread` the order
+ * form again, which `startPlane({ unread: true })` publishes for the clerk
+ * to create and update without reading or writing its status (0149).
  */
 export const ENGINES = [
   {
@@ -107,6 +109,7 @@ export const ENGINES = [
     read: 'pg-order-read',
     withheld: 'pg-order-withheld',
     moves: 'pg-order-moves',
+    unread: 'pg-order-unread',
     party: 'pg-party',
     company: 'pg-party-company',
     price: 'pg-price',
@@ -125,6 +128,7 @@ export const ENGINES = [
     read: 'ms-order-read',
     withheld: 'ms-order-withheld',
     moves: 'ms-order-moves',
+    unread: 'ms-order-unread',
     party: 'ms-party',
     company: 'ms-party-company',
     price: 'ms-price',
@@ -210,7 +214,9 @@ export interface Plane {
  * `parity.party_company` as a section of it, shown while its kind is
  * `company`. With `versions` (0113, 0115), `price` of `ENGINES` is
  * published over `parity.price`, a chain of versions, whose note the clerk
- * reads and may not write (0117).
+ * reads and may not write (0117). With `unread` (0149), the order form is
+ * published again as `unread` of `ENGINES`, whose status the clerk neither
+ * reads nor writes.
  */
 export async function startPlane(
   options: {
@@ -224,6 +230,8 @@ export async function startPlane(
     views?: boolean
     /** An order form whose status the clerk moves from draft to placed to shipped, and never back (0112, 0127). */
     moves?: boolean
+    /** An order form whose status, which defaults to draft, the clerk neither reads nor writes (0149). */
+    unread?: boolean
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -283,8 +291,14 @@ export async function startPlane(
     return reply.json<Record<string, unknown>>()
   }
   const views = options.views === true
-  for (const { connection, formId: order, versionColumn, read, withheld, moves } of ENGINES) {
-    for (const formId of [order, ...(options.paged === true ? [read] : []), ...(views ? [withheld] : []), ...(options.moves === true ? [moves] : [])]) {
+  for (const { connection, formId: order, versionColumn, read, withheld, moves, unread } of ENGINES) {
+    for (const formId of [
+      order,
+      ...(options.paged === true ? [read] : []),
+      ...(views ? [withheld] : []),
+      ...(options.moves === true ? [moves] : []),
+      ...(options.unread === true ? [unread] : []),
+    ]) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
         connection,
         root: { schema: 'sales', name: 'order' },
@@ -304,9 +318,11 @@ export async function startPlane(
             ? { ...readOnly, fields: { ...base.fields, amount: { read: [], write: [] } } }
             : formId === moves
               ? { ...base, transitions: ORDER_MOVES }
-              : deletes
-                ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
-                : base
+              : formId === unread
+                ? { ...base, fields: { ...base.fields, status: { read: [], write: [] } } }
+                : deletes
+                  ? { ...base, operations: { ...base.operations, delete: ['clerk'] }, cascades: ORDER_CASCADES }
+                  : base
       // A presentation of views alone: the form is its base (0030, 0105).
       const named = !views ? undefined : formId === order ? ORDER_VIEWS : formId === withheld ? WITHHELD_VIEWS : undefined
       const presentation: PresentationOverrides = named === undefined ? EMPTY_PRESENTATION : { ...EMPTY_PRESENTATION, views: named }

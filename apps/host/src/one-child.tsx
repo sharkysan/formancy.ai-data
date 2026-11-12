@@ -127,7 +127,7 @@ export function OneChild({
       { kind: 'child-new', owner, title },
       (discarded) => {
         opening.replaced()
-        for (const session of sessions) session.open({ record: null, version: null, answers: { [child.field]: parentToken } })
+        for (const session of sessions) session.start({ [child.field]: parentToken })
         setHeld({ kind: 'new' })
         setLine([...(discarded ? ['Discarded the unsaved changes. '] : []), `A new ${title}, for ${parentNoun} `, { code: parentToken }, '.'])
         onTab?.()

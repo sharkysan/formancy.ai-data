@@ -3445,7 +3445,7 @@
       ]
     },
     "0118": {
-      "reviewed": "sha256:bb4a1c78ef8d9a2a3d588a443d04b843283069e1a5d12ebb6b615abfeee743b4",
+      "reviewed": "sha256:6a5ae97017f45745d727d4493d687ab0be4f707c4682013babac810b0ef688d7",
       "limitations": [
         {
           "area": "host",
@@ -3630,7 +3630,7 @@
       ]
     },
     "0127": {
-      "reviewed": "sha256:6914d651b338e59aa073627b222a59888619890dcac4c656f1de383e6403cfcb",
+      "reviewed": "sha256:dd7c5faee18f7616bee09e29423aa773a15e5ce949991f1e71089da921d4e7c0",
       "limitations": [
         {
           "area": "host",
@@ -4200,6 +4200,65 @@
         {
           "area": "testing",
           "says": "oxc-parser's WebAssembly binding, under @angular/build, is installed on every platform and pins an @emnapi/core its own runtime does not accept; nothing loads it where a native binding exists, and pnpm peers check names it."
+        }
+      ]
+    },
+    "0149": {
+      "reviewed": "sha256:c16e0c82c11d26a68cc8ff03e108a1f259ef0e0bb983c6d0bcca0b0996bfead5",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A studio session, a draft or an import holding a base generated before this release is refused at publish, at a draft's submit and approval and at import, until it is generated again; a form published before starts its fields empty until it is."
+        },
+        {
+          "area": "writes",
+          "says": "A create from this release writes a column with its constant default where the person left the field as it started, so a trigger or a rule that tells a column left out from one given sees one given.",
+          "heldBy": "apps/host/src/defaults.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A default changed in the database after publication is still the old one on the form, sent and stored, until the form is generated again; drift review names it as its default changed, and the runtime does not refuse a create for it."
+        },
+        {
+          "area": "host",
+          "says": "A field that started at its default and was cleared before Save is sent empty: NULL on a nullable column, and refused as required on one that is not, where an untouched empty field was left to the database."
+        },
+        {
+          "area": "forms",
+          "says": "A new record starts at a column's constant default only for text, a whole or exact number and yes or no, in the spellings 0149 names: a function, a date, an instant, a time, a float, a uuid, a PostgreSQL literal with a backslash and a SQL Server literal past ASCII but an N literal on an nvarchar start empty, left to the database.",
+          "heldBy": "packages/data-core/src/generate/defaults.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server default spelled as text on a whole-number column, ('5'), is not read, and the field starts empty though the database stores 5; what PostgreSQL's catalog writes for the same DDL is not measured, so one DDL may start a field differently on the two engines.",
+          "heldBy": "packages/data-core/src/generate/defaults.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A lookup never starts at its column's default, which the database fills: the record a default names may be one the person may not choose.",
+          "heldBy": "packages/data-core/src/generate/defaults.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A field the person does not give on create, and a state field whose default is not one a create may start the record in, start empty on a new record, and the database fills them.",
+          "heldBy": "apps/host/src/session-work.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "Nothing in the studio changes or clears a default: it is changed in the database, and the form generated again."
+        },
+        {
+          "area": "host",
+          "says": "A host page's renderer must read spec 5's default: @formancy/* 0.13.0's do, and one that does not refuses a form that carries one."
+        },
+        {
+          "area": "testing",
+          "says": "How each engine's catalog spells a constant default is held on the images the adapters' suites run, and on no other release."
+        },
+        {
+          "area": "server",
+          "says": "The form GET /v1/forms/:id serves carries only the defaults the person's create would take, so it differs from person to person, and a page that draws its own choice for a saved record's state leaves the field's default out, or the engine refuses to open it.",
+          "heldBy": "packages/data-server/src/routes/runtime-defaults.test.ts"
         }
       ]
     }

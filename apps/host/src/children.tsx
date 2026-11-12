@@ -330,7 +330,7 @@ export function ChildSection({
       { kind: 'child-new', owner, title },
       (discarded) => {
         opening.replaced()
-        for (const session of sessions) session.open({ record: null, version: null, answers: { [child.field]: parentToken } })
+        for (const session of sessions) session.start({ [child.field]: parentToken })
         setOpen({ kind: 'new' })
         setLine([...prefix(discarded), `A new ${title}, for ${parentNoun} `, { code: parentToken }, '.'])
         onTab?.()

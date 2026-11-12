@@ -329,6 +329,34 @@ describe('a lookup with no rows on this page', () => {
   })
 })
 
+describe("a new record starts with its column's constant default (0149)", () => {
+  // sales.order.status defaults to 'draft' in the database and
+  // sales.customer.active to true, and a form the page generates starts
+  // with each, in both renderers, so what a person sees is what a save
+  // stores. Read as each control's value, found by its role and accessible
+  // name. Watched failing with the generator's defaults left out: both
+  // renderers drew an empty Status and an unticked Active.
+  test('a new order starts its Status at draft and a new customer has Active ticked, in both renderers', async () => {
+    await mounted()
+    const heading = (subject: Example, key: string): string => {
+      const found = subject.generated.form.model.fields.find((field) => field.key === key)
+      if (found === undefined) throw new Error(`${tableOf(subject)} has no field ${key}`)
+      return fieldHeading(found)
+    }
+    const order = example('order')
+    const customer = example('customer')
+    for (const renderer of RENDERERS) {
+      const status = within(pane(order, renderer)).getByRole('textbox', { name: heading(order, 'status') })
+      const active = within(pane(customer, renderer)).getByRole('checkbox', { name: heading(customer, 'active') })
+      expect({ renderer, status: (status as HTMLInputElement).value, active: (active as HTMLInputElement).checked }).toEqual({
+        renderer,
+        status: 'draft',
+        active: true,
+      })
+    }
+  })
+})
+
 describe('the page as a whole', () => {
   // Four engines over two documents on one page. Element ids are minted from
   // the form id, so two renderers of one document emit every id twice unless

@@ -12,7 +12,11 @@ import { disableFields } from './widgets.js'
  * nothing: a choice of the states a create may start it in, or disabled,
  * left to the column's default, where none is listed for this person. A
  * whole number held to moves keeps its box, and is only disabled where it
- * may go nowhere.
+ * may go nowhere. A new record's choice starts at the field's default,
+ * which the server serves only where it is a state a create of this
+ * person's may start the record in (0149); a saved record's carries none,
+ * since it opens at the state it holds, and a default its choice did not
+ * offer would stop the engine opening it.
  *
  * Presentation only, as the rest of the host's copy is: the server checks
  * every move again (0112), and refuses the one a stale page still offers.
@@ -34,6 +38,7 @@ export function withMoves(form: FormSchema, moves: PublishedForm['moves'], from:
     ...(field.label === undefined ? {} : { label: field.label }),
     ...(field.description === undefined ? {} : { description: field.description }),
     ...(field.required === undefined ? {} : { required: field.required }),
+    ...(from === null && field.default !== undefined ? { default: field.default } : {}),
     // Each by its label where the administrator gave one (0129), else as its column spells it.
     options: states.map((state) => ({ value: state, label: moves.labels.find((entry) => entry.state === state)?.label ?? state })),
   }

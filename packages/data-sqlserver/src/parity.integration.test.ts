@@ -2,6 +2,9 @@ import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type {
   ApiValue,
+  FormPolicy,
+  GeneratedForm,
+  GenerationRequest,
   LookupConfig,
   LookupQuery,
   MetadataSnapshot,
@@ -13,10 +16,13 @@ import type {
   RowFilters,
   UpdateRequest,
 } from '@formancy/data-core'
-import { buildLookupConfig, encodeKeyToken, findObject, generateForm, scopeRowFilters } from '@formancy/data-core'
+import { buildLookupConfig, encodeKeyToken, findObject, generateForm, planCreate, planRead, scopeRowFilters, toFormAnswers } from '@formancy/data-core'
 import type { SqlServerFixture, Undefined } from '@formancy/data-fixtures'
 import {
   covers,
+  DEFAULT_PARITY,
+  DEFAULT_TABLE,
+  defaultCase,
   defined,
   DISPLAY_PARITY,
   displayCase,
@@ -648,6 +654,101 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
       await reader.close()
       await owner.request().batch('alter database ro_probe set single_user with rollback immediate; drop database ro_probe')
     }
+  })
+})
+
+describe("a new record starts with its column's constant default (DEFAULT_PARITY, 0149)", () => {
+  // Each default written as a person writes it in T-SQL, in a schema of
+  // this suite's own, and discovered as the owner: what object_definition
+  // spells each as -- a number in two pairs of parentheses, text in one, N
+  // before the nvarchar's -- is what the generator reads, and the form
+  // starts every field at the answer PostgreSQL's suite starts it at. A
+  // bit's 1 and 0 are a flag's true and false. The varchar(3)'s 'toolong',
+  // which CREATE takes, is refused by its codec as too long; every insert
+  // here gives it NULL, so its own default is never applied. To be watched
+  // failing in CI with discovery spelling 'it''s' in a second pair of
+  // parentheses (it is then not read, and quoted starts empty) and with
+  // data-core reading a whole number without its sign (below then starts,
+  // and is stored, at 1).
+  const { schema, name } = DEFAULT_TABLE
+  const request: GenerationRequest = { connection: 'test', root: DEFAULT_TABLE, formId: 'defaulted', title: 'Defaulted', lookups: [], versionColumn: 'version' }
+  const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
+  let defaulted: MetadataSnapshot
+
+  /** Each field's default in the generated form, by key; a field that starts empty is left out. */
+  const startingAnswers = ({ form }: GeneratedForm): Record<string, unknown> =>
+    Object.fromEntries(form.model.fields.flatMap((field) => (field.default === undefined ? [] : [[field.key, field.default]])))
+
+  /** Every field read by the clerk, and written where the form writes it. */
+  const policyOf = ({ bindings }: GeneratedForm): FormPolicy => ({
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: [] },
+    fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create ? ['clerk'] : [] }])),
+    rowFilters: [],
+    lookups: {},
+  })
+
+  beforeAll(async () => {
+    await owner.request().batch(`create schema ${schema}`)
+    await owner.request().batch(`create table ${schema}.${name} (
+      id int identity constraint pk_${name} primary key,
+      status varchar(20) not null default 'draft',
+      quoted varchar(20) not null default 'it''s',
+      city nvarchar(20) not null default N'Zürich',
+      active bit not null default 1,
+      maybe bit null default 0,
+      quantity int not null default 1,
+      below int not null default -1,
+      big bigint not null default 7,
+      price decimal(10,2) not null default 9.5,
+      code varchar(3) null default 'toolong',
+      made_at datetimeoffset not null default sysdatetimeoffset(),
+      version int not null default 1
+    )`)
+    defaulted = await discoverSqlServer(owner, { schemas: [schema] })
+  })
+
+  test("spells each column's default as object_definition writes it", covers('sqlserver', defaultCase('spelled')), () => {
+    const columns = findObject(defaulted, DEFAULT_TABLE)?.columns ?? []
+    expect(Object.fromEntries(columns.flatMap((column) => (column.defaultExpression === null ? [] : [[column.name, column.defaultExpression]])))).toEqual(
+      DEFAULT_PARITY.spelled.sqlserver,
+    )
+  })
+
+  test('starts each field at the answer both engines start it at, and says what it started and refused', covers('sqlserver', defaultCase('started')), () => {
+    const generated = generateForm(defaulted, request)
+    expect(startingAnswers(generated)).toEqual(DEFAULT_PARITY.started.answers)
+    expect(generated.notes.filter((note) => note.message.startsWith('Starts')).map(({ subject, message }) => ({ subject, message }))).toEqual(
+      DEFAULT_PARITY.started.notes,
+    )
+  })
+
+  // A create that sends what the form starts with stores it, read back as
+  // the same answers; and a row whose insert leaves those columns out is
+  // read back as them too: the form starts with what the database fills.
+  test('stores the answers a new record starts with, which are what the database fills', covers('sqlserver', defaultCase('stored')), async () => {
+    const generated = generateForm(defaulted, request)
+    const { bindings } = generated
+    const policy = policyOf(generated)
+    const records = createSqlServerRecords(owner)
+    const now = await records.describe(bindings.root)
+    if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+    const plan = planCreate(defaulted, bindings, policy, CLERK, { ...startingAnswers(generated), ...DEFAULT_PARITY.stored.given }, now.described)
+    if (!plan.ok) throw new Error(`expected a create, got ${plan.code}: ${plan.message}`)
+    const inserted = await records.insert(plan.request)
+    if (!inserted.ok) throw new Error(`expected an insert, got ${inserted.code}: ${inserted.message}`)
+    expect(toFormAnswers(bindings, plan.fields, inserted).answers).toMatchObject(DEFAULT_PARITY.started.answers)
+
+    const filled = await owner
+      .request()
+      .query<{ id: string }>(`insert into ${schema}.${name} (code) output cast(inserted.id as nvarchar(20)) as id values (null)`)
+    const id = filled.recordset[0]?.id
+    if (id === undefined) throw new Error('nothing inserted')
+    const reading = planRead(defaulted, bindings, policy, CLERK, token([id]))
+    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}: ${reading.message}`)
+    const found = await records.read(reading.request)
+    if (!found.ok || found.record === null) throw new Error('expected the row the database filled')
+    expect(toFormAnswers(bindings, reading.fields, { ok: true, ...found.record }).answers).toMatchObject(DEFAULT_PARITY.started.answers)
   })
 })
 

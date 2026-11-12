@@ -90,6 +90,12 @@ without database VIEW DEFINITION reports row security `unknown` (0027).
 4. Every choice is a note -- `inferred`, `excluded`, `read-only`, `blocked`
    or `access` -- whose sentence the Generate step (`generate.tsx`) shows;
    a refused request is 422 `cannot-generate`, naming approved metadata only.
+   Once what each field writes is decided, a field the create writes starts
+   at its column's constant default, read from the engine's spelling the
+   snapshot holds and through the column's codec, and its note says so; a
+   constant the field refuses and a lookup's are left to the database, in
+   a note (`generate/defaults.ts`,
+   [0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 5. The administrator edits presentation as a patch over this base
    (`presentation.tsx`, 0030) and writes the `FormPolicy` (`policy.tsx`):
    who may do what, each field's grants, the row filters
@@ -413,6 +419,17 @@ save or a delete still blanks while it is asked (0146); the rest is 0044's and 0
    [0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)).
    `routes/write-once.ts` lets a write run the first time its id arrives;
    a later arrival gets that answer, audited `repeated`.
+   `GET /v1/forms/:id` serves the form with the defaults this person's
+   create takes and no other -- a field `writable.create` names, and on
+   the state field a state one of their create moves starts a record in
+   (`startingDefaults`, `packages/data-core/src/policy/starting.ts`) --
+   since a renderer submits a field it draws disabled. New record opens an
+   engine over no answers, so each field starts at the served `default`,
+   and a child's new row starts the same way under its parent (`start`,
+   through `@formancy/core`'s `withDefaults`); a record read, a copy and a
+   form discarded back to start as handed in, and a saved record's state
+   choice carries none. A save that leaves a default sends it
+   ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 3. A create asks the policy, describes the root and removes the empty echo
    of a field the actor may not write
    ([0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md));

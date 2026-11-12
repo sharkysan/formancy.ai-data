@@ -221,3 +221,85 @@ describe('a state field drawn as its moves (0127)', () => {
     expect(disabled(numbered)).toEqual(['line_no'])
   })
 })
+
+describe("a new record starts with its column's default (0149)", () => {
+  /** The form as `definition` gives it, in spec 5, the line number and the notes starting at their columns' defaults: as the server serves it to a person whose create takes both (0149). */
+  function defaulted(...given: Parameters<typeof definition>): PublishedForm {
+    const published = definition(...given)
+    const fields = published.form.model.fields.map((field) =>
+      field.key === 'line_no' ? { ...field, default: 1 } : field.key === 'notes' ? { ...field, default: 'open' } : field,
+    )
+    return { ...published, form: { ...published.form, specVersion: '5', model: { ...published.form.model, fields } } }
+  }
+  const session = (published: PublishedForm, fixed: string[] = []) =>
+    createSession({ client, formId: 'pg-order-line', definition: published, renderer: 'react', fixed })
+  const value = (drawn: ReturnType<typeof createSession>) => drawn.opened().engine.value()
+  const RECORD_AT = (notes: string) => ({ ...RECORD.answers, notes })
+  const defaultOf = (drawn: ReturnType<typeof createSession>, key: string) =>
+    drawn
+      .opened()
+      .engine.schema()
+      .model.fields.find((field) => field.key === key)?.default
+
+  // New record is a fresh form: each field at its default, which is what
+  // a save of it untouched sends, and nothing the person has to lose. A
+  // record read, a copy and a draft start as handed in (formancy.ai 0197):
+  // the stored line number kept, a field the reader may not see -- absent
+  // from the record's answers -- left out, never filled with a default the
+  // record may not hold, and a copy's left-out fields empty. Watched
+  // failing with the record's answers merged over the defaults: the opened
+  // record started its notes at open.
+  test('starts a new record at each default, and a record read or copied as handed in', () => {
+    const drawn = session(defaulted(['read', 'create', 'update']))
+    drawn.open()
+    expect(value(drawn)).toEqual({ line_no: 1, notes: 'open' })
+    expect(drawn.work()).toBeNull()
+    drawn.open({ record: 'k1:7,4', version: '3', answers: { order: 'k1:7', line_no: 4 } })
+    expect(value(drawn)).toEqual({ order: 'k1:7', line_no: 4 })
+    drawn.open({ record: null, version: null, answers: { order: 'k1:7' } })
+    expect(value(drawn)).toEqual({ order: 'k1:7' })
+  })
+
+  // A child's new row is a new record too: its parent is the page's, and
+  // every other field starts at its default, with nothing to lose until a
+  // person types. Watched failing with the parent opened as a record's
+  // answers, as before: the row started with its parent alone.
+  test('starts a new record under its parent at each default and the parent', () => {
+    const drawn = session(defaulted(['read', 'create', 'update']), ['order'])
+    drawn.start({ order: 'k1:7' })
+    expect(value(drawn)).toEqual({ order: 'k1:7', line_no: 1, notes: 'open' })
+    expect(drawn.work()).toBeNull()
+    expect(drawn.state()).toEqual({ record: undefined, version: undefined, operation: 'create' })
+  })
+
+  // The served form carries a default only where this person's create
+  // takes it (0149, data-core's `startingDefaults`), so the host draws what
+  // it is served. A state field's choice on a new record starts at it --
+  // a state a create of theirs starts the record in -- and on a saved
+  // record carries none: the record opens at the state it holds, and a
+  // default the choice does not offer would stop the engine opening it. A
+  // whole number's box, which offers no states, keeps it. Watched failing
+  // with the choice carrying the default on every record (the engine
+  // refused to open the closed ticket: open is not one of its options),
+  // and with the choice carrying none, as it was built before (the new
+  // ticket started empty).
+  test("starts a new record's state at the served default, and a saved record's choice at the state it holds", () => {
+    const moves: PublishedForm['moves'] = {
+      field: 'notes',
+      moves: [
+        { from: null, to: 'open' },
+        { from: 'open', to: 'closed' },
+        { from: 'closed', to: 'archived' },
+      ],
+      labels: [],
+    }
+    const tickets = session(defaulted(['read', 'create', 'update'], undefined, moves))
+    tickets.open()
+    expect(value(tickets)).toEqual({ line_no: 1, notes: 'open' })
+    tickets.open({ ...RECORD, answers: { ...RECORD.answers, notes: 'closed' } })
+    expect({ value: value(tickets), default: defaultOf(tickets, 'notes') }).toEqual({ value: RECORD_AT('closed'), default: undefined })
+    const numbered = session(defaulted(['read', 'create', 'update'], undefined, { field: 'line_no', moves: [{ from: null, to: '1' }], labels: [] }))
+    numbered.open()
+    expect(value(numbered)).toEqual({ line_no: 1, notes: 'open' })
+  })
+})

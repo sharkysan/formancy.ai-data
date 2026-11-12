@@ -141,6 +141,14 @@ until then the address is formancy.ai's 404
   the form is formancy's spec 5, which a host's renderer reads from
   `@formancy/*` 0.8.0 on
   ([0118](./docs/decisions/0118-generated-forms-move-to-spec-5-for-help-text-from-column-comments.md)).
+  A field a create writes starts at its column's constant default -- text,
+  a whole or exact number, or yes or no, read from each engine's spelling
+  of it and through the column's codec, so the fixture's order starts at
+  `draft` and its customer Active -- and its note says so. A function, a
+  sequence, NULL, a date, an instant, a float or a uuid, a lookup's default
+  and a constant the field would refuse start empty, left to the database,
+  the last two said in a note; nothing in the studio changes a default yet
+  ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form
@@ -920,6 +928,14 @@ the server's words; and a deletion whose answer was lost may have been
 done, is checked by reading the record, and is repeated only after asking
 again
 ([0053](./docs/decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
+
+New record, and a child's new row, start each field at its column's
+constant default where the form has one -- an order at `draft` -- and a
+save that leaves it sends it. A record you open, a Duplicate and a form
+discarded back to start as they were handed in, never at a default; a field
+you may not give on create, and a state a create may not start the record
+in, start empty, and the database fills them as before
+([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
 
 Where the server offers you create, the open record's header also has
 Duplicate record. It reads the record again and opens a new record in every

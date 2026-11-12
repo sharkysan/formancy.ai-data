@@ -11,6 +11,7 @@ import {
   cascadeCase,
   columnFilterCase,
   covers,
+  defaultCase,
   deleteCase,
   displayCase,
   driftingCase,
@@ -29,6 +30,8 @@ import {
   uuidCase,
   versionCase,
 } from './cases.js'
+import { DEFAULT_PARITY } from './defaults.js'
+import type { DefaultCase } from './defaults.js'
 import { DELETE_PARITY } from './deletes.js'
 import type { DeleteCase } from './deletes.js'
 import { sharedDrifting } from './drifting.js'
@@ -78,6 +81,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   BROWSE_PARITY: (Object.keys(BROWSE_PARITY) as BrowseCase[]).map(browseCase),
   COLUMN_FILTER_PARITY: (Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
   VERSION_PARITY: (Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
+  DEFAULT_PARITY: (Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -116,6 +120,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   PAGED_TENANT: 'the tenant the paged rows belong to (0085), which no shared case reads',
   PAGED_LATER:
     "how many customers lie past the paged lookup's first page (0085); what a search answers over them is lookups.integration.test.ts's, on both engines",
+  DEFAULT_TABLE: "where the parity suites create the table DEFAULT_PARITY's cases are about",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 

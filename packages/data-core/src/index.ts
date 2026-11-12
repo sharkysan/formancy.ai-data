@@ -127,6 +127,7 @@ export {
   throughFilters,
   writableFields,
 } from './policy/evaluate.js'
+export { startingDefaults } from './policy/starting.js'
 export { validatePolicy } from './policy/validate.js'
 export { isThroughKeyType, throughProblems, unscopedLookups } from './policy/through.js'
 export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview, grantsDelete, reachOf, reachTables, unaccepted } from './policy/cascades.js'
