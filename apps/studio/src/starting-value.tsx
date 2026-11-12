@@ -178,8 +178,8 @@ export function StartingValueControl({
         />
       )}
       <p id={hint} className="hint">
-        Generated: {field.note?.message ?? 'starts empty.'}
-        {choice || column !== undefined ? null : ' Empty, a new record starts it empty.'}
+        Generated: {field.note?.message ?? 'no starting value.'}
+        {choice || column !== undefined ? null : ' Type one, and a new record starts with it.'}
       </p>
       {problem === null ? null : (
         <p id={`${id}-problem`} className="field-problem">

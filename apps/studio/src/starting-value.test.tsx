@@ -59,7 +59,7 @@ describe("a field's starting value", () => {
     expect(status.value).toBe('draft')
     expect(computeAccessibleDescription(status)).toBe("Generated: Starts with the column's default, “draft”.")
     expect(computeAccessibleDescription(within(presentation).getByLabelText('Starting value of notes'))).toBe(
-      'Generated: starts empty. Empty, a new record starts it empty.',
+      'Generated: no starting value. Type one, and a new record starts with it.',
     )
     // No control where none is taken, and the reason said in the row.
     for (const [key, why] of [
@@ -161,7 +161,7 @@ describe("a field's starting value", () => {
     expect(created.getAttribute('aria-invalid')).toBe('true')
     expect(created.value).toBe('seven')
     const refused = '“seven” is not an answer created_by takes (its control holds a whole number). Until it is one, the field keeps the starting value it had.'
-    expect(computeAccessibleDescription(created)).toBe(`Generated: starts empty. Empty, a new record starts it empty. ${refused}`)
+    expect(computeAccessibleDescription(created)).toBe(`Generated: no starting value. Type one, and a new record starts with it. ${refused}`)
     expect(said(presentation)).toBe(refused)
     const status = within(presentation).getByLabelText<HTMLInputElement>('Starting value of status')
     await user.tripleClick(status)
