@@ -109,34 +109,42 @@ type Reader = (kind: DatabaseKind, constant: Constant, type: NormalizedType) => 
  * column's constant by and a presentation's starting value is offered by
  * (`startsAtConstant`, 0150). A date, a time, an instant, a uuid and a
  * float are not in it, left to the database: their text is the session's
- * or rounds otherwise than a page would.
+ * or rounds otherwise than a page would. A map, never an object: a kind
+ * is a name a snapshot carries, and an object would find a reader under
+ * every name it inherits -- constructor, toString.
  */
-const READERS: Readonly<Partial<Record<Kind, Reader>>> = {
-  text: (kind, constant, type) => {
-    if (constant.kind !== 'text' || type.kind !== 'text') return undefined
-    // SQL Server reads a literal without N in the database's code page,
-    // and converts an N literal written to a varchar to the column's:
-    // past ASCII, only an N literal on an nvarchar is the text it spells.
-    if (kind === 'sqlserver' && !ASCII.test(constant.text) && !(constant.national && type.lengthUnit === 'utf16-code-units')) return undefined
-    return constant.text
-  },
-  boolean: (_kind, constant) => {
-    if (constant.kind === 'boolean') return constant.value
-    // A bit's default is ((1)) or ((0)); ((2)) is stored as 1, a conversion not read.
-    return constant.kind === 'number' && (constant.text === '0' || constant.text === '1') ? constant.text === '1' : undefined
-  },
-  integer: (_kind, constant) => (constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined),
-  decimal: (_kind, constant) => (constant.kind === 'number' ? constant.text : undefined),
-}
+const READERS: ReadonlyMap<Kind, Reader> = new Map<Kind, Reader>([
+  [
+    'text',
+    (kind, constant, type) => {
+      if (constant.kind !== 'text' || type.kind !== 'text') return undefined
+      // SQL Server reads a literal without N in the database's code page,
+      // and converts an N literal written to a varchar to the column's:
+      // past ASCII, only an N literal on an nvarchar is the text it spells.
+      if (kind === 'sqlserver' && !ASCII.test(constant.text) && !(constant.national && type.lengthUnit === 'utf16-code-units')) return undefined
+      return constant.text
+    },
+  ],
+  [
+    'boolean',
+    (_kind, constant) => {
+      if (constant.kind === 'boolean') return constant.value
+      // A bit's default is ((1)) or ((0)); ((2)) is stored as 1, a conversion not read.
+      return constant.kind === 'number' && (constant.text === '0' || constant.text === '1') ? constant.text === '1' : undefined
+    },
+  ],
+  ['integer', (_kind, constant) => (constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined)],
+  ['decimal', (_kind, constant) => (constant.kind === 'number' ? constant.text : undefined)],
+])
 
 /** Whether a field of a column of `kind` starts at a value: one its column's constant is read for (0149), and so one a starting value is offered for (0150). */
 export function startsAtConstant(kind: Kind): boolean {
-  return Object.hasOwn(READERS, kind)
+  return READERS.has(kind)
 }
 
 /** What the codec of `column` is handed for `constant`: the value the database stores for it, or `undefined` where none is read (`READERS`). */
 function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
-  return READERS[column.type.kind]?.(kind, constant, column.type)
+  return READERS.get(column.type.kind)?.(kind, constant, column.type)
 }
 
 /** A value as a note says it: quoted, as the generator's other sentences quote one, so blanks are seen and a value ends where its quote does. */

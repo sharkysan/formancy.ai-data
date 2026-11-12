@@ -5,7 +5,7 @@ import { describe, expect, test } from 'vitest'
 import type { DatabaseKind } from '../adapter.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import { createSnapshot } from '../snapshot.js'
-import { readConstant } from './defaults.js'
+import { readConstant, startingAnswer, startsAtConstant } from './defaults.js'
 import { generateForm } from './generate.js'
 import type { GenerationRequest } from './types.js'
 
@@ -264,6 +264,25 @@ describe('a new record starts with its column’s constant default (0149)', () =
       kind: 'inferred',
       message: `Starts empty: the column's default, “${shown}”, is not an answer the field takes (${reason}), so the database fills it when a create leaves the field out.`,
     })
+  })
+
+  // A column's kind picks how its constant is read, and a kind is a name a
+  // snapshot carries: one that names something every object inherits --
+  // constructor, toString -- picks no reader, and the field starts empty
+  // rather than at whatever the inherited method makes of the constant.
+  // Generation refuses such a kind before it asks (`controlFor`), so the
+  // reading is asked here directly, as a text column's field and binding
+  // with the kind changed under them. Watched failing with the readers
+  // looked up by that name: each case threw, or read the constant.
+  test.each(['constructor', 'toString', 'hasOwnProperty', '__proto__'])('a column of kind %s reads no constant', (kind) => {
+    const text = col('code', varchar(10), "'x'::text")
+    const { form, bindings } = single('postgres', text)
+    const binding = bindings.fields.find((entry) => entry.field === 'code')
+    if (binding?.kind !== 'column') throw new Error('code is bound to its column')
+    expect(field(form, 'code').default).toBe('x')
+    const column: ColumnMeta = { ...text, type: { kind } as unknown as NormalizedType }
+    expect(startsAtConstant(kind as NormalizedType['kind'])).toBe(false)
+    expect(startingAnswer('postgres', column, binding, field(form, 'code'))).toEqual({ kind: 'none' })
   })
 
   // PostgreSQL's varchar(3) counts characters, and holds two emoji; the
