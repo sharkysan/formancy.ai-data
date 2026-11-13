@@ -39,10 +39,11 @@
 }
 
 /* Show and the label at the start, the moves and the width's three at the
-   end of each line; where the line is too narrow for all of them, the
-   width's three go under it, together, at its end. A long label wraps in
-   its place rather than widening the panel: its basis is small, so it never
-   pushes a move off its line. */
+   end of each line; where the line is too narrow for all of them -- a
+   phone, where the page scrolls as a whole -- the width's three go under
+   it, together, at its end. A long label wraps in its place rather than
+   widening the panel: its basis is small, so it never pushes a move off
+   its line. */
 .columns-list li {
   display: flex;
   flex-wrap: wrap;
@@ -54,8 +55,16 @@
 .columns-width {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.25rem;
   margin-inline-start: auto;
+}
+
+/* − and +: a sign each, a 32-pixel square, past WCAG 2.5.8's 24, so the
+   line keeps its width on it in Side by side's lane (columns-panel.tsx). */
+.columns-list .columns-step {
+  justify-content: center;
+  min-width: 2rem;
+  padding: 0;
 }
 
 /* A checkbox, not the page's text box (controls.css): 24 pixels, the

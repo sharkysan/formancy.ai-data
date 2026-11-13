@@ -131,9 +131,18 @@ sizing as its default limit), where it had been the column's `maxWidth`.
 
 **The keyboard's way is the Columns panel** (`apps/host/src/columns-panel.tsx`),
 where every other change of a column is (0106, formancy.ai 0046). Each
-column's line has Wider, Narrower and Fit, named "Make Amount wider",
-"Make Amount narrower" and "Fit Amount to its content", the visible word
-in each name. Wider and Narrower move the column 40 pixels from the width
+column's line has Narrower, Wider and Fit, drawn as −, + and Fit and
+named "Make Amount narrower", "Make Amount wider" and "Fit Amount to its
+content": the signs are symbols, which WCAG 2.5.3 leaves to the name, and
+short, so a column's Show, label, moves and width stay on one line in
+Side by side's lane. Drawn as words, the line needed more than the lane
+of a window 897 pixels wide: measured on 2026-11-13 in Playwright's
+Chromium and Firefox, a column's line in Columns was two lines in a
+469-pixel lane where it is one now, and one from a lane of 410 pixels;
+two lines a column took the panel past the Records panel's height, whose
+edge, below the window at the page's top, cut the lines under it, and the
+gate could decide no text there (CI run 43349833479, Chromium and
+WebKit). Wider and Narrower move the column 40 pixels from the width
 the grid draws it at now (`WIDTH_STEP`, a ruling: an eighth of the 320 a
 column is sized to, so a press is seen and eight take a column across
 that); at the floor or at `WIDEST` a press changes nothing and says so.
@@ -227,9 +236,13 @@ panel does not know a column's drawn width until it is pressed, so the end
 is said when it is reached. A double click on an edge, which other grids
 use to fit a column, does nothing here.
 
-Each column's line in Columns has three more Tab stops, Wider, Narrower
+Each column's line in Columns has three more Tab stops, Narrower, Wider
 and Fit, a hidden column's included: the panel's way through grows by
-three for every column.
+three for every column. Drawn as − and +, the steps say what they do by
+their names alone; a person who reads the screen sees signs. In a lane
+narrower than about 410 pixels -- the split moved toward the record, or a
+phone, where the page scrolls as a whole -- a column's line is two lines
+again.
 
 AG Grid draws its resize handle between the headers in the room's
 `--edge-strong`, two pixels wide and a third of the header's height; no

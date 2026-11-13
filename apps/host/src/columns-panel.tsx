@@ -16,14 +16,20 @@ import type { Measured, WidthChange } from './widths.js'
  * section's columns leave out its parent's field, as its grid does.
  *
  * A column's width is the keyboard's here too (0151), what a pointer does
- * on a header's edge: Wider and Narrower move it a step (widths.ts) from
- * the width the grid draws it at now (`measure`), never past its floor or
- * the widest, and Fit gives it back to its content; what each asks goes to
- * the grid (`onWidths`), which tells the section to keep it as it tells a
- * drag's, and Reset columns gives every column back to its content too. Each press is said on the panel's line, in the page's own
- * voice -- the browser keeps a width, not the server, so it is never the
- * teal of what the server did (0146) -- a new element each time, so a
- * press at an end that says what it said before is heard again.
+ * on a header's edge: − and +, named "Make Amount narrower" and "Make
+ * Amount wider", move it a step (widths.ts) from the width the grid draws
+ * it at now (`measure`), never past its floor or the widest, and Fit gives
+ * it back to its content; what each asks goes to the grid (`onWidths`),
+ * which tells the section to keep it as it tells a drag's, and Reset
+ * columns gives every column back to its content too. Each press is said
+ * on the panel's line, in the page's own voice -- the browser keeps a
+ * width, not the server, so it is never the teal of what the server did
+ * (0146) -- a new element each time, so a press at an end that says what
+ * it said before is heard again. The steps are signs so that a column's
+ * line stays one line in Side by side's lane: in words it was two in a
+ * window 897 pixels wide, and the panel outgrew the Records panel, whose
+ * edge, below the window, cut the lines under it (0151 says what was
+ * measured).
  *
  * What cannot be done is said, never removed from the keyboard's path: the
  * last column shown cannot be hidden -- a row is opened through its cells
@@ -142,11 +148,11 @@ export function ColumnsPanel({
                     Down
                   </button>
                   <span className="columns-width">
-                    <button type="button" className="button" aria-label={`Make ${column.label} wider`} onClick={() => step(column, 1)}>
-                      Wider
+                    <button type="button" className="button columns-step" aria-label={`Make ${column.label} narrower`} onClick={() => step(column, -1)}>
+                      −
                     </button>
-                    <button type="button" className="button" aria-label={`Make ${column.label} narrower`} onClick={() => step(column, -1)}>
-                      Narrower
+                    <button type="button" className="button columns-step" aria-label={`Make ${column.label} wider`} onClick={() => step(column, 1)}>
+                      +
                     </button>
                     <button
                       type="button"

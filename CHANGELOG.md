@@ -52,8 +52,9 @@ the same day (formancy.ai 0232).
   or a wide one that pushed the rest out of view, could not be fixed. What
   you notice: on the host page a field's column is resized by dragging its
   header's edge, by Alt and an arrow on its header, which AG Grid already
-  took from the browser there, and in Columns by Wider and Narrower, a
-  step a press said in pixels on the panel's line, and Fit, which sizes
+  took from the browser there, and in Columns by − and +, named Make it
+  narrower and wider, a step a press said in pixels on the panel's line,
+  and Fit, which sizes
   the column to the rows shown and keeps no width for it; Reset columns
   gives back every width too. A column stops at its header's longest
   word, measured once the page's fonts have loaded, and at a widest, and
