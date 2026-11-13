@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { ListColumns, ListFilterTerm, ListView } from '@formancy/data-client'
-import { arrange, defaultChoices, keptOf, mergeChoices, moveChoice, openGrid, parseKept, showChoice, withKept } from './columns.js'
+import { arrange, defaultChoices, keptOf, mergeChoices, moveChoice, openGrid, parseKept, showChoice, widthsAfter, withKept } from './columns.js'
 import type { ColumnChoice, GridState, KeptGrid } from './columns.js'
 import type { GridColumn } from './grid-datasource.js'
 
@@ -269,6 +269,34 @@ describe('what is written over what is stored', () => {
     expect(withKept(all, { version: 1, columns: [choice('id')] }, 'columns')).toEqual({ ...all, columns: [choice('id')] })
     expect(withKept(all, null, 'columns', 'widths')).toEqual(view)
     expect(withKept(widths, null, 'widths')).toBeNull()
+  })
+})
+
+describe('a width set over what is stored', () => {
+  // The same form at two levels of Drill down shares one key, and each
+  // section read storage when it opened: a width set at one is set over the
+  // widths stored, so Amount set at level 2 keeps the Notes level 1 set
+  // since, of the columns the form offers; where the other section took
+  // its widths away, they are not brought back; and where nothing is
+  // stored, or storage cannot be read, the section's own are what it
+  // changes (watched failing with the change made over the section's own
+  // widths, as before: Notes gone, and Notes brought back).
+  test('sets a width over the widths stored, else over the section’s own', () => {
+    const stored: KeptGrid = {
+      version: 1,
+      widths: [
+        { field: 'notes', width: 480 },
+        { field: 'status', width: 99 },
+      ],
+    }
+    expect(widthsAfter(stored, [], COLUMNS, [{ field: 'amount', width: 200 }])).toEqual([
+      { field: 'notes', width: 480 },
+      { field: 'amount', width: 200 },
+    ])
+    expect(widthsAfter({ version: 1, view: LARGE.name }, [{ field: 'notes', width: 480 }], COLUMNS, [{ field: 'amount', width: 200 }])).toEqual([
+      { field: 'amount', width: 200 },
+    ])
+    expect(widthsAfter(null, [{ field: 'notes', width: 480 }], COLUMNS, [{ field: 'notes', width: null }])).toEqual([])
   })
 })
 

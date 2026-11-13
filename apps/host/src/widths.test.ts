@@ -1,6 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import type { GridColumn } from './grid-datasource.js'
-import { headerFloor, NARROWEST, offeredWidths, readWidths, stepWidth, WIDEST, WIDTH_STEP, widthSaid, withWidths } from './widths.js'
+import { ROOM_GRID } from './grid-theme.js'
+import {
+  changedWidths,
+  CONTENT_WIDTH,
+  headerFace,
+  headerFloor,
+  NARROWEST,
+  offeredWidths,
+  readWidths,
+  stepWidth,
+  WIDEST,
+  WIDTH_STEP,
+  widthSaid,
+  withWidths,
+} from './widths.js'
 
 /*
  * A column's width as a person sets it (0151), as data: which widths a
@@ -98,6 +112,32 @@ describe('a width set or taken away', () => {
   })
 })
 
+describe('a resize the person finished', () => {
+  // A resize that ends at the width its column had when it began -- a
+  // click on a header's edge, which AG Grid tells as a resize finished at no
+  // distance, or Alt and an arrow at an end -- sets no width: only a column
+  // whose width moved is the person's; one the grid has no width for yet is
+  // taken as moved (watched failing with every finished width given back:
+  // Notes at the 90 it had).
+  test('is the columns whose width moved', () => {
+    const settled = new Map([
+      ['notes', 90],
+      ['amount', 120],
+    ])
+    expect(changedWidths([{ field: 'notes', width: 90 }], settled)).toEqual([])
+    expect(
+      changedWidths(
+        [
+          { field: 'notes', width: 130 },
+          { field: 'amount', width: 120 },
+        ],
+        settled,
+      ),
+    ).toEqual([{ field: 'notes', width: 130 }])
+    expect(changedWidths([{ field: 'id', width: 80 }], settled)).toEqual([{ field: 'id', width: 80 }])
+  })
+})
+
 describe('a press of Wider or Narrower', () => {
   // One step, within the column's own floor and the widest; at either end
   // the width it has, so the panel can say why nothing moved (watched
@@ -132,11 +172,41 @@ describe('the floor a header sets', () => {
   })
 })
 
+describe('the face a header is measured in', () => {
+  // A floor measured in a face other than the one the header is drawn in
+  // is too narrow or too wide for its words: the face is the grid's theme's
+  // -- its weight and size -- in the family the room's variable names,
+  // read where the page sets it, so the theme is the one place they are
+  // said (watched failing with the face written out apart from them, as
+  // before: "600 13px "IBM Plex Sans", ui-sans-serif, system-ui,
+  // sans-serif" against a family the page set otherwise).
+  test('is the theme’s weight and size in the family the page sets', () => {
+    document.documentElement.style.setProperty('--sans', "'Test Sans', sans-serif")
+    try {
+      expect(headerFace()).toBe(`${String(ROOM_GRID.headerFontWeight)} ${String(ROOM_GRID.headerFontSize)}px 'Test Sans', sans-serif`)
+    } finally {
+      document.documentElement.style.removeProperty('--sans')
+    }
+    expect(headerFace()).toBe(`${String(ROOM_GRID.headerFontWeight)} ${String(ROOM_GRID.headerFontSize)}px sans-serif`)
+  })
+})
+
+describe('the numbers 0151 says', () => {
+  // 0151, the limitations register and the gate (scripts/browser/widths.mjs,
+  // which cannot import them) say these numbers: a constant moved fails
+  // here, so what says it is read again (watched failing with WIDTH_STEP
+  // at 32).
+  test('are the step, the widest, the content’s cap and the narrowest', () => {
+    expect({ step: WIDTH_STEP, widest: WIDEST, content: CONTENT_WIDTH, narrowest: NARROWEST }).toEqual({ step: 40, widest: 960, content: 320, narrowest: 28 })
+  })
+})
+
 describe('what the panel says', () => {
-  // A width changed is said in pixels; nothing changed is said with why, so
-  // a person who cannot see the header learns the end from the press
-  // (watched failing with an end said as a change: "Amount is 960 pixels
-  // wide." at the widest).
+  // Each sentence the panel's line may say: a width set in pixels, each end
+  // with why nothing moved, and a column fitted. Which of them a press says
+  // -- an end where the step moved nothing -- is the panel's, held by
+  // column-widths.test.tsx (watched failing with the widest's sentence
+  // worded as a width set: "Amount is 960 pixels wide.").
   test('says the width set, an end reached and a column fitted', () => {
     expect(widthSaid('Amount', 160, 'set')).toBe('Amount is 160 pixels wide.')
     expect(widthSaid('Amount', WIDEST, 'widest')).toBe(`Amount is as wide as a column goes: ${String(WIDEST)} pixels.`)

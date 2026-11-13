@@ -194,6 +194,30 @@ describe('a column’s width in the grid (0151)', () => {
     ])
   })
 
+  // A click on a header's edge, and a double click, keep nothing: AG Grid
+  // starts its resize on the press -- its drag starts at no distance -- and
+  // on the release tells the width the column had as a width set, finished.
+  // Kept, the column would be the person's at a width they never chose, and
+  // no sizing would touch it again (watched failing with every finished
+  // resize of the person's kept: Notes told at the 200 it had, once for the
+  // click and twice for the double click). Pressed with the pointer on the
+  // edge itself, AG Grid's `.ag-header-cell-resize`, a DOM read: it has no
+  // role or name.
+  test('keeps nothing for a click or a double click on a header’s edge', async () => {
+    const told: WidthChange[] = []
+    render(<Grid widths={[]} onTold={(changes) => told.push(...changes)} />)
+    await waitFor(() => expect(header('Notes')).toBeTruthy())
+    const before = width('Notes')
+    const edge = header('Notes').querySelector('.ag-header-cell-resize')
+    expect(edge).not.toBeNull()
+    const user = userEvent.setup()
+    await user.pointer({ keys: '[MouseLeft]', target: edge as Element })
+    await user.dblClick(edge as Element)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(width('Notes')).toBe(before)
+    expect(told).toEqual([])
+  })
+
   // A double click on a header's edge sizes nothing: AG Grid's own would
   // size the column past the page's cap, and say so as the page's sizing
   // does, so the page could not keep it; Columns' Fit does it (watched

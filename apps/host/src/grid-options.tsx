@@ -31,7 +31,7 @@ import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
-import { headerFloor, WIDEST } from './widths.js'
+import { changedWidths, headerFloor, WIDEST } from './widths.js'
 import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
@@ -325,6 +325,16 @@ export interface GridCallbacks {
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
 export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: string; firstColumn: () => string; on: GridCallbacks }): GridOptions<GridRow> {
+  /**
+   * The width each field's column had when its last resize finished --
+   * the person's, the page's sizing or the panel's -- or when it was made:
+   * what a resize the person ends is measured against, since AG Grid tells
+   * a click on an edge as a resize finished where it began (0151).
+   */
+  const settled = new Map<string, number>()
+  const seed = (api: GridApi<GridRow>): void => {
+    for (const column of api.getColumns() ?? []) if (!settled.has(column.getColId())) settled.set(column.getColId(), Math.round(column.getActualWidth()))
+  }
   return {
     theme: roomGrid,
     // The theme's rows, said again: a grid made inside a hidden view cannot measure its theme.
@@ -377,20 +387,28 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     },
     onGridReady: (event) => {
       event.api.setGridAriaProperty('labelledby', labelledBy)
+      seed(event.api)
       on.ready(event.api)
     },
+    // A column made since, by a change of the form's columns, at the width it was made at.
+    onGridColumnsChanged: (event) => seed(event.api),
     onGridSizeChanged: () => on.resized(),
     onSortChanged: () => on.sorted(),
     // The person's own: a drag let go, Alt and an arrow, or the panel's
     // width (`drawWidths`) -- AG Grid's `uiColumnResized`, each step of a
-    // drag before it is let go not `finished`. The page's own sizing is
-    // `autosizeColumns`, never kept (grid-widths.test.tsx). Whole pixels,
+    // drag before it is let go not `finished` -- and only where the width
+    // moved from where the resize began: a click on an edge, or Alt and an
+    // arrow at an end, ends where it began (`changedWidths`). The page's own
+    // sizing is `autosizeColumns`, never kept (grid-widths.test.tsx), and
+    // settles its columns' widths as the person's resize does. Whole pixels,
     // which is what the section keeps (widths.ts).
     onColumnResized: (event: ColumnResizedEvent<GridRow>) => {
-      if (!event.finished || event.source !== 'uiColumnResized') return
-      const changes = (event.columns ?? [])
+      if (!event.finished) return
+      const finished = (event.columns ?? [])
         .filter((column) => column.getColId() !== DELETE_COLUMN)
         .map((column) => ({ field: column.getColId(), width: Math.round(column.getActualWidth()) }))
+      const changes = event.source === 'uiColumnResized' ? changedWidths(finished, settled) : []
+      for (const { field, width } of finished) settled.set(field, width)
       if (changes.length > 0) on.widthsSet(changes)
     },
     onRowClicked: (event: RowClickedEvent<GridRow>) => {

@@ -18,6 +18,7 @@ import type { Said } from './leave.js'
 import { Pager } from './pager.js'
 import type { Status } from './pager.js'
 import { wellHeight } from './grid-sizing.js'
+import { useFontsLoaded } from './use-fonts-loaded.js'
 import { useGridSizing } from './use-grid-sizing.js'
 import { useHeldRows } from './use-held-rows.js'
 import type { HeldRows } from './use-held-rows.js'
@@ -101,7 +102,7 @@ export interface RecordGridHandle {
   removed(line: Said): void
   /** A column as the grid draws it now -- its width and the least and most it may be -- or null where the grid has none (0151). */
   widthOf(field: string): Measured | null
-  /** Widths the Columns panel set, drawn by the grid and told back as a drag's are; a width taken away, given to the section to size (0151). */
+  /** Widths the Columns panel set, drawn by the grid and told back as a drag's are; a width taken away -- Fit -- given to the section, and the column sized to the rows shown (0151). */
   setWidths(changes: WidthChange[]): void
 }
 
@@ -248,7 +249,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
   }, [])
 
-  const { sizeOnce, sizeWaiting } = useGridSizing({ api, well, shown, fit, refit, arranged, widths })
+  const { sizeOnce, sizeWaiting, sizeColumns } = useGridSizing({ api, well, shown, fit, refit, arranged, widths })
 
   /**
    * The section's sort on the headers, where they show another: they follow
@@ -449,10 +450,15 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         const set = changes.flatMap(({ field, width }) => (width === null ? [] : [{ field, width }]))
         if (grid !== null && !grid.isDestroyed()) drawWidths(grid, set)
         const fitted = changes.filter((change) => change.width === null)
-        if (fitted.length > 0) latest.current.onWidths(fitted)
+        if (fitted.length === 0) return
+        latest.current.onWidths(fitted)
+        // A kept width given back is sized as the section draws it; a column with none is sized here, to the rows shown now.
+        const kept = new Set(latest.current.widths.map((each) => each.field))
+        const never = fitted.map((change) => change.field).filter((field) => !kept.has(field))
+        if (never.length > 0) sizeColumns(never)
       },
     }),
-    [],
+    [sizeColumns],
   )
 
   // A row's Delete reads the page's handler when pressed: the column is made once per noun.
@@ -470,6 +476,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     if (grid !== null && !grid.isDestroyed()) grid.setGridAriaProperty('describedby', describedBy)
   }, [describedBy])
   const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
+  // Each header's floor measured again once the page's fonts have loaded: a canvas measures in a fallback face until then (0151).
+  const faces = useFontsLoaded()
   const columnDefs = useMemo(
     () =>
       columnDefsOf(
@@ -479,7 +487,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // Read, not a dependency: a kept width is drawn when its column is made, and a width set since is the grid's already (0151).
         latest.current.widths,
       ),
-    [arranged, removeNoun, boxedKeys],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `faces` is no value the definitions read: a count of the fonts loaded, after each of which headerFloor measures in the face loaded
+    [arranged, removeNoun, boxedKeys, faces],
   )
 
   // The header's height changes after the well is fitted -- its row of

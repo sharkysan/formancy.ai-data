@@ -126,9 +126,9 @@ describe.each(ENGINES)('the record grid on $engine', (engine) => {
   // would give them to nothing, and what it sets is kept as a drag's width
   // is, for that column alone; no column moves (before 0151 this case held
   // the opposite, watched failing with the columns resizable: a header grew
-  // from 92 to 96 pixels; to be watched failing in CI with B1, a field's
-  // column not resizable, as before 0151: the header left at its width and
-  // nothing kept).
+  // from 92 to 96 pixels; to be watched failing in CI with B1 of
+  // TEMPORARY (1/2), a field's column not resizable, as before 0151: the
+  // header left at its width and nothing kept).
   test('resizes and keeps a column by Alt and an arrow on its header', async () => {
     const user = await inTheGrid(formId)
     const order = headers()
@@ -148,9 +148,9 @@ describe.each(ENGINES)('the record grid on $engine', (engine) => {
   // that one, and the page mounted again -- a reload -- opens it at the
   // width kept, its first page sized around it. The other columns are at
   // their content's width throughout, which in jsdom is each header's floor
-  // (to be watched failing in CI with B2, the grid's sizing given every
-  // column, as before 0151: Notes back at its content's width after the
-  // separator was let go, and on the page mounted again).
+  // (to be watched failing in CI with B4 of TEMPORARY (2/2), the grid's
+  // sizing given every column, as before 0151: Notes back at its content's
+  // width after the separator was let go, and on the page mounted again).
   test('keeps a width set in Columns through a new page, the separator let go and a reload', async () => {
     const notes = stamp('widths')
     await plane.db.insertOrders(engine.connection, LIST_PAGE_SIZE + 3, notes)

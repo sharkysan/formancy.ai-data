@@ -317,12 +317,15 @@ disclosure where a person arrives, which Enter changes with the keyboard
 staying on it
 (`apps/host/scripts/browser/waiting.mjs`,
 [0146](../decisions/0146-the-page-says-what-the-server-did.md)). It
-fails when a pointer's drag on a grid header's edge does not widen its
-column by as much as the pointer moved, or a reload does not open it at
-that width; when a column dragged far does not stop at a floor where every
-word of its header is whole; and when Wider in Columns, from the
-keyboard, does not grow the column a step a press, saying how wide, or Fit
-does not give it back to its content -- AG Grid reads a drag from where
+fails when a click or a double click on a grid header's edge keeps a
+width; when a pointer's drag on it does not widen its column by as much
+as the pointer moved, or a reload does not open it at that width once its
+first page is sized; when a header of several words dragged far does not
+stop at a floor where each of its words is drawn whole on one line, read
+by a Range over each word; and when Wider in Columns, from the keyboard,
+does not grow the column a step a press, saying how wide, or Fit does not
+give it back to its content, or does not size a column nobody set to a
+longer value a search listed -- AG Grid reads a drag from where
 things are drawn, which jsdom draws nowhere, so the host's
 `grid-widths.test.tsx` holds what AG Grid draws and tells without one
 (`apps/host/scripts/browser/widths.mjs`,

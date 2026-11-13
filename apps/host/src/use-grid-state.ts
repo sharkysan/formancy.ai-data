@@ -1,11 +1,10 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
-import { defaultChoices, keptOf, openGrid, parseKept, withKept } from './columns.js'
+import { defaultChoices, keptOf, openGrid, parseKept, widthsAfter, withKept } from './columns.js'
 import type { ColumnChoice, GridState, KeptPart } from './columns.js'
 import type { GridColumn } from './grid-datasource.js'
 import { browserStorage, gridKey, readPreference, removePreference, writePreference } from './prefs.js'
 import type { GridSection } from './prefs.js'
-import { withWidths } from './widths.js'
 import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
@@ -84,7 +83,8 @@ export function useGridState({
     setSort: (sort) => change({ sort, listKept: true }, 'list'),
     pick: (filter, sort) => change({ filter, sort, listKept: true }, 'list'),
     setChoices: (choices) => change({ choices, columnsKept: true }, 'columns'),
-    setWidths: (changes) => change({ widths: withWidths(now.current.widths, changes) }, 'widths'),
+    // Over the widths stored, not this section's own: another under the key may have set one since (`widthsAfter`).
+    setWidths: (changes) => change({ widths: widthsAfter(parseKept(readPreference(storage, key)), now.current.widths, columns, changes) }, 'widths'),
     resetChoices: () => change({ choices: defaultChoices(columns), columnsKept: false, widths: [] }, 'columns', 'widths'),
   }
 }

@@ -44,7 +44,7 @@ export function useGridSizing({
   arranged: readonly ArrangedColumn[]
   /** The widths the person set (0151). */
   widths: readonly ColumnWidth[]
-}): { sizeOnce: () => void; sizeWaiting: (rows: number) => void } {
+}): { sizeOnce: () => void; sizeWaiting: (rows: number) => void; sizeColumns: (columns: readonly string[]) => void } {
   /** The widths set, read when a size is made: a task after it is asked for. */
   const kept = useRef(widths)
   kept.current = widths
@@ -115,13 +115,35 @@ export function useGridSizing({
     [sizeAdded],
   )
 
+  /**
+   * `columns` sized now to the rows shown, once they are drawn, and the
+   * well fitted to a header the change may have made taller or shorter --
+   * a column shown again, given back to its content, or fitted to it by
+   * Fit (0151). While a page loads, or over a page with no rows, they wait
+   * in `unsized` for the next page that has some (`sizeWaiting`): with
+   * nothing to size them to, they would keep AG Grid's width, or the one
+   * given back, until the separator is let go, and Stacked has none.
+   */
+  const sizeColumns = useCallback(
+    (columns: readonly string[]) => {
+      const grid = api.current
+      if (grid === null || grid.isDestroyed()) return
+      if (!shown.current.loaded || shown.current.rows === 0) {
+        for (const key of columns) unsized.current.add(key)
+        if (shown.current.loaded) setTimeout(() => (grid.isDestroyed() ? undefined : fit()), 0)
+        return
+      }
+      setTimeout(() => {
+        if (grid.isDestroyed()) return
+        if (columns.length > 0) toContent(grid, columns)
+        fit()
+      }, 0)
+    },
+    [api, shown, fit, toContent],
+  )
+
   // A column shown that was hidden when the page was sized, or whose width
-  // was given back to its content: sized now, to the rows shown, and the
-  // well fitted to a header the change may have made taller or shorter.
-  // Shown while a page loads, or over a page with no rows, it waits in
-  // `unsized` for the next page that has some (`sizeWaiting`): with nothing
-  // to size it to, it would keep AG Grid's width, or the one given back,
-  // until the separator is let go, and Stacked has none.
+  // was given back to its content -- by Fit or Reset columns -- is sized.
   const drawn = useRef({ arranged, widths })
   useEffect(() => {
     const before = drawn.current
@@ -134,19 +156,8 @@ export function useGridSizing({
     const added = arranged.filter((column) => column.shown && (!shownBefore.has(column.key) || given(column.key))).map((column) => column.key)
     // A width set changes no header's height and leaves no column to size.
     if (before.arranged === arranged && added.length === 0) return
-    const grid = api.current
-    if (grid === null || grid.isDestroyed()) return
-    if (!shown.current.loaded || shown.current.rows === 0) {
-      for (const key of added) unsized.current.add(key)
-      if (shown.current.loaded) setTimeout(() => (grid.isDestroyed() ? undefined : fit()), 0)
-      return
-    }
-    setTimeout(() => {
-      if (grid.isDestroyed()) return
-      if (added.length > 0) toContent(grid, added)
-      fit()
-    }, 0)
-  }, [api, arranged, widths, shown, fit, toContent])
+    sizeColumns(added)
+  }, [arranged, widths, sizeColumns])
 
-  return { sizeOnce, sizeWaiting }
+  return { sizeOnce, sizeWaiting, sizeColumns }
 }

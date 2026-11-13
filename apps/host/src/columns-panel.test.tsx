@@ -254,9 +254,10 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
   // asked of the server or put in the address. Reset columns gives a width
   // back too. In jsdom a column's content is its header's floor, so
   // Narrower from it is at the end at once (to be watched failing in CI
-  // with B3, the panel's width set on the grid as AG Grid's own and never
-  // told: the header wider and nothing kept; and with B4, a column given
-  // back by Fit never sized again: Notes left at its kept width).
+  // with B2 of TEMPORARY (1/2), the panel's width set on the grid as AG
+  // Grid's own and never told: the header wider and nothing kept; and,
+  // apart, with B7 of TEMPORARY (2/2), a column given back by Fit never
+  // sized again: Notes left at its kept width).
   test('makes a column wider, narrower and fitted again from the keyboard', async () => {
     const user = await workspace(engine.formId)
     const labels = await labelsOf(engine.formId)
@@ -385,7 +386,7 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
       labels.filter((label) => label !== 'Carrier'),
     )
     expect(keptFor(childGrid('order'), engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
-    // A width set there is the child section's too (0151), kept with its columns.
+    // A width set there is the child section's too (0151), kept with its columns (to be watched failing in CI with B2 of TEMPORARY (1/2)).
     const first = String(labels[0])
     await press(user, within(columnList('Delivery')).getByRole('button', { name: `Make ${first} wider` }))
     await waitFor(() => expect(keptFor(childGrid('order'), engine.deliveries)?.widths).toHaveLength(1), ARRIVES)

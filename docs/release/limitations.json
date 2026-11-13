@@ -4319,7 +4319,7 @@
       ]
     },
     "0151": {
-      "reviewed": "sha256:75f34984633e1c1eb501102671547b0a941067e89372618597963a948c5bf7b5",
+      "reviewed": "sha256:8a5263921562538d020bab52935dd1e1b1e77bf4a04cd1563309a275c4fed537",
       "limitations": [
         {
           "area": "host",
@@ -4332,13 +4332,18 @@
         },
         {
           "area": "host",
-          "says": "Alt and an arrow on a header move its column two pixels a press and say nothing; Wider and Narrower at an end are not aria-disabled, and say the end when pressed; a double click on a header's edge does nothing.",
+          "says": "Alt and an arrow on a header move its column two pixels a press and say nothing; Wider and Narrower at an end are not aria-disabled, and say the end when pressed; a click or a double click on a header's edge changes nothing.",
           "heldBy": "apps/host/src/grid-widths.test.tsx"
         },
         {
           "area": "host",
           "says": "A column is never narrower than its header's longest word, so its cells may be cut, and never wider than 960 pixels; the page still sizes a column to at most 320.",
           "heldBy": "apps/host/src/widths.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The Columns panel has three more Tab stops for every column, Wider, Narrower and Fit, a hidden one's included.",
+          "heldBy": "apps/host/src/column-widths.test.tsx"
         },
         {
           "area": "host",

@@ -57,6 +57,19 @@ const SLACK = 4
 export const NARROWEST = 2 * PADDING + SLACK
 
 /**
+ * The face a header is drawn in, as a canvas names one: the grid theme's
+ * weight and size (grid-theme.ts), in the family its room variable holds
+ * where the page sets it -- the one place each is said. A canvas measures
+ * in a fallback face until the web font has loaded, so the grid measures
+ * its floors again once it has (use-fonts-loaded.ts).
+ */
+export function headerFace(): string {
+  const named = /^var\((--[\w-]+)\)$/.exec(ROOM_GRID.headerFontFamily)?.[1]
+  const family = named === undefined ? ROOM_GRID.headerFontFamily : getComputedStyle(document.documentElement).getPropertyValue(named).trim()
+  return `${String(ROOM_GRID.headerFontWeight)} ${String(ROOM_GRID.headerFontSize)}px ${family === '' ? 'sans-serif' : family}`
+}
+
+/**
  * The narrowest a column may be, by a drag, a press or its content: its
  * header's widest word, so a header wraps between words and never cuts one
  * (WCAG 1.4.12), with that criterion's letter spacing allowed for, the
@@ -69,8 +82,8 @@ export function headerFloor(label: string, sortable: boolean): number {
   // jsdom has no 2D canvas: the estimate stands there.
   const context = typeof CanvasRenderingContext2D === 'undefined' ? null : document.createElement('canvas').getContext('2d')
   if (context !== null) {
-    context.font = '600 13px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif'
-    widest = Math.max(...words.map((word) => context.measureText(word).width + word.length * 0.12 * 13))
+    context.font = headerFace()
+    widest = Math.max(...words.map((word) => context.measureText(word).width + word.length * 0.12 * ROOM_GRID.headerFontSize))
   }
   return Math.ceil(widest) + 2 * PADDING + (sortable ? SORT_ICON : 0) + SLACK
 }
@@ -127,6 +140,17 @@ export function withWidths(widths: readonly ColumnWidth[], changes: readonly Wid
     next = next.some((each) => each.field === field) ? next.map((each) => (each.field === field ? set : each)) : [...next, set]
   }
   return next
+}
+
+/**
+ * Of the widths a person's resize finished at, those that moved from the
+ * width their column had when it began (`settled`): a click on a header's
+ * edge -- AG Grid starts its resize on the press and tells the release as
+ * finished -- or Alt and an arrow at an end sets none. A column with no
+ * settled width is taken as moved.
+ */
+export function changedWidths(finished: readonly ColumnWidth[], settled: ReadonlyMap<string, number>): ColumnWidth[] {
+  return finished.filter(({ field, width }) => settled.get(field) !== width)
 }
 
 /** The width one press of Wider (1) or Narrower (-1) gives a column drawn `now`: one step, never past its floor or `WIDEST`. */

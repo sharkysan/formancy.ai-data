@@ -1,8 +1,8 @@
 import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm } from '@formancy/data-client'
 import type { GridColumn } from './grid-datasource.js'
 import { openingView, viewFiltering, viewMatching } from './views.js'
-import { offeredWidths, readWidths } from './widths.js'
-import type { ColumnWidth } from './widths.js'
+import { offeredWidths, readWidths, withWidths } from './widths.js'
+import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
  * A grid's columns as a person arranges them, and what one viewer's browser
@@ -248,4 +248,20 @@ export function withKept(stored: KeptGrid | null, ours: KeptGrid | null, ...chan
   const { view, sort } = from('list') ?? {}
   if (columns === undefined && widths === undefined && view === undefined && sort === undefined) return null
   return kept(columns, widths, view, sort)
+}
+
+/**
+ * The widths a section's change of widths leaves: the change made over the
+ * widths stored under its key, of the columns the form offers -- another
+ * section under the key, the same form at another level of Drill down, may
+ * have set or taken one away since this one opened; over the section's own
+ * where nothing is stored, or storage cannot be read.
+ */
+export function widthsAfter(
+  stored: KeptGrid | null,
+  own: readonly ColumnWidth[],
+  columns: readonly GridColumn[],
+  changes: readonly WidthChange[],
+): ColumnWidth[] {
+  return withWidths(stored === null ? own : offeredWidths(stored.widths ?? [], columns), changes)
 }

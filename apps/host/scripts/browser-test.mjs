@@ -107,12 +107,14 @@
 //     pressed, at the top too, where it does nothing; the row's Delete stays
 //     the last header; and Reset columns puts the form's order back with
 //     the keyboard on it;
-//   - a column's width (0151): a pointer's drag on a header's edge widens
-//     its column by as much as it moved, and a reload opens it at that
-//     width; dragged far, it stops at a floor where every word of its
-//     header is whole; Wider in Columns, from the keyboard, makes it wider
-//     than a phone's window, saying how wide, with nothing past either edge
-//     at 320 px, and Fit gives it back to its content, saying so;
+//   - a column's width (0151): a click and a double click on a header's
+//     edge keep nothing; a pointer's drag on it widens its column by as
+//     much as it moved, and a reload opens it at that width; a header of
+//     several words dragged far stops at a floor where each of its words is
+//     drawn whole on one line; Wider in Columns, from the keyboard, makes a
+//     column wider than a phone's window, saying how wide, with nothing past
+//     either edge at 320 px, and Fit gives it back to its content, saying
+//     so, and sizes a column nobody set to a longer value a search listed;
 //   - Drill down (0090): a customer, one of its orders and that order's
 //     line three levels down, the trail naming each; Tab reaches the
 //     trail's buttons in order, Enter on a crumb puts the keyboard on its
@@ -366,7 +368,7 @@ async function run(gate, browser) {
           ...columnsJourney(plane, gate, run),
           ...drillJourney(plane, gate, run),
           // After Drill down, which leaves Side by side, and before the list that goes on: its reload signs in again as the clerk.
-          ...widthsJourney(plane, gate),
+          ...widthsJourney(plane, gate, run),
           ...moreJourney(plane, gate),
         ]) {
           await act(page)
