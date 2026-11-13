@@ -455,7 +455,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // A kept width given back is sized as the section draws it; a column with none is sized here, to the rows shown now.
         const kept = new Set(latest.current.widths.map((each) => each.field))
         const never = fitted.map((change) => change.field).filter((field) => !kept.has(field))
-        if (never.length > 0) sizeColumns(never.filter((field) => kept.has(field)))
+        if (never.length > 0) sizeColumns(never)
       },
     }),
     [sizeColumns],

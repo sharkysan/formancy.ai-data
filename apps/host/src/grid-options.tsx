@@ -252,7 +252,7 @@ export function columnDefsOf(
       sortable: column.sortable,
       unSortIcon: column.sortable,
       hide: !column.shown,
-      resizable: false,
+      resizable: true,
       minWidth: floors.get(column.key) ?? headerFloor(column.label, column.sortable),
       maxWidth: WIDEST,
       // A width kept is the column's when it is made, and only then: drawn
@@ -302,7 +302,7 @@ export function drawWidths(grid: GridApi<GridRow>, widths: readonly ColumnWidth[
   grid.setColumnWidths(
     widths.map(({ field, width }) => ({ key: field, newWidth: width })),
     true,
-    'api',
+    'uiColumnResized',
   )
 }
 
