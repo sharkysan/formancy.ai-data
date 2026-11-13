@@ -144,7 +144,8 @@ export function startsAtConstant(kind: Kind): boolean {
 
 /** What the codec of `column` is handed for `constant`: the value the database stores for it, or `undefined` where none is read (`READERS`). */
 function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
-  return READERS.get(column.type.kind)?.(kind, constant, column.type)
+  const read = READERS.get(column.type.kind)
+  return typeof read === 'function' ? read(kind, constant, column.type) : undefined
 }
 
 /** A value as a note says it: quoted, as the generator's other sentences quote one, so blanks are seen and a value ends where its quote does. */
