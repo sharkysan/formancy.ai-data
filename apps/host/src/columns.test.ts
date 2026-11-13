@@ -8,9 +8,10 @@ import type { GridColumn } from './grid-datasource.js'
  * A grid's columns as a person arranges them, and what one viewer's browser
  * keeps of a grid (0106), as data: what a kept arrangement becomes over the
  * columns a form offers now, which values the reader takes, what is written
- * for a view, a sort and a filter of the person's own, and what a section
- * opens on. Pure; columns-panel.test.tsx and remembered.test.tsx hold the
- * page to the real server on both engines.
+ * for a view, a sort, a filter of the person's own and the widths a person
+ * set (0151), and what a section opens on. Pure; columns-panel.test.tsx,
+ * remembered.test.tsx and grid-keys.test.tsx hold the page to the real
+ * server on both engines.
  */
 
 const column = (key: string, label: string, sortable = true): GridColumn => ({ key, label, sortable, source: null })
@@ -92,8 +93,36 @@ describe('the value a browser keeps', () => {
       { version: 1, view: 'Large orders', sort: [{ field: 'id', direction: 'asc' }] },
       { version: 1, columns: [choice('id')], sort: [{ field: 'amount', direction: 'asc' }] },
       { version: 1, sort: [] },
+      { version: 1, widths: [{ field: 'notes', width: 480 }] },
+      { version: 1, columns: [choice('notes'), choice('id', false)], widths: [{ field: 'id', width: 120 }], view: 'Large orders' },
     ]
     for (const value of values) expect(parseKept(JSON.stringify(value))).toEqual(value)
+  })
+
+  // A value kept before a person could set a width (0106) holds none, and
+  // is read as it was written: the columns, the view and the sort a person
+  // chose then are theirs still (watched failing with the reader asking
+  // for widths: every such value read as nothing kept).
+  test('reads a value kept before widths were, as before', () => {
+    const before = '{"version":1,"columns":[{"field":"notes","shown":true},{"field":"id","shown":false}],"view":"Large orders"}'
+    expect(parseKept(before)).toEqual({ version: 1, columns: [choice('notes'), choice('id', false)], view: 'Large orders' })
+  })
+
+  // A width the reader would not take -- a negative, a fraction, a number
+  // in a string, past the widest -- is dropped, and the rest of the value
+  // is read: a width is the least of what is kept, and a ceiling a later
+  // release moves must not cost a person their columns and their view
+  // (watched failing with a bad width refusing the whole value, as any
+  // other part does: nothing kept).
+  test('drops a width it would not take, and reads the rest', () => {
+    const bad = '[{"field":"notes","width":-40},{"field":"amount","width":152.5},{"field":"id","width":"120"},{"field":"id","width":99999}]'
+    expect(parseKept(`{"version":1,"view":"Large orders","widths":${bad}}`)).toEqual({ version: 1, view: 'Large orders' })
+    expect(parseKept('{"version":1,"sort":[],"widths":"wide"}')).toEqual({ version: 1, sort: [] })
+    expect(parseKept('{"version":1,"columns":[{"field":"id","shown":true}],"widths":[{"field":"notes","width":480},{"field":"id","width":-3}]}')).toEqual({
+      version: 1,
+      columns: [choice('id')],
+      widths: [{ field: 'notes', width: 480 }],
+    })
   })
 
   // Anything else -- another release's, a hand edit, a value cut short --
@@ -132,6 +161,7 @@ describe('what is written for a list', () => {
     choices: defaultChoices(COLUMNS),
     filter,
     sort,
+    widths: [],
     columnsKept: false,
     listKept: true,
     ...kept,
@@ -188,6 +218,18 @@ describe('what is written for a list', () => {
     })
     expect(keptOf(state([], [], { columnsKept: false }), LIST.views)).toEqual({ version: 1, sort: [] })
   })
+
+  // A width is kept whatever else is: alone, it is the whole value, and
+  // with the columns and the list it sits beside them; with none, nothing
+  // is written for it (watched failing with the widths left out of what is
+  // written: { version: 1, sort: [] } for a person who widened Notes, and
+  // null when they had chosen nothing else).
+  test('keeps the widths a person set, alone or beside the rest', () => {
+    const widths = [{ field: 'notes', width: 480 }]
+    expect(keptOf(state(NEWEST.filter, NEWEST.sort, { listKept: false, widths }), LIST.views)).toEqual({ version: 1, widths })
+    expect(keptOf(state([], [], { widths }), LIST.views)).toEqual({ version: 1, widths, sort: [] })
+    expect(keptOf(state(NEWEST.filter, NEWEST.sort, { listKept: false, widths: [] }), LIST.views)).toBeNull()
+  })
 })
 
 describe('what is written over what is stored', () => {
@@ -213,6 +255,21 @@ describe('what is written over what is stored', () => {
     expect(withKept(null, null, 'list')).toBeNull()
     expect(withKept(view, null, 'columns')).toEqual(view)
   })
+
+  // A width set in one section is a part of its own: it keeps the columns
+  // and the view another section under the key kept since, and they keep
+  // it; Reset columns changes the columns and the widths together, so both
+  // go (watched failing with the widths written as the columns' part: the
+  // width a section set never written over what another had kept).
+  test('a width is a part of its own, and Reset columns changes both', () => {
+    const widths: KeptGrid = { version: 1, widths: [{ field: 'notes', width: 480 }] }
+    const all: KeptGrid = { ...columns, ...view, ...widths }
+    expect(withKept({ ...columns, ...view }, widths, 'widths')).toEqual(all)
+    expect(withKept(all, { version: 1, sort: [] }, 'list')).toEqual({ ...columns, ...widths, sort: [] })
+    expect(withKept(all, { version: 1, columns: [choice('id')] }, 'columns')).toEqual({ ...all, columns: [choice('id')] })
+    expect(withKept(all, null, 'columns', 'widths')).toEqual(view)
+    expect(withKept(widths, null, 'widths')).toBeNull()
+  })
 })
 
 describe('what a section opens on', () => {
@@ -221,7 +278,38 @@ describe('what a section opens on', () => {
   // default the administrator chose away from every person who never
   // chose another (watched failing with the first view taken).
   test('opens on the default view when nothing is kept', () => {
-    expect(openGrid(null, COLUMNS, LIST)).toEqual({ choices: defaultChoices(COLUMNS), filter: [], sort: NEWEST.sort, columnsKept: false, listKept: false })
+    expect(openGrid(null, COLUMNS, LIST)).toEqual({
+      choices: defaultChoices(COLUMNS),
+      filter: [],
+      sort: NEWEST.sort,
+      widths: [],
+      columnsKept: false,
+      listKept: false,
+    })
+  })
+
+  // Kept widths open with the section, those of a field the form no longer
+  // offers dropped, as a kept column is (mergeChoices); a width is neither
+  // an arrangement of the columns nor a list, so the form's order and its
+  // default view stay the form's (watched failing with the widths never
+  // read into the section: [] where Notes was kept at 480; and with a gone
+  // field's width kept: "status" among them).
+  test('opens on the kept widths of the columns still offered', () => {
+    const kept: KeptGrid = {
+      version: 1,
+      widths: [
+        { field: 'status', width: 200 },
+        { field: 'notes', width: 480 },
+      ],
+    }
+    expect(openGrid(kept, COLUMNS, LIST)).toEqual({
+      choices: defaultChoices(COLUMNS),
+      filter: [],
+      sort: NEWEST.sort,
+      widths: [{ field: 'notes', width: 480 }],
+      columnsKept: false,
+      listKept: false,
+    })
   })
 
   // A view kept by a name still offered is that view; one no longer

@@ -6,10 +6,27 @@ import { listsSent } from './test-filter.js'
 import { ORDER_VIEWS, VIEWED } from './test-forms.js'
 import { answeredOnce, chooseForm, dataCell, gridSection, gridStatus, load, mount, showChild, signIn, stamp } from './test-host.js'
 import type { User } from './test-host.js'
-import { childGrid, columnsButton, headed, headers, keptFor, listed, moveButton, openColumns, RECORDS_GRID, showBox } from './test-columns.js'
+import {
+  childGrid,
+  columnList,
+  columnsButton,
+  columnsSaid,
+  headed,
+  headers,
+  headerWidth,
+  keptFor,
+  listed,
+  moveButton,
+  openColumns,
+  RECORDS_GRID,
+  showBox,
+  steadyWidth,
+  widthButton,
+} from './test-columns.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 import { fieldHeading } from '@formancy/data-client'
+import { WIDTH_STEP } from './widths.js'
 
 /*
  * A grid's Columns on the host page (0106), on both engines, against the
@@ -18,15 +35,19 @@ import { fieldHeading } from '@formancy/data-client'
  * moved from the keyboard, the grid's headers following and nothing asked
  * of the server; the last column shown kept, and saying why; Reset columns
  * putting the form's order back and forgetting the person's; a view on a
- * hidden column listing in one request; and a child section's Columns its
- * own, without its parent's field. Every state is held to axe at WCAG 2.2
- * AA and to a name on every control. What a reload brings back is
- * remembered.test.tsx's.
+ * hidden column listing in one request; a child section's Columns its
+ * own, without its parent's field; and a column made wider, narrower and
+ * fitted to its content again from the keyboard (0151), the header
+ * following, the width kept and each press said. Every state is held to
+ * axe at WCAG 2.2 AA and to a name on every control. What a reload brings
+ * back is remembered.test.tsx's, and grid-keys.test.tsx's for a width.
  *
  * Found by role and accessible name (formancy.ai 0034): Columns a button,
  * the panel's list named by it, each column's Show a checkbox and its moves
- * buttons, and the grid's headers columnheaders. A hidden column draws no
- * header.
+ * and its width's buttons, the panel's line a status Columns names, and the
+ * grid's headers columnheaders. A hidden column draws no header. A
+ * header's width is read from the style AG Grid draws it with, which no
+ * role or name says (test-columns.ts's `headerWidth`).
  */
 
 let plane: Plane
@@ -226,6 +247,62 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
     expect(within(gridSection('Records')).queryByText('One column stays shown: a row is opened through its cells.')).toBeNull()
   })
 
+  // Wider and Narrower move a column a step from the keyboard and Fit gives
+  // it back to its content: the header follows each, the keyboard stays on
+  // the button pressed, the panel says what was done -- an end too, where
+  // nothing moves -- the browser keeps the width, then none, and nothing is
+  // asked of the server or put in the address. Reset columns gives a width
+  // back too. In jsdom a column's content is its header's floor, so
+  // Narrower from it is at the end at once (to be watched failing in CI
+  // with B3, the panel's width set on the grid as AG Grid's own and never
+  // told: the header wider and nothing kept; and with B4, a column given
+  // back by Fit never sized again: Notes left at its kept width).
+  test('makes a column wider, narrower and fitted again from the keyboard', async () => {
+    const user = await workspace(engine.formId)
+    const labels = await labelsOf(engine.formId)
+    await headed('Records', [...labels, 'Delete'])
+    await openColumns(user, 'Records')
+    const content = await steadyWidth('Records', 'Notes')
+    const before = window.location.href
+    plane.sent.length = 0
+
+    await press(user, widthButton('Records', 'Notes', 'wider'))
+    await press(user, widthButton('Records', 'Notes', 'wider'))
+    const wide = content + 2 * WIDTH_STEP
+    await waitFor(() => expect(headerWidth('Records', 'Notes')).toBe(wide), ARRIVES)
+    expect(columnsSaid('Records')).toBe(`Notes is ${String(wide)} pixels wide.`)
+    expect(focusedName()).toBe('Make Notes wider')
+    await waitFor(() => expect(keptFor(RECORDS_GRID, engine.formId)?.widths).toEqual([{ field: 'notes', width: wide }]), ARRIVES)
+    expect(await floor('a column made wider')).toEqual(CLEAN('a column made wider'))
+
+    await press(user, widthButton('Records', 'Notes', 'narrower'))
+    await press(user, widthButton('Records', 'Notes', 'narrower'))
+    await waitFor(() => expect(headerWidth('Records', 'Notes')).toBe(content), ARRIVES)
+    expect(columnsSaid('Records')).toBe(`Notes is ${String(content)} pixels wide.`)
+    await press(user, widthButton('Records', 'Notes', 'narrower'))
+    expect(columnsSaid('Records')).toBe(`Notes is as narrow as its header lets it be: ${String(content)} pixels.`)
+    expect(focusedName()).toBe('Make Notes narrower')
+
+    await press(user, widthButton('Records', 'Notes', 'wider'))
+    await waitFor(() => expect(headerWidth('Records', 'Notes')).toBe(content + WIDTH_STEP), ARRIVES)
+    await press(user, widthButton('Records', 'Notes', 'fit'))
+    await waitFor(() => expect(headerWidth('Records', 'Notes')).toBe(content), ARRIVES)
+    expect(columnsSaid('Records')).toBe('Notes is sized to its content.')
+    expect(focusedName()).toBe('Fit Notes to its content')
+    expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
+    expect(await floor('a column fitted to its content')).toEqual(CLEAN('a column fitted to its content'))
+
+    const amount = headerWidth('Records', 'Amount')
+    await press(user, widthButton('Records', 'Amount', 'wider'))
+    await waitFor(() => expect(headerWidth('Records', 'Amount')).toBe(amount + WIDTH_STEP), ARRIVES)
+    await waitFor(() => expect(keptFor(RECORDS_GRID, engine.formId)?.widths?.map((each) => each.field)).toEqual(['amount']), ARRIVES)
+    await press(user, within(gridSection('Records')).getByRole('button', { name: 'Reset columns' }))
+    await waitFor(() => expect(headerWidth('Records', 'Amount')).toBe(amount), ARRIVES)
+    expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
+    expect(asked(engine.formId)).toEqual([])
+    expect(window.location.href).toBe(before)
+  })
+
   // Reset columns puts back the form's order with every column shown, and
   // forgets the person's columns while the list they chose stays kept
   // (watched failing with Reset columns removing the whole value: the
@@ -308,6 +385,10 @@ describe.each(ENGINES)("a grid's Columns on $engine", (engine) => {
       labels.filter((label) => label !== 'Carrier'),
     )
     expect(keptFor(childGrid('order'), engine.deliveries)?.columns?.find((column) => column.field === 'carrier')).toEqual({ field: 'carrier', shown: false })
+    // A width set there is the child section's too (0151), kept with its columns.
+    const first = String(labels[0])
+    await press(user, within(columnList('Delivery')).getByRole('button', { name: `Make ${first} wider` }))
+    await waitFor(() => expect(keptFor(childGrid('order'), engine.deliveries)?.widths).toHaveLength(1), ARRIVES)
     expect(keptFor(RECORDS_GRID, engine.formId)).toBeNull()
     expect(headers('Records')).toContain('Notes')
     expect(await floor('a child section’s columns')).toEqual(CLEAN('a child section’s columns'))

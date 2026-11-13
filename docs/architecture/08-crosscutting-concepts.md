@@ -425,7 +425,10 @@ user interface is the rule, and this is what each part of it rests on.
   styling, and a control is operable without a theme
   ([formancy.ai 0101](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0101-a-control-is-operable-without-a-theme.md)).
 - **Keyboard first**: every drag has a keyboard path
-  ([formancy.ai 0046](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0046-keyboard-before-drag.md)).
+  ([formancy.ai 0046](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0046-keyboard-before-drag.md)):
+  a grid header's edge, which a pointer drags, has the Columns panel's
+  Wider, Narrower and Fit, named for the column
+  ([0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
   A delete is said before it happens: the studio says before publication who
   may delete and what a delete also does
   ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),

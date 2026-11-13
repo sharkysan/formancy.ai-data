@@ -1,4 +1,5 @@
 import { ROW_HEIGHT } from './grid-theme.js'
+import type { ColumnWidth } from './widths.js'
 
 /*
  * When a grid sizes its columns to the rows it shows (0047). AG Grid sizes
@@ -7,8 +8,9 @@ import { ROW_HEIGHT } from './grid-theme.js'
  * longest word, and kept it, since paging never sizes again. A grid in a
  * tab another hides (0142), in Separate views' hidden view or on a Drill
  * down level not shown, so sizes only where it is drawn, and otherwise
- * owes the size, which it pays when it is shown. And how tall a grid's well
- * is for the rows its page holds (`wellHeight`).
+ * owes the size, which it pays when it is shown. A column whose width a
+ * person set is never sized (`sizedToContent`, 0151). And how tall a grid's
+ * well is for the rows its page holds (`wellHeight`).
  */
 
 /** What a grid knows of its page and its columns. */
@@ -39,6 +41,15 @@ export function sizing(state: SizeState, want: SizeWant, hidden: boolean): { siz
   if (want === 'page' && state.sized) return keep
   if (hidden) return { size: false, owed: true }
   return { size: true, owed: want === 'added' ? state.owed : false }
+}
+
+/**
+ * Which of `columns` the grid sizes to their content: every one but those
+ * whose width a person set (0151), which keep it whatever asks for a size.
+ */
+export function sizedToContent(columns: readonly string[], widths: readonly ColumnWidth[]): string[] {
+  const kept = new Set(widths.map((each) => each.field))
+  return columns.filter((column) => !kept.has(column))
 }
 
 /**

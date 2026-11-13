@@ -316,7 +316,17 @@ under reduced motion; and when the demo's controls are not one closed
 disclosure where a person arrives, which Enter changes with the keyboard
 staying on it
 (`apps/host/scripts/browser/waiting.mjs`,
-[0146](../decisions/0146-the-page-says-what-the-server-did.md)).
+[0146](../decisions/0146-the-page-says-what-the-server-did.md)). It
+fails when a pointer's drag on a grid header's edge does not widen its
+column by as much as the pointer moved, or a reload does not open it at
+that width; when a column dragged far does not stop at a floor where every
+word of its header is whole; and when Wider in Columns, from the
+keyboard, does not grow the column a step a press, saying how wide, or Fit
+does not give it back to its content -- AG Grid reads a drag from where
+things are drawn, which jsdom draws nowhere, so the host's
+`grid-widths.test.tsx` holds what AG Grid draws and tells without one
+(`apps/host/scripts/browser/widths.mjs`,
+[0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

@@ -1,20 +1,23 @@
 import { useMemo, useRef, useState } from 'react'
 import type { ListFilterTerm, ListSortTerm, PublishedForm } from '@formancy/data-client'
 import { defaultChoices, keptOf, openGrid, parseKept, withKept } from './columns.js'
-import type { ColumnChoice, GridState } from './columns.js'
+import type { ColumnChoice, GridState, KeptPart } from './columns.js'
 import type { GridColumn } from './grid-datasource.js'
 import { browserStorage, gridKey, readPreference, removePreference, writePreference } from './prefs.js'
 import type { GridSection } from './prefs.js'
+import { withWidths } from './widths.js'
+import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
  * A section's grid as the section holds it (0104, 0105, 0106): the filter
- * its panel applied, the sort its view or its headers gave it, and its
- * columns as the person arranged them. The Records panel holds one, and
- * every child section its own.
+ * its panel applied, the sort its view or its headers gave it, its columns
+ * as the person arranged them, and the widths they set, by a header's edge
+ * or the Columns panel (0151). The Records panel holds one, and every child
+ * section its own.
  *
  * It opens on what this browser kept for the form and the section
  * (columns.ts's `openGrid`), and every change is kept as it is made --
- * columns, filter or sort, through prefs.ts's wrapped calls, so a browser
+ * columns, widths, filter or sort, through prefs.ts's wrapped calls, so a browser
  * that keeps nothing changes nothing here -- the part changed written over
  * what is stored, the other left as it is (`withKept`). Kept in the change itself, not
  * after a render: an opening writes nothing, and a list nobody chose is
@@ -26,6 +29,8 @@ export interface SectionGrid {
   filter: ListFilterTerm[]
   sort: ListSortTerm[]
   choices: ColumnChoice[]
+  /** The widths the person set; a column with none is sized to its content. */
+  widths: ColumnWidth[]
   /** The filter applied, by its line, a chip, a header's box or a cell (0131-0133). */
   setFilter: (filter: ListFilterTerm[]) => void
   /** A header sorted by the person. */
@@ -34,7 +39,9 @@ export interface SectionGrid {
   pick: (filter: ListFilterTerm[], sort: ListSortTerm[]) => void
   /** A column shown, hidden or moved. */
   setChoices: (choices: ColumnChoice[]) => void
-  /** The form's order, every column shown, and no columns kept any more; a list kept stays kept. */
+  /** A column's width set by a header's edge or the panel, or taken away by Fit (0151). */
+  setWidths: (changes: readonly WidthChange[]) => void
+  /** The form's order, every column shown and sized to its content, and no columns or widths kept any more; a list kept stays kept. */
   resetChoices: () => void
 }
 
@@ -59,10 +66,10 @@ export function useGridState({
 
   // Only the part changed is written over what is stored: another section
   // under this key may have kept the other part since this one opened.
-  const change = (patch: Partial<GridState>, part: 'columns' | 'list'): void => {
+  const change = (patch: Partial<GridState>, ...parts: KeptPart[]): void => {
     const next = { ...now.current, ...patch }
     now.current = next
-    const kept = withKept(parseKept(readPreference(storage, key)), keptOf(next, list?.views ?? []), part)
+    const kept = withKept(parseKept(readPreference(storage, key)), keptOf(next, list?.views ?? []), ...parts)
     if (kept === null) removePreference(storage, key)
     else writePreference(storage, key, JSON.stringify(kept))
     setState(next)
@@ -72,10 +79,12 @@ export function useGridState({
     filter: state.filter,
     sort: state.sort,
     choices: state.choices,
+    widths: state.widths,
     setFilter: (filter) => change({ filter, listKept: true }, 'list'),
     setSort: (sort) => change({ sort, listKept: true }, 'list'),
     pick: (filter, sort) => change({ filter, sort, listKept: true }, 'list'),
     setChoices: (choices) => change({ choices, columnsKept: true }, 'columns'),
-    resetChoices: () => change({ choices: defaultChoices(columns), columnsKept: false }, 'columns'),
+    setWidths: (changes) => change({ widths: withWidths(now.current.widths, changes) }, 'widths'),
+    resetChoices: () => change({ choices: defaultChoices(columns), columnsKept: false, widths: [] }, 'columns', 'widths'),
   }
 }

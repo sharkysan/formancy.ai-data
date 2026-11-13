@@ -326,7 +326,13 @@ line (0059).
    viewer's browser kept for the form -- a view by name, or a sort -- else
    on the view marked `default`, when it is offered (0105), with the
    columns that browser kept shown and in its order
-   ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+   ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)),
+   and at the widths a person set there -- by a header's edge, by Alt and
+   an arrow on it, or by the Columns panel's Wider, Narrower and Fit --
+   which AG Grid tells the section as `uiColumnResized`, the section keeps
+   in the same value, the grid draws when it makes each column, and the
+   page's sizing to the content never sizes
+   ([0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
    The picker offers the person's own views, `list.own`, under "Your
    views"; while the filter and the sort are their own, Save your view
    sends them, named, in `POST /v1/forms/:id/views/save`, and while one of

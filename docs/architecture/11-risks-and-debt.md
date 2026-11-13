@@ -286,8 +286,14 @@ A grid's columns, sort and view are kept by the viewer's browser, not the
 person: they follow nobody to another device, everybody signed in on one
 browser shares them, every child section of one form under one field
 shares one arrangement, and a person's own filter conditions are never kept; a
-hidden column is still read, and its width is still its content's
+hidden column is still read
 ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+A column's width a person sets is the browser's too, and in no view of
+theirs; a release before it reads a value holding one as nothing kept;
+Alt and an arrow on a header move a column two pixels a press and say
+nothing; and the resize handle AG Grid draws between the headers is not
+measured for contrast
+([0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
 A person's own views are kept by the server, in the configuration store,
 so a backup of it holds them and nothing removes them but the person, one
 the host no longer knows included; under a hash of the token's subject,

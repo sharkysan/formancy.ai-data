@@ -202,6 +202,7 @@ export function Records({
             definition={definition}
             columns={columns}
             choices={state.choices}
+            widths={state.widths}
             labelledBy="records-heading"
             parent={null}
             search={search}
@@ -223,7 +224,15 @@ export function Records({
                   named={viewName(filter, filterable)}
                   onRemove={mine.remove}
                 />
-                <ColumnsPanel idBase="records-columns" columns={columns} choices={state.choices} onChoices={state.setChoices} onReset={state.resetChoices} />
+                <ColumnsPanel
+                  idBase="records-columns"
+                  columns={columns}
+                  choices={state.choices}
+                  onChoices={state.setChoices}
+                  onReset={state.resetChoices}
+                  measure={(field) => grid.current?.widthOf(field) ?? null}
+                  onWidths={(changes) => grid.current?.setWidths(changes)}
+                />
                 {!panelShown(filterable, filter) ? null : (
                   <GridFilter
                     idBase="records-filter"
@@ -246,6 +255,7 @@ export function Records({
             drilling={drilling}
             onOpen={onOpen}
             onSort={state.setSort}
+            onWidths={state.setWidths}
             onFiltered={setUnmatched}
             onClearSearch={() => {
               setTyped('')
