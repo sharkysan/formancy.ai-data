@@ -1,13 +1,16 @@
 import type { ListFilterTerm, ListSortTerm, ListView, PublishedForm } from '@formancy/data-client'
 import type { GridColumn } from './grid-datasource.js'
 import { openingView, viewFiltering, viewMatching } from './views.js'
+import { offeredWidths, readWidths, withWidths } from './widths.js'
+import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
  * A grid's columns as a person arranges them, and what one viewer's browser
  * keeps of a grid (0106), as data: the columns' order and which are shown,
- * and the list the grid shows. columns-panel.tsx is where a person changes
- * the columns, use-grid-state.ts where a section holds them and keeps them,
- * and record-grid.tsx where the grid draws them.
+ * the widths a person set (widths.ts, 0151), and the list the grid shows.
+ * columns-panel.tsx is where a person changes the columns, use-grid-state.ts
+ * where a section holds them and keeps them, and record-grid.tsx where the
+ * grid draws them.
  *
  * A hidden column is hidden, never removed: the grid keeps it, with its
  * sort, so a view or a kept sort on a column nobody sees is still one the
@@ -80,17 +83,21 @@ export function showChoice(choices: readonly ColumnChoice[], field: string, show
 
 /**
  * What one viewer's browser keeps of a form's grid in one section: the
- * person's columns, when they arranged them, and the list, when they chose
- * one -- a view by its name, its own sort with it or the person's in its
- * place; or a sort with no view, where `[]` is every record, whatever the
- * form's default view is.
+ * person's columns, when they arranged them; the widths they set, when they
+ * set any (0151); and the list, when they chose one -- a view by its name,
+ * its own sort with it or the person's in its place; or a sort with no
+ * view, where `[]` is every record, whatever the form's default view is.
  */
 export interface KeptGrid {
   version: 1
   columns?: ColumnChoice[]
+  widths?: ColumnWidth[]
   view?: string
   sort?: ListSortTerm[]
 }
+
+/** The parts of what is kept that a section changes one at a time (`withKept`). */
+export type KeptPart = 'columns' | 'widths' | 'list'
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
 
@@ -113,7 +120,9 @@ const isSortTerm = (value: unknown): value is ListSortTerm =>
  * The value kept, read: null for anything but exactly `KeptGrid` -- another
  * release's, a hand edit, text that is not JSON, a field named twice --
  * which is then as if nothing were kept, so the grid opens as the form
- * gives it.
+ * gives it. But a width: one the reader would not take is dropped alone,
+ * and the rest read (`readWidths`); a value kept before widths were holds
+ * none, and reads as it did.
  */
 export function parseKept(text: string | null): KeptGrid | null {
   if (text === null) return null
@@ -123,19 +132,36 @@ export function parseKept(text: string | null): KeptGrid | null {
   } catch {
     return null
   }
-  if (!isRecord(value) || value['version'] !== 1 || !only(value, ['version', 'columns', 'view', 'sort'])) return null
+  if (!isRecord(value) || value['version'] !== 1 || !only(value, ['version', 'columns', 'widths', 'view', 'sort'])) return null
   const { columns, view, sort } = value
   if (columns !== undefined && !(Array.isArray(columns) && columns.every(isChoice) && distinct(columns.map((choice) => choice.field)))) return null
   if (view !== undefined && !(typeof view === 'string' && view !== '')) return null
   if (sort !== undefined && !(Array.isArray(sort) && sort.every(isSortTerm) && distinct(sort.map((term) => term.field)))) return null
-  return { version: 1, ...(columns === undefined ? {} : { columns }), ...(view === undefined ? {} : { view }), ...(sort === undefined ? {} : { sort }) }
+  return kept(columns, readWidths(value['widths']), view, sort)
 }
 
-/** A section's grid: its columns, its filter and its sort, and whether the columns and the list are the person's own -- kept, so kept again with the next change -- or the form's. */
+/** A kept value of the parts given, each left out where there is none: no widths is none kept. */
+function kept(columns: ColumnChoice[] | undefined, widths: ColumnWidth[] | undefined, view: string | undefined, sort: ListSortTerm[] | undefined): KeptGrid {
+  return {
+    version: 1,
+    ...(columns === undefined ? {} : { columns }),
+    ...(widths === undefined || widths.length === 0 ? {} : { widths }),
+    ...(view === undefined ? {} : { view }),
+    ...(sort === undefined ? {} : { sort }),
+  }
+}
+
+/**
+ * A section's grid: its columns, its filter and its sort, the widths the
+ * person set -- none is every column sized to its content -- and whether
+ * the columns and the list are the person's own -- kept, so kept again with
+ * the next change -- or the form's.
+ */
 export interface GridState {
   choices: ColumnChoice[]
   filter: ListFilterTerm[]
   sort: ListSortTerm[]
+  widths: ColumnWidth[]
   columnsKept: boolean
   listKept: boolean
 }
@@ -143,7 +169,7 @@ export interface GridState {
 /**
  * What a section opens on, from what was kept and what the form offers now
  * (`list`): the kept columns over the form's (`mergeChoices`), or the
- * form's; and the list --
+ * form's; the kept widths of the columns it still offers; and the list --
  *
  * - a kept view still offered by that name: its conditions, and its sort or
  *   the kept one;
@@ -158,7 +184,10 @@ export interface GridState {
  */
 export function openGrid(kept: KeptGrid | null, columns: readonly GridColumn[], list: PublishedForm['list']): GridState {
   const merged = kept?.columns === undefined ? null : mergeChoices(kept.columns, columns)
-  const arranged = merged === null ? { choices: defaultChoices(columns), columnsKept: false } : { choices: merged, columnsKept: true }
+  const arranged = {
+    ...(merged === null ? { choices: defaultChoices(columns), columnsKept: false } : { choices: merged, columnsKept: true }),
+    widths: offeredWidths(kept?.widths ?? [], columns),
+  }
   const sortable = new Set(list?.sortable ?? [])
   const sort = kept?.sort?.filter((term) => sortable.has(term.field))
   const views = list?.views ?? []
@@ -186,27 +215,53 @@ function listOf(state: GridState, views: readonly ListView[]): Pick<KeptGrid, 'v
 
 /**
  * What is kept of a section's grid in `state`, or null for nothing: its
- * columns when they are the person's, and its list when that is
- * (`listOf`).
+ * columns when they are the person's, the widths they set, and its list
+ * when that is (`listOf`).
  */
 export function keptOf(state: GridState, views: readonly ListView[]): KeptGrid | null {
-  if (!state.columnsKept && !state.listKept) return null
-  const columns = state.columnsKept ? { columns: state.choices.map(({ field, shown }) => ({ field, shown })) } : {}
-  return { version: 1, ...columns, ...(state.listKept ? listOf(state, views) : {}) }
+  if (!state.columnsKept && !state.listKept && state.widths.length === 0) return null
+  const columns = state.columnsKept ? state.choices.map(({ field, shown }) => ({ field, shown })) : undefined
+  const { view, sort } = state.listKept ? listOf(state, views) : {}
+  return kept(
+    columns,
+    state.widths.map(({ field, width }) => ({ field, width })),
+    view,
+    sort,
+  )
 }
 
 /**
- * What to write when a section changes one part of its grid -- its
- * `columns` or its `list` -- over what is `stored` under its key: that part
- * as the section has it now (`ours`), the other as stored. A section reads
+ * What to write when a section changes parts of its grid -- its `columns`,
+ * its `widths` or its `list`; Reset columns changes the columns and the
+ * widths together -- over what is `stored` under its key: those parts as
+ * the section has them now (`ours`), the others as stored. A section reads
  * storage only when it opens, so another on screen under the same key --
  * a form that is its own child, at two levels of Drill down -- may have
- * kept the other part since, and a change of columns here must not undo a
- * view picked there. Null when neither part is left.
+ * kept another part since, and a change of columns here must not undo a
+ * view picked there, nor a width set here the columns arranged there. Null
+ * when no part is left.
  */
-export function withKept(stored: KeptGrid | null, ours: KeptGrid | null, changed: 'columns' | 'list'): KeptGrid | null {
-  const columns = (changed === 'columns' ? ours : stored)?.columns
-  const { view, sort } = (changed === 'list' ? ours : stored) ?? {}
-  if (columns === undefined && view === undefined && sort === undefined) return null
-  return { version: 1, ...(columns === undefined ? {} : { columns }), ...(view === undefined ? {} : { view }), ...(sort === undefined ? {} : { sort }) }
+export function withKept(stored: KeptGrid | null, ours: KeptGrid | null, ...changed: KeptPart[]): KeptGrid | null {
+  const from = (part: KeptPart): KeptGrid | null => (changed.includes(part) ? ours : stored)
+  const columns = from('columns')?.columns
+  const widths = from('widths')?.widths
+  const { view, sort } = from('list') ?? {}
+  if (columns === undefined && widths === undefined && view === undefined && sort === undefined) return null
+  return kept(columns, widths, view, sort)
+}
+
+/**
+ * The widths a section's change of widths leaves: the change made over the
+ * widths stored under its key, of the columns the form offers -- another
+ * section under the key, the same form at another level of Drill down, may
+ * have set or taken one away since this one opened; over the section's own
+ * where nothing is stored, or storage cannot be read.
+ */
+export function widthsAfter(
+  stored: KeptGrid | null,
+  own: readonly ColumnWidth[],
+  columns: readonly GridColumn[],
+  changes: readonly WidthChange[],
+): ColumnWidth[] {
+  return withWidths(stored === null ? own : offeredWidths(stored.widths ?? [], columns), changes)
 }

@@ -925,6 +925,17 @@ them; it is this browser's, not yours on another device, and anyone else
 signed in on it shares it. A hidden column is still in Download CSV
 ([0106](./docs/decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 
+A column is as wide as you make it. Drag its header's edge, press Alt and
+an arrow on its header, or, in Columns, press its minus or plus, a step
+a press, which the panel's line says in pixels, and Fit to size it to
+the rows shown; Reset columns gives every column back to its content. A
+column is never narrower than its header's longest word, and has a
+widest. Your browser keeps the widths with the columns, so the next page,
+a reload and Drill down open at them, and the grid never sizes them away.
+Like the rest, they are this browser's, not yours on another device; a
+click or a double click on an edge changes nothing
+([0151](./docs/decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
+
 Download CSV, beside New record in the Records panel and beside each child
 section's New, saves one file of the records that grid lists, as the server
 makes it: the search you submitted, not what the box holds, the grid's

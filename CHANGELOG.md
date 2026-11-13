@@ -46,6 +46,28 @@ the same day (formancy.ai 0232).
   version that sets one, as `/fields/N/default is not a property of a
   field presentation`. A form published before gains nothing until it is
   edited and published again.
+- **A person sets a grid column's width, and the browser keeps it** (0151).
+  Why: a host grid's columns were sized to their content and nobody could
+  widen or narrow one, so a long text column the first page sized narrow,
+  or a wide one that pushed the rest out of view, could not be fixed. What
+  you notice: on the host page a field's column is resized by dragging its
+  header's edge, by Alt and an arrow on its header, which AG Grid already
+  took from the browser there, and in Columns by a minus and a plus,
+  drawn signs named Make it narrower and wider, a step a press said in
+  pixels on the panel's line, and Fit, which sizes the column to the rows
+  shown and keeps no width for it; Reset columns
+  gives back every width too. A column stops at its header's longest
+  word, measured once the page's fonts have loaded, and at a widest, and
+  the page still sizes a column to its content no wider than before. The
+  viewer's browser keeps each width in the value it keeps the columns,
+  sort and view in, under the same key, so the next page, a reload, Drill
+  down and a child section open at it, and the grid's sizing never takes
+  it away; a width set at one level of Drill down keeps the widths set at
+  another, and a width the browser would not take is dropped alone. A
+  click or a double click on an edge changes nothing. Nothing on the server, in
+  data-core or in the client changes. A release before this one reads a
+  kept value holding a width as nothing kept, so a rollback opens such a
+  viewer's grids on the form's columns and default view.
 - **A new record starts with its column's constant default** (0149). Why:
   a field whose column defaults to a constant started empty, and a create
   that left it so stored the database's default or, sent empty, NULL or a

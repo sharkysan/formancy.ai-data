@@ -8,7 +8,7 @@ import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
 import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STANDING_HELP, STARTED_AGAIN } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow, GridSource } from './grid-datasource.js'
-import { columnDefsOf, gridOptionsFor, headerSort, select } from './grid-options.js'
+import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, select } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import { filterByExample } from './cell-example.js'
@@ -19,9 +19,11 @@ import { Pager } from './pager.js'
 import type { Status } from './pager.js'
 import { wellHeight } from './grid-sizing.js'
 import { useGridSizing } from './use-grid-sizing.js'
+import { useHeaderFloors } from './use-header-floors.js'
 import { useHeldRows } from './use-held-rows.js'
 import type { HeldRows } from './use-held-rows.js'
 import { sameSort } from './views.js'
+import type { ColumnWidth, Measured, WidthChange } from './widths.js'
 
 export type { OpenHow, RowDelete } from './grid-options.js'
 export { DELETE_COLUMN } from './grid-options.js'
@@ -71,7 +73,12 @@ export { DELETE_COLUMN } from './grid-options.js'
  * the grid and asks nothing: the datasource and the options never depend
  * on them, and the open row's bar and the keyboard's way into the grid
  * follow the first column shown. A column shown again is sized to the
- * rows on the page, as the first page sized the rest.
+ * rows on the page, as the first page sized the rest. And so are their
+ * widths (0151): one the person sets -- on a header, or in the Columns
+ * panel, which sets it here (`setWidths`) -- is told to the section, one
+ * the section keeps is drawn when its column is made, and none is sized
+ * away (use-grid-sizing.ts); the panel reads a column's width here
+ * (`widthOf`).
  */
 
 /** Where a row was asked for from, so the keyboard can be given back there. */
@@ -93,6 +100,10 @@ export interface RecordGridHandle {
   say(line: Said): void
   /** A record gone from the grid: the page asked for again, and `line` said once, before its sentence. */
   removed(line: Said): void
+  /** A column as the grid draws it now -- its width and the least and most it may be -- or null where the grid has none (0151). */
+  widthOf(field: string): Measured | null
+  /** Widths the Columns panel set, drawn by the grid and told back as a drag's are; a width taken away -- Fit -- given to the section, and the column sized to the rows shown (0151). */
+  setWidths(changes: WidthChange[]): void
 }
 
 export interface RecordGridProps {
@@ -102,6 +113,8 @@ export interface RecordGridProps {
   columns: readonly GridColumn[]
   /** The section's arrangement of `columns`: their order, and which are shown (0106). */
   choices: readonly ColumnChoice[]
+  /** The widths the person set, which the grid draws when it makes a column and never sizes away (0151). */
+  widths: readonly ColumnWidth[]
   /** The heading that names the grid. */
   labelledBy: string
   /** A child grid's title: its sentences name its rows. The master has none. */
@@ -143,6 +156,8 @@ export interface RecordGridProps {
   onOpen(token: string, how: OpenHow, at: RowAt): void
   /** A header sorted by the person: the grid's sort now, in its order, for the section to hold as given -- the grid knows its own report by identity. */
   onSort(sort: ListSortTerm[]): void
+  /** A width the person set -- by a header's edge, Alt and an arrow, or the Columns panel -- for the section to keep (0151). */
+  onWidths(changes: WidthChange[]): void
   onClearSearch?: () => void
   /** Told whether the grid's first page came back with no rows under a filter: the section's filter offers a way out. */
   onFiltered?: (empty: boolean) => void
@@ -154,6 +169,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     formId,
     columns,
     choices,
+    widths,
     labelledBy,
     parent,
     search,
@@ -193,8 +209,6 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const ours = (from: GridSource): boolean => heldNow.current?.live(from) ?? true
   const [pager, setPager] = useState({ page: 0, hasMore: false })
   const shown = useRef({ rows: 0, loaded: false, sized: false, owed: false, quiet, retrying: false })
-  /** Columns shown while nothing was listed, waiting for a page with rows to be sized to (below). */
-  const unsized = useRef(new Set<string>())
   /** What a record gone from the grid says before the next page's sentence, once. */
   const removedLine = useRef<Said | null>(null)
   /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
@@ -235,7 +249,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
   }, [])
 
-  const { sizeOnce, sizeAdded } = useGridSizing({ api, well, shown, fit, refit })
+  const { sizeOnce, sizeWaiting, sizeColumns } = useGridSizing({ api, well, shown, fit, refit, arranged, widths })
 
   /**
    * The section's sort on the headers, where they show another: they follow
@@ -315,11 +329,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         fit()
         sizeOnce()
         // Columns shown while nothing was listed: sized to these rows, once they are drawn -- or, hidden, owed with the rest.
-        if (rows.length > 0 && unsized.current.size > 0) {
-          const waiting = [...unsized.current]
-          unsized.current.clear()
-          sizeAdded(waiting)
-        }
+        sizeWaiting(rows.length)
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
         // After `=`, the keyboard back on the row it was pressed on, or the first, in its column (0133).
@@ -367,7 +377,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         setTimeout(() => heldNow.current?.restart(), 0)
       },
     }),
-    [applySelection, fit, sizeOnce, sizeAdded],
+    [applySelection, fit, sizeOnce, sizeWaiting],
   )
 
   // A new search, another parent, another filter or another sort is a new
@@ -430,8 +440,25 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         removedLine.current = line
         if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
       },
+      widthOf(field) {
+        const grid = api.current
+        const column = grid === null || grid.isDestroyed() ? null : grid.getColumn(field)
+        return column === null ? null : { width: column.getActualWidth(), min: column.getMinWidth(), max: column.getMaxWidth() }
+      },
+      setWidths(changes) {
+        const grid = api.current
+        const set = changes.flatMap(({ field, width }) => (width === null ? [] : [{ field, width }]))
+        if (grid !== null && !grid.isDestroyed()) drawWidths(grid, set)
+        const fitted = changes.filter((change) => change.width === null)
+        if (fitted.length === 0) return
+        latest.current.onWidths(fitted)
+        // A kept width given back is sized as the section draws it; a column with none is sized here, to the rows shown now.
+        const kept = new Set(latest.current.widths.map((each) => each.field))
+        const never = fitted.map((change) => change.field).filter((field) => !kept.has(field))
+        if (never.length > 0) sizeColumns(never)
+      },
     }),
-    [],
+    [sizeColumns],
   )
 
   // A row's Delete reads the page's handler when pressed: the column is made once per noun.
@@ -449,14 +476,19 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     if (grid !== null && !grid.isDestroyed()) grid.setGridAriaProperty('describedby', describedBy)
   }, [describedBy])
   const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
+  // Each header's floor, measured again where the page's fonts loading changed one (0151).
+  const floors = useHeaderFloors(columns)
   const columnDefs = useMemo(
     () =>
       columnDefsOf(
         arranged,
         removeNoun === undefined ? undefined : { noun: removeNoun, press: (row) => latest.current.remove?.press(row) },
         new Set(boxedKeys === '' ? [] : boxedKeys.split('\n')),
+        // Read, not a dependency: a kept width is drawn when its column is made, and a width set since is the grid's already (0151).
+        latest.current.widths,
+        floors,
       ),
-    [arranged, removeNoun, boxedKeys],
+    [arranged, removeNoun, boxedKeys, floors],
   )
 
   // The header's height changes after the well is fitted -- its row of
@@ -470,31 +502,6 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     return () => observer.disconnect()
   }, [fit, boxedKeys])
 
-  // A column shown that was hidden when the page was sized: sized now, to
-  // the rows shown, and the well fitted to a header the change may have
-  // made taller or shorter. Shown while a page loads, or over a page with no
-  // rows, it waits in `unsized` for the next page that has some, which
-  // `answered` sizes it to: with nothing to size it to, it would keep AG
-  // Grid's width until the separator is let go, and Stacked has none.
-  const drawn = useRef(arranged)
-  useEffect(() => {
-    if (drawn.current === arranged) return
-    const before = new Set(drawn.current.filter((column) => column.shown).map((column) => column.key))
-    drawn.current = arranged
-    const added = arranged.filter((column) => column.shown && !before.has(column.key)).map((column) => column.key)
-    const grid = api.current
-    if (grid === null || grid.isDestroyed()) return
-    if (!shown.current.loaded || shown.current.rows === 0) {
-      for (const key of added) unsized.current.add(key)
-      if (shown.current.loaded) setTimeout(() => (grid.isDestroyed() ? undefined : fit()), 0)
-      return
-    }
-    setTimeout(() => {
-      if (grid.isDestroyed()) return
-      if (added.length > 0) grid.autoSizeColumns(added, true)
-      fit()
-    }, 0)
-  }, [arranged, fit])
   const options = useMemo(
     () =>
       gridOptionsFor({
@@ -519,6 +526,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
             told.current = now
             latest.current.onSort(now)
           },
+          widthsSet: (changes) => latest.current.onWidths(changes),
           resized: fit,
           asked: (row, how, rowIndex, colId) => {
             if (row === undefined) return

@@ -234,14 +234,20 @@ export async function paintedWhere(page, locate) {
 
 /**
  * A text axe called partially obscured, shown whole inside the pane that cuts
- * it, asked of axe again, and the pane put back: `passes`, a `violation` with
- * axe's ratio, or `left` with why it could not be shown. The pane is the
- * text's nearest ancestor that scrolls up and down, and only its own scroll
- * moves -- never the window's, never a grid's -- and only when the text's box
- * runs past the pane's edge and fits inside it, and the pane lies wholly in
- * the window. Its colours are the text's own and the pane's, which do not
- * change when the pane scrolls: a pane that scrolls inside itself stays where
- * it is drawn, so what lies behind its glass does not move. Anything else
+ * it, asked of axe again, and the pane and the window put back: `passes`, a
+ * `violation` with axe's ratio, or `left` with why it could not be shown.
+ * The pane is the text's nearest ancestor that scrolls up and down, and only
+ * when the text's box runs past the pane's edge and fits inside it. The
+ * pane's own scroll moves, never a grid's; the window's moves only where it
+ * cuts the pane, until the pane lies wholly in it, as a person scrolls to
+ * the pane before they scroll inside it. Side by side's Records panel is
+ * sticky and no taller than the window below its sticky top, so at the
+ * page's top it can reach below the window, where a text its edge cuts
+ * was left undecided until the window moved too (0151: the widths journey
+ * leaves the page near its top with Columns open, measured 2026-11-13 at
+ * 897 by 900 in Chromium, the panel from 307 to 1031). axe reads its
+ * colours from the styles of the elements stacked under the text, the
+ * text's own and the pane's, which neither scroll changes. Anything else
  * that covers part of a text is not this, and stays undecided.
  */
 async function reveal(page, at) {
@@ -253,15 +259,24 @@ async function reveal(page, at) {
     let pane = element.parentElement
     while (pane !== null && !/auto|scroll/.test(getComputedStyle(pane).overflowY)) pane = pane.parentElement
     if (pane === null) return { verdict: 'left', why: 'partially obscured, in no pane that scrolls' }
-    const frame = pane.getBoundingClientRect()
-    const top = frame.top + pane.clientTop
-    const bottom = top + pane.clientHeight
-    const box = element.getBoundingClientRect()
-    if (box.top >= top && box.bottom <= bottom) return { verdict: 'left', why: 'partially obscured, and not by the edge of its pane' }
-    if (box.height > pane.clientHeight || frame.top < 0 || frame.bottom > window.innerHeight)
-      return { verdict: 'left', why: 'cut by a pane it does not fit in, or one the window cuts' }
+    const [x, y] = [window.scrollX, window.scrollY]
     const before = pane.scrollTop
     try {
+      let frame = pane.getBoundingClientRect()
+      if ((frame.top < 0 || frame.bottom > window.innerHeight) && frame.height <= window.innerHeight) {
+        // Whole pixels, rounded past the edge: WebKit scrolls the window by
+        // whole pixels only, and a fraction short left the pane 0.89 of one
+        // below the window (measured 2026-11-13, 897 by 900, the pane from
+        // 176.89 to 900.89 after 126 of the 126.89 asked).
+        window.scrollBy(0, frame.top < 0 ? Math.floor(frame.top) : Math.ceil(frame.bottom - window.innerHeight))
+        frame = pane.getBoundingClientRect()
+      }
+      const top = frame.top + pane.clientTop
+      const bottom = top + pane.clientHeight
+      const box = element.getBoundingClientRect()
+      if (box.top >= top && box.bottom <= bottom) return { verdict: 'left', why: 'partially obscured, and not by the edge of its pane' }
+      if (box.height > pane.clientHeight || frame.top < 0 || frame.bottom > window.innerHeight)
+        return { verdict: 'left', why: 'cut by a pane it does not fit in, or one the window cuts however far it scrolls' }
       pane.scrollTop = before + (box.top < top ? box.top - top : box.bottom - bottom)
       const results = await window.axe.run(element, { runOnly: { type: 'rule', values: ['color-contrast'] } })
       const ratio = (outcome) => outcome[0]?.nodes[0]?.any[0]?.data?.contrastRatio
@@ -271,6 +286,7 @@ async function reveal(page, at) {
       return results.passes.length > 0 ? { verdict: 'passes' } : { verdict: 'left', why: 'shown whole in the pane that cut it, and axe measured nothing' }
     } finally {
       pane.scrollTop = before
+      window.scrollTo(x, y)
     }
   }, at)
 }

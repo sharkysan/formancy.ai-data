@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:ae5f20235262bbefb8e442a147a3450684ab527ab99af8d2e35bebd51f194361",
+      "reviewed": "sha256:8a932e88dbc0d6bfc3df17634831023fc7a05b85fa04af318e7769e603cc4ac0",
       "limitations": [
         {
           "area": "host",
@@ -3169,7 +3169,7 @@
       ]
     },
     "0106": {
-      "reviewed": "sha256:3693200ba00a742a58e2a0b37c3a01774a3dc195bd3c835b7b0a8cf642f85ae0",
+      "reviewed": "sha256:23b43bf429b5ff276c031730803ba9e2146900bcbe3b26b6d4902887aede7d20",
       "limitations": [
         {
           "area": "host",
@@ -3187,7 +3187,7 @@
         },
         {
           "area": "host",
-          "says": "A column's width is still its content's, and nothing is moved or resized by hand; search and page are not kept."
+          "says": "A column is moved only in the Columns panel, never by dragging its header, and search and page are not kept."
         },
         {
           "area": "host",
@@ -4315,6 +4315,39 @@
         {
           "area": "forms",
           "says": "A version published before gains no starting value until an administrator edits its presentation and publishes it again."
+        }
+      ]
+    },
+    "0151": {
+      "reviewed": "sha256:9cc71d1668871130477ae339b3d59fc4b14305f5607148734968a4909aeac7e2",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A column's width is kept by the viewer's browser, not by the person: it follows nobody to another device, everybody signed in on one browser profile shares it, and no view of theirs carries it.",
+          "heldBy": "apps/host/src/columns.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A release before this one reads a kept value that holds a width as nothing kept: after a rollback, a viewer who set a width opens on the form's columns and default view."
+        },
+        {
+          "area": "host",
+          "says": "Alt and an arrow on a header move its column two pixels a press and say nothing; Wider and Narrower at an end are not aria-disabled, and say the end when pressed; a click or a double click on a header's edge changes nothing.",
+          "heldBy": "apps/host/src/grid-widths.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A column is never narrower than its header's longest word, so its cells may be cut, and never wider than 960 pixels; the page still sizes a column to at most 320.",
+          "heldBy": "apps/host/src/widths.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "The Columns panel has three more Tab stops for every column, Wider, Narrower and Fit, a hidden one's included.",
+          "heldBy": "apps/host/src/column-widths.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The resize handle AG Grid draws between the headers, and the minus and plus the Columns panel draws for a column's steps, are not measured for contrast; the steps are signs, and say what they do by their names alone."
         }
       ]
     }

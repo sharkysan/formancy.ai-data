@@ -13,7 +13,17 @@ import {
   RowSelectionModule,
   ScrollApiModule,
 } from 'ag-grid-community'
-import type { CellKeyDownEvent, ColDef, GridApi, GridOptions, ICellRendererParams, IRowNode, Module, RowClickedEvent } from 'ag-grid-community'
+import type {
+  CellKeyDownEvent,
+  ColDef,
+  ColumnResizedEvent,
+  GridApi,
+  GridOptions,
+  ICellRendererParams,
+  IRowNode,
+  Module,
+  RowClickedEvent,
+} from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import type { ListSortTerm } from '@formancy/data-client'
 import type { ArrangedColumn } from './columns.js'
@@ -21,6 +31,8 @@ import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { roomGrid, ROW_HEIGHT } from './grid-theme.js'
 import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
+import { changedWidths, headerFloor, WIDEST } from './widths.js'
+import type { ColumnWidth, WidthChange } from './widths.js'
 
 /*
  * How the page configures AG Grid Community for a record grid (0047): the
@@ -39,11 +51,23 @@ import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
  *   region says what the page does with a row.
  * - **A page no longer shown is asked for again**, never reused: one block
  *   in the cache (0022, 0029). No count is asked for, so no paging panel.
- * - **Nothing edits, moves or resizes**, so Delete and Backspace clear
- *   nothing and nothing is sent from here but the page's list. A person
- *   orders and hides columns in the section's Columns panel instead
- *   (columns-panel.tsx, 0106), whose every change is a key's: a header
- *   dragged has no keyboard path (formancy.ai 0046).
+ * - **Nothing edits or moves**, so Delete and Backspace clear nothing and
+ *   nothing is sent from here but the page's list. A person orders and
+ *   hides columns in the section's Columns panel instead (columns-panel.tsx,
+ *   0106), whose every change is a key's: a header dragged has no keyboard
+ *   path (formancy.ai 0046).
+ * - **A field's column is resized by hand** (0151): its header's edge
+ *   dragged, as AG Grid draws it, or Alt and an arrow on its header, which
+ *   is AG Grid's own and takes those keys from the browser whether a column
+ *   resizes or not; and from the Columns panel, the keyboard's way that is
+ *   named and said, whose width is set on the grid as the person's
+ *   (`drawWidths`). Each width set is told to the section, which keeps it;
+ *   the grid draws a kept width when it makes the column, and from then on
+ *   the width the grid has is the column's. A double click on an
+ *   edge sizes nothing (`suppressAutoSize`): AG Grid's would size the
+ *   column past the page's cap and say it as the page's own sizing does, so
+ *   it could not be kept; the panel's Fit does it. A row's Delete is not
+ *   resized.
  * - **A row's Delete is a real button** (0053), in a last column where the
  *   form offers delete: a cell the arrow keys reach, whose button takes the
  *   keyboard when the cell does. It is out of the Tab order, so the grid
@@ -54,7 +78,8 @@ import { boxKeys, HeaderBox, NeverFilter } from './header-filter.js'
 /**
  * Every module the options below use, and no other: `AllCommunityModule`
  * would ship code nothing calls. RowApiModule is for finding the open row,
- * ColumnAutoSizeModule for sizing columns to the first page, LocaleModule
+ * ColumnAutoSizeModule for sizing columns to the first page -- a header's
+ * edge and Alt with an arrow are the core module's own (0151) -- LocaleModule
  * for the page's own words in AG Grid's live region, ColumnApiModule for
  * reading the headers' sort and showing the section's on them (0105),
  * CustomFilterModule for the floating row that holds each header's box
@@ -199,57 +224,57 @@ function DeleteCell(params: ICellRendererParams<GridRow> & { remove: RowDelete }
 }
 
 /**
- * The narrowest a column may be: its header's widest word, so a header wraps
- * between words and never cuts one, with WCAG 1.4.12's letter-spacing
- * allowed for, the cell's padding, and the sort icon. Measured in the
- * header's face where the page can draw text; estimated where it cannot.
- */
-function headerMinWidth(label: string, sortable: boolean): number {
-  const words = label.split(/\s+/)
-  let widest = Math.max(...words.map((word) => word.length * 8))
-  // jsdom has no 2D canvas: the estimate stands there.
-  const context = typeof CanvasRenderingContext2D === 'undefined' ? null : document.createElement('canvas').getContext('2d')
-  if (context !== null) {
-    context.font = '600 13px "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif'
-    widest = Math.max(...words.map((word) => context.measureText(word).width + word.length * 0.12 * 13))
-  }
-  return Math.ceil(widest) + 24 + (sortable ? 22 : 0) + 4
-}
-
-/**
  * One column per field the person may read, in the order the section
- * arranged them (0106): its label, sortable where the server says, sized to
- * the first page's content, never below what its header needs, and capped
- * so one long note does not take the well. A column the person hid is
- * there, `hide`, with whatever sort it holds: the sort a view or the
+ * arranged them (0106): its label, sortable where the server says, made at
+ * the width the person set where they set one (`widths`, 0151), and
+ * otherwise sized to the first page's content (use-grid-sizing.ts, capped
+ * there so one long note does not take the well); never below what its header needs
+ * (`floors`, measured by use-header-floors.ts, or `headerFloor` where none is given), nor a person's drag past `WIDEST`. A column the person
+ * hid is there, `hide`, with whatever sort it holds: the sort a view or the
  * section gives it is the headers' still, so the datasource asks for it
  * (grid-datasource.ts). The first shown carries the open row's bar.
  */
-export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDelete, boxed: ReadonlySet<string> = new Set()): ColDef<GridRow>[] {
+export function columnDefsOf(
+  columns: readonly ArrangedColumn[],
+  remove?: RowDelete,
+  boxed: ReadonlySet<string> = new Set(),
+  widths: readonly ColumnWidth[] = [],
+  floors: ReadonlyMap<string, number> = new Map(),
+): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key
-  const fields: ColDef<GridRow>[] = columns.map((column) => ({
-    colId: column.key,
-    headerName: column.label,
-    valueGetter: (params) => cellText(params.data, column),
-    sortable: column.sortable,
-    unSortIcon: column.sortable,
-    hide: !column.shown,
-    minWidth: headerMinWidth(column.label, column.sortable),
-    maxWidth: 320,
-    ...(column.key === first ? { cellRenderer: OpenCell } : {}),
-    // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
-    // Shown only: a hidden column's box would keep a row of empty cells under the headers.
-    ...(boxed.has(column.key) && column.shown
-      ? {
-          filter: NeverFilter,
-          floatingFilter: true,
-          floatingFilterComponent: HeaderBox,
-          suppressFloatingFilterButton: true,
-          suppressHeaderFilterButton: true,
-          suppressHeaderKeyboardEvent: boxKeys,
-        }
-      : {}),
-  }))
+  const set = new Map(widths.map((each) => [each.field, each.width]))
+  const fields: ColDef<GridRow>[] = columns.map((column) => {
+    const width = set.get(column.key)
+    return {
+      colId: column.key,
+      headerName: column.label,
+      valueGetter: (params) => cellText(params.data, column),
+      sortable: column.sortable,
+      unSortIcon: column.sortable,
+      hide: !column.shown,
+      resizable: true,
+      minWidth: floors.get(column.key) ?? headerFloor(column.label, column.sortable),
+      maxWidth: WIDEST,
+      // A width kept is the column's when it is made, and only then: drawn
+      // again from the definitions -- a column moved, a width told a moment
+      // before -- it would put back a width the person has since dragged
+      // past (grid-widths.test.tsx). After that the grid's width is the column's.
+      ...(width === undefined ? {} : { initialWidth: width }),
+      ...(column.key === first ? { cellRenderer: OpenCell } : {}),
+      // A box under the header where the filter line may name the column (0132): the page's, never AG Grid's filter or its button.
+      // Shown only: a hidden column's box would keep a row of empty cells under the headers.
+      ...(boxed.has(column.key) && column.shown
+        ? {
+            filter: NeverFilter,
+            floatingFilter: true,
+            floatingFilterComponent: HeaderBox,
+            suppressFloatingFilterButton: true,
+            suppressHeaderFilterButton: true,
+            suppressHeaderKeyboardEvent: boxKeys,
+          }
+        : {}),
+    }
+  })
   if (remove === undefined) return fields
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
   return [
@@ -259,12 +284,26 @@ export function columnDefsOf(columns: readonly ArrangedColumn[], remove?: RowDel
       headerName: 'Delete',
       valueGetter: () => '',
       sortable: false,
-      minWidth: headerMinWidth('Delete', false),
+      minWidth: headerFloor('Delete', false),
       maxWidth: 160,
       cellRenderer: DeleteCell,
       cellRendererParams: { remove },
     },
   ]
+}
+
+/**
+ * Widths set on the grid as the person's: the Columns panel's Wider and
+ * Narrower (0151), which AG Grid then tells as it tells a drag's, so the
+ * section keeps them by the one way, and a width is drawn by the grid alone.
+ */
+export function drawWidths(grid: GridApi<GridRow>, widths: readonly ColumnWidth[]): void {
+  if (widths.length === 0) return
+  grid.setColumnWidths(
+    widths.map(({ field, width }) => ({ key: field, newWidth: width })),
+    true,
+    'uiColumnResized',
+  )
 }
 
 /** What a grid tells the page, and asks of it. */
@@ -279,18 +318,31 @@ export interface GridCallbacks {
   drilling(): boolean
   /** The headers' sort changed: by a press on one, or by the page showing the section's (0105). */
   sorted(): void
+  /** A width the person set -- by a header's edge, Alt and an arrow, or the Columns panel -- once it is set (0151). */
+  widthsSet(changes: WidthChange[]): void
   /** `=` on a cell: its value kept as its column's condition (0133), or said where the column offers none. */
   example(row: GridRow | undefined, colId: string): void
 }
 
 /** The options of a grid named by the heading `labelledBy`, for its whole life: `firstColumn` is read each time, since a person moves and hides columns under them (0106). */
 export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: string; firstColumn: () => string; on: GridCallbacks }): GridOptions<GridRow> {
+  /**
+   * The width each field's column had when its last resize finished --
+   * the person's, the page's sizing or the panel's -- or when it was made:
+   * what a resize the person ends is measured against, since AG Grid tells
+   * a click on an edge as a resize finished where it began (0151).
+   */
+  const settled = new Map<string, number>()
+  const seed = (api: GridApi<GridRow>): void => {
+    for (const column of api.getColumns() ?? []) if (!settled.has(column.getColId())) settled.set(column.getColId(), Math.round(column.getActualWidth()))
+  }
   return {
     theme: roomGrid,
     // The theme's rows, said again: a grid made inside a hidden view cannot measure its theme.
     rowHeight: ROW_HEIGHT,
     defaultColDef: {
       editable: false,
+      // A field's column says otherwise (columnDefsOf); a row's Delete keeps its button's width.
       resizable: false,
       suppressMovable: true,
       // A header wraps instead of setting its column's width (WCAG 1.4.12).
@@ -316,6 +368,8 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     ensureDomOrder: true,
     animateRows: false,
     suppressMultiSort: true,
+    // A double click on a header's edge sizes nothing: the Columns panel's Fit does (above).
+    suppressAutoSize: true,
     alwaysShowHorizontalScroll: true,
     scrollbarWidth: 16,
     tabToNextCell: () => false,
@@ -334,10 +388,30 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     },
     onGridReady: (event) => {
       event.api.setGridAriaProperty('labelledby', labelledBy)
+      seed(event.api)
       on.ready(event.api)
     },
+    // A column made since, by a change of the form's columns, at the width it was made at.
+    onGridColumnsChanged: (event) => seed(event.api),
     onGridSizeChanged: () => on.resized(),
     onSortChanged: () => on.sorted(),
+    // The person's own: a drag let go, Alt and an arrow, or the panel's
+    // width (`drawWidths`) -- AG Grid's `uiColumnResized`, each step of a
+    // drag before it is let go not `finished` -- and only where the width
+    // moved from where the resize began: a click on an edge, or Alt and an
+    // arrow at an end, ends where it began (`changedWidths`). The page's own
+    // sizing is `autosizeColumns`, never kept (grid-widths.test.tsx), and
+    // settles its columns' widths as the person's resize does. Whole pixels,
+    // which is what the section keeps (widths.ts).
+    onColumnResized: (event: ColumnResizedEvent<GridRow>) => {
+      if (!event.finished) return
+      const finished = (event.columns ?? [])
+        .filter((column) => column.getColId() !== DELETE_COLUMN)
+        .map((column) => ({ field: column.getColId(), width: Math.round(column.getActualWidth()) }))
+      const changes = event.source === 'uiColumnResized' ? changedWidths(finished, settled) : []
+      for (const { field, width } of finished) settled.set(field, width)
+      if (changes.length > 0) on.widthsSet(changes)
+    },
     onRowClicked: (event: RowClickedEvent<GridRow>) => {
       // A press of the row's Delete is the button's, never the row's: it does not open the record it asks about.
       if (event.event?.target instanceof Element && event.event.target.closest('button') !== null) return

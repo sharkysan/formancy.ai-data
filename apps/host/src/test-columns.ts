@@ -11,7 +11,9 @@ import type { User } from './test-host.js'
  * and accessible name (formancy.ai 0034), inside the section whose heading
  * names the grid -- the Records panel, or a child section, each with
  * Columns of its own -- and what the browser kept of it, read from
- * `localStorage` by the key the page writes.
+ * `localStorage` by the key the page writes. And a header's width (0151),
+ * the one read the accessibility tree cannot answer: a header cell's width
+ * has no role or name, so it is read from the style AG Grid draws it with.
  */
 
 /** Columns, the disclosure button of the grid `heading` names. */
@@ -40,6 +42,43 @@ export const showBox = (heading: string, label: string): HTMLInputElement =>
 /** A column's move in the panel. */
 export const moveButton = (heading: string, label: string, way: 'up' | 'down'): HTMLElement =>
   within(columnList(heading)).getByRole('button', { name: `Move ${label} ${way}` })
+
+/** A column's Wider, Narrower or Fit in the panel (0151). */
+export const widthButton = (heading: string, label: string, how: 'wider' | 'narrower' | 'fit'): HTMLElement =>
+  within(columnList(heading)).getByRole('button', { name: how === 'fit' ? `Fit ${label} to its content` : `Make ${label} ${how}` })
+
+/** What the panel's line of the grid `heading` names says: the status Columns names. */
+export const columnsSaid = (heading: string): string => within(gridSection(heading)).getByRole('status', { name: 'Columns' }).textContent ?? ''
+
+/** The header of the column `label` in the grid `heading` names, by the label its name starts with: its sort's words follow. */
+export const header = (heading: string, label: string): HTMLElement =>
+  within(within(gridSection(heading)).getByRole('grid', { name: heading })).getByRole('columnheader', { name: new RegExp(`^${label}`) })
+
+/** A header's width as AG Grid draws it, in pixels: a DOM read, said above. */
+export const headerWidth = (heading: string, label: string): number => Number.parseFloat(header(heading, label).style.width)
+
+/**
+ * A header's width once the grid's sizing has drawn it: the same for a
+ * third of a second. The first page sizes its columns a task after its rows
+ * are drawn (use-grid-sizing.ts), so a width read as the line says the
+ * page can be AG Grid's own, from before.
+ */
+export async function steadyWidth(heading: string, label: string): Promise<number> {
+  let last = Number.NaN
+  let since = Date.now()
+  await waitFor(
+    () => {
+      const now = headerWidth(heading, label)
+      if (now !== last) {
+        last = now
+        since = Date.now()
+      }
+      expect(Date.now() - since).toBeGreaterThanOrEqual(300)
+    },
+    { timeout: 15_000, interval: 50 },
+  )
+  return last
+}
 
 /**
  * The grid's column headers, in the order drawn: each one's text, with the

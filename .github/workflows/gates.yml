@@ -320,15 +320,20 @@ jobs:
   # Pinned, not ubuntu-latest: WebKit's networking (libsoup), its TLS, its
   # EGL and every leg's fallback fonts are the image's, not Playwright's, so a
   # label that moved would move 0058's facts with no change here.
-  # ubuntu-latest was ubuntu-24.04 on 2026-10-12. The thirty minutes are
-  # not measured on CI yet: on a 20-CPU sandbox on 2026-10-14 WebKit's three
-  # gates took about 8.5 minutes before its install, so fifteen left too little
-  # for a slower runner. Each leg keeps thirty until three green runs give a
-  # slowest time to triple, as the report job's comment says of its own.
+  # ubuntu-latest was ubuntu-24.04 on 2026-10-12. The limit is the slowest
+  # leg's slowest green time tripled (0035): WebKit's, 1553 s on main's run
+  # 43312362662 (2026-11-12), the slowest of the seven green runs of main
+  # from 2026-11-05 to 2026-11-13, where Chromium's took 408 to 1111 s,
+  # Firefox's 544 to 1142 s and WebKit's 739 to 1553 s. Thirty, kept until
+  # then, was too few for WebKit once 0151 added the widths journey every
+  # window walks: its gates took 1753 s in run 43405448500, which left the
+  # upload after them cancelled, and run 43417387129 cancelled them in the
+  # host's last window. What it costs: a leg that hangs holds its runner
+  # for 78 minutes before it is cancelled.
   browser:
     name: browser (${{ matrix.browser }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 78
     strategy:
       fail-fast: false
       matrix:

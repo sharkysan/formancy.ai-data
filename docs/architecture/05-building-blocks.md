@@ -457,7 +457,13 @@ removes and the open form's grids share (`OwnViewsScope`,
 grid's columns as arranged and what a browser keeps of a grid, and
 `src/use-grid-state.ts` where a section holds its filter, sort and columns
 and keeps them through `src/prefs.ts`
-([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md));
+([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)),
+and `src/widths.ts` a column's width as a person sets it -- the widths a
+browser keeps, a press of the panel's Wider or Narrower and a header's
+floor, measured again by `src/use-header-floors.ts` once the page's fonts
+load -- which the grid draws once and `src/use-grid-sizing.ts` never
+sizes away
+([0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md));
 `src/grid-filter.tsx` is a grid's filter, seen three ways: `src/filter-line.tsx`
 the line it is typed in and `src/filter-chips.tsx` its conditions as chips,
 with Undo and the way out of a list nothing matches

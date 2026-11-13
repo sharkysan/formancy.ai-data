@@ -193,6 +193,11 @@ export function filterJourney(plane, { check }) {
           'a lookup’s record applied: the line says it by its label',
           same(await control(page, 'combobox', 'Filter').inputValue(), 'amount > 0 and customer = "Muster AG"'),
         )
+        // Measured once the list it asked for has answered: measured while it
+        // was on its way, its rows were drawn between axe's audit and the
+        // gate's reading of the cells axe left, which were then gone (CI run
+        // 43355345952, Chromium at 320 px).
+        await until(async () => /Filtered by [^.]*Customer\./.test(await lineOf(page)), 'the grid never said the list filtered by the customer')
       },
     ],
     [

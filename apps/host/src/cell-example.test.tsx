@@ -117,6 +117,7 @@ function Grid({ sent }: { sent: ListFilterTerm[][] }): ReactElement {
         asked: () => {},
         drilling: () => false,
         sorted: () => {},
+        widthsSet: () => {},
         example: (at, colId) => {
           filterByExample(now.current, at, colId)
         },

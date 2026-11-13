@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { hiddenWell, sizing } from './grid-sizing.js'
+import { hiddenWell, sizedToContent, sizing } from './grid-sizing.js'
 import type { SizeState } from './grid-sizing.js'
 
 /*
@@ -68,5 +68,18 @@ describe('hiddenWell', () => {
     expect(hiddenWell(well)).toBe(true)
     expect(hiddenWell(document.getElementById('other'))).toBe(false)
     expect(hiddenWell(null)).toBe(true)
+  })
+})
+
+describe('sizedToContent', () => {
+  // A column whose width a person set is never sized to its content,
+  // whatever asks -- the first page, the separator let go, a well drawn
+  // again, a column shown again: sized, the width they set would be gone
+  // under them (0151) (watched failing with every column given back:
+  // Notes, kept at 480, among those sized).
+  test('leaves out every column with a kept width', () => {
+    expect(sizedToContent(['id', 'notes', 'amount', '~delete'], [{ field: 'notes', width: 480 }])).toEqual(['id', 'amount', '~delete'])
+    expect(sizedToContent(['notes'], [{ field: 'notes', width: 480 }])).toEqual([])
+    expect(sizedToContent(['id', 'notes'], [])).toEqual(['id', 'notes'])
   })
 })

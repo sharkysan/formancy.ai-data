@@ -107,6 +107,14 @@
 //     pressed, at the top too, where it does nothing; the row's Delete stays
 //     the last header; and Reset columns puts the form's order back with
 //     the keyboard on it;
+//   - a column's width (0151): a click and a double click on a header's
+//     edge keep nothing; a pointer's drag on it widens its column by as
+//     much as it moved, and a reload opens it at that width; a header of
+//     several words dragged far stops at a floor where each of its words is
+//     drawn whole on one line; Wider in Columns, from the keyboard, makes a
+//     column wider than a phone's window, saying how wide, with nothing past
+//     either edge at 320 px, and Fit gives it back to its content, saying
+//     so, and sizes a column nobody set to a longer value a search listed;
 //   - Drill down (0090): a customer, one of its orders and that order's
 //     line three levels down, the trail naming each; Tab reaches the
 //     trail's buttons in order, Enter on a crumb puts the keyboard on its
@@ -176,7 +184,7 @@
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
 // CSV's, the filter's, the views', the rows kept while the next are asked
-// for, the columns', Drill down's, a customer
+// for, the columns', Drill down's, a column's width, a customer
 // list that goes on, Stacked's line and the short window, and the policy's
 // allowance.
 //
@@ -221,6 +229,7 @@ import { SHORT, shortJourney } from './browser/stacked.mjs'
 import { widths } from './browser/styles.mjs'
 import { viewJourney } from './browser/viewing.mjs'
 import { waitingJourney } from './browser/waiting.mjs'
+import { widthsJourney } from './browser/widths.mjs'
 import { workspaceJourney } from './browser/workspace.mjs'
 
 /**
@@ -358,6 +367,8 @@ async function run(gate, browser) {
           ...waitingJourney(plane, gate),
           ...columnsJourney(plane, gate, run),
           ...drillJourney(plane, gate, run),
+          // After Drill down, which leaves Side by side, and before the list that goes on: its reload signs in again as the clerk.
+          ...widthsJourney(plane, gate, run),
           ...moreJourney(plane, gate),
         ]) {
           await act(page)
@@ -429,7 +440,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, columns, Drill down and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, filter, views, columns, Drill down, widths and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

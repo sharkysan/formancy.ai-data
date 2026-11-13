@@ -286,8 +286,14 @@ A grid's columns, sort and view are kept by the viewer's browser, not the
 person: they follow nobody to another device, everybody signed in on one
 browser shares them, every child section of one form under one field
 shares one arrangement, and a person's own filter conditions are never kept; a
-hidden column is still read, and its width is still its content's
+hidden column is still read
 ([0106](../decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
+A column's width a person sets is the browser's too, and in no view of
+theirs; a release before it reads a value holding one as nothing kept;
+Alt and an arrow on a header move a column two pixels a press and say
+nothing; and the resize handle AG Grid draws between the headers is not
+measured for contrast
+([0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
 A person's own views are kept by the server, in the configuration store,
 so a backup of it holds them and nothing removes them but the person, one
 the host no longer knows included; under a hash of the token's subject,
@@ -709,7 +715,12 @@ its page tests mounts both renderers against the real server on both
 engines, so the suite grows by minutes with a feature: 1292 s under
 coverage on 2026-10-28, its job 22 minutes. The job's limit was raised
 from 25 to 40 minutes (`.github/workflows/gates.yml`) rather than the suite
-split across runners, which is the next step when that is not enough.
+split across runners, which is the next step when that is not enough. The
+browser legs grow the same way, every journey walked in every window:
+WebKit's took up to 1553 s on main by 2026-11-12 and 1753 s with 0151's
+widths journey, past the thirty minutes the legs had, so their limit is
+now that slowest green time tripled rather than the host's gate split
+across runners.
 
 **A merged branch is deleted by a repository setting** that nothing here
 reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).

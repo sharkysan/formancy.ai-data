@@ -393,6 +393,7 @@ export function ChildSection({
               definition={definition}
               columns={columns}
               choices={state.choices}
+              widths={state.widths}
               labelledBy={headingId}
               noun={title}
               parent={{ field: child.field, record: parent.token }}
@@ -421,6 +422,8 @@ export function ChildSection({
                     choices={state.choices}
                     onChoices={state.setChoices}
                     onReset={state.resetChoices}
+                    measure={(field) => grid.current?.widthOf(field) ?? null}
+                    onWidths={(changes) => grid.current?.setWidths(changes)}
                   />
                   {!panelShown(filterable, filter) ? null : (
                     <GridFilter
@@ -446,6 +449,7 @@ export function ChildSection({
               drilling={drill !== undefined}
               onOpen={askRow}
               onSort={state.setSort}
+              onWidths={state.setWidths}
               onFiltered={setUnmatched}
             />
           </HeaderFilterContext.Provider>
