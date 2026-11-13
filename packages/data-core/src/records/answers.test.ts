@@ -174,7 +174,7 @@ describe('canonicalValue', () => {
   // thrown, never written as some text.
   test('throws on an answer the field’s control could not hold', () => {
     const binding = (field: string) => PG_FORM.bindings.fields.find((entry) => entry.field === field) as Parameters<typeof canonicalValue>[0]
-    expect(() => canonicalValue(binding('paid'), 'yes')).toThrow("'true' or 'false'")
+    expect(() => canonicalValue(binding('paid'), 'yes')).toThrow('a select of “true” and “false”')
     expect(() => canonicalValue(binding('approved_by'), 2.5)).toThrow('whole number')
     expect(() => canonicalValue(binding('approved_by'), '2')).toThrow('whole number')
   })

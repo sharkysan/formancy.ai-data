@@ -38,12 +38,24 @@ export interface FieldPresentation {
    */
   description?: Text | null
   /**
+   * The answer a new record starts the field with, over the base's (0150):
+   * one that replaces the column's constant default (0149) or adds one
+   * where the base has none. Of the field's own answer type, as a record
+   * holding it reads back. Never a removal: a field left empty is left out
+   * of a create, which stores the column's default unseen. Present only
+   * where it differs from the base's.
+   */
+  default?: StartingValue
+  /**
    * The generated section it is placed in, present only where that is not
    * the one the base places it in (0075). It lands after that section's own
    * fields unless the section's `order` says otherwise.
    */
   section?: SectionAnchor
 }
+
+/** A field's starting value (0150): spec 5's `default` as a generated field takes one, text, a number or true or false, never a list. */
+export type StartingValue = string | number | boolean
 
 /** A state's label (0129): a value the policy holds the state field to, as its column holds it, and the words a person picks it by. */
 export interface StateLabel {
@@ -71,7 +83,8 @@ export interface SectionPresentation {
  * generated section a field is placed in (0075), the views a list of the
  * form's records offers (0105), a field's help text (0119), the fields the
  * Filter panel leaves out (0123), the labels of a state field's states
- * (0129) and the group the form is listed under (0143). Each entry holds
+ * (0129), the group the form is listed under (0143) and a field's starting
+ * value (0150). Each entry holds
  * only what differs from the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
@@ -100,9 +113,9 @@ export type PresentationConflict =
       kind: 'field-gone'
       field: string
       anchor: FieldAnchor
-      property: 'label' | 'span' | 'section' | 'description'
+      property: 'label' | 'span' | 'section' | 'description' | 'default'
       // A span's `all` or `one` is a string, which Text holds; a removed help text is null.
-      yours: Text | SectionAnchor | null
+      yours: Text | SectionAnchor | StartingValue | null
       resolution: 'dropped'
       message: string
     }
@@ -114,6 +127,30 @@ export type PresentationConflict =
    * help text is `null` in `yours`.
    */
   | { kind: 'both-changed'; field: string; property: 'label' | 'description'; yours: Text | null; generator: Text; resolution: 'kept-yours'; message: string }
+  /** A starting value the generator changed too (0150): the column's constant default changed in the database. */
+  | {
+      kind: 'both-changed'
+      field: string
+      property: 'default'
+      yours: StartingValue
+      generator: StartingValue
+      resolution: 'kept-yours'
+      message: string
+    }
+  /**
+   * A starting value the regenerated field no longer takes (0150): its
+   * column now holds less, or another kind, or a create no longer writes
+   * it. `field` is the new key; `reason` is the field's, as a publish
+   * would refuse it.
+   */
+  | { kind: 'default-dropped'; field: string; anchor: FieldAnchor; yours: StartingValue; reason: string; resolution: 'dropped'; message: string }
+  /**
+   * A starting value the regenerated field stores the same and holds in
+   * another spelling (0150): a whole number whose column is now a bigint,
+   * held as text; a yes or no now nullable. `field` is the new key, `now`
+   * the spelling carried.
+   */
+  | { kind: 'default-respelled'; field: string; anchor: FieldAnchor; yours: StartingValue; now: StartingValue; resolution: 'followed'; message: string }
   /** `from` and `to` are where the field is placed: the section the person moved it to, else the generator's. */
   | { kind: 'moved-section'; field: string; from: SectionAnchor; to: SectionAnchor; resolution: 'followed'; message: string }
   /**

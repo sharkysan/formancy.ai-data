@@ -1,8 +1,9 @@
 import type { FieldDef } from '@formancy/spec'
 import type { DatabaseKind } from '../adapter.js'
-import { codecFor } from '../codecs/codec.js'
-import type { ColumnMeta, ObjectMeta } from '../metadata.js'
-import { formValue } from '../records/answers.js'
+import type { Codec } from '../codecs/codec.js'
+import { codecFor, codecForType } from '../codecs/codec.js'
+import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
+import { formValue, storedValue } from '../records/answers.js'
 import type { FieldBinding, GenerationNote } from './types.js'
 
 /*
@@ -29,10 +30,16 @@ import type { FieldBinding, GenerationNote } from './types.js'
 /** A constant as a column's default spells it: text, a number's decimal digits, or a truth value. `national` is T-SQL's N prefix. */
 export type Constant = { kind: 'text'; text: string; national: boolean } | { kind: 'number'; text: string } | { kind: 'boolean'; value: boolean }
 
-/** Whether `text` holds a C0 control or DEL: a text box draws a line break or a tab otherwise than the column holds it. */
-function hasControl(text: string): boolean {
+/**
+ * Whether `text` holds a C0 control or DEL that `field`'s box draws otherwise
+ * than the column holds it: any, in a one-line box, which draws a line break
+ * or a tab otherwise; any but a line feed or a tab in a multi-line one,
+ * which keeps those two -- a carriage return it reads back as a line feed.
+ */
+function drawnOtherwise(field: FieldDef, text: string): boolean {
   for (let at = 0; at < text.length; at += 1) {
     const code = text.charCodeAt(at)
+    if (field.type === 'textarea' && (code === 0x0a || code === 0x09)) continue
     if (code < 0x20 || code === 0x7f) return true
   }
   return false
@@ -58,9 +65,8 @@ const POSTGRES_TEXT = /^'((?:[^']|'')*)'::(?:text|character varying|bpchar)$/
 const SQLSERVER_NUMBER = /^\(\((-?[0-9]+(?:\.[0-9]+)?)\)\)$/
 const SQLSERVER_TEXT = /^\((N?)'((?:[^']|'')*)'\)$/
 
-function textConstant(quoted: string, national: boolean): Constant | null {
-  const text = quoted.replaceAll("''", "'")
-  return hasControl(text) ? null : { kind: 'text', text, national }
+function textConstant(quoted: string, national: boolean): Constant {
+  return { kind: 'text', text: quoted.replaceAll("''", "'"), national }
 }
 
 function readPostgres(expression: string): Constant | null {
@@ -92,34 +98,54 @@ function withoutLeadingZeros(digits: string): string {
   return trimmed === '-0' ? '0' : trimmed
 }
 
+type Kind = NormalizedType['kind']
+
+/** How one column kind reads a constant as the value its codec is handed, or `undefined` where the constant is not one of its kind read with certainty. */
+type Reader = (kind: DatabaseKind, constant: Constant, type: NormalizedType) => unknown
+
 /**
- * What the codec of `column` is handed for `constant`: the value the
- * database stores for it, or `undefined` where the constant is not one of
- * the column's kind read with certainty. A date, a time, an instant, a uuid
- * and a float are left to the database: their text is the session's or
- * rounds otherwise than a page would.
+ * The column kinds a constant is read for, each with how: the one list of
+ * the kinds a field starts at a value of, which the generator reads its
+ * column's constant by and a presentation's starting value is offered by
+ * (`startsAtConstant`, 0150). A date, a time, an instant, a uuid and a
+ * float are not in it, left to the database: their text is the session's
+ * or rounds otherwise than a page would. A map, never an object: a kind
+ * is a name a snapshot carries, and an object would find a reader under
+ * every name it inherits -- constructor, toString.
  */
-function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
-  const type = column.type
-  switch (type.kind) {
-    case 'text':
-      if (constant.kind !== 'text') return undefined
+const READERS: ReadonlyMap<Kind, Reader> = new Map<Kind, Reader>([
+  [
+    'text',
+    (kind, constant, type) => {
+      if (constant.kind !== 'text' || type.kind !== 'text') return undefined
       // SQL Server reads a literal without N in the database's code page,
       // and converts an N literal written to a varchar to the column's:
       // past ASCII, only an N literal on an nvarchar is the text it spells.
       if (kind === 'sqlserver' && !ASCII.test(constant.text) && !(constant.national && type.lengthUnit === 'utf16-code-units')) return undefined
       return constant.text
-    case 'boolean':
+    },
+  ],
+  [
+    'boolean',
+    (_kind, constant) => {
       if (constant.kind === 'boolean') return constant.value
       // A bit's default is ((1)) or ((0)); ((2)) is stored as 1, a conversion not read.
       return constant.kind === 'number' && (constant.text === '0' || constant.text === '1') ? constant.text === '1' : undefined
-    case 'integer':
-      return constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined
-    case 'decimal':
-      return constant.kind === 'number' ? constant.text : undefined
-    default:
-      return undefined
-  }
+    },
+  ],
+  ['integer', (_kind, constant) => (constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined)],
+  ['decimal', (_kind, constant) => (constant.kind === 'number' ? constant.text : undefined)],
+])
+
+/** Whether a field of a column of `kind` starts at a value: one its column's constant is read for (0149), and so one a starting value is offered for (0150). */
+export function startsAtConstant(kind: Kind): boolean {
+  return READERS.has(kind)
+}
+
+/** What the codec of `column` is handed for `constant`: the value the database stores for it, or `undefined` where none is read (`READERS`). */
+function asStored(kind: DatabaseKind, constant: Constant, column: ColumnMeta): unknown {
+  const read = READERS.get(column.type.kind)
+  return typeof read === 'function' ? read(kind, constant, column.type) : undefined
 }
 
 /** A value as a note says it: quoted, as the generator's other sentences quote one, so blanks are seen and a value ends where its quote does. */
@@ -160,15 +186,73 @@ export function startingAnswer(kind: DatabaseKind, column: ColumnMeta, binding: 
   const constant = column.defaultExpression === null ? null : readConstant(kind, column.defaultExpression)
   const stored = constant === null ? undefined : asStored(kind, constant, column)
   if (constant === null || stored === undefined) return NONE
-  const parsed = codecFor(column).parse(stored)
-  if (!parsed.ok) return { kind: 'refused', shown: shown(constant), reason: clause(parsed.message) }
+  const taken = answerTaken(codecFor(column), binding, field, stored)
+  if (taken.kind === 'refused') return { kind: 'refused', shown: shown(constant), reason: taken.reason }
+  return taken.answer === '' ? NONE : { kind: 'starts', answer: taken.answer }
+}
+
+type Taken = { kind: 'answer'; answer: string | number | boolean } | { kind: 'refused'; reason: string }
+
+/**
+ * `stored`, a value the column would store and never null, as the answer
+ * `field` starts with: through the column's codec and `formValue`, as a
+ * record holding it is read back, and only where the field's box holds it:
+ * draws it as the column holds it (`drawnOtherwise`), and counts it within
+ * its UTF-16 code units, never fewer than the codec counts in the column's
+ * unit. The one reading of a starting answer, the column's
+ * constant's (`startingAnswer`) and an administrator's (`givenStart`) alike.
+ */
+function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stored: unknown): Taken {
+  const parsed = codec.parse(stored)
+  if (!parsed.ok) return { kind: 'refused', reason: clause(parsed.message) }
   // Never null: the codec was handed a value, and returns one.
   const answer = formValue(binding, parsed.value) as string | number | boolean
-  if (answer === '') return NONE
-  if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
-    return { kind: 'refused', shown: shown(constant), reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
+  if (typeof answer === 'string' && drawnOtherwise(field, answer)) {
+    return {
+      kind: 'refused',
+      reason:
+        field.type === 'textarea'
+          ? 'it holds a control character other than a line feed or a tab, which a box draws otherwise'
+          : 'it holds a line break, a tab or another control character, which a one-line box draws otherwise',
+    }
   }
-  return { kind: 'starts', answer }
+  if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
+    return { kind: 'refused', reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
+  }
+  return { kind: 'answer', answer }
+}
+
+/** A starting value an administrator gives a field (0150): its answer as a record holding it reads back, or why the field does not take it. */
+export type GivenStart = { ok: true; answer: string | number | boolean } | { ok: false; reason: string }
+
+/**
+ * `value`, given as the answer `field`, bound to its column by `binding`,
+ * starts a new record with (0150), read as `startingAnswer` reads the
+ * column's constant: held as the column stores it (`storedValue`), then
+ * `answerTaken`, so it is refused for what the codec or the box refuses,
+ * and its answer is the canonical one a record holding it reads back as --
+ * `9.5000` for `9.5` in a numeric(18,4). An empty answer is refused: it is
+ * the field as it starts, and spec 5 takes no empty default. The codec is
+ * the binding's type's (`codecForType`), the column itself not being at
+ * hand where a presentation is applied.
+ */
+export function givenStart(binding: ColumnBinding, field: FieldDef, value: string | number | boolean): GivenStart {
+  const stored = storedValue(binding, value)
+  return stored.ok ? storedStart(binding, field, stored.value) : { ok: false, reason: stored.reason }
+}
+
+/**
+ * `stored`, a value a column of `binding`'s type would store, as the
+ * answer `field` starts with: `givenStart` from the stored value rather
+ * than from an answer, which a rebase asks of a value stored under the
+ * bindings before (0150) -- the same stored value under a new spelling, or
+ * why the new field refuses it.
+ */
+export function storedStart(binding: ColumnBinding, field: FieldDef, stored: unknown): GivenStart {
+  const taken = answerTaken(codecForType(binding.type, binding.nullable), binding, field, stored)
+  if (taken.kind === 'refused') return { ok: false, reason: taken.reason }
+  if (taken.answer === '') return { ok: false, reason: 'it is empty, which is how the field starts without one' }
+  return { ok: true, answer: taken.answer }
 }
 
 /**

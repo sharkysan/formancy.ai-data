@@ -189,14 +189,19 @@ Formancy Data
 - **Q21. A person's labels, help text, order, widths and moves meet a
   regenerated base.** Carried by what each field and section stands for, a
   move that cannot be carried dropped and said, help text kept over a
-  changed comment said, and nothing the presentation step offers removes,
-  renames or retypes a bound field. Held by
+  changed comment said, a starting value kept over a changed column
+  default said, one the new field stores the same carried in its new
+  spelling and said, and one it refuses dropped and said, and
+  nothing the presentation step offers removes, renames or retypes a bound
+  field. Held by
   `packages/data-core/src/presentation/rebase.test.ts`,
-  `packages/data-core/src/presentation/help-text.test.ts` and
+  `packages/data-core/src/presentation/help-text.test.ts`,
+  `packages/data-core/src/presentation/starting-value.test.ts` and
   `apps/studio/src/presentation.test.tsx`
   ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md),
   [0075](../decisions/0075-a-field-may-move-to-another-generated-section.md),
-  [0119](../decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
+  [0119](../decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md),
+  [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
 - **Q22. Two administrators publish from the same version at once.**
   Exactly one wins and the other is told the current version. Held by
   `packages/data-server/src/config-store.test.ts`

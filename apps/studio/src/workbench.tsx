@@ -345,6 +345,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         return (
           <PresentationStep
             session={session}
+            base={proposal.form}
+            notes={proposal.notes}
             bindings={proposal.bindings}
             views={views}
             onViews={viewed}

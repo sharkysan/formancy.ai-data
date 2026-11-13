@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:9ee84f951698ec0873c620e187fd747bb43ca49ed0dff952219a241c461d563a",
+      "reviewed": "sha256:12406f6f762e7d2662da97a328ebe24f072e47a641cb8e936f597c43e584105a",
       "limitations": [
         {
           "area": "studio",
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:c16e0c82c11d26a68cc8ff03e108a1f259ef0e0bb983c6d0bcca0b0996bfead5",
+      "reviewed": "sha256:a334be96a01b3fd24ba98d65c9316135e6fcbd6579d40155d4f4a347b7294f35",
       "limitations": [
         {
           "area": "forms",
@@ -4244,10 +4244,6 @@
           "heldBy": "apps/host/src/session-work.test.ts"
         },
         {
-          "area": "studio",
-          "says": "Nothing in the studio changes or clears a default: it is changed in the database, and the form generated again."
-        },
-        {
           "area": "host",
           "says": "A host page's renderer must read spec 5's default: @formancy/* 0.13.0's do, and one that does not refuses a form that carries one."
         },
@@ -4259,6 +4255,66 @@
           "area": "server",
           "says": "The form GET /v1/forms/:id serves carries only the defaults the person's create would take, so it differs from person to person, and a page that draws its own choice for a saved record's state leaves the field's default out, or the engine refuses to open it.",
           "heldBy": "packages/data-server/src/routes/runtime-defaults.test.ts"
+        }
+      ]
+    },
+    "0150": {
+      "reviewed": "sha256:6f9e1b4625504e6da473f2c08577ad3a8d7dbe4e1da6249c7782fc00243700a6",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A column's default is never taken away: a field whose column has one starts at it or at another value, never empty, and a yes or no with a default offers no None.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A starting value is checked by its column's codec and its field's box, not by the database: a value a CHECK constraint refuses, or text with a character a SQL Server code page lacks, is taken, and refused or stored otherwise by the save that sends it."
+        },
+        {
+          "area": "server",
+          "says": "A starting value's fit is asked on every read of a stored version, so a later release whose codec or box refuses more stops serving a version holding one it now refuses until that version is published again."
+        },
+        {
+          "area": "forms",
+          "says": "A text constant with a control character is read: a one-line field refuses it with a note, and a multi-line field starts at a line feed or a tab.",
+          "heldBy": "packages/data-core/src/generate/defaults.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A date, a time, an instant, a float, a uuid and a lookup take no starting value in the Presentation step, though spec 5 would hold one: no case here stores a starting answer of them and reads it back.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A starting value is a constant in one language: nothing starts at today, at the signed-in person's attribute or at another field's answer, and it is not translated."
+        },
+        {
+          "area": "writes",
+          "says": "A starting value is sent as the person's answer, so a trigger that tells a column left out from one given sees one given.",
+          "heldBy": "apps/host/src/defaults.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A starting value is spelled as a record holding it reads back, so 9.5 typed for a numeric(18,4) field starts it at 9.5000.",
+          "heldBy": "apps/studio/src/starting-value.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "On the state field a starting value must be a state a create starts a record in: a policy that no longer moves from nothing to it is refused at publish until the value is changed, and the studio names the states only when it refuses one.",
+          "heldBy": "packages/data-server/src/routes/admin.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A starting value the regenerated field refuses is dropped and said, and one it stores the same is carried in its new spelling and said: the number 7 becomes the text “7” once its column is a bigint.",
+          "heldBy": "packages/data-core/src/presentation/starting-value.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server of a release before this one refuses a version whose presentation sets a starting value, so a deployment rolled back serves it only once an earlier version is restored there."
+        },
+        {
+          "area": "forms",
+          "says": "A version published before gains no starting value until an administrator edits its presentation and publishes it again."
         }
       ]
     }

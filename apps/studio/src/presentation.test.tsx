@@ -173,7 +173,10 @@ describe('presentation', () => {
   // (0105) are counted out: a view names fields by key and changes none of
   // them, which list-views.test.tsx holds, publishing what it makes. So is
   // the group the form is listed under (0143), which names no field at
-  // all: its region holds its box and No group, and nothing else.
+  // all: its region holds its box and No group, and nothing else. Widened
+  // again by 0150: a field's Starting value, a box or a choice that sets
+  // spec 5's default and nothing else, and the button that gives back the
+  // column's, which starting-value.test.tsx holds, publishing what it sets.
   test('offers nothing that could break a binding, and what it edits publishes', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
@@ -185,7 +188,7 @@ describe('presentation', () => {
         .queryAllByRole(role)
         .filter((element) => !views.contains(element) && !group.contains(element))
     const named = (role: string) => outside(role).map((element) => computeAccessibleName(element))
-    expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+)$/.test(name))).toEqual([])
+    expect(named('button').filter((name) => !/^(Undo|Redo|Move (up|down|to) .+|Use the column’s default for .+)$/.test(name))).toEqual([])
     const regions = outside('region').map((region) => computeAccessibleName(region))
     expect(regions).toEqual(['Order', 'Record'])
     const labelled = (region: string) =>
@@ -201,9 +204,10 @@ describe('presentation', () => {
         .filter((name) => name.startsWith('Move to '))
         .sort(),
     ).toEqual(offered.sort())
-    expect(named('textbox').filter((name) => !/^(Section label|Label|Help text) of .+$/.test(name))).toEqual([])
+    expect(named('textbox').filter((name) => !/^(Section label|Label|Help text|Starting value) of .+$/.test(name))).toEqual([])
     expect(named('checkbox').filter((name) => !/^Full width for .+$/.test(name))).toEqual([])
-    for (const role of ['combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
+    expect(named('combobox').filter((name) => !/^Starting value of .+$/.test(name))).toEqual([])
+    for (const role of ['listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
     const inGroup = (role: string) =>
       within(group)
         .queryAllByRole(role)

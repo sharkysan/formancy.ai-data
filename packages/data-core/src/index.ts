@@ -58,6 +58,8 @@ export { todayOf } from './presentation/view-values.js'
 export { unfilteredProblems, unfilteredShapeProblems } from './presentation/unfiltered.js'
 export { stateLabelProblems, stateLabelShapeProblems, statesOf } from './presentation/state-labels.js'
 export { defaultGroup, formGroup, GROUP_LIMIT, groupProblem, groupProblems, groupShapeProblems } from './presentation/group.js'
+export { noStartingValue, shownValue, startingStateProblem, startingStateProblems, startingValue } from './presentation/starting-value.js'
+export type { StartingValueOutcome } from './presentation/starting-value.js'
 export type {
   FieldAnchor,
   FieldPresentation,
@@ -69,6 +71,7 @@ export type {
   RebasedPresentation,
   SectionAnchor,
   SectionPresentation,
+  StartingValue,
   StateLabel,
 } from './presentation/types.js'
 

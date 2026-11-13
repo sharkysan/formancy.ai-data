@@ -5,6 +5,7 @@ import type { PresentationConflict } from '@formancy/data-core'
 import type { Text } from '@formancy/spec'
 import type { Carried } from './carry.js'
 import { labelOf, useDocument } from './document.js'
+import { quoted } from './starting-value.js'
 
 /** A label as the conflict names it: words in quotes, or the message it points at. */
 function shown(text: Text): string {
@@ -90,6 +91,23 @@ export function CarriedPanel({
         </button>
       )
     }
+    if (conflict.kind === 'both-changed' && conflict.property === 'default') {
+      // A starting value the column's default changed under (0150): the generator's is the column's constant as it is now.
+      return (
+        <button
+          type="button"
+          className="button"
+          onClick={() =>
+            report(
+              session.setFieldProperty([conflict.field], 'default', conflict.generator),
+              `Gave ${conflict.field} the starting value ${quoted(conflict.generator)}.`,
+            )
+          }
+        >
+          Use the generator&rsquo;s starting value for {conflict.field}
+        </button>
+      )
+    }
     if (conflict.kind === 'both-changed') {
       return (
         <button type="button" className="button" onClick={() => relabel(conflict.field, conflict.generator)}>
@@ -102,7 +120,8 @@ export function CarriedPanel({
       const label = conflict.yours as Text
       return <GiveLabel at={at} label={label} fresh={carried.fresh} named={(key) => labelOf(document, key)} give={(key) => relabel(key, label)} />
     }
-    // A dropped move (0075) offers nothing here: the field's own "Move to" button below is how it goes back.
+    // A dropped move (0075) offers nothing here: the field's own "Move to" button below is how it goes back;
+    // nor does a dropped starting value (0150), which the field's own box sets again.
     return null
   }
 

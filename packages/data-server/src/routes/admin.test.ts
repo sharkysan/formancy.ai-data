@@ -520,6 +520,70 @@ describe('the administrator plane', () => {
     }
   })
 
+  // A field's starting value (0150) publishes as presentation: the stored
+  // form is its base with the value applied, which the server holds every
+  // write to, so a form that starts elsewhere than its presentation says is
+  // refused, as is a value the field does not take, in applyPresentation's
+  // words; on the policy's state field a value is a state a create starts
+  // a record in, or it is refused at the write, naming the states one does;
+  // and a removal is refused, since a field left empty is left out of a
+  // create, which stores the column's default unseen. Nothing refused is
+  // written. Watched failing with the starting value left out of
+  // applyPresentation: a name of 201 characters was refused only as a form
+  // that is not its base with its presentation applied; with the state's
+  // fit left out of `storable`: lost was stored; and with a removal taken
+  // as help text's is: null was refused only as "the base has no starting
+  // value to remove", which says nothing of what a save would store.
+  test('publishes a starting value, and refuses a form that starts elsewhere, a value the field does not take and a state no create starts in', async () => {
+    const proposal = (await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: PROPOSAL })).json()
+    const NAME = { kind: 'column', column: 'name' }
+    const started = (value: unknown, form: unknown = value, policy: unknown = POLICY) => {
+      const bundle = bundleOf(proposal, policy)
+      const edited = JSON.parse(JSON.stringify(bundle.form))
+      edited.model.fields.find((field: { key: string }) => field.key === 'name').default = form
+      return { ...bundle, form: edited, presentation: { ...EMPTY_PRESENTATION, fields: [{ field: 'name', anchor: NAME, default: value }] } }
+    }
+    const publish = (bundle: unknown) =>
+      app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
+    const elsewhere = await publish(started('Ada', 'Grace'))
+    expect(elsewhere.statusCode).toBe(422)
+    expect(elsewhere.json().problems).toEqual(['form: is not the base with its presentation applied; the form, the base or the presentation was edited'])
+    const long = await publish(started('x'.repeat(201)))
+    expect(long.statusCode).toBe(422)
+    expect(long.json().problems).toEqual([
+      `presentation: /fields/0/default: “${'x'.repeat(201)}” is not an answer name takes (at most 200 characters, counting an emoji as two)`,
+    ])
+    const moved = {
+      ...POLICY,
+      transitions: {
+        field: 'name',
+        moves: [
+          { from: null, to: 'known', roles: ['clerk'] },
+          { from: 'known', to: 'lost', roles: ['clerk'] },
+        ],
+      },
+    }
+    // The form as generated, its presentation taking a default away.
+    const removed = await publish({ ...bundleOf(proposal), presentation: { ...EMPTY_PRESENTATION, fields: [{ field: 'name', anchor: NAME, default: null }] } })
+    expect(removed.statusCode).toBe(422)
+    expect(removed.json().problems).toEqual([
+      "presentation: /fields/0/default is null, and a starting value is never taken away: a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give a value, or leave it out",
+    ])
+    const lost = await publish(started('lost', 'lost', moved))
+    expect(lost.statusCode).toBe(422)
+    expect(lost.json().problems).toEqual([
+      "presentation: /fields/0/default: no create starts a record in “lost”; the policy's moves from nothing reach “known”.",
+    ])
+    expect(await store.latest('employee')).toBeNull()
+
+    const published = await publish(started('Ada'))
+    expect(published.statusCode, published.body).toBe(201)
+    const served = (await app.inject({ method: 'GET', url: '/v1/forms/employee/versions/latest', headers: as('admin') })).json()
+    expect(served.bundle.presentation.fields).toEqual([{ field: 'name', anchor: NAME, default: 'Ada' }])
+    expect(served.bundle.form.model.fields.find((field: { key: string }) => field.key === 'name').default).toBe('Ada')
+    expect(served.bundle.base.model.fields.find((field: { key: string }) => field.key === 'name')).not.toHaveProperty('default')
+  })
+
   // A base the generator would not write is a database fact somebody typed:
   // a name of 4000 characters into a column of 200 would be offered and then
   // refused by the database on every save. Checked at publish against this

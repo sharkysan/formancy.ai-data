@@ -18,6 +18,34 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **An administrator gives a field another starting value** (0150). Why:
+  since 0149 a new record starts at its column's constant default, which
+  was the database's to say -- a column that defaults to `draft` for the
+  application inserting rows may be one an administrator wants a new order
+  to start elsewhere, and a column with no default one most people answer
+  alike. What you notice: under each field's help text the studio's
+  Presentation step says what the generator started the field with and
+  takes another -- a box for text and numbers, and a yes or no's two
+  answers -- checked as the server checks it before it is set, by the
+  column's codec and the field's box, set as a record holding it reads back
+  (`9.5000` for 9.5), and refused in the step's status and under its box
+  otherwise; on the state field only a state a create starts a record in is
+  taken. A column's default is never taken away: a field left empty is left
+  out of a create, which stores the default unseen. A lookup, a field the
+  create does not write, a date, a time, an instant, a float and a uuid
+  take none, and say why. The preview and the host page's New record start
+  there; a record opened, a Duplicate and a form discarded back to start as
+  handed in, and a person who may not give the field on create is still
+  served no default. The value is presentation, carried through a
+  regeneration by its column: kept and said where the column's default
+  changed too, carried in its new spelling and said where the new field
+  stores it the same, and dropped and said where the new field refuses it.
+  A text constant with a control character is now read, and a one-line
+  field refuses it with a note, as it refuses such a starting value.
+  `PRESENTATION_VERSION` stays 1; a server of an earlier release refuses a
+  version that sets one, as `/fields/N/default is not a property of a
+  field presentation`. A form published before gains nothing until it is
+  edited and published again.
 - **A new record starts with its column's constant default** (0149). Why:
   a field whose column defaults to a constant started empty, and a create
   that left it so stored the database's default or, sent empty, NULL or a

@@ -1,4 +1,4 @@
-import type { ColumnMeta } from '../metadata.js'
+import type { ColumnMeta, NormalizedType } from '../metadata.js'
 import { canonicalFloat32, parseDecimal, parseInteger } from './numbers.js'
 import { isDate, isInstant, isTime } from './temporal.js'
 import { parseText } from './text.js'
@@ -56,8 +56,7 @@ function parseFloat32(value: number): CodecOutcome {
  * browser's `maxLength` counts UTF-16 code units, which is the server's rule
  * for nvarchar only, and the generator says per field how the two relate.
  */
-function valueParser(column: ColumnMeta): ((value: unknown) => CodecOutcome) | string {
-  const type = column.type
+function valueParser(type: NormalizedType): ((value: unknown) => CodecOutcome) | string {
   switch (type.kind) {
     case 'text':
       return (value) => (typeof value === 'string' ? parseText(type, value) : refuse('type', 'Expected text.'))
@@ -123,15 +122,25 @@ export function codecFor(column: ColumnMeta): Codec {
     return notWritable('unsupported', `${column.databaseType} has no tested codec`)
   }
   if (column.generated !== 'none') return notWritable('read-only', `the database writes this column (${column.generated})`)
+  return codecForType(column.type, column.nullable)
+}
 
-  const parser = valueParser(column)
+/**
+ * The codec of a column of `type` that the database does not write,
+ * `nullable` or not: `codecFor`'s, where a binding's type and nullability
+ * are what is at hand -- which `prepare.ts` holds to the snapshot's column
+ * -- and not the column itself. A presentation's starting value is checked
+ * through it (0150), against the bindings alone.
+ */
+export function codecForType(type: NormalizedType, nullable: boolean): Codec {
+  const parser = valueParser(type)
   if (typeof parser === 'string') return notWritable('read-only', parser)
 
   return {
     status: 'editable',
     reason: null,
     parse(value) {
-      if (value === null) return column.nullable ? { ok: true, value: null } : refuse('required', 'A value is required.')
+      if (value === null) return nullable ? { ok: true, value: null } : refuse('required', 'A value is required.')
       // Absent is not null: a patch that leaves a field out leaves it unchanged,
       // and that decision belongs to the caller, not to a codec guessing.
       if (value === undefined) return refuse('type', 'No value was given.')

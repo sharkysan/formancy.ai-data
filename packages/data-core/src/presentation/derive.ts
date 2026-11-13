@@ -4,7 +4,8 @@ import { applyPresentation } from './apply.js'
 import type { GeneratedSection } from './layout.js'
 import { copyOf, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { placements } from './placement.js'
-import type { FieldPresentation, PresentationCheck, PresentationOverrides, SectionPresentation } from './types.js'
+import { isStartingValue } from './starting-value.js'
+import type { FieldPresentation, PresentationCheck, PresentationOverrides, SectionPresentation, StartingValue } from './types.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 
 /** What the edited form changed that is presentation, gathered before it is anchored. */
@@ -12,6 +13,8 @@ interface Edits {
   labels: Map<string, Text>
   /** A field's help text as edited, or `null` where the base's was removed (0119). */
   descriptions: Map<string, Text | null>
+  /** A field's starting value as edited (0150). */
+  defaults: Map<string, StartingValue>
   spans: Map<string, 'all' | 'one'>
   sections: Map<number, { label?: Text; order?: string[] }>
   /** Each key the edited form places in another generated section than its own: the index of that section. */
@@ -26,7 +29,10 @@ interface Reading {
   seen: Set<string>
 }
 
-const NOT_PRESENTATION = "changed, and only labels, help text, order, a field's section and full width are presentation"
+const NOT_PRESENTATION = "changed, and only labels, help text, starting values, order, a field's section and full width are presentation"
+
+/** A field's properties a person edits: its label, its help text (0119) and its starting value (0150). */
+const EDITED: readonly string[] = ['label', 'description', 'default']
 
 /** Every top-level property but the model and the layouts: the document's, never the presentation's. */
 function documentProblems(base: Record<string, unknown>, edited: Record<string, unknown>, problems: string[]): void {
@@ -34,7 +40,7 @@ function documentProblems(base: Record<string, unknown>, edited: Record<string, 
   for (const key of keys) if (!same(base[key], edited[key])) problems.push(`/${key}: ${NOT_PRESENTATION}`)
 }
 
-/** The same fields, in the same model order, each changed in its label and its help text at most. */
+/** The same fields, in the same model order, each changed in its label, its help text and its starting value at most. */
 function fieldProblems(base: FormSchema, edited: Record<string, unknown>, edits: Edits, problems: string[]): void {
   const model = edited['model']
   if (!isRecord(model) || !Array.isArray(model['fields'])) {
@@ -59,9 +65,17 @@ function fieldProblems(base: FormSchema, edited: Record<string, unknown>, edits:
     const at = `/model/fields/${String(index)}`
     const field = fields[index] as Record<string, unknown>
     const was = original as unknown as Record<string, unknown>
-    const properties = [...new Set([...Object.keys(was), ...Object.keys(field)])].filter((key) => key !== 'label' && key !== 'description').sort()
+    const properties = [...new Set([...Object.keys(was), ...Object.keys(field)])].filter((key) => !EDITED.includes(key)).sort()
     for (const key of properties)
-      if (!same(was[key], field[key])) problems.push(`${at}/${key}: changed, and only a field's label and help text are presentation`)
+      if (!same(was[key], field[key])) problems.push(`${at}/${key}: changed, and only a field's label, help text and starting value are presentation`)
+    // Its shape alone: whether the field takes it is applyPresentation's, asked at the end.
+    if (field['default'] === undefined) {
+      if (was['default'] !== undefined)
+        problems.push(
+          `${at}/default: removed, and a field left empty is left out of a create, which stores the column's default unseen by the person filling the form in; give another starting value instead`,
+        )
+    } else if (!isStartingValue(field['default'])) problems.push(`${at}/default: not text, a finite number or true or false`)
+    else if (!same(was['default'], field['default'])) edits.defaults.set(original.key, field['default'])
     if (field['description'] === undefined) {
       if (was['description'] !== undefined) edits.descriptions.set(original.key, null)
     } else if (!isText(field['description'])) problems.push(`${at}/description: not text`)
@@ -173,10 +187,10 @@ function layoutProblems(base: FormSchema, sections: readonly GeneratedSection[],
  *
  * Presentation is exactly the studio's edits: a field's label, a section's
  * label, a field's place within its section's grid and full width (0030),
- * the generated section a field is placed in (0075), and a field's help
- * text (0119). Everything else is refused, including what builder-core
- * accepts -- a numeric span, a section added or emptied, translations,
- * `required`, a title -- because
+ * the generated section a field is placed in (0075), a field's help
+ * text (0119) and its starting value (0150). Everything else is refused,
+ * including what builder-core accepts -- a numeric span, a section added
+ * or emptied, translations, `required`, a title -- because
  * a regeneration could not carry it, or would carry a database fact a person
  * overrode.
  *
@@ -191,7 +205,7 @@ export function presentationOf(base: FormSchema, edited: FormSchema, bindings: F
   if (!isRecord(document)) return { ok: false, problems: ['/: the edited form is not an object'] }
 
   const problems: string[] = []
-  const edits: Edits = { labels: new Map(), descriptions: new Map(), spans: new Map(), sections: new Map(), moves: new Map() }
+  const edits: Edits = { labels: new Map(), descriptions: new Map(), defaults: new Map(), spans: new Map(), sections: new Map(), moves: new Map() }
   documentProblems(base as unknown as Record<string, unknown>, document, problems)
   fieldProblems(base, document, edits, problems)
   layoutProblems(base, layout.sections, document, edits, problems)
@@ -202,10 +216,11 @@ export function presentationOf(base: FormSchema, edited: FormSchema, bindings: F
   for (const [index, field] of base.model.fields.entries()) {
     const label = edits.labels.get(field.key)
     const description = edits.descriptions.get(field.key)
+    const start = edits.defaults.get(field.key)
     const span = edits.spans.get(field.key)
     const moved = edits.moves.get(field.key)
     const section = moved === undefined ? undefined : layout.sections[moved]?.anchor
-    if (label === undefined && description === undefined && span === undefined && section === undefined) continue
+    if (label === undefined && description === undefined && start === undefined && span === undefined && section === undefined) continue
     const bound = binding.get(field.key)
     if (bound === undefined) {
       problems.push(`/model/fields/${String(index)}: ${field.key} has no binding, so nothing anchors its presentation`)
@@ -218,6 +233,7 @@ export function presentationOf(base: FormSchema, edited: FormSchema, bindings: F
       ...(span === undefined ? {} : { span }),
       ...(section === undefined ? {} : { section: { ...section } }),
       ...(description === undefined ? {} : { description }),
+      ...(start === undefined ? {} : { default: start }),
     })
   }
   const sections: SectionPresentation[] = []

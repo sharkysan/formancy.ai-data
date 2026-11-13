@@ -147,8 +147,10 @@ until then the address is formancy.ai's 404
   `draft` and its customer Active -- and its note says so. A function, a
   sequence, NULL, a date, an instant, a float or a uuid, a lookup's default
   and a constant the field would refuse start empty, left to the database,
-  the last two said in a note; nothing in the studio changes a default yet
-  ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)).
+  the last two said in a note
+  ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md));
+  the studio's Presentation step gives a field another starting value
+  ([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form
@@ -185,11 +187,17 @@ until then the address is formancy.ai's 404
   else as its column spells it
   ([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
-  help text, order, full width, and a field moved to another generated
-  section -- carried through a regeneration by what each field stands for
+  help text, order, full width, a field moved to another generated
+  section, and a field's starting value -- carried through a regeneration
+  by what each field stands for
   ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md),
   [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md),
-  [0119](./docs/decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md)).
+  [0119](./docs/decisions/0119-a-fields-help-text-is-presentation-the-studio-edits.md),
+  [0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
+  A starting value the database's default changed under is kept and said;
+  one the regenerated field stores the same is carried in its new
+  spelling, the number 7 as the text “7” once its column is a bigint, and
+  said; and one it refuses is dropped and said.
   A key that now names another column keeps its grants only once somebody
   confirms it in the publish over the version they were written in,
   whichever client publishes over a version the server still serves; grants
@@ -553,9 +561,9 @@ speaks only to the server's administrator plane and `/v1/whoami`
 
 *A form over `sales.order_line`, which has no tenant column, discovered as the fixture's owner because the order form's own account may not read the lines. Its Order list is filtered to the person's tenant; ticked, the box “Only rows of sales.order_line whose Order is one of these” makes another tenant's line not found on read and update, and “A row that names none is reached by nobody.” Unticked, the step notes that nothing scopes the rows; nothing requires the box ([0043](./docs/decisions/0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md)).*
 
-<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each with an empty Help text box under its label, naming the column it is bound to and offering Move to Record.">
+<img src="./docs/images/readme/studio-presentation.webp" width="874" alt="The Presentation step's Order section below Undo, Redo and the status “Moved Customer down.”: its section label, then a row each for Order date, Customer, Status with its label emptied and refused, Amount, notes labelled Remarks at full width, Group, Created by and Approved by, each with an empty Help text box under its label and its starting value under that -- Status at its column's default, draft, an empty box for the rest, and none for Order date and Customer, saying why -- naming the column it is bound to and offering Move to Record.">
 
-**Step 5, Presentation.** *Labels, help text, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md)).*
+**Step 5, Presentation.** *Labels, help text, starting values, order, section and width are a patch over the generated form: every row names the column it is bound to and may move to the other section, nothing here adds, removes or renames a field, and an empty label is refused: “A label needs words a person can read.” ([0030](./docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md), [0075](./docs/decisions/0075-a-field-may-move-to-another-generated-section.md), [0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).*
 
 <img src="./docs/images/readme/studio-preview.webp" width="916" alt="The Preview step: a note that the Customer list is filled by the runtime plane once published, and the order form on white paper after Validate, with notes labelled Remarks at full width, Order date and Amount marked required, and Order date, Customer and Amount each saying required.">
 
@@ -639,6 +647,27 @@ and sorting keep them; a follow starts the other end unfiltered, and Back
 returns the page it left with its filter. A refusal is the step's alert,
 with what was typed kept
 ([0147](./docs/decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
+
+Under each field's help text, the Presentation step says what a new record
+starts the field with, as the generator noted it -- "Generated: Starts with
+the column's default, “draft”." -- and takes another: a box for text and
+numbers and, for a yes or no, its two answers. A column's default is never
+taken away: a field left empty is left out of a create, and the database
+stores its default without the person seeing it, so emptied the box keeps
+what it had and says so, and None is offered only where the column has no
+default. "Use the column’s default" gives the column's back. A value is
+checked as the server checks it before it is set -- its column's codec and
+its box, a line break or a tab refused in a one-line box; not the
+database's CHECK constraints or a SQL Server code page, which the save
+meets -- set as a record holding it reads back, `9.5000` for 9.5 in a
+`numeric(18,4)`, and refused in the step's status and under its box, in
+the server's words, with what was typed kept; on the state field it must be
+a state a create starts a record in. A lookup,
+a field the create does not write, a date, a time, an instant, a float and
+a uuid take none, and the row says why: a lookup's answer is a record the
+person may not be allowed to choose, and the others have no case here that
+creates, stores and reads back a starting answer of their kind
+([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
 
 Under the Presentation step's arrangement, List views names the form's
 list views: each a name, conditions on the fields the form's list can be
@@ -931,7 +960,9 @@ again
 
 New record, and a child's new row, start each field at its column's
 constant default where the form has one -- an order at `draft` -- and a
-save that leaves it sends it. A record you open, a Duplicate and a form
+save that leaves it sends it. New record starts a field at the starting
+value the form's administrator chose over its column's instead
+([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)). A record you open, a Duplicate and a form
 discarded back to start as they were handed in, never at a default; a field
 you may not give on create, and a state a create may not start the record
 in, start empty, and the database fills them as before

@@ -1,4 +1,4 @@
-import type { FieldBinding, FormPolicy, ListView } from '@formancy/data-core'
+import type { FieldBinding, FieldPresentation, FormPolicy, ListView } from '@formancy/data-core'
 import type { Engine } from './test-plane.js'
 
 /*
@@ -191,6 +191,16 @@ export function childForms(
       : []),
   ]
 }
+
+/**
+ * The order's starting values chosen over its base (0150): its status at
+ * placed over its column's default, draft, and its group, whose column has
+ * none, at Online. In the base's field order, as a presentation keeps them.
+ */
+export const STARTING: FieldPresentation[] = [
+  { field: 'status', anchor: { kind: 'column', column: 'status' }, default: 'placed' },
+  { field: 'group', anchor: { kind: 'column', column: 'group' }, default: 'Online' },
+]
 
 /** The order's status as the clerk moves it (0112): a new order starts as a draft, which is placed, then shipped, and nothing moves back. */
 export const ORDER_MOVES: NonNullable<FormPolicy['transitions']> = {

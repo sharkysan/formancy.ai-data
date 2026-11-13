@@ -1,6 +1,27 @@
 import type { FieldDef, FormSchema } from '@formancy/spec'
 import type { StateMoves } from '../runtime.js'
 
+/** A move of a state field, as a policy and a person's moves both hold one: from a state, or from nothing on a create, to another. */
+type Move = { from: string | null; to: string }
+
+/** The states a create starts a record in (0112): each one a move from nothing reaches, in the moves' order. */
+export function createStates(moves: readonly Move[]): string[] {
+  const states: string[] = []
+  for (const move of moves) if (move.from === null && !states.includes(move.to)) states.push(move.to)
+  return states
+}
+
+/**
+ * Whether a create may start the record at `value`: a state `createStates`
+ * names, compared as the state is spelled -- a whole number by its digits,
+ * and text or a number alone, as a state field holds no other. The one
+ * reading of it: the form route serves a default by it (`startingDefaults`)
+ * and a publish takes a starting value by it (`startingStateProblem`, 0150).
+ */
+export function startsAt(moves: readonly Move[], value: unknown): boolean {
+  return (typeof value === 'string' || typeof value === 'number') && createStates(moves).includes(String(value))
+}
+
 /**
  * The published form as one person starts a new record with it (0149):
  * each field's `default`, its column's constant one, kept only where the
@@ -21,12 +42,9 @@ import type { StateMoves } from '../runtime.js'
  */
 export function startingDefaults(form: FormSchema, create: readonly string[] | null, moves: StateMoves | null): FormSchema {
   const given = new Set(create ?? [])
-  const starts = new Set((moves?.moves ?? []).filter((move) => move.from === null).map((move) => move.to))
   const keeps = (field: FieldDef): boolean => {
     if (!given.has(field.key)) return false
-    if (moves === null || field.key !== moves.field) return true
-    const value = field.default
-    return (typeof value === 'string' || typeof value === 'number') && starts.has(String(value))
+    return moves === null || field.key !== moves.field || startsAt(moves.moves, field.default)
   }
   if (!form.model.fields.some((field) => field.default !== undefined && !keeps(field))) return form
   const fields = form.model.fields.map((field) => {
