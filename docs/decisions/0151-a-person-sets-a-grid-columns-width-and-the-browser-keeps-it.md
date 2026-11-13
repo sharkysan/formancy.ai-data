@@ -65,7 +65,14 @@
   (B6); Wider from the keyboard making the column wider than a phone's
   window, with nothing past either edge at 320 px; Fit giving it back to
   its content (B7); and Fit on a column nobody set sizing it to a longer
-  value a search listed (B3).
+  value a search listed (B3). The gate's `reveal`
+  (`apps/host/scripts/browser/measure.mjs`) scrolling the window until a
+  pane the window cuts lies wholly in it, run in Playwright's Linux
+  Chromium on 2026-11-13 at 897 by 900: without it, the states after
+  Wider and after Fit left the lines at the Records panel's edge
+  undecided; with it, every check of that width passes, and with the
+  Columns panel's labels turned down to `#3a3f4b` in a copy, the Created
+  by label at that edge is decided as failing, at 1.75:1.
 
 ## Context
 
@@ -139,15 +146,13 @@ the characters "−" and "+", axe could not decide their contrast, a text
 of only non-text characters, and the gate fails a text it cannot decide
 (CI run 43355345952, every state with Columns open, all three browsers).
 They are short, so a column's Show, label, moves and width stay on one
-line in Side by side's lane. Drawn as words, the line needed more than the lane
+line in Side by side's lane, and the panel a person scrolls through is a
+line a column shorter. Drawn as words, the line needed more than the lane
 of a window 897 pixels wide: measured on 2026-11-13 in Playwright's
 Chromium and Firefox, a column's line in Columns was two lines in a
-469-pixel lane where it is one now, and one from a lane of 410 pixels;
-two lines a column took the panel past the Records panel's height, whose
-edge, below the window at the page's top, cut the lines under it, and the
-gate could decide no text there (CI run 43349833479, Chromium and
-WebKit). Wider and Narrower move the column 40 pixels from the width
-the grid draws it at now (`WIDTH_STEP`, a ruling: an eighth of the 320 a
+469-pixel lane where it is one now, and one from a lane of 410 pixels.
+Wider and Narrower move the column 40 pixels from the width the grid
+draws it at now (`WIDTH_STEP`, a ruling: an eighth of the 320 a
 column is sized to, so a press is seen and eight take a column across
 that); at the floor or at `WIDEST` a press changes nothing and says so.
 Fit sizes the column to the rows shown and keeps no width for it, a
@@ -157,6 +162,20 @@ one way a drag's is. What a press did is said on the panel's line, a
 status named Columns, in the page's own muted voice, a new element each
 time so a press at an end is heard again: the browser keeps a width, not
 the server, so it is not the teal 0146 keeps for what the server did.
+
+The panel is taller than the Records panel either way, and the Records
+panel scrolls inside itself. At the page's top in that window, Side by
+side's Records panel also reaches below the window: measured on
+2026-11-13 in Playwright's Linux Chromium after Wider, from 307 to 1031
+pixels, its content 1,457 pixels tall in 722. The gate showed a text its
+pane cut only where the pane lay wholly in the window, so it left the
+lines at the panel's edge undecided after Wider and after Fit (CI run
+43349833479, Chromium and WebKit, with the steps in words; again in
+Playwright's Linux Chromium with the signs). It now scrolls the window
+until the pane lies wholly in it, as a person does before scrolling
+inside the pane, decides the text and scrolls both back
+(`apps/host/scripts/browser/measure.mjs`'s `reveal`); the signs were not
+what made the lines decidable.
 
 **Alt and an arrow on a header resize it, as AG Grid does.** Stopping it
 would give the keys to nothing, since AG Grid takes them from the browser
@@ -278,15 +297,13 @@ header is narrowed past them, and its cells cut, as a person asked.
   keys from the browser on a header whether a column resizes or not, so
   stopping its resize would give Back and Forward back to no one, and would
   need a listener in front of AG Grid's own.
-- **The steps in words, with the Columns list scrolling inside the
-  Records panel.** Rejected: the gate can show a line its pane cuts only
-  where that pane lies wholly in the window, and at the page's top Side
-  by side's Records panel reaches below it, so the list's foot would have
-  to stay above the window's whatever the toolbar above it holds -- the
-  filter line, its chips, a refused filter's sentences -- and Reset
-  columns and the panel's line under the list would still meet the
-  Records panel's edge. Words on a line of their own under each column's
-  line are the same panel, taller.
+- **The steps in words**, Narrower and Wider. Rejected: in Side by side's
+  lane of a window 897 pixels wide, each column's line is then two, so the
+  panel a person scrolls through inside the Records panel is a line a
+  column taller, for words the buttons' names already say. Words on a
+  line of their own under each column's line are the same panel, taller.
+  It was the gate, not the words, that left the lines at the panel's edge
+  undecided (above).
 - **A Width disclosure per column**, its words behind it. Rejected: words
   then fit, but every step asks a press more, and the panel holds a state
   per column; the signs ask none.

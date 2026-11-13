@@ -25,10 +25,9 @@ import type { Measured, WidthChange } from './widths.js'
  * Each press is said on the panel's line, in the page's own voice -- the
  * browser keeps a width, not the server, so it is never the teal of what
  * the server did (0146) -- a new element each time, so a press at an end
- * that says what it said before is heard again. The steps are drawn signs so that a
- * column's line stays one line in Side by side's lane: in words it was two
- * in a window 897 pixels wide, and the panel outgrew the Records panel,
- * whose edge, below the window, cut the lines under it (0151 says what was
+ * that says what it said before is heard again. The steps are drawn signs so
+ * that a column's line stays one line in Side by side's lane, where in
+ * words it was two in a window 897 pixels wide (0151 says what was
  * measured).
  *
  * What cannot be done is said, never removed from the keyboard's path: the
