@@ -1,5 +1,6 @@
 // A column's width in the browser (0151), on the workspace Drill down's
-// states left: Side by side, every record, the panels closed. A click and a
+// states left -- Side by side, the panels closed -- with the order form
+// chosen again, since Drill down left the customers open. A click and a
 // double click on the Records grid's first header's edge keep nothing; a
 // pointer's drag on it widens the column by as much as the pointer moved,
 // and a reload -- signed in again, the form the address names -- opens it at
@@ -33,7 +34,8 @@
 
 import { policyRefused } from '../../../../scripts/browser-gate.mjs'
 import { FORM, TOKENS } from './plane.mjs'
-import { focusedOn, until } from './measure.mjs'
+import { focusedOn, until, WITHIN } from './measure.mjs'
+import { carryOn } from './workspace.mjs'
 
 /** What a press of Wider moves a column by, said again: widths.ts's `WIDTH_STEP`, which the gate cannot import from TypeScript. */
 const STEP = 40
@@ -67,6 +69,19 @@ const keptWidths = (page) =>
     return text === null ? [] : (JSON.parse(text).widths ?? [])
   }, KEPT)
 
+/**
+ * Wait until `read` gives a value `pass` takes, and give it; otherwise fail
+ * with `problem` and what `read` gave last, so the failure says what the
+ * page showed.
+ */
+async function showing(read, pass, problem) {
+  let last
+  await until(async () => pass((last = await read())), problem).catch(() => {
+    throw new Error(`${problem}: the page showed ${JSON.stringify(last)}`)
+  })
+  return last
+}
+
 /** Null when `got` is within a pixel of `want`, otherwise both. */
 const near = (got, want) => (Math.abs(got - want) <= 1 ? null : `it is ${String(got)} px wide, not ${String(want)}`)
 
@@ -81,9 +96,22 @@ async function steadyWidth(page, label) {
       since = Date.now()
     }
     return Date.now() - since >= 300
-  }, `the header ${label} never kept one width`)
+  }, 'never').catch(() => {
+    throw new Error(`the header ${label} never kept one width: it was ${String(last)} px last`)
+  })
   return last
 }
+
+/** The line once it says `pattern`, or a failure with `problem` and what it said last. */
+const lineSays = (page, pattern, problem) =>
+  showing(
+    () => lineOf(page),
+    (line) => pattern.test(line),
+    problem,
+  )
+
+/** `label`'s width once `pass` takes it, or what it is when it never does: the check after says which. */
+const widthOnce = (page, label, pass) => showing(() => widthOf(page, label), pass, `the header ${label}`).catch(() => widthOf(page, label))
 
 /** Drag the right edge of `label`'s header by `by` pixels, as a pointer does, in steps. */
 async function dragEdge(page, label, by) {
@@ -105,6 +133,10 @@ export function widthsJourney(plane, { check }, run) {
     [
       'A click on a header’s edge (Records)',
       async (page) => {
+        // Drill down's states end on the customers: the orders are chosen again, as the list that goes on chooses them.
+        await carryOn(page, page.getByRole('navigation', { name: 'Forms' }).getByRole('link', { name: `Order ${FORM}`, exact: true }))
+        await page.getByRole('heading', { level: 2, name: `Order ${FORM}` }).waitFor(WITHIN)
+        await lineSays(page, /^Rows 1–/, 'the orders were never listed')
         at.label = (await labels(page))[0] ?? ''
         await header(page, at.label).scrollIntoViewIfNeeded()
         at.content = await steadyWidth(page, at.label)
@@ -125,8 +157,7 @@ export function widthsJourney(plane, { check }, run) {
         // As far as the window lets the pointer go, and no more than a column's few words.
         const by = Math.max(24, Math.min(160, Math.floor(page.viewportSize().width - (box?.x ?? 0) - (box?.width ?? 0) - 8)))
         await dragEdge(page, at.label, by)
-        await until(async () => (await widthOf(page, at.label)) > at.content, 'the column never widened').catch(() => null)
-        at.dragged = await widthOf(page, at.label)
+        at.dragged = await widthOnce(page, at.label, (width) => width > at.content)
         check('a header’s edge dragged: its column is as much wider as the pointer moved', near(at.dragged, at.content + by))
       },
     ],
@@ -139,7 +170,7 @@ export function widthsJourney(plane, { check }, run) {
         await page.getByLabel('Host token').fill(TOKENS.clerk)
         await page.getByRole('button', { name: 'Sign in' }).click()
         // Signed in again, the page opens the form its address names, in the layout it names.
-        await until(async () => /^Rows 1–/.test(await lineOf(page)), 'the orders were never listed after the reload')
+        await lineSays(page, /^Rows 1–/, 'the orders were never listed after the reload')
         await header(page, at.label).scrollIntoViewIfNeeded()
         check('a reload: the column opens at the width its edge was dragged to', near(await steadyWidth(page, at.label), at.dragged))
       },
@@ -153,13 +184,22 @@ export function widthsJourney(plane, { check }, run) {
         const label = several.sort((a, b) => longest(b) - longest(a))[0]
         check('the grid has a header of several words to drag', label === undefined ? 'none of its headers has two words' : null)
         if (label === undefined) return
+        // Two steps wider first, from the keyboard: its content may be its floor already, and a drag from there moves nothing.
+        await toggle(page).focus()
+        await page.keyboard.press('Enter')
+        await list(page)
+          .getByRole('button', { name: `Make ${label} wider`, exact: true })
+          .focus()
+        await page.keyboard.press('Enter')
+        await page.keyboard.press('Enter')
+        await toggle(page).focus()
+        await page.keyboard.press('Enter')
         await header(page, label).scrollIntoViewIfNeeded()
         const before = await steadyWidth(page, label)
         // Past its floor, and no further left than the window: the pointer stops four pixels in.
         const box = await header(page, label).boundingBox()
         await dragEdge(page, label, -Math.max(0, Math.floor((box?.x ?? 0) + (box?.width ?? 0) - 6)))
-        await until(async () => (await widthOf(page, label)) < before, 'the column never narrowed').catch(() => null)
-        const floor = await widthOf(page, label)
+        const floor = await widthOnce(page, label, (width) => width < before)
         check(
           'a header’s edge dragged far: its column stops at a floor',
           floor > 0 && floor < before ? null : `it is ${String(floor)} px wide, from ${String(before)}`,
@@ -197,8 +237,7 @@ export function widthsJourney(plane, { check }, run) {
         const presses = Math.ceil((WIDE - from) / STEP)
         for (let press = 0; press < presses; press += 1) await page.keyboard.press('Enter')
         const want = from + presses * STEP
-        await until(async () => (await widthOf(page, at.label)) >= want - 1, 'the column never grew to what was pressed for').catch(() => null)
-        check('Wider pressed: the column grows a step each press', near(await widthOf(page, at.label), want))
+        check('Wider pressed: the column grows a step each press', near(await widthOnce(page, at.label, (width) => width >= want - 1), want))
         check(
           'Wider pressed: the panel says how wide',
           (await said(page)) === `${at.label} is ${String(want)} pixels wide.` ? null : `it says "${await said(page)}"`,
@@ -213,7 +252,7 @@ export function widthsJourney(plane, { check }, run) {
         const wide = await widthOf(page, at.label)
         await fit.focus()
         await page.keyboard.press('Enter')
-        await until(async () => (await widthOf(page, at.label)) < wide, 'the column was never fitted').catch(() => null)
+        await widthOnce(page, at.label, (width) => width < wide)
         check('Fit pressed: the column is back at its content’s width', near(await steadyWidth(page, at.label), at.content))
         check('Fit pressed: the panel says so', (await said(page)) === `${at.label} is sized to its content.` ? null : `it says "${await said(page)}"`)
         check('Fit pressed: the keyboard stays on it', await focusedOn(page, fit))
@@ -227,22 +266,26 @@ export function widthsJourney(plane, { check }, run) {
         await plane.setGroup(run.record, long)
         await records(page).getByRole('textbox', { name: 'Search' }).fill(long)
         await records(page).getByRole('button', { name: 'Search', exact: true }).click()
-        await until(async () => /^Rows 1–1\.$/.test(await lineOf(page)), `the grid never listed "${long}"`)
+        await lineSays(page, /^Rows 1–1\.$/, `the grid never listed "${long}" alone`)
         const cell = grid(page).getByRole('gridcell', { name: long, exact: true })
         const cut = () => cell.evaluate((element) => element.scrollWidth > element.clientWidth)
         check('a column nobody set: a longer value a search lists is cut before Fit', (await cut()) ? null : 'it is whole already')
         const fit = list(page).getByRole('button', { name: 'Fit Group to its content', exact: true })
         await fit.focus()
         await page.keyboard.press('Enter')
-        const whole = await until(async () => !(await cut()), 'the cell stayed cut').then(
+        const whole = await showing(
+          () => cell.evaluate((element) => ({ scroll: element.scrollWidth, box: element.clientWidth })),
+          ({ scroll, box }) => scroll <= box,
+          'the cell stayed cut',
+        ).then(
           () => null,
-          () => 'its value is cut',
+          (error) => error.message,
         )
         check('Fit on a column nobody set: sized to the rows shown, its value whole', whole)
         await plane.setGroup(run.record, null)
         await records(page).getByRole('textbox', { name: 'Search' }).fill('')
         await records(page).getByRole('button', { name: 'Search', exact: true }).click()
-        await until(async () => /^Rows 1–(?!1\.)/.test(await lineOf(page)), 'the grid never listed every record again')
+        await lineSays(page, /^Rows 1–(?!1\.)/, 'the grid never listed every record again')
         // Every width given back, and the panel closed again, as the journeys after this one found the grid.
         await records(page).getByRole('button', { name: 'Reset columns', exact: true }).click()
         await toggle(page).focus()
