@@ -408,7 +408,7 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
       const finished = (event.columns ?? [])
         .filter((column) => column.getColId() !== DELETE_COLUMN)
         .map((column) => ({ field: column.getColId(), width: Math.round(column.getActualWidth()) }))
-      const changes = event.source === 'uiColumnResized' ? changedWidths(finished, new Map()) : []
+      const changes = event.source === 'uiColumnResized' ? changedWidths(finished, settled) : []
       for (const { field, width } of finished) settled.set(field, width)
       if (changes.length > 0) on.widthsSet(changes)
     },

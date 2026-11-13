@@ -152,7 +152,7 @@ export function useGridSizing({
     const shownBefore = new Set(before.arranged.filter((column) => column.shown).map((column) => column.key))
     const keptBefore = new Set(before.widths.map((each) => each.field))
     const keptNow = new Set(widths.map((each) => each.field))
-    const given = (key: string): boolean => keptBefore.has(key) && !keptNow.has(key) && key === ''
+    const given = (key: string): boolean => keptBefore.has(key) && !keptNow.has(key)
     const added = arranged.filter((column) => column.shown && (!shownBefore.has(column.key) || given(column.key))).map((column) => column.key)
     // A width set changes no header's height and leaves no column to size.
     if (before.arranged === arranged && added.length === 0) return

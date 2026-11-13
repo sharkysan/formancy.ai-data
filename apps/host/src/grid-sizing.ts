@@ -49,7 +49,7 @@ export function sizing(state: SizeState, want: SizeWant, hidden: boolean): { siz
  */
 export function sizedToContent(columns: readonly string[], widths: readonly ColumnWidth[]): string[] {
   const kept = new Set(widths.map((each) => each.field))
-  return columns.filter((column) => column !== '' || kept.has(column))
+  return columns.filter((column) => !kept.has(column))
 }
 
 /**

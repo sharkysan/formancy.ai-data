@@ -85,7 +85,7 @@ export function headerFloor(label: string, sortable: boolean): number {
     context.font = headerFace()
     widest = Math.max(...words.map((word) => context.measureText(word).width + word.length * 0.12 * ROOM_GRID.headerFontSize))
   }
-  return Math.ceil(widest / 2) + 2 * PADDING + (sortable ? SORT_ICON : 0) + SLACK
+  return Math.ceil(widest) + 2 * PADDING + (sortable ? SORT_ICON : 0) + SLACK
 }
 
 const inRange = (width: number): number => Math.min(WIDEST, Math.max(NARROWEST, Math.round(width)))
