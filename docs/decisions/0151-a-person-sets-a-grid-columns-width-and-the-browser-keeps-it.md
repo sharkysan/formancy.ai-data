@@ -27,8 +27,9 @@
   opening on the kept widths of the columns still offered.
   `apps/host/src/grid-sizing.test.ts` -- a column with a kept width never
   among those the grid sizes to their content.
-  `apps/host/src/fonts-loaded.test.tsx` -- each time the page's fonts
-  finish loading counted, after which the floors are measured again.
+  `apps/host/src/header-floors.test.tsx` -- the floors measured again
+  when the page's fonts finish loading, and given anew only where one
+  changed.
   `apps/host/src/column-widths.test.tsx`, the Columns panel without a
   server -- Wider, Narrower and Fit for every column, a hidden one
   included, each named for its column; a step at a time from the
@@ -115,7 +116,13 @@ face is the grid theme's weight and size in the family the room's
 variable names, read where the page sets it (`headerFace`), so the theme
 says it once; and since a canvas measures in a fallback face until the
 web font has loaded, the floors are measured again each time the page's
-fonts finish loading (`apps/host/src/use-fonts-loaded.ts`). The browser
+fonts finish loading, and the grid is given them only where one changed
+(`apps/host/src/use-header-floors.ts`): made again on every font load
+anywhere on the page, the column definitions had AG Grid draw every
+header and cell again -- a face drawn late outside the grid made 70
+changes inside it, measured in Chromium on 2026-11-13, and none since --
+the likeliest reason the README's camera found the page changing in CI
+run 43342524083. The browser
 gate drags a header of several words far past its floor and finds each of
 its words drawn whole on one line. A drag stops at 960 pixels, `WIDEST`: three times the 320
 the page sizes a column to, a ruling and not a measurement. The page's

@@ -229,7 +229,7 @@ function DeleteCell(params: ICellRendererParams<GridRow> & { remove: RowDelete }
  * the width the person set where they set one (`widths`, 0151), and
  * otherwise sized to the first page's content (use-grid-sizing.ts, capped
  * there so one long note does not take the well); never below what its header needs
- * (`headerFloor`), nor a person's drag past `WIDEST`. A column the person
+ * (`floors`, measured by use-header-floors.ts, or `headerFloor` where none is given), nor a person's drag past `WIDEST`. A column the person
  * hid is there, `hide`, with whatever sort it holds: the sort a view or the
  * section gives it is the headers' still, so the datasource asks for it
  * (grid-datasource.ts). The first shown carries the open row's bar.
@@ -239,6 +239,7 @@ export function columnDefsOf(
   remove?: RowDelete,
   boxed: ReadonlySet<string> = new Set(),
   widths: readonly ColumnWidth[] = [],
+  floors: ReadonlyMap<string, number> = new Map(),
 ): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key
   const set = new Map(widths.map((each) => [each.field, each.width]))
@@ -252,7 +253,7 @@ export function columnDefsOf(
       unSortIcon: column.sortable,
       hide: !column.shown,
       resizable: true,
-      minWidth: headerFloor(column.label, column.sortable),
+      minWidth: floors.get(column.key) ?? headerFloor(column.label, column.sortable),
       maxWidth: WIDEST,
       // A width kept is the column's when it is made, and only then: drawn
       // again from the definitions -- a column moved, a width told a moment

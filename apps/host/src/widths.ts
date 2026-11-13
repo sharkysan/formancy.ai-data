@@ -61,7 +61,7 @@ export const NARROWEST = 2 * PADDING + SLACK
  * weight and size (grid-theme.ts), in the family its room variable holds
  * where the page sets it -- the one place each is said. A canvas measures
  * in a fallback face until the web font has loaded, so the grid measures
- * its floors again once it has (use-fonts-loaded.ts).
+ * its floors again once it has (use-header-floors.ts).
  */
 export function headerFace(): string {
   const named = /^var\((--[\w-]+)\)$/.exec(ROOM_GRID.headerFontFamily)?.[1]
