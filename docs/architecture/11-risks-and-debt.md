@@ -715,7 +715,12 @@ its page tests mounts both renderers against the real server on both
 engines, so the suite grows by minutes with a feature: 1292 s under
 coverage on 2026-10-28, its job 22 minutes. The job's limit was raised
 from 25 to 40 minutes (`.github/workflows/gates.yml`) rather than the suite
-split across runners, which is the next step when that is not enough.
+split across runners, which is the next step when that is not enough. The
+browser legs grow the same way, every journey walked in every window:
+WebKit's took up to 1553 s on main by 2026-11-12 and 1753 s with 0151's
+widths journey, past the thirty minutes the legs had, so their limit is
+now that slowest green time tripled rather than the host's gate split
+across runners.
 
 **A merged branch is deleted by a repository setting** that nothing here
 reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
