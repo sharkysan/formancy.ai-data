@@ -43,11 +43,14 @@
   page's own sizing told; each step of Alt and an arrow on a header told
   while the section keeps each; a click and a double click on an edge
   keeping nothing, pressed with the pointer; a double click sizing
-  nothing; and a row's Delete never resized. To be watched failing in CI,
-  in two runs, each with the breaks of one commit -- B1 to B3 of
+  nothing; and a row's Delete never resized. Watched failing in CI, in
+  two runs, each with the breaks of one commit -- B1 to B3 of
   "TEMPORARY (1/2): break what 0151's host cases hold, to watch them fail"
-  and B4 to B7 of "TEMPORARY (2/2): ..." -- each case failed by its break
-  alone: on both engines against the real server,
+  in run 43401316795, and B4 to B7 of "TEMPORARY (2/2): ..." in run
+  43405448500 -- each case in the run of its break, which leaves the
+  breaks of the other commit out; in the first run, B2 and B3 also failed
+  B4's and B7's cases, which the second ran without them: on both engines
+  against the real server,
   `apps/host/src/grid-keys.test.tsx` -- Alt and an arrow on a header
   resizing its column and the width kept (B1), and a width set in Columns
   through a new page, the separator let go and the page mounted again, as
@@ -68,11 +71,13 @@
   value a search listed (B3). The gate's `reveal`
   (`apps/host/scripts/browser/measure.mjs`) scrolling the window until a
   pane the window cuts lies wholly in it, run in Playwright's Linux
-  Chromium on 2026-11-13 at 897 by 900: without it, the states after
-  Wider and after Fit left the lines at the Records panel's edge
-  undecided; with it, every check of that width passes, and with the
-  Columns panel's labels turned down to `#3a3f4b` in a copy, the Created
-  by label at that edge is decided as failing, at 1.75:1.
+  Chromium and WebKit on 2026-11-13 at 897 by 900: without it, the states
+  after Wider and after Fit left the lines at the Records panel's edge
+  undecided; with it, every check of that width passes in both, and with
+  the Columns panel's labels turned down to `#3a3f4b` in a copy, the
+  Created by label at that edge is decided as failing, at 1.75:1, in
+  Chromium. Without the scroll rounded to whole pixels, WebKit left them
+  undecided still.
 
 ## Context
 
@@ -175,7 +180,11 @@ Playwright's Linux Chromium with the signs). It now scrolls the window
 until the pane lies wholly in it, as a person does before scrolling
 inside the pane, decides the text and scrolls both back
 (`apps/host/scripts/browser/measure.mjs`'s `reveal`); the signs were not
-what made the lines decidable.
+what made the lines decidable. It scrolls by whole pixels, rounded past
+the edge, because WebKit scrolls the window by whole pixels only: asked
+for 126.89, it scrolled 126, and left the pane 0.89 of a pixel below the
+window (CI run 43405448500, and measured in Playwright's Linux WebKit the
+same day).
 
 **Alt and an arrow on a header resize it, as AG Grid does.** Stopping it
 would give the keys to nothing, since AG Grid takes them from the browser

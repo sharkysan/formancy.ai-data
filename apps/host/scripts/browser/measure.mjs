@@ -264,7 +264,11 @@ async function reveal(page, at) {
     try {
       let frame = pane.getBoundingClientRect()
       if ((frame.top < 0 || frame.bottom > window.innerHeight) && frame.height <= window.innerHeight) {
-        window.scrollBy(0, frame.top < 0 ? frame.top : frame.bottom - window.innerHeight)
+        // Whole pixels, rounded past the edge: WebKit scrolls the window by
+        // whole pixels only, and a fraction short left the pane 0.89 of one
+        // below the window (measured 2026-11-13, 897 by 900, the pane from
+        // 176.89 to 900.89 after 126 of the 126.89 asked).
+        window.scrollBy(0, frame.top < 0 ? Math.floor(frame.top) : Math.ceil(frame.bottom - window.innerHeight))
         frame = pane.getBoundingClientRect()
       }
       const top = frame.top + pane.clientTop
