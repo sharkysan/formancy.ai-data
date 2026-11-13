@@ -4319,7 +4319,7 @@
       ]
     },
     "0151": {
-      "reviewed": "sha256:83430b8ee5444f13209e25c0ff215afbf63d74c71beebf1f84bca202ace64f95",
+      "reviewed": "sha256:0203f484d563df7bb788cfd882e8fd23d2d42bc649c801844e8c6f9f2c460c0f",
       "limitations": [
         {
           "area": "host",
@@ -4347,7 +4347,7 @@
         },
         {
           "area": "host",
-          "says": "The resize handle AG Grid draws between the headers is not measured for contrast."
+          "says": "The resize handle AG Grid draws between the headers, and the minus and plus the Columns panel draws for a column's steps, are not measured for contrast; the steps are signs, and say what they do by their names alone."
         }
       ]
     }

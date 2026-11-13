@@ -926,8 +926,8 @@ signed in on it shares it. A hidden column is still in Download CSV
 ([0106](./docs/decisions/0106-a-hosts-grid-keeps-its-columns-sort-and-view-in-the-viewers-browser.md)).
 
 A column is as wide as you make it. Drag its header's edge, press Alt and
-an arrow on its header, or, in Columns, press its − or +, a step a
-press, which the panel's line says in pixels, and Fit to size it to
+an arrow on its header, or, in Columns, press its minus or plus, a step
+a press, which the panel's line says in pixels, and Fit to size it to
 the rows shown; Reset columns gives every column back to its content. A
 column is never narrower than its header's longest word, and has a
 widest. Your browser keeps the widths with the columns, so the next page,

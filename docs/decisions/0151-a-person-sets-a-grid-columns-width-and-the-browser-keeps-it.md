@@ -131,11 +131,15 @@ sizing as its default limit), where it had been the column's `maxWidth`.
 
 **The keyboard's way is the Columns panel** (`apps/host/src/columns-panel.tsx`),
 where every other change of a column is (0106, formancy.ai 0046). Each
-column's line has Narrower, Wider and Fit, drawn as −, + and Fit and
-named "Make Amount narrower", "Make Amount wider" and "Fit Amount to its
-content": the signs are symbols, which WCAG 2.5.3 leaves to the name, and
-short, so a column's Show, label, moves and width stay on one line in
-Side by side's lane. Drawn as words, the line needed more than the lane
+column's line has Narrower, Wider and Fit, drawn as a minus, a plus and
+the word Fit and named "Make Amount narrower", "Make Amount wider" and
+"Fit Amount to its content". The minus and the plus are drawn signs, SVGs
+the tree does not hold, which leave the buttons to their names: typed as
+the characters "−" and "+", axe could not decide their contrast, a text
+of only non-text characters, and the gate fails a text it cannot decide
+(CI run 43355345952, every state with Columns open, all three browsers).
+They are short, so a column's Show, label, moves and width stay on one
+line in Side by side's lane. Drawn as words, the line needed more than the lane
 of a window 897 pixels wide: measured on 2026-11-13 in Playwright's
 Chromium and Firefox, a column's line in Columns was two lines in a
 469-pixel lane where it is one now, and one from a lane of 410 pixels;
@@ -238,8 +242,10 @@ use to fit a column, does nothing here.
 
 Each column's line in Columns has three more Tab stops, Narrower, Wider
 and Fit, a hidden column's included: the panel's way through grows by
-three for every column. Drawn as − and +, the steps say what they do by
-their names alone; a person who reads the screen sees signs. In a lane
+three for every column. Drawn as a minus and a plus, the steps say what
+they do by their names alone; a person who reads the screen sees signs,
+drawn in the button's text colour, whose contrast no gate measures, as
+it measures none of the resize handle's. In a lane
 narrower than about 410 pixels -- the split moved toward the record, or a
 phone, where the page scrolls as a whole -- a column's line is two lines
 again.
@@ -272,6 +278,18 @@ header is narrowed past them, and its cells cut, as a person asked.
   keys from the browser on a header whether a column resizes or not, so
   stopping its resize would give Back and Forward back to no one, and would
   need a listener in front of AG Grid's own.
+- **The steps in words, with the Columns list scrolling inside the
+  Records panel.** Rejected: the gate can show a line its pane cuts only
+  where that pane lies wholly in the window, and at the page's top Side
+  by side's Records panel reaches below it, so the list's foot would have
+  to stay above the window's whatever the toolbar above it holds -- the
+  filter line, its chips, a refused filter's sentences -- and Reset
+  columns and the panel's line under the list would still meet the
+  Records panel's edge. Words on a line of their own under each column's
+  line are the same panel, taller.
+- **A Width disclosure per column**, its words behind it. Rejected: words
+  then fit, but every step asks a press more, and the panel holds a state
+  per column; the signs ask none.
 - **A spinbutton per column**, one Tab stop whose Up and Down move the
   width a step and whose value is said as it changes. Rejected: its value
   would be the width the grid draws, which the page's sizing changes under
