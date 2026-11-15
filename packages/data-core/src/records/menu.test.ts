@@ -26,7 +26,9 @@ import {
   sectioned,
   snapshot,
   TENANT,
+  togetherOn,
 } from './test-support.js'
+import { customers, defaultedNumber, noted, notes } from './test-together.js'
 
 /*
  * The forms a person's menu names, and the children under each (0045): the
@@ -306,6 +308,56 @@ describe('a section under its parent (0109)', () => {
     expect(menuOf([hidden, company()], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
       { form: 'company', field: 'customer', one: true, when: null },
     ])
+  })
+})
+
+describe('a record whose rows are saved with it (0155)', () => {
+  const lines = (policy: FormPolicy = LINE_POLICY, bounds = { min: 1, max: 3 }, connection = 'erp') =>
+    bundle('order-line', 'Order line', PG, togetherOn(lineForm(PG).bindings, 'order', bounds), policy, connection)
+  const operationsOf = (bundles: readonly MenuBundle[], context: PolicyContext = CLERK) =>
+    Object.fromEntries(menuOf(bundles, context).forms.map((entry) => [entry.id, entry.operations]))
+
+  // An order that must hold a line is created with its lines, in one
+  // save, so the menu offers its create only to a person who could make
+  // that save: one the line form is a child of the order for, who may
+  // create its rows in a save. Not to a clerk whose line policy keeps
+  // creating lines to managers, nor to one who may not read the lines at
+  // all -- a bound applies to everyone, so a child they cannot see still
+  // requires rows. A min of 0, or lines on another connection, require
+  // nothing. The line form itself never offers create alone. Watched
+  // failing with the menu asking nothing of together children: every
+  // clerk was offered the order's create.
+  test('leaves out the create of a record whose rows are required exactly where the person could not make the save', () => {
+    expect(operationsOf([ORDER, lines()])).toEqual({ order: ['read', 'create', 'update'], 'order-line': ['read', 'update'] })
+    const managersCreate = lines({ ...LINE_POLICY, operations: { ...LINE_POLICY.operations, create: ['manager'] } })
+    expect(operationsOf([ORDER, managersCreate])).toEqual({ order: ['read', 'update'], 'order-line': ['read', 'update'] })
+    // Clerks may create lines and not read them: no tab of lines is theirs to add them in.
+    const managersRead = lines({ ...LINE_POLICY, operations: { read: ['manager'], create: ['clerk'], update: [] } })
+    expect(operationsOf([ORDER, managersRead])).toEqual({ order: ['read', 'update'] })
+    expect(operationsOf([ORDER, lines(LINE_POLICY, { min: 0, max: 3 })])).toEqual({ order: ['read', 'create', 'update'], 'order-line': ['read', 'update'] })
+    expect(operationsOf([ORDER, lines(LINE_POLICY, { min: 1, max: 3 }, 'archive')])).toEqual({
+      order: ['read', 'create', 'update'],
+      'order-line': ['read', 'update'],
+    })
+  })
+
+  // A customer whose number the database fills by a default that can
+  // repeat has a key no save can know before its notes' statements, so the
+  // planner refuses every save that creates one with notes, and the menu
+  // offers no create of it while notes are required; with the number
+  // typed, it offers one. Watched failing with the key unasked: the
+  // defaulted customer's create was offered.
+  test('leaves out the create of a record whose key a save of its rows could not know', () => {
+    const of = (source: MetadataSnapshot) => {
+      const parent = customers(source)
+      const child = notes(source)
+      return operationsOf([
+        bundle('customer', 'Customer', source, parent.bindings, parent.policy),
+        bundle('notes', 'Note', source, child.bindings, child.policy),
+      ])
+    }
+    expect(of(noted())).toEqual({ customer: ['read', 'create'], notes: ['read'] })
+    expect(of(noted(defaultedNumber))).toEqual({ customer: ['read'], notes: ['read'] })
   })
 })
 

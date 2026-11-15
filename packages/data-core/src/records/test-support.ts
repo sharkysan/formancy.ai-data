@@ -356,6 +356,20 @@ export function edited(bindings: FormBindings, change: (draft: FormBindings) => 
   return draft
 }
 
+/**
+ * `bindings` with lookup `field` saving the form's rows with the record it
+ * references (0155), `min` to `max` of them, and written on create only:
+ * what the generator will write for a together choice, which it does not
+ * yet, so these suites edit what it writes.
+ */
+export function togetherOn(bindings: FormBindings, field: string, bounds: { min: number; max: number } = { min: 1, max: 3 }): FormBindings {
+  return edited(bindings, (draft) => {
+    const binding = draft.fields.find((candidate) => candidate.field === field) as Extract<FieldBinding, { kind: 'lookup' }>
+    binding.together = { ...bounds }
+    binding.writes = { create: true, update: false }
+  })
+}
+
 /** The binding for a field key. A key the form lacks fails the test that asked, at its first use. */
 export function fieldOf(bindings: FormBindings, key: string): FieldBinding {
   return bindings.fields.find((binding) => binding.field === key) as FieldBinding

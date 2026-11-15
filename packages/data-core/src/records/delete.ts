@@ -1,10 +1,10 @@
-import { deleteUnoffered, offers } from '../generate/offers.js'
+import { deleteUnoffered, offeredFor, type WriteScope } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import type { MetadataSnapshot } from '../metadata.js'
 import { deleteProblems, deleteReach } from '../policy/cascades.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { driftRefusal } from './drift.js'
-import { versionFits } from './plan.js'
+import { unoffered, versionFits } from './plan.js'
 import type { PlannedDelete } from './plan-types.js'
 import { prepare, refuse, unaddressable } from './prepare.js'
 import { filtersFor, throughFor } from './scope.js'
@@ -36,6 +36,9 @@ import type { DescribedTable } from './types.js'
  * not read is no reason to refuse -- a delete hands out nothing but the
  * token it was sent, as a read does, where a list hands out one per row.
  *
+ * `scope` is where the delete is made (0155): a together child's row is
+ * deleted only in a save of its record (`offeredFor`).
+ *
  * Pure and isomorphic, as the other planners are.
  */
 export function planDelete(
@@ -46,6 +49,7 @@ export function planDelete(
   recordToken: string,
   expectedVersion: string,
   described: DescribedTable,
+  scope: WriteScope = null,
 ): PlannedDelete {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
@@ -55,16 +59,17 @@ export function planDelete(
   const through = throughFor(snapshot, bindings, prepared, policy, context, 'delete')
   if (!through.ok) return through
   const concurrency = prepared.target.concurrency
-  if (!offers(bindings, 'delete') || concurrency === null) return refuse('operation-unavailable', 'This form does not offer delete.')
+  if (!offeredFor(bindings, 'delete', scope)) return unoffered(bindings, 'delete', scope)
+  if (concurrency === null) return refuse('operation-unavailable', 'This form does not offer delete.')
   // The generator's own rule, asked of the bindings' own snapshot: a hand
   // edit that offers what it would not is refused, never planned (0050).
-  const unoffered = deleteUnoffered(
+  const blocked = deleteUnoffered(
     snapshot.kind,
     prepared.root,
     prepared.target.identity.map((column) => column.name),
     concurrency,
   )
-  if (unoffered !== null) return refuse('invalid-bindings', `The bindings offer delete, and their snapshot says: ${unoffered}`)
+  if (blocked !== null) return refuse('invalid-bindings', `The bindings offer delete, and their snapshot says: ${blocked}`)
   if (!prepared.addressable) return unaddressable(prepared)
   const problems = deleteProblems(snapshot, bindings, policy)
   if (problems.length > 0) return refuse('invalid-policy', problems.join('; '))

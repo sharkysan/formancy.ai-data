@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:0a5d14f805a5e4492a4ffc95add0c1793813316a1487632101eaae9c2de18b42",
+      "reviewed": "sha256:7341e9082104c2821a0c5ceb92603e6faef65060c2e7bdd5d98e945fcec64ecc",
       "limitations": [
         {
           "area": "forms",
@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:70f4af6c63dc720b4a6824eb28411dbbfa867ede44ee819ea2760cd6c7da0ba5",
+      "reviewed": "sha256:ca31e952eebc00181f4bd5443f662c01e610d9ef59e0ad0f03e5975888c6966a",
       "limitations": [
         {
           "area": "databases",
@@ -336,7 +336,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:5e5570e2ba15bf994e336bb26a125fe93e09bdf892c29a1cf3c9f4ed99794f5e",
+      "reviewed": "sha256:207967644ca41af1096f02a5626ed774da15bb6e7a45b52c400509ac1b0f4a9a",
       "limitations": [
         {
           "area": "access",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:0d74f897564c1be05d0f777f5cab1c935758391d312585162d4c9263b3a86924",
+      "reviewed": "sha256:6433ac5c0c6d2b878249f59c15b99f2ade94dc7ab0b7b1dbe2fdc9339c71cbe5",
       "limitations": [
         {
           "area": "operations",
@@ -506,7 +506,7 @@
       ]
     },
     "0027": {
-      "reviewed": "sha256:cc529b7775cc570e2e5eccef3b3b407fa237531b6f5b6775ab18bbe68148bc2c",
+      "reviewed": "sha256:259cdc0ca18272f01f5fbb34a400e786ff9d7eff73def0483178bf9289e7cdf3",
       "limitations": [
         {
           "area": "databases",
@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:12406f6f762e7d2662da97a328ebe24f072e47a641cb8e936f597c43e584105a",
+      "reviewed": "sha256:09a30add315929e018d727ad4a3bc26e0b450458371a3006b956de25b2feb47c",
       "limitations": [
         {
           "area": "studio",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:fa2f9c35db8b11d8788a0b8a9098dab1cfb17216494e6223060255e8b2b0add0",
+      "reviewed": "sha256:6353a5d64a92a07e62a6b89856b7d6f9d1e1b645373faa58708c0dd8854cfa10",
       "limitations": [
         {
           "area": "writes",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:042c94b87b9852399587e290feedd83bbf827b7fc1500c1c8e4b49eb4553581c",
+      "reviewed": "sha256:1d4f471070e6b239445aada4980c6605efe1176f42c584be61442a3412a7924e",
       "limitations": [
         {
           "area": "forms",
@@ -1134,7 +1134,7 @@
       "none": "Superseded by 0118: what generated forms are written in, and what an integrator's renderer must read, are that record's costs now, a whole-number field's fraction included."
     },
     "0043": {
-      "reviewed": "sha256:e591046f44912a3c34c9a680d1fcded0d3a5c38b3838ee2414a0577876f87ce3",
+      "reviewed": "sha256:7a8d70692051659d4f428d8c277446bc3e070719fb671c2f8a21a4e23cdd6a4b",
       "limitations": [
         {
           "area": "access",
@@ -1242,7 +1242,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:cc66c8c8c854c3dc9e9b4e05143113afa7dbc678f636a2a4ad62cc69c509f6b1",
+      "reviewed": "sha256:a5c2c7770fb904c49f57a26568ebcebfd1a86e98ecd44d94a4e57e73362e50f6",
       "limitations": [
         {
           "area": "server",
@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:8a932e88dbc0d6bfc3df17634831023fc7a05b85fa04af318e7769e603cc4ac0",
+      "reviewed": "sha256:900ab46578cc6f8e72bf225c73126df0c310ceae9c8d7233f458f083c8f2870c",
       "limitations": [
         {
           "area": "host",
@@ -1409,7 +1409,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:adec72050ff4442e8a8fd306912bf385aec4b56b37febeab3926d45a1c802def",
+      "reviewed": "sha256:50bb734d59e282d5baba44929c36a7509c66cffcc3c8d7a8c5e903aa26f34667",
       "limitations": [
         {
           "area": "writes",
@@ -1568,7 +1568,7 @@
       ]
     },
     "0053": {
-      "reviewed": "sha256:59d04e7b36c0db0a6730568b7841c19bb05825ea0dd655b1fe19141c09ab1366",
+      "reviewed": "sha256:4203bd1f063a3b0c337b0be229571a814e9906f0df6e768fb615f9a4b915e0a3",
       "limitations": [
         {
           "area": "host",
@@ -1873,7 +1873,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:902b0d06d513c2a894d2ddde01f5e3c3bf8969c64d83a8e6b5bc7f5e83bf97b0",
+      "reviewed": "sha256:773fa0ffab5b048eec87af05147055934dfbdbd15fea1f2cf09ea31d1ce4dbd3",
       "limitations": [
         {
           "area": "server",
@@ -2829,7 +2829,7 @@
       "none": "A grant of the live demo's own account: nothing a user, integrator or operator of a release meets. The generator is unchanged, so a deployment's own column with a default is still offered wherever its account may INSERT it, as 0027 says."
     },
     "0090": {
-      "reviewed": "sha256:2a3f95dc0af2e72a4bc61d4322aac879541f3fed68316759c6008d69e71bb867",
+      "reviewed": "sha256:fd1b879b6b72ab5da028692e291243554487b88a3c48890d54fba26f901d383f",
       "limitations": [
         {
           "area": "host",
@@ -3953,7 +3953,7 @@
       ]
     },
     "0142": {
-      "reviewed": "sha256:d06fc5657b3e1f52962ea7d1649485fee65d8630c0be5ab42c46a88bc00d5f23",
+      "reviewed": "sha256:e8360af9bb47d525d7a7af865551f63455d380119083c431b952557285659b2f",
       "limitations": [
         {
           "area": "host",
@@ -4458,6 +4458,40 @@
     "0154": {
       "reviewed": "sha256:cd38471d6ed98beac45014b9da51ca46f7705bfb917b28d1ff3ff5c05a00e027",
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
+    },
+    "0155": {
+      "reviewed": "sha256:f94ed9360170ecef5cb89a8e8c98c90925b1c6dff51ec68d05b1444818815c3c",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A record's rows are planned as one save in data-core and run by nothing yet: no adapter saves, no route takes a save and the generator writes no together lookup, so no published form saves a record with its rows."
+        },
+        {
+          "area": "forms",
+          "says": "A form whose lookup is saved with its record offers no create or delete of its rows alone, only their updates.",
+          "heldBy": "packages/data-core/src/records/together.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "The menu offers the create of a record that a together lookup requires rows of only to a person who could save those rows with it, and to nobody where the record's key is filled by a default that can repeat; the create route does not refuse such a create yet.",
+          "heldBy": "packages/data-core/src/records/menu.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A record holds at most one row less than a list's page of a together child, since a save is planned from one page of its rows, until the adapters' save measures how many rows one save can hold.",
+          "heldBy": "packages/data-core/src/records/together.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A save of a record's rows alone moves the record's version and writes none of its stamped columns, so a column the server stamps on update does not say who saved the rows, or when.",
+          "heldBy": "packages/data-core/src/records/save.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a save is held to one batch of 2,100 parameters by a prediction of the batch the adapter will build, which no batch has yet been compared with, and a record whose step and together children's rows exceed it offers no save of them.",
+          "heldBy": "packages/data-core/src/records/together.test.ts"
+        }
+      ]
     }
   }
 }

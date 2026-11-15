@@ -335,6 +335,8 @@ identity is a key (0016), and every update reads the record first, one
 extra query (0022). A delete cannot be undone here, and one refused because
 other rows refer to the record names none of them (0050). A reference a
 delete clears does not move the referring row's version column (0051).
+A form whose lookup is saved with its record offers no create or delete of
+its rows alone, and a save of a record's rows alone stamps nothing (0155).
 Only writes through the module are stamped; a stamped wall clock and day
 are UTC's, whatever the business's zone; an id a SQL Server code page
 cannot hold is the database's 422 on a field the person cannot write,
@@ -355,8 +357,9 @@ the touch itself, and taken once it holds UPDATE on the table -- any grant
 to write the table will do, as
 [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
 measured. A save of a
-record with its rows, which is not built, would meet the same lock on the
-record's table
+record with its rows
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)),
+which is not built, would meet the same lock on the record's table
 ([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
@@ -728,6 +731,22 @@ nothing; a row whose sorted column moves it past that row between two
 pages is shown twice, which refuses the file `moved`, or skipped unseen,
 and an order no index serves still reads every admitted row for each
 page.
+
+**A record's rows saved with it, for two forms' writes alone.** The cost
+of [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md), bought so
+that an order holds its lines within bounds and is stored with them or not
+at all. The record's version moves on every save of its rows, so two people
+saving different lines of one order at once are one saved and one `stale`;
+the bound holds for the writes of the parent's form and the together
+child's, not for another form over the child's table, another form's
+delete that reaches it, a trigger or another application; on SQL Server a
+trigger that ends the transaction can store a save in part; a save is
+held to one batch there, by a prediction of its parameters; and a record
+holds at most one row less than a list's page of a together child
+(`TOGETHER_MAX_ROWS`), since a save is planned from one page of its rows,
+until the adapters' save measures how many one save can hold. Only the
+planning is built: the adapters, the route, the host page and the studio
+follow, and until they do nothing published saves this way.
 
 **One verifier, two products, two installs.** The cost of
 [0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md),

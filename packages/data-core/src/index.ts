@@ -32,8 +32,10 @@ export { readCheckList } from './generate/check-lists.js'
 export type { CheckList, ListedLiteral } from './generate/check-lists.js'
 export { listedFor } from './generate/listed.js'
 export type { Listed } from './generate/listed.js'
-export { deleteUnoffered, offers, versionProvesRecord } from './generate/offers.js'
-export type { OfferedOperation } from './generate/offers.js'
+export { deleteUnoffered, offeredFor, offers, versionProvesRecord } from './generate/offers.js'
+export type { OfferedOperation, WriteScope } from './generate/offers.js'
+export { boundsProblem, TOGETHER_MAX_ROWS, togetherOf, togetherProblem, touchColumnProblem } from './generate/together.js'
+export type { Together } from './generate/together.js'
 export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION, SERVED_SPEC_VERSIONS } from './generate/version.js'
 export { isStampChoice, stampedOn, stampProblem } from './generate/stamps.js'
 export type {
@@ -52,6 +54,7 @@ export type {
   StampChoice,
   StampOn,
   StampValue,
+  TogetherBounds,
   ValidityBinding,
 } from './generate/types.js'
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
@@ -218,6 +221,26 @@ export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
 export { formMenu, grantedOperations, lookupOpens, menuForm } from './records/menu.js'
 export type { MenuBundle, MenuForm } from './records/menu.js'
+export { menuSaves, menuTogether, rowsRequired, saveParameters, SQLSERVER_MAX_PARAMETERS, togetherChildren } from './records/together.js'
+export type { MenuSaves, MenuTogether, TogetherChild } from './records/together.js'
+export { planSave, planSaveList } from './records/save.js'
+export type { RequiredRows, SaveInput } from './records/save.js'
+export type { SaveBundle, SaveChildInput } from './records/save-steps.js'
+export type {
+  HeldRows,
+  ParentColumn,
+  PlannedSave,
+  PlannedSaveStep,
+  SaveChild,
+  SaveOutcome,
+  SavePlan,
+  SavePlanRefusal,
+  SaveRecordStep,
+  SaveRequest,
+  SaveStep,
+  TouchRequest,
+} from './records/save-types.js'
+export type { SaveBody, SaveChange, SavedRecord, SavePart, SaveRecordChange, SaveRefusal } from './save.js'
 export type { Listable } from './records/list.js'
 export { readSort, validateExportQuery, validateListQuery } from './records/list-query.js'
 export type { ExportQueryCheck, ExportQueryRefusal, ListQueryCheck, ListQueryErrorCode, ListQueryRefusal } from './records/list-query.js'

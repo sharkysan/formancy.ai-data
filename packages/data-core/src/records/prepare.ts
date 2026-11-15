@@ -1,6 +1,7 @@
 import { canonicalize } from '@formancy/spec'
 import { versionColumnProblem } from '../generate/generate.js'
 import { isStampChoice, stampedOn, stampProblem, stampRoleProblem } from '../generate/stamps.js'
+import { togetherProblem, touchColumnProblem } from '../generate/together.js'
 import type { FieldBinding, FormBindings, StampBinding } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import { isLookupKeyType } from '../lookup/values.js'
@@ -123,9 +124,10 @@ export function keyOrderProblem(table: KeyedTable, identity: readonly string[]):
  * this module increments, held to the rule the generator confirms one by —
  * never the key, a field's column or a generated one — so an update cannot
  * move the record's address or its tenant. `bound` is every column a field is
- * bound to.
+ * bound to. A touch column is a rowversion's alone, held to
+ * `touchColumnProblem` (0155): a save of rows alone sets it to itself.
  */
-function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings, bound: ReadonlySet<string>): string | null {
+function concurrencyProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings, bound: ReadonlySet<string>): string | null {
   const concurrency = bindings.concurrency
   if (concurrency === null) return null
   const column = columns.get(concurrency.column)
@@ -135,7 +137,11 @@ function concurrencyProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: 
     if (column.type.kind !== 'rowversion') problem = `it is ${column.databaseType}`
     else problem = column.access.select ? null : "this connection's account may not read it"
   } else problem = versionColumnProblem(column, bindings.identity ?? [], bound)
-  return problem === null ? null : `${concurrency.column} cannot be a ${concurrency.kind}: ${problem}`
+  if (problem !== null) return `${concurrency.column} cannot be a ${concurrency.kind}: ${problem}`
+  if (!Object.hasOwn(concurrency, 'touch')) return null
+  if (concurrency.kind !== 'rowversion')
+    return `${concurrency.column} is a version column, which a save of rows moves itself, and a touch column is a rowversion's`
+  return touchColumnProblem(root, bindings.identity ?? [], concurrency.touch)
 }
 
 function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings): string | null {
@@ -156,7 +162,12 @@ function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMe
     // A key the account cannot read cannot be read back into a token: it addresses nothing.
     if (!column.access.select) return `the identity names ${name}, which this connection's account may not read`
   }
-  return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings, bound) ?? stampsProblem(columns, bindings)
+  return (
+    identityProblem(root, bindings.identity) ??
+    concurrencyProblem(root, columns, bindings, bound) ??
+    stampsProblem(columns, bindings) ??
+    togetherProblem(root, bindings)
+  )
 }
 
 /** Whether a stored stamp is a stamp the generator could have written: a choice, and a type. */

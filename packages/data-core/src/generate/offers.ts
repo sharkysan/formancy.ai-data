@@ -1,5 +1,6 @@
 import type { DatabaseKind } from '../adapter.js'
 import type { ColumnMeta, Generation, ObjectMeta } from '../metadata.js'
+import { togetherOf } from './together.js'
 import type { ConcurrencyBinding, FormBindings } from './types.js'
 
 /** A write a form may offer, as its bindings say: the operations other than read, which every form offers. */
@@ -7,9 +8,10 @@ export type OfferedOperation = 'create' | 'update' | 'delete' | 'supersede'
 
 /**
  * Whether the bindings offer `operation` (0050): exactly when they say
- * `true` for it. One function for every reader -- the planners, the policy's
- * fit, drift review, the published bundle's check, the form route and the
- * menu -- so none of them can offer what another refuses.
+ * `true` for it. One function for every reader -- the policy's fit, drift
+ * review and the published bundle's check, and through `offeredFor` the
+ * planners, the form route and the menu -- so none of them can offer what
+ * another refuses.
  *
  * An absent flag is `false`. The generator writes `delete` since 0050, and
  * the bindings are compared with the generator at publish only, so every
@@ -22,6 +24,37 @@ export function offers(bindings: Pick<FormBindings, 'operations'>, operation: Of
   return (
     typeof operations === 'object' && operations !== null && Object.hasOwn(operations, operation) && (operations as Record<string, unknown>)[operation] === true
   )
+}
+
+/**
+ * Where a write is made (0155): alone -- `null`, every route but a save --
+ * or in a save of a record with its rows, as a row of the form's together
+ * lookup `save`.
+ */
+export type WriteScope = null | { save: string }
+
+/**
+ * Whether the form offers `operation` in `scope` (0155): what the menu, the
+ * form route and the planners all ask, so none of them can offer a write
+ * another refuses.
+ *
+ * Alone, it is `offers()`, except that a form with a together lookup offers
+ * no create, delete or change from a date by itself: its rows are added
+ * and removed with their record, in a save. It keeps update, since its
+ * together field is written on create only and a row's own version guards
+ * it. In a save, it is `offers()` for a create, an update or a delete of a
+ * row of the form's one together lookup, `scope.save`, and nothing else.
+ * A form whose bindings carry a together lookup malformed offers nothing
+ * in a save, and nothing a save would make alone.
+ *
+ * The policy's fit keeps asking `offers()`: a policy grants against what
+ * the form can do in some write, so a together child's policy may grant
+ * the create and delete a save alone uses.
+ */
+export function offeredFor(bindings: Pick<FormBindings, 'operations' | 'fields'>, operation: OfferedOperation, scope: WriteScope): boolean {
+  const together = togetherOf(bindings)
+  if (scope === null) return (together === null || operation === 'update') && offers(bindings, operation)
+  return together !== null && together !== 'malformed' && together.binding.field === scope.save && operation !== 'supersede' && offers(bindings, operation)
 }
 
 /** How a column's value is numbered by the database, for a key no form writes (0026). */
