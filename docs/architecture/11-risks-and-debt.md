@@ -342,20 +342,21 @@ not `unstampable`, and nothing tests it; and the parity suites that hold
 what each engine stores for a stamp were run for it on each engine's
 default image alone
 ([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
-On PostgreSQL under any isolation but READ COMMITTED a write first takes
-`LOCK … IN ROW EXCLUSIVE MODE` on its table
-([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)), and
-that lock asks a grant on the table, not on a column: an account granted
-UPDATE on columns alone, which discovery reads as able to update them, is
-refused it, 42501, though the UPDATE itself is allowed. That was measured
-with the statement the locked path sends, not through the adapter, in
-`packages/data-postgres/src/save-facts.integration.test.ts` on PostgreSQL
-17.11, 2026-11-15; the locked path sends it before every update
-(`sendWrite`), so, by reading the code, such an account's updates are
-refused there too. A grant to write the table -- INSERT, UPDATE or DELETE,
-as [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
-measured -- is enough. A save of a record with its rows, which is
-not built, would meet the same lock on the record's table
+On PostgreSQL under any isolation but READ COMMITTED every read and write
+takes its table's lock first, and an account granted columns of the table
+and nothing on the table cannot take it and is refused `permission-denied`:
+that is [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)'s
+recorded cost, in `docs/release/limitations.json`, held through the adapter
+for a read by `packages/data-postgres/src/records-definition.integration.test.ts`.
+`packages/data-postgres/src/save-facts.integration.test.ts` adds the case a
+save would meet: `LOCK … IN ROW EXCLUSIVE MODE` is refused, 42501, to an
+account granted UPDATE on the version column alone, which may still make
+the touch itself, and taken once it holds UPDATE on the table -- any grant
+to write the table will do, as
+[0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
+measured. A save of a
+record with its rows, which is not built, would meet the same lock on the
+record's table
 ([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
