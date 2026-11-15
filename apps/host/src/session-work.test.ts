@@ -220,6 +220,49 @@ describe('a state field drawn as its moves (0127)', () => {
     numbered.open({ ...RECORD, answers: { ...RECORD.answers, line_no: 2 } })
     expect(disabled(numbered)).toEqual(['line_no'])
   })
+
+  // A state field whose column a check lists is generated as a select of
+  // every listed value (0152); held to moves, it is drawn as them, as a box
+  // is, or the clerk would be offered every state the check lists. A whole
+  // number's listed values are text, so its choice is drawn too. Watched
+  // failing with only a text box drawn as moves: the published select of
+  // every value was kept.
+  test('draws a select of listed values as the moves, a whole number’s too', () => {
+    const listed = (fields: PublishedForm['form']['model']['fields']): PublishedForm['form']['model']['fields'] =>
+      fields.map((field) =>
+        field.key === 'notes'
+          ? { ...field, type: 'select', options: ['closed', 'open', 'void'].map((value) => ({ value, label: value })) }
+          : field.key === 'line_no'
+            ? { ...field, type: 'select', options: ['1', '2', '3'].map((value) => ({ value, label: value })) }
+            : field,
+      )
+    const published = (moves: PublishedForm['moves']): PublishedForm => {
+      const plain = definition(['read', 'create', 'update'], undefined, moves)
+      return { ...plain, form: { ...plain.form, model: { ...plain.form.model, fields: listed(plain.form.model.fields) } } }
+    }
+    const drawn = createSession({ client, formId: 'pg-order-line', definition: published(MOVES), renderer: 'react' })
+    drawn.open(at('open'))
+    expect(notes(drawn)?.options).toEqual([
+      { value: 'open', label: 'open' },
+      { value: 'closed', label: 'closed' },
+    ])
+    const numbered = createSession({
+      client,
+      formId: 'pg-order-line',
+      definition: published({ field: 'line_no', moves: [{ from: '1', to: '2' }], labels: [] }),
+      renderer: 'react',
+    })
+    numbered.open({ ...RECORD, answers: { ...RECORD.answers, line_no: '1' } })
+    expect(
+      numbered
+        .opened()
+        .engine.schema()
+        .model.fields.find((field) => field.key === 'line_no')?.options,
+    ).toEqual([
+      { value: '1', label: '1' },
+      { value: '2', label: '2' },
+    ])
+  })
 })
 
 describe("a new record starts with its column's default (0149)", () => {
