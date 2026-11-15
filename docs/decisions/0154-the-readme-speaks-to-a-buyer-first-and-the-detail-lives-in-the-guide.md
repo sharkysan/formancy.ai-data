@@ -17,14 +17,23 @@
     `docs/guide/`, which names no file), and with the studio's region
     planted in `README.md` ("README.md holds the pictures region "studio",
     which is drawn on docs/guide/studio.md").
-  - `scripts/architecture.test.mjs`: every relative link of `README.md` and
-    of each page of `docs/guide/` reaches a file git would commit, and every
-    fragment a heading of it. Watched failing with the README's link into
-    *What it is tested on* given a heading the page does not have and one
-    of *Development*'s into `CONTRIBUTING.md` misspelled, and its read-at-all
-    case with the README and the guide left out of what it reads; it found
-    the link from `docs/architecture/03-context-and-scope.md` to the
-    README's old *When the schema changes* on its first run.
+  - `scripts/architecture.test.mjs`: every relative link of every Markdown
+    file git would commit but the decision records and `CHANGELOG.md` --
+    `README.md`, the guide's pages, the packages' READMEs, the
+    getting-started guide among them -- reaches a file git would commit,
+    and every fragment a heading of it; a link to the licence the build
+    copies into a package is checked as one to the root's file. Watched
+    failing with the README's link into *What it is tested on* given a
+    heading the page does not have and one of *Development*'s into
+    `CONTRIBUTING.md` misspelled; with `../README.md#studio` planted in
+    `docs/getting-started.md`, `../../README.md#deploying` in
+    `docs/deploy/cloudflare.md` and `../../README.md#what-it-is-tested-on`
+    in `packages/data-server/README.md`; with the build's copies not read
+    as the root's, when every package README's link to its `LICENSE.md`
+    failed; and its read-at-all case with only the README and the guide
+    read. It found the link from
+    `docs/architecture/03-context-and-scope.md` to the README's old *When
+    the schema changes* on its first run.
   - `scripts/release-report/tested-on.test.mjs`: the table on
     `docs/guide/tested-on.md` is what `testedOn()` renders. Watched failing
     with one of jose's versions changed there.
@@ -72,13 +81,21 @@ the licence's sentence by its block (0048), and the link to the setup page.
 **The README is a page for a buyer first and a developer second.** In
 order: the name, a promise and three sentences of what the module does and
 on what terms; the hero picture; *Try it*, the live demo and the examples
-page; *Why*, a few benefits, each ending with the records whose
-**Verified by** holds it; *How it works*, the path from a connection to a
-person's record in a handful of steps; *What you get*, a dozen bullets at
-most, grouped for a reader -- working with records, administration,
-operations -- each linking its records and none counting anything that
-goes stale; *What it does not do yet*; *Quick start*, the composed stack
-and what an application of one's own installs; a short *Status*; the
+page; *Why*, opening with a line that says the page describes `main`,
+which has more than the latest release, then a few benefits, each ending
+with the records whose **Verified by** holds it, and saying, where there
+is one, the condition a reader would otherwise meet too late -- in the
+first, that a form offers
+update and delete only where a rowversion or a confirmed version column
+tells a stale save, so a PostgreSQL table needs such a column to be
+editable; *How it works*, the path from a connection to a person's record
+in a handful of steps; *What you get*, a dozen bullets at most, grouped
+for a reader -- working with records, as the host page, an example that
+is not released, draws them; administration, in the studio, built from
+the repository and not published; operations -- each linking its records
+and none counting anything that goes stale; *What it does not do yet*;
+*Get started*, the composed stack and what an application of one's own
+installs, the studio built from the repository; a short *Status*; the
 *Licence, in one table*, unchanged, which `CLAUDE.md` names as the
 explanation; and *Learn more*.
 
@@ -95,7 +112,11 @@ longer true were corrected in the move rather than carried: the live
 demo's address was said to be formancy.ai's 404 until its Worker was
 created, which `docs/setup.md` records as done on 2026-10-19, and the
 drift paragraph said no command checks drift for a pipeline, which 0111's
-`dist/drift-check-cli.mjs` does. `docs/README.md` lists the pages.
+`dist/drift-check-cli.mjs` does. One number was dropped in the move: the
+status said the live demo's start on Cloudflare answered after 1778 ms,
+a figure nothing in the repository says how anyone measured, while the
+live demo's own section said its start there was not yet measured.
+`docs/README.md` lists the pages.
 
 **The generated blocks follow their sections.** The hero's pictures region
 stays in the README; each app's region is drawn on its page of the guide,
@@ -126,7 +147,7 @@ so.
 it, why it might fit, what it does and does not do yet, and what it costs,
 in a page a few hundred lines long, every claim on it still linking the
 record that holds it. A developer finds the composed stack and the
-packages in *Quick start*. The reference is unchanged in substance, and a
+packages in *Get started*. The reference is unchanged in substance, and a
 page of it can be linked whole.
 
 **What it costs.**
@@ -147,6 +168,11 @@ page of it can be linked whole.
   find a region left on another page, and needs git, as the licence
   block's already did; an app given scenes needs its page of the guide
   before the check passes.
+- The link check reads every Markdown file git would commit but the
+  records and the changelog, so a heading renamed on any page fails until
+  every link to it, on any page, is aimed again; and a file a build writes
+  beside a package is known to it only as `scripts/sync-licenses.mjs`'s
+  licence copies, read from the manifests as that script reads them.
 - The README's own *Try it* is held for both addresses only: the live
   demo's people, minutes and cap, and the examples page's port, are held on
   the guide's pages, where the README no longer states them.

@@ -229,7 +229,7 @@ describe('parseConnections, for an Entra principal', () => {
   })
 
   // The login types the allowlist takes are the adapter's, which the
-  // README's tested-on row says (0074): a type added on one side and not
+  // tested-on page's row says (0074): a type added on one side and not
   // the other would be a login no row names, or a row no entry can reach.
   test('takes exactly the Entra logins the SQL Server adapter opens, which it says are not tested', () => {
     expect(['sql', ...CONNECTION_LOGINS]).toEqual(SQLSERVER_LOGINS.map((login) => login.login))

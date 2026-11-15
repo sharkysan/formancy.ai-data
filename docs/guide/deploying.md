@@ -5,7 +5,7 @@ policies, Cloudflare as the edge, the host's identity keys, other origins,
 proxies, publication under review and the browse role, and what follows when
 the schema changes.
 
-The composed stack of [*Quick start*](../../README.md#quick-start) has one proxy,
+The composed stack of [*Get started*](../../README.md#get-started) has one proxy,
 [`deploy/web/nginx.conf`](../../deploy/web/nginx.conf), which serves the studio
 and the host page at `/studio/` and `/host/` beside `/v1/` and is the shape a
 deployment's own proxy copies. CI runs [the getting-started guide](../getting-started.md)

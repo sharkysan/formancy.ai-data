@@ -32,7 +32,7 @@ delete; a host page on another origin run in a browser; a run through a real
 Cloudflare tunnel; anything that reads what Cloudflare sends at the
 examples page's address, which was read by hand once, on 2026-10-16, or
 a sign-in to the live demo on Cloudflare, which was read by hand on
-2026-10-19, its start answering after 1778 ms
+2026-10-19
 ([0088](../decisions/0088-the-demo-image-makes-postgresqls-socket-directory-at-every-start-and-the-gate-runs-it-with-run-empty.md));
 a test that logs in as an Entra principal; and a licence a lawyer has
 reviewed.

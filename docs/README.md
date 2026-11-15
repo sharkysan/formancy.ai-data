@@ -50,9 +50,9 @@ told
 `scripts/architecture.test.mjs`, in `pnpm test:repo`, fails when a section
 file or this entry is missing, when a workspace package or app is not named
 in [the building blocks](architecture/05-building-blocks.md), when a
-decision record is cited by no section, when a relative link here, in a
-section, in [the setup guide](setup.md), in the README or on a page of the
-guide does not reach a file or a heading GitHub would give it, and when
+decision record is cited by no section, when a relative link in any
+Markdown file the repository holds, the decision records and the
+changelog aside, does not reach a file or a heading GitHub would give it, and when
 a repository path a section writes in backticks names nothing in the
 repository. Whether a sentence is still true of what it names is held by
 review.
@@ -66,7 +66,7 @@ one page per reason to read it
 
 | | |
 |---|---|
-| [What it does](guide/capabilities.md) | Everything the module does, for the administrator, the person filling in a form and the operator, each line with the record that holds it |
+| [What it does](guide/capabilities.md) | What the module does, for the administrator, the person filling in a form and the operator, each line with the record that holds it |
 | [Status](guide/status.md) | The release, where `main`'s changes since are listed, and what is not yet measured or read by hand |
 | [Studio](guide/studio.md) | The administrator's application, step by step and pictured, how to run it from a clone, and what its suites hold |
 | [Host example](guide/host.md) | The host page's workspace over the runtime plane, pictured, how to run it, its suites, and the live demo's build of it |

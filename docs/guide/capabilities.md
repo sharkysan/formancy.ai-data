@@ -1,11 +1,11 @@
 # What it does
 
-Everything Formancy Data does, by who meets it -- the administrator in the
+What Formancy Data does, by who meets it -- the administrator in the
 studio, the person filling in a form through any host, and the operator --
 each line linking the decision record whose **Verified by** names what fails
 when the line stops being true. [The README's *What you
-get*](../../README.md#what-you-get) is the short version, and [the status
-page](status.md) says which release carries what.
+get*](../../README.md#what-you-get) is the short version, and
+[`CHANGELOG.md`](../../CHANGELOG.md) says which release carries what.
 
 **For the administrator, in the [studio](studio.md):**
 
@@ -49,6 +49,14 @@ page](status.md) says which release carries what.
 - **Generates a form deterministically**, and says what it inferred, made
   read-only, excluded and blocked, and why
   ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).
+  Update and delete are offered only where a stale save can be told: by
+  SQL Server's rowversion, or by a version column the request confirms,
+  which the studio's Choose step says to confirm only if every writer of
+  the table increments it on each update, and which a PostgreSQL table,
+  having no rowversion, needs to be editable. Without either the form
+  reads and creates, and its note says why
+  ([0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md),
+  [0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)).
   A key the database numbers or fills -- an identity, or a column with a
   default that is all of the key the policy does not pin, such as a uuid
   from `gen_random_uuid()` or `newsequentialid()` alone or beside a pinned
@@ -379,7 +387,7 @@ page](status.md) says which release carries what.
 
 **For the operator:**
 
-- **The whole product from one command**, as [*Quick start*](../../README.md#quick-start) says
+- **The whole product from one command**, as [*Get started*](../../README.md#get-started) says
   ([0032](../decisions/0032-a-clean-install-is-the-composed-stack-and-ci-runs-its-guide.md)),
   and a guide that puts it behind a Cloudflare Tunnel and Access, through
   which nothing has run yet
@@ -393,9 +401,10 @@ page](status.md) says which release carries what.
   key there is none
   ([0050](../decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
   performance measured through the shipped server on both engines, for every
-  runtime request but a page of records, the menu of forms and a delete, and held in CI by rows read and
-  round trips, never a time -- a page of records deep in key order held by
-  the rows it reads, untimed
+  runtime request but a page of records, a file of them, the menu of forms
+  and a delete, and held in CI by rows read and round trips, never a
+  time -- a page of records deep in key order held by the rows it reads,
+  untimed
   ([0034](../decisions/0034-performance-is-measured-through-the-shipped-server-and-held-without-a-clock.md)).
 - **A host identity key rotates without a restart.** A JSON Web Key Set
   file, each key selected by the `kid` a token names and read again on

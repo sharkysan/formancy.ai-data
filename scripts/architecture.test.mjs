@@ -23,10 +23,11 @@ import YAML from 'yaml'
  *   package is placed in section 5 by the pull request that adds it;
  * - a decision record that no section links to, so that a new record is
  *   placed in the architecture by the pull request that writes it;
- * - a relative link in the entry, a section, docs/setup.md, README.md or a
- *   page of docs/guide/ that names no file git would commit, or a fragment
- *   that names no heading of the Markdown file it points into, as GitHub
- *   anchors headings;
+ * - a relative link in any Markdown file git would commit but the decision
+ *   records and CHANGELOG.md that names no file git would commit, or a
+ *   fragment that names no heading of the Markdown file it points into, as
+ *   GitHub anchors headings; a link to a file the build copies into a
+ *   package, which git ignores, is read as a link to the file it copies;
  * - a repository path written in backticks that names nothing git would
  *   commit. What counts as a path is `isRepositoryPath`, tested below: a
  *   code span with no space in it, holding a slash, whose first segment is a
@@ -234,21 +235,24 @@ function resolveLink(file, href) {
  * past the root, one git would not commit -- a directory, an ignored file,
  * none at all -- a fragment into a file that is not Markdown, and one that
  * names no heading. `files` is what git would commit, and `read` a file's
- * text, so that a fixture can stand in for the repository.
+ * text, so that a fixture can stand in for the repository. `copies` maps a
+ * file the build writes and git ignores to the one it copies, which a link
+ * to it is checked against.
  */
-function linkProblems(file, markdown, files, read) {
+function linkProblems(file, markdown, files, read, copies = new Map()) {
   return linksIn(markdown)
     .filter(isRelative)
     .flatMap((href) => {
       const link = resolveLink(file, href)
       if (link.outside) return [`${file}: ${href} leads out of the repository`]
-      if (!files.has(link.target)) {
-        const directory = [...files].some((path) => path.startsWith(`${link.target}/`))
-        return [`${file}: ${href} names ${link.target}, ${directory ? 'a directory: link its README.md' : 'which is no file git would commit'}`]
+      const target = copies.get(link.target) ?? link.target
+      if (!files.has(target)) {
+        const directory = [...files].some((path) => path.startsWith(`${target}/`))
+        return [`${file}: ${href} names ${target}, ${directory ? 'a directory: link its README.md' : 'which is no file git would commit'}`]
       }
       if (link.fragment === undefined || link.fragment === '') return []
-      if (!link.target.endsWith('.md')) return [`${file}: ${href} has a fragment into a file that is not Markdown, which nothing here can check`]
-      return anchorsOf(read(link.target) ?? '').has(link.fragment) ? [] : [`${file}: ${href} names no heading of ${link.target}`]
+      if (!target.endsWith('.md')) return [`${file}: ${href} has a fragment into a file that is not Markdown, which nothing here can check`]
+      return anchorsOf(read(target) ?? '').has(link.fragment) ? [] : [`${file}: ${href} names no heading of ${target}`]
     })
 }
 
@@ -364,13 +368,40 @@ const guidePages = () =>
     .map((entry) => `${GUIDE}/${entry.name}`)
 
 /**
- * Pages whose links alone these rules hold: the README, which since 0154 is
- * mostly links into the guide and the records, and the guide's pages, which
- * took the README's reference sections with their links and anchors. Their
- * code spans name built files that git never holds, `apps/host/dist-demo`
- * among them, so the path rule is not theirs.
+ * Pages whose links alone these rules hold: every Markdown file git would
+ * commit but the decision records and CHANGELOG.md, which say what was true
+ * when each was written and link it as it was then. Since 0154 the README is
+ * mostly links into the guide and the records, the guide's pages took the
+ * README's reference sections with their anchors, and a page outside both
+ * -- a package's README, the getting-started guide, the Cloudflare guide --
+ * links their headings. Their code spans name built files that git never
+ * holds, `apps/host/dist-demo` among them, so the path rule is not theirs.
  */
-const linksHeld = () => ['README.md', ...guidePages()]
+const linksHeld = (files) => [...files].filter((file) => file.endsWith('.md') && !file.startsWith(`${DECISIONS}/`) && file !== 'CHANGELOG.md').sort()
+
+/** The files scripts/sync-licenses.mjs copies from the repository's root into a package. */
+const LICENCE_FILES = ['LICENSE.md', 'NOTICE']
+
+/**
+ * The files the build writes and git ignores, each to the file it copies:
+ * scripts/sync-licenses.mjs puts the root's LICENSE.md and NOTICE into every
+ * package whose manifest is not private, where its `publishConfig.directory`
+ * says, else beside the manifest, so that the tarball carries them, and a
+ * package's README links its own copy. Read from the manifests, as the
+ * script reads them.
+ */
+function buildCopies() {
+  const copies = new Map()
+  for (const entry of listing('packages').filter((each) => each.isDirectory())) {
+    const manifest = textOf(`packages/${entry.name}/package.json`)
+    if (manifest === undefined) continue
+    const parsed = JSON.parse(manifest)
+    if (parsed.private === true) continue
+    const directory = posix.normalize(posix.join('packages', entry.name, parsed.publishConfig?.directory ?? '.'))
+    for (const file of LICENCE_FILES) copies.set(`${directory}/${file}`, file)
+  }
+  return copies
+}
 
 describe('the architecture', () => {
   // A reader told the architecture is arc42 looks for a section by its
@@ -427,11 +458,14 @@ describe('the architecture', () => {
 
   // A link to a file that moved, to one git ignores -- the plan, a build --
   // or to a heading since reworded opens on nothing, or on GitHub's 404,
-  // and reads as true in the source. The README and the guide's pages are
-  // held too: a section moved between them leaves a link to its old anchor.
+  // and reads as true in the source. Every other page git holds is held
+  // too, but the records and the changelog: a section moved between the
+  // README and the guide leaves a link to its old anchor wherever one was.
   test('links only to files git would commit, and to headings they have', () => {
     const files = committable()
-    expect([...documents(), ...ALSO_HELD, ...linksHeld()].flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf))).toEqual([])
+    const copies = buildCopies()
+    const held = [...new Set([...documents(), ...ALSO_HELD, ...linksHeld(files)])]
+    expect(held.flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf, copies))).toEqual([])
   })
 
   // The sections name the module a step happens in, by its path, far more
@@ -471,17 +505,32 @@ describe('the architecture', () => {
       'no anchor into Markdown was checked',
     ).not.toEqual([])
     expect(links.map((link) => link.target).filter((target) => target.startsWith(`${DECISIONS}/`))).not.toEqual([])
-    // The README and the guide's pages are read: the README's links into the
-    // guide, and a guide page's into a heading of another file, are found.
+    // The README, the guide's pages and the pages beyond them are read: the
+    // README's links into the guide, a guide page's into a heading of
+    // another file, and a package README's into the licence the build copies
+    // beside it, are found; the records and the changelog are not read.
     expect(guidePages()).toEqual(expect.arrayContaining([`${GUIDE}/capabilities.md`, `${GUIDE}/deploying.md`]))
-    const held = linksHeld().flatMap((file) =>
+    const files = committable()
+    expect(linksHeld(files)).toEqual(
+      expect.arrayContaining([
+        'README.md',
+        `${GUIDE}/capabilities.md`,
+        'docs/getting-started.md',
+        'docs/deploy/cloudflare.md',
+        'packages/data-server/README.md',
+      ]),
+    )
+    expect(linksHeld(files).filter((file) => file.startsWith(`${DECISIONS}/`) || file === 'CHANGELOG.md')).toEqual([])
+    expect(buildCopies().get('packages/data-server/LICENSE.md')).toBe('LICENSE.md')
+    expect(buildCopies().has('packages/data-fixtures/LICENSE.md'), 'a private package gets no copy').toBe(false)
+    const held = linksHeld(files).flatMap((file) =>
       linksIn(textOf(file) ?? '')
         .filter(isRelative)
         .map((href) => ({ file, ...resolveLink(file, href) })),
     )
     expect(held.filter((link) => link.file === 'README.md' && (link.target ?? '').startsWith(`${GUIDE}/`))).not.toEqual([])
     expect(held.filter((link) => link.file.startsWith(`${GUIDE}/`) && (link.fragment ?? '') !== '')).not.toEqual([])
-    const files = committable()
+    expect(held.filter((link) => link.file === 'packages/data-server/README.md' && link.target === 'packages/data-server/LICENSE.md')).not.toEqual([])
     const tops = topLevelDirectories(files)
     expect([...tops]).toEqual(expect.arrayContaining(['.github', 'apps', 'deploy', 'docs', 'packages', 'scripts']))
     const paths = documents().flatMap((file) => codeSpansIn(textOf(file) ?? '').filter((span) => isRepositoryPath(span, tops)))
@@ -555,6 +604,21 @@ describe('the Markdown reader', () => {
       'docs/architecture/01-a.md: ../plan.md names docs/plan.md, which is no file git would commit',
       'docs/architecture/01-a.md: ../../packages/x/src/y.ts#L3 has a fragment into a file that is not Markdown, which nothing here can check',
       'docs/architecture/01-a.md: ../decisions/README.md#nothing names no heading of docs/decisions/README.md',
+    ])
+  })
+
+  // A package's README links the licence the build copies beside it, which
+  // git ignores. Refused, the link would be "fixed" to the root's file, a
+  // path the unpacked tarball does not have; passed unread, a heading
+  // misspelled in it would pass too. A file nothing copies stays refused.
+  test('reads a link to a file the build copies as a link to the file it copies', () => {
+    const files = new Set(['LICENSE.md', 'packages/x/README.md'])
+    const read = (file) => (file === 'LICENSE.md' ? '# Terms\n' : '')
+    const copies = new Map([['packages/x/LICENSE.md', 'LICENSE.md']])
+    const markdown = '[ok](./LICENSE.md) [heading](LICENSE.md#terms) [gone](LICENSE.md#nothing) [notice](NOTICE)'
+    expect(linkProblems('packages/x/README.md', markdown, files, read, copies)).toEqual([
+      'packages/x/README.md: LICENSE.md#nothing names no heading of LICENSE.md',
+      'packages/x/README.md: NOTICE names packages/x/NOTICE, which is no file git would commit',
     ])
   })
 

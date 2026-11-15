@@ -200,8 +200,11 @@ and each of these fails on the change that breaks what it holds:
 - **This documentation.** `scripts/architecture.test.mjs`: `docs/README.md`
   and these twelve sections exist; the building blocks name every workspace
   package and app; every decision record is linked from a section; every
-  relative link reaches a file and every fragment a heading, here, in the
-  README and on the guide's pages; and every repository path written in
+  relative link reaches a file and every fragment a heading, in every
+  Markdown file git holds but the decision records and the changelog,
+  which say what was true when they were written, a link to the licence
+  the build copies into a package read as one to the root's; and every
+  repository path written in
   backticks here names something git would commit
   ([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md),
   [0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).

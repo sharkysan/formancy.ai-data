@@ -806,8 +806,14 @@ the same day (formancy.ai 0232).
   how to try it or what it does not do yet, and a developer met the
   packages to install after the thousandth line. What you notice: the
   README is now the promise, the two demos, why it might fit, how it works,
-  what you get in a dozen bullets, what it does not do yet, a quick start, a
-  short status and the licence table, each claim still linking its record.
+  what you get, what it does not do yet, how to get started, a short status
+  and the licence table, each claim still linking its record. It says that
+  it describes `main`, which has more than the latest release; that a form
+  offers update and delete only where a rowversion, or a version column an
+  administrator confirms, tells a stale save, so a PostgreSQL table needs
+  such a column to be editable; that the host page is an example and the
+  studio is built from the repository, neither of them released; and that
+  a SQL Server older than 2019 cannot be discovered.
   The rest moved nearly unchanged to pages of `docs/guide/` under the
   sections' own headings -- *What it does* (`capabilities.md`), *Status*,
   *Studio*, *Host example*, *Examples*, *Live demo*, *Packages*,
@@ -818,11 +824,17 @@ the same day (formancy.ai 0232).
   released tag's README still opens that release's. Two moved sentences
   that were no longer true were corrected: the live demo's Worker was
   created on 2026-10-19, and `dist/drift-check-cli.mjs` is the command a
-  pipeline checks drift with (0111). The pictures' generator draws each
+  pipeline checks drift with (0111). The live demo's start on Cloudflare
+  is no longer given a time: nothing recorded how its 1778 ms was
+  measured. The pictures' generator draws each
   app's region on its page with its links aimed from there, the tested-on
   table is written on `docs/guide/tested-on.md`, and
-  `scripts/architecture.test.mjs` now holds the README's and the guide's
-  links and headings too.
+  `scripts/architecture.test.mjs` now holds the relative links and
+  headings of every Markdown file git holds but the decision records and
+  this changelog, which say what was true when they were written: the
+  packages' READMEs, `docs/getting-started.md` and
+  `docs/deploy/cloudflare.md` among them, which link headings of the
+  README and of the data server's README.
 - **The dependencies with a security advisory and a fix in reach move to
   the fix, and the workspace needs Node 22.22.3, 24.15 or 26** (0148). Why: GitHub
   listed 24 advisories against the lockfile, 6 of them high. The SQL

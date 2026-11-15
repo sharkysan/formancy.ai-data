@@ -173,9 +173,10 @@ and the document says what. Three shapes, in order of preference:
    file is not what the generator produces; `scripts/check-cla.test.mjs` fails
    when `CLA.md` changes under a signature; `scripts/upstream-deps.test.mjs`
    fails on an inexact upstream version; `scripts/architecture.test.mjs`
-   fails when a relative link in the architecture, the README or the guide's
-   pages, or the heading it points at, names nothing, when a path from the
-   repository's root written in the architecture in backticks names nothing,
+   fails when a relative link in a Markdown file git holds, but a decision
+   record or `CHANGELOG.md`, or the heading it points at, names nothing,
+   when a path from the repository's root written in the architecture in
+   backticks names nothing,
    when the building blocks leave out a workspace package and when no
    section links a decision record -- it
    never reads whether a sentence is still true; `scripts/lint.test.mjs`
