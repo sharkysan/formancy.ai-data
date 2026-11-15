@@ -4350,6 +4350,52 @@
           "says": "The resize handle AG Grid draws between the headers, and the minus and plus the Columns panel draws for a column's steps, are not measured for contrast; the steps are signs, and say what they do by their names alone."
         }
       ]
+    },
+    "0153": {
+      "reviewed": "sha256:5807b148bf39fa1d57c9f16a98859d069df9326911c59b0a7bcb5e037b23cf55",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A stamped wall clock and a stamped day are UTC's on both engines, so a table whose defaults or other writers use local time disagrees with a stamp by the zone's offset, and a stamp of the day is the day in UTC, not the business's.",
+          "heldBy": "packages/data-postgres/src/stamps.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Only writes through the module are stamped: another application, a script or a person in the database's own tool leaves a stamped column as they write it."
+        },
+        {
+          "area": "writes",
+          "says": "On PostgreSQL a stamp is the time its transaction began, which on the write path that locks the table first is before the wait for the lock; on SQL Server it is the time the write's batch began, before its locks."
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server stores a stamped instant at +00:00, where a sysdatetimeoffset() default beside it stores the server's own offset: one instant, two spellings in the table.",
+          "heldBy": "packages/data-sqlserver/src/stamps.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A column that refers to a person by number, such as an integer created_by that references a users table, cannot be stamped, since the signed-in person's id is text.",
+          "heldBy": "packages/data-core/src/generate/stamps.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A person whose token lacks the attribute a stamp names is offered the write and refused it on save, missing-attribute, and an id longer than its column refuses every save of that person until the column is widened.",
+          "heldBy": "packages/data-core/src/records/plan-stamps.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "Who a stamp names is the token's subject as the host issues it, so a person renamed in the host is somebody else from then on, and nothing stored is changed."
+        },
+        {
+          "area": "writes",
+          "says": "A change from a date stamps the next version only: the version it ends keeps who created it and when.",
+          "heldBy": "packages/data-core/src/records/plan-stamps.test.ts"
+        },
+        {
+          "area": "testing",
+          "says": "What each engine stores for a stamp was not run against a server when the change was made; the parity suites hold it on both engines in CI, and nothing tests a stamp into SQL Server's smalldatetime, which rounds to the minute."
+        }
+      ]
     }
   }
 }

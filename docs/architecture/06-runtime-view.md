@@ -65,8 +65,10 @@ without database VIEW DEFINITION reports row security `unknown` (0027).
 ## 6.2 Generating a form, and what its notes say
 
 1. The Choose step (`apps/studio/src/choose.tsx`) picks a root, lookups
-   with their display columns, a version column to confirm and columns to
-   pin; `workbench.tsx` sends them as `POST /v1/form-proposals`, read by
+   with their display columns, a version column to confirm, columns to
+   pin and the columns the server stamps, each ticked by the
+   administrator, an audit name only a suggestion (`choose-stamps.tsx`,
+   [0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)); `workbench.tsx` sends them as `POST /v1/form-proposals`, read by
    `readGeneration` (`generation.ts`) before a fresh discovery (6.1), by
    the rules a stored bundle's request is held to
    ([0030](../decisions/0030-presentation-is-a-patch-over-the-generated-base.md)).
@@ -447,6 +449,14 @@ save or a delete still blanks while it is asked (0146); the rest is 0044's and 0
    `planCreate` pins the tenant from the context, refuses over-posting and
    drift, and reads every answer through its column's codec, in its unit
    ([0026](../decisions/0026-name-every-column-fact-the-engines-disagree-on.md)).
+   What the form stamps on the write is the planner's too
+   (`records/stamps.ts`): who from the verified context, through the
+   column's codec -- an attribute it lacks is 403 `missing-attribute`, an
+   id the column cannot hold 403 `unstampable` -- and when as columns the
+   adapter gives its engine's clock; a value sent for a stamped field is
+   over-posting, and an update that changes nothing is refused before any
+   stamp is planned
+   ([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
    An update reads the record first, where the actor may, to tell an
    unedited echo from a change, an instant or a time included
    ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md));
@@ -464,7 +474,8 @@ save or a delete still blanks while it is asked (0146); the rest is 0044's and 0
    filters, with a deadline and no abandonment, since a write goes on after
    its client leaves; one that cannot answer is 503, nothing saved (6.8).
 5. One guarded statement writes, carrying the definition it was decided
-   over; an update's key, filters, throughs and expected version are one
+   over and every stamp -- PostgreSQL's `current_timestamp`, SQL Server's
+   one reading of the clock per batch (0153); an update's key, filters, throughs and expected version are one
    WHERE (PostgreSQL [0016](../decisions/0016-postgres-operations.md), SQL
    Server [0017](../decisions/0017-sqlserver-operations.md)). Zero rows is
    followed by one read that tells `stale` from `not-found`. Stale is 409,

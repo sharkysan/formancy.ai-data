@@ -102,7 +102,9 @@ server answered, which reports the difference and does not prevent it.
   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)),
   lists, deletes, cascades, uuid keys and a column's constant default --
   each engine's spelling, one starting answer, what the database stores
-  (`defaults.ts`, 0149) -- beside them, and a file of
+  (`defaults.ts`, 0149) -- and what the server stamps, against each
+  engine's own clock read before and after the write, per engine where the
+  clocks differ (`stamps.ts`, [0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)) -- beside them, and a file of
   records in `packages/data-fixtures/src/exports.ts`: `export: shipments`,
   the bytes both adapters' lists must make through data-core's export, a
   double, a real and a zoneless timestamp's fraction where the engines

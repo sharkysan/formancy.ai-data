@@ -111,6 +111,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A write whose answer was lost | unknown, never refused, never replayed | [0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md) | `e2e-lost-answer.integration.test.ts` |
 | A SQL Server that answers a SQL login asking for TLS that it will not encrypt, or with an answer that is not a PRELOGIN response | the connection ends before the login is sent, 503 | [0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | `packages/data-sqlserver/src/encryption.test.ts`, `routes/unencrypted.integration.test.ts` |
 | A file of records that cannot be made whole -- past its byte budget or its deadline, rows that moved between pages, text UTF-8 cannot carry, labels that cannot be loaded | a JSON refusal and nothing of the file, never a shorter file sent as whole | [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | `routes/runtime-exports.test.ts`, `packages/data-client/src/transport.test.ts` |
+| A stamp the context cannot fill -- an attribute the token lacks, an id longer than its column | 403 `missing-attribute` or `unstampable`, nothing written, never cut to fit | [0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md) | `packages/data-core/src/records/plan-stamps.test.ts`, `routes/runtime-stamps.integration.test.ts` |
 | A starting value a field does not take, or one no case holds -- a lookup's, a date's | refused at publish, saying why; dropped and said by a regeneration | [0150](../decisions/0150-an-administrator-gives-a-field-another-starting-value.md) | `packages/data-core/src/presentation/starting-value.test.ts`, `routes/admin.test.ts` |
 | A setting nobody could have meant | the process stops, naming it | [0059](../decisions/0059-the-host-identity-key-is-a-set-selected-by-kid-and-read-again-on-sighup.md), [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md), [0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | each setting's test |
 
@@ -235,7 +236,11 @@ Deny by default: a field with no entry is nobody's, roles match as exact
 strings, and there is no wildcard. A row filter is an equality between a
 column from approved metadata and an attribute of the context, and a missing
 attribute is a refusal. A pinned column is written from the context, and a
-submitted value for it is over-posting. `validatePolicy` refuses a policy
+submitted value for it is over-posting. So is a value for a column the
+server stamps -- who wrote a record, from the verified context, or when,
+by the database's clock -- which no grant can make a person's, and which,
+unlike a pinned column, filters nothing; a row filter on one is refused
+([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)). `validatePolicy` refuses a policy
 that does not fit its form. A field holding a record's state can be held to
 the moves the policy lists, each a pair of values for named roles, any
 other change refused from the record as read and the move guarded by the

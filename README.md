@@ -186,6 +186,16 @@ until then the address is formancy.ai's 404
   each state by the label the Presentation step's State labels gives it,
   else as its column spells it
   ([0129](./docs/decisions/0129-an-administrator-labels-a-state-fields-states.md)).
+  Who created or last changed a record, and when, can be the server's to
+  write: a column the Choose step's stamps tick -- suggested by an audit
+  name, never stamped without the tick -- is filled on create, on update or
+  on both with the signed-in person's id, one of their attributes, or the
+  time by the database's own clock in the same guarded statement, a wall
+  clock and a day in UTC on both engines. The field is read-only, a value
+  sent for it is refused as over-posting, and a stamp filters nothing:
+  everybody who may read sees the records others wrote. Only writes
+  through the module are stamped
+  ([0153](./docs/decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
 - **Keeps presentation as a patch over the generated form** -- labels,
   help text, order, full width, a field moved to another generated
   section, and a field's starting value -- carried through a regeneration

@@ -317,6 +317,11 @@ identity is a key (0016), and every update reads the record first, one
 extra query (0022). A delete cannot be undone here, and one refused because
 other rows refer to the record names none of them (0050). A reference a
 delete clears does not move the referring row's version column (0051).
+Only writes through the module are stamped; a stamped wall clock and day
+are UTC's, whatever the business's zone; and what each engine stores for a
+stamp is held by parity suites that were not run where they were written,
+only in CI
+([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
 token ([0014](../decisions/0014-host-identity-is-verified-offline.md)).

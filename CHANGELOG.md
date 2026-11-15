@@ -18,6 +18,35 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The server stamps who wrote a record, and when** (0153). Why: a table's
+  audit columns -- `created_by`, `created_at`, `changed_by`, `changed_at`
+  -- were inputs a person could fill with somebody else's name, or left to
+  the database's defaults, which know the time and not who is signed in to
+  the host; a row filter writes the context on create, and filters every
+  read by it too. What you notice: the studio's Choose step lists the
+  columns a stamp can take, the ones an audit name suggests first and said,
+  all unticked, and a ticked one is filled on create, on update or on both
+  with the signed-in person's id, one of their verified attributes, or the
+  time by the database's own clock -- PostgreSQL's `current_timestamp`, the
+  value a `now()` default of the same statement takes, and on SQL Server
+  one reading of `sysutcdatetime()` per write; a wall clock and a day are
+  UTC's on both, and an instant is stored at +00:00 on SQL Server. The
+  field is shown read-only in the Record section, never required; a value
+  sent for it is 403 `over-posting`, a page never sends one and a
+  Duplicate never copies one; an update restamps what it stamps and keeps
+  who created the record; and a stamp filters nothing, so everybody who may
+  read sees the records others wrote. The stamps are part of the one
+  guarded statement, and the next version a change from a date starts is
+  stamped as a create. An id longer than its column is 403 `unstampable`,
+  never cut, a token without the attribute a stamp names 403
+  `missing-attribute`, and drift review stops the writes a stamped column
+  dropped, retyped or narrowed under a stamp of who could no longer take.
+  A person into anything but text, the time into a time of day, a stamp
+  on the key, the version column, a pinned column, a lookup's or a chain's
+  is refused when the form is generated; a server older than this release
+  refuses a stored version that stamps. Only writes through the module are
+  stamped. The parity suites that hold each engine's clock were written
+  where no container could start, and are to be watched failing in CI.
 - **An administrator gives a field another starting value** (0150). Why:
   since 0149 a new record starts at its column's constant default, which
   was the database's to say -- a column that defaults to `draft` for the

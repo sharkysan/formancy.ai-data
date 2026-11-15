@@ -206,3 +206,4 @@ only enforcement is "we remember" says so plainly.
 | [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150 |
 | [0150](0150-an-administrator-gives-a-field-another-starting-value.md) | An administrator gives a field another starting value | accepted |
 | [0151](0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md) | A person sets a grid column's width, and the browser keeps it | accepted |
+| [0153](0153-the-server-stamps-who-wrote-a-record-and-when.md) | The server stamps who wrote a record, and when | accepted |
