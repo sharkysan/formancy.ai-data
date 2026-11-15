@@ -33,6 +33,11 @@ export function planRefusal(code: PlanRefusalCode, message: string): HttpRefusal
       // The host's token verified, and still did not produce a context the
       // policy can read: a deployment problem, not the person's.
       return { status: 403, body: { code, message } }
+    case 'unstampable':
+      // A column the server stamps cannot hold who the token says the person
+      // is (0153): a deployment problem too, which no retry changes. The
+      // message names the column and never the value.
+      return { status: 403, body: { code, message } }
     case 'invalid-policy':
     case 'invalid-bindings':
       return { status: 500, body: { code, message: 'This form is published with a configuration the server cannot apply.' } }

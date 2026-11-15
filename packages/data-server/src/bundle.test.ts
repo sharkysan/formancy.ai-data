@@ -848,6 +848,49 @@ describe('a format-2 bundle (0030)', () => {
       }
     })
 
+    // The stamps are the request's too (0153): one named by hand in the
+    // bindings would have the server write who or when into a column no
+    // administrator confirmed, and one taken from them would let the next
+    // version's person type who created a record. Read as strictly as the
+    // rest, and in any order the request gives them. Watched failing with
+    // the stamps left out of the comparison, and with `stamps` not read:
+    // the reading dropped it, and the stored request was refused as not
+    // normalised.
+    test('stamps the bindings do not have, or ones they have that the request does not name', () => {
+      const stamped = ordered()
+      stamped.generation.stamps = [{ column: 'employee_id', value: { kind: 'time' }, on: 'create' }]
+      expect(refused(stamped)).toEqual(['generation: names stamps the bindings do not have as it names them'])
+      const bound = ordered()
+      bound.bindings.stamps = [{ column: 'tenant_id', value: { kind: 'actor' }, on: 'create', type: INT32 }]
+      expect(refused(bound)).toContainEqual('generation: names stamps the bindings do not have as it names them')
+      for (const stamps of [
+        {},
+        [{ column: 'a' }],
+        [{ column: 'a', value: { kind: 'actor' }, on: 'never' }],
+        [{ column: 'a', value: { kind: 'who' }, on: 'create' }],
+      ]) {
+        const odd = ordered() as unknown as { generation: Record<string, unknown> }
+        odd.generation['stamps'] = stamps
+        expect(refused(odd as unknown as BundleV2), JSON.stringify(stamps)).toEqual([
+          "generation: stamps must be a list of { column, value: { kind: 'actor' } | { kind: 'attribute', attribute } | { kind: 'time' }, on: 'create' | 'update' | 'both' }",
+        ])
+      }
+    })
+
+    // A stamp the generator cannot honour is no form at all: a column the
+    // snapshot lacks, or of a type that cannot take what fills it, is
+    // refused at publish in the generator's words. Watched failing with the
+    // generator's stamp check taken out: both were generated and stored.
+    test('a stamp the generator refuses', () => {
+      const request: GenerationRequest = { ...ORDER_REQUEST, stamps: [{ column: 'made_by', value: { kind: 'actor' }, on: 'create' }] }
+      const absent = ordered()
+      absent.generation = request
+      expect(generatedProblems(absent)).toEqual(['generation: order has no column made_by to stamp'])
+      const unfit = ordered()
+      unfit.generation = { ...ORDER_REQUEST, stamps: [{ column: 'tenant_id', value: { kind: 'actor' }, on: 'create' }] }
+      expect(generatedProblems(unfit)).toEqual(['generation: tenant_id cannot be stamped: it is integer, and a person is stamped as text'])
+    })
+
     // A section is read as strictly as the rest of a request: its condition
     // is a column and a value, both text, or null, and nothing else.
     test('a section of another shape', () => {

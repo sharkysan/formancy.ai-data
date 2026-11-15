@@ -21,8 +21,9 @@ import type { HelpText } from './help.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor } from './names.js'
 import { deleteUnoffered } from './offers.js'
 import { sectionFor } from './section.js'
+import { stampedOn, stampNote, stampsFor, unstampable } from './stamps.js'
 import { narrowForValidity, validityFor, validityOperations } from './validity.js'
-import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice } from './types.js'
+import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice, StampBinding } from './types.js'
 import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
 
 /** formancy's form id rule. */
@@ -87,6 +88,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   // column than a lookup's column can.
   const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], new Set([...lookupColumns, ...pinned]), notes)
   const validity = validityFor(root, request.validity, concurrency, pinned)
+  const chain = validity === undefined ? [] : [validity.from, validity.to, ...validity.key]
+  const stamps = stampsFor(root, request, { identity: identity ?? [], versionColumn: concurrency?.column, pinned, lookupColumns, chain })
+  const stamped = new Map(stamps.map((stamp) => [stamp.column, stamp]))
   const planned: Planned[] = []
 
   for (const column of root.columns) {
@@ -101,14 +105,14 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
       }
       continue
     }
-    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), notes)
+    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), stamped.get(column.name), notes)
     if (plan !== null) planned.push(plan)
   }
 
   if (validity !== undefined) narrowForValidity(validity, planned, notes)
   // After the narrowing: a field starts with a default only where the create writes it (0149).
   startWithDefaults(snapshot.kind, root, planned, notes)
-  const offered = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut }, notes)
+  const offered = operationsFor(snapshot.kind, root, identity, concurrency, planned, { pinned, fixedOut, stamps }, notes)
   const operations = validity === undefined ? offered : validityOperations(root, validity, offered, notes)
   rowSecurityNotes(snapshot, [root, ...lookups.map((entry) => entry.target)], notes)
   const rules: LogicRule[] = planned
@@ -134,6 +138,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     fields: planned.map((entry) => entry.binding),
     snapshotFingerprint: snapshot.fingerprint,
     ...(validity === undefined ? {} : { validity }),
+    ...(stamps.length === 0 ? {} : { stamps }),
   }
 
   return { form, bindings, notes }
@@ -315,6 +320,7 @@ function planColumn(
   isView: boolean,
   pinned: boolean,
   filled: boolean,
+  stamp: StampBinding | undefined,
   notes: GenerationNote[],
 ): Planned | null {
   if (!column.access.select) {
@@ -329,7 +335,7 @@ function planColumn(
 
   const key = allocate(fieldKeyFor(column.name))
   const generated = column.generated !== 'none'
-  const possible = !isView && !generated && !filled && !pinned && control.readOnly === undefined
+  const possible = !isView && !generated && !filled && !pinned && stamp === undefined && control.readOnly === undefined
 
   const help = helpTextFor([column])
   notes.push({
@@ -349,6 +355,7 @@ function planColumn(
       kind: 'read-only',
       message: 'Pinned by the policy: its value comes from the trusted context, never from the person filling the form.',
     })
+  if (stamp !== undefined) notes.push({ subject: key, kind: 'read-only', message: stampNote(stamp) })
   const writes = writesFor([column], possible, key, notes)
   const required = writes.create && !column.nullable && !column.hasDefault
 
@@ -356,7 +363,7 @@ function planColumn(
     ordinal: column.ordinal,
     field: { key, label: labelFor(column.name), ...described(help), ...control.field, ...(required ? { required: true } : {}) },
     binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writes },
-    system: generated || filled,
+    system: generated || filled || stamp !== undefined,
     multiline: control.field.type === 'textarea',
     privilegeOnly: possible,
   }
@@ -422,13 +429,18 @@ function concurrencyFor(
   return { kind: 'version-column', column: candidate.name, confirmed: false }
 }
 
-/** The pinned columns, and those of them the account may not INSERT, which a create could never write from context. */
+/**
+ * The pinned columns, and those of them the account may not INSERT, which a
+ * create could never write from context; and the columns the server stamps
+ * (0153), which a write gives values to as it gives a pinned one.
+ */
 interface Pins {
   pinned: ReadonlySet<string>
   fixedOut: readonly ColumnMeta[]
+  stamps: readonly StampBinding[]
 }
 
-function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixedOut }: Pins, notes: GenerationNote[]): boolean {
+function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixedOut, stamps }: Pins, notes: GenerationNote[]): boolean {
   const blocked = (message: string) => notes.push({ subject: root.ref.name, kind: 'blocked', message })
   if (!root.columns.some((column) => column.access.insert)) {
     blocked(`Create is not offered: this connection's account may INSERT none of the columns of ${root.ref.schema}.${root.ref.name}.`)
@@ -443,16 +455,19 @@ function createFor(root: ObjectMeta, planned: readonly Planned[], { pinned, fixe
   // A create needs a value for every column that has neither a default nor a
   // generator. One with no field written on create — excluded for its type,
   // unreadable, or not insertable — cannot get one. A pinned column gets its
-  // value from context, so it is never one nobody can fill; one the account
-  // may not insert was said above.
+  // value from context, and a stamped one from the server, so neither is one
+  // nobody can fill; one the account may not insert is said.
+  const unstamped = unstampable(root, stamps, 'create')
+  for (const message of unstamped) blocked(message)
   const bound = new Set([
     ...pinned,
+    ...stampedOn(stamps, 'create').map((stamp) => stamp.column),
     ...planned.flatMap((entry) => (entry.binding.writes.create ? (entry.binding.kind === 'lookup' ? entry.binding.columns : [entry.binding.column]) : [])),
   ])
   const unreachable = root.columns.filter((column) => !column.nullable && !column.hasDefault && column.generated === 'none' && !bound.has(column.name))
   if (unreachable.length > 0)
     blocked(`Create is not offered: ${unreachable.map((column) => column.name).join(', ')} must be given a value and no field can give one.`)
-  return unreachable.length === 0 && fixedOut.length === 0
+  return unreachable.length === 0 && fixedOut.length === 0 && unstamped.length === 0
 }
 
 function operationsFor(
@@ -507,6 +522,10 @@ function operationsFor(
       message: "Update is not offered: this connection's account may UPDATE none of the columns this form writes.",
     })
   }
+  // An update stamps its columns as a create does (0153): one the account may not UPDATE fails every save.
+  const unstamped = update ? unstampable(root, pins.stamps, 'update') : []
+  for (const message of unstamped) notes.push({ subject: root.ref.name, kind: 'blocked', message })
+  if (unstamped.length > 0) update = false
 
   // What the delete also does to other tables is never read here: that is
   // the policy's to accept (deleteProblems), one decision for publish,

@@ -22,6 +22,18 @@ export interface RecordValue extends RecordColumn {
   value: ApiValue
 }
 
+/**
+ * A column a write gives the database's own clock (0153): the time the
+ * statement runs, written by the adapter in its engine's own expression and
+ * in the column's own type -- an instant, a wall clock in UTC, or the day
+ * in UTC. Never a value: no clock is read in this package (formancy.ai
+ * 0019), and nothing of the request is in the SQL but the column's name.
+ */
+export interface ClockColumn {
+  name: string
+  type: Extract<NormalizedType, { kind: 'timestamp' | 'date' }>
+}
+
 /** How a stale write is detected for this table. */
 export interface RecordConcurrency {
   /**
@@ -237,12 +249,16 @@ export type DescribedTable = Pick<ObjectMeta, 'kind' | 'primaryKey' | 'uniqueKey
 
 /**
  * Insert one record. `values` already holds every pinned column — the tenant —
- * from trusted context; the adapter writes exactly these columns and no others,
- * so a column with a default gets it and a generated one is never named.
+ * from trusted context, and every column stamped with who wrote it (0153);
+ * the adapter writes exactly these columns and those of `clock`, and no
+ * others, so a column with a default gets it and a generated one is never
+ * named.
  */
 export interface InsertRequest {
   target: RecordTarget
   values: readonly RecordValue[]
+  /** The columns stamped with when (0153), written in the insert itself; absent for none. */
+  clock?: readonly ClockColumn[]
   /** What to read back from the inserted row: generated keys, defaults, computed columns. */
   returning: readonly RecordColumn[]
   /** The `definition` of the description this insert was decided over: it runs only while the table still has it (0041). */
@@ -265,7 +281,10 @@ export interface InsertRequest {
 export interface UpdateRequest {
   target: RecordTarget & { concurrency: RecordConcurrency }
   key: readonly RecordValue[]
+  /** The person's changes, and every column stamped with who changed it (0153). */
   set: readonly RecordValue[]
+  /** The columns stamped with when (0153), set in the update itself; absent for none. */
+  clock?: readonly ClockColumn[]
   /** The token a read returned: hex for a rowversion, a decimal string for a version column. */
   expectedVersion: string
   filters: RowFilters
@@ -302,8 +321,14 @@ export interface SupersedeRequest {
   start: RecordValue
   /** The chain's key, copied from the row ended into the next version. */
   chain: readonly RecordColumn[]
-  /** The next version's other values, as a create's: the person's answers and the pinned columns outside the chain's key. */
+  /** The next version's other values, as a create's: the person's answers, the pinned columns outside the chain's key, and its stamps of who (0153). */
   values: readonly RecordValue[]
+  /**
+   * The next version's columns stamped with when, as a create's (0153); absent
+   * for none. The version ended is not stamped: its end is the next one's
+   * start, and who wrote that, and when, is the next version's.
+   */
+  clock?: readonly ClockColumn[]
   /** What to read back from the next version. */
   returning: readonly RecordColumn[]
   /** The `definition` of the description this change was decided over (0041). */

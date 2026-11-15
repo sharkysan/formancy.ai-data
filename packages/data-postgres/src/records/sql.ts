@@ -1,4 +1,5 @@
 import type {
+  ClockColumn,
   InsertRequest,
   ObjectRef,
   ReachTerms,
@@ -36,6 +37,28 @@ export function column(name: string): string {
 /** A value from canonical text, converted by the server to its column's type (`sql/statement.ts`). */
 export function bound(statement: Statement, value: RecordValue): string {
   return statement.as(bindText(value.value, value.type), sqlTypeOf(value.type))
+}
+
+/**
+ * The database's clock as a stamped column's type holds it (0153): fixed
+ * SQL, so nothing of a request but the column's name reaches the statement,
+ * and quoted where it is named. `current_timestamp` is SQL syntax, which no
+ * search path can shadow, and is the transaction's start -- the value a
+ * `now()` default takes in the same statement, so a stamp and such a default
+ * are one instant. A wall clock and a day are UTC's, through `at time zone`,
+ * which the parser makes pg_catalog's own `timezone`, whatever the session's
+ * TimeZone: SQL Server has no session zone, and the two engines stamp alike
+ * only in UTC. A column of less precision rounds it, as it rounds any value
+ * assigned to it.
+ */
+export function clockSql(type: ClockColumn['type']): string {
+  if (type.kind === 'date') return `(current_timestamp at time zone 'UTC')::pg_catalog.date`
+  return type.withTimeZone ? 'current_timestamp' : `(current_timestamp at time zone 'UTC')`
+}
+
+/** The columns a write stamps with the clock, as `[name, SQL]`; none for a request that carries none. */
+export function clocked(columns: readonly ClockColumn[] | undefined): Array<[string, string]> {
+  return (columns ?? []).map((entry) => [quoteIdentifier(entry.name), clockSql(entry.type)])
 }
 
 /**
@@ -238,13 +261,16 @@ export function freshSql(statement: Statement, request: InsertRequest): string |
  * is `definition` (0041): `insert … select … where`, which inserts nothing
  * when the guard is false. With no columns it is `select where`, which
  * inserts one row of defaults as `default values` does (measured on
- * PostgreSQL 17, the probes before 0041).
+ * PostgreSQL 17, the probes before 0041). The columns stamped with the
+ * clock (0153) follow the values, in the same statement.
  */
 export function insertStatement(request: InsertRequest, definition: Definition, path: WritePath): RecordStatement {
   const statement = new Statement()
   const table = `insert into ${quoteTable(request.target.table)} as ${ROW}`
-  const columns = request.values.length === 0 ? '' : ` (${request.values.map((value) => quoteIdentifier(value.name)).join(', ')})`
-  const values = request.values.map((value) => bound(statement, value)).join(', ')
+  const stamped = clocked(request.clock)
+  const names = [...request.values.map((value) => quoteIdentifier(value.name)), ...stamped.map(([name]) => name)]
+  const columns = names.length === 0 ? '' : ` (${names.join(', ')})`
+  const values = [...request.values.map((value) => bound(statement, value)), ...stamped.map(([, sql]) => sql)].join(', ')
   const fresh = freshSql(statement, request)
   const body = `select ${values}\nwhere ${[...guard(statement, request.target.table, definition, path), ...(fresh === undefined ? [] : [fresh])].join(' and ')}`
   const returning = outputs(request.target, request.returning)
@@ -258,7 +284,8 @@ export function insertStatement(request: InsertRequest, definition: Definition, 
  * moved by one in the same statement, so nothing can change between the
  * check and the write and every writer through this module sees the change.
  * The same WHERE holds the table to the definition the update was decided
- * over (0041).
+ * over (0041). The columns stamped with the clock (0153) are set in the same
+ * SET.
  */
 export function updateStatement(
   request: UpdateRequest,
@@ -270,6 +297,7 @@ export function updateStatement(
   const statement = new Statement()
   const version = request.target.concurrency.column
   const set = request.set.map((value) => `${quoteIdentifier(value.name)} = ${bound(statement, value)}`)
+  for (const [name, sql] of clocked(request.clock)) set.push(`${name} = ${sql}`)
   set.push(`${quoteIdentifier(version)} = ${column(version)} ${op('+')} 1`)
   const where = [
     ...located(statement, request.key, terms, through),

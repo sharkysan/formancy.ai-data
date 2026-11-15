@@ -1,6 +1,7 @@
 import { canonicalize } from '@formancy/spec'
 import { versionColumnProblem } from '../generate/generate.js'
-import type { FieldBinding, FormBindings } from '../generate/types.js'
+import { isStampChoice, stampedOn, stampProblem, stampRoleProblem } from '../generate/stamps.js'
+import type { FieldBinding, FormBindings, StampBinding } from '../generate/types.js'
 import { bindingsVersionProblem } from '../generate/version.js'
 import { isLookupKeyType } from '../lookup/values.js'
 import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
@@ -155,7 +156,59 @@ function bindingsProblem(root: ObjectMeta, columns: ReadonlyMap<string, ColumnMe
     // A key the account cannot read cannot be read back into a token: it addresses nothing.
     if (!column.access.select) return `the identity names ${name}, which this connection's account may not read`
   }
-  return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings, bound)
+  return identityProblem(root, bindings.identity) ?? concurrencyProblem(columns, bindings, bound) ?? stampsProblem(columns, bindings)
+}
+
+/** Whether a stored stamp is a stamp the generator could have written: a choice, and a type. */
+function isStampBinding(stamp: unknown): stamp is StampBinding {
+  if (typeof stamp !== 'object' || stamp === null) return false
+  const { type, ...choice } = stamp as Record<string, unknown>
+  return typeof type === 'object' && type !== null && isStampChoice(choice)
+}
+
+/**
+ * Why the bindings' stamps (0153) do not fit the root, or `null`: each names
+ * a column the table has, once, as the snapshot types it; one that can take
+ * what fills it and is nothing else to the form -- the generator's own rules,
+ * `stampProblem` and `stampRoleProblem` -- and no field writes; and each
+ * write it is stamped on that the form offers is one the account may make
+ * on it (0027). A hand edit can break any of these, and the planner would
+ * then write what nobody confirmed, or what the database refuses every time.
+ * A row filter on a stamped column is the policy's to refuse (`validatePolicy`).
+ */
+function stampsProblem(columns: ReadonlyMap<string, ColumnMeta>, bindings: FormBindings): string | null {
+  const stamps: unknown = bindings.stamps
+  if (stamps === undefined) return null
+  if (!Array.isArray(stamps)) return 'the stamps are not a list'
+  const lookups = new Set(bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? binding.columns : [])))
+  const written = new Set(bindings.fields.flatMap((binding) => (binding.writes.create || binding.writes.update ? columnsOf(binding) : [])))
+  const validity = bindings.validity
+  const roles = {
+    identity: bindings.identity ?? [],
+    versionColumn: bindings.concurrency?.column,
+    pinned: new Set<string>(),
+    lookupColumns: lookups,
+    chain: validity === undefined ? [] : [validity.from, validity.to, ...validity.key],
+  }
+  const seen = new Set<string>()
+  for (const stamp of stamps as unknown[]) {
+    if (!isStampBinding(stamp)) return 'a stamp is not { column, value, on, type }'
+    const column = columns.get(stamp.column)
+    if (column === undefined) return `the server stamps ${stamp.column}, which the table does not have`
+    if (seen.has(stamp.column)) return `${stamp.column} is stamped twice`
+    seen.add(stamp.column)
+    if (canonicalize(column.type) !== canonicalize(stamp.type))
+      return `the stamp of ${stamp.column} describes it as something other than what the snapshot says it is`
+    const problem = stampProblem(column, stamp.value) ?? stampRoleProblem(stamp.column, roles)
+    if (problem !== null) return `${stamp.column} cannot be stamped: ${problem}`
+    if (written.has(stamp.column)) return `${stamp.column} is stamped by the server, and a field writes it`
+    for (const operation of ['create', 'update'] as const) {
+      const privilege = operation === 'create' ? 'insert' : 'update'
+      if (bindings.operations[operation] && stampedOn([stamp], operation).length > 0 && !column.access[privilege])
+        return `${stamp.column} is stamped on ${operation}, and this connection's account may not ${privilege.toUpperCase()} it`
+    }
+  }
+  return null
 }
 
 /**

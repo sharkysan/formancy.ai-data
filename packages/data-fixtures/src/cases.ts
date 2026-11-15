@@ -19,6 +19,8 @@ import { LIST_PARITY } from './lists.js'
 import type { ListCase } from './lists.js'
 import type { FilterParityCase, RefusalParityCase } from './parity.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
+import { STAMP_PARITY } from './stamps.js'
+import type { StampCase } from './stamps.js'
 import { UUID_PARITY } from './uuid.js'
 import type { UuidCase } from './uuid.js'
 import { VERSION_PARITY } from './chains.js'
@@ -111,6 +113,9 @@ export const versionCase = (name: VersionCase): string => `versions: ${name}`
 /** What a new record starts with on each engine (0149), by the name of its entry in DEFAULT_PARITY. */
 export const defaultCase = (name: DefaultCase): string => `defaults: ${name}`
 
+/** What the server stamps on each engine (0153), by the name of its entry in STAMP_PARITY. */
+export const stampCase = (name: StampCase): string => `stamps: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -121,7 +126,7 @@ export const defaultCase = (name: DefaultCase): string => `defaults: ${name}`
  * file of a form's records holds (0079), then what a browse shows (0099),
  * then what a person's conditions on its columns narrow a list to (0104),
  * then what a form over versions does (0113), then what a new record
- * starts with (0149).
+ * starts with (0149), then what the server stamps (0153).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -147,6 +152,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
     ...(Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
     ...(Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
+    ...(Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

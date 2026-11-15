@@ -75,8 +75,12 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   }
 
   const bound = boundColumns(bindings)
+  const stamped = new Set((bindings.stamps ?? []).map((stamp) => stamp.column))
   for (const rule of policy.rowFilters) {
     if (!bound.has(rule.column)) problems.push(`rowFilters: ${rule.column} is not a column this form is bound to`)
+    // A filter on who created a row would hide every row from everybody else (0153).
+    else if (stamped.has(rule.column))
+      problems.push(`rowFilters: ${rule.column} is stamped by the server, and a stamp filters nothing: a person sees the records others wrote`)
   }
 
   for (const key of policy.lookups.keys()) {

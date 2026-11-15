@@ -155,9 +155,12 @@ function overPosted(
   entry: ParsedFieldPolicy | undefined,
   actor: TrustedContext,
   pinned: ReadonlySet<string>,
+  stamped: ReadonlySet<string>,
   operation: 'create' | 'update',
 ): string | null {
   if (binding === undefined) return 'is not a field of this form'
+  // Who wrote a record, and when, is the server's to say (0153), on every operation.
+  if (binding.kind === 'column' && stamped.has(binding.column)) return 'is stamped by the server: who wrote the record, and when, never comes from the request'
   if (!binding.writes[operation]) return `is never written by this form on ${operation}`
   // On create the column is written from the context; on update a new value
   // would move the record into another tenant. Neither is the request's.
@@ -194,10 +197,11 @@ export function checkSubmittedFields(
   if (!scoped.ok) return scoped
 
   const pinned = new Set(parsed.rowFilters.map((rule) => rule.column))
+  const stamped = new Set((bindings.stamps ?? []).map((stamp) => stamp.column))
   const reasons: string[] = []
   for (const key of [...new Set(submittedKeys)].sort(byCodepoint)) {
     const binding = bindings.fields.find((candidate) => candidate.field === key)
-    const reason = overPosted(binding, parsed.fields.get(key), actor, pinned, operation)
+    const reason = overPosted(binding, parsed.fields.get(key), actor, pinned, stamped, operation)
     if (reason !== null) reasons.push(`${key} ${reason}`)
   }
   return reasons.length === 0 ? { ok: true } : refuse('over-posting', reasons.join('; '))

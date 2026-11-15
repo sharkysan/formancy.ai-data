@@ -20,6 +20,7 @@ import {
   suggestedDisplay,
   versionCandidates,
 } from './choice.js'
+import { StampsChoice } from './choose-stamps.js'
 import { VersionsChoice } from './choose-versions.js'
 
 /** The attribute a newly pinned column is given until somebody types another: the one tenant isolation uses. */
@@ -300,8 +301,9 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
 
 /**
  * Step 3: one root table or view, the relationships to offer as lookups and
- * how each is shown, the columns the policy pins, and a version column to
- * confirm when the database keeps none (plan section 3).
+ * how each is shown, the columns the policy pins, a version column to
+ * confirm when the database keeps none (plan section 3), and the columns
+ * the server stamps (0153).
  *
  * Everything offered comes from the snapshot: a lookup whose target this
  * connection cannot see is listed and disabled with the gap that explains it,
@@ -412,6 +414,7 @@ export function ChooseStep({
           <Pins root={root} rowFilters={rowFilters} onRowFilters={onRowFilters} />
           <VersionColumn root={root} choice={choice} onChoice={onChoice} />
           <VersionsChoice root={root} choice={choice} onChoice={onChoice} />
+          <StampsChoice root={root} choice={choice} rowFilters={rowFilters} onChoice={onChoice} />
           {problems.length === 0 ? null : (
             <div role="alert" className="problem-box">
               <p>The form was not generated:</p>

@@ -3,8 +3,8 @@ import { numbersKey, versionProvesRecord } from '../generate/offers.js'
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
 import { cite, hiding, unseen } from './access.js'
-import { type ColumnChangeKind, classify, sameDefinition } from './compare.js'
-import { allFields, type Comparison, describe, type Draft, fieldsOver, list, type Operation, writesOn, writtenOn } from './context.js'
+import { type ColumnChangeKind, classify, compareTypes, sameDefinition } from './compare.js'
+import { allFields, type Comparison, describe, type Draft, fieldsOver, list, type Operation, stampedWrites, stampsOn, writesOn, writtenOn } from './context.js'
 import type { DriftKind } from './types.js'
 
 /** Controls that hold the same values: a longer text becomes a textarea, and both hold any string. */
@@ -17,7 +17,14 @@ const CREATE_LOST = 'A create must now give it a value, and no field of this for
  * rule the generator offers create by, applied to the database as it is now.
  */
 function blocksCreate(bindings: FormBindings, column: ColumnMeta): boolean {
-  return !column.nullable && !column.hasDefault && column.generated === 'none' && !writesOn(bindings, column.name, 'create')
+  // A column the server stamps on create gets its value from the server (0153).
+  return (
+    !column.nullable &&
+    !column.hasDefault &&
+    column.generated === 'none' &&
+    !writesOn(bindings, column.name, 'create') &&
+    !stampsOn(bindings, column.name, 'create')
+  )
 }
 
 /**
@@ -72,8 +79,10 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
   const fields = fieldsOver(bindings, [was.name])
   const token = bindings.concurrency?.column === was.name
   const gaps = hiding(comparison.current.gaps, root, 'columns')
+  // A column the server stamps is written on those operations whether or not a field shows it (0153).
+  const stamped = stampedWrites(bindings, was.name)
 
-  if (fields.length === 0 && !token) {
+  if (fields.length === 0 && !token && stamped.length === 0) {
     // Nothing here binds it. Out of sight, the gap reports itself; gone, it is a note.
     if (gaps.length > 0) return null
     return {
@@ -88,7 +97,7 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
   }
 
   // A delete names the version as an update does (0050).
-  const stops: readonly Operation[] = token ? ['update', 'delete'] : []
+  const stops: readonly Operation[] = token ? ['update', 'delete'] : stamped
   // A confirmed token is named by every read and by every create's RETURNING
   // or OUTPUT (0027), so gone or out of sight, it fails them all; a suggested
   // one is named by nothing, and neither update nor delete was offered over it.
@@ -120,6 +129,17 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
         : `${was.name}, the form's concurrency token, is gone, so a stale update or delete could not be detected. Update and delete are blocked until the form is reviewed.`,
     }
   }
+  if (fields.length === 0) {
+    return {
+      kind: 'column-dropped',
+      subject,
+      affects: [],
+      stops,
+      breaksReads: false,
+      otherwise: 'review',
+      message: `${was.name} is gone, and the server stamps it on ${stamped.join(' and ')} (0153). Those writes are blocked until the form is reviewed.`,
+    }
+  }
   return {
     kind: 'column-dropped',
     subject,
@@ -130,6 +150,24 @@ function droppedColumn(comparison: Comparison, was: ColumnMeta): Draft | null {
     message: `${was.name} is gone, and the form binds it to ${list(fields)}. The form is blocked until it is reviewed.`,
   }
 }
+
+/**
+ * The writes a change stops because the server stamps the column on them
+ * (0153), whatever else it stops: a column retyped, now generated, or
+ * narrowed under a stamp of who -- an id that fitted may no longer -- may
+ * refuse what the server writes, or take it as something else. A stamp of
+ * the time still fits a column of less precision, which the database rounds
+ * it to, and one that no longer accepts NULL: a stamp is never NULL.
+ */
+function stampStops(bindings: FormBindings, kind: ColumnChangeKind, was: ColumnMeta, is: ColumnMeta): Operation[] {
+  const stamps = (bindings.stamps ?? []).filter((stamp) => stamp.column === is.name)
+  if (stamps.length === 0) return []
+  const narrowed = kind === 'column-tightened' && compareTypes(was.type, is.type) === 'tightened' && stamps.some((stamp) => stamp.value.kind !== 'time')
+  const retyped = kind === 'column-type-changed' || (kind === 'column-generation-changed' && is.generated !== 'none')
+  return narrowed || retyped ? stampedWrites(bindings, is.name) : []
+}
+
+const STAMP_STOPPED = 'The server stamps it (0153), and what it stamps may no longer fit, so the writes it stamps are blocked until the form is reviewed.'
 
 interface Effect {
   kind: DriftKind
@@ -278,9 +316,11 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
   // The generator's create rule, now: a change that leaves this column needing a value nobody gives stops create.
   const createLost = blocksCreate(bindings, is) && !blocksCreate(bindings, was)
   const numbering = numberingLost(comparison, was, is)
+  const stamping = effect.breaksReads ? [] : stampStops(bindings, found.kind, was, is).filter((operation) => !effect.stops.includes(operation))
   const stops: Operation[] = [
     ...effect.stops,
-    ...(createLost ? ['create' as const] : []),
+    ...stamping,
+    ...(createLost && !stamping.includes('create') ? ['create' as const] : []),
     ...(numbering && !effect.stops.includes('delete') ? ['delete' as const] : []),
   ]
   return {
@@ -289,8 +329,8 @@ function changedColumn(comparison: Comparison, was: ColumnMeta, is: ColumnMeta):
     affects: fieldsOver(bindings, [is.name]),
     stops,
     breaksReads: effect.breaksReads,
-    otherwise: numbering ? 'review' : effect.otherwise,
-    message: `${is.name}: ${found.reasons.join('; ')}. ${effect.consequence}${createLost ? ` ${CREATE_LOST}` : ''}${numbering ? ` ${NUMBERING_LOST}` : ''}`,
+    otherwise: numbering || stamping.length > 0 ? 'review' : effect.otherwise,
+    message: `${is.name}: ${found.reasons.join('; ')}. ${effect.consequence}${stamping.length > 0 ? ` ${STAMP_STOPPED}` : ''}${createLost ? ` ${CREATE_LOST}` : ''}${numbering ? ` ${NUMBERING_LOST}` : ''}`,
   }
 }
 

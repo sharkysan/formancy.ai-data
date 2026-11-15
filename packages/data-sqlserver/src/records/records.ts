@@ -1,4 +1,14 @@
-import type { DeleteOutcome, RecordAdapter, RecordColumn, RecordConcurrency, RecordFailure, RecordRead, RecordTarget, RecordValue } from '@formancy/data-core'
+import type {
+  ClockColumn,
+  DeleteOutcome,
+  RecordAdapter,
+  RecordColumn,
+  RecordConcurrency,
+  RecordFailure,
+  RecordRead,
+  RecordTarget,
+  RecordValue,
+} from '@formancy/data-core'
 import { decodeRowversion, deleteTerms, encodeRowversion, listTerms, rowFilterTerms, throughTerms } from '@formancy/data-core'
 import type { ConnectionPool } from 'mssql'
 import { prepare, send } from '../sql/statement.js'
@@ -65,8 +75,9 @@ function checkKey(target: RecordTarget, key: readonly RecordValue[]): void {
 }
 
 /** The values a write assigns: each column once, which SQL Server would otherwise refuse with an error that is not a refusal. */
-function checkAssigned(values: readonly RecordValue[], reserved: string | null): void {
-  const given = names(values)
+function checkAssigned(values: readonly RecordValue[], reserved: string | null, clock: readonly ClockColumn[] = []): void {
+  // A column stamped with the clock (0153) is a column the write names too.
+  const given = [...names(values), ...clock.map((entry) => entry.name)]
   if (new Set(given).size !== given.length) throw new Error('A write names each column once')
   if (reserved !== null && given.includes(reserved)) throw new Error(`${reserved} is the concurrency column; the database or the adapter writes it`)
 }
@@ -213,7 +224,7 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
     },
 
     async insert(request) {
-      checkAssigned(request.values, null)
+      checkAssigned(request.values, null, request.clock)
       const definition = definitionBytes(request.definition)
       const rows = await attempt(pool, insertStatement(request, definition), 'write', request.values)
       if (!Array.isArray(rows)) return rows
@@ -231,7 +242,7 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const through = throughTerms(request.through)
       checkKey(target, request.key)
       if (request.set.length === 0) throw new Error('An update sets at least one column')
-      checkAssigned(request.set, target.concurrency.column)
+      checkAssigned(request.set, target.concurrency.column, request.clock)
       const definition = definitionBytes(request.definition)
 
       const expected = expectedVersion(target.concurrency, request.expectedVersion)
@@ -255,10 +266,11 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const terms = rowFilterTerms(request.filters)
       const through = throughTerms(request.through)
       checkKey(target, request.key)
-      const written = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
+      // A column stamped with the clock (0153) is one the next version is written with too.
+      const written = [...request.chain.map((entry) => entry.name), request.start.name, ...names(request.values), ...names(request.clock ?? [])]
       if (new Set(written).size !== written.length || written.includes(request.ends))
         throw new Error('A change from a date writes each column of the next version once, and never its end')
-      checkAssigned([request.start, ...request.values], target.concurrency.column)
+      checkAssigned([request.start, ...request.values], target.concurrency.column, request.clock)
       const definition = definitionBytes(request.definition)
       const expected = expectedVersion(target.concurrency, request.expectedVersion)
       if (expected !== undefined) {

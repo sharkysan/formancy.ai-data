@@ -17,6 +17,7 @@ import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedIns
 import { columnsOf, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFields, throughFor } from './scope.js'
 import { decodeRecordKey } from './token.js'
+import { clockOf, stampedColumns, stampsOf } from './stamps.js'
 import { planMove } from './transition.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
@@ -249,9 +250,11 @@ export function planCreate(
   if (!scoping.ok) return scoping
   const drifted = driftRefusal(snapshot, bindings, policy, described, 'create')
   if (drifted !== undefined) return drifted
+  const stamps = stampsOf(prepared, bindings, context, 'create')
+  if (!stamps.ok) return stamps
 
   const fixed = new Map(pinned.values.map((entry) => [entry.name, entry.value]))
-  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields)
+  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields, stampedColumns(bindings, 'create'))
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'create', decoded.selections)
   if (!memberships.ok) return memberships
@@ -259,7 +262,7 @@ export function planCreate(
   if (!move.ok) return move
 
   const { fields, returning } = readBack(prepared, bindings, policy, context)
-  const values = inCatalogValues(prepared.root, [...pinned.values, ...decoded.values])
+  const values = inCatalogValues(prepared.root, [...pinned.values, ...decoded.values, ...stamps.stamped.values])
   // A create of a chain's first version holds only where the chain has none
   // (0113), asked of the key's values it writes. A key part the database
   // fills is not compared: a part of the key alone would match other chains.
@@ -267,7 +270,7 @@ export function planCreate(
   const fresh = chain.length > 0 && chain.every((name) => values.some((value) => value.name === name)) ? { fresh: [...chain] } : {}
   return {
     ok: true,
-    request: { target: prepared.target, values, returning, definition: described.definition, ...fresh },
+    request: { target: prepared.target, values, ...clockOf(stamps.stamped), returning, definition: described.definition, ...fresh },
     fields,
     memberships: memberships.checks,
     moved: move.moved,
@@ -400,8 +403,12 @@ export function planUpdate(
   if (!scoping.ok) return scoping
   const decoded = decodeAnswers(prepared, bindings, unechoed.answers, fixed, 'update', scoping.fields)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
-  // No statement sets nothing alike on both engines, so an empty patch is refused here, once.
+  // No statement sets nothing alike on both engines, so an empty patch is
+  // refused here, once -- asked before the stamps, which say who changed
+  // the record and when, and are no change of their own (0153).
   if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
+  const stamps = stampsOf(prepared, bindings, context, 'update')
+  if (!stamps.ok) return stamps
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   if (!memberships.ok) return memberships
   const move = planMove(policy, context, bindings, decoded.values, asRead, expectedVersion)
@@ -412,7 +419,8 @@ export function planUpdate(
     request: {
       target: { ...prepared.target, concurrency },
       key: key.key,
-      set: inCatalogValues(prepared.root, decoded.values),
+      set: inCatalogValues(prepared.root, [...decoded.values, ...stamps.stamped.values]),
+      ...clockOf(stamps.stamped),
       expectedVersion,
       filters: filters.filters,
       through: through.through,

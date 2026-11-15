@@ -1,4 +1,5 @@
-import type { GenerationRequest, LookupChoice } from '@formancy/data-core'
+import { isStampChoice } from '@formancy/data-core'
+import type { GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
 import { CONFIGURATION_ID as FORM_ID } from './config-store.js'
 
 export type GenerationReading = { ok: true; generation: GenerationRequest } | { ok: false; problems: string[] }
@@ -24,6 +25,13 @@ function validityOf(value: unknown): GenerationRequest['validity'] | null {
   return { from: value['from'], to: value['to'] }
 }
 
+/** The columns the server stamps (0153): absent, or a list of choices, each exactly `{ column, value, on }`; `null` for anything else. */
+function stampsOf(value: unknown): StampChoice[] | undefined | null {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value) || !value.every(isStampChoice)) return null
+  return value.map((stamp) => ({ column: stamp.column, value: { ...stamp.value }, on: stamp.on }))
+}
+
 function lookupChoices(value: unknown): LookupChoice[] | undefined {
   if (value === undefined) return []
   if (!Array.isArray(value)) return undefined
@@ -46,14 +54,16 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
  *
  * Normalised: `lookups` and `pinned` are always lists, `versionColumn` is
  * present only when it is a string, a lookup's `section` only when it
- * marks one (0109), and `validity` only when it names a chain (0113). Other properties are not carried, so a
+ * marks one (0109), `validity` only when it names a chain (0113), and
+ * `stamps` only when it is given (0153), as given. Other properties are not carried, so a
  * stored request that is not equal to its own reading holds something this
- * reading would not have produced.
+ * reading would not have produced -- and a server older than 0153 refuses a
+ * stored request that stamps, as it refuses every property it does not read.
  */
 export function readGeneration(value: unknown): GenerationReading {
   if (!isRecord(value)) return { ok: false, problems: ['a generation request is an object'] }
   const problems: string[] = []
-  const { connection, root, formId, title, versionColumn, pinned, validity } = value
+  const { connection, root, formId, title, versionColumn, pinned, validity, stamps } = value
   if (typeof connection !== 'string') problems.push('connection must name a connection')
   if (!isRecord(root) || typeof root['schema'] !== 'string' || typeof root['name'] !== 'string') problems.push('root must be { schema, name }')
   if (typeof formId !== 'string' || !FORM_ID.test(formId)) problems.push('formId must be a lower-case form id')
@@ -65,7 +75,13 @@ export function readGeneration(value: unknown): GenerationReading {
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')
   const chain = validityOf(validity)
   if (chain === null) problems.push('validity must be { from, to }, two columns')
-  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null) return { ok: false, problems }
+  const stamped = stampsOf(stamps)
+  if (stamped === null)
+    problems.push(
+      "stamps must be a list of { column, value: { kind: 'actor' } | { kind: 'attribute', attribute } | { kind: 'time' }, on: 'create' | 'update' | 'both' }",
+    )
+  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null || stamped === null)
+    return { ok: false, problems }
   return {
     ok: true,
     generation: {
@@ -77,6 +93,7 @@ export function readGeneration(value: unknown): GenerationReading {
       pinned: pinnedColumns,
       ...(typeof versionColumn === 'string' ? { versionColumn } : {}),
       ...(chain === undefined ? {} : { validity: chain }),
+      ...(stamped === undefined ? {} : { stamps: stamped }),
     },
   }
 }

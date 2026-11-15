@@ -316,4 +316,41 @@ end
 $$;
 create trigger tr_price_declined before insert on parity.price_declined for each row execute function parity.decline_next_price();
 
+-- What the server stamps (0153): who created a row, when and at which site,
+-- who changed it last and when, and the day -- each filled by the server on
+-- the writes an administrator names, never from the request. One column of
+-- each temporal type a stamp takes: an instant (created_at), a wall clock
+-- (changed_at), a day (changed_on), and logged_at, timestamp(3) here and
+-- datetime on SQL Server, the one type the engines spell apart. noted_at is
+-- stamped by nothing: its default is the engine's clock, which a stamp of
+-- the same statement is compared with. created_by is NOT NULL with no
+-- default, so a create the server did not stamp is refused by the database.
+-- audited_price is price with a creator: the next version a change from a
+-- date inserts is stamped as a create.
+create table parity.audited (
+  id int generated always as identity constraint pk_audited primary key,
+  tenant_id int not null,
+  note varchar(50) null,
+  created_by varchar(40) not null,
+  created_at timestamptz not null,
+  created_in varchar(20) null,
+  changed_by varchar(40) null,
+  changed_at timestamp null,
+  changed_on date null,
+  logged_at timestamp(3) null,
+  noted_at timestamptz not null default now(),
+  version int not null default 1
+);
+create table parity.audited_price (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount numeric(18, 4) not null,
+  created_by varchar(40) not null,
+  created_at timestamptz not null,
+  version int not null default 1,
+  constraint pk_audited_price primary key (tenant_id, product_no, valid_from)
+);
+
 analyze parity.tenant_item;

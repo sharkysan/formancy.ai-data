@@ -4,6 +4,7 @@ import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { bindValue } from '../sql/values.js'
 import {
+  clocked,
   column,
   keyPredicates,
   located,
@@ -56,14 +57,21 @@ export function supersedeStatement(
   const set = [`${quoteName(request.ends)} = ${start}`]
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${column(target.concurrency.column)} + 1`)
   const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected), `${column(request.ends)} is null`]
-  const names = [...request.chain.map((entry) => quoteName(entry.name)), ...assigned.map(({ value }) => quoteName(value.name))]
-  const selected = [...request.chain.map((entry) => column(entry.name)), ...assigned.map(({ sql }) => sql)]
+  // The next version is stamped as a create is (0153); the version ended is not.
+  const stamped = clocked(request.clock)
+  const names = [
+    ...request.chain.map((entry) => quoteName(entry.name)),
+    ...assigned.map(({ value }) => quoteName(value.name)),
+    ...stamped.map(([name]) => name),
+  ]
+  const selected = [...request.chain.map((entry) => column(entry.name)), ...assigned.map(({ sql }) => sql), ...stamped.map(([, sql]) => sql)]
   const again = keyPredicates(parameters, request.key)
   const sql = writeBatch(parameters, {
     target,
     definition,
     operation: 'SUPERSEDE',
     counted: true,
+    clock: stamped.length > 0,
     statement: (output) =>
       [
         'declare @ending int;',

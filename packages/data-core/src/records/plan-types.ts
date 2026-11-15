@@ -51,6 +51,9 @@ import type { DeleteRequest, InsertRequest, ListRequest, ReadRequest, SupersedeR
  *   from the page's own statement, never before it.
  * - `version-ended` — a change from a date of a version that has ended, as
  *   read at the version the change names (0113).
+ * - `unstampable` — a column the server stamps cannot hold the signed-in
+ *   person's id or the attribute it is stamped with (0153): too long for
+ *   it, or text it refuses. Never cut to fit.
  */
 export type PlanRefusalCode =
   | PolicyRefusalCode
@@ -68,6 +71,7 @@ export type PlanRefusalCode =
   | 'invalid-cursor'
   | 'cursor-gone'
   | 'version-ended'
+  | 'unstampable'
 
 export interface PlanRefusal {
   ok: false
