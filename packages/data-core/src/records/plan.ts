@@ -385,8 +385,6 @@ export function planUpdate(
   if (!allowed.ok) return allowed
   const drifted = driftRefusal(snapshot, bindings, policy, described, 'update')
   if (drifted !== undefined) return drifted
-  const stamps = stampsOf(prepared, bindings, context, 'update')
-  if (!stamps.ok) return stamps
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
   if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion)) {
@@ -409,6 +407,8 @@ export function planUpdate(
   // refused here, once -- asked before the stamps, which say who changed
   // the record and when, and are no change of their own (0153).
   if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
+  const stamps = stampsOf(prepared, bindings, context, 'update')
+  if (!stamps.ok) return stamps
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   if (!memberships.ok) return memberships
   const move = planMove(policy, context, bindings, decoded.values, asRead, expectedVersion)

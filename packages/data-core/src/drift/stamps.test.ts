@@ -78,6 +78,37 @@ describe('a stamped column changed', () => {
     expect(diffSnapshots(BASE, retyped, BINDINGS, AUDITED_POLICY)).toMatchObject({ readable: false })
   })
 
+  // A column no field shows breaks no read when it changes, so only the
+  // stamp can stop its writes: retyped to a number, the creator's id is no
+  // longer something it holds; made computed, the database refuses any
+  // value for it. Either stops create, which stamps it, and leaves update.
+  // Watched failing with each half of `retyped` removed in turn: create
+  // stayed offered, and every insert would be refused by the database.
+  test('retyped or now generated under a stamp no field shows, stops the writes that stamp it', () => {
+    const changes = {
+      retyped: (column: ColumnMeta) => {
+        column.type = { kind: 'integer', min: '-2147483648', max: '2147483647' }
+        column.databaseType = 'integer'
+      },
+      computed: (column: ColumnMeta) => {
+        column.generated = 'computed'
+      },
+    }
+    for (const [name, change] of Object.entries(changes)) {
+      const changed = now(HIDDEN, (objects) => change(columnOf(objects, 'created_by')))
+      const report = diffSnapshots(HIDDEN, changed, HIDDEN_BINDINGS, AUDITED_POLICY)
+      expect({ name, readable: report.readable, writable: report.writable }).toEqual({
+        name,
+        readable: true,
+        writable: { create: false, update: true, delete: true },
+      })
+      expect(report.changes[0]?.message, name).toContain('The server stamps it (0153), and what it stamps may no longer fit')
+      const root = { ...described(changed, HIDDEN_BINDINGS) }
+      expect(driftRefusal(HIDDEN, HIDDEN_BINDINGS, AUDITED_POLICY, root, 'create'), name).toMatchObject({ ok: false, code: 'drift' })
+      expect(driftRefusal(HIDDEN, HIDDEN_BINDINGS, AUDITED_POLICY, root, 'update'), name).toBeUndefined()
+    }
+  })
+
   // The time still fits a column of less precision, which rounds it, and
   // one that no longer takes NULL, since a stamp is never NULL: a note, and
   // nothing stopped. Watched failing with every narrowing of a stamped

@@ -25,9 +25,11 @@ export interface Stamped {
 /**
  * What `operation` stamps for this person, or why it cannot: an attribute
  * the context lacks is `missing-attribute`, as a row filter's is; a value
- * its column cannot hold -- an id longer than the column, text it refuses
- * -- is `unstampable`, naming the column and never the value. Never cut to
- * fit: a stamp that is not who wrote the row says something untrue.
+ * the column's codec refuses -- an id longer than the column, in its unit
+ * -- is `unstampable`, naming the column and never the value. What the
+ * codec accepts and the database then refuses is the database's answer for
+ * that column (0153). Never cut to fit: a stamp that is not who wrote the
+ * row says something untrue.
  *
  * `prepare` has held every stamp to its column (`stampProblem`), so a stamp
  * of the time is a timestamp or a date, and a column is in the snapshot.

@@ -119,6 +119,17 @@ describe('an update of a form that stamps', () => {
     expect(update({ note: 'x', changed_by: 'mallory' })).toMatchObject({ ok: false, code: 'over-posting' })
   })
 
+  // Nothing to change is asked before the stamps are, so a request that
+  // changes nothing is that, whoever sends it -- even a person whose id
+  // the column cannot hold, whose save of a change is `unstampable`.
+  // Watched failing with the stamps planned before the empty patch was
+  // refused: the empty update was `unstampable`.
+  test('that changes nothing is nothing, before any stamp is planned', () => {
+    const long = signedIn('b'.repeat(41), { tenant: '1', site: 'Basel' })
+    expect(update({}, long)).toMatchObject({ ok: false, code: 'nothing-to-update' })
+    expect(update({ note: 'x' }, long)).toMatchObject({ ok: false, code: 'unstampable' })
+  })
+
   // A stamp filters nothing: Bob reads and updates the record Alice
   // created, under the tenant's filter alone (0011).
   test('is no filter on a read or an update', () => {
