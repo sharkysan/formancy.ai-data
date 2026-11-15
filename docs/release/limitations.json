@@ -4352,7 +4352,7 @@
       ]
     },
     "0152": {
-      "reviewed": "sha256:97f47f6d7cf884d5c6764b8ba5703dd12d75cbcbc99b3a86e5e4b874253d76ea",
+      "reviewed": "sha256:33e43be7b520b073d779ca42edaa1e5a77cafe16e9eb4b6d94273b35486b3e1b",
       "limitations": [
         {
           "area": "forms",
@@ -4361,7 +4361,12 @@
         },
         {
           "area": "forms",
-          "says": "An unvalidated or disabled list, two lists on one column, a list beside a check the connection cannot read, and one holding an empty value or a value the column cannot hold leave the column the box it was, with a note saying why.",
+          "says": "An unvalidated or disabled list, two lists on one column, and one holding an empty value or a value the column cannot hold leave the column the box it was, with a note saying why.",
+          "heldBy": "packages/data-core/src/generate/listed.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "No other check of the table is consulted: one that refuses a listed value, readable or out of sight, leaves the select offering it, and the database refuses it on Save as a check violation.",
           "heldBy": "packages/data-core/src/generate/listed.test.ts"
         },
         {
@@ -4391,12 +4396,12 @@
         },
         {
           "area": "forms",
-          "says": "A value added to a published select's check, or the check gone, stopped or no longer validated, is for review and stops nothing, and a record holding a value the select does not list is refused on Save until a listed one is chosen.",
+          "says": "A value added to a published select's check, or the check gone, stopped, no longer validated or replaced by an expression the reader does not take -- even one that refuses a value the select offers, which the database then refuses on Save -- is for review and stops nothing, and a record holding a value the select does not list is refused on Save until a listed one is chosen.",
           "heldBy": "packages/data-core/src/drift/listed.test.ts"
         },
         {
           "area": "testing",
-          "says": "Each engine's spelling of a list is measured for ck_order_status on PostgreSQL 17.11 and SQL Server 2022 alone, and held for the rest by the parity suites on the images they run and on no other release."
+          "says": "Each engine's spelling of a list is measured on PostgreSQL 17.11 and SQL Server 2022 (16.0.4295.3) alone, for ck_order_status and the parity suites' DDL, and held by those suites on the images they run and on no other release."
         }
       ]
     },

@@ -1,6 +1,6 @@
 # 0152 — A column whose values a check lists is a select of them
 
-- **Status:** accepted; extends [0009](0009-generation-is-deterministic-and-says-what-it-chose.md): a text or whole-number column one enforced, validated check lists the values of is a select of exactly them, and a list not drawn says why; extends [0010](0010-drift-is-classified-against-the-bindings.md): a published select is compared with its check -- a value gone from the list tightens the column, and one added, or the check gone, stopped, unvalidated or no longer a list, is a field the column outgrew, for review; extends [0005](0005-one-fixture-written-twice.md): the comparator holds data-core's reading of each check, as each engine spells it, to the model's list; amends [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md): a state field generated as such a select is drawn as its moves too; extends [0149](0149-a-new-record-starts-with-its-columns-constant-default.md): a default, or a starting value (0150), the list does not name is none
+- **Status:** accepted; extends [0009](0009-generation-is-deterministic-and-says-what-it-chose.md): a text or whole-number column one enforced, validated check lists the values of is a select of exactly them, and a list not drawn says why; extends [0010](0010-drift-is-classified-against-the-bindings.md): a published select is compared with the checks that list its column -- a value an enforced list leaves out tightens the column, and one every validated list names that the select does not, or the check gone, stopped, unvalidated or no longer a list it reads, is a field the column outgrew, for review; extends [0005](0005-one-fixture-written-twice.md): the comparator holds data-core's reading of each check, as each engine spells it, to the model's list; amends [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md): a state field generated as such a select is drawn as its moves too; extends [0149](0149-a-new-record-starts-with-its-columns-constant-default.md): a default, or a starting value (0150), the list does not name is none
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -9,24 +9,30 @@
   literals and no other: the captured snapshots' ck_order_status on both,
   a text, char(n) and varchar list, a list of one, OR on PostgreSQL and
   nested OR on SQL Server, whole numbers bare, quoted and cast, and in
-  parentheses, a doubled quote, a comma, blanks and text past ASCII in a
-  value, an empty one, a reserved word, a quoted name and a doubled
-  bracket; and NOT IN, a range, a comparison, LIKE, a function, another
-  column, NULL, two columns, an AND, a COLLATE, a cast with a modifier or
-  not named, a decimal, an array literal, a backslash, the other
-  engine's spelling, other spacing, a trailing word and an unclosed quote
-  or bracket as no list (watched failing with the reading not held to the
-  whole text: a trailing OR was read; with the backslash read; with an OR
-  of one term read; with two columns joined as one).
+  parentheses, an integer in a bigint's list cast to bigint on PostgreSQL
+  and one past int written with a point on SQL Server, a doubled quote, a
+  comma, blanks and text past ASCII in a value, an empty one, a reserved
+  word, a quoted name and a doubled bracket; and NOT IN, a range, a
+  comparison, LIKE, a function, another column, NULL, two columns, an
+  AND, a COLLATE, a cast with a modifier or not named, text or a decimal
+  cast to a bigint, a decimal, a point with digits after it, an array
+  literal, a backslash, the other engine's spelling, other spacing, a
+  trailing word and an unclosed quote or bracket as no list (watched
+  failing with the reading not held to the whole text: a trailing OR was
+  read; with the backslash read; with an OR of one term read; with two
+  columns joined as one; and with the bigint spellings unread, as the
+  parity suites first measured them: no list).
   `packages/data-core/src/generate/listed.test.ts` -- ck_order_status as
   each engine spells it is one select of draft, placed and shipped, its
   binding naming the check, its note the values (watched failing with
   the values kept in catalog order: SQL Server's select offered shipped
   first); whole numbers by value as canonical text, a value read back
-  alike once; a list not validated, not enforced, listed twice, beside a
-  check this connection cannot read, with a value the column cannot hold
-  or with an empty value is no select, and says why (watched failing with
-  the check's state ignored: a NOT VALID list was a select); a number on
+  alike once; a list not validated, not enforced, listed twice, with a
+  value the column cannot hold or with an empty value is no select, and
+  says why (watched failing with
+  the check's state ignored: a NOT VALID list was a select); no other
+  check of the table is consulted, readable or out of sight (watched
+  failing with a check out of sight refused: the list was a box); a number on
   text, text on a whole number, a decimal, a yes or no, SQL Server text
   past ASCII but an N literal on an nvarchar, and a list over another
   column are none, said nowhere; a whole number's answer, a bigint past
@@ -46,7 +52,16 @@
   both are two changes; the check gone, not enforced, not validated or no
   longer a list is a field the column outgrew, for review (watched failing
   with only the values compared: a dropped check said nothing about the
-  field); a check out of sight is left to the gap; a field the form only
+  field), and one replaced by an expression the reader does not take says
+  that whether it takes every offered value is not known (watched failing
+  with the message as it was); a second list that leaves out an offered
+  value, NOT VALID included, stops writes (watched failing with it read as
+  the column held to no list: review only); lists that between them leave
+  values out are named together, a disabled one not; the rows are held to
+  what every validated list names; a list in sight that leaves out an
+  offered value stops writes beside a check out of sight (watched failing
+  with every listed field left to the gap once any check was), and
+  otherwise a check out of sight is left to the gap; a field the form only
   shows is noted; a field published as a text box rests on no list.
   `packages/data-fixtures/src/conformance.test.ts` -- a list read
   otherwise than the model says, a spelling the reader does not take, an
@@ -73,11 +88,13 @@
   DDL read alike, one form, a listed value of every select stored and read
   back as given, and a value gone from the list blocking writes in review
   while the runtime sends them and the database refuses it with a check
-  violation (not run on the machine this record was written on, which had
-  no Docker; to be watched failing in CI with the array's cast left
-  unread, status and the other varchar lists then no list on PostgreSQL,
-  and with the options kept in catalog order, status then offering
-  shipped first on SQL Server). `packages/data-server/src/e2e.integration.test.ts`
+  violation (run on postgres:17-alpine, 17.11, and
+  mssql/server:2022-latest, 16.0.4295.3, on 2026-11-15, where `read` and
+  `generated` were watched failing on both with the bigint spellings
+  unread: ck_listed_big no list; to be watched failing in CI with the
+  array's cast left unread, status and the other varchar lists then no
+  list on PostgreSQL, and with the options kept in catalog order, status
+  then offering shipped first on SQL Server). `packages/data-server/src/e2e.integration.test.ts`
   -- the journey's compatible change, which adds cancelled to
   ck_order_status, is two things to review and stops nothing (computed
   here over the captured snapshots of both engines; to be run in CI).
@@ -106,16 +123,23 @@ the browser and the server's replay both run (formancy.ai 0076).
 
 **A text or whole-number column whose values one check lists is a select
 of exactly them** (`listedFor`, `packages/data-core/src/generate/listed.ts`):
-one check, enforced and validated, every other check of the table
-readable, every value one the column's codec reads back as itself and
-none empty. Anything else keeps the column's own control, and a list not
-drawn for a reason a person would want says so in a note: not validated
--- a row from before it may hold another value, which a select could not
-show --, not enforced, listed by two checks, beside a check this
-connection cannot read, with a value the column cannot hold, with an
-empty value, which a select cannot tell from no answer. Two lists are
-not intersected: the field would rest on two checks for a schema that
-says one thing twice, and it stays the box it was.
+one check, enforced and validated, every value one the column's codec
+reads back as itself and none empty. Anything else keeps the column's
+own control, and a list not drawn for a reason a person would want says
+so in a note: not validated -- a row from before it may hold another
+value, which a select could not show --, not enforced, listed by two
+checks, with a value the column cannot hold, with an empty value, which
+a select cannot tell from no answer. Two lists are not intersected: the
+field would rest on two checks for a schema that says one thing twice,
+and it stays the box it was. No other check is evaluated, readable or
+out of sight: one that refuses a listed value -- `status <> 'shipped'`
+beside the list -- leaves the select offering it, and the database
+refuses it on Save, as it refuses a typed value. A refusal for a check
+out of sight alone would be a rule for a case neither engine produces:
+PostgreSQL shows every check's expression to every role, and SQL Server
+hides a table's checks together -- VIEW DEFINITION is granted on the
+table and refused on a constraint, measured on 2022 (16.0.4295.3) on
+2026-11-15 -- so the list is out of sight with it.
 
 **The list is read per engine from the spelling the snapshot holds**
 (`readCheckList`, `generate/check-lists.ts`), as 0149 reads a default, and
@@ -131,7 +155,7 @@ SQL from what it reads.
 | OR of those | `((t) OR (t) …)`, nested as written | as a list |
 | A column | `name`, `"quoted ""name"""` | `[name]`, `[gr]]oup]` |
 | Text | `'…'::text`, `::character varying`, `::bpchar`, quotes doubled, no backslash | `'…'`, `N'…'`, quotes doubled; past ASCII only N on an nvarchar |
-| A whole number | `7` bare; `'-1'::integer`, `::bigint`, `::smallint` | `(7)`, `(-1)` |
+| A whole number | `7` bare; `'-1'::integer`, `::bigint`, `::smallint`; in a list of bigint, an integer cast to it, `(0)::bigint`, `('-1'::integer)::bigint` | `(7)`, `(-1)`; past int, which T-SQL types as numeric, with a point, `(9007199254740993.)` |
 
 **The options are the values as a record holding each reads back**,
 through the column's codec -- a char(n)'s without its padding, a whole
@@ -156,24 +180,31 @@ host draws a select of listed values as the moves its person may make, as
 it draws a box (`apps/host/src/moves.ts`), so the clerk is offered where
 the record may go, not every value the check lists.
 
-**Drift review compares the published select with its check**
-(`drift/listed.ts`), through `listedFor` again, so review and generation
-cannot disagree:
+**Drift review compares the published select with every check that
+lists its column** (`drift/listed.ts`), each read as `listedFor` reads one
+(`enforcedLists`), so review and generation cannot disagree about what a
+list holds. The database refuses on a write what any enforced list leaves
+out, a NOT VALID or WITH NOCHECK one included, and every row holds what
+every validated list names:
 
 | Against a published select | For the form |
 |---|---|
 | The same values, spelled otherwise | nothing; the check's own change is noted |
-| A value the list no longer names | `column-tightened`: stops the writes the field gives, as a shorter length does |
-| A value the list now names too | `column-outgrew-field`, review: the select cannot offer it |
-| The check gone, not enforced, not validated, no longer a list | `column-outgrew-field`, review |
-| A check out of sight | the gap's to say, as for every check |
+| A value an enforced list leaves out -- the check narrowed, or another list beside it | `column-tightened`: stops the writes the field gives, as a shorter length does |
+| A value every validated list names that the select does not | `column-outgrew-field`, review: the select cannot offer it |
+| The check gone, not enforced, not validated | `column-outgrew-field`, review |
+| The check no longer a list the reader takes, a narrower expression included | `column-outgrew-field`, review, saying whether it takes every offered value is not known |
+| A check out of sight | the gap's to say, as for every check; a list in sight that leaves out an offered value still stops writes |
 
 A field the column outgrew stops nothing: 0010 stops writes where the
 published control cannot hold the column because a save would write
 back what the control made of a value, unseen, and the engine refuses an
 answer the select does not list instead. A record holding such a value
 is refused on Save until a listed one is chosen; generating the form
-again offers it.
+again offers it. A replacement the reader does not take may refuse an
+offered value, or not, and the reader cannot say which: it is review's,
+and the database refuses such a value with its own error, as it refuses
+one any changed check refuses, which 0010 notes and stops nothing for.
 
 **The runtime compares no check** (0041): a write it plans goes to the
 database, which refuses a value its check no longer lists, with its own
@@ -203,9 +234,15 @@ it.
   `standard_conforming_strings`, and on SQL Server a value past ASCII but
   in an N literal on an nvarchar, which it reads in a code page the
   snapshot does not record.
-- An unvalidated or disabled list, two lists on one column, a list beside
-  a check this connection cannot read, one holding an empty value or a
-  value the column cannot hold: the text box, with a note.
+- An unvalidated or disabled list, two lists on one column, one holding
+  an empty value or a value the column cannot hold: the text box, with a
+  note.
+- No other check of the table is consulted: one that refuses a listed
+  value, readable or out of sight, leaves the select offering it, and
+  the database refuses it on Save as a check violation.
+- A published list replaced by an expression the reader does not take is
+  for review and stops nothing, even where the new check refuses a value
+  the select offers: such a value is refused by the database on Save.
 - Each value is labelled as the column holds it, `in_transit` and not
   "In transit"; an administrator relabels a state field's states (0129)
   and no other select's. A presentation could carry labels later.
@@ -233,11 +270,11 @@ it.
   approval and at import until it is, as every generator change has been
   (0030). Where its table's check names a value since added, review says
   so as a field the column outgrew, and a form generated again offers it.
-- The spellings read are measured for one list on one release of each
-  engine -- the captured snapshots' ck_order_status, PostgreSQL 17.11 and
-  SQL Server 2022 -- and the rest are what each catalog is documented to
-  write, held per engine by the parity suites on the images they run and
-  on no other release.
+- The spellings read are measured on one release of each engine,
+  PostgreSQL 17.11 and SQL Server 2022 (16.0.4295.3), on 2026-11-15: the
+  captured snapshots' ck_order_status, and each check of the parity
+  suites' DDL, which those suites hold on the images they run and on no
+  other release.
 
 **What it forecloses.** Nothing: PostgreSQL's enums and domains over a
 list are a later record, read the same way.

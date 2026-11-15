@@ -242,9 +242,12 @@ What a check admits is the database's comparison, not its text: under a
 case-insensitive SQL Server collation, which pads trailing blanks too, a
 row may hold a value the select does not list, and is refused on Save
 until a listed one is chosen -- read from the engines' comparison rules,
-not measured. The server does not check an answer against the list, the
-database does; a state field's moves are not held to it; and a form
-published before keeps its box until it is generated again
+not measured. No other check is consulted, so one that refuses a listed
+value leaves the select offering it; a published list replaced by an
+expression the reader does not take is for review only, even where it
+refuses an offered value. The server does not check an answer against
+the list, the database does; a state field's moves are not held to it;
+and a form published before keeps its box until it is generated again
 ([0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
 A client sends exact decimals as strings, and a value comes back
 canonicalised to its column's scale

@@ -157,8 +157,8 @@ until then the address is formancy.ai's 404
   and labelled as the column holds them, so the order form's Status is a
   choice on both engines; a list not validated, named twice or holding an
   empty value stays a box and says why, anything but a list of literals
-  stays a box, and drift review blocks the field's writes when the list
-  loses a value it offers
+  stays a box, and drift review blocks the field's writes when an
+  enforced list it reads leaves out a value it offers
   ([0152](./docs/decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
