@@ -46,6 +46,12 @@ databases once per run in a vitest `globalSetup`
 (`packages/data-client/src/test-databases.ts`,
 `apps/host/src/test-databases.ts`), so every file there needs Docker;
 `data-core`, `data-identity`, `apps/examples` and `apps/studio` need none.
+A host file fails when a connection it opened is still open or connecting
+after its own `afterAll`, naming the test that opened it
+(`apps/host/src/test-connections.ts`, over Node's `net.client.socket`
+channel); one opened after that, by a request the file left being
+answered, it does not see. `@formancy/data-client`'s suite has no such
+check.
 The whole product runs over HTTP into the real server and through the real
 drivers on both engines in `packages/data-server/src/e2e.integration.test.ts`
 ([0025](../decisions/0025-each-adapter-owns-its-driver.md)).

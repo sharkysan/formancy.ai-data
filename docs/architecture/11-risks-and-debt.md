@@ -722,6 +722,15 @@ widths journey, past the thirty minutes the legs had, so their limit is
 now that slowest green time tripled rather than the host's gate split
 across runners.
 
+**A host run once failed after every test passed, and nothing said
+where.** On CI run 43421963967 a SQL Server connection's connect failed
+after Vitest had torn its file down, as an unhandled
+`ReferenceError: process is not defined` from tedious; a rerun passed.
+Its cause is not known. A host file now fails when a connection it opened
+outlives it, naming the test (`apps/host/src/test-connections.ts`), which
+names this one if it opened before the check; one opened after, by a
+request a file left being answered, it still cannot name.
+
 **A merged branch is deleted by a repository setting** that nothing here
 reads ([0036](../decisions/0036-a-merged-branch-is-deleted-by-the-merge.md)).
 
