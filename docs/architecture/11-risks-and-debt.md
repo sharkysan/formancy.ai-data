@@ -342,6 +342,22 @@ not `unstampable`, and nothing tests it; and the parity suites that hold
 what each engine stores for a stamp were run for it on each engine's
 default image alone
 ([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
+On PostgreSQL under any isolation but READ COMMITTED every read and write
+takes its table's lock first, and an account granted columns of the table
+and nothing on the table cannot take it and is refused `permission-denied`:
+that is [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)'s
+recorded cost, in `docs/release/limitations.json`, held through the adapter
+for a read by `packages/data-postgres/src/records-definition.integration.test.ts`.
+`packages/data-postgres/src/save-facts.integration.test.ts` adds the case a
+save would meet: `LOCK … IN ROW EXCLUSIVE MODE` is refused, 42501, to an
+account granted UPDATE on the version column alone, which may still make
+the touch itself, and taken once it holds UPDATE on the table -- any grant
+to write the table will do, as
+[0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
+measured. A save of a
+record with its rows, which is not built, would meet the same lock on the
+record's table
+([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
 token ([0014](../decisions/0014-host-identity-is-verified-offline.md)).

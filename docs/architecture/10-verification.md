@@ -36,6 +36,28 @@ PostgreSQL 14, outside the matrix, to show that a server this release was
 not tested on is said to be untested and is served ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)); the report names
 such an image as outside the matrix, with its files.
 
+Some engine facts are measured before anything is designed on them.
+`packages/data-postgres/src/save-facts.integration.test.ts` and
+`packages/data-sqlserver/src/save-facts.integration.test.ts` hold what a
+save of a record with its rows in one transaction, which is not built,
+would rest on: plain statements through each adapter's own driver, on
+tables of the file's own, with no product code run, on every image of the
+matrix. A measured fact has no code to revert, so each case was watched
+failing with the opposite asserted, on the default images, PostgreSQL
+17.11 and SQL Server 2022 CU27, on 2026-11-15; what the other images
+answer, their legs show. No decision rests on them yet.
+
+| Engine | What was measured | Why a save needs to know |
+|---|---|---|
+| PostgreSQL | Under REPEATABLE READ neither `SET LOCAL` nor `LOCK TABLE` takes the transaction's snapshot, and a `select set_config(...)` does | A save sets its timeouts and takes its lock before its first read; had either taken the snapshot, its count would miss a row committed after it |
+| PostgreSQL | `LOCK … IN ROW EXCLUSIVE MODE` is refused, 42501, to an account granted UPDATE on a column alone, which may make that update; UPDATE on the table is enough | Under any isolation but READ COMMITTED a save locks every table it writes, the record's among them, so a column grant alone does not let it save, as [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md) records for every read and write on that path ([11.2](11-risks-and-debt.md#112-known-limitations-by-area)) |
+| PostgreSQL | Under REPEATABLE READ a `FOR NO KEY UPDATE` that waited on a holder that only locked the row is let through when the holder commits, and its count misses the holder's committed rows | Serialising saves of a record's rows by locking the record's row, its version kept, would let two saves pass a bound together |
+| PostgreSQL | Two transactions each moving the record's version, then counting: the second waits on the first, then finds no row to move under READ COMMITTED and is refused 40001 under REPEATABLE READ | Moving the version is what keeps the second save's rows out, under either isolation |
+| SQL Server | A rowversion table's `set c = c` moves the rowversion, for a value and for NULL, and keeps the value | It is how a save of rows alone would move a rowversion record's version |
+| SQL Server | That touch fires the table's AFTER UPDATE trigger once for the row, and in it `UPDATE()` is true for the column set and false for one not set | A record's own triggers fire on a save of its rows alone, and one that refuses a change to a column would refuse every touch of that column |
+| SQL Server | `SET LOCK_TIMEOUT` sent inside `sp_executesql` bounds a lock wait after it in that request, 1222, and ends with the request; sent as a batch of its own, it outlives the request on the pooled session | A save's lock timeout bounds the save, and not the next request on its connection |
+| SQL Server | The race of the fourth row, under locking READ COMMITTED and under READ_COMMITTED_SNAPSHOT: the second waits, then finds no row to move | As the fourth row; and an UPDATE under row versioning still waits for the row it updates |
+
 There is no mocked driver, no `--skip-db` flag and no environment variable
 that turns a suite into a no-op. That no mock exists is **not mechanically
 enforced**: nothing fails if somebody adds one, and 0003 says it is held by
