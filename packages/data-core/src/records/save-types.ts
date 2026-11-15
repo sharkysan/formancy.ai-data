@@ -56,11 +56,16 @@ export type SaveRecordStep = { kind: 'insert'; request: InsertRequest } | { kind
 
 /**
  * One together child the save changes, and its steps. Every one of them is
- * pinned to the record by `parent`: the adapter adds it to each statement
- * that locates a row -- the update's and the delete's WHERE, and the read
- * that explains one that changed nothing -- writes it into each create, and
- * counts by it, so another record's row is `not-found` in all of them.
+ * pinned to the record by `parent`, one pin for the child rather than one
+ * per row, so no two copies can disagree: the adapter is to add it to each
+ * statement that locates a row -- the update's and the delete's WHERE, and
+ * the read that explains one that changed nothing -- write it into each
+ * create, and count by it, so another record's row is `not-found` in all of
+ * them. What data-core holds is that `parent` carries the record's key;
+ * that each statement applies it is the adapters' save's to prove (0155),
+ * since no type can make an adapter apply it.
  */
+
 export interface SaveChild {
   table: ObjectRef
   parent: readonly ParentColumn[]

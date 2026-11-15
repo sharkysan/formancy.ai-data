@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:b34df1f340b8ad76ad0ebefc936337e3bf40646df06c6e4983ebccf9ad4d9406",
+      "reviewed": "sha256:ca31e952eebc00181f4bd5443f662c01e610d9ef59e0ad0f03e5975888c6966a",
       "limitations": [
         {
           "area": "databases",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:25deeeae686ec62ff4a8203b18ff4820caa24048371a14b497f8b4c707c81957",
+      "reviewed": "sha256:1d4f471070e6b239445aada4980c6605efe1176f42c584be61442a3412a7924e",
       "limitations": [
         {
           "area": "forms",
@@ -1134,7 +1134,7 @@
       "none": "Superseded by 0118: what generated forms are written in, and what an integrator's renderer must read, are that record's costs now, a whole-number field's fraction included."
     },
     "0043": {
-      "reviewed": "sha256:2a4dd729848a1bad694976355a36fc53f9ac80d6a2cfda27a3177d418b55665d",
+      "reviewed": "sha256:7a8d70692051659d4f428d8c277446bc3e070719fb671c2f8a21a4e23cdd6a4b",
       "limitations": [
         {
           "area": "access",
@@ -1409,7 +1409,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:b28045766ae445188e71ccdc4051fbc5106d698ebe444d74762e889a10a35762",
+      "reviewed": "sha256:50bb734d59e282d5baba44929c36a7509c66cffcc3c8d7a8c5e903aa26f34667",
       "limitations": [
         {
           "area": "writes",
@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:48be7306164bcab701f9846e1d9e07767b1665a90b41a9ae3d0312007eb3b67e",
+      "reviewed": "sha256:f94ed9360170ecef5cb89a8e8c98c90925b1c6dff51ec68d05b1444818815c3c",
       "limitations": [
         {
           "area": "writes",
@@ -4468,12 +4468,23 @@
         },
         {
           "area": "forms",
-          "says": "A form whose lookup is saved with its record offers no create or delete of its rows alone, only their updates, and the menu offers the create of a record such a form requires rows of only to a person who could save those rows with it.",
+          "says": "A form whose lookup is saved with its record offers no create or delete of its rows alone, only their updates.",
+          "heldBy": "packages/data-core/src/records/together.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "The menu offers the create of a record that a together lookup requires rows of only to a person who could save those rows with it, and to nobody where the record's key is filled by a default that can repeat; the create route does not refuse such a create yet.",
+          "heldBy": "packages/data-core/src/records/menu.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A record holds at most one row less than a list's page of a together child, since a save is planned from one page of its rows, until the adapters' save measures how many rows one save can hold.",
           "heldBy": "packages/data-core/src/records/together.test.ts"
         },
         {
           "area": "writes",
-          "says": "A save of a record's rows alone moves the record's version and writes none of its stamped columns, so a column the server stamps on update does not say who saved the rows, or when."
+          "says": "A save of a record's rows alone moves the record's version and writes none of its stamped columns, so a column the server stamps on update does not say who saved the rows, or when.",
+          "heldBy": "packages/data-core/src/records/save.test.ts"
         },
         {
           "area": "databases",

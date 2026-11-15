@@ -357,8 +357,9 @@ the touch itself, and taken once it holds UPDATE on the table -- any grant
 to write the table will do, as
 [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
 measured. A save of a
-record with its rows, which is not built, would meet the same lock on the
-record's table
+record with its rows
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)),
+which is not built, would meet the same lock on the record's table
 ([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
@@ -739,8 +740,11 @@ saving different lines of one order at once are one saved and one `stale`;
 the bound holds for the writes of the parent's form and the together
 child's, not for another form over the child's table, another form's
 delete that reaches it, a trigger or another application; on SQL Server a
-trigger that ends the transaction can store a save in part; and a save is
-held to one batch there, by a prediction of its parameters. Only the
+trigger that ends the transaction can store a save in part; a save is
+held to one batch there, by a prediction of its parameters; and a record
+holds at most one row less than a list's page of a together child
+(`TOGETHER_MAX_ROWS`), since a save is planned from one page of its rows,
+until the adapters' save measures how many one save can hold. Only the
 planning is built: the adapters, the route, the host page and the studio
 follow, and until they do nothing published saves this way.
 

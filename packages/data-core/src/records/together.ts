@@ -1,9 +1,9 @@
 import type { DatabaseKind } from '../adapter.js'
-import { offeredFor, offers } from '../generate/offers.js'
+import { numbersKey, offeredFor, offers } from '../generate/offers.js'
 import { stampedOn } from '../generate/stamps.js'
 import { togetherOf } from '../generate/together.js'
 import type { FormBindings } from '../generate/types.js'
-import type { MetadataSnapshot } from '../metadata.js'
+import type { ColumnMeta, MetadataSnapshot } from '../metadata.js'
 import { deleteReach } from '../policy/cascades.js'
 import { authorizeOperation } from '../policy/evaluate.js'
 import { readPolicy } from '../policy/inputs.js'
@@ -11,7 +11,7 @@ import type { FormPolicy, PolicyContext } from '../policy/types.js'
 import { childLookups, parentKey, referencingFields } from './children.js'
 import type { ChildLookup, ParentKey, PublishedTable } from './children.js'
 import type { MenuBundle, MenuForm } from './menu.js'
-import { columnsOf, prepare } from './prepare.js'
+import { columnsOf, prepare, type Prepared } from './prepare.js'
 
 /*
  * What the menu and the create route need to know of together children
@@ -34,7 +34,8 @@ export const SQLSERVER_MAX_PARAMETERS = 2100
  * A together child under a parent in one person's menu (0155): its bounds,
  * and what this person may do with its rows in a save. `created` is a save
  * that creates the record: the child's create in a save under its policy,
- * with the parent's create. `saved` is a save over a saved record: each of
+ * with the parent's create and a key the save can know before the rows'
+ * statements (`MenuSaves.knownKey`). `saved` is a save over a saved record: each of
  * the child's create, update and delete in a save under its policy, each
  * with the parent's update, a confirmed concurrency and, on a rowversion, a
  * confirmed touch column. Every flag is false where the parent's bundle,
@@ -58,11 +59,51 @@ export interface MenuTogether {
   parameters: { row: number; child: number }
 }
 
-/** What a form's records need of the form itself to carry a save of their rows, read from its bundle alone: its engine, whether a save of rows alone can move a record's version, and what the record's own step binds. */
+/** What a form's records need of the form itself to carry a save of their rows, read from its bundle alone: its engine, whether a save of rows alone can move a record's version, whether a new record's key can be known before its rows' statements, and what the record's own step binds. */
 export interface MenuSaves {
   kind: DatabaseKind
+  /** A confirmed version column, or a rowversion with a confirmed touch column that no row filter pins (`pinsTouch`). */
   touch: boolean
+  /** Every key column a create of the form writes -- by a field, a pin or a stamp -- or the database numbers (`newKeyPart`). */
+  knownKey: boolean
   parameters: number
+}
+
+/**
+ * How a save that creates a record knows one column of its key before its
+ * rows' statements (0155): `'written'` where the record's insert writes it,
+ * `'returned'` where the database numbers it and the record's step returns
+ * it (`numbersKey`), and `null` where the database fills it any other way
+ * -- a default that can repeat, which nothing knows before the insert. One
+ * rule for `planSave`, which asks it of the values one create writes, and
+ * for the menu, which asks it of every column a create of the form can
+ * write, so that the menu offers no create of a record whose rows the
+ * planner would refuse.
+ */
+export function newKeyPart(kind: DatabaseKind, prepared: Prepared, name: string, written: boolean): 'written' | 'returned' | null {
+  if (written) return 'written'
+  const identity = prepared.target.identity.map((column) => column.name)
+  return numbersKey(kind, prepared.root, prepared.columns.get(name) as ColumnMeta, identity) ? 'returned' : null
+}
+
+/**
+ * Whether `policy`'s row filters pin `touch` (0155): a save of rows alone
+ * sets the touch column to itself, and a filter holding it would make the
+ * touch a write of a pinned column, so `planSave` refuses such a save and
+ * the menu offers none. `false` for a policy that cannot be read, which
+ * refuses every operation first.
+ */
+export function pinsTouch(policy: FormPolicy, touch: string): boolean {
+  return readPolicy(policy).parsed?.rowFilters.some((rule) => rule.column === touch) ?? false
+}
+
+/** Every column a create of the form can write: a field's written on create, a column the policy's row filters pin, and a stamp on create. */
+function createdColumns(bindings: FormBindings, policy: FormPolicy): Set<string> {
+  return new Set([
+    ...bindings.fields.flatMap((binding) => (binding.writes.create ? columnsOf(binding) : [])),
+    ...(readPolicy(policy).parsed?.rowFilters ?? []).map((rule) => rule.column),
+    ...stampedOn(bindings.stamps, 'create').map((stamp) => stamp.column),
+  ])
 }
 
 /** What a SQL Server statement binds besides its values: the table's name and the definition it was decided over (`writeBatch`). */
@@ -85,9 +126,10 @@ function written(bindings: FormBindings, operation: 'create' | 'update', pinned:
 
 /**
  * The most parameters one change of a row of a together child binds in a
- * SQL Server save (0155): a prediction of the batch the adapter builds,
- * read from data-sqlserver's statements on 2026-11-15, which its suite
- * holds every batch it builds for a shared case to. The most of the
+ * SQL Server save (0155): a prediction of the batch the adapter will build,
+ * read from data-sqlserver's statements on 2026-11-15, which no batch has
+ * been compared with yet -- data-sqlserver's save suite is to hold every
+ * batch it builds to it. The most of the
  * create, update and delete the form offers: each value it writes, its
  * key, its version, every filter and through value, one per foreign-key
  * column of its record, the table's name and definition, and for a delete
@@ -146,16 +188,20 @@ export function menuTogether(bundle: MenuBundle, context: PolicyContext): MenuTo
 export function menuSaves(bundle: MenuBundle): MenuSaves | null {
   const ready = prepare(bundle.snapshot, bundle.bindings)
   if (!ready.ok || !ready.prepared.addressable || togetherOf(bundle.bindings) !== null || bundle.bindings.validity !== undefined) return null
+  const { prepared } = ready
   const filters = filterParameters(bundle.policy)
-  const concurrency = ready.prepared.target.concurrency
-  const identity = ready.prepared.target.identity.length
+  const concurrency = prepared.target.concurrency
+  const touch = bundle.bindings.concurrency?.touch
+  const created = createdColumns(bundle.bindings, bundle.policy)
+  const identity = prepared.target.identity.length
   const step =
     filters === null
       ? Number.POSITIVE_INFINITY
       : Math.max(written(bundle.bindings, 'create', filters.rows), written(bundle.bindings, 'update', 0) + identity + 1 + filters.rows + filters.through)
   return {
     kind: bundle.snapshot.kind,
-    touch: concurrency !== null && (concurrency.kind === 'version-column' || bundle.bindings.concurrency?.touch !== undefined),
+    touch: concurrency !== null && (concurrency.kind === 'version-column' || (touch !== undefined && !pinsTouch(bundle.policy, touch))),
+    knownKey: prepared.target.identity.every((column) => newKeyPart(bundle.snapshot.kind, prepared, column.name, created.has(column.name)) !== null),
     // The record's step, its key read back, and the deadline.
     parameters: STATEMENT + step + identity + 1,
   }
@@ -171,7 +217,10 @@ function requires(key: ParentKey | null, lookup: ChildLookup, min: number): bool
  * (0155): each form on the parent's connection whose together lookup
  * references them (`referencingFields`) with a `min` of at least 1, each
  * bundle read alone, whoever the person is -- a bound applies to everyone.
- * The parent's create route refuses a plain create where one is found.
+ * The menu leaves out the parent's create where the person could not make
+ * that save (`formMenu`). The parent's create route is to refuse a plain
+ * create where one is found, from the save's route on, and refuses none
+ * yet.
  */
 export function rowsRequired<T extends PublishedTable>(
   parent: PublishedTable,
@@ -204,7 +253,8 @@ export function togetherChildren(
   const saves = parent.saves
   const bound = children.reduce((sum, { together }) => sum + together.max * together.parameters.row + together.parameters.child, saves?.parameters ?? 0)
   const carries = saves !== null && (saves.kind !== 'sqlserver' || bound <= SQLSERVER_MAX_PARAMETERS)
-  const creates = carries && parent.operations.includes('create')
+  const creates = carries && saves.knownKey && parent.operations.includes('create')
+
   const updates = carries && saves.touch && parent.operations.includes('update')
   return children.map(({ form, together }) => ({
     form,

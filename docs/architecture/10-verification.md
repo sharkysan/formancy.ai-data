@@ -45,7 +45,9 @@ tables of the file's own, with no product code run, on every image of the
 matrix. A measured fact has no code to revert, so each case was watched
 failing with the opposite asserted, on the default images, PostgreSQL
 17.11 and SQL Server 2022 CU27, on 2026-11-15; what the other images
-answer, their legs show. No decision rests on them yet.
+answer, their legs show.
+[0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)
+rests on them, and names these files in its Verified by.
 
 | Engine | What was measured | Why a save needs to know |
 |---|---|---|
@@ -142,8 +144,8 @@ A save of a record with its rows has no shared case yet
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)): data-core plans it, and
 `packages/data-core/src/records/save.test.ts`, `together.test.ts` and
 `menu.test.ts` beside it hold the plan with no database -- each part under
-its own form's policy, every field error at once, every row step pinned to
-the record, the key bound or taken from the record's step, the touch,
+its own form's policy, every field error at once, each child pinned to the
+record by the key it carries, the key bound or taken from the record's step, the touch,
 `within`, the counts and bounds, the order of the steps, what a form offers
 alone and in a save, which children require rows, and what the menu
 offers -- each case watched failing with its rule taken out. Its shared
@@ -622,7 +624,11 @@ and a number typed here would drift from the next run.
 - **A save is planned and not run.** What data-core plans for a record
   saved with its rows is held by unit tests alone, and `saveParameters`,
   its prediction of the SQL Server batch a save will be, is compared with
-  no batch: no adapter builds one yet
+  no batch: no adapter builds one yet. Nor does anything hold that the pin
+  each child carries reaches the WHERE that locates each of its rows, or
+  the read that explains one that changed nothing: the request carries it
+  once per child, and only the adapters' save can show it applied
+
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is

@@ -33,7 +33,11 @@ import type { MenuSaves, MenuTogether } from './together.js'
  * and a together child offers no create or delete alone, its rows being
  * added and removed with their record (0155). `GET /v1/forms/:id` narrows
  * this by the database as it is now; the menu says it as it is. One
- * function, so the two cannot disagree about the policy.
+ * function, so the two cannot disagree about the policy. They can disagree
+ * about one create until the save's route lands: the menu leaves out the
+ * create of a record a together child requires rows of where the person
+ * could not make that save (`formMenu`), and the form route, which asks
+ * this alone, does not yet.
  */
 export function grantedOperations(bindings: FormBindings, policy: FormPolicy, context: PolicyContext): PolicyOperation[] {
   return OPERATIONS.filter((operation) => (operation === 'read' || offeredFor(bindings, operation, null)) && authorizeOperation(policy, context, operation).ok)
@@ -139,8 +143,10 @@ function sectionWhen(parent: MenuForm, section: SectionBinding): FormMenuChild['
  * is not one of its children here, or its `TogetherChild` gives them no
  * create of the child's rows with the record -- every such child of every
  * form, read or not, since a bound applies to everyone. The create route
- * refuses a plain create of such a record whoever asks.
+ * is to refuse a plain create of such a record whoever asks, from the
+ * save's route on (0155); it refuses none yet.
  */
+
 export function formMenu(forms: readonly MenuForm[]): FormMenu {
   const named = forms.filter((form) => form.operations.includes('read')).sort((left, right) => byCodepoint(left.id, right.id))
   return {

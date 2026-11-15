@@ -28,6 +28,7 @@ import {
   TENANT,
   togetherOn,
 } from './test-support.js'
+import { customers, defaultedNumber, noted, notes } from './test-together.js'
 
 /*
  * The forms a person's menu names, and the children under each (0045): the
@@ -338,6 +339,25 @@ describe('a record whose rows are saved with it (0155)', () => {
       order: ['read', 'create', 'update'],
       'order-line': ['read', 'update'],
     })
+  })
+
+  // A customer whose number the database fills by a default that can
+  // repeat has a key no save can know before its notes' statements, so the
+  // planner refuses every save that creates one with notes, and the menu
+  // offers no create of it while notes are required; with the number
+  // typed, it offers one. Watched failing with the key unasked: the
+  // defaulted customer's create was offered.
+  test('leaves out the create of a record whose key a save of its rows could not know', () => {
+    const of = (source: MetadataSnapshot) => {
+      const parent = customers(source)
+      const child = notes(source)
+      return operationsOf([
+        bundle('customer', 'Customer', source, parent.bindings, parent.policy),
+        bundle('notes', 'Note', source, child.bindings, child.policy),
+      ])
+    }
+    expect(of(noted())).toEqual({ customer: ['read', 'create'], notes: ['read'] })
+    expect(of(noted(defaultedNumber))).toEqual({ customer: ['read'], notes: ['read'] })
   })
 })
 

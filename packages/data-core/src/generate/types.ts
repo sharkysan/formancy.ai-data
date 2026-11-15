@@ -23,7 +23,7 @@ export interface LookupChoice {
   together?: TogetherBounds
 }
 
-/** How many rows of a together child one record holds (0155): whole numbers, `0 <= min <= max`, `max` at least 1. */
+/** How many rows of a together child one record holds (0155): whole numbers, `0 <= min <= max`, `max` at least 1 and at most `TOGETHER_MAX_ROWS`. */
 export interface TogetherBounds {
   min: number
   max: number

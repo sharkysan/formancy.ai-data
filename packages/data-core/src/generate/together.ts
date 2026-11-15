@@ -1,4 +1,5 @@
 import type { ObjectMeta } from '../metadata.js'
+import { LIST_PAGE_SIZE } from '../runtime.js'
 import type { FieldBinding, FormBindings } from './types.js'
 
 /*
@@ -18,7 +19,17 @@ export interface Together {
   max: number
 }
 
-/** Why `bounds` are not bounds a together lookup can carry -- whole numbers, `0 <= min <= max`, `max` at least 1 -- or `null`. */
+/**
+ * The largest `max` a together lookup may carry (0155): one row less than a
+ * list's page, since a save over a saved record is planned from one page
+ * of the child's list holding one row more than `max` (`planSaveList`), and
+ * no page holds more than `LIST_PAGE_SIZE`. Derived, not measured: the
+ * adapters' save is to measure how many rows one save can hold, which may
+ * lower it.
+ */
+export const TOGETHER_MAX_ROWS = LIST_PAGE_SIZE - 1
+
+/** Why `bounds` are not bounds a together lookup can carry -- whole numbers, `0 <= min <= max`, `max` at least 1 and at most `TOGETHER_MAX_ROWS` -- or `null`. */
 export function boundsProblem(bounds: unknown): string | null {
   if (typeof bounds !== 'object' || bounds === null || Array.isArray(bounds)) return 'its bounds are not { min, max }'
   const { min, max, ...rest } = bounds as Record<string, unknown>
@@ -26,6 +37,7 @@ export function boundsProblem(bounds: unknown): string | null {
   if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max)) return 'its bounds are not whole numbers'
   if ((min as number) < 0 || (min as number) > (max as number)) return 'its bounds are not 0 <= min <= max'
   if ((max as number) < 1) return 'its max is below 1'
+  if ((max as number) > TOGETHER_MAX_ROWS) return `its max is above ${String(TOGETHER_MAX_ROWS)}, one row less than a list's page`
   return null
 }
 

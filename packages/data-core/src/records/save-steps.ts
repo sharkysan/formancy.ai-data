@@ -8,7 +8,7 @@ import type { SaveChange, SavePart } from '../save.js'
 import { findObject } from '../snapshot.js'
 import type { PublishedTable } from './children.js'
 import { planDelete } from './delete.js'
-import { planCreate, planUpdate } from './plan.js'
+import { planCreate, planUpdate, readAnswers } from './plan.js'
 import type { FieldError, FormRecord, MembershipCheck, PlanRefusal } from './plan-types.js'
 import { prepare, refuse } from './prepare.js'
 import type { PlannedSaveStep, SaveChild, SavePlanRefusal } from './save-types.js'
@@ -89,15 +89,23 @@ function withinScope(input: SaveChildInput, together: Together, context: PolicyC
 
 /**
  * A row's answers on an update, less the field that names its record: the
- * page may send it back as it read it, the record's own token, and it is
- * dropped; any other value would move the row to another record, past
- * either one's bound, and is over-posting (0011, 0022).
+ * page may send it back as it read it -- the record's own token, or the
+ * row's own value as listed, which a collation that ignores case may spell
+ * otherwise (children.ts) -- and it is dropped; any other value would move
+ * the row to another record, past either one's bound, and is over-posting
+ * (0011, 0022). Answers that are not an object are refused as an update
+ * alone refuses them.
  */
-function withoutRecordField(answers: Record<string, unknown>, field: string, record: string): { ok: true; answers: Record<string, unknown> } | PlanRefusal {
-  if (!Object.hasOwn(answers, field)) return { ok: true, answers }
-  if (answers[field] !== record) return refuse('over-posting', `${field} names the record this row is saved with, and a save never moves a row to another`)
-  const { [field]: _record, ...rest } = answers
-  return { ok: true, answers: rest }
+function withoutRecordField(answers: unknown, field: string, record: string, row: FormRecord): { ok: true; answers: Record<string, unknown> } | PlanRefusal {
+  const read = readAnswers(answers)
+  if (!read.ok) return read
+  const kept = Object.fromEntries([...read.answers].filter(([key]) => key !== field))
+  if (!read.answers.has(field)) return { ok: true, answers: kept }
+  const sent = read.answers.get(field)
+  if (sent !== record && sent !== row.answers[field]) {
+    return refuse('over-posting', `${field} names the record this row is saved with, and a save never moves a row to another`)
+  }
+  return { ok: true, answers: kept }
 }
 
 /** One change planned: its request, the part it is, and the fields its answer may show and the selections to recheck; or its field errors. */
@@ -134,7 +142,7 @@ function planChange(input: SaveChildInput, change: SaveChange, record: string | 
     const at: SavePart = { form, field, record: token }
     const row = listed(token)
     if (row === undefined) return notFound(at)
-    const kept = withoutRecordField(answers, field, record as string)
+    const kept = withoutRecordField(answers, field, record as string, row)
     if (!kept.ok) return { ...kept, at }
     const planned = planUpdate(snapshot, bindings, policy, context, token, version, kept.answers, row, read.described, { scope })
     if (planned.ok) return { ok: true, kind: 'update', at, request: planned.request, fields: planned.fields, memberships: planned.memberships }

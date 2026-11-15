@@ -328,22 +328,6 @@ resend gets the first sending's answer
 (`packages/data-server/src/routes/write-once.ts`). nginx passes `/v1/` with
 `proxy_next_upstream off`, so the proxy never sends a write twice either.
 
-**A record saved with its rows is one transaction, guarded by its
-version** ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). The
-rows of a together child -- a lookup an administrator marks as saved with
-its record, with bounds -- are created, changed and deleted with their
-record or not at all. `planSave` makes the one request: the record's step,
-then each changed child's deletes, updates and creates, each the request
-today's planners make under that form's own policy and pinned to the
-record's key, then each child's count and the record read back. The
-record's version moves on every save, by its update or, where its own
-answers change nothing, by a touch -- a version column incremented, a
-rowversion's confirmed touch column set to itself -- so one row lock
-serialises every save of its rows, a resend over a saved record is
-`stale`, and one read reconciles a lost answer. Each statement is still
-one guarded statement, none retried. data-core plans this alone so far:
-no adapter runs a save, and no route takes one.
-
 **Held by** both adapters' record suites, where two concurrent updates with
 one version give one winner and one `stale`;
 `packages/data-server/src/e2e-lost-answer.integration.test.ts`, release gate
@@ -356,6 +340,34 @@ browser gate, which names what each browser does with a lost POST as a fact
 been saved" where nothing was. The write id holds in one process, so a
 resend that reaches another replica, or this one after a restart, is applied
 again, and a create whose key the database numbers cannot be reconciled.
+
+**A record saved with its rows is to be one transaction, guarded by its
+version** ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). The
+rows of a together child -- a lookup an administrator marks as saved with
+its record, with bounds -- are to be created, changed and deleted with
+their record or not at all. `planSave` makes the one request: the record's
+step, then each changed child's deletes, updates and creates, each the
+request today's planners make under that form's own policy, the child
+pinned to the record's key, then each child's count and the record read
+back. Every plan moves the record's version, by its update or, where its
+own answers change nothing, by a touch -- a version column incremented, a
+rowversion's confirmed touch column set to itself -- so that one row lock
+will serialise every save of its rows, a resend over a saved record will
+be `stale`, and one read will reconcile a lost answer. Each statement is
+still one guarded statement, none retried. data-core plans this alone so
+far: no adapter runs a save, and no route takes one.
+
+**Held by**, for the plan alone, `packages/data-core/src/records/save.test.ts`,
+`together.test.ts` and `menu.test.ts` beside it, with no database; the
+transaction itself, the lock and the pin in each located statement by
+nothing until the adapters' save.
+
+**What it costs.** What 0155 records: the second of two
+people saving different lines of one order at once is `stale`, the
+record's UPDATE triggers fire on a save of its rows alone, a touch stamps
+nothing, and on SQL Server a trigger that ends the transaction can store a
+save in part.
+
 
 ## 8.7 Audit
 

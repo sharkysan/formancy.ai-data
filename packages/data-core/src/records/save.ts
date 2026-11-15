@@ -1,6 +1,4 @@
-import { numbersKey } from '../generate/offers.js'
 import { togetherOf, type Together } from '../generate/together.js'
-import type { ColumnMeta } from '../metadata.js'
 import { byCodepoint } from '../policy/inputs.js'
 import type { PolicyContext } from '../policy/types.js'
 import type { SavePart } from '../save.js'
@@ -11,6 +9,7 @@ import type { FieldError, FormRecord, MembershipCheck, PlannedInsert, PlannedLis
 import { prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { type ChildPlan, planChild, type SaveBundle, type SaveChildInput } from './save-steps.js'
 import type { ParentColumn, PlannedSave, PlannedSaveStep, SaveChild, SavePlanRefusal, SaveRecordStep } from './save-types.js'
+import { newKeyPart, pinsTouch } from './together.js'
 import type { DescribedTable, RecordValue } from './types.js'
 
 /** One column of the record's key as a save knows it before any statement: its value, or the record's step returns it. */
@@ -36,19 +35,27 @@ type KeyPart = { value: RecordValue } | { returned: string }
  * asks again, and a refusal there answers alone, at its part.
  */
 
+/** A together child that requires rows of a new record (`rowsRequired`), by its form's id. */
+export interface RequiredRows {
+  form: string
+  field: string
+  min: number
+  max: number
+}
+
 /** What the route read before the transaction: the record's bundle, its step, each child the save changes, and the configured deadline. */
 export interface SaveInput {
   parent: SaveBundle
+  /**
+   * The record's step. A create carries each together child that requires
+   * rows of the record (`rowsRequired`), whoever the person is, `[]` for
+   * none: a save that creates none of one's rows would leave the record
+   * below its bound, and nothing else knows of a child the body leaves out.
+   */
   record:
-    | { create: { answers: unknown; described: DescribedTable } }
+    | { create: { answers: unknown; described: DescribedTable; required: readonly RequiredRows[] } }
     | { update: { record: string; version: string; answers: unknown; asRead: FormRecord | undefined; described: DescribedTable } }
   children: readonly SaveChildInput[]
-  /**
-   * For a save that creates its record: each together child that requires
-   * rows of it (`rowsRequired`), whoever the person is. A save that creates
-   * none of one's rows would leave the record below its bound.
-   */
-  required?: ReadonlyArray<{ form: string; field: string; min: number; max: number }>
   /** The server's deadline for the transaction, a whole number of milliseconds from configuration. */
   deadlineMs: number
 }
@@ -58,18 +65,25 @@ export interface SaveInput {
  * child's own list under its read policy, narrowed to the record through
  * its together field, in key order, with `max + 1` rows -- one more than
  * the record may hold, so a record another writer left above its bound is
- * seen -- and no filter, related condition or search. One statement per
- * child, which reads every row as this person reads it, and describes the
- * table.
+ * seen -- and no filter, related condition or search. The field and `max`
+ * are the child's own bindings', so the list cannot be planned over
+ * another. One statement per child, which reads every row as this person
+ * reads it, and describes the table; one page, which `TOGETHER_MAX_ROWS`
+ * keeps `max + 1` within.
  */
-export function planSaveList(child: SaveBundle, field: string, record: string, max: number, context: PolicyContext): PlannedList {
+export function planSaveList(child: SaveBundle, record: string, context: PolicyContext): PlannedList {
+  const ready = prepare(child.snapshot, child.bindings)
+  if (!ready.ok) return ready
+  const together = togetherOf(child.bindings)
+  // A malformed one is refused by `prepare` above.
+  if (together === null || together === 'malformed') return refuse('operation-unavailable', "This form's rows are not saved with a record.")
   return planList(child.snapshot, child.bindings, child.policy, context, {
     search: '',
     sort: [],
-    parent: { field, record },
+    parent: { field: together.binding.field, record },
     filter: [],
     after: null,
-    limit: max + 1,
+    limit: together.max + 1,
   })
 }
 
@@ -122,7 +136,7 @@ function recordStep(parent: SaveBundle, planned: Extract<PlannedInsert | Planned
       at,
     }
   }
-  if (touch !== null && request.filters.kind === 'restricted' && request.filters.equal.some((term) => term.column === touch)) {
+  if (touch !== null && pinsTouch(parent.policy, touch)) {
     return { ...refuse('invalid-policy', `rowFilters: ${touch} is the touch column, which a save of rows sets; a row filter cannot pin it.`), at }
   }
   const { target, key, expectedVersion, filters, through, definition } = request
@@ -133,17 +147,18 @@ function recordStep(parent: SaveBundle, planned: Extract<PlannedInsert | Planned
  * The record's key as the save knows it before any statement: each
  * identity column's value where it is known -- a saved record's token, or
  * a value its insert writes -- or the column itself where the database
- * numbers it and the record's step returns it. A key the database fills
- * any other way cannot be known, and its rows cannot be saved with it.
+ * numbers it and the record's step returns it (`newKeyPart`, which the
+ * menu asks too). A key the database fills any other way cannot be known,
+ * and its rows cannot be saved with it.
  */
 function recordKey(parent: SaveBundle, prepared: Prepared, step: SaveRecordStep): { ok: true; key: Map<string, KeyPart> } | SavePlanRefusal {
   const key = new Map<string, KeyPart>()
   const known = step.kind === 'insert' ? step.request.values : step.request.key
-  const identity = prepared.target.identity.map((column) => column.name)
-  for (const name of identity) {
+  for (const { name } of prepared.target.identity) {
     const value = known.find((entry) => entry.name === name)
-    if (value !== undefined) key.set(name, { value })
-    else if (numbersKey(parent.snapshot.kind, prepared.root, prepared.columns.get(name) as ColumnMeta, identity)) key.set(name, { returned: name })
+    const part = newKeyPart(parent.snapshot.kind, prepared, name, value !== undefined)
+    if (part === 'written') key.set(name, { value: value as RecordValue })
+    else if (part === 'returned') key.set(name, { returned: name })
     else
       return {
         ...refuse(
@@ -199,8 +214,9 @@ function planRecord(input: SaveInput, rows: boolean, context: PolicyContext): Pl
 }
 
 /** The first bound the save would leave a child outside, before any statement, or `null`: a child that requires rows of a new record and gets none, then each child's own. */
-function firstBound(input: SaveInput, children: ReadonlyArray<SaveChildInput & { together: Together }>, creating: boolean): SavePlanRefusal | null {
-  for (const entry of creating ? (input.required ?? []) : []) {
+function firstBound(input: SaveInput, children: ReadonlyArray<SaveChildInput & { together: Together }>): SavePlanRefusal | null {
+  const creating = 'create' in input.record
+  for (const entry of 'create' in input.record ? input.record.create.required : []) {
     if (children.some((child) => child.form === entry.form && child.field === entry.field)) continue
     const rows = { form: entry.form, field: entry.field, min: entry.min, max: entry.max, held: 0 }
     const message = `${entry.form} holds at least ${String(entry.min)} rows of this record; it would hold 0.`
@@ -280,7 +296,7 @@ export function planSave(input: SaveInput, context: PolicyContext): PlannedSave 
     const fields = errors.flatMap((part) => part.fieldErrors.map((error) => error.field))
     return { ok: false, code: 'invalid-values', message: `${[...new Set(fields)].join(', ')} cannot be written`, parts: errors }
   }
-  const bound = firstBound(input, children, 'create' in input.record)
+  const bound = firstBound(input, children)
   if (bound !== null) return bound
 
   // Every refusal above is answered, so the record and each child planned.

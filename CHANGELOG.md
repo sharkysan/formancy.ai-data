@@ -80,6 +80,28 @@ the same day (formancy.ai 0232).
   stamped, and on SQL Server an id a code-page column's code page cannot
   hold is the database's 422 on the stamped field rather than
   `unstampable`.
+- **data-core plans a record saved with the rows of its together
+  children, and nothing runs it yet** (0155). Why: an order could not be
+  held to at least one line, nor stored with its lines all or nothing; the
+  save that will do both is planned in data-core first, held by unit
+  tests, before the adapters, the route and the pages build on it. What
+  you notice: nothing -- the generator writes no together lookup, and the
+  bundle check refuses a stored request that carries one, so no published
+  form changes. For integrators of `@formancy/data-core`: `planSave` and
+  `planSaveList` plan the one request an adapter will run, with its types
+  (`SaveInput`, `SaveRequest`, `PlannedSave` and the rest) and the wire's
+  `SaveBody` and `SavedRecord`, and no `RecordAdapter` method takes it
+  yet; `offeredFor` says what a form offers alone and in a save, which
+  `grantedOperations` and the planners now ask; `planCreate` and
+  `planDelete` take where a write is made as a new last argument, and
+  `planUpdate` takes it and a save's touch in a new options object, each
+  alone by default; `MenuForm` gains the required `together` and `saves`,
+  so code that builds one must add them; a form whose bindings carry a
+  together lookup offers no create or delete alone, and its `max` is at
+  most `TOGETHER_MAX_ROWS`, one row less than a list's page; and
+  `LookupChoice.together`, `GenerationRequest.touchColumn` and
+  `ConcurrencyBinding.touch` are new optional fields. The feature's own
+  line comes with the save's route.
 - **An administrator gives a field another starting value** (0150). Why:
   since 0149 a new record starts at its column's constant default, which
   was the database's to say -- a column that defaults to `draft` for the
