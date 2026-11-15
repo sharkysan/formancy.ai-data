@@ -5,19 +5,20 @@ import { CHECK_LIST_PARITY, checkListOf, LISTED_TABLE } from './check-lists.js'
 
 /*
  * CHECK_LIST_PARITY held to data-core without a server (0152): each check
- * as its engine's catalog is documented to spell the parity suites' DDL --
- * ruleutils.c's deparse on PostgreSQL, SQL Server's definition written
- * again from its parse -- read and generated as the suites will read and
- * generate what discovery returns. ck_listed_status's spellings are the
- * ones the captured snapshots hold for ck_order_status, the same DDL; the
- * rest are documented, not measured here. The parity suites hold the real
+ * as its engine's catalog spells the parity suites' DDL -- ruleutils.c's
+ * deparse on PostgreSQL, SQL Server's definition written again from its
+ * parse -- read and generated as the suites read and generate what
+ * discovery returns. ck_listed_status's spellings are the ones the
+ * captured snapshots hold for ck_order_status, the same DDL; the rest are
+ * what the parity suites' discovery returned on PostgreSQL 17.11 and SQL
+ * Server 2022 (16.0.4295.3) on 2026-11-15. The suites hold the real
  * spellings, on real servers: a spelling this file has wrong fails there,
  * and one data-core reads otherwise than the expectations say fails here.
  */
 
 const SPELLED: Record<DatabaseKind, Record<keyof typeof CHECK_LIST_PARITY.read, string>> = {
   postgres: {
-    ck_listed_big: "(big = ANY (ARRAY['9007199254740993'::bigint, '0'::bigint]))",
+    ck_listed_big: "(big = ANY (ARRAY['9007199254740993'::bigint, (0)::bigint, ('-1'::integer)::bigint]))",
     ck_listed_code: "(code = ANY (ARRAY['A'::bpchar, 'BB'::bpchar]))",
     ck_listed_flavour: "((flavour)::text = ANY ((ARRAY['a'::character varying, NULL::character varying])::text[]))",
     ck_listed_group: '((("group")::text = \'A\'::text) OR (("group")::text = \'B\'::text))',
@@ -35,11 +36,11 @@ const SPELLED: Record<DatabaseKind, Record<keyof typeof CHECK_LIST_PARITY.read, 
     ck_listed_tier_again: "((tier)::text = ANY ((ARRAY['a'::character varying, 'b'::character varying])::text[]))",
   },
   sqlserver: {
-    ck_listed_big: '([big]=(0) OR [big]=(9007199254740993))',
+    ck_listed_big: '([big]=(-1) OR [big]=(0) OR [big]=(9007199254740993.))',
     ck_listed_code: "([code]='BB' OR [code]='A')",
     ck_listed_flavour: "([flavour]=NULL OR [flavour]='a')",
     ck_listed_group: "([group]='A' OR [group]='B')",
-    ck_listed_kind: "([kind]<>'x' AND [kind]<>'y')",
+    ck_listed_kind: "(NOT ([kind]='y' OR [kind]='x'))",
     ck_listed_label: "([label]=N'Zürich' OR [label]=N' spaced ' OR [label]=N'a, b' OR [label]=N'it''s')",
     ck_listed_level: '([level]>=(1) AND [level]<=(3))',
     ck_listed_mark: "([mark]='x' OR [mark]='')",

@@ -99,13 +99,17 @@ function joined(terms: readonly CheckList[]): CheckList | null {
  * array cast `::text[]` where its elements are varchar; `=` for a list of
  * one; ` OR ` between parenthesised comparisons. A literal is a positive
  * integer bare; a negative one, or one of another integer type, quoted and
- * cast; text quoted and cast to its type, with no modifier.
+ * cast; an integer in a list of bigint -- over a bigint column, or beside
+ * a literal past int -- in parentheses, cast to the array's type,
+ * `(0)::bigint`; text quoted and cast to its type, with no modifier.
  *
- * Measured on 17.11: `((status)::text = ANY ((ARRAY['draft'::character
- * varying, 'placed'::character varying, 'shipped'::character
- * varying])::text[]))`, the shared fixture's ck_order_status, which the
- * captured snapshots hold. The other spellings are ruleutils.c's, held per
- * engine by the parity suites' CHECK_LIST_PARITY.
+ * Measured on 17.11 on 2026-11-15: `((status)::text = ANY
+ * ((ARRAY['draft'::character varying, 'placed'::character varying,
+ * 'shipped'::character varying])::text[]))`, the shared fixture's
+ * ck_order_status, which the captured snapshots hold, and each check of
+ * CHECK_LIST_PARITY's DDL, which the parity suite holds on every image it
+ * runs -- a bigint's `(big = ANY (ARRAY['9007199254740993'::bigint,
+ * (0)::bigint, ('-1'::integer)::bigint]))` among them.
  */
 
 const PG_TEXT_CASTS = ['text', 'character varying', 'bpchar'] as const
@@ -126,9 +130,21 @@ function pgColumn(text: string, at: number): Step<string> {
   return pgIdentifier(text, at)
 }
 
-function pgLiteral(text: string, at: number): Step<ListedLiteral> {
+/** An integer as `get_const_expr` writes one: bare while positive, `'-1'::integer` otherwise. */
+function pgInteger(text: string, at: number): Step<ListedLiteral> {
   const bare = match(text, at, /[0-9]+/)
   if (bare !== null) return { at: bare.at, value: { kind: 'number', text: bare.value } }
+  const negative = match(text, at, /'-[0-9]+'::integer/)
+  return negative === null ? null : { at: negative.at, value: { kind: 'number', text: negative.value.slice(1, negative.value.indexOf("'", 1)) } }
+}
+
+function pgLiteral(text: string, at: number): Step<ListedLiteral> {
+  const integer = pgInteger(text, at)
+  if (integer !== null) return integer
+  // An integer in a bigint's list, cast to the array's type: `(0)::bigint`.
+  const widened = text[at] === '(' ? pgInteger(text, at + 1) : null
+  const end = widened === null ? null : token(text, widened.at, ')::bigint')
+  if (widened !== null && end !== null) return { at: end, value: widened.value }
   const inside = quoted(text, at)
   const cast = inside === null ? null : token(text, inside.at, '::')
   if (inside === null || cast === null) return null
@@ -205,18 +221,23 @@ function pgTerm(text: string, at: number): Step<CheckList> {
  * whole in one pair of parentheses; an IN list as one `=` per value, joined
  * by ` OR `, the last value first; a column in brackets, `]` doubled inside;
  * no space around `=`; text quoted, N before a national literal; a number in
- * parentheses, its sign inside.
+ * parentheses, its sign inside, and one past int, which T-SQL types as
+ * numeric, with a point after its digits.
  *
- * Measured on 2022 (16.0.4295.3): `([status]='shipped' OR [status]='placed'
- * OR [status]='draft')`, the shared fixture's ck_order_status, which the
- * captured snapshots hold; a number's parentheses in its `([weight_kg]>(0))`.
+ * Measured on 2022 (16.0.4295.3) on 2026-11-15: `([status]='shipped' OR
+ * [status]='placed' OR [status]='draft')`, the shared fixture's
+ * ck_order_status, which the captured snapshots hold, and each check of
+ * CHECK_LIST_PARITY's DDL, which the parity suite holds on every image it
+ * runs -- a bigint's `([big]=(-1) OR [big]=(0) OR
+ * [big]=(9007199254740993.))` among them.
  */
 
 function msLiteral(text: string, at: number): Step<ListedLiteral> {
   const number = token(text, at, '(')
   if (number !== null) {
     const digits = match(text, number, /-?[0-9]+/)
-    const end = digits === null ? null : token(text, digits.at, ')')
+    // An integer past int is a numeric literal, which SQL Server writes with a point and nothing after it.
+    const end = digits === null ? null : (token(text, digits.at, '.)') ?? token(text, digits.at, ')'))
     return digits === null || end === null ? null : { at: end, value: { kind: 'number', text: digits.value } }
   }
   const national = text[at] === 'N'

@@ -770,16 +770,20 @@ describe('a column whose values a check lists is a select of them (CHECK_LIST_PA
   // Each check written as a person writes it in T-SQL, in a schema of this
   // suite's own, and discovered as the owner: what SQL Server writes each
   // definition back as -- an IN list as one equality per value, the last
-  // first, a number in parentheses, N before a national literal -- is what
-  // data-core reads, and the form is the one PostgreSQL's suite generates
-  // from its own spelling of the same DDL. The label is an nvarchar of N
-  // literals: a plain literal past ASCII is read in a code page the
-  // snapshot does not record, and would be no list. WITH NOCHECK leaves
-  // stage's list untrusted. To be watched failing in CI with the options
-  // kept in the order the catalog spells them (status then offers shipped
-  // first, which PostgreSQL's suite does not), and with the whole-number
-  // shape kept for a listed integer (priority is then stored from, and read
-  // back as, the number -1).
+  // first, a number in parentheses and one past int with a point, N before
+  // a national literal, NOT IN as NOT around a list -- is what data-core
+  // reads, and the form is the one PostgreSQL's suite generates from its
+  // own spelling of the same DDL. The label is an nvarchar of N literals: a
+  // plain literal past ASCII is read in a code page the snapshot does not
+  // record, and would be no list. WITH NOCHECK leaves stage's list
+  // untrusted. tier's second list is the table's: CREATE TABLE refuses a
+  // second column CHECK on one column. Watched failing on 2022
+  // (16.0.4295.3) with the point after a number past int unread (big then
+  // no list); to be watched failing in CI with the options kept in the
+  // order the catalog spells them (status then offers shipped first, which
+  // PostgreSQL's suite does not), and with the whole-number shape kept for
+  // a listed integer (priority is then stored from, and read back as, the
+  // number -1).
   const { schema, name } = LISTED_TABLE
   const request: GenerationRequest = { connection: 'test', root: LISTED_TABLE, formId: 'listed', title: 'Listed', lookups: [], versionColumn: 'version' }
   const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
@@ -811,16 +815,17 @@ describe('a column whose values a check lists is a select of them (CHECK_LIST_PA
       priority int not null constraint ck_listed_priority check (priority in (10, 2, -1)),
       [group] varchar(10) null constraint ck_listed_group check ([group] = 'A' or [group] = 'B'),
       code char(2) not null constraint ck_listed_code check (code in ('A', 'BB')),
-      big bigint null constraint ck_listed_big check (big in (9007199254740993, 0)),
+      big bigint null constraint ck_listed_big check (big in (9007199254740993, 0, -1)),
       stage varchar(10) null,
       mark varchar(5) null constraint ck_listed_mark check (mark in ('', 'x')),
-      tier varchar(10) null constraint ck_listed_tier check (tier in ('a', 'b', 'c')) constraint ck_listed_tier_again check (tier in ('a', 'b')),
+      tier varchar(10) null constraint ck_listed_tier check (tier in ('a', 'b', 'c')),
       level int null constraint ck_listed_level check (level >= 1 and level <= 3),
       kind varchar(10) null constraint ck_listed_kind check (kind not in ('x', 'y')),
       ref varchar(10) null constraint ck_listed_ref check (ref like 'R%'),
       shout varchar(10) null constraint ck_listed_shout check (upper(shout) in ('A', 'B')),
       flavour varchar(10) null constraint ck_listed_flavour check (flavour in ('a', null)),
-      version int not null default 1
+      version int not null default 1,
+      constraint ck_listed_tier_again check (tier in ('a', 'b'))
     )`)
     await owner.request().batch(`alter table ${schema}.${name} with nocheck add constraint ck_listed_stage check (stage in ('a', 'b'))`)
     listed = await discoverSqlServer(owner, { schemas: [schema] })

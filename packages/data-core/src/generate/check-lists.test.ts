@@ -51,6 +51,20 @@ describe('PostgreSQL, as pg_get_expr deparses a check', () => {
       "(priority = ANY (ARRAY['-1'::integer, 0, '9007199254740993'::bigint, '7'::smallint]))",
       { column: 'priority', literals: [number('-1'), number('0'), number('9007199254740993'), number('7')] },
     ],
+    // A bigint's IN list is an array of bigint, so each integer literal in it
+    // is cast to bigint, which pg_get_expr shows: measured on 17.11, `big in
+    // (9007199254740993, 0, -3)`. Read as no list, a bigint list would be a
+    // box on PostgreSQL and a select on SQL Server, two forms from one DDL.
+    [
+      "a bigint's IN list, each integer in it cast to bigint",
+      "(big = ANY (ARRAY['9007199254740993'::bigint, (0)::bigint, ('-3'::integer)::bigint]))",
+      { column: 'big', literals: [number('9007199254740993'), number('0'), number('-3')] },
+    ],
+    [
+      "an integer column's list holding a bigint, which makes the array bigint",
+      "(wide = ANY (ARRAY[(1)::bigint, '3000000000'::bigint]))",
+      { column: 'wide', literals: [number('1'), number('3000000000')] },
+    ],
     ['a whole number equality', '(priority = 3)', { column: 'priority', literals: [number('3')] }],
     [
       'quotes doubled, commas, spaces and text past ASCII inside a value',
@@ -83,6 +97,10 @@ describe('PostgreSQL, as pg_get_expr deparses a check', () => {
     ['a cast not named', "(status = ANY (ARRAY['a'::citext]))"],
     ['a decimal', '(amount = ANY (ARRAY[1.5, 2.5]))'],
     ['a decimal cast', '(amount = ANY (ARRAY[(1)::numeric, (2)::numeric]))'],
+    ['an integer cast to a type PostgreSQL does not cast a list to', '(big = ANY (ARRAY[(1)::integer, (2)::smallint]))'],
+    ['text cast to a bigint', "(big = ANY (ARRAY[('1'::text)::bigint]))"],
+    ['a decimal cast to a bigint, which rounds', '(big = ANY (ARRAY[(1.5)::bigint]))'],
+    ['a bigint cast once more', "(big = ANY (ARRAY[('1'::bigint)::bigint]))"],
     ['an array literal', "(status = ANY ('{a,b}'::text[]))"],
     ['a backslash, which standard_conforming_strings decides', "(status = ANY (ARRAY['a\\b'::text]))"],
     ['a NOT NULL as PostgreSQL 18 files one', '(amount IS NOT NULL)'],
@@ -112,6 +130,15 @@ describe('SQL Server, as it writes a check definition again', () => {
     ['a list of one', "([status]='draft')", { column: 'status', literals: [text('draft')] }],
     ['national literals', "([status]=N'b' OR [status]=N'a')", { column: 'status', literals: [text('b', true), text('a', true)] }],
     ['whole numbers in parentheses, a sign inside', '([priority]=(3) OR [priority]=(-1))', { column: 'priority', literals: [number('3'), number('-1')] }],
+    // T-SQL types an integer literal past int as numeric, and SQL Server
+    // writes one back with a point: measured on 2022 (16.0.4295.3), `big in
+    // (9007199254740993, 0)` and `-9007199254740993`. Read as no list, the
+    // bigint list would be a box here and a select on PostgreSQL.
+    [
+      'a whole number past int, which SQL Server writes with a point',
+      '([big]=(0) OR [big]=(9007199254740993.) OR [big]=(-9007199254740993.))',
+      { column: 'big', literals: [number('0'), number('9007199254740993'), number('-9007199254740993')] },
+    ],
     [
       'quotes doubled, commas, spaces and text past ASCII inside a value',
       "([label]=N' Zürich ' OR [label]='a, b' OR [label]='it''s' OR [label]='')",
@@ -124,8 +151,8 @@ describe('SQL Server, as it writes a check definition again', () => {
   })
 
   test.each([
-    ['NOT IN', "([status]<>'a' AND [status]<>'b')"],
-    ['NOT around a list', "(NOT ([status]='a' OR [status]='b'))"],
+    ['NOT IN, which SQL Server writes as NOT around a list', "(NOT ([status]='b' OR [status]='a'))"],
+    ['inequalities joined by AND', "([status]<>'a' AND [status]<>'b')"],
     ['a range', '([priority]>=(1) AND [priority]<=(3))'],
     ['a comparison', '([carrier_code]>(0))'],
     ['LIKE', "([status] like 'a%')"],
@@ -136,6 +163,8 @@ describe('SQL Server, as it writes a check definition again', () => {
     ['an AND with a list', "([status]='a' AND [amount]>(0))"],
     ['a COLLATE', "([status]='a' COLLATE Latin1_General_CS_AS)"],
     ['a decimal', '([amount]=(1.5))'],
+    ['a point with digits after it', '([big]=(1.0))'],
+    ['a point with no digits before it', '([big]=(.5))'],
     ['a hexadecimal', '([priority]=(0x01))'],
     ["PostgreSQL's spelling", "(status = ANY (ARRAY['a'::text]))"],
     ['a comparison not in parentheses', "[status]='a'"],

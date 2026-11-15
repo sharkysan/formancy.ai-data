@@ -11,9 +11,10 @@ import { readCheckList } from '@formancy/data-core'
  * with a doubled quote, a comma and blanks inside its values (an nvarchar
  * of N literals on SQL Server, whose plain literals are read in a code
  * page), on whole numbers out of order with a negative one, on a bigint
- * past 2^53, on a char(2); equalities joined by OR on a column named by a
- * reserved word; a list added NOT VALID or WITH NOCHECK, one with an empty
- * string, two lists on one column; and the near misses that are no list:
+ * past 2^53 beside a zero and a negative one, on a char(2); equalities
+ * joined by OR on a column named by a reserved word; a list added NOT
+ * VALID or WITH NOCHECK, one with an empty string, two lists on one
+ * column, the second the table's; and the near misses that are no list:
  * a range, NOT IN, LIKE, a function of the column, and an IN list holding
  * NULL, which admits every value, since a CHECK passes what it cannot
  * decide. It discovers the table as the owner and generates a form over
@@ -22,9 +23,10 @@ import { readCheckList } from '@formancy/data-core'
  * Nothing here is written per engine: each catalog's own spelling of the
  * same DDL is what each suite reads, and the reading, the form, what is
  * stored and what is refused are the same on both. ck_order_status's
- * spelling is what the captured snapshots hold; the others are what each
- * catalog is documented to write, held here so a release that spells one
- * otherwise fails on that engine.
+ * spelling is what the captured snapshots hold; each catalog's spelling of
+ * the others was measured by the suites on PostgreSQL 17.11 and SQL Server
+ * 2022 (16.0.4295.3) on 2026-11-15, and is held so a release that spells
+ * one otherwise fails on that engine.
  */
 
 /** Where each suite creates the table: a schema of the parity suites' own, outside every scope another suite discovers. */
@@ -57,7 +59,7 @@ export function checkListOf(kind: DatabaseKind, check: Pick<CheckMeta, 'expressi
  */
 export const CHECK_LIST_PARITY = {
   read: {
-    ck_listed_big: { column: 'big', values: ['0', '9007199254740993'] },
+    ck_listed_big: { column: 'big', values: ['-1', '0', '9007199254740993'] },
     ck_listed_code: { column: 'code', values: ['A', 'BB'] },
     ck_listed_flavour: null,
     ck_listed_group: { column: 'group', values: ['A', 'B'] },
@@ -80,7 +82,7 @@ export const CHECK_LIST_PARITY = {
       priority: ['-1', '2', '10'],
       group: ['A', 'B'],
       code: ['A', 'BB'],
-      big: ['0', '9007199254740993'],
+      big: ['-1', '0', '9007199254740993'],
     },
     notes: [
       {

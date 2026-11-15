@@ -770,12 +770,15 @@ describe('a column whose values a check lists is a select of them (CHECK_LIST_PA
   // pg_get_expr spells each as is what data-core reads, and the form is
   // the one SQL Server's suite generates from its own spelling of the same
   // DDL. A varchar's list is compared as text, its array cast to text[]; a
-  // negative whole number and a bigint are quoted and cast; an IN list of
-  // one would be an equality; NOT VALID leaves stage's list unvalidated.
-  // To be watched failing in CI with data-core reading the array without
-  // its cast (status, label, mark, stage and tier then read as no list),
-  // and with the whole-number shape kept for a listed integer (priority is
-  // then stored from, and read back as, the number -1).
+  // negative whole number and a bigint are quoted and cast, and in a
+  // bigint's list every integer is cast to bigint; an IN list of one would
+  // be an equality; NOT VALID leaves stage's list unvalidated; tier's
+  // second list is the table's, as SQL Server's suite needs it. Watched
+  // failing on 17.11 with the integers cast to bigint unread (big then no
+  // list); to be watched failing in CI with data-core reading the array
+  // without its cast (status, label, mark, stage and tier then read as no
+  // list), and with the whole-number shape kept for a listed integer
+  // (priority is then stored from, and read back as, the number -1).
   const { schema, name } = LISTED_TABLE
   const request: GenerationRequest = { connection: 'test', root: LISTED_TABLE, formId: 'listed', title: 'Listed', lookups: [], versionColumn: 'version' }
   const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
@@ -807,16 +810,17 @@ describe('a column whose values a check lists is a select of them (CHECK_LIST_PA
       priority int not null constraint ck_listed_priority check (priority in (10, 2, -1)),
       "group" varchar(10) null constraint ck_listed_group check ("group" = 'A' or "group" = 'B'),
       code char(2) not null constraint ck_listed_code check (code in ('A', 'BB')),
-      big bigint null constraint ck_listed_big check (big in (9007199254740993, 0)),
+      big bigint null constraint ck_listed_big check (big in (9007199254740993, 0, -1)),
       stage varchar(10) null,
       mark varchar(5) null constraint ck_listed_mark check (mark in ('', 'x')),
-      tier varchar(10) null constraint ck_listed_tier check (tier in ('a', 'b', 'c')) constraint ck_listed_tier_again check (tier in ('a', 'b')),
+      tier varchar(10) null constraint ck_listed_tier check (tier in ('a', 'b', 'c')),
       level int null constraint ck_listed_level check (level >= 1 and level <= 3),
       kind varchar(10) null constraint ck_listed_kind check (kind not in ('x', 'y')),
       ref varchar(10) null constraint ck_listed_ref check (ref like 'R%'),
       shout varchar(10) null constraint ck_listed_shout check (upper(shout) in ('A', 'B')),
       flavour varchar(10) null constraint ck_listed_flavour check (flavour in ('a', null)),
-      version int not null default 1
+      version int not null default 1,
+      constraint ck_listed_tier_again check (tier in ('a', 'b'))
     )`)
     await owner.unsafe(`alter table ${schema}.${name} add constraint ck_listed_stage check (stage in ('a', 'b')) not valid`)
     listed = await discoverPostgres(owner, { schemas: [schema] })
