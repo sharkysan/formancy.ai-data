@@ -208,3 +208,4 @@ only enforcement is "we remember" says so plainly.
 | [0151](0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md) | A person sets a grid column's width, and the browser keeps it | accepted |
 | [0152](0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md) | A column whose values a check lists is a select of them | accepted |
 | [0153](0153-the-server-stamps-who-wrote-a-record-and-when.md) | The server stamps who wrote a record, and when | accepted |
+| [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted |

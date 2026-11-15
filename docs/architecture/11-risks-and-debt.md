@@ -626,12 +626,16 @@ apart by a space set in proportional type; and the studio's preview loses a
 field's required marker where the renderer cannot fill its options, which
 is upstream's renderer and themes.
 
-The README's *Status* paragraph names what is not there yet: figures for a
-page of records, the menu of forms and a delete; a host page on another
-origin run in a browser; a run through a real Cloudflare tunnel; anything
-that reads what Cloudflare serves at the examples page's address; the live
-demo's Worker, which nobody has created, and anything read of the demo on
-Cloudflare; and a licence a lawyer has reviewed.
+[The status page](../guide/status.md) names what is not there yet, and the
+README's *What it does not do yet* most of it: figures for a page of
+records, a file of them, the menu of forms and a delete; a host page on
+another origin run in a browser; a run through a real Cloudflare tunnel;
+anything that reads what Cloudflare serves at the examples page's address
+or the live demo on Cloudflare, each read by hand once; a test that logs in
+as an Entra principal; and a licence a lawyer has reviewed. The README says
+it shortly and the guide at length, and nothing holds the two to each
+other
+([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).
 
 ## 11.4 The release gates still open
 

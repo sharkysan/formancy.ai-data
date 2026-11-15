@@ -198,13 +198,13 @@ Cloudflare guide checked offline, and a live demo of the runtime with a
 server and a database of each visitor's own on Cloudflare
 ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md)).
 Which of these the latest release carries, and which are on `main` only,
-the README's *Status* paragraph and `CHANGELOG.md`'s *Unreleased* say, and
-this section does not repeat them; the first release's notes summarise the
+the README's *Status*, [the status page](../guide/status.md) and
+`CHANGELOG.md`'s *Unreleased* say, and this section does not repeat them; the first release's notes summarise the
 development before it
 ([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)).
 
-**Not built, and said so** in the README, `CHANGELOG.md`'s known gaps or the
-record that left it out:
+**Not built, and said so** in the README's *What it does not do yet*, the
+guide, `CHANGELOG.md`'s known gaps or the record that left it out:
 
 - A host page that draws a field written on create only as read-only on a
   record just created: it stays editable until the record is opened again,

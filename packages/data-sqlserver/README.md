@@ -48,7 +48,8 @@ const pool = await connectSqlServer({ host, port, database, encrypt: true, trust
 ```
 
 **No test of this release logs in as either**, which `SQLSERVER_LOGINS`
-says and the README's tested-on table derives from it: no container takes
+says and the repository's
+[tested-on table](../../docs/guide/tested-on.md) derives from it: no container takes
 an Entra login, and no test asks Entra. **An Entra pool is TDS 8.0**,
 `encrypt: 'strict'` whatever `encrypt: true` would otherwise mean: TLS
 before the first TDS message, with the server's certificate checked, so

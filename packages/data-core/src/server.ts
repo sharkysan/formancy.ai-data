@@ -96,7 +96,7 @@ export interface NamedProduct {
  * none of (0073): every `ServerProduct` that no engine of TESTED_SERVERS
  * names, but `other`, which names no product. Derived from the two, so an
  * Azure product a later record tests leaves this list without an edit here;
- * the README's "Recognised, not tested" row is derived from it, and
+ * docs/guide/tested-on.md's "Recognised, not tested" row is derived from it, and
  * serverStanding calls none of them tested, since it compares the product
  * first.
  */

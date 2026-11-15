@@ -1,5 +1,5 @@
-// `pnpm pictures`: the README's pictures, taken app by app, and README.md's
-// regions written from what was taken (0038).
+// `pnpm pictures`: the README's pictures, taken app by app, and the regions of
+// README.md and the guide's pages written from what was taken (0038, 0154).
 //
 //   pnpm pictures                       retake every picture whose text changed, or that has no record or no file
 //   pnpm pictures --all                 retake every picture, on an empty record: the one way to a new look
@@ -167,7 +167,7 @@ function main() {
   }
   if (!write) return
   if (fresh) writeFileSync(RECORD, serialize(redated(before, JSON.parse(readFileSync(RECORD, 'utf8')), scenes), scenes), 'utf8')
-  if (!run('node', ['scripts/pictures/readme.mjs', '--write'])) throw new Error('README.md could not be written from the record')
+  if (!run('node', ['scripts/pictures/readme.mjs', '--write'])) throw new Error('the pages holding the pictures regions could not be written from the record')
   const after = JSON.parse(readFileSync(RECORD, 'utf8'))
   console.log(`\n${table(before, after, scenes)}`)
 }

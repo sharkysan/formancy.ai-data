@@ -48,7 +48,7 @@ export interface SqlServerLogin {
  * Every login `connectSqlServer` takes, in the order a reader meets them.
  * Every suite logs in with a SQL login; nothing logs in as an Entra
  * principal, since no container takes one and no test asks Entra (0074).
- * The README's tested-on table says this list, derived
+ * docs/guide/tested-on.md's table says this list, derived
  * (scripts/release-report/tested-on.mjs), and the allowlist's login types
  * are held to it (packages/data-server/src/connections.test.ts).
  */

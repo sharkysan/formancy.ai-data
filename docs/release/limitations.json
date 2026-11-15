@@ -2495,7 +2495,7 @@
         },
         {
           "area": "testing",
-          "says": "The README's tested-on row calls the SQL login tested from a value typed in `SQLSERVER_LOGINS`: no server record says which login a test made, so the release report does not say that every SQL Server login of a run was a SQL login."
+          "says": "The tested-on page's row calls the SQL login tested from a value typed in `SQLSERVER_LOGINS`: no server record says which login a test made, so the release report does not say that every SQL Server login of a run was a SQL login."
         }
       ]
     },
@@ -4454,6 +4454,10 @@
           "says": "On SQL Server an id that a code-page column's code page cannot hold passes the codec and is refused by the database: 422 out-of-range, with a field error on the stamped field, which the person cannot write, rather than 403 unstampable. Nothing tests it."
         }
       ]
+    },
+    "0154": {
+      "reviewed": "sha256:cd38471d6ed98beac45014b9da51ca46f7705bfb917b28d1ff3ff5c05a00e027",
+      "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     }
   }
 }

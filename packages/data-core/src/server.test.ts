@@ -154,9 +154,9 @@ describe('serverName', () => {
 
 describe('UNTESTED_PRODUCTS', () => {
   // No test runs on Azure SQL Database or Managed Instance (0073), and the
-  // README's "Recognised, not tested" row is derived from this list. A
+  // tested-on page's "Recognised, not tested" row is derived from this list. A
   // product dropped from it -- an Azure product added to TESTED_SERVERS, a
-  // filter turned round -- would leave the README silent where 0073 says
+  // filter turned round -- would leave that page silent where 0073 says
   // it speaks; a tested product in it would tell a buyer that PostgreSQL 17
   // was not tested. `other` names no product, so it is never listed.
   test('names Azure SQL Database and Azure SQL Managed Instance, and no product the release was tested on', () => {
@@ -176,7 +176,7 @@ describe('UNTESTED_PRODUCTS', () => {
   // Managed Instance, to 180, past 2025's 170, and at none. A standing that
   // called an Azure product tested at any one of them -- Azure SQL Database
   // at 12 and level 170, say, which the release was tested at neither of --
-  // would tell an Azure estate it was tested while the README says not.
+  // would tell an Azure estate it was tested while the tested-on page says not.
   test('lists only products serverStanding calls not tested at every major a SQL Server release or a tested engine names, at none, and at every compatibility level from 100 to 180 or none', () => {
     const majors = [...new Set([...Object.keys(SQLSERVER_RELEASES).map(Number), ...TESTED_SERVERS.postgres.majors, ...TESTED_SERVERS.sqlserver.majors]), null]
     const levels = [undefined, ...Array.from({ length: 9 }, (_, at) => 100 + at * 10)]

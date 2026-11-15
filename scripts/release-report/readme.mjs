@@ -1,5 +1,6 @@
-// The README blocks that say what the repository is tested on (0035): a table
-// in README.md and one line in each adapter's README, rendered from
+// The blocks that say what the repository is tested on (0035): a table on
+// the guide's page *What it is tested on*, docs/guide/tested-on.md, which the
+// README links (0154), and one line in each adapter's README, rendered from
 // `testedOn()` -- what the checkout itself says -- in scripts/generated-block.mjs's
 // grammar.
 //
@@ -21,6 +22,9 @@ import { testedOn } from './tested-on.mjs'
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 
 export const GENERATOR = 'scripts/release-report/readme.mjs'
+
+/** The page that holds the table: the guide's *What it is tested on* (0154). */
+export const TABLE = 'docs/guide/tested-on.md'
 
 /** The engines' names as a reader knows them; a third engine without one fails here, not silently. */
 const ENGINE_NAMES = { postgres: 'PostgreSQL', sqlserver: 'SQL Server' }
@@ -69,7 +73,7 @@ function legsOf(facts, engine) {
 }
 
 /**
- * README.md's engine cell: the default, the suites that also run on each
+ * The table's engine cell: the default, the suites that also run on each
  * other image of the matrix, and that an image outside it one file names is
  * not one the release is tested with (0067 narrows 0003).
  */
@@ -79,7 +83,7 @@ function engineCell(facts, engine) {
 }
 
 /**
- * README.md's row for the products a snapshot recognises and no test runs
+ * The table's row for the products a snapshot recognises and no test runs
  * on (0073), from data-core's UNTESTED_PRODUCTS: Azure SQL Database and
  * Managed Instance, which before it the README did not name at all. Its
  * cell sits under "Tested with", so it opens with "None" and names the
@@ -93,7 +97,7 @@ function untestedRows(facts) {
 }
 
 /**
- * README.md's row for the ways into SQL Server (0074), from data-sqlserver's
+ * The table's row for the ways into SQL Server (0074), from data-sqlserver's
  * SQLSERVER_LOGINS: under "Tested with", the logins a test logs in with,
  * then the others, said as accepted and not tested -- the Entra principals,
  * which an allowlist may name and no test logs in as.
@@ -105,7 +109,7 @@ function loginRow(facts) {
   return ['**SQL Server logins**', `${tested.length === 0 ? 'None' : prose(tested)}${said}`, '']
 }
 
-/** README.md's block: one table, every row derived. */
+/** The tested-on page's block: one table, every row derived. */
 export function readmeTable(facts) {
   const rows = [
     ...facts.engines.map((engine) => [`**${engineName(engine)}**`, engineCell(facts, engine), '']),
@@ -165,7 +169,7 @@ export function adapterLine(facts, engine) {
 /** Every document with a block of this generator, and the body it should hold. */
 export function documents(facts) {
   return [
-    { file: 'README.md', body: readmeTable(facts) },
+    { file: TABLE, body: readmeTable(facts) },
     ...facts.engines.map((engine) => ({ file: `packages/data-${engine}/README.md`, body: adapterLine(facts, engine) })),
   ]
 }

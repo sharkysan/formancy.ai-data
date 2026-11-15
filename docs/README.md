@@ -8,7 +8,8 @@ use is licensed. It is source-available, never open source, and
 that means.
 
 It is not the user documentation. How to use the module is in
-[the README](../README.md), each package's own README, and
+[the README](../README.md) and [the guide](#the-guide) it links, each
+package's own README, and
 [the getting-started guide](getting-started.md), which CI runs as written.
 How work is done here, and the bar a change meets, is
 [`CLAUDE.md`](../CLAUDE.md). Nothing here is a tutorial.
@@ -49,12 +50,32 @@ told
 `scripts/architecture.test.mjs`, in `pnpm test:repo`, fails when a section
 file or this entry is missing, when a workspace package or app is not named
 in [the building blocks](architecture/05-building-blocks.md), when a
-decision record is cited by no section, when a relative link here, in a
-section or in [the setup guide](setup.md) does not reach a file or a
-heading GitHub would give it, and when
+decision record is cited by no section, when a relative link in any
+Markdown file the repository holds, the decision records and the
+changelog aside, does not reach a file or a heading GitHub would give it, and when
 a repository path a section writes in backticks names nothing in the
 repository. Whether a sentence is still true of what it names is held by
 review.
+
+## The guide
+
+The README speaks to somebody deciding whether the module solves their
+problem, and to a developer trying it; what it leaves out is in `guide/`,
+one page per reason to read it
+([0154](decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).
+
+| | |
+|---|---|
+| [What it does](guide/capabilities.md) | What the module does, for the administrator, the person filling in a form and the operator, each line with the record that holds it |
+| [Status](guide/status.md) | The release, where `main`'s changes since are listed, and what is not yet measured or read by hand |
+| [Studio](guide/studio.md) | The administrator's application, step by step and pictured, how to run it from a clone, and what its suites hold |
+| [Host example](guide/host.md) | The host page's workspace over the runtime plane, pictured, how to run it, its suites, and the live demo's build of it |
+| [Examples](guide/examples.md) | The examples page, both renderers with no server, how formancy.ai serves it, and what its browser gate measures |
+| [Live demo](guide/live-demo.md) | Whom a visitor signs in as, what they meet, what it costs the rightsholder, how it runs, and what tests it |
+| [Packages](guide/packages.md) | What this repository builds and publishes, and how it relates to formancy.ai |
+| [Deploying](guide/deploying.md) | The proxy and the pages' policies, Cloudflare as the edge, keys, origins, proxies, review and browsing, and when the schema changes |
+| [What it is tested on](guide/tested-on.md) | The images, drivers, upstream packages, Node, browsers and tools, generated from what is installed |
+| [Development](guide/development.md) | Building and testing this repository: the gates, the image matrix, the browser gates, the pictures, performance |
 
 ## Decisions
 
@@ -77,7 +98,7 @@ with a link, and does not restate it. These documents do the same.
 | [The release report](release/README.md) | What every run of the gates reports about itself, what fails it, and what a release does with it |
 | [`gates.json`](release/gates.json) | The release gates, each with the evidence a run must pass or the reason it is open |
 | [`limitations.json`](release/limitations.json) | For every decision record, the costs a user, integrator or operator meets, or why it has none |
-| [The README's pictures](images/README.md) | How they are taken, what holds them, and what they show that is wrong |
+| [The pictures](images/README.md) | How the README's and the guide's pictures are taken, what holds them, and what they show that is wrong |
 
 The delivery plan this repository started from is a working document kept
 out of the repository, as `.gitignore` says; what it asked for became the
