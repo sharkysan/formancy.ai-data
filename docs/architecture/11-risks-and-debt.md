@@ -342,6 +342,21 @@ not `unstampable`, and nothing tests it; and the parity suites that hold
 what each engine stores for a stamp were run for it on each engine's
 default image alone
 ([0153](../decisions/0153-the-server-stamps-who-wrote-a-record-and-when.md)).
+On PostgreSQL under any isolation but READ COMMITTED a write first takes
+`LOCK … IN ROW EXCLUSIVE MODE` on its table
+([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)), and
+that lock asks a grant on the table, not on a column: an account granted
+UPDATE on columns alone, which discovery reads as able to update them, is
+refused it, 42501, though the UPDATE itself is allowed. That was measured
+with the statement the locked path sends, not through the adapter, in
+`packages/data-postgres/src/save-facts.integration.test.ts` on PostgreSQL
+17.11, 2026-11-15; the locked path sends it before every update
+(`sendWrite`), so, by reading the code, such an account's updates are
+refused there too. A grant to write the table -- INSERT, UPDATE or DELETE,
+as [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
+measured -- is enough. A save of a record with its rows, which is
+not built, would meet the same lock on the record's table
+([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
 
 **Access.** Roles and attributes are only as fine-grained as the host's
 token ([0014](../decisions/0014-host-identity-is-verified-offline.md)).
