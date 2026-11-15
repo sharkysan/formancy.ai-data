@@ -33,7 +33,7 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:6b61bcbe7eb47abc3c27b1c88b2cb699d78215334f1634e2f049ef1453ff2926",
+      "reviewed": "sha256:60a6548cc03559335f4b7cf23ca9c93a1081da2e147dbc4f725fdad273432ffd",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:bf869f2174f9dfd039280ad263f45c8ba9fff92f1d1ca3ebb5c8b1f80459e4c8",
+      "reviewed": "sha256:0a5d14f805a5e4492a4ffc95add0c1793813316a1487632101eaae9c2de18b42",
       "limitations": [
         {
           "area": "forms",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:e8a3a675ff274a1e954f629a03d77fd81540ce1029a8ad230916cf10d14faf3a",
+      "reviewed": "sha256:a6dec00c7585d2251aba428aec0b8b3c2a575e6b4d2c90acce6e99ea45c1291b",
       "limitations": [
         {
           "area": "forms",
@@ -3630,7 +3630,7 @@
       ]
     },
     "0127": {
-      "reviewed": "sha256:dd7c5faee18f7616bee09e29423aa773a15e5ce949991f1e71089da921d4e7c0",
+      "reviewed": "sha256:fbb9b08ea6131a34226c5cf22e8a73bb28c6df9e603d244791104754182efaf2",
       "limitations": [
         {
           "area": "host",
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:a334be96a01b3fd24ba98d65c9316135e6fcbd6579d40155d4f4a347b7294f35",
+      "reviewed": "sha256:87aa943fe52e5654104cea8636756bfefa2975c2a42c076ad551540e2b784d60",
       "limitations": [
         {
           "area": "forms",
@@ -4348,6 +4348,55 @@
         {
           "area": "host",
           "says": "The resize handle AG Grid draws between the headers, and the minus and plus the Columns panel draws for a column's steps, are not measured for contrast; the steps are signs, and say what they do by their names alone."
+        }
+      ]
+    },
+    "0152": {
+      "reviewed": "sha256:97f47f6d7cf884d5c6764b8ba5703dd12d75cbcbc99b3a86e5e4b874253d76ea",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A column is a select of the values a check lists only for one enforced, validated check over a text or whole-number column, in the spellings 0152 names: a function, a range, NOT IN, LIKE, a COLLATE, an array literal, a list holding NULL, a decimal, date or uuid list, a PostgreSQL value with a backslash and a SQL Server value past ASCII in any but an N literal on an nvarchar leave the column the box it was.",
+          "heldBy": "packages/data-core/src/generate/check-lists.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "An unvalidated or disabled list, two lists on one column, a list beside a check the connection cannot read, and one holding an empty value or a value the column cannot hold leave the column the box it was, with a note saying why.",
+          "heldBy": "packages/data-core/src/generate/listed.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A listed value is labelled as the column holds it and offered in a stated order, a whole number's by its value and text by codepoint, not as the check was written; only a state field's states take an administrator's label.",
+          "heldBy": "packages/data-core/src/generate/listed.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "What a check admits is the database's comparison: under a case-insensitive SQL Server collation, which also pads trailing blanks, or a nondeterministic PostgreSQL one, a row may hold a value the select does not list, and such a record is refused on Save until a listed value is chosen; this is not measured."
+        },
+        {
+          "area": "writes",
+          "says": "The server does not check an answer against the list: a value it does not name, from a client other than formancy's engine, reaches the database, which refuses it as a check violation."
+        },
+        {
+          "area": "forms",
+          "says": "A state field's moves are not held to its column's list, so a move to a state the check does not name is offered by the host and refused by the database on Save."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's starting value of a listed field is typed, and refused when the list does not name it; the host's filter line takes a listed field's value as typed text."
+        },
+        {
+          "area": "forms",
+          "says": "A form published before this release keeps its text box over a listed column until it is generated again, and a studio session, a draft or an import holding a base generated before it is refused at publish until it is."
+        },
+        {
+          "area": "forms",
+          "says": "A value added to a published select's check, or the check gone, stopped or no longer validated, is for review and stops nothing, and a record holding a value the select does not list is refused on Save until a listed one is chosen.",
+          "heldBy": "packages/data-core/src/drift/listed.test.ts"
+        },
+        {
+          "area": "testing",
+          "says": "Each engine's spelling of a list is measured for ck_order_status on PostgreSQL 17.11 and SQL Server 2022 alone, and held for the rest by the parity suites on the images they run and on no other release."
         }
       ]
     },

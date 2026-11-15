@@ -18,6 +18,35 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A column whose values a check lists is a select of them** (0152).
+  Why: a column constrained by `status in ('draft', 'placed', 'shipped')`
+  was a free text box, and the database refused any other value only on
+  save. What you notice: the generator draws such a text or whole-number
+  column as a select of exactly the database's values, on both engines
+  from the same DDL, each labelled as the column holds it, a whole
+  number's by its value and text by codepoint -- SQL Server writes an IN
+  list back to front, so the order it was written in is not one both
+  engines can say -- and its note names the check; the fixture's order
+  form draws Status so, in the studio, on the host page and on the
+  examples page. The list is read out of each engine's own spelling of the
+  check, which the snapshot already holds, and nothing is added to the
+  snapshot. Only one enforced, validated check yields a select: a list
+  added NOT VALID or WITH NOCHECK, disabled, named twice, beside a check
+  the connection cannot read, or holding an empty value or one the column
+  cannot hold leaves the box, with a note saying why, and anything but a
+  list of literals -- a range, NOT IN, LIKE, a function, NULL among them
+  -- leaves it silently. A whole number's answer is its text, a bigint
+  past 2^53 included; a default or a starting value the list does not
+  name is none. A state field over such a column is still drawn as the
+  moves its person may make. Drift review compares a published select
+  with its check: a value gone from the list blocks the field's writes, a
+  value added or the check gone, stopped or unvalidated is for review and
+  stops nothing, and the runtime, which compares no check, leaves a value
+  the database no longer takes to its check violation. A form published
+  before keeps its text box until it is generated again, and a session,
+  a draft or an import holding a base generated before is refused at
+  publish until it is.
+
 - **The server stamps who wrote a record, and when** (0153). Why: a table's
   audit columns -- `created_by`, `created_at`, `changed_by`, `changed_at`
   -- were inputs a person could fill with somebody else's name, or left to
