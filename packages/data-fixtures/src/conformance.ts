@@ -1,5 +1,6 @@
-import type { ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
+import type { CheckMeta, ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
 import { findObject, gapCovers } from '@formancy/data-core'
+import { checkListOf } from './check-lists.js'
 import type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
 import { FIXTURE_MODEL } from './model.js'
 
@@ -217,6 +218,7 @@ function objectDisagreements(actual: ObjectMeta, entry: ExpectedObject, kind: Me
       out.push(`${at} enforced is ${String(found.enforced)}, expected ${String(facts.enforced)}`)
     if (facts.validated !== undefined && found.validated !== facts.validated)
       out.push(`${at} validated is ${String(found.validated)}, expected ${String(facts.validated)}`)
+    if (facts.listed !== undefined) out.push(...listDisagreements(found, facts.listed, kind, at))
   }
 
   return out
@@ -307,6 +309,22 @@ function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, 
   if (expected.hasDefault !== undefined && actual.hasDefault !== expected.hasDefault)
     out.push(`${where} hasDefault is ${String(actual.hasDefault)}, expected ${String(expected.hasDefault)}`)
   return out
+}
+
+/**
+ * Whether data-core reads the list the model says out of the check as this
+ * engine spelled it (0152): the spelling is the adapter's, the reading
+ * data-core's, and the form one model generates on both engines rests on
+ * the two agreeing. Values as a set, in codepoint order, each once.
+ */
+function listDisagreements(found: CheckMeta, expected: ExpectedCheckFacts['listed'], kind: MetadataSnapshot['kind'], at: string): string[] {
+  if (found.expression === null) return [`${at} expression cannot be read, so whether it lists values is unknown`]
+  const actual = checkListOf(kind, found)
+  const said = (list: typeof actual) => (list === null ? 'no list' : `${list.column} in [${list.values.join(', ')}]`)
+  const wanted = expected === undefined || expected === null ? null : { column: expected.column, values: [...expected.values] }
+  return JSON.stringify(actual) === JSON.stringify(wanted)
+    ? []
+    : [`${at} reads as ${said(actual)} from ${JSON.stringify(found.expression)}, expected ${said(wanted)}`]
 }
 
 function resolve(column: ExpectedColumn, kind: MetadataSnapshot['kind']): ExpectedColumnFacts {

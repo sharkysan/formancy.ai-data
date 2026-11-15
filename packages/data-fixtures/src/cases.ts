@@ -5,6 +5,8 @@ import { TestRunner } from 'vitest'
 import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
+import { CHECK_LIST_PARITY } from './check-lists.js'
+import type { ListedCase } from './check-lists.js'
 import type { CascadeCase } from './cascades.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
@@ -115,6 +117,8 @@ export const defaultCase = (name: DefaultCase): string => `defaults: ${name}`
 
 /** What the server stamps on each engine (0153), by the name of its entry in STAMP_PARITY. */
 export const stampCase = (name: StampCase): string => `stamps: ${name}`
+/** What a check that lists a column's values makes of its field on each engine (0152), by the name of its entry in CHECK_LIST_PARITY. */
+export const listedCase = (name: ListedCase): string => `check lists: ${name}`
 
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
@@ -126,7 +130,8 @@ export const stampCase = (name: StampCase): string => `stamps: ${name}`
  * file of a form's records holds (0079), then what a browse shows (0099),
  * then what a person's conditions on its columns narrow a list to (0104),
  * then what a form over versions does (0113), then what a new record
- * starts with (0149), then what the server stamps (0153).
+ * starts with (0149), then what the server stamps (0153), then what a check
+ * that lists a column's values makes of its field (0152).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -153,6 +158,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
     ...(Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
     ...(Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
+    ...(Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

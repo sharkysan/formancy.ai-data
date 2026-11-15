@@ -1,5 +1,6 @@
 import {
   buildLookupConfig,
+  diffSnapshots,
   encodeKeyToken,
   findObject,
   generateForm,
@@ -30,6 +31,8 @@ import type {
 } from '@formancy/data-core'
 import type { PostgresFixture } from '@formancy/data-fixtures'
 import {
+  CHECK_LIST_PARITY,
+  checkListOf,
   covers,
   DEFAULT_PARITY,
   DEFAULT_TABLE,
@@ -39,6 +42,8 @@ import {
   displayCase,
   FILTER_PARITY,
   filterCase,
+  LISTED_TABLE,
+  listedCase,
   PARITY_SCOPE,
   REFUSAL_PARITY,
   refusalCase,
@@ -756,6 +761,129 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
     const found = await records.read(reading.request)
     if (!found.ok || found.record === null) throw new Error('expected the row the database filled')
     expect(toFormAnswers(bindings, reading.fields, { ok: true, ...found.record }).answers).toMatchObject(DEFAULT_PARITY.started.answers)
+  })
+})
+
+describe('a column whose values a check lists is a select of them (CHECK_LIST_PARITY, 0152)', () => {
+  // Each check written as a person writes it in PostgreSQL's DDL, in a
+  // schema of this suite's own, and discovered as the owner: what
+  // pg_get_expr spells each as is what data-core reads, and the form is
+  // the one SQL Server's suite generates from its own spelling of the same
+  // DDL. A varchar's list is compared as text, its array cast to text[]; a
+  // negative whole number and a bigint are quoted and cast; an IN list of
+  // one would be an equality; NOT VALID leaves stage's list unvalidated.
+  // To be watched failing in CI with data-core reading the array without
+  // its cast (status, label, mark, stage and tier then read as no list),
+  // and with the whole-number shape kept for a listed integer (priority is
+  // then stored from, and read back as, the number -1).
+  const { schema, name } = LISTED_TABLE
+  const request: GenerationRequest = { connection: 'test', root: LISTED_TABLE, formId: 'listed', title: 'Listed', lookups: [], versionColumn: 'version' }
+  const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
+  let listed: MetadataSnapshot
+
+  /** Every field read by the clerk, and written where the form writes it. */
+  const policyOf = ({ bindings }: GeneratedForm): FormPolicy => ({
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: Object.fromEntries(
+      bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
+    ),
+    rowFilters: [],
+    lookups: {},
+  })
+
+  /** Each select of the form, by key, its options' values in the order drawn. */
+  const selectsOf = ({ form }: GeneratedForm): Record<string, string[]> =>
+    Object.fromEntries(
+      form.model.fields.flatMap((field) => (field.type === 'select' ? [[field.key, (field.options ?? []).map((option) => option.value)]] : [])),
+    )
+
+  beforeAll(async () => {
+    await owner.unsafe(`create schema ${schema}`)
+    await owner.unsafe(`create table ${schema}.${name} (
+      id int generated always as identity constraint pk_${name} primary key,
+      status varchar(20) not null default 'draft' constraint ck_listed_status check (status in ('draft', 'placed', 'shipped')),
+      label varchar(40) null constraint ck_listed_label check (label in ('it''s', 'a, b', ' spaced ', 'Zürich')),
+      priority int not null constraint ck_listed_priority check (priority in (10, 2, -1)),
+      "group" varchar(10) null constraint ck_listed_group check ("group" = 'A' or "group" = 'B'),
+      code char(2) not null constraint ck_listed_code check (code in ('A', 'BB')),
+      big bigint null constraint ck_listed_big check (big in (9007199254740993, 0)),
+      stage varchar(10) null,
+      mark varchar(5) null constraint ck_listed_mark check (mark in ('', 'x')),
+      tier varchar(10) null constraint ck_listed_tier check (tier in ('a', 'b', 'c')) constraint ck_listed_tier_again check (tier in ('a', 'b')),
+      level int null constraint ck_listed_level check (level >= 1 and level <= 3),
+      kind varchar(10) null constraint ck_listed_kind check (kind not in ('x', 'y')),
+      ref varchar(10) null constraint ck_listed_ref check (ref like 'R%'),
+      shout varchar(10) null constraint ck_listed_shout check (upper(shout) in ('A', 'B')),
+      flavour varchar(10) null constraint ck_listed_flavour check (flavour in ('a', null)),
+      version int not null default 1
+    )`)
+    await owner.unsafe(`alter table ${schema}.${name} add constraint ck_listed_stage check (stage in ('a', 'b')) not valid`)
+    listed = await discoverPostgres(owner, { schemas: [schema] })
+  })
+
+  test("reads each check as both engines' spellings read", covers('postgres', listedCase('read')), () => {
+    const checks = findObject(listed, LISTED_TABLE)?.checks ?? []
+    const spelled = JSON.stringify(Object.fromEntries(checks.map((check) => [check.name, check.expression])))
+    expect(Object.fromEntries(checks.map((check) => [check.name, checkListOf('postgres', check)])), `pg_get_expr spelled ${spelled}`).toEqual(
+      CHECK_LIST_PARITY.read,
+    )
+  })
+
+  test('generates the select both engines generate, and says why each list not drawn is not', covers('postgres', listedCase('generated')), () => {
+    const generated = generateForm(listed, request)
+    expect(selectsOf(generated)).toEqual(CHECK_LIST_PARITY.generated.selects)
+    expect(generated.notes.filter((note) => note.message.startsWith('Not a select')).map(({ subject, message }) => ({ subject, message }))).toEqual(
+      CHECK_LIST_PARITY.generated.notes,
+    )
+  })
+
+  // A listed value of every select, a whole number's as its text, is
+  // stored and read back as the answer it was given.
+  test('stores a listed value of every select and reads it back as given', covers('postgres', listedCase('stored')), async () => {
+    const generated = generateForm(listed, request)
+    const { bindings } = generated
+    const records = createPostgresRecords(owner)
+    const now = await records.describe(bindings.root)
+    if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+    const plan = planCreate(listed, bindings, policyOf(generated), CLERK, { ...CHECK_LIST_PARITY.stored.answers }, now.described)
+    if (!plan.ok) throw new Error(`expected a create, got ${plan.code}: ${plan.message}`)
+    const inserted = await records.insert(plan.request)
+    if (!inserted.ok) throw new Error(`expected an insert, got ${inserted.code}: ${inserted.message}`)
+    expect(toFormAnswers(bindings, plan.fields, inserted).answers).toMatchObject(CHECK_LIST_PARITY.stored.answers)
+  })
+
+  // The list narrowed under the published form: review stops its writes,
+  // the runtime -- which compares no check (0041) -- still sends them, and
+  // the database refuses the value it no longer lists. Generated again, the
+  // select offers what is left.
+  test('a value gone from the list stops writes in review, and the database refuses it', covers('postgres', listedCase('narrowed')), async () => {
+    const generated = generateForm(listed, request)
+    const { bindings } = generated
+    const policy = policyOf(generated)
+    const { gone, kept } = CHECK_LIST_PARITY.narrowed
+    await owner.unsafe(`delete from ${schema}.${name} where status = '${gone}'`)
+    await owner.unsafe(
+      `alter table ${schema}.${name} drop constraint ck_listed_status, add constraint ck_listed_status check (status in (${kept.map((value) => `'${value}'`).join(', ')}))`,
+    )
+    const narrowed = await discoverPostgres(owner, { schemas: [schema] })
+
+    const report = diffSnapshots(listed, narrowed, bindings, policy)
+    expect(report.changes.map((change) => [change.kind, change.severity, 'name' in change.subject ? change.subject.name : ''])).toEqual(
+      CHECK_LIST_PARITY.narrowed.changes,
+    )
+    expect({ review: report.writable, runtime: report.runtime.writable }).toMatchObject({
+      review: { create: false, update: false },
+      runtime: { create: true, update: true },
+    })
+
+    const records = createPostgresRecords(owner)
+    const now = await records.describe(bindings.root)
+    if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+    const plan = planCreate(listed, bindings, policy, CLERK, { ...CHECK_LIST_PARITY.stored.answers, status: gone }, now.described)
+    if (!plan.ok) throw new Error(`expected the runtime to plan the create, got ${plan.code}: ${plan.message}`)
+    expect(await records.insert(plan.request)).toMatchObject({ ok: false, code: 'check-violation' })
+    expect(selectsOf(generateForm(narrowed, request))['status']).toEqual(kept)
   })
 })
 
