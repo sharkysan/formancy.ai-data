@@ -239,7 +239,11 @@ import { workspaceJourney } from './browser/workspace.mjs'
  * again), as `Error: read ECONNRESET` with a stack that names no caller.
  * So the rejection is said with the step that was running, what the error
  * carries beyond its stack, and what the process still had open -- then
- * thrown, failing the run as Node would have.
+ * thrown, failing the run as Node would have. What it named came from
+ * requests that outlived the plane's server: one refused once it had
+ * closed, and the reset of a connection only such a request could have
+ * opened. The teardown at the end of `run` leaves none
+ * (scripts/gate-origin.mjs); this stays for whatever comes next.
  */
 let stage = 'starting'
 process.on('unhandledRejection', (reason) => {
@@ -299,10 +303,10 @@ async function run(gate, browser) {
   stage = `starting the plane for ${browser.browserType().name()}`
   const started = Date.now()
   const plane = await startPlane()
-  const { http, port } = await serve(plane)
+  const origin = await serve(plane)
   // Between the browser and the page's origin: every byte the browser sends
   // and receives crosses it, so what the browser itself does is counted there.
-  const hop = await startTcpHop({ kind: 'http', host: '127.0.0.1', port })
+  const hop = await startTcpHop({ kind: 'http', host: '127.0.0.1', port: origin.port })
   console.log(`PostgreSQL and the server started in ${String(Math.round((Date.now() - started) / 1000))} s`)
   // The connections the run's lost creates took, one per pass: held once the
   // run is over, since each pass holds only the row its create reached.
@@ -423,17 +427,30 @@ async function run(gate, browser) {
     // The policy's one allowance, watched being needed in this browser (0083).
     check(
       'without the policy’s allowance, the browser refuses the style elements AG Grid creates',
-      await allowanceProblem(browser, `http://127.0.0.1:${String(port)}`),
+      await allowanceProblem(browser, `http://127.0.0.1:${String(origin.port)}`),
     )
   } finally {
+    // From the browser in, each closed before what it sends to. The browser
+    // first, which sends every request: WebKit sent the origin one after
+    // the last page had closed (run 43697124883). recordedPerBrowser closes
+    // it again, which Playwright takes as done, and says so if it cannot,
+    // as this does. Then the hop, then the origin with every connection
+    // the browser held, and the plane only once it has answered every
+    // request it was handed (scripts/gate-origin.mjs), so that nothing is
+    // still being answered when the plane closes its connection registry
+    // and stops the database.
+    stage = `closing ${browser.browserType().name()}`
+    try {
+      await browser.close()
+    } catch (error) {
+      console.log(`  could not close ${browser.browserType().name()} before the plane: ${String(error)}`)
+    }
     stage = 'closing the hop'
     await hop.close()
-    stage = "closing the page's server"
-    http.close()
-    await plane.close((step) => {
+    await origin.close((step) => {
       stage = step
     })
-    stage = `past ${browser.browserType().name()}'s run, its browser closing or the next starting`
+    stage = `past ${browser.browserType().name()}'s run, the next browser starting`
   }
 
   console.log('')
