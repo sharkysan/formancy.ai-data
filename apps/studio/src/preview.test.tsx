@@ -44,9 +44,10 @@ describe('the preview', () => {
 
   // A new order starts its status at the column's constant default (0149):
   // the Generate step says so beside the other inferred choices, and the
-  // preview, a fresh form like a new record's, draws the box holding it --
-  // the value a save would store. Watched failing with the generator's
-  // defaults left out: no note, and an empty Status box.
+  // preview, a fresh form like a new record's, draws the choice holding it
+  // -- the value a save would store, one of those ck_order_status lists
+  // (0152). Watched failing with the generator's defaults left out: no
+  // note, and an empty Status box.
   test("says the status starts at the column's default, and draws it there", async () => {
     const user = await signIn(plane)
     const generated = await generateOrder(user)
@@ -56,7 +57,7 @@ describe('the preview', () => {
     expect(inferred).toContain("status Starts with the column's default, “draft”.")
     const preview = await goTo(user, 'Preview')
     const sheet = within(preview).getByRole('form', { name: 'Order preview' })
-    expect(within(sheet).getByRole<HTMLInputElement>('textbox', { name: 'Status' }).value).toBe('draft')
+    expect(within(sheet).getByRole<HTMLSelectElement>('combobox', { name: 'Status' }).value).toBe('draft')
   })
 
   // Validate runs the engine the published form will run: a required field

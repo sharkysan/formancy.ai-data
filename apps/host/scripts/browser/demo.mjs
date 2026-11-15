@@ -218,7 +218,7 @@ export async function demoPass({ origin, prefix, check, timed }) {
     )
     await option.click()
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Order date*' }).fill('2026-10-17')
-    await paper(fresh, 'Order').getByRole('textbox', { name: 'Status' }).fill('placed')
+    await paper(fresh, 'Order').getByRole('combobox', { name: 'Status' }).selectOption('placed')
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Amount*' }).fill('13')
     await paper(fresh, 'Order').getByRole('button', { name: 'Save' }).click()
     const made = detail(page, /^Order k1:\d+$/)

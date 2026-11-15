@@ -16,6 +16,7 @@ import {
 } from './access.js'
 import { controlFor } from './controls.js'
 import { startWithDefaults } from './defaults.js'
+import { listedControl, listedFor } from './listed.js'
 import { helpTextFor, tooLongNote } from './help.js'
 import type { HelpText } from './help.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor } from './names.js'
@@ -105,7 +106,15 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
       }
       continue
     }
-    const plan = planColumn(root, column, allocate, isView, pinned.has(column.name), filledKey(identity, pinned, column), stamped.get(column.name), notes)
+    const plan = planColumn(
+      snapshot.kind,
+      root,
+      column,
+      allocate,
+      isView,
+      { pinned: pinned.has(column.name), filled: filledKey(identity, pinned, column), stamp: stamped.get(column.name) },
+      notes,
+    )
     if (plan !== null) planned.push(plan)
   }
 
@@ -314,20 +323,21 @@ function sentence(text: string): string {
 }
 
 function planColumn(
+  kind: MetadataSnapshot['kind'],
   root: ObjectMeta,
   column: ColumnMeta,
   allocate: (wanted: string) => string,
   isView: boolean,
-  pinned: boolean,
-  filled: boolean,
-  stamp: StampBinding | undefined,
+  { pinned, filled, stamp }: { pinned: boolean; filled: boolean; stamp: StampBinding | undefined },
   notes: GenerationNote[],
 ): Planned | null {
   if (!column.access.select) {
     notes.push({ subject: column.name, kind: 'excluded', message: UNREADABLE })
     return null
   }
-  const control = controlFor(column.type, column.nullable)
+  // A select of exactly the values a check lists, where one does (0152); the column's own control otherwise.
+  const listed = listedFor(kind, root, column)
+  const control = listed.kind === 'select' ? listedControl(listed) : controlFor(column.type, column.nullable)
   if ('exclude' in control) {
     notes.push({ subject: column.name, kind: 'excluded', message: `${column.databaseType}: ${control.exclude}.` })
     return null
@@ -345,6 +355,7 @@ function planColumn(
   })
   if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
+  if (listed.kind === 'refused') notes.push({ subject: key, kind: 'inferred', message: `Not a select of the values ${listed.check} lists: ${listed.reason}.` })
   if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
   if (filled) notes.push({ subject: key, kind: 'read-only', message: FILLED_KEY })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
@@ -362,7 +373,15 @@ function planColumn(
   return {
     ordinal: column.ordinal,
     field: { key, label: labelFor(column.name), ...described(help), ...control.field, ...(required ? { required: true } : {}) },
-    binding: { kind: 'column', field: key, column: column.name, type: column.type, nullable: column.nullable, writes },
+    binding: {
+      kind: 'column',
+      field: key,
+      column: column.name,
+      type: column.type,
+      nullable: column.nullable,
+      writes,
+      ...(listed.kind === 'select' ? { listed: { check: listed.check, values: [...listed.values] } } : {}),
+    },
     system: generated || filled || stamp !== undefined,
     multiline: control.field.type === 'textarea',
     privilegeOnly: possible,

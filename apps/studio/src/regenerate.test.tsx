@@ -286,9 +286,11 @@ describe('regenerating a published form', () => {
   // default changed in the database since (0150): the person's is kept,
   // and the generator's -- the column's constant as it is now -- offered.
   // Choosing it leaves nothing chosen over the base, and the published
-  // presentation says so. Watched failing with the default's both-changed
-  // offered as a label is: there was no "Use the generator’s starting
-  // value for status", and the panel offered the generator's label.
+  // presentation says so. The new default is one ck_order_status lists, as
+  // a default must be to start a select of them (0152). Watched failing
+  // with the default's both-changed offered as a label is: there was no
+  // "Use the generator’s starting value for status", and the panel offered
+  // the generator's label.
   test('a starting value kept over a changed default: the generator’s, chosen, publishes no override', async () => {
     const user = await signIn(plane)
     await generateOrder(user)
@@ -301,17 +303,17 @@ describe('regenerating a published form', () => {
     await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
     await within(publish).findByText('Published version 1 of sales-order.')
 
-    plane.databases.set('fixture', statusDefault('open'))
+    plane.databases.set('fixture', statusDefault('shipped'))
     const regenerated = await regenerate(user)
     await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
     const presentation = await screen.findByRole('main', { name: 'Presentation' })
     expect(within(presentation).getByLabelText<HTMLInputElement>('Starting value of status').value).toBe('placed')
     const carried = within(presentation).getByRole('region', { name: 'Carried from version 1' })
     expect(within(carried).getByRole('listitem').textContent).toContain(
-      'You started status at “placed”, and the generator now starts it at “open”; yours is kept.',
+      'You started status at “placed”, and the generator now starts it at “shipped”; yours is kept.',
     )
     await pressEnter(user, within(carried).getByRole('button', { name: 'Use the generator’s starting value for status' }))
-    expect(within(presentation).getByLabelText<HTMLInputElement>('Starting value of status').value).toBe('open')
+    expect(within(presentation).getByLabelText<HTMLInputElement>('Starting value of status').value).toBe('shipped')
     expect(within(presentation).getByLabelText<HTMLInputElement>('Label of status').value).toBe('Status')
     expect(focusedName()).toBe('Use the generator’s starting value for status')
     expect(await audit()).toEqual([])

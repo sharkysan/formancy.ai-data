@@ -28,6 +28,10 @@ export type {
   TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
+export { readCheckList } from './generate/check-lists.js'
+export type { CheckList, ListedLiteral } from './generate/check-lists.js'
+export { listedFor } from './generate/listed.js'
+export type { Listed } from './generate/listed.js'
 export { deleteUnoffered, offers, versionProvesRecord } from './generate/offers.js'
 export type { OfferedOperation } from './generate/offers.js'
 export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION, SERVED_SPEC_VERSIONS } from './generate/version.js'
@@ -40,6 +44,7 @@ export type {
   GeneratedForm,
   GenerationNote,
   GenerationRequest,
+  ListedBinding,
   LookupChoice,
   SectionBinding,
   SectionCondition,

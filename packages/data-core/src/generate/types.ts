@@ -115,6 +115,18 @@ export interface FieldWrites {
   update: boolean
 }
 
+/**
+ * The values a column field is a select of (0152): those `check` lists,
+ * each as a record holding it reads back -- a whole number's canonical
+ * digits as text -- in the order the field offers them. What drift review
+ * compares the check with, and what tells the answer's shape: a select's
+ * answer is the value itself, never a number or a yes or no.
+ */
+export interface ListedBinding {
+  check: string
+  values: string[]
+}
+
 /** How one form field reaches the database. */
 export type FieldBinding =
   | {
@@ -124,6 +136,8 @@ export type FieldBinding =
       type: NormalizedType
       nullable: boolean
       writes: FieldWrites
+      /** Present where the field is a select of the values a check lists (0152); absent on every other column field, and on bindings written before it. */
+      listed?: ListedBinding
     }
   | {
       kind: 'lookup'

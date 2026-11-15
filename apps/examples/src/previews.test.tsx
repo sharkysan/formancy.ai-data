@@ -346,13 +346,38 @@ describe("a new record starts with its column's constant default (0149)", () => 
     const order = example('order')
     const customer = example('customer')
     for (const renderer of RENDERERS) {
-      const status = within(pane(order, renderer)).getByRole('textbox', { name: heading(order, 'status') })
+      // A select of ck_order_status's values since 0152.
+      const status = within(pane(order, renderer)).getByRole('combobox', { name: heading(order, 'status') })
       const active = within(pane(customer, renderer)).getByRole('checkbox', { name: heading(customer, 'active') })
-      expect({ renderer, status: (status as HTMLInputElement).value, active: (active as HTMLInputElement).checked }).toEqual({
+      expect({ renderer, status: (status as HTMLSelectElement).value, active: (active as HTMLInputElement).checked }).toEqual({
         renderer,
         status: 'draft',
         active: true,
       })
+    }
+  })
+})
+
+describe('a column whose values a check lists is a select of them (0152)', () => {
+  // ck_order_status lists draft, placed and shipped, and the captured
+  // snapshot holds it as PostgreSQL spells it: both renderers draw Status as
+  // a choice of exactly those values, each as the column holds it, besides
+  // the empty choice a select starts with, so a person picks a value the
+  // database takes rather than typing one it refuses on save. Found by role
+  // and accessible name; an option by its role and name. Watched failing with
+  // the generator's lists left unread: Status was a text box in both.
+  test('both renderers draw Status as a choice of the values ck_order_status lists', async () => {
+    await mounted()
+    const order = example('order')
+    const found = order.generated.form.model.fields.find((field) => field.key === 'status')
+    if (found === undefined) throw new Error('sales.order has no status field')
+    for (const renderer of RENDERERS) {
+      const status = within(pane(order, renderer)).getByRole('combobox', { name: fieldHeading(found) })
+      const offered = within(status)
+        .getAllByRole('option')
+        .map((option) => option.textContent?.trim() ?? '')
+        .filter((name) => name !== '')
+      expect({ renderer, offered }).toEqual({ renderer, offered: ['draft', 'placed', 'shipped'] })
     }
   })
 })

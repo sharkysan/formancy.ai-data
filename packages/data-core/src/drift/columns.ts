@@ -36,8 +36,10 @@ function blocksCreate(bindings: FormBindings, column: ColumnMeta): boolean {
  */
 function outgrownControl(bindings: FormBindings, after: ColumnMeta): string | null {
   const binding = bindings.fields.find((candidate) => candidate.kind === 'column' && candidate.column === after.name)
-  // A lookup's select holds an encoded key, never the column's value itself.
-  if (binding?.kind !== 'column') return null
+  // A lookup's select holds an encoded key, never the column's value itself;
+  // a select of listed values holds what its check lists, whatever the type
+  // allows, and is compared with that check (`listed.ts`, 0152).
+  if (binding?.kind !== 'column' || binding.listed !== undefined) return null
   const published = controlFor(binding.type, binding.nullable)
   const now = controlFor(after.type, after.nullable)
   return 'field' in published &&
