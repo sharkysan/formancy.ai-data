@@ -13,6 +13,7 @@ import { Buffer } from 'node:buffer'
 import { webcrypto } from 'node:crypto'
 import { getTestBed } from '@angular/core/testing'
 import { BrowserTestingModule, platformBrowserTesting } from '@angular/platform-browser/testing'
+import { configure } from '@testing-library/react'
 
 getTestBed().initTestEnvironment(BrowserTestingModule, platformBrowserTesting())
 
@@ -42,3 +43,15 @@ Object.defineProperty(globalThis, 'Uint8Array', {
  * uses, for write ids -- is the same function.
  */
 Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true, writable: true })
+
+/*
+ * How long a `findBy` or a `waitFor` waits for the page by default: fifteen
+ * seconds, the figure the files that name a wait of their own already use
+ * (`ARRIVES`), and the studio's suite's default. Testing Library's own is
+ * one second. On CI's hosted runner, with every other package's suite
+ * beside it, AG Grid had not drawn the Customer column's filter box after
+ * 1.4 seconds and lookup-box.test.tsx failed (pull request #188's run, on
+ * a change to the studio alone); the files that render AG Grid directly
+ * wait for it with the default. A failing wait only takes longer to say so.
+ */
+configure({ asyncUtilTimeout: 15_000 })
