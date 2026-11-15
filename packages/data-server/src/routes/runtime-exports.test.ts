@@ -265,6 +265,9 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('an export never deletes')
     },
+    save: async () => {
+      throw new Error('an export never saves')
+    },
   }
   const lookups: LookupAdapter = {
     search: async () => {

@@ -296,6 +296,9 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('these routes never delete')
     },
+    save: async () => {
+      throw new Error('these routes never save a record with its rows')
+    },
   }
   const lookups: LookupAdapter = {
     search: async () => {

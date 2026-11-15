@@ -181,6 +181,7 @@ function registry(): ConnectionRegistry {
     insert: refused('inserts'),
     update: refused('updates'),
     supersede: refused('changes from a date'),
+    save: refused('saves a record with its rows'),
     delete: async (request) => {
       deletes.push(request)
       return deleteOutcome ?? { ok: true, deleted: { values: { id: '7' }, version: VERSION } }

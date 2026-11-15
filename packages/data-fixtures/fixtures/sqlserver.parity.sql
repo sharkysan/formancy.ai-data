@@ -316,4 +316,69 @@ create table parity.audited_price (
 );
 GO
 
+-- A record and the rows saved with it (0155), as postgres.parity.sql's
+-- saved_order is. The note columns are varchar under the database's
+-- collation, code page 1252, which has no 'Ł': SQL Server stores its best
+-- fit without an error, which the save's text check refuses. The lines'
+-- trigger is one trigger for every event, over `inserted` and `deleted`;
+-- the marks' holds the application lock with sp_getapplock, shared, for
+-- the transaction, and sleeps with WAITFOR.
+create table parity.saved_order (
+  id int identity(1, 1) not null constraint pk_saved_order primary key,
+  tenant_id int not null,
+  note varchar(50) null constraint ck_saved_order_note check (note <> 'refused'),
+  total int not null constraint df_saved_order_total default 0,
+  version int not null constraint df_saved_order_version default 1
+);
+create table parity.saved_line (
+  id int identity(1, 1) not null constraint pk_saved_line primary key,
+  order_id int not null constraint fk_saved_line_order references parity.saved_order (id) on delete cascade,
+  line_no int not null,
+  quantity int not null constraint ck_saved_line_quantity check (quantity >= 0),
+  note varchar(50) null,
+  version int not null constraint df_saved_line_version default 1,
+  constraint uq_saved_line_no unique (order_id, line_no)
+);
+create table parity.saved_mark (
+  id int identity(1, 1) not null constraint pk_saved_mark primary key,
+  order_id int not null constraint fk_saved_mark_order references parity.saved_order (id) on delete cascade,
+  mark_no int not null,
+  note varchar(50) null,
+  version int not null constraint df_saved_mark_version default 1,
+  constraint uq_saved_mark_no unique (order_id, mark_no)
+);
+create table parity.saved_account (
+  code varchar(20) not null constraint pk_saved_account primary key,
+  tenant_id int not null,
+  note varchar(50) null,
+  version int not null constraint df_saved_account_version default 1
+);
+create table parity.saved_entry (
+  id int identity(1, 1) not null constraint pk_saved_entry primary key,
+  account_code varchar(20) not null constraint fk_saved_entry_account references parity.saved_account (code),
+  entry_no int not null,
+  amount int not null,
+  version int not null constraint df_saved_entry_version default 1,
+  constraint uq_saved_entry_no unique (account_code, entry_no)
+);
+GO
+create trigger parity.tr_saved_line_total on parity.saved_line after insert, update, delete as
+begin
+  set nocount on;
+  update o set total = (select coalesce(sum(l.quantity), 0) from parity.saved_line as l where l.order_id = o.id), version = o.version + 1
+  from parity.saved_order as o
+  where o.id in (select order_id from inserted union select order_id from deleted);
+end
+GO
+create trigger parity.tr_saved_mark on parity.saved_mark after insert as
+begin
+  set nocount on;
+  declare @held int;
+  if exists (select 1 from inserted where note = 'race')
+    exec @held = sp_getapplock @Resource = N'parity.saved_mark', @LockMode = N'Shared', @LockOwner = N'Transaction', @LockTimeout = 30000;
+  if exists (select 1 from inserted where note = 'slow')
+    waitfor delay '00:00:00.200';
+end
+GO
+
 update statistics parity.tenant_item with fullscan;

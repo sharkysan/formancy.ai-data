@@ -1,6 +1,7 @@
 import type { ApiValue } from '../codecs/codec.js'
 import type { LookupDisplayColumn, LookupKeyColumn, LookupKeyType, LookupSearchColumn, LookupSearchType, RowFilters, RowFilterType } from '../lookup/types.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta, ObjectRef } from '../metadata.js'
+import type { SaveOutcome, SaveRequest } from './save-types.js'
 
 /**
  * One column of a record operation: its name, which comes from approved
@@ -535,4 +536,14 @@ export interface RecordAdapter {
   supersede(request: SupersedeRequest): Promise<RecordOutcome>
   /** One record, by its key and the version its person read (0050): one guarded statement, never retried. */
   delete(request: DeleteRequest): Promise<DeleteOutcome>
+  /**
+   * A record and the rows of its together children (0155), in one
+   * transaction, every step in the request's order and every row step
+   * pinned to the record: each row as its step left it and the record read
+   * back by its key, or the one step that refused the save, with nothing
+   * stored -- except on SQL Server, where a trigger that ends the
+   * transaction can leave it stored in part, `unknown-outcome`. Never
+   * retried, as no write is (0015).
+   */
+  save(request: SaveRequest): Promise<SaveOutcome>
 }

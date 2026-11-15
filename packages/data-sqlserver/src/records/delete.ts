@@ -4,20 +4,8 @@ import { DENIED_OBJECTS, DENIED_SCHEMAS, VIEWS_DATABASE } from '../discovery/vis
 import { quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
-import {
-  located,
-  NOT_ONE_ROW,
-  NOT_ONE_ROW_MESSAGE,
-  REACH_MOVED,
-  REACH_MOVED_MESSAGE,
-  REACH_UNDELETABLE,
-  REACH_UNDELETABLE_MESSAGE,
-  ROW,
-  selection,
-  tableName,
-  versionIs,
-  writeBatch,
-} from './statements.js'
+import { NOT_ONE_ROW, NOT_ONE_ROW_MESSAGE, REACH_MOVED, REACH_MOVED_MESSAGE, REACH_UNDELETABLE, REACH_UNDELETABLE_MESSAGE } from './batch-steps.js'
+import { located, ROW, selection, tableName, versionIs, writeBatch } from './statements.js'
 import type { ExpectedVersion } from './statements.js'
 
 /*

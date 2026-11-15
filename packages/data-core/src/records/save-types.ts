@@ -18,11 +18,11 @@ import type {
 
 /*
  * A save of a record with the rows of its together children (0155), as an
- * adapter will receive it, and what `planSave` answers. Declared here, and
- * not yet a method of `RecordAdapter`: neither adapter runs one, and a port
- * method with no implementation is a claim nothing checks. Each step is
- * today's request for one record; what is new is the order, the pin to
- * the record, the touch, `within` and the counts.
+ * adapter receives it (`RecordAdapter.save`), and what `planSave` answers.
+ * Each step is today's request for one record; what is new is the order,
+ * the pin to the record, the touch, `within` and the counts, which both
+ * adapters run as one transaction and the shared cases hold alike
+ * (`SAVE_PARITY`, `@formancy/data-fixtures`).
  */
 
 /**

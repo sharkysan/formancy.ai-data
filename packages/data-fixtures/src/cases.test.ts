@@ -33,6 +33,7 @@ import {
   throughCase,
   UPDATE_RECREATED_CASE,
   uuidCase,
+  saveCase,
   versionCase,
 } from './cases.js'
 import { DECLINE_PARITY } from './declines.js'
@@ -50,6 +51,8 @@ import type { ListCase } from './lists.js'
 import { FIXTURE_MODEL } from './model.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import type { RefusalParityCase } from './parity.js'
+import { SAVE_PARITY } from './saves.js'
+import type { SaveCase } from './saves.js'
 import { STAMP_PARITY } from './stamps.js'
 import type { StampCase } from './stamps.js'
 import { UUID_PARITY } from './uuid.js'
@@ -94,6 +97,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   STAMP_PARITY: (Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
   CHECK_LIST_PARITY: (Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
   DECLINE_PARITY: (Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
+  SAVE_PARITY: (Object.keys(SAVE_PARITY) as SaveCase[]).map(saveCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -144,6 +148,17 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   DECLINING_TABLE: "where the failures suites create the table DECLINE_PARITY's cases are about",
   DECLINING_REMOVABLE: "where the failures suites create the table DECLINE_PARITY's delete case is about",
   DECLINING_MESSAGES: "what DECLINING_TABLE's trigger raises for each note; what a write answers then is DECLINE_PARITY's",
+  SAVED_ORDER_POLICY: "who may do what with the saves suites' order form; what a save stores is SAVE_PARITY's",
+  SAVED_LINE_POLICY: "who may do what with the saves suites' line form; what a save stores is SAVE_PARITY's",
+  SAVED_MARK_POLICY: "who may do what with the saves suites' mark form; what a save stores is SAVE_PARITY's",
+  SAVED_ACCOUNT_POLICY: "who may do what with the saves suites' account form; what a save stores is SAVE_PARITY's",
+  SAVED_ENTRY_POLICY: "who may do what with the saves suites' entry form; what a save stores is SAVE_PARITY's",
+  SAVE_CLERK: 'the person who saves in the saves suites (0155)',
+  SAVED_BOUNDS: "the bounds the saves suites' children are saved with; what a count holds is SAVE_PARITY's",
+  SAVE_RACE_LOCK: "the application lock the saves suites' race holds, on each engine; what the race stores is SAVE_PARITY's",
+  SAVE_SIZES: 'how many line changes the sized save suites measure (0155)',
+  SIZED_ORDER_POLICY: "who may do what with the sized save suites' order form, which no shared case reads",
+  SIZED_LINE_POLICY: "who may do what with the sized save suites' line form, which no shared case reads",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 
