@@ -1,4 +1,4 @@
-import type { InsertRequest, RecordTarget, RecordValue, RowFilterTerm, SupersedeRequest, UpdateRequest } from '@formancy/data-core'
+import type { ClockColumn, InsertRequest, RecordTarget, RecordValue, RowFilterTerm, SupersedeRequest, UpdateRequest } from '@formancy/data-core'
 
 /**
  * Checks on the shape of a record request, made before anything is sent.
@@ -15,7 +15,7 @@ export function isVersion(token: string): boolean {
   return typeof token === 'string' && VERSION.test(token)
 }
 
-function once(values: readonly RecordValue[], what: string): void {
+function once(values: readonly { name: string }[], what: string): void {
   const seen = new Set<string>()
   for (const value of values) {
     if (seen.has(value.name)) throw new Error(`${value.name} is named twice in ${what}.`)
@@ -29,8 +29,13 @@ export function checkKey(target: RecordTarget, key: readonly RecordValue[]): voi
   if (target.identity.length === 0 || !matches) throw new Error('The key does not name the columns of the target identity, in order.')
 }
 
+/** A column stamped with the clock (0153) is a column the write names too, and is held as a value is. */
+function named(values: readonly RecordValue[], clock: readonly ClockColumn[] = []): { name: string }[] {
+  return [...values, ...clock]
+}
+
 export function checkInsert(request: InsertRequest): void {
-  once(request.values, 'the values to insert')
+  once(named(request.values, request.clock), 'the columns to insert')
   for (const name of request.fresh ?? []) {
     if (!request.values.some((value) => value.name === name)) throw new Error(`${name} is part of the chain a create starts, and the create does not write it.`)
   }
@@ -47,8 +52,9 @@ export function checkUpdate(request: UpdateRequest, terms: readonly RowFilterTer
   const concurrency = request.target.concurrency
   if (concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; an update here is guarded by a version column.')
   if (request.set.length === 0) throw new Error('An update with nothing to set would only move the version, and tell every other editor the record changed.')
-  once(request.set, 'the values to set')
-  for (const value of request.set) {
+  const set = named(request.set, request.clock)
+  once(set, 'the columns to set')
+  for (const value of set) {
     if (value.name === concurrency.column) throw new Error(`${value.name} is the version column; an update moves it, and never sets it.`)
     if (terms.some((term) => term.column === value.name))
       throw new Error(`${value.name} is a filter column; setting it could move the record out of the rows this actor may write.`)
@@ -68,7 +74,7 @@ export function checkSupersede(request: SupersedeRequest): void {
   const concurrency = request.target.concurrency
   if (concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; a change here is guarded by a version column.')
   if (request.chain.length === 0) throw new Error('A change from a date copies the chain it follows, and this one names no column of it.')
-  const written = [...request.chain.map((column) => column.name), request.start.name, ...request.values.map((value) => value.name)]
+  const written = [...request.chain.map((column) => column.name), request.start.name, ...named(request.values, request.clock).map((value) => value.name)]
   const seen = new Set<string>()
   for (const name of written) {
     if (seen.has(name)) throw new Error(`${name} is written twice in the next version.`)

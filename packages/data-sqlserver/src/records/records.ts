@@ -266,7 +266,8 @@ export function createSqlServerRecords(pool: ConnectionPool): RecordAdapter {
       const terms = rowFilterTerms(request.filters)
       const through = throughTerms(request.through)
       checkKey(target, request.key)
-      const written = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
+      // A column stamped with the clock (0153) is one the next version is written with too.
+      const written = [...request.chain.map((entry) => entry.name), request.start.name, ...names(request.values), ...names(request.clock ?? [])]
       if (new Set(written).size !== written.length || written.includes(request.ends))
         throw new Error('A change from a date writes each column of the next version once, and never its end')
       checkAssigned([request.start, ...request.values], target.concurrency.column, request.clock)

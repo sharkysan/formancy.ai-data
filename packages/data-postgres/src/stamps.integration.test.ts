@@ -1,5 +1,5 @@
 import { generateForm, planCreate, planRead, planSupersede, planUpdate, recordToken, toFormAnswers } from '@formancy/data-core'
-import type { FormBindings, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
+import type { ClockColumn, FormBindings, MetadataSnapshot, RecordAdapter, SupersedeRequest } from '@formancy/data-core'
 import {
   ALICE,
   AUDITED_POLICY,
@@ -118,10 +118,11 @@ async function measured(id: string, before: string, after: string, against: 'cre
 describe('a create of a form that stamps', () => {
   // Who is Alice's id and site, from the context; the instant is the
   // database's, read between its own clock before and after; nothing an
-  // update stamps is there yet. To be watched failing in CI with the clock
-  // columns left out of the insert -- 23502, created_at may not be NULL --
-  // and with `clockSql` reading the session's zone for a wall clock: the
-  // owner's session is in Pacific/Chatham, hours from UTC.
+  // update stamps is there yet. Watched failing with the clock columns
+  // left out of the insert -- 23502, created_at may not be NULL -- and with
+  // `localtimestamp`, the session's zone, for a wall clock: the owner's
+  // session is in Pacific/Chatham, hours from UTC, and the wall clock was
+  // not the instant in UTC.
   test('stores who from the context and the time from the database', covers('postgres', stampCase('created'), stampCase('utc')), async () => {
     const { id, before, after } = await created('first')
     const row = await measured(id, before, after, 'created')
@@ -134,9 +135,9 @@ describe('a create of a form that stamps', () => {
 
   // `current_timestamp` is the transaction's start, and so is the `now()`
   // default of noted_at in the same insert: one instant. A column of less
-  // precision rounds it. To be watched failing in CI with
-  // `clock_timestamp()` in place of `current_timestamp`: the default and
-  // the stamp were two readings.
+  // precision rounds it. Watched failing with `clock_timestamp()` in place
+  // of `current_timestamp`: the default and the stamp were two readings,
+  // the stamp the later.
   test("is one instant with the clock's default, and rounded to its column", covers('postgres', stampCase('clock'), stampCase('rounded')), async () => {
     const { id, before, after } = await created('clocked')
     const row = await measured(id, before, after, 'created')
@@ -148,9 +149,9 @@ describe('a create of a form that stamps', () => {
 describe('an update of a form that stamps', () => {
   // Bob's update of Alice's row: who changed it last is Bob, when is the
   // database's, and the day its UTC day; who created it, where and when
-  // are untouched. To be watched failing in CI with the update's clock left
-  // out of the SET: changed_at keeps the create's instant, outside the
-  // update's window.
+  // are untouched. Watched failing with the update's clock left out of the
+  // SET: changed_at kept the create's instant, outside the update's
+  // window.
   test('restamps who changed it and when, and keeps who created it', covers('postgres', stampCase('updated')), async () => {
     const { id, version } = await created('to change')
     const [createdAt] = await owner.unsafe<Array<{ at: string }>>('select created_at::text as at from parity.audited where id = $1', [Number(id)])
@@ -171,35 +172,41 @@ describe('an update of a form that stamps', () => {
   })
 })
 
+/** Bob's change from a date of a price Alice created, product `productNo`, as the planner sends it. */
+async function changeFromDate(productNo: number): Promise<SupersedeRequest> {
+  await owner.unsafe(
+    "insert into parity.audited_price (tenant_id, product_no, valid_from, amount, created_by, created_at) values (1, $1, '2026-01-01', 9.5, 'alice', '2026-01-01T00:00:00Z')",
+    [productNo],
+  )
+  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: '1', product_no: String(productNo), valid_from: '2026-01-01' })
+  if (!token.ok) throw new Error(token.message)
+  const reading = planRead(parity, priced, AUDITED_PRICE_POLICY, BOB, token.token)
+  if (!reading.ok) throw new Error(`expected a read, got ${reading.code}`)
+  const read = await records.read(reading.request)
+  if (!read.ok || read.record === null) throw new Error('expected the open version')
+  const asRead = toFormAnswers(priced, reading.fields, { ok: true, ...read.record })
+  const plan = planSupersede(
+    parity,
+    priced,
+    AUDITED_PRICE_POLICY,
+    BOB,
+    token.token,
+    String(read.record.version),
+    { valid_from: '2026-07-01', amount: '10.0000' },
+    asRead,
+    await described('audited_price'),
+  )
+  if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
+  return plan.request
+}
+
 describe('a change from a date of a form that stamps', () => {
   // The next version is a create, stamped as Bob's; the version ended is
-  // not stamped again, and keeps Alice's and when. To be watched failing in
-  // CI with the clock left out of the next version: 23502, created_at may
-  // not be NULL, and nothing ended.
+  // not stamped again, and keeps Alice's and when. Watched failing with the
+  // clock left out of the next version: the change was refused, created_at
+  // being NOT NULL.
   test('stamps the next version as a create', covers('postgres', stampCase('superseded')), async () => {
-    await owner.unsafe(
-      "insert into parity.audited_price (tenant_id, product_no, valid_from, amount, created_by, created_at) values (1, 7, '2026-01-01', 9.5, 'alice', '2026-01-01T00:00:00Z')",
-    )
-    const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: '1', product_no: '7', valid_from: '2026-01-01' })
-    if (!token.ok) throw new Error(token.message)
-    const reading = planRead(parity, priced, AUDITED_PRICE_POLICY, BOB, token.token)
-    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}`)
-    const read = await records.read(reading.request)
-    if (!read.ok || read.record === null) throw new Error('expected the open version')
-    const asRead = toFormAnswers(priced, reading.fields, { ok: true, ...read.record })
-    const plan = planSupersede(
-      parity,
-      priced,
-      AUDITED_PRICE_POLICY,
-      BOB,
-      token.token,
-      String(read.record.version),
-      { valid_from: '2026-07-01', amount: '10.0000' },
-      asRead,
-      await described('audited_price'),
-    )
-    if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
-    const outcome = await records.supersede(plan.request)
+    const outcome = await records.supersede(await changeFromDate(7))
     expect(outcome.ok).toBe(true)
     const versions = await owner.unsafe<Array<{ from: string; by: string; at: string }>>(
       `select valid_from::text as "from", created_by as by, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at
@@ -208,5 +215,51 @@ describe('a change from a date of a form that stamps', () => {
     expect(versions.map((entry) => entry.by)).toEqual([STAMP_PARITY.superseded.ended, STAMP_PARITY.superseded.next])
     expect(versions[0]?.at).toBe(STAMP_PARITY.superseded.endedAt)
     expect(versions[1]?.at).not.toBe(STAMP_PARITY.superseded.endedAt)
+  })
+})
+
+/** A column a write would stamp with the clock, of a type a stamp takes: what the checks below read is its name. */
+const stamp = (name: string): ClockColumn => ({ name, type: { kind: 'date' } })
+
+describe('a write whose clock names a column it may not write', () => {
+  // A column stamped with the clock is one the write names (0153), so the
+  // adapter's own checks hold it as they hold a value: named once, never
+  // the version column, a filter column or where a version ends, never the
+  // next version's end or a column of its chain. The planner sends none of
+  // these; each is a programming error, thrown before anything is sent.
+  // The SQL Server suite throws for the same requests, but for an update's
+  // filter column or end, which its update has never refused among the
+  // values either. Watched failing with the clock left out of the checks:
+  // each request was sent, or came back answered.
+  test('is thrown before anything is sent', async () => {
+    const create = planCreate(parity, audited, AUDITED_POLICY, ALICE, { note: 'refused' }, await described('audited'))
+    if (!create.ok) throw new Error(`expected a create, got ${create.code}: ${create.message}`)
+    const insert = create.request
+    const inserting = insert.clock ?? []
+    await expect(records.insert({ ...insert, clock: [...inserting, stamp('created_at')] })).rejects.toThrow('created_at is named twice')
+    await expect(records.insert({ ...insert, clock: [...inserting, stamp('created_by')] })).rejects.toThrow('created_by is named twice')
+
+    const { id, version } = await created('to refuse')
+    const token = recordToken(['id'], { id })
+    if (!token.ok) throw new Error(token.message)
+    const planned = planUpdate(parity, audited, AUDITED_POLICY, BOB, token.token, version, { note: 'refused' }, undefined, await described('audited'))
+    if (!planned.ok) throw new Error(`expected an update, got ${planned.code}: ${planned.message}`)
+    const update = planned.request
+    const updating = update.clock ?? []
+    await expect(records.update({ ...update, clock: [...updating, stamp('changed_by')] })).rejects.toThrow('changed_by is named twice')
+    await expect(records.update({ ...update, clock: [...updating, stamp('version')] })).rejects.toThrow('version is the version column')
+    await expect(records.update({ ...update, clock: [...updating, stamp('tenant_id')] })).rejects.toThrow('tenant_id is a filter column')
+    await expect(records.update({ ...update, open: 'changed_on' })).rejects.toThrow('changed_on is where a version ends')
+
+    const change = await changeFromDate(8)
+    const superseding = change.clock ?? []
+    await expect(records.supersede({ ...change, clock: [...superseding, stamp('valid_to')] })).rejects.toThrow("valid_to is not the next version's")
+    await expect(records.supersede({ ...change, clock: [...superseding, stamp('product_no')] })).rejects.toThrow('product_no is written twice')
+
+    // Nothing was sent: the row updated is as created, and the price has its one version.
+    const [row] = await owner.unsafe<Array<{ note: string; version: number }>>('select note, version from parity.audited where id = $1', [Number(id)])
+    expect(row).toEqual({ note: 'to refuse', version: Number(version) })
+    const [prices] = await owner.unsafe<Array<{ count: number }>>('select count(*)::int as count from parity.audited_price where product_no = 8')
+    expect(prices?.count).toBe(1)
   })
 })

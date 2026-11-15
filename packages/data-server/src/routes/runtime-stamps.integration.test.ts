@@ -204,9 +204,9 @@ describe.each([
     expect(published.statusCode, published.body).toBe(201)
   })
 
-  // The whole journey on one record. To be watched failing in CI with the
-  // planner's stamps left out of the insert -- the database refuses
-  // created_by NULL -- and with the stamps planned from the answers.
+  // The whole journey on one record. Watched failing on both engines with
+  // the planner's stamps of who left out of the insert: 422, the database
+  // refused created_by NULL.
   test('stamps who and when, never from the body, and filters nothing', async () => {
     const definition = (await call('GET', `/v1/forms/${formId}`, alice)).json()
     // What a page may send and a copy carries are the over-posting check's (0117, 0107): no stamp.

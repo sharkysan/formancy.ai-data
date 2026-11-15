@@ -1,5 +1,5 @@
 import { generateForm, planCreate, planRead, planSupersede, planUpdate, recordToken, toFormAnswers } from '@formancy/data-core'
-import type { FormBindings, MetadataSnapshot, RecordAdapter } from '@formancy/data-core'
+import type { ClockColumn, FormBindings, MetadataSnapshot, RecordAdapter, SupersedeRequest } from '@formancy/data-core'
 import {
   ALICE,
   AUDITED_POLICY,
@@ -77,7 +77,7 @@ async function described(name: string) {
 
 /** The server's own clock in UTC, as text at datetime2(7). */
 async function clock(): Promise<string> {
-  const result = await owner.request().query<{ at: string }>('select convert(nvarchar(33), sysutcdatetime(), 126) as at')
+  const result = await owner.request().query<{ at: string }>('select convert(nvarchar(33), sysutcdatetime(), 126) as [at]')
   return (result.recordset[0] as { at: string }).at
 }
 
@@ -107,7 +107,7 @@ async function measured(id: string, before: string, after: string, against: 'cre
     .input('after', mssql.NVarChar(33), after)
     .query<StampedRow>(
       `select created_by, created_in, changed_by, convert(nvarchar(10), changed_on, 23) as changed_on,
-         cast(case when ${instant} >= convert(datetime2(7), @before, 126) and ${instant} <= convert(datetime2(7), @after, 126) then 1 else 0 end as bit) as within,
+         cast(case when ${instant} >= convert(datetime2(7), @before, 126) and ${instant} <= convert(datetime2(7), @after, 126) then 1 else 0 end as bit) as [within],
          case when created_at = noted_at then 'equal' when created_at < noted_at then 'earlier' else 'later' end as toDefault,
          datepart(tzoffset, created_at) as offsetMinutes,
          cast(case when changed_at = ${instant} then 1 else 0 end as bit) as wallInUtc,
@@ -124,10 +124,11 @@ describe('a create of a form that stamps', () => {
   // Who is Alice's id and site, from the context; the instant is the
   // server's, read between its own clock before and after, stored at
   // +00:00 whatever the server's own zone; the wall clock is that instant
-  // in UTC; nothing an update stamps is there yet. To be watched failing in
-  // CI with the clock columns left out of the insert -- 515, created_at may
-  // not be NULL -- and with `sysdatetimeoffset()` stamped as it is, at the
-  // server's own offset, on a server whose zone is not UTC.
+  // in UTC; nothing an update stamps is there yet. Watched failing with
+  // the clock columns left out of the insert: 515, created_at may not be
+  // NULL. With `sysdatetimeoffset()` stamped as it is, at the server's own
+  // offset, it fails only on a server whose zone is not UTC, which the
+  // container's is, so that was not watched.
   test('stores who from the context and the time from the database', covers('sqlserver', stampCase('created'), stampCase('utc')), async () => {
     const { id, before, after } = await created('first')
     const row = await measured(id, before, after, 'created')
@@ -141,9 +142,9 @@ describe('a create of a form that stamps', () => {
   // The batch reads the clock once, before the insert; a
   // `sysdatetimeoffset()` default reads its own as the insert runs, so the
   // stamp is not later than it. datetime keeps 1/300 s, and rounds the
-  // instant to it. To be watched failing in CI with the default's own
-  // function stamped in the insert's VALUES: one reading each, in no order
-  // the engine promises.
+  // instant to it. Not watched failing with the default's own function
+  // stamped in the insert's VALUES: one reading each, in no order the
+  // engine promises, so it fails only when the clock moves between them.
   test("is not later than the clock's default, and rounded to its column", covers('sqlserver', stampCase('clock'), stampCase('rounded')), async () => {
     const { id, before, after } = await created('clocked')
     const row = await measured(id, before, after, 'created')
@@ -155,8 +156,8 @@ describe('a create of a form that stamps', () => {
 describe('an update of a form that stamps', () => {
   // Bob's update of Alice's row: who changed it last is Bob, when is the
   // server's, and the day its UTC day; who created it, where and when are
-  // untouched. To be watched failing in CI with the update's clock left out
-  // of the SET: changed_at keeps the create's instant, outside the update's
+  // untouched. Watched failing with the update's clock left out of the
+  // SET: changed_at kept the create's instant, outside the update's
   // window.
   test('restamps who changed it and when, and keeps who created it', covers('sqlserver', stampCase('updated')), async () => {
     const { id, version } = await created('to change')
@@ -165,7 +166,7 @@ describe('an update of a form that stamps', () => {
         await owner
           .request()
           .input('id', mssql.Int, Number(id))
-          .query<{ at: string }>('select convert(nvarchar(40), created_at, 127) as at from parity.audited where id = @id')
+          .query<{ at: string }>('select convert(nvarchar(40), created_at, 127) as [at] from parity.audited where id = @id')
       ).recordset[0]?.at
     const was = await createdAt()
     const token = recordToken(['id'], { id })
@@ -184,45 +185,99 @@ describe('an update of a form that stamps', () => {
   })
 })
 
+/** Bob's change from a date of a price Alice created, product `productNo`, as the planner sends it. */
+async function changeFromDate(productNo: number): Promise<SupersedeRequest> {
+  await owner
+    .request()
+    .input('product', mssql.Int, productNo)
+    .query(
+      "insert into parity.audited_price (tenant_id, product_no, valid_from, amount, created_by, created_at) values (1, @product, '2026-01-01', 9.5, N'alice', '2026-01-01T00:00:00+00:00')",
+    )
+  const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: '1', product_no: String(productNo), valid_from: '2026-01-01' })
+  if (!token.ok) throw new Error(token.message)
+  const reading = planRead(parity, priced, AUDITED_PRICE_POLICY, BOB, token.token)
+  if (!reading.ok) throw new Error(`expected a read, got ${reading.code}`)
+  const read = await records.read(reading.request)
+  if (!read.ok || read.record === null) throw new Error('expected the open version')
+  const asRead = toFormAnswers(priced, reading.fields, { ok: true, ...read.record })
+  const plan = planSupersede(
+    parity,
+    priced,
+    AUDITED_PRICE_POLICY,
+    BOB,
+    token.token,
+    String(read.record.version),
+    { valid_from: '2026-07-01', amount: '10.0000' },
+    asRead,
+    await described('audited_price'),
+  )
+  if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
+  return plan.request
+}
+
 describe('a change from a date of a form that stamps', () => {
   // The next version is a create, stamped as Bob's; the version ended is
-  // not stamped again, and keeps Alice's and when. To be watched failing in
-  // CI with the clock left out of the next version: 515, created_at may not
-  // be NULL, and the batch rolls back what it ended.
+  // not stamped again, and keeps Alice's and when. Watched failing with the
+  // clock left out of the next version: the change was refused, created_at
+  // being NOT NULL.
   test('stamps the next version as a create', covers('sqlserver', stampCase('superseded')), async () => {
-    await owner
-      .request()
-      .query(
-        "insert into parity.audited_price (tenant_id, product_no, valid_from, amount, created_by, created_at) values (1, 7, '2026-01-01', 9.5, N'alice', '2026-01-01T00:00:00+00:00')",
-      )
-    const token = recordToken(['tenant_id', 'product_no', 'valid_from'], { tenant_id: '1', product_no: '7', valid_from: '2026-01-01' })
-    if (!token.ok) throw new Error(token.message)
-    const reading = planRead(parity, priced, AUDITED_PRICE_POLICY, BOB, token.token)
-    if (!reading.ok) throw new Error(`expected a read, got ${reading.code}`)
-    const read = await records.read(reading.request)
-    if (!read.ok || read.record === null) throw new Error('expected the open version')
-    const asRead = toFormAnswers(priced, reading.fields, { ok: true, ...read.record })
-    const plan = planSupersede(
-      parity,
-      priced,
-      AUDITED_PRICE_POLICY,
-      BOB,
-      token.token,
-      String(read.record.version),
-      { valid_from: '2026-07-01', amount: '10.0000' },
-      asRead,
-      await described('audited_price'),
-    )
-    if (!plan.ok) throw new Error(`expected a change, got ${plan.code}: ${plan.message}`)
-    const outcome = await records.supersede(plan.request)
+    const outcome = await records.supersede(await changeFromDate(7))
     expect(outcome.ok).toBe(true)
+    // BY is a reserved keyword in T-SQL, so the alias is delimited.
     const versions = await owner
       .request()
       .query<{ by: string; at: string }>(
-        "select created_by as by, convert(nvarchar(19), switchoffset(created_at, '+00:00'), 126) + 'Z' as at from parity.audited_price where tenant_id = 1 and product_no = 7 order by valid_from",
+        "select created_by as [by], convert(nvarchar(19), switchoffset(created_at, '+00:00'), 126) + 'Z' as [at] from parity.audited_price where tenant_id = 1 and product_no = 7 order by valid_from",
       )
     expect(versions.recordset.map((entry) => entry.by)).toEqual([STAMP_PARITY.superseded.ended, STAMP_PARITY.superseded.next])
     expect(versions.recordset[0]?.at).toBe(STAMP_PARITY.superseded.endedAt)
     expect(versions.recordset[1]?.at).not.toBe(STAMP_PARITY.superseded.endedAt)
+  })
+})
+
+/** A column a write would stamp with the clock, of a type a stamp takes: what the checks below read is its name. */
+const stamp = (name: string): ClockColumn => ({ name, type: { kind: 'date' } })
+
+describe('a write whose clock names a column it may not write', () => {
+  // A column stamped with the clock is one the write names (0153), so the
+  // adapter's own checks hold it as they hold a value: named once, never
+  // the concurrency column, never the next version's end or a column of
+  // its chain. The planner sends none of these; each is a programming
+  // error, thrown before anything is sent. The PostgreSQL suite throws for
+  // the same requests, and for an update's filter column or end too, which
+  // this adapter's update has never refused among the values either.
+  // Watched failing with the clock left out of the supersede's check: the
+  // change was sent, and came back answered.
+  test('is thrown before anything is sent', async () => {
+    const create = planCreate(parity, audited, AUDITED_POLICY, ALICE, { note: 'refused' }, await described('audited'))
+    if (!create.ok) throw new Error(`expected a create, got ${create.code}: ${create.message}`)
+    const insert = create.request
+    const inserting = insert.clock ?? []
+    await expect(records.insert({ ...insert, clock: [...inserting, stamp('created_at')] })).rejects.toThrow('A write names each column once')
+    await expect(records.insert({ ...insert, clock: [...inserting, stamp('created_by')] })).rejects.toThrow('A write names each column once')
+
+    const { id, version } = await created('to refuse')
+    const token = recordToken(['id'], { id })
+    if (!token.ok) throw new Error(token.message)
+    const planned = planUpdate(parity, audited, AUDITED_POLICY, BOB, token.token, version, { note: 'refused' }, undefined, await described('audited'))
+    if (!planned.ok) throw new Error(`expected an update, got ${planned.code}: ${planned.message}`)
+    const update = planned.request
+    const updating = update.clock ?? []
+    await expect(records.update({ ...update, clock: [...updating, stamp('changed_by')] })).rejects.toThrow('A write names each column once')
+    await expect(records.update({ ...update, clock: [...updating, stamp('version')] })).rejects.toThrow('version is the concurrency column')
+
+    const change = await changeFromDate(8)
+    const superseding = change.clock ?? []
+    await expect(records.supersede({ ...change, clock: [...superseding, stamp('valid_to')] })).rejects.toThrow('and never its end')
+    await expect(records.supersede({ ...change, clock: [...superseding, stamp('product_no')] })).rejects.toThrow('and never its end')
+
+    // Nothing was sent: the row updated is as created, and the price has its one version.
+    const row = await owner
+      .request()
+      .input('id', mssql.Int, Number(id))
+      .query<{ note: string; version: number }>('select note, version from parity.audited where id = @id')
+    expect(row.recordset[0]).toEqual({ note: 'to refuse', version: Number(version) })
+    const prices = await owner.request().query<{ count: number }>('select count(*) as [count] from parity.audited_price where product_no = 8')
+    expect(prices.recordset[0]?.count).toBe(1)
   })
 })
