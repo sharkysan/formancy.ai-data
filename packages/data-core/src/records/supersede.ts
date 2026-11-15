@@ -10,6 +10,7 @@ import { decodeAnswers, inCatalogValues, invalid, membershipChecks, pinnedValues
 import type { FormRecord, PlannedSupersede, PlanRefusal } from './plan-types.js'
 import { columnsOf, prepare, refuse, unaddressable } from './prepare.js'
 import { filtersFor, throughFields, throughFor } from './scope.js'
+import { clockOf, stampedColumns, stampsOf } from './stamps.js'
 import { decodeRecordKey } from './token.js'
 import { planMove } from './transition.js'
 import type { DescribedTable, RecordColumn } from './types.js'
@@ -108,6 +109,9 @@ export function planSupersede(
     const drifted = driftRefusal(snapshot, bindings, policy, described, operation)
     if (drifted !== undefined) return drifted
   }
+  // The next version is a create, and is stamped as one (0153).
+  const stamps = stampsOf(prepared, bindings, context, 'create')
+  if (!stamps.ok) return stamps
   const key = decodeRecordKey(prepared.target.identity, recordToken)
   if (!key.ok) return refuse('invalid-record-token', key.message)
   if (!versionFits(prepared, concurrency.kind, concurrency.column, expectedVersion))
@@ -117,7 +121,8 @@ export function planSupersede(
   const fixed = new Map<string, ApiValue>(pinned.values.filter((entry) => !chain.has(entry.name)).map((entry) => [entry.name, entry.value]))
   const scoping = throughFields(bindings, policy, context, 'create')
   if (!scoping.ok) return scoping
-  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields, chain)
+  const supplied = new Set([...chain, ...stampedColumns(bindings, 'create')])
+  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields, supplied)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   const start = decoded.values.find((value) => value.name === validity.from)
   if (start === undefined || typeof start.value !== 'string') return invalid([{ field: fromField, code: 'required', message: 'A value is required.' }])
@@ -134,7 +139,11 @@ export function planSupersede(
   if (!move.ok) return move
 
   const { fields, returning } = readBack(prepared, bindings, policy, context)
-  const values = [...pinned.values.filter((entry) => !chain.has(entry.name)), ...decoded.values.filter((value) => value.name !== validity.from)]
+  const values = [
+    ...pinned.values.filter((entry) => !chain.has(entry.name)),
+    ...decoded.values.filter((value) => value.name !== validity.from),
+    ...stamps.stamped.values,
+  ]
   return {
     ok: true,
     request: {
@@ -147,6 +156,7 @@ export function planSupersede(
       start,
       chain: validity.key.map((name): RecordColumn => ({ name, type: (prepared.columns.get(name) as ColumnMeta).type })),
       values: inCatalogValues(prepared.root, values),
+      ...clockOf(stamps.stamped),
       returning,
       definition: described.definition,
     },

@@ -61,6 +61,36 @@ export interface GenerationRequest {
    * generator refuses a pair it cannot hold a chain to (`validityFor`).
    */
   validity?: { from: string; to: string }
+  /**
+   * Columns the server fills itself on create, on update or on both (0153):
+   * who wrote a row, or when. Confirmed by an administrator, as a version
+   * column is: a column that merely has an audit column's name is suggested
+   * and never stamped without this. The request never supplies one, so the
+   * generated field for one is shown and never written.
+   */
+  stamps?: StampChoice[]
+}
+
+/**
+ * What the server fills a stamped column with (0153): the signed-in
+ * person's id, one of the verified context's attributes by name, or the
+ * time the write runs, by the database's own clock.
+ */
+export type StampValue = { kind: 'actor' } | { kind: 'attribute'; attribute: string } | { kind: 'time' }
+
+/** When the server stamps a column (0153): on a create, on an update, or on both. */
+export type StampOn = 'create' | 'update' | 'both'
+
+/** A column the server fills, what with and when (0153), as an administrator confirmed it. */
+export interface StampChoice {
+  column: string
+  value: StampValue
+  on: StampOn
+}
+
+/** A stamp as the bindings keep it (0153): the choice, and its column's type as the snapshot says. */
+export interface StampBinding extends StampChoice {
+  type: NormalizedType
 }
 
 /**
@@ -149,6 +179,12 @@ export interface FormBindings {
   fields: FieldBinding[]
   /** The chain the rows are versions of (0113); absent for a form whose rows are records of their own. */
   validity?: ValidityBinding
+  /**
+   * The columns the server stamps (0153), in the root's catalog order;
+   * absent for a form that stamps none, so every form published before
+   * keeps comparing equal to its regeneration.
+   */
+  stamps?: StampBinding[]
   /** The snapshot this was generated from. Drift review compares against it. */
   snapshotFingerprint: string
 }

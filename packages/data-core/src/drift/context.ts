@@ -1,3 +1,4 @@
+import { stampedOn } from '../generate/stamps.js'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import type { ForeignKeyMeta, KeyMeta, MetadataSnapshot, ObjectMeta, ObjectRef } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
@@ -113,6 +114,20 @@ export function fieldsOver(bindings: FormBindings, columns: readonly string[]): 
 /** Whether a field gives `column` its value on `operation` (0027: a field is written per operation). */
 export function writesOn(bindings: FormBindings, column: string, operation: FieldWrite): boolean {
   return bindings.fields.some((binding) => binding.writes[operation] && columnsOf(binding).includes(column))
+}
+
+/**
+ * Whether the server stamps `column` on `operation` (0153): a write of the
+ * column that no field makes, which a change to the column can make unsafe
+ * as it can a field's, and which gives a NOT NULL column its value.
+ */
+export function stampsOn(bindings: FormBindings, column: string, operation: FieldWrite): boolean {
+  return stampedOn(bindings.stamps, operation).some((stamp) => stamp.column === column)
+}
+
+/** The operations on which the server stamps `column` (0153). */
+export function stampedWrites(bindings: FormBindings, column: string): FieldWrite[] {
+  return (['create', 'update'] as const).filter((operation) => stampsOn(bindings, column, operation))
 }
 
 /** The operations on which a field gives `column` its value. */

@@ -31,6 +31,7 @@ export { generateForm } from './generate/generate.js'
 export { deleteUnoffered, offers, versionProvesRecord } from './generate/offers.js'
 export type { OfferedOperation } from './generate/offers.js'
 export { BINDINGS_VERSION, bindingsVersionProblem, GENERATED_SPEC_VERSION, SERVED_SPEC_VERSIONS } from './generate/version.js'
+export { isStampChoice, stampedOn, stampProblem } from './generate/stamps.js'
 export type {
   ConcurrencyBinding,
   FieldBinding,
@@ -42,6 +43,10 @@ export type {
   LookupChoice,
   SectionBinding,
   SectionCondition,
+  StampBinding,
+  StampChoice,
+  StampOn,
+  StampValue,
   ValidityBinding,
 } from './generate/types.js'
 export { describedOf, diffRootDefinition, diffSnapshots, ROOT_DEFINITION } from './drift/diff.js'
@@ -157,6 +162,7 @@ export type {
   TransitionRule,
 } from './policy/types.js'
 export type {
+  ClockColumn,
   DeleteOutcome,
   DeleteReach,
   DeleteRequest,

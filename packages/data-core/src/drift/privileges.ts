@@ -2,7 +2,20 @@ import type { FormBindings } from '../generate/types.js'
 import type { ColumnAccess, ColumnMeta, MetadataSnapshot, ObjectMeta, ObjectRef, RowSecurity } from '../metadata.js'
 import { reachTables } from '../policy/cascades.js'
 import { findObject, recordsDeleteFacts } from '../snapshot.js'
-import { allFields, type Comparison, describe, type Draft, fieldsOver, list, lookups, type Operation, objectIn, sameRef, writesOn } from './context.js'
+import {
+  allFields,
+  type Comparison,
+  describe,
+  type Draft,
+  fieldsOver,
+  list,
+  lookups,
+  type Operation,
+  objectIn,
+  sameRef,
+  stampsOn,
+  writesOn,
+} from './context.js'
 
 /*
  * What a change in what the account may do means for one form (0027).
@@ -63,13 +76,19 @@ function onRoot(bindings: FormBindings, column: ColumnMeta, lost: ReadonlySet<ke
       into.stops.add('update')
       add('Every update writes it as the version column, so update is blocked.', false)
     }
-    if (writesOn(bindings, column.name, 'update')) {
+    if (stampsOn(bindings, column.name, 'update')) {
+      into.stops.add('update')
+      add('The server stamps it on update (0153), so update is blocked.', true)
+    } else if (writesOn(bindings, column.name, 'update')) {
       into.stops.add('update')
       add(`The form writes it on update as ${list(fields)}, so update is blocked.`, true)
     }
   }
   if (lost.has('insert')) {
-    if (writesOn(bindings, column.name, 'create')) {
+    if (stampsOn(bindings, column.name, 'create')) {
+      into.stops.add('create')
+      add('The server stamps it on create (0153), so create is blocked.', true)
+    } else if (writesOn(bindings, column.name, 'create')) {
       into.stops.add('create')
       add(`The form writes it on create as ${list(fields)}, so create is blocked.`, true)
     } else if (fields.length > 0 && column.generated === 'none') {
