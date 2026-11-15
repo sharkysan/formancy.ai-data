@@ -1,4 +1,5 @@
 import type {
+  ClockColumn,
   InsertRequest,
   ObjectRef,
   ReadRequest,
@@ -215,6 +216,34 @@ export function existsStatement(
   )
 }
 
+/**
+ * The variable a write's batch reads the clock into, once (0153): UTC, at
+ * datetime2(7), the finest SQL Server keeps. Every stamp of one write is
+ * that one instant, which no reading per column would promise: each of
+ * `sysutcdatetime()` and `sysdatetimeoffset()` is a reading of its own.
+ */
+export const NOW = '@now'
+
+/**
+ * The batch's one reading of the clock as a stamped column's type holds it
+ * (0153), as fixed SQL: nothing of a request but the column's name, quoted
+ * where it is named. An instant is the reading at +00:00 -- the server's
+ * own offset, which `sysdatetimeoffset()` and a default of it store, is
+ * never written, and the API reads an instant in UTC either way; a wall
+ * clock is the reading, UTC's, as PostgreSQL's is; a day is UTC's day. A
+ * column of less precision -- datetime2(3), datetime, smalldatetime --
+ * rounds it, as SQL Server rounds every datetime2 assigned to one.
+ */
+export function clockSql(type: ClockColumn['type']): string {
+  if (type.kind === 'date') return `convert(date, ${NOW})`
+  return type.withTimeZone ? `todatetimeoffset(${NOW}, 0)` : NOW
+}
+
+/** The columns a write stamps with the clock, as `[name, SQL]`; none for a request that carries none. */
+export function clocked(columns: readonly ClockColumn[] | undefined): Array<[string, string]> {
+  return (columns ?? []).map((entry) => [quoteName(entry.name), clockSql(entry.type)])
+}
+
 /** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
 export interface Assigned {
   value: RecordValue
@@ -322,6 +351,8 @@ export interface Write {
   returned: Selected[]
   /** Checks that may read `@rows`, the rows the statement changed. */
   afterWrite: readonly string[]
+  /** The statement stamps a column with the clock (0153), and the batch reads it into `@now` first. */
+  clock?: boolean
 }
 
 /**
@@ -378,7 +409,7 @@ export interface Write {
  */
 export function writeBatch(
   parameters: Parameters,
-  { target, definition, operation, statement, assigned, returned, afterWrite, counted = false }: Write,
+  { target, definition, operation, statement, assigned, returned, afterWrite, counted = false, clock = false }: Write,
 ): string {
   const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
   const stored = guarded.map(({ value }, position) => ({
@@ -403,6 +434,7 @@ export function writeBatch(
     'set xact_abort on;',
     `declare @written table (${captured.map((column) => `${column.name} ${column.declared}`).join(', ')});`,
     'declare @transaction bigint, @rows int, @ended bit, @d varbinary(32);',
+    ...(clock ? [`declare ${NOW} datetime2(7) = sysutcdatetime();`] : []),
     ...refind.declared,
     'begin try',
     'begin transaction;',
@@ -443,20 +475,22 @@ function freshPredicate(request: InsertRequest, assigned: readonly Assigned[]): 
   return `not exists (select 1 from ${quoteTable(request.target.table)} as [c] with (updlock, holdlock) where ${parts.join(' and ')})`
 }
 
-/** Exactly the given columns, so a column with a default gets it and a generated one is never named. */
+/** Exactly the given columns, so a column with a default gets it and a generated one is never named; then the columns stamped with the clock (0153). */
 export function insertStatement(request: InsertRequest, definition: Buffer): Statement {
   const parameters = new Parameters()
   const assigned = request.values.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))
+  const stamped = clocked(request.clock)
   const table = quoteTable(request.target.table)
-  const columns = assigned.map(({ value }) => quoteName(value.name)).join(', ')
-  const values = assigned.map(({ sql }) => sql).join(', ')
+  const columns = [...assigned.map(({ value }) => quoteName(value.name)), ...stamped.map(([name]) => name)].join(', ')
+  const values = [...assigned.map(({ sql }) => sql), ...stamped.map(([, sql]) => sql)].join(', ')
   const fresh = freshPredicate(request, assigned)
   const sql = writeBatch(parameters, {
     target: request.target,
     definition,
     operation: 'INSERT',
+    clock: stamped.length > 0,
     statement: (output) =>
-      assigned.length === 0
+      columns === ''
         ? `insert into ${table} ${output} default values`
         : fresh === undefined
           ? `insert into ${table} (${columns}) ${output} values (${values})`
@@ -498,6 +532,8 @@ export function updateStatement(
   const assigned = request.set.map((value) => ({ value, sql: bindValue(parameters, value.type, value.value) }))
   // A SET names a column of the table updated, so it is not qualified; what it is set from is.
   const set = assigned.map(({ value, sql }) => `${quoteName(value.name)} = ${sql}`)
+  const stamped = clocked(request.clock)
+  for (const [name, sql] of stamped) set.push(`${name} = ${sql}`)
   const version = column(target.concurrency.column)
   if (target.concurrency.kind === 'version-column') set.push(`${quoteName(target.concurrency.column)} = ${version} + 1`)
   const where = [...located(parameters, request.key, terms, through), versionIs(parameters, target.concurrency, expected)]
@@ -507,6 +543,7 @@ export function updateStatement(
     target,
     definition,
     operation: 'UPDATE',
+    clock: stamped.length > 0,
     statement: (output) => `update ${ROW} set ${set.join(', ')} ${output} from ${quoteTable(target.table)} as ${ROW} where ${where.join(' and ')}`,
     assigned,
     returned: selection(request.returning, target.concurrency, 'inserted.'),

@@ -3,7 +3,7 @@ import { op } from '../sql/catalog.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
 import { Statement } from '../sql/statement.js'
 import type { Definition } from './definition.js'
-import { bound, column, freshSql, guard, located, outputs, ROW, versionIs } from './sql.js'
+import { bound, clocked, column, freshSql, guard, located, outputs, ROW, versionIs } from './sql.js'
 import type { RecordStatement, WritePath } from './sql.js'
 
 /*
@@ -55,11 +55,18 @@ export function supersedeStatement(
     `${column(request.ends)} is null`,
     ...guard(statement, table, definition, path),
   ]
-  const names = [...request.chain.map((entry) => entry.name), request.start.name, ...request.values.map((value) => value.name)]
+  // The next version is stamped as a create is (0153); the version ended is not.
+  const stamped = clocked(request.clock)
+  const names = [
+    ...request.chain.map((entry) => quoteIdentifier(entry.name)),
+    quoteIdentifier(request.start.name),
+    ...request.values.map((value) => quoteIdentifier(value.name)),
+  ]
   const selected = [
     ...request.chain.map((entry) => `${ENDED}.${quoteIdentifier(entry.name)}`),
     bound(statement, request.start),
     ...request.values.map((value) => bound(statement, value)),
+    ...stamped.map(([, sql]) => sql),
   ]
   const text = [
     `with ${ENDED} as (`,
@@ -68,7 +75,7 @@ export function supersedeStatement(
     `where ${where.join(' and ')}`,
     `returning ${request.chain.map((entry) => column(entry.name)).join(', ')}`,
     `), ${NEXT} as (`,
-    `insert into ${quoteTable(table)} as ${ROW} (${names.map(quoteIdentifier).join(', ')})`,
+    `insert into ${quoteTable(table)} as ${ROW} (${[...names, ...stamped.map(([name]) => name)].join(', ')})`,
     `select ${selected.join(', ')} from ${ENDED}`,
     `returning ${outputs(request.target, request.returning).join(', ')}`,
     ')',
