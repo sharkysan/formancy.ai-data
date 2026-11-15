@@ -131,8 +131,15 @@ package or app, and nothing checks what they say a package may import.
 A change is not done until the documents that describe it say so. Update them
 in the same pull request as the code, not in a follow-up:
 
-- **`README.md`** when behaviour, a package or a command changes — including
-  the *Status* paragraph, which describes one point in time and no other.
+- **`README.md` and `docs/guide/`** when behaviour, a package or a command
+  changes. The README speaks to somebody deciding whether to use the module
+  and the guide's pages hold the detail
+  ([0154](docs/decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)):
+  a feature's line goes on the capabilities page, `docs/guide/capabilities.md`,
+  and on the page of the app it changes, and into the README's *What you get*
+  or *What it does not do yet* only where the README's reader would notice.
+  The README's *Status* and `docs/guide/status.md` each describe one point
+  in time and no other.
 - **`CHANGELOG.md`** — a line under *Unreleased* for anything a user or
   integrator would notice, with the reason attached, not only the what. A bump
   of an upstream `@formancy/*` version is always noticed.
@@ -166,10 +173,11 @@ and the document says what. Three shapes, in order of preference:
    file is not what the generator produces; `scripts/check-cla.test.mjs` fails
    when `CLA.md` changes under a signature; `scripts/upstream-deps.test.mjs`
    fails on an inexact upstream version; `scripts/architecture.test.mjs`
-   fails when a relative link in the architecture, or the heading it points
-   at, names nothing, when a path from the repository's root written there
-   in backticks names nothing, when the building blocks leave out a
-   workspace package and when no section links a decision record -- it
+   fails when a relative link in the architecture, the README or the guide's
+   pages, or the heading it points at, names nothing, when a path from the
+   repository's root written in the architecture in backticks names nothing,
+   when the building blocks leave out a workspace package and when no
+   section links a decision record -- it
    never reads whether a sentence is still true; `scripts/lint.test.mjs`
    fails when a TypeScript or JavaScript file git holds is not linted, has
    a rule at warn or a recommended rule off beyond `require-await`, a
@@ -330,7 +338,8 @@ the same promises:
   `room.css` before its own stylesheet, and no stylesheet here declares one
   of its variables again
   ([0096](docs/decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)).
-- **The README's pictures**, `scripts/pictures/readme.test.mjs` in
+- **The README's pictures**, the hero's in `README.md` and each app's on
+  its page of the guide, `scripts/pictures/readme.test.mjs` in
   `pnpm test:repo` and each app's `pictures.mjs --check` in
   `pnpm test:pictures`, in Chromium, in a CI job of its own: every picture is whole elements of a state the page
   reaches, and a caption quotes only text those elements hold
@@ -461,8 +470,9 @@ Docker. `data-core`, `data-identity`, `apps/examples` and `apps/studio` need
 none. `pnpm test:repo` needs `pnpm build` first too: `scripts/mint-token.test.mjs` runs
 the built server's code. `pnpm test:browser` measures in Chromium alone
 unless `FORMANCY_BROWSERS` names more (`firefox`, `chromium,webkit`, `all`);
-CI runs every browser. The dev servers and the snapshot captures are in
-`README.md`.
+CI runs every browser. The dev servers and the snapshot captures are on
+the guide's pages for each app, `docs/guide/studio.md`,
+`docs/guide/host.md` and `docs/guide/examples.md`.
 
 ## Checks before pushing
 
@@ -495,7 +505,8 @@ still runs every package's suite. Run the ones for what you changed.
 
 Two things `pnpm test:repo` fails on until you do them. After a dependency
 or an image changes, `node scripts/release-report/readme.mjs --write`, so the
-README's *What it is tested on* blocks say what is installed. A new decision
+*What it is tested on* blocks -- `docs/guide/tested-on.md`'s table and the
+adapters' lines -- say what is installed. A new decision
 record needs its entry in `docs/release/limitations.json` -- the costs a user,
 integrator or operator meets, or why it has none -- and an edited one, a
 Status line naming a later record included, a re-read and
@@ -524,8 +535,8 @@ SQL Server image, which is about a gigabyte and a half.
 downloads once per machine, with Firefox's and WebKit's system libraries
 through sudo:
 `pnpm --filter @formancy/data-examples exec playwright install --with-deps chromium firefox webkit`.
-WebKit runs on Linux only. `test:pictures` checks the README's pictures in
-Chromium.
+WebKit runs on Linux only. `test:pictures` checks the README's and the
+guide's pictures in Chromium.
 
 `test:e2e:install` is the only gate that looks at the packages from outside. It
 packs them, installs the tarballs into a plain npm project, type-checks it with

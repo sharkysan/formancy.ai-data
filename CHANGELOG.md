@@ -799,6 +799,30 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The README speaks to somebody deciding whether to use the module, and
+  its detail is in `docs/guide/`** (0154). Why: the README had become the
+  whole reference, 1,675 lines on 2026-11-15, so a team lead or a product
+  owner met every behaviour's conditions before what the module is for,
+  how to try it or what it does not do yet, and a developer met the
+  packages to install after the thousandth line. What you notice: the
+  README is now the promise, the two demos, why it might fit, how it works,
+  what you get in a dozen bullets, what it does not do yet, a quick start, a
+  short status and the licence table, each claim still linking its record.
+  The rest moved nearly unchanged to pages of `docs/guide/` under the
+  sections' own headings -- *What it does* (`capabilities.md`), *Status*,
+  *Studio*, *Host example*, *Examples*, *Live demo*, *Packages*,
+  *Deploying* with *When the schema changes*, *What it is tested on* and
+  *Development* -- the studio's, the host page's and the examples page's
+  pictures with them, and `docs/README.md` lists the pages. A link into one
+  of those README anchors now opens the README at its top; a link to a
+  released tag's README still opens that release's. Two moved sentences
+  that were no longer true were corrected: the live demo's Worker was
+  created on 2026-10-19, and `dist/drift-check-cli.mjs` is the command a
+  pipeline checks drift with (0111). The pictures' generator draws each
+  app's region on its page with its links aimed from there, the tested-on
+  table is written on `docs/guide/tested-on.md`, and
+  `scripts/architecture.test.mjs` now holds the README's and the guide's
+  links and headings too.
 - **The dependencies with a security advisory and a fix in reach move to
   the fix, and the workspace needs Node 22.22.3, 24.15 or 26** (0148). Why: GitHub
   listed 24 advisories against the lockfile, 6 of them high. The SQL

@@ -9,7 +9,8 @@ import { dockerfileImages, installed, NESTED, published, testedOn, workspace } f
 
 /**
  * What the checkout says it is tested on (0035), held to the tree: the
- * README's generated blocks to what is installed and built, compose to the
+ * generated blocks -- the tested-on page's table (0154) and the adapters'
+ * lines -- to what is installed and built, compose to the
  * images the suites start, and testedOn() to every dependency a published
  * package declares. Runs in `pnpm test:repo`, after `pnpm build`: the images
  * come from data-fixtures' built output.
@@ -34,7 +35,7 @@ describe('the browsers’ pins', () => {
   // own in Playwright's browsers.json; the `chromium` entry beside it is the
   // full browser, another download, which Playwright 1.63.0 pins at the
   // same version and revision. What this holds is the entry read: from
-  // `chromium`, the README's table and the report would name a build the
+  // `chromium`, the tested-on table and the report would name a build the
   // gates never launch. That a run launched the shell is the report's to
   // hold, from the options it launched with (problems.mjs, launchedBuild).
   test('hold Chromium to the headless shell Playwright pins', () => {
@@ -43,7 +44,7 @@ describe('the browsers’ pins', () => {
 
   // Every browser the gates run in is held to a build Playwright pins: a
   // browser without one would be reported at whatever version a machine
-  // had, and the README's table would leave it out (0058).
+  // had, and the tested-on table would leave it out (0058).
   test('pin a build of Playwright’s for every browser the gates run in, in their order', () => {
     expect(facts.browser.pins.map((pin) => [pin.browser, pin.name])).toEqual([
       ['chromium', 'chromium-headless-shell'],
@@ -53,9 +54,9 @@ describe('the browsers’ pins', () => {
   })
 })
 
-describe('the README blocks', () => {
-  // A dependency or an image bumped without the README following would leave
-  // the README naming a version nobody runs any more, which is the drift a
+describe('the tested-on blocks', () => {
+  // A dependency or an image bumped without the blocks following would leave
+  // the tested-on page naming a version nobody runs any more, which is the drift a
   // generated block exists to stop.
   test('say what testedOn() says', () => {
     expect(
@@ -110,7 +111,7 @@ describe('the README blocks', () => {
     const table = readmeTable(facts).split('\n')
     expect(table[0]).toBe('| | Tested with | Declared as |')
     const row = table.find((line) => line.startsWith('| **Recognised, not tested** |'))
-    expect(row, 'the README table has no "Recognised, not tested" row').toBeDefined()
+    expect(row, 'the tested-on table has no "Recognised, not tested" row').toBeDefined()
     const [, testedWith, declaredAs] = row
       .slice(1, -1)
       .split('|')
@@ -142,7 +143,7 @@ describe('the README blocks', () => {
     const row = readmeTable(facts)
       .split('\n')
       .find((line) => line.startsWith('| **SQL Server logins** |'))
-    expect(row, 'the README table has no "SQL Server logins" row').toBeDefined()
+    expect(row, 'the tested-on table has no "SQL Server logins" row').toBeDefined()
     const [, testedWith, declaredAs] = row
       .slice(1, -1)
       .split('|')
@@ -263,7 +264,7 @@ describe('testedOn()', () => {
   })
 
   // A lookup that found nothing would render an empty row that equals
-  // itself, and the README test above would pass on a table of blanks.
+  // itself, and the blocks test above would pass on a table of blanks.
   test('finds a version for every browser, every tool and every package it names', () => {
     const version = /^\d+\.\d+/
     expect(facts.browser.playwright).toMatch(version)
@@ -276,7 +277,7 @@ describe('testedOn()', () => {
     }
     for (const entry of [...facts.runtime, ...facts.upstream]) expect(entry.version ?? entry.loaded, entry.name).toMatch(version)
     expect(facts.node.ci.length).toBeGreaterThan(0)
-    // The README's Development line sends a reader to the table for pnpm's
+    // The Development page sends a reader to the table for pnpm's
     // version: corepack runs the one the root's packageManager pins.
     expect(facts.packageManager).toEqual({ name: 'pnpm', version: expect.stringMatching(version), declared: expect.stringMatching(/^pnpm@/) })
     expect(facts.engines).toEqual(Object.keys(facts.images))

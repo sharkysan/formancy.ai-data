@@ -4454,6 +4454,10 @@
           "says": "On SQL Server an id that a code-page column's code page cannot hold passes the codec and is refused by the database: 422 out-of-range, with a field error on the stamped field, which the person cannot write, rather than 403 unstampable. Nothing tests it."
         }
       ]
+    },
+    "0154": {
+      "reviewed": "sha256:5415fdb43bc77d7cafb47d2d809983e87304be536a1460e0583c8271365cf08e",
+      "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     }
   }
 }

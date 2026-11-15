@@ -1,6 +1,8 @@
 # How the README's pictures are taken
 
-Every picture in the [README](../../README.md) is taken by `pnpm pictures`, in
+Every picture in the [README](../../README.md) and on the guide's pages --
+[Studio](../guide/studio.md), [Host example](../guide/host.md) and
+[Examples](../guide/examples.md) -- is taken by `pnpm pictures`, in
 Chromium, from a state the product reaches: the built page against the real
 data server, never a mock-up, and never retouched. The pictures job then walks
 the same states, in Chromium, and fails when a picture's elements no longer
@@ -118,12 +120,16 @@ listens on a port.
 
 ## Parts, quotes and holds
 
-`scripts/pictures/scenes.json` holds each scene: its app, where the README
+`scripts/pictures/scenes.json` holds each scene: its app, where its page
 shows it, its title, its studio step, its caption, its alt text, and its
 **quotes**: every “…” in a caption or alt names the parts it must occur in,
 and `pnpm test:repo` fails when the recorded text of a named part does not
-hold it. The README's picture regions are rendered from scenes.json and the
-record, and `pnpm test:repo` fails when they are not what the render gives.
+hold it. The picture regions are rendered from scenes.json and the record:
+the hero's in the README, and each app's on its page of the guide,
+`docs/guide/<app>.md`, a caption's links, which scenes.json writes from the
+repository's root, aimed from the page. `pnpm test:repo` fails when a region
+is not what the render gives, or is on a page it is not drawn on
+([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).
 
 **Holds** are what the act asserts after reaching a state, by role and name or
 against the database: that both panes hold the id digit for digit, that the
@@ -171,10 +177,11 @@ through.
    focused field excepted), that headings are in Archivo, and that no token,
    password or connection string shows. Anything that looks wrong is a product
    defect to fix or file, never cropped out or retouched.
-3. Open README.md on the pull request's branch on github.com, signed in, in a
-   desktop window, in both themes, with every `<details>` open. Write the
-   window width, the column width (the article's content box, in the
-   browser's developer tools) and the date into the pull request and below.
+3. Open README.md, and each page of the guide a changed picture is on, on
+   the pull request's branch on github.com, signed in, in a desktop window,
+   in both themes, with every `<details>` open. Write the window width, the
+   column width (the article's content box, in the browser's developer
+   tools) and the date into the pull request and below.
    There is no retake for width: GitHub scales a wider picture down. If the
    hero's digits cannot be read at that width, the hero's parts change, and
    the pull request says so.
@@ -185,7 +192,7 @@ through.
    settle, and is a question for the camera.
 5. Say in the pull request which pictures changed and why: whether their text
    changed, or which change of look made `--scene` or `--all` necessary.
-   Review the decoded PNGs and the rendered README, not GitHub's diff view,
+   Review the decoded PNGs and the rendered pages, not GitHub's diff view,
    which may not show a WebP at all.
 
 **GitHub's column width has not been measured.** The machine the pictures

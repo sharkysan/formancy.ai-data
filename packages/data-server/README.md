@@ -603,7 +603,8 @@ Server 2025 container started with a certificate refuses one over TDS 8.0,
 that nothing is tried again as a SQL login, and that no secret, tenant or
 client reaches the log, an answer or an audit event. The server logs at start, once for each such connection,
 "No test of this release logs in as an Entra principal; connection erp
-logs in as one.", and the README's *What it is tested on* says so too
+logs in as one.", and the repository's
+[*What it is tested on*](../../docs/guide/tested-on.md) says so too
 ([0074](../../docs/decisions/0074-a-sql-server-connection-may-log-in-as-an-entra-principal-and-no-test-logs-in-as-one.md)).
 
 - **One way in.** `user` and `password`, or `login`, never both;

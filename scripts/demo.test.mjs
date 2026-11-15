@@ -34,6 +34,8 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..')
 const app = join(repo, 'apps', 'examples')
 const read = (...path) => readFileSync(join(repo, ...path), 'utf8').replaceAll('\r\n', '\n')
 const readme = read('README.md')
+/** The guide's page for the examples page, which README.md's *Examples* section became (0154). */
+const examplesPage = read('docs', 'guide', 'examples.md')
 const root = JSON.parse(read('package.json'))
 const examples = JSON.parse(read('apps', 'examples', 'package.json'))
 const vite = read('apps', 'examples', 'vite.config.ts')
@@ -523,8 +525,8 @@ describe("the demo's headers (0069)", () => {
   })
 })
 
-describe("README.md's demo", () => {
-  const examplesSection = section('Examples')
+describe('the demo, as README.md and the guide’s Examples page tell it', () => {
+  const examplesSection = examplesPage
 
   // The demo is the examples page as the browser gate measures it: built,
   // then served. `pnpm demo` serves the build with Vite's preview and the
@@ -536,10 +538,10 @@ describe("README.md's demo", () => {
     expect(examples.scripts.preview).toBe('vite preview')
   })
 
-  // A port changed in the config would leave the README sending a reader to
-  // an address nothing answers; every port the Examples section names is
-  // the page's.
-  test("the Examples section names only the page's port, for both the demo and the dev server", () => {
+  // A port changed in the config would leave the guide sending a reader to
+  // an address nothing answers; every port the Examples page names is the
+  // examples page's.
+  test("the guide's Examples page names only the page's port, for both the demo and the dev server", () => {
     const preview = port('preview')
     expect(preview).toBeDefined()
     expect(port('server')).toBe(preview)
@@ -549,9 +551,10 @@ describe("README.md's demo", () => {
     for (const each of named) expect(each).toBe(preview)
   })
 
-  // A route moved in the Worker's config would leave the README sending a
-  // reader to formancy.ai's 404 while the demo answered somewhere else.
-  test("Try it and Examples send a reader to the address the demo's Worker is routed at", () => {
+  // A route moved in the Worker's config would leave the README or the
+  // guide sending a reader to formancy.ai's 404 while the demo answered
+  // somewhere else.
+  test("README.md's Try it and the guide's Examples send a reader to the address the demo's Worker is routed at", () => {
     expect(section('Try it')).toContain(demoUrl(wrangler))
     expect(examplesSection).toContain(demoUrl(wrangler))
   })

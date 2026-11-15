@@ -22,9 +22,10 @@ runs data-fixtures and each engine's adapter suite on every other image of
 it, `FORMANCY_IMAGES` choosing the image for the leg
 ([0067](../decisions/0067-the-adapter-suites-run-on-every-image-of-a-per-engine-matrix.md)). What the versions of one engine disagree on is a row of
 `VERSION_FACTS` (`packages/data-fixtures/src/versions.ts`), asserted on
-every leg by the major its server answered and never skipped. The README's
-*What it is tested on* block is generated from what is installed and names
-the matrix. A file that needs an image of its own names it:
+every leg by the major its server answered and never skipped. The table on
+the guide's *What it is tested on*, `docs/guide/tested-on.md`, is generated
+from what is installed and names the matrix. A file that needs an image of
+its own names it:
 `packages/data-postgres/src/discovery-pg18.integration.test.ts` names
 PostgreSQL 18 for one catalog fact, a NOT NULL added NOT VALID, which it
 holds to read as the nullable column and unvalidated check that the same
@@ -199,9 +200,11 @@ and each of these fails on the change that breaks what it holds:
 - **This documentation.** `scripts/architecture.test.mjs`: `docs/README.md`
   and these twelve sections exist; the building blocks name every workspace
   package and app; every decision record is linked from a section; every
-  relative link reaches a file and every fragment a heading; and every
-  repository path written in backticks names something git would commit
-  ([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md)).
+  relative link reaches a file and every fragment a heading, here, in the
+  README and on the guide's pages; and every repository path written in
+  backticks here names something git would commit
+  ([0076](../decisions/0076-the-architecture-is-documented-as-arc42-and-every-change-updates-the-section-it-touches.md),
+  [0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)).
   A path given from inside a package, or whose first directory is
   misspelled, is not read as one, a package named that the workspace does
   not have passes, and whether a sentence is still true is review's.
@@ -255,8 +258,9 @@ and each of these fails on the change that breaks what it holds:
   headers
   ([0069](../decisions/0069-the-examples-page-is-served-at-formancy-ai-data-examples.md));
   `scripts/live-demo.test.mjs` for the live demo's Worker config, deploy
-  and headers, `scripts/live-demo-docs.test.mjs` for what the README says
-  of it, and `scripts/live-demo-gate/*.test.mjs` for its gate's pure parts
+  and headers, `scripts/live-demo-docs.test.mjs` for what the README and
+  the guide's pages say of it, and `scripts/live-demo-gate/*.test.mjs` for
+  its gate's pure parts
   ([0070](../decisions/0070-the-live-demo-runs-the-real-server-and-postgresql-in-a-cloudflare-container-of-each-visitors-own.md));
   `scripts/server-start.test.mjs` for what the built server says and
   refuses at start about the Entra connections in its allowlist
@@ -407,11 +411,14 @@ not Safari; and no scrollbar took width in any of them.
 
 ## 10.6 The README's pictures
 
-Every picture in `README.md` is taken by `pnpm pictures` from a state the
-product reaches, the built page against the real server, and never
-retouched
+Every picture in `README.md` and on the guide's pages is taken by
+`pnpm pictures` from a state the product reaches, the built page against
+the real server, and never retouched
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
-`scripts/pictures/readme.test.mjs` holds the README's picture regions to
+`scripts/pictures/readme.test.mjs` holds the picture regions -- the hero's
+in the README, each app's on its page of the guide, each on its own page
+and on no other, its links aimed from there
+([0154](../decisions/0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md)) -- to
 `scripts/pictures/scenes.json` and what was captured; each app's
 `pictures.mjs --check`, run by `pnpm test:pictures` in Chromium in the
 `pictures` job, walks the same states and fails when a pictured element no

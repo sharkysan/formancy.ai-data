@@ -7,7 +7,7 @@
 // `generator` is the repository-relative script that writes the body, so a
 // reader who wants it changed knows what to run; `from`, when the body is a
 // rendering of a data file, names that file; `name` tells two blocks of one
-// generator in one document apart. The README's tested-on table, the
+// generator in one document apart. The tested-on page's table, the
 // adapters' tested-on lines and the getting-started guide's tables (0032) are
 // all in it, and scripts/generated-block.test.mjs fails on a block anywhere
 // in tracked Markdown that does not parse, is not closed, or names a

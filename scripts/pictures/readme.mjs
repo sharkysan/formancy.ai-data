@@ -1,31 +1,38 @@
-// README.md's pictures, written where they are generated, and the repository
-// guard's checks of them (0038).
+// The README's pictures and its guide pages', written where they are
+// generated, and the repository guard's checks of them (0038, 0154).
 //
 // Two jobs, both pure over what `repository()` reads, so readme.test.mjs runs
 // them in `pnpm test:repo` without a browser:
 //
-// - **Render.** README.md carries one generated region per placement: `hero`
-//   for the hero scene, and one per app for the rest, in scenes.json's
-//   order. An `inline` or `hero` scene is its picture at its recorded CSS
-//   width and its italic caption, a studio scene's led by its step; each run
-//   of consecutive `more` scenes is one <details> whose summary is derived
-//   from their titles. `node scripts/pictures/readme.mjs --write` writes the
-//   regions; nothing else does.
+// - **Render.** One generated region per placement: `hero` for the hero
+//   scene, in README.md, and one per app for the rest, in scenes.json's
+//   order, each on that app's page of the guide, docs/guide/<app>.md
+//   (`pageOf`). An `inline` or `hero` scene is its picture at its recorded
+//   CSS width and its italic caption, a studio scene's led by its step; each
+//   run of consecutive `more` scenes is one <details> whose summary is
+//   derived from their titles. A caption's links are written from the
+//   repository's root, as scenes.json holds them, and the render re-aims
+//   them, and every picture, from the page the region is on.
+//   `node scripts/pictures/readme.mjs --write` writes the regions; nothing
+//   else does.
 // - **Check.** Each function below returns the sentences that are wrong with
-//   the repository, empty when nothing is: the regions are the render, every
-//   scene has its picture and the bytes match, nothing else is in the
-//   pictures' directory, every caption quotes only what its parts say, one
-//   look, every link and picture the regions show resolves, the scenes'
-//   shape, and a guard on the guard.
+//   the repository, empty when nothing is: the regions are the render, each
+//   on its own page and on no other, every scene has its picture and the
+//   bytes match, nothing else is in the pictures' directory, every caption
+//   quotes only what its parts say, one look, every link and picture the
+//   regions show resolves from the page it is on, the scenes' shape, and a
+//   guard on the guard.
 
+import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { join, resolve } from 'node:path'
+import { join, posix, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { marker } from '../generated-block.mjs'
 import { describeLook, IMAGES, misquotes, pictureOf, readRecord, readScenes, REPO, serialize, undecodable } from './record.mjs'
 
-export const README = join(REPO, 'README.md')
+/** The page a region is drawn on, from the repository's root: the hero's README.md, an app's its page of the guide. */
+export const pageOf = (name) => (name === 'hero' ? 'README.md' : `docs/guide/${name}.md`)
 
 const PLACEMENTS = ['hero', 'inline', 'more']
 // The one grammar 0035 gives every generated region, which names a single
@@ -43,7 +50,7 @@ export const HERO_LINE =
 /** The region a scene is drawn in: the hero's own, or its app's. */
 const regionOf = (scene) => (scene.placement === 'hero' ? 'hero' : scene.app)
 
-/** The regions README.md must carry, in scenes.json's order: derived, so an app given scenes is given a region. */
+/** The regions the pages must carry, in scenes.json's order: derived, so an app given scenes is given a region. */
 export const regionNames = (scenes) => [...new Set(scenes.map(regionOf))]
 
 /** `"8. Drift"` as the caption's lead, `**Step 8, Drift.**`. */
@@ -55,7 +62,7 @@ function lead(step) {
 
 const attribute = (text) => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
 
-/** One scene as README.md shows it: the picture at its recorded CSS width, then its caption. */
+/** One scene as its page shows it: the picture at its recorded CSS width, then its caption. */
 function picture(scene, record) {
   const entry = record[scene.id]
   if (entry === undefined) throw new Error(`${scene.id} has no record in docs/images/readme/captured.json: \`pnpm pictures --scene ${scene.id}\` takes it`)
@@ -66,7 +73,28 @@ function picture(scene, record) {
   ].join('\n')
 }
 
-/** Every generated region's text, by name, from scenes.json and the record. */
+/** A relative link or picture source: no scheme, and not a fragment of the page itself. */
+const isRelative = (target) => !/^[a-z]+:/i.test(target) && !target.startsWith('#')
+
+/**
+ * `text`, written from the repository's root, with every relative link and
+ * picture source re-aimed from `page`: `./docs/decisions/x.md` is itself in
+ * README.md and `../decisions/x.md` in docs/guide/studio.md.
+ */
+export function relink(text, page) {
+  const from = posix.dirname(page)
+  const aimed = (target) => {
+    const at = target.indexOf('#')
+    const path = at === -1 ? target : target.slice(0, at)
+    const relative = posix.relative(from, posix.normalize(path))
+    return `${relative.startsWith('../') ? relative : `./${relative}`}${at === -1 ? '' : target.slice(at)}`
+  }
+  return text
+    .replace(/\]\(([^)\s]+)\)/g, (whole, target) => (isRelative(target) ? `](${aimed(target)})` : whole))
+    .replace(/\bsrc="([^"]+)"/g, (whole, target) => (isRelative(target) ? `src="${aimed(target)}"` : whole))
+}
+
+/** Every generated region's text, by name, from scenes.json and the record, its links aimed from the page it is drawn on. */
 export function render(scenes, record) {
   const rendered = {}
   for (const name of regionNames(scenes)) {
@@ -99,37 +127,44 @@ export function render(scenes, record) {
     }
     close()
     if (name === 'hero') blocks.push(HERO_LINE)
-    rendered[name] = blocks.join('\n\n')
+    rendered[name] = relink(blocks.join('\n\n'), pageOf(name))
   }
   return rendered
 }
 
-/** The generated regions of `markdown`, by name; throws when one is repeated or unclosed. */
-export function generatedRegions(markdown) {
+/** The pages the regions are drawn on, in scenes.json's order, each once. */
+export const regionPages = (scenes) => [...new Set(regionNames(scenes).map(pageOf))]
+
+/** The generated regions of `markdown`, the text of `file`, by name; throws when one is repeated or unclosed. */
+export function generatedRegions(markdown, file = 'README.md') {
   const text = markdown.replaceAll('\r\n', '\n')
   const found = {}
   for (const match of text.matchAll(ANY_START)) {
     const [marker, name] = match
-    if (Object.hasOwn(found, name)) throw new Error(`README.md holds the pictures region "${name}" twice`)
+    if (Object.hasOwn(found, name)) throw new Error(`${file} holds the pictures region "${name}" twice`)
     const from = match.index + marker.length
     const end = text.indexOf(END, from)
     const next = text.slice(from).search(ANY_START)
-    if (end === -1 || (next !== -1 && from + next < end)) throw new Error(`README.md: the pictures region "${name}" is never closed by ${END}`)
+    if (end === -1 || (next !== -1 && from + next < end)) throw new Error(`${file}: the pictures region "${name}" is never closed by ${END}`)
     found[name] = text.slice(from, end).trim()
   }
   return found
 }
 
-/** `markdown` with every generated region replaced by what `render` gives; throws when a region is missing or one is not this render's. */
-export function rewrite(markdown, scenes, record) {
+/**
+ * `markdown`, the text of `page`, with each region drawn on that page
+ * replaced by what `render` gives; throws when one is missing or the page
+ * holds a region that is not drawn there.
+ */
+export function rewrite(markdown, scenes, record, page = 'README.md') {
   let text = markdown.replaceAll('\r\n', '\n')
-  const present = Object.keys(generatedRegions(text))
-  const names = regionNames(scenes)
+  const present = Object.keys(generatedRegions(text, page))
+  const names = regionNames(scenes).filter((name) => pageOf(name) === page)
   const missing = names.filter((name) => !present.includes(name))
   const stray = present.filter((name) => !names.includes(name))
   if (missing.length > 0 || stray.length > 0) {
     throw new Error(
-      `README.md must hold the pictures regions ${names.join(', ')}, each opened by ${START('<name>')}${missing.length > 0 ? `; ${missing.join(', ')} missing` : ''}${stray.length > 0 ? `; ${stray.join(', ')} no scene's` : ''}`,
+      `${page} must hold the pictures regions ${names.join(', ') || '(none)'}, each opened by ${START('<name>')}${missing.length > 0 ? `; ${missing.join(', ')} missing` : ''}${stray.length > 0 ? `; ${stray.join(', ')} not drawn on this page` : ''}`,
     )
   }
   const rendered = render(scenes, record)
@@ -142,15 +177,35 @@ export function rewrite(markdown, scenes, record) {
   return text
 }
 
-/** What the checks read, from the working tree. */
+/** This generator's marker, whatever region it opens: what a page holding one has in it. */
+const MARKED = '<!-- generated by scripts/pictures/readme.mjs '
+
+/**
+ * Every Markdown file git would commit that holds this generator's marker,
+ * `/`-separated from the repository's root: tracked, and new but not
+ * ignored, less a tracked file deleted from the checkout.
+ */
+function markedPages() {
+  const listed = (...options) =>
+    execFileSync('git', ['ls-files', '-z', ...options, '--', '*.md'], { cwd: REPO, encoding: 'utf8' })
+      .split('\0')
+      .filter((file) => file !== '')
+  const deleted = new Set(listed('--deleted'))
+  return [...new Set(listed('--cached', '--others', '--exclude-standard'))]
+    .filter((file) => !deleted.has(file))
+    .filter((file) => readFileSync(join(REPO, file), 'utf8').includes(MARKED))
+}
+
+/** What the checks read, from the working tree. `documents` is every page a region is drawn on and every page holding a region, by path; a page that is not there is `undefined`. */
 export function repository() {
   const scenes = readScenes()
   const recordText = existsSync(join(IMAGES, 'captured.json')) ? readFileSync(join(IMAGES, 'captured.json'), 'utf8') : undefined
+  const pages = [...new Set([...regionPages(scenes), ...markedPages()])]
   return {
     scenes,
     record: recordText === undefined ? {} : JSON.parse(recordText),
     recordText,
-    readme: readFileSync(README, 'utf8'),
+    documents: Object.fromEntries(pages.map((page) => [page, existsSync(join(REPO, page)) ? readFileSync(join(REPO, page), 'utf8') : undefined])),
     listing: existsSync(IMAGES) ? readdirSync(IMAGES) : [],
     file: (path) => (existsSync(join(REPO, path)) ? readFileSync(join(REPO, path)) : undefined),
     exists: (path) => existsSync(join(REPO, path)),
@@ -158,18 +213,38 @@ export function repository() {
   }
 }
 
-/** The regions equal the render; each region appears once and no other pictures region exists. */
-export function regionProblems({ scenes, record, readme }) {
-  let present
-  try {
-    present = generatedRegions(readme)
-  } catch (error) {
-    return [error.message]
-  }
+/**
+ * The regions equal the render, each once and on the page it is drawn on:
+ * none missing from its page, none on another page or on two, and none that
+ * no scene is drawn in.
+ */
+export function regionProblems({ scenes, record, documents }) {
   const names = regionNames(scenes)
   const problems = []
-  for (const name of Object.keys(present)) if (!names.includes(name)) problems.push(`README.md holds a pictures region "${name}" no scene is drawn in`)
-  for (const name of names) if (!Object.hasOwn(present, name)) problems.push(`README.md does not hold the pictures region "${name}", opened by ${START(name)}`)
+  const present = {}
+  /** Pages whose regions could not be read, which say so once rather than as each region missing. */
+  const unread = new Set()
+  for (const [file, text] of Object.entries(documents)) {
+    if (text === undefined) continue
+    let regions
+    try {
+      regions = generatedRegions(text, file)
+    } catch (error) {
+      problems.push(error.message)
+      unread.add(file)
+      continue
+    }
+    for (const [name, body] of Object.entries(regions)) {
+      if (!names.includes(name)) problems.push(`${file} holds a pictures region "${name}" no scene is drawn in`)
+      else if (file !== pageOf(name)) problems.push(`${file} holds the pictures region "${name}", which is drawn on ${pageOf(name)}`)
+      else present[name] = body
+    }
+  }
+  for (const name of names) {
+    const page = pageOf(name)
+    if (documents[page] === undefined) problems.push(`${page} does not exist, and the pictures region "${name}" is drawn on it`)
+    else if (!Object.hasOwn(present, name) && !unread.has(page)) problems.push(`${page} does not hold the pictures region "${name}", opened by ${START(name)}`)
+  }
   let rendered
   try {
     rendered = render(scenes, record)
@@ -178,7 +253,9 @@ export function regionProblems({ scenes, record, readme }) {
   }
   for (const name of names) {
     if (Object.hasOwn(present, name) && present[name] !== rendered[name])
-      problems.push(`README.md's pictures region "${name}" is not what scenes.json and captured.json render: run \`node scripts/pictures/readme.mjs --write\``)
+      problems.push(
+        `${pageOf(name)}'s pictures region "${name}" is not what scenes.json and captured.json render: run \`node scripts/pictures/readme.mjs --write\``,
+      )
   }
   return problems
 }
@@ -250,20 +327,24 @@ function relativeTargets(markdown) {
     .filter((target) => !/^[a-z]+:/i.test(target) && !target.startsWith('#'))
 }
 
+/** The file a relative `target` on `page` names, from the repository's root, without its fragment. */
+const fileFrom = (page, target) => posix.normalize(posix.join(posix.dirname(page), target.split('#')[0]))
+
 /**
- * Every relative link and picture in README.md's generated regions names a
- * file that exists: a caption's, said by its scene, and what the render
- * writes itself -- the hero line's link to the recipe, and every <img> --
- * said by its region. A render that cannot be drawn is guardProblems' to say.
+ * Every relative link and picture in the generated regions names a file
+ * that exists, read from the page the region is drawn on: a caption's,
+ * written from the repository's root and said by its scene, and what the
+ * render writes itself -- the hero line's link to the recipe, every <img>,
+ * and every link as the render re-aimed it -- said by its region. A render
+ * that cannot be drawn is guardProblems' to say.
  */
 export function linkProblems({ scenes, record, exists }) {
-  const missing = (target) => !exists(target.split('#')[0].replace(/^\.\//, ''))
   const problems = []
   const inCaptions = new Set()
   for (const scene of scenes) {
     for (const target of relativeTargets(scene.caption ?? '')) {
-      inCaptions.add(target)
-      if (missing(target)) problems.push(`${scene.id}'s caption links ${target}, which is no file of the repository`)
+      inCaptions.add(fileFrom('README.md', target))
+      if (!exists(fileFrom('README.md', target))) problems.push(`${scene.id}'s caption links ${target}, which is no file of the repository`)
     }
   }
   let rendered = {}
@@ -273,8 +354,10 @@ export function linkProblems({ scenes, record, exists }) {
     // guardProblems says the regions could not be rendered.
   }
   for (const [name, text] of Object.entries(rendered)) {
+    const page = pageOf(name)
     for (const target of new Set(relativeTargets(text))) {
-      if (!inCaptions.has(target) && missing(target)) problems.push(`README.md's pictures region "${name}" links ${target}, which is no file of the repository`)
+      const file = fileFrom(page, target)
+      if (!inCaptions.has(file) && !exists(file)) problems.push(`${page}'s pictures region "${name}" links ${target}, which is no file of the repository`)
     }
   }
   return problems
@@ -322,13 +405,26 @@ export function guardProblems({ scenes, record, appScripts }, drawn) {
   return problems
 }
 
-// `node scripts/pictures/readme.mjs --write` rewrites README.md's pictures regions.
+// `node scripts/pictures/readme.mjs --write` rewrites the pictures regions of
+// every page they are drawn on; without it, prints each page as it would be.
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const next = rewrite(readFileSync(README, 'utf8'), readScenes(), readRecord())
-  if (process.argv.includes('--write')) {
-    writeFileSync(README, next, 'utf8')
-    console.log(`README.md: ${String(regionNames(readScenes()).length)} pictures regions written from scenes.json and captured.json`)
-  } else {
-    process.stdout.write(next)
+  const scenes = readScenes()
+  const record = readRecord()
+  const pages = regionPages(scenes)
+  // Every page is rendered before any is written, so a page that cannot be leaves all of them as they were.
+  const next = pages.map((page) => {
+    if (!existsSync(join(REPO, page)))
+      throw new Error(
+        `${page} does not exist, and the pictures regions ${regionNames(scenes)
+          .filter((name) => pageOf(name) === page)
+          .join(', ')} are drawn on it`,
+      )
+    return [page, rewrite(readFileSync(join(REPO, page), 'utf8'), scenes, record, page)]
+  })
+  for (const [page, text] of next) {
+    if (process.argv.includes('--write')) writeFileSync(join(REPO, page), text, 'utf8')
+    else process.stdout.write(`--- ${page}\n${text}`)
   }
+  if (process.argv.includes('--write'))
+    console.log(`${pages.join(', ')}: ${String(regionNames(scenes).length)} pictures regions written from scenes.json and captured.json`)
 }

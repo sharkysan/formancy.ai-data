@@ -80,7 +80,7 @@ describe('the plan', () => {
   })
 
   // 0038's one look: only --all without --app may start a new look, so only
-  // it starts from an empty record; --check writes neither pictures nor README.
+  // it starts from an empty record; --check writes neither pictures nor pages.
   test('starts from an empty record only for --all without --app, and writes nothing for --check', () => {
     expect(plan(parse(['--all'], SCENES), SCENES)).toMatchObject({ fresh: true, write: true })
     expect(plan(parse(['--all', '--app', 'studio'], SCENES), SCENES)).toEqual({ runs: [{ app: 'studio', args: ['--all'] }], fresh: false, write: true })

@@ -54,7 +54,7 @@ describe('every generated block in tracked Markdown', () => {
   // a rendering of nothing.
   test('parses, is closed, and names a generator and a source that exist', () => {
     const found = trackedMarkdown().flatMap((file) => blocks(readFileSync(join(repo, file), 'utf8')).map((entry) => ({ file, ...entry })))
-    // The guide's two tables (0032), the README's table and the two adapter lines (0035).
+    // The getting-started guide's two tables (0032), the tested-on page's table and the two adapter lines (0035).
     expect(found.length).toBeGreaterThanOrEqual(5)
     const missing = found.flatMap(({ file, line, generator, from }) => [
       ...(existsSync(join(repo, generator)) ? [] : [`${file}:${String(line)} names the generator ${generator}, which does not exist`]),

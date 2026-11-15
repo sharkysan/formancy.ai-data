@@ -23,9 +23,10 @@ import YAML from 'yaml'
  *   package is placed in section 5 by the pull request that adds it;
  * - a decision record that no section links to, so that a new record is
  *   placed in the architecture by the pull request that writes it;
- * - a relative link in the entry, a section or docs/setup.md that names no
- *   file git would commit, or a fragment that names no heading of the
- *   Markdown file it points into, as GitHub anchors headings;
+ * - a relative link in the entry, a section, docs/setup.md, README.md or a
+ *   page of docs/guide/ that names no file git would commit, or a fragment
+ *   that names no heading of the Markdown file it points into, as GitHub
+ *   anchors headings;
  * - a repository path written in backticks that names nothing git would
  *   commit. What counts as a path is `isRepositoryPath`, tested below: a
  *   code span with no space in it, holding a slash, whose first segment is a
@@ -355,6 +356,22 @@ const documents = () => [
  */
 const ALSO_HELD = ['docs/setup.md']
 
+/** The guide's pages, from the directory listing. */
+const GUIDE = 'docs/guide'
+const guidePages = () =>
+  listing(GUIDE)
+    .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+    .map((entry) => `${GUIDE}/${entry.name}`)
+
+/**
+ * Pages whose links alone these rules hold: the README, which since 0154 is
+ * mostly links into the guide and the records, and the guide's pages, which
+ * took the README's reference sections with their links and anchors. Their
+ * code spans name built files that git never holds, `apps/host/dist-demo`
+ * among them, so the path rule is not theirs.
+ */
+const linksHeld = () => ['README.md', ...guidePages()]
+
 describe('the architecture', () => {
   // A reader told the architecture is arc42 looks for a section by its
   // number. One missing, renamed, or never linked from the entry is a
@@ -410,10 +427,11 @@ describe('the architecture', () => {
 
   // A link to a file that moved, to one git ignores -- the plan, a build --
   // or to a heading since reworded opens on nothing, or on GitHub's 404,
-  // and reads as true in the source.
+  // and reads as true in the source. The README and the guide's pages are
+  // held too: a section moved between them leaves a link to its old anchor.
   test('links only to files git would commit, and to headings they have', () => {
     const files = committable()
-    expect([...documents(), ...ALSO_HELD].flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf))).toEqual([])
+    expect([...documents(), ...ALSO_HELD, ...linksHeld()].flatMap((file) => linkProblems(file, textOf(file) ?? '', files, textOf))).toEqual([])
   })
 
   // The sections name the module a step happens in, by its path, far more
@@ -453,6 +471,16 @@ describe('the architecture', () => {
       'no anchor into Markdown was checked',
     ).not.toEqual([])
     expect(links.map((link) => link.target).filter((target) => target.startsWith(`${DECISIONS}/`))).not.toEqual([])
+    // The README and the guide's pages are read: the README's links into the
+    // guide, and a guide page's into a heading of another file, are found.
+    expect(guidePages()).toEqual(expect.arrayContaining([`${GUIDE}/capabilities.md`, `${GUIDE}/deploying.md`]))
+    const held = linksHeld().flatMap((file) =>
+      linksIn(textOf(file) ?? '')
+        .filter(isRelative)
+        .map((href) => ({ file, ...resolveLink(file, href) })),
+    )
+    expect(held.filter((link) => link.file === 'README.md' && (link.target ?? '').startsWith(`${GUIDE}/`))).not.toEqual([])
+    expect(held.filter((link) => link.file.startsWith(`${GUIDE}/`) && (link.fragment ?? '') !== '')).not.toEqual([])
     const files = committable()
     const tops = topLevelDirectories(files)
     expect([...tops]).toEqual(expect.arrayContaining(['.github', 'apps', 'deploy', 'docs', 'packages', 'scripts']))

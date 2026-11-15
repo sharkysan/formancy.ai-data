@@ -9,8 +9,10 @@ import {
   linkProblems,
   lookProblems,
   orphanProblems,
+  pageOf,
   quoteProblems,
   regionProblems,
+  relink,
   render,
   repository,
   rewrite,
@@ -19,7 +21,8 @@ import {
 } from './readme.mjs'
 
 /**
- * The README's pictures, held in `pnpm test:repo` without a browser (0038).
+ * The README's pictures and the guide pages', held in `pnpm test:repo`
+ * without a browser (0038, 0154).
  *
  * The first block is the gate: the repository as it is. Every check returns
  * the sentences that are wrong with it, and passes only when there are none.
@@ -32,9 +35,10 @@ describe("the repository's README pictures", () => {
   const here = repository()
 
   // A caption or a recorded size edited without `readme.mjs --write`, or a
-  // region's markers lost in an edit of README.md, would leave the README
-  // showing what no capture made, or nothing at all, and saying it is held.
-  test('are the regions README.md shows, as scenes.json and captured.json render them', () => {
+  // region's markers lost in an edit of README.md or a guide page, would
+  // leave the page showing what no capture made, or nothing at all, and
+  // saying it is held.
+  test('are the regions README.md and the guide pages show, each on its own page, as scenes.json and captured.json render them', () => {
     expect(regionProblems(here)).toEqual([])
   })
 
@@ -173,7 +177,7 @@ const TEXT = {
   'host-other-tenant': { Record: '- region "Record":\n  - alert: No such record.' },
 }
 
-/** The small repository, every check passing: what the README regions, the record and the files are after a capture. */
+/** The small repository, every check passing: what the pages' regions, the record and the files are after a capture. */
 function fixture() {
   const list = scenes()
   const files = new Map()
@@ -192,35 +196,13 @@ function fixture() {
       text: TEXT[scene.id],
     })
   }
-  const skeleton = [
-    '# Formancy Data',
-    '',
-    'Intro.',
-    '',
-    START('hero'),
-    END,
-    '',
-    '## Examples',
-    '',
-    START('examples'),
-    END,
-    '',
-    '## Studio',
-    '',
-    START('studio'),
-    END,
-    '',
-    '## Host',
-    '',
-    START('host'),
-    END,
-    '',
-  ].join('\n')
+  const skeleton = (title, name) => [`# ${title}`, '', 'Intro.', '', START(name), END, ''].join('\n')
+  const titles = { hero: 'Formancy Data', examples: 'Examples', studio: 'Studio', host: 'Host' }
   return {
     scenes: list,
     record,
     recordText: serialize(record, list),
-    readme: rewrite(skeleton, list, record),
+    documents: Object.fromEntries(Object.entries(titles).map(([name, title]) => [pageOf(name), rewrite(skeleton(title, name), list, record, pageOf(name))])),
     listing: ['captured.json', ...list.map((scene) => `${scene.id}.webp`)],
     file: (path) => files.get(path),
     exists: (path) => [LINK.slice(2), RECIPE].includes(path) || files.has(path),
@@ -239,25 +221,27 @@ describe('each check, on a small repository', () => {
     for (const [name, check] of Object.entries(ALL)) expect(check(state), name).toEqual([])
   })
 
-  // The format README.md shows, pinned: the picture at its recorded CSS width
+  // The format the pages show, pinned: the picture at its recorded CSS width
   // with its alt, the italic caption led by the step, and a run of `more`
-  // scenes folded into one <details> whose summary is their titles.
+  // scenes folded into one <details> whose summary is their titles -- an
+  // app's on its page of the guide, one directory below the root, so its
+  // pictures are `../images/`.
   test('renders a region in the order scenes.json gives, with runs of more scenes folded', () => {
     const { scenes: list, record } = fixture()
     expect(render(list, record).studio).toBe(
       [
-        '<img src="./docs/images/readme/studio-drift.webp" width="842" alt="The Drift step: “3 changes, 1 blocking.”">',
+        '<img src="../images/readme/studio-drift.webp" width="842" alt="The Drift step: “3 changes, 1 blocking.”">',
         '',
         '**Step 8, Drift.** *The rename is a “possible-rename”.*',
         '',
         '<details>',
         '<summary>More: Regenerated, Restored</summary>',
         '',
-        '<img src="./docs/images/readme/studio-regenerated.webp" width="842" alt="A panel.">',
+        '<img src="../images/readme/studio-regenerated.webp" width="842" alt="A panel.">',
         '',
         '*“Nothing is published until you publish it.”*',
         '',
-        '<img src="./docs/images/readme/studio-restored.webp" width="842" alt="The versions panel.">',
+        '<img src="../images/readme/studio-restored.webp" width="842" alt="The versions panel.">',
         '',
         '*“The database was not changed.”*',
         '',
@@ -267,6 +251,24 @@ describe('each check, on a small repository', () => {
     expect(render(list, record).hero).toMatch(
       /^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nEvery picture in this README is taken by `pnpm pictures`/,
     )
+  })
+
+  // scenes.json writes a caption's links from the repository's root. Drawn
+  // as written on a page of the guide, one directory down, every one would
+  // name a file under docs/guide/ that is not there. Each is aimed from the
+  // page, its fragment kept, and a link to another site or to a heading of
+  // the page itself is left alone.
+  // Watched failing with relink returning its text unchanged: the
+  // repository's guide regions then linked ./docs/decisions/… from
+  // docs/guide/, and the link check above failed on every one.
+  test('aims a region’s links and pictures from the page it is drawn on', () => {
+    const text = '[0008](./docs/decisions/0008-x.md#why) <img src="./docs/images/readme/a.webp"> [site](https://formancy.ai/) [here](#top) [up](./README.md)'
+    expect(relink(text, 'README.md')).toBe(text)
+    expect(relink(text, 'docs/guide/studio.md')).toBe(
+      '[0008](../decisions/0008-x.md#why) <img src="../images/readme/a.webp"> [site](https://formancy.ai/) [here](#top) [up](../../README.md)',
+    )
+    expect(pageOf('hero')).toBe('README.md')
+    expect(pageOf('studio')).toBe('docs/guide/studio.md')
   })
 
   // The hero line tells a reader which job goes red on a picture whose text
@@ -283,29 +285,42 @@ describe('each check, on a small repository', () => {
   })
 
   // Watched failing with: one caption edited in scenes.json without `readme.mjs --write`.
-  test('regions: a caption edited without writing the README', () => {
+  test('regions: a caption edited without writing the page', () => {
     const state = fixture()
     state.scenes[2].caption = 'The rename is a “possible-rename”, said differently.'
     expect(regionProblems(state)).toEqual([
-      'README.md\'s pictures region "studio" is not what scenes.json and captured.json render: run `node scripts/pictures/readme.mjs --write`',
+      'docs/guide/studio.md\'s pictures region "studio" is not what scenes.json and captured.json render: run `node scripts/pictures/readme.mjs --write`',
     ])
   })
 
-  // Watched failing with: the studio region's markers deleted from README.md.
+  // Watched failing with: the studio region's markers deleted from docs/guide/studio.md.
   test("regions: the studio region's markers deleted", () => {
     const state = fixture()
-    state.readme = state.readme.replace(START('studio'), '')
-    expect(regionProblems(state)).toEqual([expect.stringContaining('does not hold the pictures region "studio"')])
+    state.documents['docs/guide/studio.md'] = state.documents['docs/guide/studio.md'].replace(START('studio'), '')
+    expect(regionProblems(state)).toEqual([`docs/guide/studio.md does not hold the pictures region "studio", opened by ${START('studio')}`])
   })
 
-  // A second copy of a region, or one no scene is drawn in, is a region nothing renders.
-  test('regions: one twice, and one no scene is drawn in', () => {
+  // A second copy of a region, on its own page or on another, or one no
+  // scene is drawn in, is a region nothing renders.
+  test('regions: one twice, one on a page it is not drawn on, and one no scene is drawn in', () => {
     const twice = fixture()
-    twice.readme = `${twice.readme}\n${START('host')}\n${END}\n`
-    expect(regionProblems(twice)).toEqual(['README.md holds the pictures region "host" twice'])
+    twice.documents['docs/guide/host.md'] += `\n${START('host')}\n${END}\n`
+    expect(regionProblems(twice)).toEqual(['docs/guide/host.md holds the pictures region "host" twice'])
+    const elsewhere = fixture()
+    elsewhere.documents['README.md'] += `\n${START('host')}\n${END}\n`
+    expect(regionProblems(elsewhere)).toEqual(['README.md holds the pictures region "host", which is drawn on docs/guide/host.md'])
     const stray = fixture()
-    stray.readme = `${stray.readme}\n${START('site')}\n${END}\n`
+    stray.documents['README.md'] += `\n${START('site')}\n${END}\n`
     expect(regionProblems(stray)).toEqual(['README.md holds a pictures region "site" no scene is drawn in'])
+  })
+
+  // A page of the guide renamed or deleted takes its region with it, and
+  // nothing else would say the app's pictures are shown nowhere.
+  // Watched failing with: docs/guide/host.md left out of the documents.
+  test('regions: the page a region is drawn on missing', () => {
+    const state = fixture()
+    state.documents['docs/guide/host.md'] = undefined
+    expect(regionProblems(state)).toEqual(['docs/guide/host.md does not exist, and the pictures region "host" is drawn on it'])
   })
 
   // Watched failing with: one byte appended to studio-restored.webp; separately, host-other-tenant.webp deleted.
@@ -410,7 +425,7 @@ describe('each check, on a small repository', () => {
     expect(linkProblems(state)).toEqual(["studio-drift's caption links ./docs/decisions/0099-no-such-record.md, which is no file of the repository"])
   })
 
-  // The hero line and every <img> are written into README.md by the render,
+  // The hero line and every <img> are written into the pages by the render,
   // not by a caption: a recipe never written, or a picture gone, would leave
   // the README linking nowhere while a caption-only check stayed green.
   // Watched failing with: docs/images/README.md, which the hero line links,
@@ -423,7 +438,7 @@ describe('each check, on a small repository', () => {
     const picture = fixture()
     picture.files.delete(pictureOf('studio-restored'))
     expect(linkProblems(picture)).toEqual([
-      'README.md\'s pictures region "studio" links ./docs/images/readme/studio-restored.webp, which is no file of the repository',
+      'docs/guide/studio.md\'s pictures region "studio" links ../images/readme/studio-restored.webp, which is no file of the repository',
     ])
   })
 
@@ -475,8 +490,8 @@ describe('each check, on a small repository', () => {
     expect(guardProblems(state)).toEqual(['apps/examples/scripts/pictures.mjs takes no scene of scenes.json, so its check would compare nothing'])
   })
 
-  // A render that drew no picture would be written into README.md and then
-  // match it, so the region check alone would pass an empty README.
+  // A render that drew no picture would be written into its page and then
+  // match it, so the region check alone would pass an empty page.
   test('guard on the guard: a region that draws no picture, and a render that cannot draw', () => {
     const state = fixture()
     const rendered = render(state.scenes, state.record)

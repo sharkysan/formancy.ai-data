@@ -45,8 +45,8 @@ browser.
   ([0068](../../docs/decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
   `UNTESTED_PRODUCTS` names, with their names, the products a snapshot
   recognises that no test runs on -- Azure SQL Database and Azure SQL
-  Managed Instance -- derived from `TESTED_SERVERS`, and the root README's
-  *What it is tested on* row from it
+  Managed Instance -- derived from `TESTED_SERVERS`, and the repository's
+  [*What it is tested on*](../../docs/guide/tested-on.md) row from it
   ([0073](../../docs/decisions/0073-azure-sql-is-not-tested-and-the-release-says-so.md)).
 - **Form generation**: `generateForm(snapshot, request)` returns a spec 5
   formancy document, its `FormBindings`, and a note on every choice it made.
