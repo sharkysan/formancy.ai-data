@@ -143,7 +143,6 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   checkListOf: "data-core's reading of a check as the model and CHECK_LIST_PARITY compare it, a function",
   DECLINING_TABLE: "where the failures suites create the table DECLINE_PARITY's cases are about",
   DECLINING_REMOVABLE: "where the failures suites create the table DECLINE_PARITY's delete case is about",
-  DECLINING_SAID: "where the failures suites keep the messages DECLINING_TABLE's trigger raises",
   DECLINING_MESSAGES: "what DECLINING_TABLE's trigger raises for each note; what a write answers then is DECLINE_PARITY's",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }

@@ -169,10 +169,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
   // person (0156): the notice says the reason exactly as the trigger worded
   // it, then that the words are the database's own -- the one sentence in a
   // notice the server did not write -- and takes the keyboard, as a refused
-  // save's does; and both states pass the floor. Without the source line a
-  // person could take the deployment's words for the module's; answered as
-  // `refused`, they would read the server's sentence instead of the reason.
-  test('says a reason the deployment worded, as its own, for a save and a delete, and passes the floor', async () => {
+  // save's does; a reason that names the column Notes is bound to goes on
+  // that field, and the saved line says it with whose words they are; and
+  // every state passes the floor. Without the source line a person could
+  // take the deployment's words for the module's; answered as `refused`,
+  // they would read the server's sentence instead of the reason.
+  test('says a reason the deployment worded, as its own, for a save, on a field and for a delete, and passes the floor', async () => {
     const user = await openForm(plane, formId)
     await load(user, EDGES.seededOrder)
     await shows('React', 'Customer', 'Muster AG')
@@ -182,6 +184,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(paragraphs(notice('React') as HTMLElement)).toEqual([DECLINING.saved.reason, DECLINED_BY])
     await waitFor(() => expect(focusedName()).toBe('React Not saved'))
     expect(await floor('declined save')).toEqual(CLEAN('declined save'))
+
+    await answer(user, 'React', 'Notes', DECLINING.field.notes)
+    await save(user, 'React')
+    expect(await said('React', /^Not saved\./)).toBe(`Not saved. ${DECLINING.field.reason} ${DECLINED_BY}`)
+    expect(notice('React')).toBeNull()
+    expect(await floor('declined on a field')).toEqual(CLEAN('declined on a field'))
 
     // Nothing was saved and the typing is kept, so loading another record asks first.
     const kept = await freshOrder(formId, DECLINING.deleted.notes)

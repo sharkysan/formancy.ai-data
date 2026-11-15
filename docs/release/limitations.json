@@ -248,7 +248,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:bf71817ab1c83ece07b205fcb93294b8b3183380e9bd59b4539ba3aa74d0a9a8",
+      "reviewed": "sha256:d2d576fdcc0d701244f1b9a3e125c719337586b0ab3e39d70a8de6d49acca1fc",
       "limitations": [
         {
           "area": "databases",
@@ -551,7 +551,7 @@
       ]
     },
     "0028": {
-      "reviewed": "sha256:f984d6d4bc30a1532ac7672933ef493862d65bd048ebbe558daf4c3e38456d03",
+      "reviewed": "sha256:3171211100e74db81b8e23dcd6b7297698b43decf29cf0530abc164cd633add2",
       "limitations": [
         {
           "area": "databases",
@@ -4494,7 +4494,7 @@
       ]
     },
     "0156": {
-      "reviewed": "sha256:af723267d499154decfaf3492e11a221e1d49041e4725e2640fd516f201f35ba",
+      "reviewed": "sha256:c48fe472732b428f5db051028756fedd9b6078405795e2fa13e8af780a407fff",
       "limitations": [
         {
           "area": "writes",
@@ -4506,13 +4506,23 @@
         },
         {
           "area": "writes",
-          "says": "A reason longer than 2,046 UTF-16 code units with its prefix, a whole one of 2,047 among them, or one with a line break or any other control character, is the server's own sentence instead.",
+          "says": "A reason longer than 2,046 UTF-16 code units with its prefix, a whole one of 2,047 among them, or one with a line break, a line or paragraph separator, a bidirectional control or any other control character, is the server's own sentence instead.",
           "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
         },
         {
           "area": "databases",
-          "says": "On PostgreSQL only RAISE EXCEPTION's own SQLSTATE carries a reason, so a RAISE with an ERRCODE of its own keeps that code's meaning, and on SQL Server only a THROW or a severity-16 RAISERROR from 50000 under none of the adapter's own numbers does.",
+          "says": "On PostgreSQL only RAISE EXCEPTION's own SQLSTATE carries a reason, so a RAISE with an ERRCODE of its own keeps that code's meaning.",
+          "heldBy": "packages/data-postgres/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server only a THROW or a severity-16 RAISERROR from 50000 under none of the adapter's own numbers carries a reason.",
           "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A reason placed on a field is shown there as any field's refusal is, and only the form's line beside it says the words are the database's own.",
+          "heldBy": "apps/host/src/page.test.tsx"
         },
         {
           "area": "writes",
@@ -4534,7 +4544,7 @@
         },
         {
           "area": "testing",
-          "says": "What THROW and RAISERROR carry is measured on SQL Server 2022 (16.0.4295.3) alone, and the suites for this change were run on each engine’s default image alone."
+          "says": "What THROW and RAISERROR carry is measured on SQL Server 2022 (16.0.4295.3) alone, and the adapters' suites for this change were run on each engine’s default image alone."
         }
       ]
     }

@@ -8,8 +8,8 @@ import { REFUSAL_LONGEST, REFUSAL_PREFIX } from '@formancy/data-core'
  * Each suite creates DECLINING_TABLE as the fixture's owner, in a schema of
  * its own outside every scope another suite discovers, in its engine's DDL:
  * an item's notes by version -- item_no and valid_from its key, valid_to
- * NULL while a version is open, note, and a version column -- and
- * DECLINING_SAID beside it, holding DECLINING_MESSAGES. A trigger raises the
+ * NULL while a version is open, note, and a version column -- and a table
+ * `said` beside it in that schema, holding DECLINING_MESSAGES. A trigger raises the
  * message of the note a row is written with, or deleted with: PostgreSQL's
  * BEFORE trigger with RAISE EXCEPTION USING MESSAGE (P0001), before the row
  * is kept; SQL Server's AFTER trigger with THROW 50001, whose error the
@@ -29,10 +29,13 @@ import { REFUSAL_LONGEST, REFUSAL_PREFIX } from '@formancy/data-core'
  * nothing is written.
  */
 
-/** Where each suite creates the tables, and the messages their trigger raises. */
+/**
+ * Where each suite creates the tables its cases are about, which it
+ * describes, plans over and generates its forms from by these names: a DDL
+ * that created them elsewhere is a suite that finds no table.
+ */
 export const DECLINING_TABLE = { schema: 'declining', name: 'declining' } as const
 export const DECLINING_REMOVABLE = { schema: 'declining', name: 'removable' } as const
-export const DECLINING_SAID = { schema: 'declining', name: 'said' } as const
 
 /** The reason a person reads when the deployment declines a write of the record. */
 const CLOSED = 'The books for this period are closed.'

@@ -1,4 +1,15 @@
-import { generateForm, planBrowse, planCreate, planDelete, planRead, planSupersede, planUpdate, recordToken, toFormAnswers } from '@formancy/data-core'
+import {
+  generateForm,
+  planBrowse,
+  planCreate,
+  planDelete,
+  planRead,
+  planSupersede,
+  planUpdate,
+  recordToken,
+  REFUSAL_PREFIX,
+  toFormAnswers,
+} from '@formancy/data-core'
 import type {
   DeleteOutcome,
   DescribedTable,
@@ -10,7 +21,16 @@ import type {
   RecordAdapter,
   RecordOutcome,
 } from '@formancy/data-core'
-import { covers, DECLINE_PARITY, declineCase, DECLINING_MESSAGES, defined, startPostgresFixture } from '@formancy/data-fixtures'
+import {
+  covers,
+  DECLINE_PARITY,
+  declineCase,
+  DECLINING_MESSAGES,
+  DECLINING_REMOVABLE,
+  DECLINING_TABLE,
+  defined,
+  startPostgresFixture,
+} from '@formancy/data-fixtures'
 import type { DeclineAnswer, DeclineCase, PostgresFixture } from '@formancy/data-fixtures'
 import postgres from 'postgres'
 import type { Sql } from 'postgres'
@@ -39,7 +59,7 @@ let owner: Sql
 let records: RecordAdapter
 let snapshot: MetadataSnapshot
 
-const TABLE = { schema: 'declining', name: 'declining' } as const
+const TABLE = DECLINING_TABLE
 const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
 const RW = { read: ['clerk'], write: ['clerk'] }
 const READS = { read: ['clerk'], write: [] }
@@ -65,13 +85,18 @@ let versionsForm: FormBindings
 
 /** The rows the cases that address a stored record address: each item's one open version. */
 const STORED = { update: 2, supersede: 3 } as const
-const REMOVABLE = { schema: 'declining', name: 'removable' } as const
+const REMOVABLE = DECLINING_REMOVABLE
 let removableForm: FormBindings
+/** The message the trigger with an ERRCODE of its own raises: a reason, prefixed, as a create noted `closed` meets it. */
+const CLOSED_MESSAGE = `${REFUSAL_PREFIX}${DECLINE_PARITY.insert.answer.reason}`
 
 beforeAll(async () => {
   fixture = await startPostgresFixture()
   owner = postgres(fixture.admin, { onnotice: () => {} })
-  // Constants of this file, so they are spliced.
+  // The DDL is this file's, and CLOSED_MESSAGE, from DECLINE_PARITY and
+  // data-core's prefix, is spliced into it as a literal: refused here when it
+  // holds a quote, which would end the literal early.
+  if (CLOSED_MESSAGE.includes("'")) throw new Error(`a message spliced into the DDL holds a quote: ${CLOSED_MESSAGE}`)
   await owner.unsafe(`
     create schema declining;
     create table declining.said (note varchar(20) not null constraint pk_said primary key, message text not null);
@@ -135,7 +160,16 @@ beforeAll(async () => {
       return new;
     end
     $$;
-    create trigger tr_ambiguous before insert on declining.ambiguous for each row execute function declining.ambiguous_check();`)
+    create trigger tr_ambiguous before insert on declining.ambiguous for each row execute function declining.ambiguous_check();
+
+    -- A RAISE with an ERRCODE of its own and the prefix: a check violation (23514), whatever its message says.
+    create table declining.coded (id int not null constraint pk_coded primary key, note varchar(20) null);
+    create function declining.coded_check() returns trigger language plpgsql as $$
+    begin
+      raise exception using errcode = 'check_violation', message = '${CLOSED_MESSAGE}';
+    end
+    $$;
+    create trigger tr_coded before insert on declining.coded for each row execute function declining.coded_check();`)
   for (const item of Object.values(STORED)) await owner`insert into declining.declining (item_no, valid_from, note) values (${item}, '2026-01-01', 'open')`
   await owner`insert into declining.removable (note) values (${DECLINE_PARITY.delete.note})`
   // A row of the view too, whose note's message it raises as it is read.
@@ -303,13 +337,36 @@ describe('a refusal worded for the person is only ever a write’s', () => {
   })
 })
 
+describe('only RAISE EXCEPTION’s own SQLSTATE carries a reason (0156)', () => {
+  // A RAISE that names an ERRCODE of its own says what was refused in that
+  // code: a check violation is `check-violation`, prefix or not, as it was
+  // before 0156, and no reason is read from its message. Read under any
+  // SQLSTATE, the prefix would turn a constraint's answer into words the
+  // person reads, and a check named in class 23 into no check at all.
+  // Watched failing with the P0001 condition taken out of `raised`:
+  // declined, with the reason.
+  test('a RAISE with an ERRCODE of its own and the prefix keeps that code’s meaning', async () => {
+    const outcome = await defined(records).insert({
+      target: { table: { schema: 'declining', name: 'coded' }, identity: [{ name: 'id', type: columnType('coded', 'id') }], concurrency: null },
+      values: [
+        { name: 'id', type: columnType('coded', 'id'), value: '1' },
+        { name: 'note', type: columnType('coded', 'note'), value: 'closed' },
+      ],
+      returning: [],
+    })
+    expect(outcome).toMatchObject({ ok: false, code: 'check-violation', message: expect.stringMatching(/23514/) })
+    expect(outcome).not.toHaveProperty('reason')
+    expect([...(await owner`select id from declining.coded`)]).toEqual([])
+  })
+})
+
 describe('a class-42 error a trigger function raises (0156)', () => {
   const insert = (id: string, note: string) =>
     defined(records).insert({
-      target: { table: { schema: 'declining', name: 'ambiguous' }, identity: [{ name: 'id', type: intType() }], concurrency: null },
+      target: { table: { schema: 'declining', name: 'ambiguous' }, identity: [{ name: 'id', type: columnType('ambiguous', 'id') }], concurrency: null },
       values: [
-        { name: 'id', type: intType(), value: id },
-        { name: 'note', type: noteType(), value: note },
+        { name: 'id', type: columnType('ambiguous', 'id'), value: id },
+        { name: 'note', type: columnType('ambiguous', 'note'), value: note },
       ],
       returning: [],
     })
@@ -328,14 +385,11 @@ describe('a class-42 error a trigger function raises (0156)', () => {
   })
 })
 
-function intType() {
-  const found = snapshot.objects.find((object) => object.ref.name === 'ambiguous')?.columns.find((column) => column.name === 'id')
-  if (found === undefined) throw new Error('declining.ambiguous has no id')
-  return found.type
-}
-
-function noteType() {
-  const found = snapshot.objects.find((object) => object.ref.name === 'ambiguous')?.columns.find((column) => column.name === 'note')
-  if (found === undefined) throw new Error('declining.ambiguous has no note')
+/** A column's type in a table of the declining schema, as discovery read it. */
+function columnType(table: string, name: string) {
+  const found = snapshot.objects
+    .find((object) => object.ref.schema === 'declining' && object.ref.name === table)
+    ?.columns.find((column) => column.name === name)
+  if (found === undefined) throw new Error(`declining.${table} has no ${name}`)
   return found.type
 }

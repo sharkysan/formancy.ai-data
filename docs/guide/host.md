@@ -296,6 +296,9 @@ typed since. A reload or a closed tab does not ask.
 A save the server refuses because the table changed under the form is said in
 the server's sentence, which names no column, and what was typed stays in the
 form ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)).
+Of the host page's suites and checks, only that picture's check below holds
+the page to it, and on PostgreSQL alone
+([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
 A save or a delete the database's own rules refuse in words written for you
 -- a trigger whose error starts `formancy: refused: ` -- says that reason
@@ -303,13 +306,11 @@ exactly as the trigger wrote it, under "Not saved" or "Not deleted", then
 "This reason is the database's own.", since it is the one sentence there
 the server did not write; the keyboard goes to it, as to any refusal, and
 what was typed stays in the form. A reason that names a column is said on
-the field bound to it instead, with "Not saved." and the reason on the
-form's line. Any other refusal a trigger raises is said in the server's
+the field bound to it instead, as any field's refusal is, and the form's
+line says "Not saved.", the reason and "This reason is the database's
+own." Any other refusal a trigger raises is said in the server's
 sentence, as before
 ([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
-Of the host page's suites and checks, only that picture's check below holds
-the page to it, and on PostgreSQL alone
-([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
 
 A field its person may write in no operation -- a tenant pinned to the
 token, a field the policy lets them read and not write -- is drawn

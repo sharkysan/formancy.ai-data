@@ -617,7 +617,14 @@ return saved.ok ? toFormAnswers(bindings, planned.fields, saved) : saved // { re
 - **A database's refusal** is a `RecordFailure` with a stable code. `refused`
   is a refusal this port has no code for — a trigger's own error, a write
   declined without one, an error the adapter does not recognise — and is
-  expected to be refused again. `unavailable` means only what passes: the
+  expected to be refused again. `declined` is a write a trigger refused in
+  words for the person: `reason` is the rest of a message that starts
+  with exactly `formancy: refused: `, for the person and for no log, and
+  `column` the one `formancy: refused [column]: ` names.
+  `deploymentRefusal` (`records/refusal.ts`) is the one reading of such a
+  message both adapters ask, and passes on none longer than
+  `REFUSAL_LONGEST`, 2,046 UTF-16 code units, or with a control character
+  ([0156](../../docs/decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)). `unavailable` means only what passes: the
   database unreachable, or a deadlock or lock timeout the engine documents as
   such. Nothing was written in either case.
 - **`toFormAnswers`** is the inverse, for the fields the actor may read: a

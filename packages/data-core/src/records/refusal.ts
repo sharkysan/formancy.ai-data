@@ -39,8 +39,16 @@ const COLUMN_CLOSES = ']: '
  */
 export const REFUSAL_LONGEST = 2046
 
-/** A control character anywhere -- a line break, a tab, an escape: one line of text, or nothing. */
-const CONTROL = /\p{Cc}/u
+/**
+ * A control character anywhere: one line of text, or nothing. A C0 or C1
+ * control -- a line break, a tab, an escape -- and two that `\p{Cc}` leaves
+ * out: a line or paragraph separator, which breaks the line as a line feed
+ * does, and a bidirectional embedding, override or isolate, which holds over
+ * the text after it, so a reason could reorder the page's own sentence
+ * beside it. Not every format character: a joiner, which an emoji sequence
+ * is made of, passes.
+ */
+const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}\u202a-\u202e\u2066-\u2069]/u
 
 /**
  * What a message the engine raised says, as this module reads it:

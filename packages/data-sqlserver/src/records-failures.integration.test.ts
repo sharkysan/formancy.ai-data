@@ -33,7 +33,17 @@ import {
   toFormAnswers,
 } from '@formancy/data-core'
 import type { DeclineAnswer, DeclineCase, DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
-import { covers, DECLINE_PARITY, declineCase, DECLINING_MESSAGES, defined, EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
+import {
+  covers,
+  DECLINE_PARITY,
+  declineCase,
+  DECLINING_MESSAGES,
+  DECLINING_REMOVABLE,
+  DECLINING_TABLE,
+  defined,
+  EDGE_VALUES,
+  startSqlServerFixture,
+} from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -1009,8 +1019,8 @@ describe('when the connection fails', () => {
  * server sends it, and the owner reads the tables after.
  */
 describe('a refusal the deployment words for the person', () => {
-  const TABLE: ObjectRef = { schema: 'declining', name: 'declining' }
-  const REMOVABLE: ObjectRef = { schema: 'declining', name: 'removable' }
+  const TABLE: ObjectRef = DECLINING_TABLE
+  const REMOVABLE: ObjectRef = DECLINING_REMOVABLE
   const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
   const RW = { read: ['clerk'], write: ['clerk'] }
   const READS = { read: ['clerk'], write: [] }
@@ -1037,7 +1047,11 @@ describe('a refusal the deployment words for the person', () => {
   let removableForm: FormBindings
 
   beforeAll(async () => {
-    // Constants of this file, so they are spliced; the messages are data, bound.
+    // The DDL is this file's, and CLOSED_MESSAGE, from DECLINE_PARITY and
+    // data-core's prefix, is spliced into its triggers as a literal: refused
+    // here when it holds a quote, which would end the literal early. The
+    // messages the tables hold are data, bound.
+    if (CLOSED_MESSAGE.includes("'")) throw new Error(`a message spliced into the DDL holds a quote: ${CLOSED_MESSAGE}`)
     await owner.request().batch('create schema declining')
     await owner.request().batch(`
       create table declining.said (note nvarchar(20) not null constraint pk_said primary key, message nvarchar(max) not null);

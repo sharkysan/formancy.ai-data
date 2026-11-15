@@ -29,7 +29,8 @@ import { disableFields } from './widgets.js'
  *   sent again (0015).
  * - **declined**: a refusal the deployment worded for the person (0156), its
  *   reason verbatim, about the record as a whole; one that names a field is
- *   **invalid**, its reason on the field. Nothing is sent again.
+ *   **invalid**, its reason on the field, marked `declined` so the page
+ *   says whose words they are there too. Nothing is sent again.
  * - **unknown**: the answer was lost -- by the database, said in the server's
  *   502, or between this page and the server -- and the write may have been
  *   stored (0031). Nothing is applied and nothing is sent again. An update
@@ -61,7 +62,8 @@ import { disableFields } from './widgets.js'
 export type Renderer = 'react' | 'angular'
 
 export type SaveResult =
-  | { kind: 'saved' | 'created' | 'stale' | 'invalid' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held'; message: string }
+  | { kind: 'saved' | 'created' | 'stale' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held'; message: string }
+  | { kind: 'invalid'; message: string; declined?: true }
   | { kind: 'unknown'; message: string; unknown: UnknownWrite }
 
 /** What a press says while the previous save is unanswered. */
@@ -332,7 +334,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
       const problems = Object.fromEntries(Object.entries(fieldProblems(outcome)).filter(([field]) => keys.has(field)))
       if (Object.keys(problems).length === 0) return { kind: outcome.code === 'declined' ? 'declined' : 'refused', message: outcome.message }
       engine.applyServerErrors(problems)
-      return { kind: 'invalid', message: outcome.message }
+      return { kind: 'invalid', message: outcome.message, ...(outcome.code === 'declined' ? { declined: true as const } : {}) }
     }
     const now = engine.value() as Record<string, unknown>
     let newer = false

@@ -34,7 +34,9 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  * One renderer's half of the page: a region named by its heading, the saved
  * line, the notice a refused save opens, and the form on white paper in
  * Blueprint. A save the deployment declined (0156) opens the same notice,
- * its reason verbatim and a line saying the words are the database's own.
+ * its reason verbatim and a line saying the words are the database's own;
+ * one whose reason names a field puts it there, and the saved line says
+ * whose words they are.
  *
  * The engine is the session's, read through `useSyncExternalStore`, and
  * everything below the saved line is keyed by how many times the session has
@@ -243,7 +245,7 @@ function PaneBody({
     // and this line says only that nothing was saved.
     if (result?.kind === 'invalid') {
       toShow.current?.()
-      say(`Not saved. ${result.message}`, 'refused')
+      say(`Not saved. ${result.message}${result.declined === true ? ` ${DECLINED_BY}` : ''}`, 'refused')
     } else say(result === null ? '' : result.message, 'answer', result?.kind === 'saved' || result?.kind === 'created')
   }
 

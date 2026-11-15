@@ -244,10 +244,12 @@ get*](../../README.md#what-you-get) is the short version, and
   field bound to that column. On PostgreSQL it is a `RAISE EXCEPTION`; on
   SQL Server a `THROW` or a severity-16 `RAISERROR` from 50000, under none
   of the numbers the adapter raises for itself. A message with a control
-  character, or longer than SQL Server carries whole -- 2,046 UTF-16 code
-  units with the prefix, measured on SQL Server 2022 (16.0.4295.3) on
-  2026-11-15, past which THROW cuts it -- is the server's own sentence, as
-  every other trigger error still is, and so is any read's. The reason is
+  character -- a line or paragraph separator and a bidirectional control
+  included -- or longer than 2,046 UTF-16 code units with the prefix is
+  the server's own sentence, as every other trigger error and any read's
+  still is. The bound is one short of the 2,047 that THROW and RAISERROR
+  carry whole, since a longer message arrives cut to exactly 2,047,
+  measured on SQL Server 2022 (16.0.4295.3) on 2026-11-15. The reason is
   never logged or audited, and nothing checks what it says: a trigger can
   put a value there the person's policy hides. A PostgreSQL trigger
   function's own SQL error is a refusal now, where it was a server error

@@ -55,6 +55,15 @@ describe('deploymentRefusal (0156)', () => {
       expect(deploymentRefusal(`formancy: refused: one${control}two`), JSON.stringify(control)).toEqual({ kind: 'unshaped', why: 'a control character' })
     }
     expect(deploymentRefusal('formancy: refused [no\tte]: closed')).toEqual({ kind: 'unshaped', why: 'a control character' })
+    // A line or paragraph separator breaks the line as a line feed does; a
+    // bidirectional embedding, override or isolate holds over the text after
+    // it, so a reason could reorder the page's own sentence beside it. None
+    // of them is in \p{Cc}. A joiner, which an emoji sequence is made of, is
+    // a format character too, and passes.
+    for (const control of ['\u2028', '\u2029', '\u202a', '\u202b', '\u202c', '\u202d', '\u202e', '\u2066', '\u2067', '\u2068', '\u2069']) {
+      expect(deploymentRefusal(`formancy: refused: one${control}two`), JSON.stringify(control)).toEqual({ kind: 'unshaped', why: 'a control character' })
+    }
+    expect(deploymentRefusal('formancy: refused: Closed 👩\u200d💼.')).toEqual({ kind: 'declined', reason: 'Closed 👩\u200d💼.' })
     expect(deploymentRefusal('formancy: refused: ')).toEqual({ kind: 'unshaped', why: 'no reason' })
     expect(deploymentRefusal('formancy: refused:    ')).toEqual({ kind: 'unshaped', why: 'no reason' })
     expect(deploymentRefusal('formancy: refused [note]: ')).toEqual({ kind: 'unshaped', why: 'no reason' })

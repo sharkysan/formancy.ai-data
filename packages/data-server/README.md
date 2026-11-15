@@ -183,7 +183,13 @@ existed would be documented and inert.
   the database refused for a reason with no code of its own — a trigger's
   error, a declined write — is 422 `refused`, which says sending it again
   will be refused the same way; 503 `unavailable` is kept for what passes
-  (0028). A write sent to the database whose answer was lost is 502
+  (0028). A write a trigger refuses in words for the person, its message
+  starting with exactly `formancy: refused: `, is 422 `declined`: its
+  message is the rest of the trigger's, the one sentence the server did
+  not write, with a field error where `formancy: refused [column]: ` names
+  a column the form binds. The reason is never logged or audited: one log
+  line names the code and the form, and the audit's outcome is
+  `declined` ([0156](../../docs/decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)). A write sent to the database whose answer was lost is 502
   `unknown-outcome` with `operation`, `record` and `version`: an update's
   token and version as sent, a create's token when the insert names its key
   -- a key the person types, a tenant pinned from the token -- and `null` when
@@ -401,7 +407,8 @@ existed would be documented and inert.
   deleted: true }`, the token of the row deleted and nothing of its values;
   404 not found or outside the person's rows; 409 `stale`, `drift` or
   `schema-changed`; 422 `referenced` while other rows refer to it, naming
-  none -- the log names the key, at info, and no value -- or `refused`;
+  none -- the log names the key, at info, and no value -- `refused`, or
+  `declined` with a trigger's reason as its message (0156);
   503 "Nothing was deleted."; 502 `unknown-outcome`
   with `operation: 'delete'`, the record and the version, where deleting
   again with that version deletes nothing else. Never a field error.

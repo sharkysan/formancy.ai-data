@@ -30,8 +30,10 @@ the same day (formancy.ai 0232).
   names a bound column. On PostgreSQL that is `RAISE EXCEPTION`; on SQL
   Server a `THROW`, or a `RAISERROR` at severity 16, from 50000, under
   none of the adapter's own numbers. The host page says the reason, then
-  "This reason is the database's own." A message with a control character,
-  with no reason, or longer than 2,046 UTF-16 code units with its prefix
+  "This reason is the database's own."; a reason placed on a field is said
+  there, and the line under the form says both. A message with a control
+  character -- a line or paragraph separator and a bidirectional control
+  included -- with no reason, or longer than 2,046 UTF-16 code units with its prefix
   is the server's own sentence, as every trigger error without the prefix
   still is: measured on SQL Server 2022, THROW and RAISERROR keep 2,047
   whole and cut a longer message to 2,047 ending in `...`, so a cut one

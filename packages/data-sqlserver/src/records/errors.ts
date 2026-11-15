@@ -9,6 +9,7 @@ import {
   NEXT_NOT_INSERTED_MESSAGE,
   NOT_ONE_ROW,
   NOT_ONE_ROW_MESSAGE,
+  OWN_NUMBERS,
   REACH_MOVED,
   REACH_MOVED_MESSAGE,
   REACH_UNDELETABLE,
@@ -123,22 +124,13 @@ const PASSING: ReadonlySet<number> = new Set([
 const FIRST_USER_ERROR = 50000
 
 /**
- * The numbers the write batches raise for themselves (statements.ts). A
- * customer's trigger may THROW one too, and its error is then refused like
- * any number nobody mapped -- never a reason for the person (0156), whatever
- * its message says: a number the adapter answers by is the adapter's.
+ * The numbers the write batches raise for themselves (statements.ts's
+ * OWN_NUMBERS). A customer's trigger may THROW one too, and its error is
+ * then refused like any number nobody mapped -- never a reason for the
+ * person (0156), whatever its message says: a number the adapter answers by
+ * is the adapter's.
  */
-const OWN_NUMBERS: ReadonlySet<number> = new Set([
-  TEXT_NOT_STORED,
-  NOT_ONE_ROW,
-  DECIDED_BY_TRIGGER,
-  TRANSACTION_REPLACED,
-  TRANSACTION_ENDED,
-  DEFINITION_MOVED,
-  REACH_MOVED,
-  REACH_UNDELETABLE,
-  NEXT_NOT_INSERTED,
-])
+const OWN: ReadonlySet<number> = new Set(OWN_NUMBERS)
 
 /** The severity of THROW, and of the RAISERROR a deployment words a refusal with (0156). */
 const USER_SEVERITY = 16
@@ -249,10 +241,13 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
  * is not one passed on. `undefined` for any other error, which is classified
  * as before. The batch's CATCH raises it again as it was (statements.ts),
  * and replaces it with its own when a trigger ended the transaction, so a
- * reason never claims "nothing was written" over a COMMIT.
+ * reason never claims "nothing was written" over a COMMIT. A read is asked
+ * too, as PostgreSQL's adapter asks it, though no test provokes one here: a
+ * T-SQL function may not THROW or RAISERROR, so a view cannot raise one as
+ * it is read, as a PostgreSQL function can.
  */
 function worded(error: ServerError, phase: Phase): RecordFailure | undefined {
-  if (phase !== 'write' || error.number < FIRST_USER_ERROR || OWN_NUMBERS.has(error.number) || error.severity !== USER_SEVERITY) return undefined
+  if (phase !== 'write' || error.number < FIRST_USER_ERROR || OWN.has(error.number) || error.severity !== USER_SEVERITY) return undefined
   const read = deploymentRefusal(error.message)
   if (read.kind === 'none') return undefined
   if (read.kind === 'unshaped') {

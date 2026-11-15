@@ -1,6 +1,6 @@
 # 0156 — A trigger can refuse a write in words the person reads
 
-- **Status:** accepted; narrows [0022](0022-the-runtime-plane-asks-the-policy-every-time.md): a database's refusal still reaches the person in the server's own words, but for one: a write a trigger refuses with a message that starts with exactly `formancy: refused: ` is 422 `declined`, its message the rest of the trigger's, beside the field bound to the column `formancy: refused [column]: ` names; narrows [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): such a write is `declined`, not `refused`, alike on both engines -- PostgreSQL's P0001 on a write, SQL Server's user error from 50000 at severity 16 under none of the adapter's own numbers, each read through one reading in data-core -- and a PostgreSQL error in class 42 without an entry of its own that arose inside a function is `refused`, no longer thrown as the adapter's own SQL at fault
+- **Status:** accepted; narrows [0016](0016-postgres-operations.md): a PostgreSQL error in class 42 without an entry of its own that arose inside a function, by the error's context field, is `refused`, no longer thrown as the adapter's own SQL at fault; narrows [0022](0022-the-runtime-plane-asks-the-policy-every-time.md): a database's refusal still reaches the person in the server's own words, but for one: a write a trigger refuses with a message that starts with exactly `formancy: refused: ` is 422 `declined`, its message the rest of the trigger's, beside the field bound to the column `formancy: refused [column]: ` names; narrows [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md): such a write is `declined`, not `refused`, alike on both engines -- PostgreSQL's P0001 on a write, SQL Server's user error from 50000 at severity 16 under none of the adapter's own numbers, each read through one reading in data-core
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:**
@@ -13,7 +13,11 @@
   reason); no message longer than `REFUSAL_LONGEST`, with a control
   character, with no reason, or with a column unclosed or empty (watched
   failing with the length unchecked, with the control characters
-  unchecked, and with a blank reason passed on); a length in UTF-16 code
+  unchecked, and with a blank reason passed on); a line or paragraph
+  separator and a bidirectional embedding, override or isolate refused,
+  and a joiner in an emoji sequence passed on (watched failing with
+  `\p{Cc}` alone: U+2028 declined; and with the separators and not the
+  bidirectional controls: U+202A declined); a length in UTF-16 code
   units, as SQL Server's nvarchar counts (watched failing with code
   points counted).
   `packages/data-postgres/src/records-failures.integration.test.ts` and
@@ -44,10 +48,16 @@
   with the severity unasked: 11 `declined`); a trigger that commits the
   write and then THROWs the prefix `unknown-outcome`, its row stored
   (watched failing with the batch's own error for an ended transaction
-  left out of its CATCH: `declined` over a stored row). On PostgreSQL
+  left out of its CATCH: `declined` over a stored row). The rule that a
+  read is never declined is asked on SQL Server too and provoked by
+  nothing there: a T-SQL function may not THROW or RAISERROR, so no view
+  raises a user error as it is read. On PostgreSQL
   alone: a read through a view whose function RAISEs the prefix `refused`
   (watched failing with the phase unasked: `declined`, which a browse
-  answers with a 500); a trigger function's ambiguous column, 42702,
+  answers with a 500); a RAISE with the prefix under an ERRCODE of its
+  own, `check_violation`, `check-violation` with no reason (watched
+  failing with the P0001 condition taken out: `declined`); a trigger
+  function's ambiguous column, 42702,
   `refused` and its missing column, 42703, still `schema-changed`
   (watched failing with the context field unread: 42702 thrown; and with
   every class-42 error inside a function `refused`: 42703 `refused`).
@@ -64,16 +74,24 @@
   added to it). `packages/data-server/src/routes/runtime-deletes.test.ts`
   -- a delete's reason about the record whatever column it names (watched
   failing with it answered as `refused`).
+  `packages/data-sqlserver/src/records/statements.test.ts` --
+  `OWN_NUMBERS`, the numbers `records/errors.ts` reads no reason under, is
+  every user error number `statements.ts` exports (watched failing with
+  `NEXT_NOT_INSERTED` left out of it).
   `apps/host/src/page.test.tsx` -- on both engines, a save and a delete a
   trigger declines say the reason as the trigger wrote it and then that
-  it is the database's own, the keyboard on the save's notice, and both
-  states pass axe and the name check. Not run here: both attempts on this
-  machine failed in the suite's global setup before any test, SQL Server
-  not ready in its 120 seconds and then a request timing out while
-  another worktree's databases ran; the trigger the setup adds was run
-  alone against the SQL Server fixture and refused an update with the
-  reason. It is CI's to run, and to watch failing with `declined`
-  answered as `refused`.
+  it is the database's own, the keyboard on the save's notice; a save
+  whose reason names the column Notes is bound to opens no notice, and
+  its line says "Not saved.", the reason and that it is the database's
+  own; and every state passes axe and the name check. Not watched
+  failing: with `declined` answered as `refused` the save's notice would
+  hold the reason alone, and with the field's decline unmarked its line
+  would end at the reason. The setup adds the orders' trigger after the
+  paged orders, and the test plane inserts its approved order through a
+  table variable: SQL Server refuses an OUTPUT without INTO on a table
+  with an enabled trigger (334), which the setup's first run met. Not seen
+  passing before CI: on the machine this was written on, SQL Server did
+  not start within the setup's 120 seconds beside other suites' databases.
 
 ## Context
 
@@ -121,12 +139,14 @@ so a message that only resembles it is what it was.
 |---|---|---|
 | The error | SQLSTATE P0001, `RAISE EXCEPTION` | a user error, 50000 or above, at severity 16: `THROW`, or `RAISERROR(…, 16, …)` |
 | Never | another SQLSTATE, a RAISE with an ERRCODE of its own included | a number the adapter raises for itself (`statements.ts`), whatever follows it; another severity |
-| Only on | a write: a read's RAISE, from a function a view calls, is `refused` | a write |
+| Only on | a write: a read's RAISE, from a function a view calls, is `refused` | a write, asked and not provoked: a T-SQL function may not raise |
 
 **What the message says is read once**, `deploymentRefusal` in
 `packages/data-core/src/records/refusal.ts`, so the two engines cannot
 pass on two different things. **Fail closed on shape**: a message with a
-control character, with no reason after the prefix, with a column
+control character -- a C0 or C1 control, a line or paragraph separator,
+or a bidirectional embedding, override or isolate, which holds over the
+text after it -- with no reason after the prefix, with a column
 unclosed or empty, or longer than `REFUSAL_LONGEST` is the engine's
 ordinary refusal, `refused`, in the server's own words, as every trigger
 error without the prefix still is.
@@ -157,7 +177,8 @@ for it (0011, 0023). The deployment may have written a value into it.
 or delete says the reason, verbatim, under "Not saved" or "Not deleted",
 then "This reason is the database's own." -- the one sentence there the
 server did not write. A reason naming a bound field goes on that field,
-as any field's refusal does.
+as any field's refusal does, and the form's line says "Not saved.", the
+reason and "This reason is the database's own." there too.
 
 **A reason never says "not saved" over a COMMIT.** A SQL Server trigger
 that ends the write's transaction and then THROWs the prefix is answered
@@ -184,15 +205,18 @@ the page says as one, not "it may have been saved".
   checked: a trigger runs as the connection's account and sees every
   column, so it can put into its reason a value the person's policy
   hides, or say something untrue. The host page says the words are the
-  database's own; nothing else does.
+  database's own, in the notice or on the form's line; the field a reason
+  is placed on, and its renderer's error summary, show it as they show
+  any field's refusal, and nothing else says whose it is.
 - A trigger cannot know who saved: it runs as the connection's account,
   so its reason cannot depend on the person or their roles.
 - A whole message of 2,047 code units is refused with the cut ones it
   cannot be told from, and so is any longer one. The bound counts the
   prefix and the column.
 - A reason is one line. One with a line break, a tab or any other control
-  character is refused rather than cleaned, and the person reads the
-  server's sentence.
+  character -- a line or paragraph separator and a bidirectional
+  embedding, override or isolate included -- is refused rather than
+  cleaned, and the person reads the server's sentence.
 - The reason is in whatever language the trigger wrote it in; nothing
   translates it.
 - On PostgreSQL only RAISE EXCEPTION's own SQLSTATE carries one: a RAISE
@@ -209,8 +233,9 @@ the page says as one, not "it may have been saved".
   operator sees as `refused` in the audit and in no log line, where the
   500 it was came with the error's text in the server's log.
 - What THROW and RAISERROR carry is measured on one SQL Server release,
-  2022 (16.0.4295.3), and every suite here was run for this change on each
-  engine's default image alone; the matrix's other images hold it in CI.
+  2022 (16.0.4295.3), and the adapters' suites were run for this change on
+  each engine's default image alone, and the host page's not; the matrix's
+  other images, and the host page, hold it in CI.
 
 **What it forecloses.** Nothing: a routine an action calls, and a check
 routine that returns its refusal, can answer through the same code.
