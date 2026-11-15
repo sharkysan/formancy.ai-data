@@ -190,9 +190,12 @@ export interface Sent {
 /**
  * `app.inject` as a `fetch`, recording each request's path and body into
  * `sent`: the host suites' plane (`test-plane.ts`) without its extras, over a
- * server of the suite's own.
+ * server of the suite's own. Every request still being answered is in
+ * `pending`, as the plane's are (test-fetch.ts), so a suite closes its server
+ * and its connections after them rather than from under them: `app.close()`
+ * does not wait for an injected request.
  */
-export function fetchThrough(app: Awaited<ReturnType<typeof createDataServer>>, sent: Sent[]): typeof fetch {
+export function fetchThrough(app: Awaited<ReturnType<typeof createDataServer>>, sent: Sent[], pending?: Set<Promise<unknown>>): typeof fetch {
   return async (input, init) => {
     const href = input instanceof Request ? input.url : String(input)
     const url = new URL(href, 'http://host.test')
@@ -201,12 +204,17 @@ export function fetchThrough(app: Awaited<ReturnType<typeof createDataServer>>, 
     const body = typeof init?.body === 'string' ? init.body : undefined
     sent.push({ path: url.pathname, body })
     init?.signal?.throwIfAborted()
-    const reply = await app.inject({
-      method: method as 'GET' | 'POST',
-      url: `${url.pathname}${url.search}`,
-      headers,
-      ...(body === undefined ? {} : { payload: body }),
-    })
+    const answering = Promise.resolve(
+      app.inject({
+        method: method as 'GET' | 'POST',
+        url: `${url.pathname}${url.search}`,
+        headers,
+        ...(body === undefined ? {} : { payload: body }),
+      }),
+    )
+    pending?.add(answering)
+    void answering.finally(() => pending?.delete(answering)).catch(() => {})
+    const reply = await answering
     const answered = new Headers()
     for (const [name, value] of Object.entries(reply.headers)) {
       if (value !== undefined) answered.set(name, Array.isArray(value) ? value.join(', ') : String(value))

@@ -24,7 +24,7 @@ export default mergeConfig(
         include: ['src/**/*.{ts,tsx}'],
         exclude: ['src/**/*.test.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/test-*.{ts,tsx}'],
       },
-      setupFiles: ['src/test-setup.ts'],
+      setupFiles: ['src/test-setup.ts', 'src/test-connections.ts'],
       include: ['src/**/*.test.{ts,tsx}'],
       environment: 'jsdom',
       // PostgreSQL and SQL Server, started once for every file (0003, 0029):

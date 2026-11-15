@@ -90,6 +90,7 @@ let registryClose: () => Promise<void>
 let root: string
 let owners: Owners
 const sent: Sent[] = []
+const pending = new Set<Promise<unknown>>()
 let fetchThroughServer: typeof fetch
 
 const formId = (engine: Engine, account: Account) => `${engine}-stamped-page-${account}`
@@ -156,7 +157,7 @@ beforeAll(async () => {
     admin: { registry, store, adminRoles: ['data-admin'], audit: { sink: () => {} } },
     runtime: { registry, store },
   })
-  fetchThroughServer = fetchThrough(app, sent)
+  fetchThroughServer = fetchThrough(app, sent, pending)
 
   const admin = async (url: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const reply = await app.inject({ method: 'POST', url, headers: { authorization: `Bearer ${TOKENS.admin}` }, payload })
@@ -202,6 +203,11 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  // After every request still being answered, as the plane closes
+  // (test-plane.ts): `app.close()` does not wait for an injected request,
+  // and the connections are closed, and the writer's login dropped, from
+  // under it otherwise.
+  await Promise.allSettled([...pending])
   await app?.close()
   await registryClose?.()
   if (owners !== undefined) {
@@ -261,6 +267,15 @@ function refusal(renderer: RendererName): HTMLElement | null {
  * which is all a refused submit leaves (it sends nothing), or the notice a
  * refused save opens. Returns what the pane says, which fields are invalid,
  * and every update the page sent.
+ *
+ * The pane's line is its statuses outside the paper. The paper's are the
+ * renderer's, a field's character count among them, which it says a second
+ * after the last keystroke (`@formancy/react`'s character count): read as
+ * the pane's line, "You have 25 characters remaining." settled the wait
+ * while the save still said "Saving…" whenever the save took longer than
+ * that second, and the case read no "Saved." (a whole-suite run here on
+ * 2026-11-15; with every request held 1.5 s, every case that edits the
+ * note failed so).
  */
 async function pressSave(user: User, renderer: RendererName) {
   const mark = sent.length
@@ -269,10 +284,15 @@ async function pressSave(user: User, renderer: RendererName) {
     Array.from(paper(renderer).querySelectorAll('input'))
       .filter((element) => element.getAttribute('aria-invalid') === 'true')
       .map((element) => element.labels?.[0]?.textContent ?? element.name)
+  const line = () =>
+    within(pane(renderer))
+      .queryAllByRole('status')
+      .filter((status) => !paper(renderer).contains(status))
+      .map((status) => status.textContent ?? '')
   await user.click(within(paper(renderer)).getByRole('button', { name: 'Save' }))
   await waitFor(() => {
-    const line = statuses(renderer).filter((text) => text !== '' && text !== 'Saving…')
-    expect(line.length > 0 || invalid().length > 0 || refusal(renderer) !== null, 'the page settled').toBe(true)
+    const said = line().filter((text) => text !== '' && text !== 'Saving…')
+    expect(said.length > 0 || invalid().length > 0 || refusal(renderer) !== null, 'the page settled').toBe(true)
   }, ARRIVES)
   return {
     statuses: statuses(renderer).filter((text) => text !== ''),
