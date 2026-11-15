@@ -23,6 +23,7 @@ import {
   refusalCase,
   sharedCases,
   shipmentCase,
+  stampCase,
   temporalCase,
   THROUGH_CASES,
   throughCase,
@@ -43,6 +44,8 @@ import type { ListCase } from './lists.js'
 import { FIXTURE_MODEL } from './model.js'
 import { DISPLAY_PARITY, FILTER_PARITY, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 import type { RefusalParityCase } from './parity.js'
+import { STAMP_PARITY } from './stamps.js'
+import type { StampCase } from './stamps.js'
 import { UUID_PARITY } from './uuid.js'
 import type { UuidCase } from './uuid.js'
 import { VERSION_PARITY } from './chains.js'
@@ -82,6 +85,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   COLUMN_FILTER_PARITY: (Object.keys(COLUMN_FILTER_PARITY) as ColumnFilterCase[]).map(columnFilterCase),
   VERSION_PARITY: (Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
   DEFAULT_PARITY: (Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
+  STAMP_PARITY: (Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -121,6 +125,12 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   PAGED_LATER:
     "how many customers lie past the paged lookup's first page (0085); what a search answers over them is lookups.integration.test.ts's, on both engines",
   DEFAULT_TABLE: "where the parity suites create the table DEFAULT_PARITY's cases are about",
+  AUDITED_STAMPS: "what the stamps suites stamp parity.audited with (0153); what is stored is STAMP_PARITY's",
+  AUDITED_PRICE_STAMPS: "what the stamps suites stamp parity.audited_price with (0153); what a change from a date stores is STAMP_PARITY's",
+  AUDITED_POLICY: "who may do what with the stamps suites' audited form; what is stored is STAMP_PARITY's",
+  AUDITED_PRICE_POLICY: "who may do what with the stamps suites' audited price form; what is stored is STAMP_PARITY's",
+  ALICE: 'the person who creates in the stamps suites (0153)',
+  BOB: 'the person who changes what Alice created in the stamps suites (0153)',
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 

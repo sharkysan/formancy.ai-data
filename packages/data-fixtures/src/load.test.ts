@@ -91,6 +91,8 @@ describe('the fixture files', () => {
     const postgres = readFixture('postgres.parity.sql')
     const sqlServer = readFixture('sqlserver.parity.sql')
     expect(tables(postgres)).toEqual([
+      'audited',
+      'audited_price',
       'contended',
       'declined',
       'display_kinds',

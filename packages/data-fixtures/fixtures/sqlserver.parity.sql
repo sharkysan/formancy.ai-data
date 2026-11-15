@@ -285,4 +285,35 @@ begin
 end
 GO
 
+-- What the server stamps (0153), as postgres.parity.sql's audited is. Its
+-- instants are datetimeoffset at SQL Server's default precision, 7, and
+-- logged_at is datetime, which keeps 1/300 s, where PostgreSQL's is
+-- timestamp(3).
+create table parity.audited (
+  id int identity(1, 1) not null constraint pk_audited primary key,
+  tenant_id int not null,
+  note nvarchar(50) null,
+  created_by nvarchar(40) not null,
+  created_at datetimeoffset not null,
+  created_in nvarchar(20) null,
+  changed_by nvarchar(40) null,
+  changed_at datetime2 null,
+  changed_on date null,
+  logged_at datetime null,
+  noted_at datetimeoffset not null constraint df_audited_noted_at default sysdatetimeoffset(),
+  version int not null constraint df_audited_version default 1
+);
+create table parity.audited_price (
+  tenant_id int not null,
+  product_no int not null,
+  valid_from date not null,
+  valid_to date null,
+  amount decimal(18, 4) not null,
+  created_by nvarchar(40) not null,
+  created_at datetimeoffset not null,
+  version int not null constraint df_audited_price_version default 1,
+  constraint pk_audited_price primary key (tenant_id, product_no, valid_from)
+);
+GO
+
 update statistics parity.tenant_item with fullscan;
