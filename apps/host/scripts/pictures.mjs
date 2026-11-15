@@ -191,6 +191,12 @@ function actsOver(plane) {
   const paper = (page, name) => pane(page, name).getByRole('form', { name: `Order, ${name}`, exact: true })
   const box = (page, name, label) => paper(page, name).getByRole('textbox', { name: field(label) })
   const customer = (page, name) => paper(page, name).getByRole('combobox', { name: field(journey.order.customer.label) })
+  /** A journey entry into its field: chosen where it is a select -- Status, of the values ck_order_status lists (0152) -- typed otherwise. */
+  const enter = async (page, name, { label, value }) => {
+    const select = paper(page, name).getByRole('combobox', { name: field(label) })
+    if ((await select.count()) === 1) await select.selectOption(value)
+    else await fillField(paper(page, name), box(page, name, label), value, { within: WITHIN })
+  }
   const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
   /** The detail: the region its heading names -- the open record's, or "No record open". */
   const detail = (page, name) => page.getByRole('region', { name, exact: true })
@@ -289,7 +295,7 @@ function actsOver(plane) {
     },
 
     'host-stale': async (page) => {
-      await fillField(paper(page, 'React'), box(page, 'React', journey.order.update.label), journey.order.update.value, { within: WITHIN })
+      await enter(page, 'React', journey.order.update)
       await save(page, 'React')
       await pane(page, 'React').getByRole('status').filter({ hasText: HOST.saved }).waitFor()
       // Angular, still at the version it read.
@@ -317,7 +323,7 @@ function actsOver(plane) {
       )
       await paper(page, 'React').getByRole('option', { name: DELETED.name, exact: true }).click()
       if ((await named).status() !== 200) throw new Error('the page could not have the chosen customer named')
-      for (const entry of journey.order.create) await fillField(paper(page, 'React'), box(page, 'React', entry.label), entry.value, { within: WITHIN })
+      for (const entry of journey.order.create) await enter(page, 'React', entry)
       await owner`delete from sales.customer where tenant_id = 1 and customer_no = ${DELETED.no}`
       await save(page, 'React')
       await paper(page, 'React').getByRole('heading', { name: 'There is 1 problem to fix', exact: true }).waitFor()
