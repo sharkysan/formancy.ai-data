@@ -7,14 +7,15 @@ import { diffSnapshots, gap, NO_FILTERS, object, ORDER, ORDER_REF, restrict, sna
 
 /*
  * A field drawn as a select of the values a check lists (0152), reviewed
- * against the check as it is now (0010). Values gone from the list are a
- * tightened column: the select offers a value the database refuses, so its
- * writes stop. Values added, or the column no longer held to a list, are a
- * field the column outgrew, for review only: the engine refuses an answer
- * the select does not list rather than writing another back (formancy.ai
- * 0076), so nothing is changed unseen. The runtime compares no check
- * (0041), so it refuses none of these; the database refuses a value it no
- * longer lists, with its own error.
+ * against every check that lists its column as it is now (0010). Values an
+ * enforced list leaves out are a tightened column: the select offers a
+ * value the database refuses, so its writes stop. Values every validated
+ * list names and the select does not, or the column no longer held to a
+ * list, are a field the column outgrew, for review only: the engine
+ * refuses an answer the select does not list rather than writing another
+ * back (formancy.ai 0076), so nothing is changed unseen. The runtime
+ * compares no check (0041), so it refuses none of these; the database
+ * refuses a value it no longer lists, with its own error.
  */
 
 /** ck_order_status as SQL Server writes `status in ('draft', 'placed', 'shipped')`. */
@@ -24,6 +25,14 @@ const withCheck =
   (check: Partial<CheckMeta> & { expression: string | null }) =>
   (objects: ObjectMeta[]): void => {
     object(objects, 'order').checks.push({ name: 'ck_order_status', enforced: true, validated: true, ...check })
+  }
+
+/** ck_order_status as published, and `others` beside it. */
+const besideListed =
+  (...others: Array<Partial<CheckMeta> & { name: string; expression: string | null }>) =>
+  (objects: ObjectMeta[]): void => {
+    withCheck({ expression: LISTED })(objects)
+    for (const other of others) withCheck(other)(objects)
   }
 
 const BASE = () => snapshot(withCheck({ expression: LISTED }))
@@ -114,12 +123,110 @@ describe('a select of listed values against its check', () => {
       withCheck({ expression: LISTED, validated: false }),
       'status offers the values ck_order_status listed, and ck_order_status no longer holds status to a list: it was not validated, so a row from before it may hold a value it does not list, which a select could not show.',
     ],
-    ['no longer a list', withCheck({ expression: "([status]<>'')" }), 'ck_order_status, whose values status offers, no longer lists the values of status.'],
+    [
+      'no longer a list',
+      withCheck({ expression: "([status]<>'')" }),
+      'ck_order_status, whose values status offers, is no longer a list this release reads, so whether it still takes every value status offers is not known; the database refuses one it does not, with a check violation.',
+    ],
   ])('a check %s is a field the column outgrew, for review', (_case, edit, message) => {
     const report = review(edit)
     expect(shape(report)[0]).toEqual(['column-outgrew-field', 'review', 'status'])
     expect(report.changes[0]?.message.startsWith(message)).toBe(true)
     expect(report.blocking).toBe(false)
+  })
+
+  // The database refuses what any enforced list leaves out, not only the
+  // published one's: a second list naming fewer values, or one added NOT
+  // VALID or WITH NOCHECK, which still holds every new or changed row,
+  // refuses shipped as surely as a narrowed ck_order_status. The rows are
+  // still held to values the select offers, so nothing outgrew. Watched
+  // failing with the second list read as the column no longer held to a
+  // list: review only, writes on, and a message saying no list held it.
+  test.each([
+    ['a second list', { validated: true }],
+    ['a second list added NOT VALID', { validated: false }],
+  ])('%s that leaves out a value the select offers stops its writes', (_case, state) => {
+    const report = review(besideListed({ name: 'ck_order_status_again', expression: "([status]='placed' OR [status]='draft')", ...state }))
+    expect(shape(report)).toEqual([
+      ['column-tightened', 'blocking', 'status'],
+      ['check-changed', 'info', 'ck_order_status_again'],
+    ])
+    expect(report.changes[0]?.message).toBe(
+      'ck_order_status_again does not list “shipped”, which status still offers and the database now refuses, so writes of status are blocked until the form is generated again.',
+    )
+    expect(report.writable).toEqual({ create: false, update: false, delete: false })
+  })
+
+  // Two lists that each leave a value out are named together; a disabled one
+  // refuses nothing, and says nothing about the field.
+  test('lists that between them leave out values are named together, and a disabled one is not', () => {
+    const report = review(
+      besideListed(
+        { name: 'ck_no_placed', expression: "([status]='shipped' OR [status]='draft')" },
+        { name: 'ck_no_shipped', expression: "([status]='placed' OR [status]='draft')" },
+        { name: 'ck_off', expression: "([status]='draft')", enforced: false, validated: false },
+      ),
+    )
+    expect(report.changes.filter((change) => change.kind !== 'check-changed').map((change) => [change.kind, change.message])).toEqual([
+      [
+        'column-tightened',
+        'ck_no_placed and ck_no_shipped between them do not list “placed” and “shipped”, which status still offers and the database now refuses, so writes of status are blocked until the form is generated again.',
+      ],
+    ])
+  })
+
+  // The rows are held to what every validated list names: a list naming a
+  // value the select does not offer, beside one that leaves it out, holds
+  // no row to it, and a value both name is one a row may hold, which the
+  // select cannot show.
+  test('two lists hold the rows to what both name', () => {
+    const wider = review(besideListed({ name: 'ck_wider', expression: "([status]='lost' OR [status]='shipped' OR [status]='placed' OR [status]='draft')" }))
+    expect(shape(wider)).toEqual([['check-changed', 'info', 'ck_wider']])
+    const both = review((objects) => {
+      withCheck({ expression: "([status]='lost' OR [status]='placed' OR [status]='draft')" })(objects)
+      withCheck({ name: 'ck_again', expression: "([status]='lost' OR [status]='shipped' OR [status]='placed' OR [status]='draft')" })(objects)
+    })
+    expect(shape(both)).toEqual([
+      ['column-tightened', 'blocking', 'status'],
+      ['column-outgrew-field', 'review', 'status'],
+      ['check-changed', 'info', 'ck_again'],
+      ['check-changed', 'info', 'ck_order_status'],
+    ])
+    expect(both.changes[1]?.message.startsWith('ck_again and ck_order_status now list “lost” too, and status does not offer it.')).toBe(true)
+  })
+
+  // A replacement the reader does not take may refuse a value the select
+  // offers, or not, and the reader cannot say which: it is for review, and
+  // the database refuses such a value with its own error, as it does one a
+  // changed check refuses (0010). Watched failing with the message as it
+  // was: it said only that the check no longer listed the values.
+  test('a list replaced by a narrower expression the reader does not take is for review, and says what is not known', () => {
+    const report = review(withCheck({ expression: "(([status]='placed' OR [status]='draft') AND len([status])>(0))" }))
+    expect(shape(report)).toEqual([
+      ['column-outgrew-field', 'review', 'status'],
+      ['check-changed', 'info', 'ck_order_status'],
+    ])
+    expect(
+      report.changes[0]?.message.startsWith(
+        'ck_order_status, whose values status offers, is no longer a list this release reads, so whether it still takes every value status offers is not known',
+      ),
+    ).toBe(true)
+    expect(report.blocking).toBe(false)
+  })
+
+  // A list in sight that refuses a value the select offers is proof enough,
+  // whatever else is out of sight. Watched failing with every listed field
+  // left to the gap once any check was: nothing blocked.
+  test('a list that leaves out a value stops writes beside a check out of sight', () => {
+    const report = review(
+      (objects) => {
+        withCheck({ expression: "([status]='placed' OR [status]='draft')" })(objects)
+        withCheck({ name: 'ck_hidden', expression: null })(objects)
+      },
+      [gap(ORDER_REF, 'checks')],
+    )
+    expect(shape(report)).toContainEqual(['column-tightened', 'blocking', 'status'])
+    expect(shape(report).filter(([kind]) => kind === 'column-outgrew-field')).toEqual([])
   })
 
   // Out of sight is the gap's to say, for a check as for any constraint: the

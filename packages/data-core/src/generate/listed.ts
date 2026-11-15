@@ -1,8 +1,8 @@
 import type { DatabaseKind } from '../adapter.js'
 import { codecForType } from '../codecs/codec.js'
-import type { ColumnMeta, ObjectMeta } from '../metadata.js'
+import type { CheckMeta, ColumnMeta, ObjectMeta } from '../metadata.js'
 import { readCheckList } from './check-lists.js'
-import type { ListedLiteral } from './check-lists.js'
+import type { CheckList, ListedLiteral } from './check-lists.js'
 import type { ControlPlan } from './controls.js'
 import { withoutLeadingZeros } from './defaults.js'
 
@@ -12,10 +12,11 @@ import { withoutLeadingZeros } from './defaults.js'
  * once, for the generator and for drift review, what a list means for one
  * column of one table: a select, nothing, or a refusal a note says.
  *
- * A select is drawn only where the database holds every row to the list
- * and nothing else might: one check, enforced and validated, every other
- * check of the table readable, over a text or whole-number column, each
- * value one the column's codec reads back as itself and none empty. Its
+ * A select is drawn only where the database holds every row to the list:
+ * one check, enforced and validated, over a text or whole-number column,
+ * each value one the column's codec reads back as itself and none empty.
+ * No other check is evaluated, readable or not: one that refuses a listed
+ * value leaves the select offering it, and the database refuses it. Its
  * options are the values as a record holding each reads back, each
  * labelled as it is stored, in a stated order -- a whole number's by its
  * value, a text's by codepoint -- because SQL Server writes an IN list
@@ -72,17 +73,49 @@ function ordered(column: ColumnMeta, values: readonly string[]): string[] {
   })
 }
 
+/** Each check of `object` read as a list of `column`'s values, in the snapshot's order. A text or whole-number column's only. */
+function listsOf(kind: DatabaseKind, object: ObjectMeta, column: ColumnMeta): Array<{ check: CheckMeta; read: CheckList }> {
+  if (column.type.kind !== 'text' && column.type.kind !== 'integer') return []
+  return object.checks.flatMap((check) => {
+    const read = check.expression === null ? null : readCheckList(kind, check.expression)
+    return read !== null && read.column === column.name ? [{ check, read }] : []
+  })
+}
+
+/**
+ * The values `list` names, each as a record holding it reads back, in the
+ * order drawn, and the first reason a select could not offer them all; a
+ * value the column cannot hold is none of them, since no row holds it.
+ * `null` where a literal is not one of the column's kind read with
+ * certainty: what the list admits is then not known.
+ */
+function valuesOf(kind: DatabaseKind, list: CheckList, column: ColumnMeta): { values: string[]; refusal: string | undefined } | null {
+  const codec = codecForType(column.type, column.nullable)
+  const values = new Set<string>()
+  let refusal: string | undefined
+  for (const literal of list.literals) {
+    const stored = asStored(kind, literal, column)
+    if (stored === undefined) return null
+    const parsed = codec.parse(stored)
+    if (!parsed.ok) {
+      refusal ??= `${quotedValue(stored)} is not a value the column holds: ${clause(parsed.message)}`
+      continue
+    }
+    // Never null: the codec was handed a value, and its canonical text is what a record holding it reads back as.
+    const value = String(parsed.value)
+    if (value === '') refusal ??= 'one of its values is empty, which a select cannot tell from no answer'
+    values.add(value)
+  }
+  return { values: ordered(column, [...values]), refusal }
+}
+
 /**
  * What the checks of `object` list for `column`, as `kind`'s catalog spells
  * them. A text or whole-number column only: another kind keeps its own
  * control, and a list over it is read as none, as a spelling not read is.
  */
 export function listedFor(kind: DatabaseKind, object: ObjectMeta, column: ColumnMeta): Listed {
-  if (column.type.kind !== 'text' && column.type.kind !== 'integer') return NONE
-  const lists = object.checks.flatMap((check) => {
-    const read = check.expression === null ? null : readCheckList(kind, check.expression)
-    return read !== null && read.column === column.name ? [{ check, read }] : []
-  })
+  const lists = listsOf(kind, object, column)
   const [only] = lists
   if (only === undefined) return NONE
   const { check, read } = only
@@ -90,22 +123,29 @@ export function listedFor(kind: DatabaseKind, object: ObjectMeta, column: Column
   if (lists.length > 1) return refused(`${lists.map((entry) => entry.check.name).join(' and ')} each list its values, and a select is drawn from one check`)
   if (!check.enforced) return refused('the database does not enforce it, so a row may hold a value it does not list')
   if (!check.validated) return refused('it was not validated, so a row from before it may hold a value it does not list, which a select could not show')
-  const hidden = object.checks.find((other) => other.expression === null)
-  if (hidden !== undefined) return refused(`${hidden.name} cannot be read by this connection, and may refuse a value it lists`)
+  const named = valuesOf(kind, read, column)
+  if (named === null) return NONE
+  if (named.refusal !== undefined) return refused(named.refusal)
+  return { kind: 'select', check: check.name, values: named.values }
+}
 
-  const codec = codecForType(column.type, column.nullable)
-  const values = new Set<string>()
-  for (const literal of read.literals) {
-    const stored = asStored(kind, literal, column)
-    if (stored === undefined) return NONE
-    const parsed = codec.parse(stored)
-    if (!parsed.ok) return refused(`${quotedValue(stored)} is not a value the column holds: ${clause(parsed.message)}`)
-    // Never null: the codec was handed a value, and its canonical text is what a record holding it reads back as.
-    const value = String(parsed.value)
-    if (value === '') return refused('one of its values is empty, which a select cannot tell from no answer')
-    values.add(value)
-  }
-  return { kind: 'select', check: check.name, values: ordered(column, [...values]) }
+/** One enforced check that lists a column's values, as drift review weighs it: its name, whether every row was proved against it, and what it admits -- `null` where that is not read with certainty. */
+export interface EnforcedList {
+  check: string
+  validated: boolean
+  values: string[] | null
+}
+
+/**
+ * Every enforced check of `object` that lists `column`'s values, read as
+ * `listedFor` reads one (0152): what the database refuses on a write --
+ * a list added NOT VALID or WITH NOCHECK holds every new or changed row --
+ * and, where validated, what every row already holds.
+ */
+export function enforcedLists(kind: DatabaseKind, object: ObjectMeta, column: ColumnMeta): EnforcedList[] {
+  return listsOf(kind, object, column)
+    .filter(({ check }) => check.enforced)
+    .map(({ check, read }) => ({ check: check.name, validated: check.validated, values: valuesOf(kind, read, column)?.values ?? null }))
 }
 
 /** The control a select of listed values is: each value its own label, as the column holds it (0152). */

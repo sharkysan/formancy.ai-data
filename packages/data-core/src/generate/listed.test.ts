@@ -162,11 +162,6 @@ describe('what a list means for one column', () => {
       'ck_status and ck_status_again each list its values, and a select is drawn from one check',
     ],
     [
-      'beside a check it cannot read',
-      [check('ck_status', STATUS_LIST.postgres), check('ck_hidden', null)],
-      'ck_hidden cannot be read by this connection, and may refuse a value it lists',
-    ],
-    [
       'with a value the column cannot hold',
       [check('ck_status', "((status)::text = ANY ((ARRAY['draft'::character varying, 'far too long for a varchar(20)'::character varying])::text[]))")],
       '“far too long for a varchar(20)” is not a value the column holds: at most 20 characters',
@@ -182,6 +177,24 @@ describe('what a list means for one column', () => {
     expect(binding(bindings.fields, 'status').listed).toBeUndefined()
     const [first] = checks
     expect(notes).toContainEqual({ subject: 'status', kind: 'inferred', message: `Not a select of the values ${first?.name ?? ''} lists: ${reason}.` })
+  })
+
+  // The select is the list's alone: no other check is evaluated, so one that
+  // refuses a listed value, readable or out of sight, leaves the select
+  // offering it, and the database refuses it on Save as a check violation.
+  // A refusal for an unread check alone, beside a readable one that refuses
+  // as much, would be a rule kept for a case neither engine produces:
+  // PostgreSQL never hides a check, and SQL Server hides a table's together
+  // -- VIEW DEFINITION is granted on the table and refused on a constraint,
+  // measured on 2022 (16.0.4295.3) on 2026-11-15 -- so its list is out of
+  // sight too. Watched failing with the unread check refused: the list was
+  // a box, with a note.
+  test('no other check of the table is consulted, readable or out of sight', () => {
+    const root = table(
+      [col('status', VARCHAR(20))],
+      [check('ck_status', STATUS_LIST.postgres), check('ck_not_shipped', "((status)::text <> 'shipped'::text)"), check('ck_hidden', null)],
+    )
+    expect(listedFor('postgres', root, root.columns[1] as ColumnMeta)).toEqual({ kind: 'select', check: 'ck_status', values: ['draft', 'placed', 'shipped'] })
   })
 
   // A list of another kind than the column's, or over a kind no select is
@@ -217,7 +230,7 @@ describe('a select of listed values downstream', () => {
   test('a whole number round-trips as its canonical text through the planner and the codec', () => {
     const root = table(
       [col('priority', INT32), col('big', INT64)],
-      [check('ck_priority', '([priority]=(3) OR [priority]=(2) OR [priority]=(-1))'), check('ck_big', '([big]=(9007199254740993) OR [big]=(0))')],
+      [check('ck_priority', '([priority]=(3) OR [priority]=(2) OR [priority]=(-1))'), check('ck_big', '([big]=(0) OR [big]=(9007199254740993.))')],
     )
     const { form, bindings } = generated('sqlserver', root)
     expect(field(form, 'priority')).toMatchObject({ type: 'select', options: options(['-1', '2', '3']) })
