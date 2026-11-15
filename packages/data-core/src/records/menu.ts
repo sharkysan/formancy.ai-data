@@ -1,5 +1,5 @@
 import { canonicalize } from '@formancy/spec'
-import { offers } from '../generate/offers.js'
+import { offeredFor } from '../generate/offers.js'
 import type { FieldBinding, FormBindings, SectionBinding } from '../generate/types.js'
 import { authorizeOperation, readableFields } from '../policy/evaluate.js'
 import { byCodepoint, OPERATIONS } from '../policy/inputs.js'
@@ -10,6 +10,8 @@ import { formValue } from './answers.js'
 import { childLookups, parentKey, referencingFields } from './children.js'
 import type { ChildLookup, ParentKey, PublishedTable } from './children.js'
 import { listable } from './list.js'
+import { menuSaves, menuTogether, togetherChildren } from './together.js'
+import type { MenuSaves, MenuTogether } from './together.js'
 
 /*
  * The forms a person's menu names, and the children under each (0045):
@@ -25,14 +27,16 @@ import { listable } from './list.js'
  * The operations this person may use on the form as published, in read,
  * create, update, delete order: those the policy grants them -- an
  * operation it cannot scope for their context is not granted
- * (`authorizeOperation`) -- of those the bindings offer, by `offers()`,
- * which reads an absent flag as not offered: every form published before
- * 0050 says nothing of delete, and offers none (0050). `GET /v1/forms/:id`
- * narrows this by the database as it is now; the menu says it as it is.
- * One function, so the two cannot disagree about the policy.
+ * (`authorizeOperation`) -- of those the bindings offer for a write alone,
+ * by `offeredFor`, which reads an absent flag as not offered: every form
+ * published before 0050 says nothing of delete, and offers none (0050);
+ * and a together child offers no create or delete alone, its rows being
+ * added and removed with their record (0155). `GET /v1/forms/:id` narrows
+ * this by the database as it is now; the menu says it as it is. One
+ * function, so the two cannot disagree about the policy.
  */
 export function grantedOperations(bindings: FormBindings, policy: FormPolicy, context: PolicyContext): PolicyOperation[] {
-  return OPERATIONS.filter((operation) => (operation === 'read' || offers(bindings, operation)) && authorizeOperation(policy, context, operation).ok)
+  return OPERATIONS.filter((operation) => (operation === 'read' || offeredFor(bindings, operation, null)) && authorizeOperation(policy, context, operation).ok)
 }
 
 /** One published form as the menu reads it: its id, its title, what its presentation says of its group, and what deciding its entry needs. */
@@ -50,8 +54,9 @@ export interface MenuBundle extends PublishedTable {
  * fields they may narrow its list by (`listable`, which the list route
  * asks; `null` when they are offered no list of it), and what its records
  * offer a child and what its lookups reference (`parentKey`,
- * `childLookups`). Empty but for its names and operations when they may
- * not read it: nothing more of it is needed.
+ * `childLookups`). Empty but for its names, its operations and its
+ * together lookup when they may not read it: nothing more of it is
+ * needed.
  */
 export interface MenuForm {
   id: string
@@ -64,6 +69,10 @@ export interface MenuForm {
   lookups: ChildLookup[]
   /** The column fields this person may read, each with the column it is bound to: what a section's condition is read from (0109). */
   readable: ColumnBinding[]
+  /** Its together lookup (0155), read whether or not this person may read the form, since a bound applies to everyone; `null` where it has none. */
+  together: MenuTogether | null
+  /** What its records need of the form itself to carry a save of their rows (`menuSaves`), `null` where they cannot or this person may not read it. */
+  saves: MenuSaves | null
 }
 
 type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
@@ -77,7 +86,8 @@ type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
 export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
   const operations = grantedOperations(bundle.bindings, bundle.policy, context)
   const named = { id: bundle.id, title: bundle.title, group: formGroup(bundle.group, bundle.bindings.root, bundle.snapshot.kind) }
-  if (!operations.includes('read')) return { ...named, operations, listedBy: null, key: null, lookups: [], readable: [] }
+  const together = menuTogether(bundle, context)
+  if (!operations.includes('read')) return { ...named, operations, listedBy: null, key: null, lookups: [], readable: [], together, saves: null }
   const listed = listable(bundle.snapshot, bundle.bindings, bundle.policy, context)
   const fields = readableFields(bundle.policy, context, bundle.bindings)
   const read = new Set(fields.ok ? fields.fields : [])
@@ -89,6 +99,8 @@ export function menuForm(bundle: MenuBundle, context: PolicyContext): MenuForm {
     key: parentKey(bundle),
     lookups: childLookups(bundle),
     readable,
+    together,
+    saves: menuSaves(bundle),
   }
 }
 
@@ -121,6 +133,13 @@ function sectionWhen(parent: MenuForm, section: SectionBinding): FormMenuChild['
  * named only where a page asking its list with that parent would be served
  * by the policy; the database as it is now, which can still refuse a page
  * as drift, is asked when the child form is opened.
+ *
+ * A form whose records a together child requires rows of (0155) is not
+ * offered `create` where this person could not make that save: the child
+ * is not one of its children here, or its `TogetherChild` gives them no
+ * create of the child's rows with the record -- every such child of every
+ * form, read or not, since a bound applies to everyone. The create route
+ * refuses a plain create of such a record whoever asks.
  */
 export function formMenu(forms: readonly MenuForm[]): FormMenu {
   const named = forms.filter((form) => form.operations.includes('read')).sort((left, right) => byCodepoint(left.id, right.id))
@@ -135,7 +154,10 @@ export function formMenu(forms: readonly MenuForm[]): FormMenu {
           children.push({ form: child.id, field, one: section !== null, when: section === null ? null : sectionWhen(parent, section) })
         }
       }
-      return { id: parent.id, title: parent.title, group: parent.group, operations: [...parent.operations], children }
+      const shown = (id: string, field: string): boolean => children.some((child) => child.form === id && child.field === field)
+      const unsaved = togetherChildren(parent, forms).some((entry) => entry.required && !(shown(entry.form.id, entry.field) && entry.together.created.create))
+      const operations = unsaved ? parent.operations.filter((operation) => operation !== 'create') : [...parent.operations]
+      return { id: parent.id, title: parent.title, group: parent.group, operations, children }
     }),
   }
 }

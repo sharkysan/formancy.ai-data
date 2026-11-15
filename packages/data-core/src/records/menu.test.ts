@@ -26,6 +26,7 @@ import {
   sectioned,
   snapshot,
   TENANT,
+  togetherOn,
 } from './test-support.js'
 
 /*
@@ -306,6 +307,37 @@ describe('a section under its parent (0109)', () => {
     expect(menuOf([hidden, company()], CLERK).forms.find((entry) => entry.id === 'customer')?.children).toEqual([
       { form: 'company', field: 'customer', one: true, when: null },
     ])
+  })
+})
+
+describe('a record whose rows are saved with it (0155)', () => {
+  const lines = (policy: FormPolicy = LINE_POLICY, bounds = { min: 1, max: 3 }, connection = 'erp') =>
+    bundle('order-line', 'Order line', PG, togetherOn(lineForm(PG).bindings, 'order', bounds), policy, connection)
+  const operationsOf = (bundles: readonly MenuBundle[], context: PolicyContext = CLERK) =>
+    Object.fromEntries(menuOf(bundles, context).forms.map((entry) => [entry.id, entry.operations]))
+
+  // An order that must hold a line is created with its lines, in one
+  // save, so the menu offers its create only to a person who could make
+  // that save: one the line form is a child of the order for, who may
+  // create its rows in a save. Not to a clerk whose line policy keeps
+  // creating lines to managers, nor to one who may not read the lines at
+  // all -- a bound applies to everyone, so a child they cannot see still
+  // requires rows. A min of 0, or lines on another connection, require
+  // nothing. The line form itself never offers create alone. Watched
+  // failing with the menu asking nothing of together children: every
+  // clerk was offered the order's create.
+  test('leaves out the create of a record whose rows are required exactly where the person could not make the save', () => {
+    expect(operationsOf([ORDER, lines()])).toEqual({ order: ['read', 'create', 'update'], 'order-line': ['read', 'update'] })
+    const managersCreate = lines({ ...LINE_POLICY, operations: { ...LINE_POLICY.operations, create: ['manager'] } })
+    expect(operationsOf([ORDER, managersCreate])).toEqual({ order: ['read', 'update'], 'order-line': ['read', 'update'] })
+    // Clerks may create lines and not read them: no tab of lines is theirs to add them in.
+    const managersRead = lines({ ...LINE_POLICY, operations: { read: ['manager'], create: ['clerk'], update: [] } })
+    expect(operationsOf([ORDER, managersRead])).toEqual({ order: ['read', 'update'] })
+    expect(operationsOf([ORDER, lines(LINE_POLICY, { min: 0, max: 3 })])).toEqual({ order: ['read', 'create', 'update'], 'order-line': ['read', 'update'] })
+    expect(operationsOf([ORDER, lines(LINE_POLICY, { min: 1, max: 3 }, 'archive')])).toEqual({
+      order: ['read', 'create', 'update'],
+      'order-line': ['read', 'update'],
+    })
   })
 })
 

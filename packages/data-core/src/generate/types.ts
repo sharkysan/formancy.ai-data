@@ -15,6 +15,18 @@ export interface LookupChoice {
    * company details while its kind is `company`. `null` shows it always.
    */
   section?: { when: SectionCondition | null }
+  /**
+   * This form's rows are saved with the record the foreign key references,
+   * in one transaction, and that record holds at least `min` and at most
+   * `max` of them through the two forms (0155). Never inferred.
+   */
+  together?: TogetherBounds
+}
+
+/** How many rows of a together child one record holds (0155): whole numbers, `0 <= min <= max`, `max` at least 1. */
+export interface TogetherBounds {
+  min: number
+  max: number
 }
 
 /** A column of the table a section's lookup references, and the value it holds while the section is shown (0109). */
@@ -45,6 +57,13 @@ export interface GenerationRequest {
    * concurrency strategy is how a lost update happens.
    */
   versionColumn?: string
+  /**
+   * For a root whose concurrency is a rowversion: the column a save of a
+   * record's rows alone sets to itself, so that the rowversion moves
+   * (0155). Confirmed by an administrator, never inferred, as a version
+   * column is.
+   */
+  touchColumn?: string
   /**
    * Root columns the form's policy pins to trusted context — the tenant
    * column, typically (0011). The request never supplies them: on create they
@@ -157,6 +176,12 @@ export type FieldBinding =
        * lookup of a form is.
        */
       section?: SectionBinding
+      /**
+       * The choice's `together` (0155): this form's rows are saved with the
+       * record the lookup references; absent for a lookup that is not. At
+       * most one lookup of a form is, and it is written on create only.
+       */
+      together?: TogetherBounds
     }
 
 export interface ConcurrencyBinding {
@@ -164,6 +189,8 @@ export interface ConcurrencyBinding {
   column: string
   /** Database-generated, or confirmed by an administrator. An inferred one is not used. */
   confirmed: boolean
+  /** A rowversion's confirmed touch column (0155), the request's `touchColumn`; absent where none is confirmed. */
+  touch?: string
 }
 
 /**

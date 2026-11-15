@@ -1,6 +1,6 @@
 import { canonicalize } from '@formancy/spec'
 import type { ApiValue } from '../codecs/codec.js'
-import { offers } from '../generate/offers.js'
+import { offeredFor } from '../generate/offers.js'
 import type { FormBindings, ValidityBinding } from '../generate/types.js'
 import type { ColumnMeta, MetadataSnapshot } from '../metadata.js'
 import { authorizeOperation, checkSubmittedFields } from '../policy/evaluate.js'
@@ -31,7 +31,7 @@ import type { DescribedTable, RecordColumn } from './types.js'
  */
 export function versionFields(bindings: FormBindings): { from: string; to: string; key: string[] } | null {
   const validity = bindings.validity
-  if (validity === undefined || !offers(bindings, 'supersede')) return null
+  if (validity === undefined || !offeredFor(bindings, 'supersede', null)) return null
   const from = fieldOf(bindings, validity.from)
   const to = fieldOf(bindings, validity.to)
   // The chain's key by the fields that hold it, each once: a lookup holds several of its columns.
@@ -80,7 +80,7 @@ export function planSupersede(
   const { prepared } = ready
   const validity = bindings.validity
   const concurrency = prepared.target.concurrency
-  if (validity === undefined || concurrency === null || !offers(bindings, 'supersede'))
+  if (validity === undefined || concurrency === null || !offeredFor(bindings, 'supersede', null))
     return refuse('operation-unavailable', 'This form does not offer a change from a date.')
   if (!prepared.addressable) return unaddressable(prepared)
   for (const operation of ['update', 'create'] as const) {

@@ -2,6 +2,8 @@ import type { ApiValue } from '../codecs/codec.js'
 import { codecFor } from '../codecs/codec.js'
 import { decodeRowversion } from '../codecs/rowversion.js'
 import { readsCutToShape } from '../codecs/temporal.js'
+import { offeredFor, offers, type OfferedOperation, type WriteScope } from '../generate/offers.js'
+import { togetherOf } from '../generate/together.js'
 import type { FormBindings } from '../generate/types.js'
 import { buildLookupConfig } from '../lookup/config.js'
 import { scopeRowFilters } from '../lookup/filters.js'
@@ -17,7 +19,7 @@ import type { FieldError, FormRecord, InvalidValues, MembershipCheck, PlannedIns
 import { columnsOf, prepare, type Prepared, refuse, unaddressable } from './prepare.js'
 import { filtersFor, readColumns, throughFields, throughFor } from './scope.js'
 import { decodeRecordKey } from './token.js'
-import { clockOf, stampedColumns, stampsOf } from './stamps.js'
+import { clockOf, type Stamped, stampedColumns, stampsOf } from './stamps.js'
 import { planMove } from './transition.js'
 import type { DescribedTable, RecordColumn, RecordValue } from './types.js'
 
@@ -217,6 +219,32 @@ export function pinnedValues(prepared: Prepared, policy: FormPolicy, context: Po
 }
 
 /**
+ * Why the form does not offer `operation` in `scope`, in words: a together
+ * child's rows are added and removed with their record (0155), which is
+ * not the same as a form that offers no such write at all.
+ */
+export function unoffered(bindings: FormBindings, operation: OfferedOperation, scope: WriteScope): PlanRefusal {
+  if (scope === null && offers(bindings, operation) && togetherOf(bindings) !== null) {
+    return refuse('operation-unavailable', "This form's rows are created and deleted with the record they belong to, in one save.")
+  }
+  return refuse(
+    'operation-unavailable',
+    scope === null ? `This form does not offer ${operation}.` : `This form does not offer ${operation} in a save of ${scope.save}.`,
+  )
+}
+
+/**
+ * In a save (0155), the field that names the record a row is saved with,
+ * and its columns: the save supplies them from the record, so the answers
+ * never carry the field and nothing requires it. `null` for a write alone.
+ */
+function savedWith(bindings: FormBindings, scope: WriteScope): { field: string; columns: ReadonlySet<string> } | null {
+  if (scope === null) return null
+  const binding = bindings.fields.find((candidate) => candidate.field === scope.save)
+  return { field: scope.save, columns: new Set(binding === undefined ? [] : columnsOf(binding)) }
+}
+
+/**
  * The insert for a person's answers — or why not, or which fields are wrong.
  *
  * Over-posting is refused before any value is read. The tenant is written
@@ -227,6 +255,12 @@ export function pinnedValues(prepared: Prepared, policy: FormPolicy, context: Po
  * `described` is the root as the catalog described it in this request
  * (0041): a create it stops is refused `drift`, and the insert carries its
  * definition, so it runs only while the table still has it.
+ *
+ * In a save (`scope`, 0155), a row of the together lookup's form: the
+ * field that names the record is the save's, so an answer for it is
+ * over-posting, and its columns are neither required, nor scoping, nor in
+ * the insert -- not even a pinned one -- since the save supplies them from
+ * the record, whose row it checks under this lookup's filter (`within`).
  */
 export function planCreate(
   snapshot: MetadataSnapshot,
@@ -235,26 +269,33 @@ export function planCreate(
   context: PolicyContext,
   answers: unknown,
   described: DescribedTable,
+  scope: WriteScope = null,
 ): PlannedInsert {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
   const { prepared } = ready
-  if (!bindings.operations.create) return refuse('operation-unavailable', 'This form does not offer create.')
+  if (!offeredFor(bindings, 'create', scope)) return unoffered(bindings, 'create', scope)
   const submitted = readAnswers(answers)
   if (!submitted.ok) return submitted
   const pinned = pinnedValues(prepared, policy, context)
   if (!pinned.ok) return pinned
   const allowed = checkSubmittedFields(policy, context, bindings, 'create', [...submitted.answers.keys()])
   if (!allowed.ok) return allowed
-  const scoping = throughFields(bindings, policy, context, 'create')
-  if (!scoping.ok) return scoping
+  const saved = savedWith(bindings, scope)
+  if (saved !== null && submitted.answers.has(saved.field)) {
+    return refuse('over-posting', `${saved.field} names the record this row is saved with, which the save supplies and the request never does`)
+  }
+  const through = throughFields(bindings, policy, context, 'create')
+  if (!through.ok) return through
+  const scoping = new Set([...through.fields].filter((field) => field !== saved?.field))
   const drifted = driftRefusal(snapshot, bindings, policy, described, 'create')
   if (drifted !== undefined) return drifted
   const stamps = stampsOf(prepared, bindings, context, 'create')
   if (!stamps.ok) return stamps
 
   const fixed = new Map(pinned.values.map((entry) => [entry.name, entry.value]))
-  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping.fields, stampedColumns(bindings, 'create'))
+  const supplied = new Set([...stampedColumns(bindings, 'create'), ...(saved?.columns ?? [])])
+  const decoded = decodeAnswers(prepared, bindings, submitted.answers, fixed, 'create', scoping, supplied)
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'create', decoded.selections)
   if (!memberships.ok) return memberships
@@ -262,7 +303,8 @@ export function planCreate(
   if (!move.ok) return move
 
   const { fields, returning } = readBack(prepared, bindings, policy, context)
-  const values = inCatalogValues(prepared.root, [...pinned.values, ...decoded.values, ...stamps.stamped.values])
+  const pins = pinned.values.filter((entry) => saved?.columns.has(entry.name) !== true)
+  const values = inCatalogValues(prepared.root, [...pins, ...decoded.values, ...stamps.stamped.values])
   // A create of a chain's first version holds only where the chain has none
   // (0113), asked of the key's values it writes. A key part the database
   // fills is not compared: a part of the key alone would match other chains.
@@ -349,6 +391,11 @@ function withoutCutEchoes(
  * that read, or by `describe` (0041): an update it stops is refused `drift`,
  * and the update carries its definition, so it runs only while the table
  * still has it.
+ *
+ * `scope` is where the update is made (0155): alone, or as a row in a
+ * save. `touch` is a save's record step: answers that change no column are
+ * not refused `nothing-to-update` but planned with nothing to set and no
+ * stamp, which `planSave` makes the touch that moves the record's version.
  */
 export function planUpdate(
   snapshot: MetadataSnapshot,
@@ -360,11 +407,13 @@ export function planUpdate(
   answers: unknown,
   asRead: FormRecord | undefined,
   described: DescribedTable,
+  options: { scope?: WriteScope; touch?: boolean } = {},
 ): PlannedUpdate {
   const ready = prepare(snapshot, bindings)
   if (!ready.ok) return ready
   const { prepared } = ready
-  if (!bindings.operations.update) return refuse('operation-unavailable', 'This form does not offer update.')
+  const scope = options.scope ?? null
+  if (!offeredFor(bindings, 'update', scope)) return unoffered(bindings, 'update', scope)
   const concurrency = prepared.target.concurrency
   if (concurrency === null) {
     return refuse('operation-unavailable', 'Update needs a confirmed concurrency token, and this form has none: a stale save could not be detected.')
@@ -405,9 +454,13 @@ export function planUpdate(
   if (decoded.errors.length > 0) return invalid(decoded.errors)
   // No statement sets nothing alike on both engines, so an empty patch is
   // refused here, once -- asked before the stamps, which say who changed
-  // the record and when, and are no change of their own (0153).
-  if (decoded.values.length === 0) return refuse('nothing-to-update', 'These answers change no column.')
-  const stamps = stampsOf(prepared, bindings, context, 'update')
+  // the record and when, and are no change of their own (0153). A save's
+  // touch changes none of the record's columns either, and stamps nothing.
+  const touching = decoded.values.length === 0
+  if (touching && options.touch !== true) return refuse('nothing-to-update', 'These answers change no column.')
+  const stamps: { ok: true; stamped: Stamped } | PlanRefusal = touching
+    ? { ok: true, stamped: { values: [], clock: [] } }
+    : stampsOf(prepared, bindings, context, 'update')
   if (!stamps.ok) return stamps
   const memberships = membershipChecks(snapshot, bindings, policy, context, 'update', decoded.selections)
   if (!memberships.ok) return memberships
