@@ -4352,7 +4352,7 @@
       ]
     },
     "0153": {
-      "reviewed": "sha256:5807b148bf39fa1d57c9f16a98859d069df9326911c59b0a7bcb5e037b23cf55",
+      "reviewed": "sha256:215123108ced570860c3b9d9f96e94f0ad0e29f4be5e367d583670342d9eeb66",
       "limitations": [
         {
           "area": "writes",
@@ -4393,7 +4393,11 @@
         },
         {
           "area": "testing",
-          "says": "What each engine stores for a stamp was not run against a server when the change was made; the parity suites hold it on both engines in CI, and nothing tests a stamp into SQL Server's smalldatetime, which rounds to the minute."
+          "says": "The parity suites that hold what each engine stores for a stamp were run for this change on each engine's default image alone, and nothing tests a stamp into SQL Server's smalldatetime, which rounds to the minute."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server an id that a code-page column's code page cannot hold passes the codec and is refused by the database: 422 out-of-range, with a field error on the stamped field, which the person cannot write, rather than 403 unstampable. Nothing tests it."
         }
       ]
     }

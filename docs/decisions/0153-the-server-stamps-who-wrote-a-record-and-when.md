@@ -31,7 +31,9 @@
   `unstampable`, naming the column (watched failing with the codec
   skipped); an update restamps what it stamps and nothing of the create's,
   and an update that changes nothing is still `nothing-to-update` (watched
-  failing with the create's stamps planned on update); a read and an
+  failing with the create's stamps planned on update), even from a person
+  whose id the column cannot hold (watched failing with the stamps planned
+  before the empty patch was refused: `unstampable`); a read and an
   update are filtered by the tenant alone; the fields a page sends and a
   copy carries name no stamp (watched failing with the stamped fields
   generated writable); a row filter on a stamped column is refused
@@ -44,8 +46,11 @@
   failing with the stamp unasked: a note, and every create left to the
   database to refuse); narrowed under a stamp of who, it stops them, and
   the runtime refuses those writes and allows the others (watched failing
-  with `stampStops` unasked); a stamp of the time narrowed to less
-  precision, or to NOT NULL, stops nothing (watched failing with every
+  with `stampStops` unasked); retyped to a number, or now computed, a
+  stamped column no field shows stops the create that stamps it, and not
+  the update (watched failing with each half of the retyped check taken
+  out in turn: create stayed offered); a stamp of the time narrowed to
+  less precision, or to NOT NULL, stops nothing (watched failing with every
   narrowing stopping); a revoked grant stops the write it stamps (watched
   failing with the stamp unasked: update stayed offered).
   `packages/data-postgres/src/records/stamps.test.ts` and
@@ -62,11 +67,19 @@
   context, the time between the engine's own clock read before and after,
   the instant's place against a default of the engine's clock, its offset,
   the wall clock and the day in UTC, `logged_at` within half its column's
-  unit, and a change from a date stamping its next version only (to be
-  watched failing in CI with the clock left out of each statement --
-  23502 and 515, NOT NULL -- with `clockSql` reading PostgreSQL's session
-  zone under the owner's Pacific/Chatham session, and with SQL Server's
-  instant stamped by `sysdatetimeoffset()`).
+  unit, and a change from a date stamping its next version only (watched
+  failing on both engines with the clock left out of the insert -- 23502
+  and 515, NOT NULL -- of the update's SET and of the next version; on
+  PostgreSQL with `localtimestamp` for the wall clock under the owner's
+  Pacific/Chatham session, and with `clock_timestamp()` for the instant;
+  not watched with SQL Server's instant stamped by `sysdatetimeoffset()`,
+  which fails only on a server whose zone is not UTC, as the container's
+  is). In the same files, a write whose clock names a column it may not
+  write -- named twice, the version column, the next version's end or a
+  column of its chain, and on PostgreSQL an update's filter column or end
+  -- is thrown before anything is sent (watched failing with the clock
+  left out of PostgreSQL's request checks and of SQL Server's check of the
+  next version: the requests were sent, and some written).
   `packages/data-server/src/routes/runtime-stamps.integration.test.ts`, on
   both engines through the runtime plane -- the form proposed with its
   stamps and published; Alice's create stores her id and site and the
@@ -74,8 +87,8 @@
   restamps who changed it and keeps who created it; an echo of a stamp
   changed is refused; Carol reads what Alice created; an id the column
   cannot hold is 403 `unstampable` and a token without the attribute 403
-  `missing-attribute` (to be watched failing in CI with the stamps left out
-  of the insert, which the database refuses).
+  `missing-attribute` (watched failing on both engines with the planner's
+  stamps of who left out of the insert: 422, created_by NOT NULL).
   `packages/data-server/src/bundle.test.ts` -- a stored request's stamps
   are its bindings' exactly, in any order, read as strictly as the rest of
   it (watched failing with the stamps left out of the comparison, and with
@@ -92,7 +105,10 @@
   the request and the generator binds it, every control named and axe
   clean (watched failing with the stamps left out of the request); an
   attribute without a name and a column pinned and stamped are said before
-  anything is sent (watched failing with the stamps unasked); an integer
+  anything is sent (watched failing with the stamps unasked); a column
+  pinned after it was stamped keeps its box, ticked and said to be taken,
+  so the stamp can be unticked (watched failing with the boxes drawn of
+  the candidates alone: no box could); an integer
   created_by is neither offered nor suggested (watched failing with the
   candidates asked of nothing but the key, and with the suggestion asked of
   the name alone); and a published form generated again keeps its stamp
@@ -149,9 +165,11 @@ nothing, so whoever may read sees the records others wrote.
 (`records/stamps.ts`): the actor's id or the attribute, through the
 column's codec, beside the pinned tenant among the insert's values or the
 update's SET. An attribute the context lacks is `missing-attribute`; a
-value the column cannot hold -- an id longer than it, text it refuses --
-is `unstampable`, 403, naming the column and never the value, and is never
-cut to fit.
+value the column's codec refuses -- an id longer than the column, in its
+unit -- is `unstampable`, 403, naming the column and never the value, and
+is never cut to fit. The stamps are planned once the update is known to
+change something, so an update that changes nothing is that, whoever
+sends it.
 
 **When is the database's clock, in the statement itself**, as fixed SQL:
 the request carries the column and its type (`ClockColumn`), never a time.
@@ -207,6 +225,9 @@ a box, unticked. One whose name is an audit column's --
 or `_date`, in any case, where its kind can take it -- comes first, says
 what its name suggests, and starts with it once ticked: who or when, on
 create for `created_` and on both for the others. A name is never a stamp.
+A column ticked and then taken by something else in the step -- a pin, a
+lookup, the version column, a chain -- keeps its box, said to be taken,
+until it is unticked.
 
 ## Consequences
 
@@ -239,14 +260,23 @@ What it costs:
   offers the write to a person whose token lacks the attribute a stamp
   names, and refuses it with `missing-attribute`; an id longer than the
   column refuses every save of that person until the column is widened.
+- **Only what the codec sees is `unstampable`.** A value the codec
+  accepts and the database then refuses is the database's answer for that
+  column: on SQL Server, a code-page varchar whose code page lacks a
+  character of the id passes the codec, which checks a code-page column
+  by its characters only, and fails the batch's check that text was
+  stored as sent -- 422 `out-of-range`, with a field error on the stamped
+  field, which the person cannot write. Read from the code; nothing tests
+  a stamp into such a column.
 - **The ended version of a chain is not restamped**: who ended it is the
   next version's creator.
-- **What each engine does was not measured in this change.** The parity
-  suites hold each expectation above on both engines and the release
-  report fails a run where one is missing; they were written where no
-  container could be started, and are to be watched failing in CI.
-  SQL Server's smalldatetime, which rounds to the minute, has no column in
-  the fixture, and nothing tests a stamp into one.
+- **What each engine does is held by the parity suites**, on both engines,
+  and the release report fails a run where one is missing; they passed on
+  each engine's default image (`packages/data-fixtures/src/images.ts`) on
+  2026-11-15, and nothing else of the image matrix was run for this
+  change. SQL Server's
+  smalldatetime, which rounds to the minute, has no column in the fixture,
+  and nothing tests a stamp into one.
 
 ## Alternatives considered
 

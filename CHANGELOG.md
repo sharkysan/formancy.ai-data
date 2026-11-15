@@ -45,8 +45,9 @@ the same day (formancy.ai 0232).
   on the key, the version column, a pinned column, a lookup's or a chain's
   is refused when the form is generated; a server older than this release
   refuses a stored version that stamps. Only writes through the module are
-  stamped. The parity suites that hold each engine's clock were written
-  where no container could start, and are to be watched failing in CI.
+  stamped, and on SQL Server an id a code-page column's code page cannot
+  hold is the database's 422 on the stamped field rather than
+  `unstampable`.
 - **An administrator gives a field another starting value** (0150). Why:
   since 0149 a new record starts at its column's constant default, which
   was the database's to say -- a column that defaults to `draft` for the
