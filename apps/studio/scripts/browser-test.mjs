@@ -187,7 +187,7 @@ async function wayIn(gate, page) {
  */
 async function underReview(gate, page, { refuseFonts, guard }) {
   const plane = await startPlane({ review: true })
-  const { http, port } = await serve(plane)
+  const { port, close } = await serve(plane)
   try {
     const origin = `http://127.0.0.1:${String(port)}`
     guard.allow(origin)
@@ -209,8 +209,9 @@ async function underReview(gate, page, { refuseFonts, guard }) {
     // own: every check of what the policy refused heard something.
     gate.check('and the policy held: an inline script put in the page was refused, and the page heard the refusal', canaryProblem(await canary(page), POLICY))
   } finally {
-    http.close()
-    await plane.close()
+    // The origin, with every connection the page holds, then the plane once
+    // it has answered what it was handed (scripts/gate-origin.mjs).
+    await close()
   }
 }
 
@@ -228,7 +229,7 @@ async function run(gate, browser) {
   for (const { label, width, refuseFonts = false } of list) {
     gate.pass({ label, width })
     const plane = await startPlane()
-    const { http, port } = await serve(plane)
+    const { port, close } = await serve(plane)
     const page = await browser.newPage({ viewport: { width, height: 900 } })
     const origin = `http://127.0.0.1:${String(port)}`
     // Every request to another origin refused and named at the end of the
@@ -259,9 +260,10 @@ async function run(gate, browser) {
       gate.check('after the journey’s last state, the browser refused nothing under the page’s policy', await policyRefused(page))
       await underReview(gate, page, { refuseFonts, guard })
     } finally {
+      // The page first, which sends every request, then the origin and the
+      // plane behind it (scripts/gate-origin.mjs).
       await page.close()
-      http.close()
-      await plane.close()
+      await close()
     }
   }
 

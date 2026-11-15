@@ -234,7 +234,9 @@ and each of these fails on the change that breaks what it holds:
 - **What a gate measures without a browser or Docker.**
   `scripts/browsers.test.mjs` and `scripts/browser-gate.test.mjs` for the
   browser gates
-  ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md));
+  ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)),
+  and `scripts/gate-origin.test.mjs` for the origin the studio's and the
+  host page's gates serve from, against the plane's own Fastify (10.5);
   `scripts/pictures/*.test.mjs` for the pictures
   ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md));
   `scripts/getting-started/*.test.mjs` for the guide's tables, control names
@@ -359,6 +361,27 @@ Grid's style elements refused
 ([0083](../decisions/0083-the-studio-and-the-host-page-are-served-under-a-content-security-policy-each.md)).
 The host page's gate starts PostgreSQL alone, because layout, focus and
 colour do not depend on the engine.
+
+The studio's and the host page's gates serve the built page and the plane
+from one origin, `scripts/gate-origin.mjs`, which hands each request under
+`/v1/` to the plane's Fastify through `inject`. Fastify's own close waits
+for no injected request and refuses one handed to it after, so the origin
+closes first: it stops taking connections, drops every one the browser
+holds, kept alive or partway through a request, and closes the plane only
+once the plane has answered every request it was handed; a request the
+plane refuses is answered 503. The host page's gate closes its browser and
+its TCP hop before its origin. Before this order WebKit's leg failed after
+its last check had passed, as an unhandled rejection: a request refused by
+a plane that had closed, and postgres.js's fetch of array types, which it
+does not await, on a connection the database's stop reset -- one only a
+request still being answered after the plane's server had closed could
+have opened, since the connection registry opens a pool again when asked
+after it has closed, and nothing ends that one.
+`scripts/gate-origin.test.mjs` fails when a refusal goes unanswered, when
+a connection outlives the origin's close, and when the plane closes with a
+request still being answered. That each gate calls the origin's close
+after its browser or its page, and the host's after its hop, is held by
+review.
 
 Every check runs in Chromium, Firefox and WebKit, headless, in Playwright's
 builds, none skipped or loosened for a browser

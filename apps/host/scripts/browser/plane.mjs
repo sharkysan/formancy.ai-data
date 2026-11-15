@@ -221,7 +221,14 @@ export async function startPlane() {
     refuseNext: () => {
       refusing = 1
     },
-    /** Each step named to `step` before it runs, for the gate to say which one a late error came in. */
+    /**
+     * Each step named to `step` before it runs, for the gate to say which
+     * one a late error came in. Called by the page's origin once the server
+     * has answered every request it was handed (scripts/gate-origin.mjs):
+     * the server's close waits for no injected request, and the registry
+     * opens a connection again for one that asks after it has closed, a
+     * pool nothing ends, which the database's stop then resets.
+     */
     close: async (step = () => {}) => {
       step('closing the server')
       await server.close()
