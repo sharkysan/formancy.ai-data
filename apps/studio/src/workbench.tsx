@@ -213,6 +213,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const versionColumn = generation.versionColumn ?? null
     // A chain of versions (0113) is the request's too: left out, the next version would be a form of records of their own.
     const validity = generation.validity ?? null
+    // So are the stamps (0153): left out, the next version would let a person type who created a record.
+    const stamps = generation.stamps ?? []
     const request: ProposalRequest = {
       connection,
       root,
@@ -222,9 +224,10 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       pinned: generation.pinned ?? [],
       ...(versionColumn === null ? {} : { versionColumn }),
       ...(validity === null ? {} : { validity }),
+      ...(stamps.length === 0 ? {} : { stamps }),
     }
     setDiscovered({ connection, snapshot })
-    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, validity } })
+    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, validity, stamps } })
     setPolicy(withRequiredLookupPins(regeneration.policy, bindings))
     setGenerated({
       request,

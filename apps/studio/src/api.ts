@@ -8,6 +8,7 @@ import type {
   MetadataSnapshot,
   ObjectRef,
   ReassignedKey,
+  StampChoice,
 } from '@formancy/data-core'
 import type {
   Administration,
@@ -76,6 +77,8 @@ export interface ProposalRequest {
   versionColumn?: string
   /** The root's rows are versions of one thing, each valid from `from` until `to` (0113). */
   validity?: { from: string; to: string }
+  /** The columns the server stamps, as the administrator confirmed them (0153). */
+  stamps?: StampChoice[]
 }
 
 /**

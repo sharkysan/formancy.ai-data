@@ -9,6 +9,7 @@ import type {
   ObjectMeta,
   ObjectRef,
   RowFilterRule,
+  StampChoice,
 } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
@@ -27,6 +28,8 @@ export interface Choice {
   versionColumn: string | null
   /** The columns a version starts and ends at, where the rows are versions of one thing (0113); `null` for records of their own. */
   validity: { from: string; to: string } | null
+  /** The columns the server stamps (0153), each confirmed here; a column whose name suggests one is never stamped without it. */
+  stamps: StampChoice[]
 }
 
 /**
@@ -84,7 +87,7 @@ export function choiceFor(ref: ObjectRef, snapshot: MetadataSnapshot): Choice {
     const display = target === undefined ? [] : suggestedDisplay(target, foreignKey.references.columns)
     return display.length === 0 ? [] : [{ foreignKey: foreignKey.name, display }]
   })
-  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, validity: null }
+  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, validity: null, stamps: [] }
 }
 
 /** The gaps about one object itself, which are what "cannot tell" is made of (0004). */
@@ -257,6 +260,7 @@ export function proposalFor(connection: string, choice: Choice, rowFilters: read
     pinned: rowFilters.map((rule) => rule.column),
     ...(choice.versionColumn === null ? {} : { versionColumn: choice.versionColumn }),
     ...(choice.validity === null ? {} : { validity: { ...choice.validity } }),
+    ...(choice.stamps.length === 0 ? {} : { stamps: choice.stamps.map((stamp) => ({ ...stamp, value: { ...stamp.value } })) }),
   }
 }
 
@@ -280,6 +284,66 @@ export function validityCandidates(root: ObjectMeta): { from: ColumnMeta[]; to: 
   return { from: points.filter((column) => !column.nullable && keyed.has(column.name)), to: points.filter((column) => column.nullable) }
 }
 
+/** Whether a column can take a person: text, as the verified context's id and attributes are (0153). */
+function takesPerson(column: ColumnMeta): boolean {
+  return column.type.kind === 'text'
+}
+
+/** Whether a column can take the time: an instant, a wall clock or a day (0153). */
+function takesTime(column: ColumnMeta): boolean {
+  return column.type.kind === 'timestamp' || column.type.kind === 'date'
+}
+
+/**
+ * The columns the server could stamp (0153): of a kind a stamp fills, the
+ * database does not generate, and nothing else to the form -- not the key,
+ * the version column, a chosen lookup's, a pinned one, or a chain's. What
+ * the generator refuses of one it says itself, in its words.
+ */
+export function stampCandidates(root: ObjectMeta, choice: Choice, rowFilters: readonly RowFilterRule[]): ColumnMeta[] {
+  const taken = new Set([
+    ...(root.primaryKey?.columns ?? root.uniqueKeys[0]?.columns ?? []),
+    ...(choice.versionColumn === null ? [] : [choice.versionColumn]),
+    ...choice.lookups.flatMap((lookup) => root.foreignKeys.find((foreignKey) => foreignKey.name === lookup.foreignKey)?.columns ?? []),
+    ...rowFilters.map((rule) => rule.column),
+    ...(choice.validity === null ? [] : [choice.validity.from, choice.validity.to]),
+  ])
+  return root.columns.filter((column) => column.generated === 'none' && !taken.has(column.name) && (takesPerson(column) || takesTime(column)))
+}
+
+/** An audit column's name: who or when a row was created or changed (0153), in any case. */
+const AUDIT_NAME = /^(created|changed|updated|modified)_(by|at|on|date)$/i
+
+/**
+ * What a column's name suggests it is stamped with (0153), or `null`: who
+ * for a `_by`, when for an `_at`, `_on` or `_date`; on create for a
+ * `created_`, and on both writes for a `changed_`, `updated_` or
+ * `modified_`, which a create sets as well as every update. Only where the
+ * column's kind can take it: an integer `created_by` is a reference to
+ * somebody, which a stamp cannot fill. A suggestion is shown, never sent:
+ * the administrator ticks it, as they confirm a version column.
+ */
+export function stampSuggestion(column: ColumnMeta): Omit<StampChoice, 'column'> | null {
+  const named = AUDIT_NAME.exec(column.name)
+  if (named === null) return null
+  const [, act = '', what = ''] = named
+  const on = act.toLowerCase() === 'created' ? 'create' : 'both'
+  if (what.toLowerCase() === 'by') return takesPerson(column) ? { value: { kind: 'actor' }, on } : null
+  return takesTime(column) ? { value: { kind: 'time' }, on } : null
+}
+
+/** The stamp a column starts with when it is ticked: its suggestion, or what its kind takes, on create. */
+export function startingStamp(column: ColumnMeta): StampChoice {
+  const suggested = stampSuggestion(column)
+  if (suggested !== null) return { column: column.name, ...suggested }
+  return { column: column.name, value: takesTime(column) ? { kind: 'time' } : { kind: 'actor' }, on: 'create' }
+}
+
+/** What fills a column, as the stamp's control offers it: who for a text, when for a time. */
+export function stampValues(column: ColumnMeta): Array<StampChoice['value']['kind']> {
+  return takesTime(column) ? ['time'] : ['actor', 'attribute']
+}
+
 /** What is wrong with a choice before it is sent, in words; the server and the generator check again. */
 export function choiceProblems(choice: Choice, rowFilters: readonly RowFilterRule[]): string[] {
   const problems: string[] = []
@@ -293,6 +357,11 @@ export function choiceProblems(choice: Choice, rowFilters: readonly RowFilterRul
   }
   for (const rule of rowFilters) {
     if (rule.attribute.trim() === '') problems.push(`Name the trusted attribute ${rule.column} is pinned to.`)
+  }
+  for (const stamp of choice.stamps) {
+    if (stamp.value.kind === 'attribute' && stamp.value.attribute.trim() === '') problems.push(`Name the attribute ${stamp.column} is stamped with.`)
+    // A pin filters every read by the column; a stamp filters nothing (0153).
+    if (rowFilters.some((rule) => rule.column === stamp.column)) problems.push(`${stamp.column} is pinned and stamped: unpin it, or leave it unstamped.`)
   }
   return problems
 }
