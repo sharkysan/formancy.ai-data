@@ -27,8 +27,9 @@ function suggested(column: ColumnMeta): string | null {
  * column first, said so in a hint, and filled with what the name suggests
  * once ticked -- then what fills it and when. A name is a suggestion and
  * never a stamp: a person ticks it, as they confirm a version column.
- * Offered only where the root has a column a stamp can take; whether the
- * generator honours one it says itself, in its words.
+ * Offered only where the root has a column a stamp can take, or one
+ * already stamped; whether the generator honours one it says itself, in
+ * its words.
  */
 export function StampsChoice({
   root,
@@ -43,9 +44,13 @@ export function StampsChoice({
 }): ReactElement | null {
   const hint = useId()
   const candidates = stampCandidates(root, choice, rowFilters)
-  if (candidates.length === 0) return null
+  // A column stamped before something else in the step took it -- a pin, a
+  // lookup, the version column, a chain -- keeps its box where it was, so
+  // the stamp the step or the generator then refuses can be unticked.
+  const offered = root.columns.filter((column) => candidates.includes(column) || choice.stamps.some((stamp) => stamp.column === column.name))
+  if (offered.length === 0) return null
   // The suggested first, each group in catalog order.
-  const ordered = [...candidates.filter((column) => stampSuggestion(column) !== null), ...candidates.filter((column) => stampSuggestion(column) === null)]
+  const ordered = [...offered.filter((column) => stampSuggestion(column) !== null), ...offered.filter((column) => stampSuggestion(column) === null)]
   const set = (column: string, next: StampChoice | null) => {
     const others = choice.stamps.filter((stamp) => stamp.column !== column)
     onChoice({ ...choice, stamps: next === null ? others : [...others, next] })
@@ -61,7 +66,9 @@ export function StampsChoice({
       {ordered.map((column) => {
         const stamp = choice.stamps.find((entry) => entry.column === column.name)
         const id = `stamp-${column.name}`
-        const about = suggested(column)
+        const about = candidates.includes(column)
+          ? suggested(column)
+          : `Something else in this step now takes ${column.name}, so it cannot be stamped: untick it.`
         return (
           <div className="choice" key={column.name}>
             <div className="check">

@@ -102,6 +102,31 @@ describe('the stamps of a root', () => {
     expect(lastProposal().stamps).toEqual([{ column: 'name', value: { kind: 'attribute', attribute: 'login' }, on: 'both' }])
   })
 
+  // A column pinned after it was stamped is no candidate any more, and the
+  // step says the two cannot go together; its box stays, ticked and said
+  // to be taken, so the stamp can be unticked where it was ticked and the
+  // pin kept. Watched failing with the boxes drawn of the candidates alone:
+  // the alert asked to leave name unstamped, and no box could.
+  test('keeps the box of a stamp whose column is taken, so it can be unticked', async () => {
+    const user = await signIn(plane)
+    const choose = await chooseCustomer(user)
+    await user.click(within(stamps(choose)).getByRole('checkbox', { name: 'Stamp name' }))
+    await user.click(within(choose).getByRole('checkbox', { name: 'Pin name' }))
+    await generate(user, choose)
+    expect(within(within(choose).getByRole('alert')).getByText('name is pinned and stamped: unpin it, or leave it unstamped.')).toBeDefined()
+    const box = within(stamps(choose)).getByRole('checkbox', { name: 'Stamp name' })
+    expect(box).toHaveProperty('checked', true)
+    expect(within(stamps(choose)).getByText('Something else in this step now takes name, so it cannot be stamped: untick it.')).toBeDefined()
+    expect(unnamed()).toEqual([])
+    expect(await audit()).toEqual([])
+    await user.click(box)
+    expect(within(stamps(choose)).queryByRole('checkbox', { name: 'Stamp name' })).toBeNull()
+    await generate(user, choose)
+    await screen.findByRole('main', { name: 'Generate' })
+    expect(Object.hasOwn(lastProposal(), 'stamps')).toBe(false)
+    expect(lastProposal().pinned).toContain('name')
+  })
+
   // An order's created_by is a number, an employee's id: its name says who
   // created the order, and a stamp of the signed-in person could not fill
   // it, so it is neither suggested nor offered. Watched failing with the
