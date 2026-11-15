@@ -1,6 +1,6 @@
 # 0027 — A snapshot says what its account may do, and whose it is
 
-- **Status:** accepted; DELETE on each table, and the gap rule for row security shared with what refers to a table, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md)
+- **Status:** accepted; DELETE on each table, and the gap rule for row security shared with what refers to a table, extended by [0049](0049-a-snapshot-says-whether-its-account-may-delete-and-what-refers-to-each-table.md); extended by [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md): a together field is written on create only, so no update alone moves a row to another record, and the planner refuses bindings that write one on update
 - **Date:** 2026-10-09
 - **Deciders:** Daniel Bacher
 - **Verified by:**

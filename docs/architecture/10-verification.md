@@ -138,6 +138,17 @@ server answered, which reports the difference and does not prevent it.
   spell a value their own way
   ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
+A save of a record with its rows has no shared case yet
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)): data-core plans it, and
+`packages/data-core/src/records/save.test.ts`, `together.test.ts` and
+`menu.test.ts` beside it hold the plan with no database -- each part under
+its own form's policy, every field error at once, every row step pinned to
+the record, the key bound or taken from the record's step, the touch,
+`within`, the counts and bounds, the order of the steps, what a form offers
+alone and in a save, which children require rows, and what the menu
+offers -- each case watched failing with its rule taken out. Its shared
+cases come with the adapters' save.
+
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
 each engine and fails a run in which one is missing or failed on either. What
@@ -608,6 +619,11 @@ and a number typed here would drift from the next run.
   place; that every server of the matrix encrypts, and its TLS passes the
   adapter's guard, is shown on each image
   ([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
+- **A save is planned and not run.** What data-core plans for a record
+  saved with its rows is held by unit tests alone, and `saveParameters`,
+  its prediction of the SQL Server batch a save will be, is compared with
+  no batch: no adapter builds one yet
+  ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is
   the maintainer reading it (`GOVERNANCE.md`, [§11.6](11-risks-and-debt.md#116-people-and-process)).

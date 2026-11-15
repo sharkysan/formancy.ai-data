@@ -1,6 +1,6 @@
 # 0142 — A record's child forms are tabs beside it
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md): a together child's tab says the bound and where Save is, with Go to Save -- decided, and built with the host page's save
 - **Date:** 2026-11-05
 - **Deciders:** Daniel Bacher
 - **Verified by:** `apps/host/src/tabs.test.ts` -- a record's tabs are
