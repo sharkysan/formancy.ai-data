@@ -39,6 +39,15 @@ export interface ExpectedForeignKey {
 export interface ExpectedCheckFacts {
   enforced?: boolean
   validated?: boolean
+  /**
+   * The list data-core reads out of the check as the engine spells it
+   * (0152): its one column and the values it compares the column with, in
+   * codepoint order, each once -- the order a list is a set in, since SQL
+   * Server writes an IN list back to front -- or `null`, no list. The
+   * spelling is the adapter's, the reading data-core's, so a release that
+   * spells a list otherwise fails here on that engine.
+   */
+  listed?: { column: string; values: readonly string[] } | null
 }
 
 export interface ExpectedCheck extends ExpectedCheckFacts {
@@ -286,7 +295,7 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
         validated: true,
       },
     ],
-    checks: [{ name: 'ck_order_status', enforced: true, validated: true }],
+    checks: [{ name: 'ck_order_status', enforced: true, validated: true, listed: { column: 'status', values: ['draft', 'placed', 'shipped'] } }],
     rowSecurity: 'none',
   },
   {
@@ -392,10 +401,11 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
     foreignKeys: [],
     checks: [
       // Added NOT VALID / WITH NOCHECK over a row it refuses: enforced for new rows, never checked against that one.
-      { name: 'ck_shipment_carrier', enforced: true, validated: false },
+      // A comparison with a number, an inequality and a range are no list (0152), on either engine.
+      { name: 'ck_shipment_carrier', enforced: true, validated: false, listed: null },
       // SQL Server's file disables it, which also marks it untrusted. PostgreSQL 17 cannot disable a check.
-      { name: 'ck_shipment_reference', enforced: true, validated: true, byKind: { sqlserver: { enforced: false, validated: false } } },
-      { name: 'ck_shipment_weight', enforced: true, validated: true },
+      { name: 'ck_shipment_reference', enforced: true, validated: true, listed: null, byKind: { sqlserver: { enforced: false, validated: false } } },
+      { name: 'ck_shipment_weight', enforced: true, validated: true, listed: null },
     ],
     rowSecurity: 'none',
   },

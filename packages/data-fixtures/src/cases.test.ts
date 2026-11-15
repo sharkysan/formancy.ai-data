@@ -4,6 +4,8 @@ import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
 import type { CascadeCase } from './cascades.js'
+import { CHECK_LIST_PARITY } from './check-lists.js'
+import type { ListedCase } from './check-lists.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
 import {
@@ -19,6 +21,7 @@ import {
   exportCase,
   filterCase,
   listCase,
+  listedCase,
   MODEL_CASES,
   refusalCase,
   sharedCases,
@@ -86,6 +89,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   VERSION_PARITY: (Object.keys(VERSION_PARITY) as VersionCase[]).map(versionCase),
   DEFAULT_PARITY: (Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
   STAMP_PARITY: (Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
+  CHECK_LIST_PARITY: (Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -131,6 +135,8 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   AUDITED_PRICE_POLICY: "who may do what with the stamps suites' audited price form; what is stored is STAMP_PARITY's",
   ALICE: 'the person who creates in the stamps suites (0153)',
   BOB: 'the person who changes what Alice created in the stamps suites (0153)',
+  LISTED_TABLE: "where the parity suites create the table CHECK_LIST_PARITY's cases are about",
+  checkListOf: "data-core's reading of a check as the model and CHECK_LIST_PARITY compare it, a function",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 

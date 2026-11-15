@@ -8,6 +8,7 @@ import type { DescribedTable } from '../records/types.js'
 import { findObject } from '../snapshot.js'
 import { absence, gapChanges, unseen } from './access.js'
 import { columnChanges } from './columns.js'
+import { listedChanges } from './listed.js'
 import {
   allFields,
   byCodepoint,
@@ -124,6 +125,8 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       ...ROOT_DEFINITION.flatMap((family) => family(comparison)),
       ...lookupTargetChanges(comparison),
       ...checkChanges(comparison),
+      // A select of listed values against its check: review's, as every check is (0152).
+      ...listedChanges(comparison),
       ...privilegeChanges(comparison),
       // What refers to the root is review's, never in a request's description (0050).
       ...referrerChanges(comparison),

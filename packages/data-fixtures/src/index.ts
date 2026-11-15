@@ -4,6 +4,7 @@ export {
   browseCase,
   covers,
   cascadeCase,
+  listedCase,
   columnFilterCase,
   defaultCase,
   deleteCase,
@@ -28,6 +29,8 @@ export {
 export { DEFAULT_PARITY, DEFAULT_TABLE } from './defaults.js'
 export { ALICE, AUDITED_POLICY, AUDITED_PRICE_POLICY, AUDITED_PRICE_STAMPS, AUDITED_STAMPS, BOB, STAMP_PARITY } from './stamps.js'
 export type { StampCase, StampedRow } from './stamps.js'
+export { CHECK_LIST_PARITY, checkListOf, LISTED_TABLE } from './check-lists.js'
+export type { ListedCase } from './check-lists.js'
 export type { DefaultCase } from './defaults.js'
 export { DELETE_PARITY, deleteAnswer, UPDATE_RECREATED } from './deletes.js'
 export { BROWSE_PARITY } from './browse.js'

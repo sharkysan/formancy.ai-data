@@ -92,8 +92,8 @@ export function readConstant(kind: DatabaseKind, expression: string): Constant |
   return kind === 'postgres' ? readPostgres(expression) : readSqlServer(expression)
 }
 
-/** A whole number's digits as the codec takes them: no leading zero, no negative zero. Its value, not a guess at one. */
-function withoutLeadingZeros(digits: string): string {
+/** A whole number's digits as the codec takes them: no leading zero, no negative zero. Its value, not a guess at one; a listed value's too (0152). */
+export function withoutLeadingZeros(digits: string): string {
   const trimmed = digits.replace(/^(-?)0+(?=[0-9])/, '$1')
   return trimmed === '-0' ? '0' : trimmed
 }
@@ -218,6 +218,10 @@ function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stor
   }
   if (typeof answer === 'string' && field.maxLength !== undefined && answer.length > field.maxLength) {
     return { kind: 'refused', reason: `longer than the ${String(field.maxLength)} UTF-16 code units the field holds` }
+  }
+  // A select of the values a check lists (0152) starts at one of them or at none: the engine refuses to open a form whose default no option offers.
+  if (binding.listed !== undefined && !binding.listed.values.includes(String(answer))) {
+    return { kind: 'refused', reason: `it is not one of the values ${binding.listed.check} lists` }
   }
   return { kind: 'answer', answer }
 }

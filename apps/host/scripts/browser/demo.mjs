@@ -209,16 +209,19 @@ export async function demoPass({ origin, prefix, check, timed }) {
     const customer = paper(fresh, 'Order').getByRole('combobox', { name: 'Customer*' })
     await customer.click()
     await customer.pressSequentially('Kunz', { delay: 60 })
-    const option = page.getByRole('option').filter({ hasText: 'Kunz' }).first()
+    // The typeahead's own list, by its name: the order's Status is a select of
+    // the values its check lists (0152), whose options are options too.
+    const suggestions = paper(fresh, 'Order').getByRole('listbox', { name: 'Customer suggestions' })
+    const option = suggestions.getByRole('option').filter({ hasText: 'Kunz' }).first()
     await option.waitFor(WITHIN)
-    const offered = await page.getByRole('option').allTextContents()
+    const offered = await suggestions.getByRole('option').allTextContents()
     check(
       'the customer typeahead offers what the visitor typed',
       offered.length > 0 && offered.every((text) => text.includes('Kunz')) ? null : `it offered ${JSON.stringify(offered.slice(0, 4))}`,
     )
     await option.click()
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Order date*' }).fill('2026-10-17')
-    await paper(fresh, 'Order').getByRole('textbox', { name: 'Status' }).fill('placed')
+    await paper(fresh, 'Order').getByRole('combobox', { name: 'Status' }).selectOption('placed')
     await paper(fresh, 'Order').getByRole('textbox', { name: 'Amount*' }).fill('13')
     await paper(fresh, 'Order').getByRole('button', { name: 'Save' }).click()
     const made = detail(page, /^Order k1:\d+$/)

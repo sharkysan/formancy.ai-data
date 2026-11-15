@@ -151,6 +151,15 @@ until then the address is formancy.ai's 404
   ([0149](./docs/decisions/0149-a-new-record-starts-with-its-columns-constant-default.md));
   the studio's Presentation step gives a field another starting value
   ([0150](./docs/decisions/0150-an-administrator-gives-a-field-another-starting-value.md)).
+  A text or whole-number column whose values one enforced, validated check
+  lists -- the fixture's `status in ('draft', 'placed', 'shipped')` -- is
+  a select of exactly them, read from each engine's spelling of the check
+  and labelled as the column holds them, so the order form's Status is a
+  choice on both engines; a list not validated, named twice or holding an
+  empty value stays a box and says why, anything but a list of literals
+  stays a box, and drift review blocks the field's writes when an
+  enforced list it reads leaves out a value it offers
+  ([0152](./docs/decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
 - **Writes a policy the server asks on every request.** Who may read, create
   and update which fields; row filters taken from the signed-in person's
   trusted attributes, never from the form

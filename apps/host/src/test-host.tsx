@@ -215,9 +215,13 @@ export async function shows(renderer: RendererName, name: string, value: string)
   await waitFor(() => expect({ renderer, name, value: control(renderer, name).value }).toEqual({ renderer, name, value }), ARRIVES_WITHIN)
 }
 
-/** Clear a text control and type `value`, as a person does. */
+/** Clear a text control and type `value`, or choose it in a select -- a column whose values a check lists (0152) -- as a person does. */
 export async function answer(user: User, renderer: RendererName, name: string, value: string): Promise<void> {
   const element = control(renderer, name)
+  if (element instanceof HTMLSelectElement) {
+    await user.selectOptions(element, value)
+    return
+  }
   await user.clear(element)
   await user.type(element, value)
 }

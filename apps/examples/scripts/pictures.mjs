@@ -53,7 +53,8 @@ const acts = {
       Angular: page.getByRole('region', { name: 'sales.order Angular', exact: true }),
     }
     for (const part of Object.values(parts)) {
-      await fillField(part, part.getByRole('textbox', { name: 'Status', exact: true }), 'placed', { within: WITHIN })
+      // A choice of the values ck_order_status lists (0152).
+      await part.getByRole('combobox', { name: 'Status', exact: true }).selectOption('placed', { timeout: WITHIN })
       await fillField(part, part.getByRole('textbox', { name: field('Amount') }), AMOUNT, { within: WITHIN })
       await part.getByRole('button', { name: 'Validate' }).click()
     }

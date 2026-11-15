@@ -12,11 +12,14 @@ import { disableFields } from './widgets.js'
  * nothing: a choice of the states a create may start it in, or disabled,
  * left to the column's default, where none is listed for this person. A
  * whole number held to moves keeps its box, and is only disabled where it
- * may go nowhere. A new record's choice starts at the field's default,
- * which the server serves only where it is a state a create of this
- * person's may start the record in (0149); a saved record's carries none,
- * since it opens at the state it holds, and a default its choice did not
- * offer would stop the engine opening it.
+ * may go nowhere; a select of the values a check lists (0152), text or a
+ * whole number, answers text and is drawn as the moves, so it never offers
+ * every value its check lists where the policy holds it to a few. A new
+ * record's choice starts at the field's default, which the server serves
+ * only where it is a state a create of this person's may start the record
+ * in (0149); a saved record's carries none, since it opens at the state it
+ * holds, and a default its choice did not offer would stop the engine
+ * opening it.
  *
  * Presentation only, as the rest of the host's copy is: the server checks
  * every move again (0112), and refuses the one a stale page still offers.
@@ -30,7 +33,8 @@ export function withMoves(form: FormSchema, moves: PublishedForm['moves'], from:
   const to = moves.moves.filter((move) => move.from === from).map((move) => move.to)
   if (to.length === 0) return disableFields(form, [field.key])
   // A whole number's state keeps its number box: a choice answers text, which its codec would read as another value.
-  if (field.type !== 'text') return form
+  // A select of the values a check lists already answers text, a whole number's too (0152), and is drawn as the moves like a box.
+  if (field.type !== 'text' && !(field.type === 'select' && field.options !== undefined)) return form
   const states = from === null ? to : [from, ...to]
   const choice = {
     key: field.key,

@@ -12,8 +12,9 @@ import type { RecordRead, RecordValue } from './types.js'
  * The one place a form's answer and a column's value are translated, in both
  * directions, so a record read back is the answers that went in.
  *
- * Most answers are the column's canonical value as it is (0008). Three are
- * not, because the generated control holds something else (0009):
+ * Most answers are the column's canonical value as it is (0008) -- a select
+ * of the values a check lists among them, a whole number's too (0152).
+ * Three are not, because the generated control holds something else (0009):
  *
  * - a nullable boolean is a select of 'true' and 'false', because a checkbox
  *   has two answers and the column three (0095);
@@ -26,8 +27,14 @@ import type { RecordRead, RecordValue } from './types.js'
 type ColumnBinding = Extract<FieldBinding, { kind: 'column' }>
 type LookupBinding = Extract<FieldBinding, { kind: 'lookup' }>
 
-/** What the generated control holds for this column, decided by the generator's own `controlFor`, so the two cannot disagree. */
+/**
+ * What the generated control holds for this column, decided by the
+ * generator's own `controlFor`, so the two cannot disagree; a select of the
+ * values a check lists holds each as the column's canonical text, a whole
+ * number's digits included (0152), whatever its type's own control holds.
+ */
 function shapeOf(binding: ColumnBinding): 'three-state' | 'whole-number' | 'as-is' {
+  if (binding.listed !== undefined) return 'as-is'
   const control = controlFor(binding.type, binding.nullable)
   if (!('field' in control)) return 'as-is'
   if (binding.type.kind === 'boolean' && control.field.type === 'select') return 'three-state'

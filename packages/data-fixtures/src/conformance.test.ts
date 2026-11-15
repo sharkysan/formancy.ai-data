@@ -6,6 +6,22 @@ import { restrictedDisagreements, snapshotDisagreements, structuralDisagreements
 import { FIXTURE_MODEL } from './model.js'
 
 /**
+ * A check as each engine's catalog spells it (0152): a list as the captured
+ * snapshots hold ck_order_status -- PostgreSQL's varchar IN list, SQL
+ * Server's equalities back to front -- and anything else as a comparison,
+ * which is no list on either.
+ */
+function spelled(kind: DatabaseKind, listed: { column: string; values: readonly string[] } | null): string {
+  if (listed === null) return kind === 'postgres' ? '(weight_kg > (0)::double precision)' : '([weight_kg]>(0))'
+  if (kind === 'postgres')
+    return `((${listed.column})::text = ANY ((ARRAY[${listed.values.map((value) => `'${value}'::character varying`).join(', ')}])::text[]))`
+  return `(${[...listed.values]
+    .reverse()
+    .map((value) => `[${listed.column}]='${value}'`)
+    .join(' OR ')})`
+}
+
+/**
  * The snapshot a perfect adapter would produce, built from the model itself.
  * Every test below starts from it and breaks one thing, so each proves the
  * comparator notices exactly that thing.
@@ -44,7 +60,7 @@ function perfect(kind: DatabaseKind): ObjectMeta[] {
     })),
     checks: entry.checks.map((check) => {
       const facts = { ...check, ...(check.byKind?.[kind] ?? {}) }
-      return { name: check.name, expression: null, enforced: facts.enforced ?? true, validated: facts.validated ?? true }
+      return { name: check.name, expression: spelled(kind, facts.listed ?? null), enforced: facts.enforced ?? true, validated: facts.validated ?? true }
     }),
     rowSecurity: typeof entry.rowSecurity === 'string' ? entry.rowSecurity : entry.rowSecurity[kind],
   }))
@@ -257,6 +273,34 @@ describe('snapshotDisagreements', () => {
       if (carrier !== undefined) carrier.validated = true
     })
     expect(snapshotDisagreements(postgres)).toEqual(['sales.shipment ck_shipment_carrier validated is true, expected false'])
+  })
+
+  // The order form's status is a select of what ck_order_status lists
+  // (0152), read by data-core out of each engine's spelling: an adapter that
+  // spelled it otherwise, a value short or another column would be one form
+  // on one engine and another on the other. Watched failing with the list
+  // left uncompared: each of these passed.
+  test('notices a list read otherwise than the model says, and a list where it says none', () => {
+    const orderStatus = (objects: ObjectMeta[]) =>
+      object(objects, 'order').checks.find((entry) => entry.name === 'ck_order_status') as ObjectMeta['checks'][number]
+    const short = snapshot('sqlserver', (objects) => (orderStatus(objects).expression = "([status]='placed' OR [status]='draft')"))
+    expect(snapshotDisagreements(short)).toEqual([
+      `sales.order ck_order_status reads as status in [draft, placed] from "([status]='placed' OR [status]='draft')", expected status in [draft, placed, shipped]`,
+    ])
+    // Spelled in a way the reader does not take: the IN list SQL Server never writes back.
+    const unread = snapshot('sqlserver', (objects) => (orderStatus(objects).expression = "([status] IN ('draft', 'placed', 'shipped'))"))
+    expect(snapshotDisagreements(unread)).toEqual([
+      `sales.order ck_order_status reads as no list from "([status] IN ('draft', 'placed', 'shipped'))", expected status in [draft, placed, shipped]`,
+    ])
+    const hidden = snapshot('postgres', (objects) => (orderStatus(objects).expression = null))
+    expect(snapshotDisagreements(hidden)).toEqual(['sales.order ck_order_status expression cannot be read, so whether it lists values is unknown'])
+    const listing = snapshot('postgres', (objects) => {
+      const weight = object(objects, 'shipment').checks.find((entry) => entry.name === 'ck_shipment_weight')
+      if (weight !== undefined) weight.expression = '(weight_kg = ANY (ARRAY[1, 2]))'
+    })
+    expect(snapshotDisagreements(listing)).toEqual([
+      'sales.shipment ck_shipment_weight reads as weight_kg in [1, 2] from "(weight_kg = ANY (ARRAY[1, 2]))", expected no list',
+    ])
   })
 
   // A composite key's order is its pairing. Reversed, a lookup would join

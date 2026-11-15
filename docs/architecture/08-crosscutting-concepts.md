@@ -76,6 +76,20 @@ holds what the reading takes to the released validator and
 `acceptsDefault`. The database is not asked: a CHECK constraint or a SQL
 Server code page meets the value at the save, as any answer.
 
+**A check's list is read, never run.** A column whose values one
+enforced, validated check lists is a select of exactly them, each value
+as a record holding it reads back -- a whole number's canonical text, a
+bigint past 2^53 among them -- and a select's answer is that text
+(`generate/listed.ts`, `records/answers.ts`). The list is read out of
+the spelling the snapshot holds, per engine, by a cursor that takes one
+column compared by `=` with literals in the shape each server writes and
+nothing else (`generate/check-lists.ts`); it never evaluates the
+expression, executes it or builds SQL from it, and a spelling it does not
+take is no list, so the column keeps its box. The database still decides:
+the server does not check an answer against the list, and a value the
+check no longer names is refused by it with a check violation
+([0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
+
 **Held by** `packages/data-core/src/codecs/codec.test.ts` -- the fixture's
 largest `numeric(18,4)` and an integer past 2^53 survive as strings, and a
 JSON number for a decimal is refused -- and by both adapters' record suites

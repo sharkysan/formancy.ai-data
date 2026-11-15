@@ -1309,7 +1309,10 @@ describe.each([
 
   // Step 4: a compatible change. Measured on both servers: a nullable
   // column, a wider text column and a replaced check are, for this form, one
-  // thing to review and two to note — nothing it rests on stops.
+  // thing to review and two to note — nothing it rests on stops. Since 0152
+  // status is a select of what ck_order_status lists, and the replaced check
+  // lists cancelled too, which it does not offer: a second thing to review,
+  // and still nothing stops.
   //
   // And version 1 keeps saving over it (0041): the runtime decides with
   // drift's rules over the table as it is now, which call a widening and a
@@ -1321,6 +1324,7 @@ describe.each([
     expect(drift.blocking).toBe(false)
     expect(drift.changes.map((change: { kind: string; severity: string }) => [change.kind, change.severity])).toEqual([
       ['column-added', 'review'],
+      ['column-outgrew-field', 'review'],
       ['check-changed', 'info'],
       ['column-loosened', 'info'],
     ])
