@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
  * record's rows do when each moves the record's version first, under
  * locking READ COMMITTED and under READ_COMMITTED_SNAPSHOT. Plain statements
  * through mssql, each `query` sent as `sp_executesql` as the adapter's are
- * (../sql/statement.ts), on tables of this file's own; no product code runs.
+ * (sql/statement.ts), on tables of this file's own; no product code runs.
  *
  * Characterisation, as the spike's file is: each case states what the engine
  * does, and a server release that changes an answer fails here by name. A

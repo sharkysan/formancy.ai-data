@@ -212,6 +212,8 @@ describe("a row lock that only locked, and REPEATABLE READ's waiter", () => {
           const [counted] = await wx.unsafe<{ n: number }[]>(COUNT_LINES, [4])
           return counted?.n
         })
+        // Settled here too, so a waiter refused before it blocks is the case's to assert and never unhandled.
+        void waited.catch(() => undefined)
         await waitsBehindAnother(waiterBackend)
       })
       expect(await waited).toBe(1)
