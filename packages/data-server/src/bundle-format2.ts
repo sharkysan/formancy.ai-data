@@ -1,5 +1,5 @@
 import { applyPresentation, findObject, generateForm, presentationShapeProblems } from '@formancy/data-core'
-import type { FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
+import type { FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides, StampChoice } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import type { BundleV2 } from './bundle.js'
@@ -62,7 +62,7 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
 /**
  * What the stored request alone decides, against the base and bindings it is
  * said to have produced (0030): the title, the root, a confirmed version
- * column, the pins, the lookups and a chain of versions. A regeneration generates from this
+ * column, the pins, the lookups, a chain of versions and the stamps (0153). A regeneration generates from this
  * request and its draft is checked at publish against the same request, so
  * an edit to it alone would reach the next version unannounced. None of
  * these asks the generator, so a later release cannot fail a stored version
@@ -99,6 +99,13 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
   const chain = isRecord(bindings.validity) ? bindings.validity : undefined
   const span = (named: { from: string; to: string } | undefined) => (named === undefined ? 'none' : `from ${named.from} to ${named.to}`)
   if (span(generation.validity) !== span(chain)) problems.push(`generation: names versions ${span(generation.validity)}, and the bindings ${span(chain)}`)
+
+  // The stamps (0153) are in the bindings exactly as the request names them,
+  // whatever order it gives them in: column, what fills it and when.
+  const stampsOf = (stamps: readonly StampChoice[] | undefined) =>
+    canonicalize([...(stamps ?? [])].map(({ column, value, on }) => ({ column, value, on })).sort((left, right) => (left.column < right.column ? -1 : 1)))
+  const stamped = Array.isArray(bindings.stamps) ? bindings.stamps : []
+  if (stampsOf(generation.stamps) !== stampsOf(stamped)) problems.push('generation: names stamps the bindings do not have as it names them')
 
   for (const column of generation.pinned ?? []) {
     const field = bindings.fields.find((binding) => binding.kind === 'column' && binding.column === column)
