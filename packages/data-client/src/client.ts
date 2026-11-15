@@ -63,7 +63,9 @@ export interface DataClientOptions {
 /**
  * Why a call did not succeed. `status` is the HTTP status, or 0 when nothing
  * answered or nothing was sent. `code` and `message` are the server's when it
- * gave them; `fieldErrors` is present when the refusal concerns fields.
+ * gave them; `fieldErrors` is present when the refusal concerns fields. On
+ * `declined` (0156) the message is the deployment's reason for refusing a
+ * write, in its own words, which a host shows the person as theirs.
  */
 export type Refusal = { ok: false; status: number; code: string; message: string; fieldErrors?: FieldError[] }
 export type Outcome<T> = { ok: true; value: T } | Refusal

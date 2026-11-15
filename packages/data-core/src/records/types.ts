@@ -421,6 +421,10 @@ export interface RecordRead {
  *   not show as discovery would describe it — gone, out of sight, a foreign
  *   table, a partition — is this too: the runtime never says which (0010),
  *   drift review does.
+ * - `declined` — a write the deployment's own logic refused in words of its
+ *   own (0156): a trigger's error whose message starts `formancy: refused: `,
+ *   `reason` the rest, and `column` the one `formancy: refused [column]: `
+ *   names. Nothing was written. Only ever a write's: a read is `refused`.
  * - `refused` — the database refused the statement for a reason this port has no code for:
  *   a trigger's own error, a write it declined without one, an INSTEAD OF trigger this
  *   adapter cannot verify, an error it does not recognise. Nothing was written. The same
@@ -449,6 +453,7 @@ export type RecordFailureCode =
   | 'out-of-range'
   | 'permission-denied'
   | 'schema-changed'
+  | 'declined'
   | 'refused'
   | 'unavailable'
   | 'unknown-outcome'
@@ -456,12 +461,19 @@ export type RecordFailureCode =
 export interface RecordFailure {
   ok: false
   code: RecordFailureCode
-  /** The column at fault, when the engine says which. */
+  /** The column at fault, when the engine says which; on `declined`, the one the deployment's refusal names, which may be no column at all. */
   column?: string
   /** The constraint at fault, when the engine says which. */
   constraint?: string
-  /** A sentence for a log. Never contains a value the person entered. */
+  /** A sentence for a log. Never contains a value the person entered, nor a `declined` failure's reason. */
   message: string
+  /**
+   * `declined` only (0156): the deployment's sentence for the person, as its
+   * trigger raised it after the prefix. For the person who saved and nobody
+   * else: never logged and never audited, since the deployment may have
+   * written a value into it.
+   */
+  reason?: string
 }
 
 export type RecordOutcome = RecordRead | RecordFailure

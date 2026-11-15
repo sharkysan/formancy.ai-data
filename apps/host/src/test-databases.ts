@@ -1,9 +1,10 @@
+import { REFUSAL_PREFIX } from '@formancy/data-core'
 import { EDGE_VALUES, insertPaged, pagedCustomers, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture } from '@formancy/data-fixtures'
 import type { PagedCustomer } from '@formancy/data-fixtures'
 import mssql from 'mssql'
 import postgres from 'postgres'
 import type { TestProject } from 'vitest/node'
-import { SECOND_CUSTOMER } from './test-values.js'
+import { DECLINING, SECOND_CUSTOMER } from './test-values.js'
 
 /*
  * Both databases, once for the whole run (0003): the shared fixture on real
@@ -19,7 +20,10 @@ import { SECOND_CUSTOMER } from './test-values.js'
  * may pick. Added here, in the host's run, rather than to the shared fixture,
  * whose two customers every other suite counts. And tenant 3's paged
  * customers and orders (`insertPaged`, 0085): a lookup page of each and
- * more, which only tenant 3's clerk sees.
+ * more, which only tenant 3's clerk sees. And a trigger on the orders that
+ * refuses, in words for the person (0156), a save of the notes and a delete
+ * of the order `DECLINING` names, and nothing else, so no other suite's
+ * order meets it.
  *
  * What is provided is how to connect, not a connection: a worker cannot be
  * handed a socket.
@@ -99,11 +103,60 @@ export default async function setup(project: TestProject): Promise<() => Promise
   }
 
   const [pgPaged, msPaged] = await Promise.all([insertPaged({ kind: 'postgres', admin: pg.admin }), insertPaged({ kind: 'sqlserver', admin: ms.admin })])
+  // Last: SQL Server refuses an OUTPUT without INTO on a table with an
+  // enabled trigger (334), which insertPaged's insert of the orders is.
+  await declineOrders(pg.admin, ms.admin)
 
   project.provide('databases', details)
   project.provide('paged', { customers: pagedCustomers(), orders: { pg: pgPaged.order, ms: msPaged.order } })
   project.provide('edges', { orderDate: EDGE_VALUES.orderDate, largestAmount: EDGE_VALUES.largestAmount, seededOrder: `k1:${EDGE_VALUES.beyondSafeInteger}` })
   return async () => {
     await Promise.all([pg.stop(), ms.stop()])
+  }
+}
+
+/**
+ * The trigger on the orders that refuses, in words for the person (0156),
+ * what `DECLINING` names, on both engines. Its notes and reasons are
+ * test-values.ts's DECLINING, and its prefix data-core's, spliced as
+ * literals: the DDL takes no parameters. Refused here when one holds a
+ * quote, which would end its literal early.
+ */
+async function declineOrders(pgAdmin: string, msAdmin: mssql.config): Promise<void> {
+  const { saved, field, deleted } = DECLINING
+  const spliced = [REFUSAL_PREFIX, saved.notes, saved.reason, field.notes, field.reason, deleted.notes, deleted.reason]
+  const quoted = spliced.find((text) => text.includes("'"))
+  if (quoted !== undefined) throw new Error(`a value spliced into the trigger holds a quote: ${quoted}`)
+  const fieldMessage = `formancy: refused [${field.column}]: ${field.reason}`
+  const sql = postgres(pgAdmin, { onnotice: () => {} })
+  try {
+    await sql.unsafe(`
+      create function sales.decline_order() returns trigger language plpgsql as $$
+      begin
+        if tg_op = 'DELETE' then
+          if old.notes = '${deleted.notes}' then raise exception using message = '${REFUSAL_PREFIX}${deleted.reason}'; end if;
+          return old;
+        end if;
+        if new.notes = '${saved.notes}' then raise exception using message = '${REFUSAL_PREFIX}${saved.reason}'; end if;
+        if new.notes = '${field.notes}' then raise exception using message = '${fieldMessage}'; end if;
+        return new;
+      end
+      $$;
+      create trigger tr_decline_order before insert or update or delete on sales."order" for each row execute function sales.decline_order();`)
+  } finally {
+    await sql.end()
+  }
+  const pool = await new mssql.ConnectionPool(msAdmin).connect()
+  try {
+    await pool.request().batch(`
+      create trigger sales.tr_decline_order on sales.[order] after insert, update, delete as
+      begin
+        set nocount on;
+        if exists (select 1 from inserted where notes = N'${saved.notes}') throw 50001, N'${REFUSAL_PREFIX}${saved.reason}', 1;
+        if exists (select 1 from inserted where notes = N'${field.notes}') throw 50001, N'${fieldMessage}', 1;
+        if not exists (select 1 from inserted) and exists (select 1 from deleted where notes = N'${deleted.notes}') throw 50001, N'${REFUSAL_PREFIX}${deleted.reason}', 1;
+      end`)
+  } finally {
+    await pool.close()
   }
 }

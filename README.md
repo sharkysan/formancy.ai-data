@@ -161,10 +161,13 @@ release; your application's own pages draw records their own way:
   [0079](./docs/decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md),
   [0107](./docs/decisions/0107-a-record-is-duplicated-into-a-new-one-of-the-fields-the-server-names.md)).
 - **Rules a record keeps**: a status field held to the moves the policy
-  lists for each role, and a table of versions changed from a date, the
-  open version ended and the next inserted in one write
+  lists for each role, a table of versions changed from a date, the
+  open version ended and the next inserted in one write, and the triggers
+  your database already has refusing a save or a delete in words the
+  person reads, once their message starts `formancy: refused: `
   ([0112](./docs/decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md),
-  [0113](./docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
+  [0113](./docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md),
+  [0156](./docs/decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
 
 **Administration**, in [the studio](./docs/guide/studio.md), which is
 built from this repository and not published as a package:

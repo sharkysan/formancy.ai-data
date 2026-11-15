@@ -2,8 +2,15 @@ import mssql from 'mssql'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type {
   ApiValue,
+  DeleteOutcome,
+  DescribedTable,
+  FormBindings,
+  FormPolicy,
+  FormRecord,
   MetadataSnapshot,
   ObjectRef,
+  PolicyContext,
+  RecordAdapter,
   RecordColumn,
   RecordOutcome,
   RecordTarget,
@@ -12,9 +19,31 @@ import type {
   RowFilterType,
   UpdateRequest,
 } from '@formancy/data-core'
-import { findObject } from '@formancy/data-core'
-import type { DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
-import { defined, EDGE_VALUES, startSqlServerFixture } from '@formancy/data-fixtures'
+import {
+  findObject,
+  generateForm,
+  planCreate,
+  planDelete,
+  planRead,
+  planSupersede,
+  planUpdate,
+  recordToken,
+  REFUSAL_LONGEST,
+  REFUSAL_PREFIX,
+  toFormAnswers,
+} from '@formancy/data-core'
+import type { DeclineAnswer, DeclineCase, DefinedRecords, SqlServerFixture, Undefined } from '@formancy/data-fixtures'
+import {
+  covers,
+  DECLINE_PARITY,
+  declineCase,
+  DECLINING_MESSAGES,
+  DECLINING_REMOVABLE,
+  DECLINING_TABLE,
+  defined,
+  EDGE_VALUES,
+  startSqlServerFixture,
+} from '@formancy/data-fixtures'
 import { createSqlServerRecords, discoverSqlServer } from './index.js'
 
 /**
@@ -971,5 +1000,329 @@ describe('when the connection fails', () => {
       await impatient.close()
     }
     expect(await countries('Timed out')).toBe(0)
+  })
+})
+
+/*
+ * A refusal the deployment words for the person (0156): DECLINE_PARITY's
+ * cases, which the PostgreSQL suite runs too, each declared with
+ * `covers()` (0035), and what is SQL Server's own -- its user error numbers,
+ * RAISERROR beside THROW, a trigger that ends the write's transaction, and
+ * how long a message THROW carries.
+ *
+ * `declining.declining` is the table the cases are about, in this engine's
+ * DDL: an AFTER trigger THROWs 50001 with the message `declining.said`
+ * holds for the note a row is written with, and `declining.removable`'s for
+ * the note a row is deleted with; the write batch's CATCH rolls the write
+ * back and raises the error again as it was. Each request is the planner's,
+ * over forms generated from what discovery reports as the owner, as the
+ * server sends it, and the owner reads the tables after.
+ */
+describe('a refusal the deployment words for the person', () => {
+  const TABLE: ObjectRef = DECLINING_TABLE
+  const REMOVABLE: ObjectRef = DECLINING_REMOVABLE
+  const CLARA: PolicyContext = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
+  const RW = { read: ['clerk'], write: ['clerk'] }
+  const READS = { read: ['clerk'], write: [] }
+  const POLICY: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: { item_no: RW, valid_from: RW, valid_to: READS, note: RW },
+    rowFilters: [],
+    lookups: {},
+  }
+  const REMOVABLE_POLICY: FormPolicy = {
+    ...POLICY,
+    operations: { read: ['clerk'], create: [], update: [], delete: ['clerk'] },
+    fields: { id: READS, note: READS },
+  }
+  const STORED = { update: 2, supersede: 3 } as const
+  /** The reason every case below that is declined gives, and the message it is raised with. */
+  const CLOSED = DECLINE_PARITY.insert.answer.reason
+  const CLOSED_MESSAGE = `${REFUSAL_PREFIX}${CLOSED}`
+  let declining: MetadataSnapshot
+  let records: RecordAdapter
+  let recordsForm: FormBindings
+  let versionsForm: FormBindings
+  let removableForm: FormBindings
+
+  beforeAll(async () => {
+    // The DDL is this file's, and CLOSED_MESSAGE, from DECLINE_PARITY and
+    // data-core's prefix, is spliced into its triggers as a literal: refused
+    // here when it holds a quote, which would end the literal early. The
+    // messages the tables hold are data, bound.
+    if (CLOSED_MESSAGE.includes("'")) throw new Error(`a message spliced into the DDL holds a quote: ${CLOSED_MESSAGE}`)
+    await owner.request().batch('create schema declining')
+    await owner.request().batch(`
+      create table declining.said (note nvarchar(20) not null constraint pk_said primary key, message nvarchar(max) not null);
+      create table declining.declining (
+        item_no int not null,
+        valid_from date not null,
+        valid_to date null,
+        note nvarchar(20) null,
+        version int not null constraint df_declining_version default 1,
+        constraint pk_declining primary key (item_no, valid_from)
+      );
+      create table declining.removable (id int identity(1, 1) not null constraint pk_removable primary key, note nvarchar(20) null,
+        version int not null constraint df_removable_version default 1);
+      create table declining.owned (id int not null constraint pk_owned primary key);
+      create table declining.raised (id int not null constraint pk_raised primary key, note nvarchar(20) null);
+      create table declining.ended (id int not null constraint pk_ended primary key);
+      create table declining.measured (id int identity(1, 1) not null constraint pk_measured primary key, how nvarchar(10) not null,
+        message nvarchar(max) not null)`)
+    for (const trigger of [
+      `create trigger declining.tr_declining on declining.declining after insert, update as begin set nocount on;
+        declare @said nvarchar(max) = (select top (1) s.message from declining.said as s join inserted as i on i.note = s.note);
+        if @said is not null throw 50001, @said, 1; end`,
+      `create trigger declining.tr_removable on declining.removable after delete as begin set nocount on;
+        declare @said nvarchar(max) = (select top (1) s.message from declining.said as s join deleted as d on d.note = s.note);
+        if @said is not null throw 50001, @said, 1; end`,
+      // One of the adapter's own numbers, DEFINITION_MOVED's, with the prefix.
+      `create trigger declining.tr_owned on declining.owned after insert as throw 51706, N'${CLOSED_MESSAGE}', 1;`,
+      // RAISERROR, at THROW's severity and below it.
+      `create trigger declining.tr_raised on declining.raised after insert as begin set nocount on;
+        declare @note nvarchar(20) = (select top (1) note from inserted);
+        if @note = N'sixteen' raiserror(N'${CLOSED_MESSAGE}', 16, 1);
+        else if @note = N'eleven' raiserror(N'${CLOSED_MESSAGE}', 11, 1); end`,
+      // Commits the write and then refuses it in words for the person.
+      `create trigger declining.tr_ended on declining.ended after insert as begin set nocount on; commit transaction; throw 50001, N'${CLOSED_MESSAGE}', 1; end`,
+      // THROWs or RAISERRORs the message the row holds, as it was written.
+      `create trigger declining.tr_measured on declining.measured after insert as begin set nocount on;
+        declare @how nvarchar(10), @message nvarchar(max);
+        select top (1) @how = how, @message = message from inserted;
+        if @how = N'throw' throw 50001, @message, 1;
+        raiserror(@message, 16, 1); end`,
+    ]) {
+      await owner.request().batch(trigger)
+    }
+    for (const item of Object.values(STORED)) {
+      await owner
+        .request()
+        .input('item', mssql.Int, item)
+        .query("insert into declining.declining (item_no, valid_from, note) values (@item, '2026-01-01', N'open')")
+    }
+    await owner.request().input('note', mssql.NVarChar(20), DECLINE_PARITY.delete.note).query('insert into declining.removable (note) values (@note)')
+    for (const [note, message] of Object.entries(DECLINING_MESSAGES)) {
+      await owner
+        .request()
+        .input('note', mssql.NVarChar(20), note)
+        .input('message', mssql.NVarChar(mssql.MAX), message)
+        .query('insert into declining.said (note, message) values (@note, @message)')
+    }
+    declining = await discoverSqlServer(owner, { schemas: ['declining'] })
+    const request = { connection: 'test', root: TABLE, formId: 'declining', title: 'Declining', lookups: [], versionColumn: 'version' }
+    recordsForm = generateForm(declining, request).bindings
+    versionsForm = generateForm(declining, { ...request, formId: 'declining-versions', validity: { from: 'valid_from', to: 'valid_to' } }).bindings
+    removableForm = generateForm(declining, { ...request, root: REMOVABLE, formId: 'removable' }).bindings
+    records = createSqlServerRecords(owner)
+  })
+
+  async function describedAs(table: ObjectRef): Promise<DescribedTable> {
+    const found = await records.describe(table)
+    if (!found.ok) throw new Error(`expected a description, got ${found.code}`)
+    return found.described
+  }
+
+  function tokenOf(item: number): string {
+    const token = recordToken(['item_no', 'valid_from'], { item_no: String(item), valid_from: '2026-01-01' })
+    if (!token.ok) throw new Error(token.message)
+    return token.token
+  }
+
+  async function asRead(bindings: FormBindings, item: number): Promise<FormRecord> {
+    const plan = planRead(declining, bindings, POLICY, CLARA, tokenOf(item))
+    if (!plan.ok) throw new Error(`expected a read, got ${plan.code}`)
+    const read = await records.read(plan.request)
+    if (!read.ok || read.record === null) throw new Error('expected the record')
+    return toFormAnswers(bindings, plan.fields, { ok: true, ...read.record })
+  }
+
+  async function rowsOf(item: number) {
+    const rows = await owner
+      .request()
+      .input('item', mssql.Int, item)
+      .query<{ from: string; to: string | null; note: string | null; version: number }>(
+        'select convert(nvarchar(10), valid_from, 23) as [from], convert(nvarchar(10), valid_to, 23) as [to], note, version from declining.declining where item_no = @item order by valid_from',
+      )
+    return rows.recordset
+  }
+
+  /** What a write answered, as DECLINE_PARITY names it; and that a reason never reaches the sentence for the log. */
+  function answerOf(outcome: RecordOutcome | DeleteOutcome): DeclineAnswer | { code: 'written' } {
+    if (outcome.ok) return { code: 'written' }
+    if (outcome.reason !== undefined) expect(outcome.message).not.toContain(outcome.reason)
+    return {
+      code: outcome.code,
+      ...(outcome.reason === undefined ? {} : { reason: outcome.reason }),
+      ...(outcome.code !== 'declined' || outcome.column === undefined ? {} : { column: outcome.column }),
+    }
+  }
+
+  async function created(name: DeclineCase, item: number) {
+    const answers = { item_no: String(item), valid_from: '2026-01-01', note: DECLINE_PARITY[name].note }
+    const plan = planCreate(declining, recordsForm, POLICY, CLARA, answers, await describedAs(TABLE))
+    if (!plan.ok) throw new Error(`expected a create, got ${plan.code}: ${plan.message}`)
+    return { answer: answerOf(await records.insert(plan.request)), rows: await rowsOf(item) }
+  }
+
+  function typeOf(table: ObjectRef, name: string) {
+    const found = findObject(declining, table)?.columns.find((column) => column.name === name)
+    if (found === undefined) throw new Error(`${table.name} has no column ${name}`)
+    return found.type
+  }
+
+  const insertInto = (table: ObjectRef, values: Record<string, ApiValue>) =>
+    defined(records).insert({
+      target: { table, identity: [{ name: 'id', type: typeOf(table, 'id') }], concurrency: null },
+      values: Object.entries(values).map(([name, value]) => ({ name, type: typeOf(table, name), value })),
+      returning: [],
+    })
+
+  // The reason is the deployment's sentence, verbatim, for every write a
+  // person makes, THROWn by an AFTER trigger and raised again as it was by
+  // the batch's CATCH. Before 0156 each was `refused`, in the server's
+  // sentence. Watched failing with the user error's reading taken out:
+  // refused, on every write.
+  test(
+    'a create, an update, a change from a date and a delete the trigger refuses are declined with its reason, and nothing is written',
+    covers('sqlserver', declineCase('insert'), declineCase('update'), declineCase('supersede'), declineCase('delete')),
+    async () => {
+      expect(await created('insert', 1)).toEqual({ answer: DECLINE_PARITY.insert.answer, rows: [] })
+
+      const read = await asRead(recordsForm, STORED.update)
+      const update = planUpdate(
+        declining,
+        recordsForm,
+        POLICY,
+        CLARA,
+        tokenOf(STORED.update),
+        '1',
+        { note: DECLINE_PARITY.update.note },
+        read,
+        await describedAs(TABLE),
+      )
+      if (!update.ok) throw new Error(`expected an update, got ${update.code}`)
+      expect(answerOf(await records.update(update.request))).toEqual(DECLINE_PARITY.update.answer)
+      expect(await rowsOf(STORED.update)).toEqual([{ from: '2026-01-01', to: null, note: 'open', version: 1 }])
+
+      const change = planSupersede(
+        declining,
+        versionsForm,
+        POLICY,
+        CLARA,
+        tokenOf(STORED.supersede),
+        '1',
+        { valid_from: '2026-07-01', note: DECLINE_PARITY.supersede.note },
+        await asRead(versionsForm, STORED.supersede),
+        await describedAs(TABLE),
+      )
+      if (!change.ok) throw new Error(`expected a change, got ${change.code}: ${change.message}`)
+      expect(answerOf(await records.supersede(change.request))).toEqual(DECLINE_PARITY.supersede.answer)
+      // The version the batch ended first is open again: the batch rolled back what it had done.
+      expect(await rowsOf(STORED.supersede)).toEqual([{ from: '2026-01-01', to: null, note: 'open', version: 1 }])
+
+      const removal = planDelete(declining, removableForm, REMOVABLE_POLICY, CLARA, 'k1:1', '1', await describedAs(REMOVABLE))
+      if (!removal.ok) throw new Error(`expected a delete, got ${removal.code}: ${removal.message}`)
+      expect(answerOf(await records.delete(removal.request))).toEqual(DECLINE_PARITY.delete.answer)
+      const kept = await owner.request().query<{ id: number; note: string; version: number }>('select id, note, version from declining.removable')
+      expect(kept.recordset).toEqual([{ id: 1, note: 'kept', version: 1 }])
+    },
+  )
+
+  // Watched failing with the bracket left unread: refused.
+  test('a refusal that names a column is declined with the column and the reason after it', covers('sqlserver', declineCase('column')), async () => {
+    expect(await created('column', 5)).toEqual({ answer: DECLINE_PARITY.column.answer, rows: [] })
+  })
+
+  // Nothing changes for a trigger written before 0156, as REFUSAL_PARITY's
+  // guardedInsert holds for THROW 50001. Watched failing with every user
+  // error's message passed on: declined.
+  test('the same reason without the prefix is refused, as every THROW was', covers('sqlserver', declineCase('unprefixed')), async () => {
+    expect(await created('unprefixed', 6)).toEqual({ answer: DECLINE_PARITY.unprefixed.answer, rows: [] })
+  })
+
+  // The bound is THROW's, measured below: the longest message passed on
+  // arrives whole through the trigger and the batch's CATCH, one more code
+  // unit is refused, and one far past it, which THROW cuts, is refused
+  // rather than shown cut. Watched failing with the bound at 2,047: cut
+  // declined, its reason ending in `...`.
+  test(
+    'a reason with a control character, or longer than THROW carries uncut, is refused; the longest is declined whole',
+    covers('sqlserver', declineCase('control'), declineCase('longest'), declineCase('overlong'), declineCase('cut')),
+    async () => {
+      expect(await created('control', 7)).toEqual({ answer: DECLINE_PARITY.control.answer, rows: [] })
+      expect(await created('longest', 8)).toEqual({ answer: DECLINE_PARITY.longest.answer, rows: [] })
+      expect(await created('overlong', 9)).toEqual({ answer: DECLINE_PARITY.overlong.answer, rows: [] })
+      expect(await created('cut', 10)).toEqual({ answer: DECLINE_PARITY.cut.answer, rows: [] })
+    },
+  )
+
+  // What a message of each length arrives as, THROWn or RAISERRORed by a
+  // trigger inside the write batch's shape -- TRY, the write, CATCH, roll
+  // back, THROW again -- which is what REFUSAL_LONGEST rests on: the
+  // longest message that arrives whole and cannot be the start of a longer
+  // one. Measured, not read from Microsoft's documentation, which gives
+  // THROW's message as nvarchar(2048): both keep 2,047 code units whole and
+  // cut a longer message to its first 2,044 and `...`, 2,047 too, so the
+  // bound is one short of it. First run with the bound typed as 2,047, from
+  // the design: `cut` above was declined with a reason ending in `...`.
+  test('a message THROW or RAISERROR carries arrives whole one past the bound, and a longer one arrives cut to that length', async () => {
+    const lengths = [REFUSAL_LONGEST - 1, REFUSAL_LONGEST, REFUSAL_LONGEST + 1, REFUSAL_LONGEST + 2, 4019]
+    const arrived: Record<string, Record<number, { number: unknown; length: number; tail: string }>> = { throw: {}, raiserror: {} }
+    for (const how of ['throw', 'raiserror'] as const) {
+      for (const length of lengths) {
+        const message = `${REFUSAL_PREFIX}${'x'.repeat(length - REFUSAL_PREFIX.length - 1)}y`
+        try {
+          await owner
+            .request()
+            .input('how', mssql.NVarChar(10), how)
+            .input('message', mssql.NVarChar(mssql.MAX), message)
+            .query(
+              'set xact_abort on; begin try begin transaction; insert into declining.measured (how, message) values (@how, @message); commit transaction; end try ' +
+                'begin catch if @@trancount > 0 rollback transaction; throw; end catch',
+            )
+          ;(arrived[how] as Record<number, unknown>)[length] = 'nothing raised'
+        } catch (error) {
+          const { number, message: said } = error as { number: unknown; message: string }
+          ;(arrived[how] as Record<number, unknown>)[length] = { number, length: said.length, tail: said.slice(-3) }
+        }
+      }
+    }
+    const carried = REFUSAL_LONGEST + 1
+    const expected = (number: number) =>
+      Object.fromEntries(lengths.map((length) => [length, length <= carried ? { number, length, tail: 'xxy' } : { number, length: carried, tail: '...' }]))
+    expect(arrived).toEqual({ throw: expected(50001), raiserror: expected(50000) })
+  })
+
+  // A number the adapter answers by is the adapter's, whatever a trigger
+  // puts after it: DEFINITION_MOVED's with the prefix is no reason for the
+  // person. Watched failing with the adapter's own numbers left unasked:
+  // declined.
+  test("the prefix under one of the adapter's own numbers is refused, never declined", async () => {
+    expect(await insertInto({ schema: 'declining', name: 'owned' }, { id: '1' })).toMatchObject({
+      ok: false,
+      code: 'refused',
+      message: expect.stringContaining('51706'),
+    })
+  })
+
+  // RAISERROR is a user error too, number 50000, and is declined at THROW's
+  // severity, 16. Below it the batch's CATCH still rolls it back and raises
+  // it again, and it is refused. Watched failing with the severity left
+  // unasked: eleven declined.
+  test('a RAISERROR at severity 16 with the prefix is declined, and one below it refused', async () => {
+    const raised: ObjectRef = { schema: 'declining', name: 'raised' }
+    expect(await insertInto(raised, { id: '1', note: 'sixteen' })).toMatchObject({ ok: false, code: 'declined', reason: CLOSED })
+    expect(await insertInto(raised, { id: '2', note: 'eleven' })).toMatchObject({ ok: false, code: 'refused' })
+    expect((await owner.request().query<{ n: number }>('select count(*) as n from declining.raised')).recordset[0]?.n).toBe(0)
+  })
+
+  // A trigger that commits the write and then THROWs the prefix: the batch
+  // raises its own error in the trigger's place (0031), so a reason never
+  // says "not saved" over a COMMIT that stored the row. Watched failing
+  // with the batch's TRANSACTION_ENDED left out of CATCH.
+  test('the prefix after a trigger ended the write’s transaction is unknown-outcome, and the row is stored', async () => {
+    expect(await insertInto({ schema: 'declining', name: 'ended' }, { id: '1' })).toMatchObject({ ok: false, code: 'unknown-outcome' })
+    expect((await owner.request().query<{ n: number }>('select count(*) as n from declining.ended')).recordset[0]?.n).toBe(1)
   })
 })

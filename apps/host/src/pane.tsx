@@ -10,7 +10,7 @@ import { ServerDid } from './server-did.js'
 import type { SaveResult, Session, Submitted } from './session.js'
 import { useSteadyOffer } from './steady-offer.js'
 import { UnknownNotice } from './unknown-notice.js'
-import { NoticeHeading } from './words.js'
+import { DECLINED_BY, NoticeHeading } from './words.js'
 
 /** How a renderer is written for a person. */
 const NAMES = { react: 'React', angular: 'Angular' } as const
@@ -28,12 +28,15 @@ export const DISCARDED = 'Loaded the saved record. Your changes were discarded.'
 type Kind = 'answer' | 'pending' | 'refused'
 
 /** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. */
-type Notice = { kind: 'stale' | 'refused' | 'unknown'; message: string; n: number }
+type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: string; n: number }
 
 /**
  * One renderer's half of the page: a region named by its heading, the saved
  * line, the notice a refused save opens, and the form on white paper in
- * Blueprint.
+ * Blueprint. A save the deployment declined (0156) opens the same notice,
+ * its reason verbatim and a line saying the words are the database's own;
+ * one whose reason names a field puts it there, and the saved line says
+ * whose words they are.
  *
  * The engine is the session's, read through `useSyncExternalStore`, and
  * everything below the saved line is keyed by how many times the session has
@@ -230,7 +233,7 @@ function PaneBody({
       say(result.message, result.kind === 'replaced' ? 'answer' : 'refused')
       return
     }
-    if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'unknown') {
+    if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'declined' || result?.kind === 'unknown') {
       say('')
       open(result.kind, result.message)
       return
@@ -242,7 +245,7 @@ function PaneBody({
     // and this line says only that nothing was saved.
     if (result?.kind === 'invalid') {
       toShow.current?.()
-      say(`Not saved. ${result.message}`, 'refused')
+      say(`Not saved. ${result.message}${result.declined === true ? ` ${DECLINED_BY}` : ''}`, 'refused')
     } else say(result === null ? '' : result.message, 'answer', result?.kind === 'saved' || result?.kind === 'created')
   }
 
@@ -280,6 +283,7 @@ function PaneBody({
             Not saved
           </NoticeHeading>
           <p className="notice-text">{notice.message}</p>
+          {notice.kind === 'declined' ? <p className="notice-text">{DECLINED_BY}</p> : null}
           {notice.kind === 'stale' ? (
             <>
               <p className="notice-text">{DRAFT_KEPT}</p>

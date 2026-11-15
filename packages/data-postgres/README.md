@@ -203,13 +203,24 @@ in short:
   arrives as a SQLSTATE: a terminated backend, a shutdown and a
   `transaction_timeout` (25P04) are FATAL, close the connection, and reach
   the adapter as postgres.js's CONNECTION_CLOSED — `unknown-outcome` for a
-  write, as the parity suite shows by terminating one mid-write. Anything else the server refuses — a trigger's `RAISE`, an
+  write, as the parity suite shows by terminating one mid-write. A trigger's
+  `RAISE EXCEPTION` on a write, P0001, whose message starts with exactly
+  `formancy: refused: ` is `declined`, the rest of the message its
+  `reason` and the column `formancy: refused [column]: ` names its
+  `column`. Such a message longer than 2,046 UTF-16 code units or with a
+  control character is `refused`, and so is one a read meets; a RAISE
+  with an ERRCODE of its own keeps that code's meaning, prefix or not
+  ([0156](../../docs/decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
+  Anything else the server refuses — a trigger's other `RAISE`, an
   error code only a function knows (38000) — is `refused`: it certainly rolled
   back, and the same request will be refused again. A connection that fails
   before a statement is sent is `unavailable`; after a write was sent it is
   `unknown-outcome` — the tests show such a write committing after the client
   gave up — and it is never retried. A malformed request, filters that say
-  nothing, or a syntax error in this adapter's own SQL is thrown.
+  nothing, or a syntax error in this adapter's own SQL is thrown. A class-42
+  error with no code of its own that arose inside a function — a trigger
+  function's ambiguous column, by the error's context field — is the
+  deployment's SQL, and `refused` (0156).
 
 ### Every write holds the table to the definition it was decided over
 

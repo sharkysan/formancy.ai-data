@@ -81,15 +81,25 @@ function fieldOf(bindings: FormBindings, column: string | undefined): string | u
 /** A read that found no record inside the filters, as the port's failure, for the answers that need one. */
 export const NOT_FOUND: RecordFailure = { ok: false, code: 'not-found', message: 'No such record exists inside the filters.' }
 
+/** What `refused` says to the person after a write: the server's own words, since the database's are never passed on (0028). */
+const REFUSED_SAVE = 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.'
+const REFUSED_DELETE = 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.'
+
 /**
  * A database's refusal as an HTTP answer (0015).
  *
  * Constraint failures become a field error where the engine names a column the
  * form binds, so a person sees the message beside the field. `refused` is
  * 422, because sending it again will be refused the same way; `unavailable`
- * is 503, because it may not be. `unknown-outcome` is not answered here: only
- * a write has one, and the write routes answer it with `unknownOutcome`, which
- * names what was addressed. A read that reported one would be an adapter's
+ * is 503, because it may not be. `declined` is 422 too, and its message is
+ * the deployment's reason as its trigger worded it (0156) -- the one
+ * sentence here the server did not write -- beside the field its column is
+ * bound to when it names one, and about the whole record when it names an
+ * unbound column or none. A `declined` with no reason is an adapter's bug,
+ * answered as `refused` rather than with words nobody wrote.
+ * `unknown-outcome` is not answered here: only a write has one, and the
+ * write routes answer it with `unknownOutcome`, which names what was
+ * addressed. A read that reported one would be an adapter's
  * bug, and is thrown -- a 500 -- rather than told to a person as "may have
  * been saved" (0031).
  */
@@ -128,10 +138,12 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
       return { status: 403, body: { code: 'permission-denied', message: 'The database connection is not allowed to do this.' } }
     case 'schema-changed':
       return { status: 409, body: { code: 'schema-changed', message: 'The database changed since this form was published.' } }
+    case 'declined':
+      return failure.reason === undefined ? withField(422, 'refused', REFUSED_SAVE) : withField(422, 'declined', failure.reason)
     case 'refused':
       // A trigger's own error, a write declined, an error the adapter does not
       // know: it will be refused again, so the person is not invited to retry (0028).
-      return withField(422, 'refused', 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.')
+      return withField(422, 'refused', REFUSED_SAVE)
     case 'unavailable':
       // Unreachable, or a refusal the engine documents as passing: a deadlock, a lock timeout.
       return { status: 503, body: { code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' } }
@@ -148,16 +160,16 @@ export function recordFailure(bindings: FormBindings, failure: RecordFailure): H
  * `referenced`, said without the table, the key or how many rows -- the
  * route logs the key's name (runtime-deletes.ts) -- though the answer
  * itself tells the person that something refers to the record, which any
- * refusal would.
+ * refusal would. A delete the deployment declined (0156) is 422 with its
+ * reason, about the record whatever column it names.
  * `unknown-outcome` is the route's to answer with `unknownOutcome`, which
  * names what was addressed; here it is a bug, as for a read.
  */
 export function deleteFailure(failure: RecordFailure): HttpRefusal {
-  const refused: HttpRefusal = {
-    status: 422,
-    body: { code: 'refused', message: 'The database refused this request, and nothing was deleted. Sending it again will be refused the same way.' },
-  }
+  const refused: HttpRefusal = { status: 422, body: { code: 'refused', message: REFUSED_DELETE } }
   switch (failure.code) {
+    case 'declined':
+      return failure.reason === undefined ? refused : { status: 422, body: { code: 'declined', message: failure.reason } }
     case 'not-found':
       return { status: 404, body: { code: 'not-found', message: 'No such record.' } }
     case 'stale':

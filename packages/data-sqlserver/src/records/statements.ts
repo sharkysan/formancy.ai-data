@@ -58,6 +58,23 @@ export const REACH_UNDELETABLE_MESSAGE = 'formancy: this account may not delete 
 /** A change from a date that ended a version and inserted no next one (0113): rolled back. */
 export const NEXT_NOT_INSERTED = 51709
 export const NEXT_NOT_INSERTED_MESSAGE = 'formancy: a change from a date ended a version and inserted no next one'
+/**
+ * Every number above, the ones the batches raise for themselves: errors.ts
+ * reads none of them as a deployment's reason for the person, whatever its
+ * message (0156). statements.test.ts fails when a number exported here is
+ * left out of it.
+ */
+export const OWN_NUMBERS: readonly number[] = [
+  TEXT_NOT_STORED,
+  NOT_ONE_ROW,
+  DECIDED_BY_TRIGGER,
+  TRANSACTION_REPLACED,
+  TRANSACTION_ENDED,
+  DEFINITION_MOVED,
+  REACH_MOVED,
+  REACH_UNDELETABLE,
+  NEXT_NOT_INSERTED,
+]
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }

@@ -1,3 +1,4 @@
+import { deploymentRefusal } from '@formancy/data-core'
 import type { RecordFailure, RecordFailureCode } from '@formancy/data-core'
 
 /** Whether the statement that failed could have written. */
@@ -65,9 +66,10 @@ const BY_CLASS: ReadonlyMap<string, RecordFailureCode> = new Map([
  * out, and sees exactly that.
  *
  * An allowlist, not a default. Everything else the server sends — a
- * trigger's RAISE (P0), an error code only a function knows (38000, C11), a
- * feature not supported, an internal error — is `refused`: the same request
- * is expected to be refused again, so it is not a reason to try again.
+ * trigger's RAISE (P0) not worded for the person (0156), an error code only
+ * a function knows (38000, C11), a feature not supported, an internal error
+ * — is `refused`: the same request is expected to be refused again, so it
+ * is not a reason to try again.
  */
 const PASSING_CLASSES: ReadonlySet<string> = new Set(['08', '40', '53', '57', '58', '28'])
 const PASSING_STATES: ReadonlySet<string> = new Set(['55P03', '55006', '25006', '3D000'])
@@ -75,9 +77,15 @@ const PASSING_STATES: ReadonlySet<string> = new Set(['55P03', '55006', '25006', 
 /**
  * Class 42 is syntax errors and access-rule violations. The ones a database
  * can cause are named above; any other — a syntax error, an ambiguous name,
- * a parameter of indeterminate type — is this adapter's own SQL at fault.
+ * a parameter of indeterminate type — is this adapter's own SQL at fault,
+ * when it arose in this adapter's statement. One that arose inside a
+ * function, as a trigger function's does, is the deployment's SQL (0156):
+ * `insideFunction`.
  */
 const PROGRAMMING_ERROR_CLASS = '42'
+
+/** RAISE EXCEPTION's SQLSTATE, the one whose message a deployment words for the person (0156). */
+const RAISED = 'P0001'
 
 /** Driver and socket errors that happen before a statement is sent: nothing reached the server. */
 const NOT_SENT: ReadonlySet<string> = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'CONNECT_TIMEOUT', 'CONNECTION_ENDED'])
@@ -101,6 +109,8 @@ interface ServerError extends Error {
   code: string
   constraint_name?: unknown
   column_name?: unknown
+  /** The error's context, PostgreSQL's W field: filled under a function's error context, absent for an error in the statement sent. postgres.js names it `where`. */
+  where?: unknown
 }
 
 /**
@@ -132,18 +142,74 @@ function codeOf(state: string): RecordFailureCode {
 }
 
 /**
+ * Whether the error arose inside a function -- a trigger function, or one a
+ * statement called -- rather than in the statement this adapter sent: the
+ * engine's own report, its context field, never a phrase in its message.
+ * PostgreSQL fills it under a function's error context, "PL/pgSQL function
+ * … line 3 at PERFORM", and sends none for an error in the statement itself.
+ */
+function insideFunction(error: ServerError): boolean {
+  return identifier(error.where) !== undefined
+}
+
+/**
+ * A RAISE the deployment worded for the person (0156), on a write: the
+ * reason after `formancy: refused: `, which reaches the person and no log,
+ * or `refused` when its shape is not one passed on. `undefined` for a
+ * message without the prefix, which is refused as before. A read's RAISE --
+ * from a function a view calls -- is never a person's reason: a refusal
+ * worded for one is a write's.
+ */
+function raised(error: ServerError, phase: Phase): RecordFailure | undefined {
+  if (error.code !== RAISED || phase !== 'write') return undefined
+  const read = deploymentRefusal(error.message)
+  if (read.kind === 'none') return undefined
+  if (read.kind === 'unshaped') {
+    return {
+      ok: false,
+      code: 'refused',
+      message: `PostgreSQL refused the statement with a refusal worded for the person (P0001) that is not passed on: ${read.why}.`,
+    }
+  }
+  return {
+    ok: false,
+    code: 'declined',
+    ...(read.column === undefined ? {} : { column: read.column }),
+    reason: read.reason,
+    message: 'PostgreSQL refused the write with a refusal worded for the person (P0001), whose reason goes to the person and to no log.',
+  }
+}
+
+/**
  * The failure for a refusal the server sent.
  *
  * Every error the server sends ends the statement, and outside an explicit
  * transaction its implicit one rolls back, so nothing was written whatever
- * the code: `unavailable` when it passes, `refused` when it will not.
+ * the code: `unavailable` when it passes, `refused` when it will not, and
+ * `declined` when the deployment worded it for the person (0156).
+ *
+ * Class 42 without an entry of its own is thrown as this adapter's own SQL
+ * at fault only when it arose in the statement sent. Inside a function it
+ * is the deployment's -- a trigger function with an ambiguous column, 42702
+ * -- and `refused`: thrown, it was a 500, which a client reads as "it may
+ * have been saved" over a write PostgreSQL certainly rolled back. The codes
+ * with an entry keep it wherever they arose.
  *
  * The message names the SQLSTATE and the constraint or column, which are
  * identifiers; never the server's own message or detail, which can quote the
  * value ("Key (id)=(42) already exists").
  */
-function serverFailure(error: ServerError): RecordFailure {
-  if (error.code.slice(0, 2) === PROGRAMMING_ERROR_CLASS && !BY_STATE.has(error.code)) throw error
+function serverFailure(error: ServerError, phase: Phase): RecordFailure {
+  if (error.code.slice(0, 2) === PROGRAMMING_ERROR_CLASS && !BY_STATE.has(error.code)) {
+    if (!insideFunction(error)) throw error
+    return {
+      ok: false,
+      code: 'refused',
+      message: `PostgreSQL refused the statement with SQLSTATE ${error.code}, which arose inside a function and not in this adapter's SQL.`,
+    }
+  }
+  const worded = raised(error, phase)
+  if (worded !== undefined) return worded
   const code = codeOf(error.code)
   const constraint = identifier(error.constraint_name)
   const column = identifier(error.column_name)
@@ -165,10 +231,11 @@ function serverFailure(error: ServerError): RecordFailure {
  * after it may have committed a write, so for a write it is
  * `unknown-outcome`, and this adapter never retries it. Anything else — a
  * TypeError, a driver error about how it was called, a SQLSTATE in class 42
- * — is a programming error and is thrown, not dressed as a database answer.
+ * that arose in this adapter's statement — is a programming error and is
+ * thrown, not dressed as a database answer.
  */
 export function recordFailure(error: unknown, phase: Phase): RecordFailure {
-  if (isServerError(error)) return serverFailure(error)
+  if (isServerError(error)) return serverFailure(error, phase)
   const code = error instanceof Error ? (error as { code?: unknown }).code : undefined
   if (typeof code === 'string' && NOT_SENT.has(code)) {
     return { ok: false, code: 'unavailable', message: `The database could not be reached (${code}); nothing was sent.` }

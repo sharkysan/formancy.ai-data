@@ -479,7 +479,13 @@ save or a delete still blanks while it is asked (0146); the rest is 0044's and 0
    WHERE (PostgreSQL [0016](../decisions/0016-postgres-operations.md), SQL
    Server [0017](../decisions/0017-sqlserver-operations.md)). Zero rows is
    followed by one read that tells `stale` from `not-found`. Stale is 409,
-   and the session keeps the person's draft, merging nothing (0029).
+   and the session keeps the person's draft, merging nothing (0029). A
+   trigger that refuses the write with a message starting
+   `formancy: refused: ` is 422 `declined` with the rest of it, which the
+   host page says as the database's own words and the log and the audit
+   never hold; a PostgreSQL trigger function's own SQL error is 422
+   `refused`, where it was a 500 the client read as a lost answer
+   ([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
 6. A connection lost after the write was sent is `unknown-outcome`: logged
    once, answered 502 with the operation, record and version
    (`routes/runtime-errors.ts`), and never sent again. The client counts a

@@ -556,6 +556,7 @@ own cascade never asks. Either rolls back what the cascade did
   |---|---|
   | 544, 8102 (an identity), 271 (a computed column), 273, 272 (a rowversion), 13536, 13537 (a GENERATED ALWAYS column, such as a system-versioning period's) | `schema-changed`, as PostgreSQL's 428C9 |
   | 1205, 1222, 1204, 701, 8645, 8651, 9002, 1105, 3960, 3906 (a read-only database, PostgreSQL's 25006), 976, 983 (an availability replica not accessible now) | `unavailable`: SQL Server documents each as passing |
+  | 50000 and above at severity 16 — a trigger's THROW or RAISERROR — whose message starts `formancy: refused: `, on a write, under none of the numbers the adapter raises for itself | `declined`, with the rest of the message as its `reason` and the column `formancy: refused [column]: ` names; refused when the message is longer than 2,046 UTF-16 code units or holds a control character ([0156](../../docs/decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)) |
   | 50000 and above — a trigger's THROW or RAISERROR — and any other number | `refused`: nothing was written, and the same request would be refused again; unless a trigger ended the write's transaction before it, which is `unknown-outcome` (0031) |
 
   Of the `unavailable` numbers 1205, a deadlock victim, and 3906, a database

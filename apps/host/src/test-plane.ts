@@ -530,8 +530,11 @@ export async function startPlane(
           .request()
           .input('approver', mssql.Int, approver)
           .input('creator', mssql.Int, creator)
+          // Into a table variable: SQL Server refuses an OUTPUT without INTO
+          // on a table with an enabled trigger (334), and the run's setup adds
+          // one to the orders (test-databases.ts, 0156).
           .query<{ id: string }>(
-            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) output cast(inserted.id as nvarchar(40)) as id values (1, 1001, '2026-10-08', 'placed', 1, @approver, @creator)",
+            "declare @made table (id bigint); insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) output inserted.id into @made values (1, 1001, '2026-10-08', 'placed', 1, @approver, @creator); select cast(id as nvarchar(40)) as id from @made",
           )
         return `k1:${String(result.recordset[0]?.id)}`
       },

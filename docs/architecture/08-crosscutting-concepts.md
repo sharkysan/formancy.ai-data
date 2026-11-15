@@ -122,6 +122,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | Drift that blocks an operation | 409 `drift`, nothing written | [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md), [0010](../decisions/0010-drift-is-classified-against-the-bindings.md) | `routes/runtime-drift.integration.test.ts` |
 | A grant whose key now names another column | 422 `keys-reassigned`, nothing written, until someone decides | [0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | `routes/admin-keys-reassigned.integration.test.ts`, `routes/admin-evolution.test.ts` |
 | A route with no audit name | its registration throws, or 500 `unaudited-route` | [0033](../decisions/0033-the-administrator-plane-is-audited.md) | `routes/admin-audit.test.ts` |
+| A trigger's reason for the person that may have been cut, holds a control character or says nothing | the server's own sentence, never the reason cut | [0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md) | `packages/data-sqlserver/src/records-failures.integration.test.ts`, `packages/data-postgres/src/records-failures.integration.test.ts` |
 | A write whose answer was lost | unknown, never refused, never replayed | [0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md) | `e2e-lost-answer.integration.test.ts` |
 | A SQL Server that answers a SQL login asking for TLS that it will not encrypt, or with an answer that is not a PRELOGIN response | the connection ends before the login is sent, 503 | [0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md) | `packages/data-sqlserver/src/encryption.test.ts`, `routes/unencrypted.integration.test.ts` |
 | A file of records that cannot be made whole -- past its byte budget or its deadline, rows that moved between pages, text UTF-8 cannot carry, labels that cannot be loaded | a JSON refusal and nothing of the file, never a shorter file sent as whole | [0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md) | `routes/runtime-exports.test.ts`, `packages/data-client/src/transport.test.ts` |
@@ -397,6 +398,10 @@ trail tells that a table was browsed and not which row led there
 ([0103](../decisions/0103-a-browsed-row-follows-its-foreign-keys-either-way.md)).
 No event has a field for a filter's conditions, on either plane
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)).
+A write the deployment declined in words for the person is the outcome
+`declined`, and no event has a field for its reason, which may hold a
+value
+([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
 
 **It is operational, not evidence.** The event is written after the commit,
 by another system: a crash between the two loses it, and whoever runs the
@@ -420,6 +425,24 @@ PostgreSQL's "Key (id)=(42) already exists" does
 (`packages/data-postgres/src/records/errors.ts`) and SQL Server's messages
 do ([0017](../decisions/0017-sqlserver-operations.md)). Both engines are held
 to one set of failure codes, so a form says the same whichever refused.
+
+**One sentence is the deployment's, not the server's.** A write a trigger
+refuses with a message starting `formancy: refused: ` is 422 `declined`, and
+its `message` is the rest of that message, beside the field bound to the
+column `formancy: refused [column]: ` names. Which error may carry one is
+each engine's -- PostgreSQL's P0001 on a write, SQL Server's user error
+from 50000 at severity 16 under none of the adapter's own numbers -- and
+what it says, and whether its shape is passed on, is read once in
+`packages/data-core/src/records/refusal.ts`: one line of at most
+`REFUSAL_LONGEST` UTF-16 code units, one short of what SQL Server's THROW
+carries whole, or the server's own sentence, as every other trigger error
+is. The adapter's message for the log says only that it was declined, and
+the route logs the code and the form; the reason goes to the person and
+nowhere else
+([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
+**Held by** both adapters' `records-failures.integration.test.ts` on
+`DECLINE_PARITY` (`packages/data-fixtures/src/declines.ts`),
+`refusal.test.ts` beside the reader, and `routes/runtime.test.ts`.
 
 **The sentence says what is safe next.** A refusal with no code of its own is
 `refused`, 422, "Sending it again will be refused the same way", and

@@ -330,7 +330,13 @@ and a time to the minute
 **Writes.** On SQL Server, a table with an enabled INSTEAD OF trigger cannot
 be written that way through the adapter, `returning` is the row before an
 AFTER trigger changed it, and a trigger's `RAISERROR` refuses a write the
-customer's own application lets commit (0017). An update trusts that the
+customer's own application lets commit (0017). A trigger's reason for the
+person is shown as written and checked for nothing but its shape: it can
+say a value the person's policy hides, or something untrue, and a whole
+one of 2,047 code units is refused with the cut ones, which arrive at that
+length on SQL Server; and a trigger runs as the connection's account, so
+its reason cannot depend on who saved
+([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)). An update trusts that the
 identity is a key (0016), and every update reads the record first, one
 extra query (0022). A delete cannot be undone here, and one refused because
 other rows refer to the record names none of them (0050). A reference a

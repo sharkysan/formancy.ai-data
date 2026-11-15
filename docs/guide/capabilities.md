@@ -236,6 +236,25 @@ get*](../../README.md#what-you-get) is the short version, and
   every save on a new connection and never sends one twice, so its page says
   the save may have been saved
   ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
+- **A trigger can refuse a write in words the person reads.** A trigger, or
+  a function it calls, whose error message starts with exactly
+  `formancy: refused: ` has the rest shown to the person who saved, as
+  422 `declined`, for a create, an update, a change from a date and a
+  delete on both engines; `formancy: refused [column]: ` puts it beside the
+  field bound to that column. On PostgreSQL it is a `RAISE EXCEPTION`; on
+  SQL Server a `THROW` or a severity-16 `RAISERROR` from 50000, under none
+  of the numbers the adapter raises for itself. A message with a control
+  character -- a line or paragraph separator and a bidirectional control
+  included -- or longer than 2,046 UTF-16 code units with the prefix is
+  the server's own sentence, as every other trigger error and any read's
+  still is. The bound is one short of the 2,047 that THROW and RAISERROR
+  carry whole, since a longer message arrives cut to exactly 2,047,
+  measured on SQL Server 2022 (16.0.4295.3) on 2026-11-15. The reason is
+  never logged or audited, and nothing checks what it says: a trigger can
+  put a value there the person's policy hides. A PostgreSQL trigger
+  function's own SQL error is a refusal now, where it was a server error
+  that the page read as "it may have been saved"
+  ([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).

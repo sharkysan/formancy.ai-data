@@ -277,6 +277,8 @@ export type { ThroughTerms } from './records/through.js'
 export { DELETE_REFUSED, driftRefusal, LIST_REFUSED, NOTHING_LEFT, READ_REFUSED, runtimeOperations, WRITE_REFUSED } from './records/drift.js'
 export { rejectedSelection, toFormAnswers } from './records/answers.js'
 export { decodeRecordKey, intendedRecord, recordToken } from './records/token.js'
+export { deploymentRefusal, REFUSAL_LONGEST, REFUSAL_PREFIX } from './records/refusal.js'
+export type { DeploymentRefusal } from './records/refusal.js'
 export type { RecordKeyDecoding, RecordTokenEncoding, RecordTokenErrorCode, RecordTokenRefusal } from './records/token.js'
 export type {
   FieldError,

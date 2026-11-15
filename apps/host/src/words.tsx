@@ -1,6 +1,14 @@
 import type { ReactElement, ReactNode } from 'react'
 import type { Said } from './leave.js'
 
+/**
+ * What a notice says under a reason the deployment worded for the person
+ * (0156), a save's or a delete's: whose words those are. Every other
+ * sentence in a notice is the server's own; this one is not, and the person
+ * is told so.
+ */
+export const DECLINED_BY = "This reason is the database's own."
+
 /** A sentence of the page's, with its tokens and ids set as code. */
 export function Words({ said }: { said: Said }): ReactElement {
   return <>{said.map((part, index) => (typeof part === 'string' ? part : <code key={index}>{part.code}</code>))}</>

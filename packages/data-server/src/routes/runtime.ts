@@ -260,11 +260,24 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     return found.ok ? { ok: true, described: found.described } : { ok: false, answer: recordFailure(bundle.bindings, found) }
   }
 
-  /** A write's answer, sent, with what the audit names: its record, and whether it was a repeat. */
+  /**
+   * A write's answer, sent, with what the audit names: its record, and
+   * whether it was a repeat. A write the deployment declined (0156) is said
+   * once in the log by its code and the form, and never with its reason,
+   * which goes to the person alone: the deployment may have written a value
+   * into it. The audit names it by the same code, from the body, and holds
+   * no message of any answer.
+   */
   async function answered(reply: FastifyReply, answer: WriteAnswer & { repeated?: boolean }): Promise<FastifyReply> {
     const trail = reply.request.auditTrail
     if (trail !== undefined && answer.record !== undefined) trail.record = answer.record
     if (trail !== undefined && answer.repeated === true) trail.repeated = true
+    if (isRecord(answer.body) && answer.body['code'] === 'declined' && answer.repeated !== true) {
+      reply.log.info(
+        { form: (reply.request.params as { id?: unknown }).id, code: 'declined' },
+        'refused: the deployment declined a write, in words that go to the person and to no log',
+      )
+    }
     return reply.code(answer.status).send(answer.body)
   }
 

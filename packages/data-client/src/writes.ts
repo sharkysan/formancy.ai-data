@@ -84,7 +84,11 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  *    lost the answer. What was addressed comes from the body, or the call.
  * 4. A 4xx with a sentence is the server's refusal: nothing was written.
  *    This is 0028's 422 `refused`, 409 `stale`, 401 and 403 -- and a rate
- *    limit's 429, which carries a sentence and no code.
+ *    limit's 429, which carries a sentence and no code -- and 0156's 422
+ *    `declined`, whose sentence is the deployment's own reason, passed on by
+ *    the server as its trigger worded it. A trigger function's own SQL at
+ *    fault on PostgreSQL is a 422 `refused` since 0156, where it was a 500,
+ *    which this read as an unknown write over one certainly rolled back.
  * 5. A 503 `unavailable` with a sentence: the database was not reached.
  * 6. Anything else -- a 500, another 502 or 504 -- was lost.
  */
