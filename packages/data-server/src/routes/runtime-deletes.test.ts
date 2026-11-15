@@ -310,6 +310,12 @@ describe('the delete route', () => {
       ],
       [{ ok: false, code: 'refused', message: 'm' }, 422, 'refused', /nothing was deleted\. Sending it again will be refused the same way/],
       [{ ok: false, code: 'check-violation', column: 'note', message: 'm' }, 422, 'refused', /nothing was deleted/],
+      // The deployment's reason, verbatim and about the record, whatever
+      // column it names (0156); one with no reason, an adapter's bug, in
+      // the server's words (watched failing with the reason dropped:
+      // refused).
+      [{ ok: false, code: 'declined', column: 'note', reason: 'Closed tickets are kept.', message: 'm' }, 422, 'declined', /^Closed tickets are kept\.$/],
+      [{ ok: false, code: 'declined', message: 'm' }, 422, 'refused', /nothing was deleted\. Sending it again will be refused the same way/],
       [{ ok: false, code: 'permission-denied', message: 'm' }, 403, 'permission-denied', /not allowed/],
       [{ ok: false, code: 'schema-changed', message: 'm' }, 409, 'schema-changed', /changed since this form was published/],
       [{ ok: false, code: 'unavailable', message: 'm' }, 503, 'unavailable', /Nothing was deleted\./],

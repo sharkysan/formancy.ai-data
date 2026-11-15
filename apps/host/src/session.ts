@@ -27,6 +27,9 @@ import { disableFields } from './widgets.js'
  *   entry verbatim, at 0.3.0 to 0.13.0 (`fieldProblems`).
  * - **refused**: anything else is the server's sentence, verbatim, and is not
  *   sent again (0015).
+ * - **declined**: a refusal the deployment worded for the person (0156), its
+ *   reason verbatim, about the record as a whole; one that names a field is
+ *   **invalid**, its reason on the field. Nothing is sent again.
  * - **unknown**: the answer was lost -- by the database, said in the server's
  *   502, or between this page and the server -- and the write may have been
  *   stored (0031). Nothing is applied and nothing is sent again. An update
@@ -58,7 +61,7 @@ import { disableFields } from './widgets.js'
 export type Renderer = 'react' | 'angular'
 
 export type SaveResult =
-  | { kind: 'saved' | 'created' | 'stale' | 'invalid' | 'refused' | 'busy' | 'replaced' | 'held'; message: string }
+  | { kind: 'saved' | 'created' | 'stale' | 'invalid' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held'; message: string }
   | { kind: 'unknown'; message: string; unknown: UnknownWrite }
 
 /** What a press says while the previous save is unanswered. */
@@ -327,7 +330,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     if (!outcome.ok) {
       if (outcome.status === 409 && outcome.code === 'stale') return { kind: 'stale', message: outcome.message }
       const problems = Object.fromEntries(Object.entries(fieldProblems(outcome)).filter(([field]) => keys.has(field)))
-      if (Object.keys(problems).length === 0) return { kind: 'refused', message: outcome.message }
+      if (Object.keys(problems).length === 0) return { kind: outcome.code === 'declined' ? 'declined' : 'refused', message: outcome.message }
       engine.applyServerErrors(problems)
       return { kind: 'invalid', message: outcome.message }
     }

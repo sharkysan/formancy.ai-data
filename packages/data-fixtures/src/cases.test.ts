@@ -13,6 +13,7 @@ import {
   cascadeCase,
   columnFilterCase,
   covers,
+  declineCase,
   defaultCase,
   deleteCase,
   displayCase,
@@ -34,6 +35,8 @@ import {
   uuidCase,
   versionCase,
 } from './cases.js'
+import { DECLINE_PARITY } from './declines.js'
+import type { DeclineCase } from './declines.js'
 import { DEFAULT_PARITY } from './defaults.js'
 import type { DefaultCase } from './defaults.js'
 import { DELETE_PARITY } from './deletes.js'
@@ -90,6 +93,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   DEFAULT_PARITY: (Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
   STAMP_PARITY: (Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
   CHECK_LIST_PARITY: (Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
+  DECLINE_PARITY: (Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -137,6 +141,10 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   BOB: 'the person who changes what Alice created in the stamps suites (0153)',
   LISTED_TABLE: "where the parity suites create the table CHECK_LIST_PARITY's cases are about",
   checkListOf: "data-core's reading of a check as the model and CHECK_LIST_PARITY compare it, a function",
+  DECLINING_TABLE: "where the failures suites create the table DECLINE_PARITY's cases are about",
+  DECLINING_REMOVABLE: "where the failures suites create the table DECLINE_PARITY's delete case is about",
+  DECLINING_SAID: "where the failures suites keep the messages DECLINING_TABLE's trigger raises",
+  DECLINING_MESSAGES: "what DECLINING_TABLE's trigger raises for each note; what a write answers then is DECLINE_PARITY's",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 

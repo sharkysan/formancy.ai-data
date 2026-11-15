@@ -10,6 +10,8 @@ import type { ListedCase } from './check-lists.js'
 import type { CascadeCase } from './cascades.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
+import { DECLINE_PARITY } from './declines.js'
+import type { DeclineCase } from './declines.js'
 import { DEFAULT_PARITY } from './defaults.js'
 import type { DefaultCase } from './defaults.js'
 import { DELETE_PARITY } from './deletes.js'
@@ -120,6 +122,9 @@ export const stampCase = (name: StampCase): string => `stamps: ${name}`
 /** What a check that lists a column's values makes of its field on each engine (0152), by the name of its entry in CHECK_LIST_PARITY. */
 export const listedCase = (name: ListedCase): string => `check lists: ${name}`
 
+/** What a write the deployment refuses in words for the person answers on each engine (0156), by the name of its entry in DECLINE_PARITY. */
+export const declineCase = (name: DeclineCase): string => `declined: ${name}`
+
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
  * every filter, label, temporal read, refusal and edge value, then the two
@@ -131,7 +136,8 @@ export const listedCase = (name: ListedCase): string => `check lists: ${name}`
  * then what a person's conditions on its columns narrow a list to (0104),
  * then what a form over versions does (0113), then what a new record
  * starts with (0149), then what the server stamps (0153), then what a check
- * that lists a column's values makes of its field (0152).
+ * that lists a column's values makes of its field (0152), then what a write
+ * the deployment refuses in words for the person answers (0156).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -159,6 +165,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(DEFAULT_PARITY) as DefaultCase[]).map(defaultCase),
     ...(Object.keys(STAMP_PARITY) as StampCase[]).map(stampCase),
     ...(Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
+    ...(Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

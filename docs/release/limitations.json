@@ -404,7 +404,7 @@
       ]
     },
     "0022": {
-      "reviewed": "sha256:17b8c2aa634c62e011110f9cb549cce4529106f8e58c60b8f20e3e0c22ad061d",
+      "reviewed": "sha256:614d065af6e81d6be1817ec3c45cf8f77775eec1fd034e61fa89c8ee6d887c96",
       "limitations": [
         {
           "area": "writes",
@@ -551,7 +551,7 @@
       ]
     },
     "0028": {
-      "reviewed": "sha256:75c4a3963d4472c3fbbdf573bb63e48b0b2f541cd65a0e319cda239ba0f0acfb",
+      "reviewed": "sha256:f984d6d4bc30a1532ac7672933ef493862d65bd048ebbe558daf4c3e38456d03",
       "limitations": [
         {
           "area": "databases",
@@ -4490,6 +4490,51 @@
           "area": "databases",
           "says": "On SQL Server a save is held to one batch of 2,100 parameters by a prediction of the batch the adapter will build, which no batch has yet been compared with, and a record whose step and together children's rows exceed it offers no save of them.",
           "heldBy": "packages/data-core/src/records/together.test.ts"
+        }
+      ]
+    },
+    "0156": {
+      "reviewed": "sha256:af723267d499154decfaf3492e11a221e1d49041e4725e2640fd516f201f35ba",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A trigger's reason for the person is shown as written and checked only for its shape, so it can say a value the person's policy hides, or something untrue."
+        },
+        {
+          "area": "writes",
+          "says": "A trigger runs as the connection's account, so its reason cannot depend on who saved or on their roles."
+        },
+        {
+          "area": "writes",
+          "says": "A reason longer than 2,046 UTF-16 code units with its prefix, a whole one of 2,047 among them, or one with a line break or any other control character, is the server's own sentence instead.",
+          "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL only RAISE EXCEPTION's own SQLSTATE carries a reason, so a RAISE with an ERRCODE of its own keeps that code's meaning, and on SQL Server only a THROW or a severity-16 RAISERROR from 50000 under none of the adapter's own numbers does.",
+          "heldBy": "packages/data-sqlserver/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A read is never declined: a function a view calls that raises the prefix is refused in the server’s sentence.",
+          "heldBy": "packages/data-postgres/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A reason is in the language the trigger wrote it in, and nothing translates it."
+        },
+        {
+          "area": "operations",
+          "says": "A PostgreSQL trigger function's own SQL error is a 422 refused, which an operator sees in the audit and in no log line, where it was a 500 in the server's log.",
+          "heldBy": "packages/data-postgres/src/records-failures.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A trigger whose messages already start `formancy: refused: ` has them shown to people from this release on."
+        },
+        {
+          "area": "testing",
+          "says": "What THROW and RAISERROR carry is measured on SQL Server 2022 (16.0.4295.3) alone, and the suites for this change were run on each engine’s default image alone."
         }
       ]
     }

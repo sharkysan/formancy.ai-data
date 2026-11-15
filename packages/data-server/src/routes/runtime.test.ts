@@ -627,6 +627,32 @@ describe('the runtime plane', () => {
     expect(unavailable.statusCode).toBe(503)
     expect(unavailable.json()).toEqual({ code: 'unavailable', message: 'The database could not complete this now. Nothing was saved.' })
   })
+
+  // A refusal the deployment worded for the person (0156) is the one
+  // sentence the server passes on rather than writes: 422 `declined`, its
+  // reason verbatim, beside the field its column is bound to, and about the
+  // whole record for a column the form does not bind. Watched failing with
+  // `declined` answered as `refused`: the server's own sentence instead of
+  // the reason; and with the field left out, no field error.
+  test("a write the deployment declined is 422 with the deployment's reason, beside its field when it names one", async () => {
+    const reason = 'Customers of a closed region cannot be changed.'
+    writeOutcome = { ok: false, code: 'declined', reason, message: 'P0001, worded for the person' }
+    const declined = await post('/v1/forms/customer/records/create', { answers: NEW })
+    expect(declined.statusCode).toBe(422)
+    expect(declined.json()).toEqual({ code: 'declined', message: reason })
+    writeOutcome = { ok: false, code: 'declined', column: 'name', reason, message: 'P0001, worded for the person' }
+    const update = await post('/v1/forms/customer/records/update', { record: RECORD, version: VERSION, answers: { name: 'Neuer Name' } })
+    expect(update.statusCode).toBe(422)
+    expect(update.json()).toEqual({ code: 'declined', message: reason, fieldErrors: [{ field: 'name', code: 'declined', message: reason }] })
+    writeOutcome = { ok: false, code: 'declined', column: 'no_such_column', reason, message: 'P0001, worded for the person' }
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json()).toEqual({ code: 'declined', message: reason })
+    // No reason is an adapter's bug, answered in the server's words rather than with words nobody wrote.
+    writeOutcome = { ok: false, code: 'declined', message: 'P0001, worded for the person' }
+    expect((await post('/v1/forms/customer/records/create', { answers: NEW })).json()).toEqual({
+      code: 'refused',
+      message: 'The database refused this request, and nothing was saved. Sending it again will be refused the same way.',
+    })
+  })
 })
 
 describe('a form reached through a parent (0043)', () => {
@@ -990,6 +1016,39 @@ describe('the operational audit trail', () => {
     writeOutcome = { ok: false, code: 'refused', message: 'trigger' }
     await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
     expect(events.map(({ status, outcome }) => ({ status, outcome }))).toEqual([{ status: 422, outcome: 'refused' }])
+  })
+
+  // The deployment's reason may hold a value -- "Muster AG owes 4,200" --
+  // so it goes to the person who saved and nowhere else (0156): the trail
+  // names the code, and the log says once that the deployment declined,
+  // by the code and the form. Watched failing with the reason added to
+  // the log line: the log held it; and with the line removed: no line.
+  test("records a declined write by its code, and never the deployment's reason, in the trail or the log", async () => {
+    const reason = 'Muster AG owes 4,200 and cannot order.'
+    const events: RuntimeAuditEvent[] = []
+    const lines: Array<Record<string, unknown>> = []
+    const store = createFileConfigurationStore(root)
+    const server = await createDataServer({
+      verifyIdentity,
+      logger: { stream: { write: (line: string) => void lines.push(JSON.parse(line) as Record<string, unknown>) } },
+      runtime: { registry: registry(), store, audit: { sink: collect(events), key: KEY, now: () => '2026-10-09T12:00:00.000Z' } },
+    })
+    writeOutcome = { ok: false, code: 'declined', column: 'name', reason, message: 'P0001, worded for the person' }
+    const response = await server.inject({ method: 'POST', url: '/v1/forms/customer/records/create', headers: as('clerk'), payload: { answers: NEW } })
+    expect(response.json()).toMatchObject({ code: 'declined', message: reason })
+    expect(events.map(({ operation, status, outcome }) => ({ operation, status, outcome }))).toEqual([
+      { operation: 'create', status: 422, outcome: 'declined' },
+    ])
+    expect(lines.filter((line) => line['code'] === 'declined')).toEqual([
+      expect.objectContaining({
+        form: 'customer',
+        code: 'declined',
+        msg: 'refused: the deployment declined a write, in words that go to the person and to no log',
+      }),
+    ])
+    expect(JSON.stringify(events)).not.toContain('Muster')
+    expect(JSON.stringify(lines)).not.toContain('Muster')
+    expect(JSON.stringify(lines)).not.toContain('4,200')
   })
 
   // A record token spells its key, and a key is often small. Without a key to

@@ -41,6 +41,8 @@ import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
 import { CHANGED_SINCE_UNKNOWN } from './session.js'
+import { DECLINING } from './test-values.js'
+import { DECLINED_BY } from './words.js'
 import { fieldHeading } from '@formancy/data-client'
 
 /*
@@ -161,6 +163,37 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await save(user, 'React')
     await said('React', /^Not saved\./)
     expect(await floor('refused selection')).toEqual(CLEAN('refused selection'))
+  })
+
+  // A save and a delete the deployment's trigger refused in words for the
+  // person (0156): the notice says the reason exactly as the trigger worded
+  // it, then that the words are the database's own -- the one sentence in a
+  // notice the server did not write -- and takes the keyboard, as a refused
+  // save's does; and both states pass the floor. Without the source line a
+  // person could take the deployment's words for the module's; answered as
+  // `refused`, they would read the server's sentence instead of the reason.
+  test('says a reason the deployment worded, as its own, for a save and a delete, and passes the floor', async () => {
+    const user = await openForm(plane, formId)
+    await load(user, EDGES.seededOrder)
+    await shows('React', 'Customer', 'Muster AG')
+    await answer(user, 'React', 'Notes', DECLINING.saved.notes)
+    await save(user, 'React')
+    await waitFor(() => expect(notice('React')).not.toBeNull(), { timeout: 15_000 })
+    expect(paragraphs(notice('React') as HTMLElement)).toEqual([DECLINING.saved.reason, DECLINED_BY])
+    await waitFor(() => expect(focusedName()).toBe('React Not saved'))
+    expect(await floor('declined save')).toEqual(CLEAN('declined save'))
+
+    // Nothing was saved and the typing is kept, so loading another record asks first.
+    const kept = await freshOrder(formId, DECLINING.deleted.notes)
+    await load(user, kept)
+    await waitFor(() => expect(unsavedNotice()).not.toBeNull())
+    await user.click(within(unsavedNotice() as HTMLElement).getByRole('button', { name: 'Discard and continue' }))
+    await shows('Angular', 'Notes', DECLINING.deleted.notes)
+    await user.click(screen.getByRole('button', { name: 'Delete record' }))
+    await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
+    const refused = await screen.findByRole('region', { name: 'Not deleted' }, { timeout: 15_000 })
+    expect(paragraphs(refused)).toEqual([DECLINING.deleted.reason, DECLINED_BY])
+    expect(await floor('declined delete')).toEqual(CLEAN('declined delete'))
   })
 
   // The workspace's own states, each held to the floor: signed in with no

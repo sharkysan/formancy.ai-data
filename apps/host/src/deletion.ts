@@ -47,7 +47,7 @@ export type Deletion =
   | { state: 'confirming'; target: DeleteTarget; discards: readonly PaneWork[]; n: number }
   | { state: 'sending'; target: DeleteTarget; n: number }
   | { state: 'not-found'; target: DeleteTarget; n: number }
-  | { state: 'refused'; target: DeleteTarget; message: string; stale: boolean; n: number }
+  | { state: 'refused'; target: DeleteTarget; message: string; stale: boolean; declined: boolean; n: number }
   | { state: 'unknown'; target: DeleteTarget; unknown: UnknownWrite; checking: boolean; n: number }
   | { state: 'checked'; target: DeleteTarget; unknown: UnknownWrite; found: Checked; n: number }
 
@@ -154,7 +154,8 @@ export function answer(now: Deletion, outcome: DeleteOutcome): { next: Deletion;
   if (outcome.code === 'unknown-outcome' && 'operation' in outcome)
     return { next: { state: 'unknown', target, unknown: outcome, checking: false, n }, gone: false }
   if (outcome.status === 404 && outcome.code === 'not-found') return { next: { state: 'not-found', target, n }, gone: false }
-  return { next: { state: 'refused', target, message: outcome.message, stale: outcome.status === 409 && outcome.code === 'stale', n }, gone: false }
+  const stale = outcome.status === 409 && outcome.code === 'stale'
+  return { next: { state: 'refused', target, message: outcome.message, stale, declined: outcome.code === 'declined', n }, gone: false }
 }
 
 /** "Check whether it was deleted" pressed: a second press while it reads sends nothing. */

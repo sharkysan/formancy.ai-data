@@ -7,3 +7,14 @@
 
 /** The second tenant-1 customer this run adds on both engines, so an order's customer can be changed to another the clerk may pick. */
 export const SECOND_CUSTOMER = { no: 900, name: 'Zweite Kundin AG' } as const
+
+/**
+ * What the trigger this run adds to the orders on both engines refuses in
+ * words for the person (0156): a save of an order with these notes, and a
+ * delete of one that holds the others, each with its reason after
+ * `formancy: refused: `. Any other order is written as before.
+ */
+export const DECLINING = {
+  saved: { notes: 'the books are closed', reason: 'The books for this period are closed.' },
+  deleted: { notes: 'kept on file', reason: 'Orders kept on file are never deleted.' },
+} as const

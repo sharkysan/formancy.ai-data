@@ -18,6 +18,30 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A trigger can refuse a write in words the person reads** (0156).
+  Why: a trigger's refusal reached nobody -- the person read "The
+  database refused this request … Sending it again will be refused the
+  same way", which tells them nothing they can act on and is wrong when
+  they can. What you notice: a trigger, or a function it calls, whose
+  error message starts with exactly `formancy: refused: ` has the rest
+  shown to the person who saved, for a create, an update, a change from a
+  date and a delete, on both engines: 422 `declined`, its `message` the
+  reason, and a field error too where `formancy: refused [column]: `
+  names a bound column. On PostgreSQL that is `RAISE EXCEPTION`; on SQL
+  Server a `THROW`, or a `RAISERROR` at severity 16, from 50000, under
+  none of the adapter's own numbers. The host page says the reason, then
+  "This reason is the database's own." A message with a control character,
+  with no reason, or longer than 2,046 UTF-16 code units with its prefix
+  is the server's own sentence, as every trigger error without the prefix
+  still is: measured on SQL Server 2022, THROW and RAISERROR keep 2,047
+  whole and cut a longer message to 2,047 ending in `...`, so a cut one
+  could not be told apart. The reason is never logged or audited, since
+  it may hold a value; the audit's outcome is `declined`. The cost: only
+  the shape is checked, so a trigger can say a value the person's policy
+  hides, or something untrue. For an integrator, `RecordFailureCode` has
+  `declined` and `RecordFailure` a `reason`, and `@formancy/data-client`
+  passes the 422 on as a refusal like any other.
+
 - **A column whose values a check lists is a select of them** (0152).
   Why: a column constrained by `status in ('draft', 'placed', 'shipped')`
   was a free text box, and the database refused any other value only on
@@ -1247,6 +1271,15 @@ the same day (formancy.ai 0232).
   for `fieldHeading`, below.
 
 ### Fixed
+
+- **A PostgreSQL trigger function's own SQL error is a refusal, not a
+  server error** (0156). Why: an error in class 42 with no code of its own
+  -- an ambiguous column in a trigger function, 42702 -- was taken to be
+  the adapter's SQL at fault and answered 500, which `data-client` reads
+  as an answer lost, so the person was told the record may have been
+  saved over a write PostgreSQL had certainly rolled back. What you
+  notice: one that arose inside a function, by the error's context field,
+  is 422 `refused`; a missing column there is still `schema-changed`.
 
 - **A crumb, or any press that shows a level, keeps the keyboard on what it
   shows.** Why: React runs the effects a commit still has pending before

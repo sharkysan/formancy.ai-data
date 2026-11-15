@@ -1,3 +1,4 @@
+import { deploymentRefusal } from '@formancy/data-core'
 import type { RecordFailure, RecordFailureCode, RecordValue } from '@formancy/data-core'
 import {
   DECIDED_BY_TRIGGER,
@@ -38,9 +39,12 @@ import {
  * them (0028):
  *
  * - `refused`, the default: the database refused the statement for a reason
- *   the port has no code for — a trigger's THROW or RAISERROR, an INSTEAD OF
- *   trigger the adapter cannot verify, a number nobody mapped. Nothing was
- *   written, and the same request would be refused again.
+ *   the port has no code for — a trigger's THROW or RAISERROR not worded for
+ *   the person (0156), an INSTEAD OF trigger the adapter cannot verify, a
+ *   number nobody mapped. Nothing was written, and the same request would
+ *   be refused again.
+ * - `declined`, a trigger's THROW or RAISERROR worded for the person
+ *   (`worded`, 0156). Nothing was written either.
  * - `unavailable`, only for what SQL Server documents as passing: a deadlock
  *   it chose this statement to lose, a lock or resource it could not get in
  *   time, a log or filegroup that is full, a database that is read-only or
@@ -55,6 +59,8 @@ export type Phase = 'read' | 'write'
 interface ServerError {
   number: number
   message: string
+  /** The error's severity, tedious's `class`, when the driver reported one. */
+  severity: number | undefined
 }
 
 const UNIQUE_KEY = /^Violation of (?:PRIMARY KEY|UNIQUE KEY) constraint '(.+?)'\. Cannot insert duplicate key in object '/
@@ -115,6 +121,27 @@ const PASSING: ReadonlySet<number> = new Set([
 
 /** The first number SQL Server leaves to users: THROW's and RAISERROR's own. */
 const FIRST_USER_ERROR = 50000
+
+/**
+ * The numbers the write batches raise for themselves (statements.ts). A
+ * customer's trigger may THROW one too, and its error is then refused like
+ * any number nobody mapped -- never a reason for the person (0156), whatever
+ * its message says: a number the adapter answers by is the adapter's.
+ */
+const OWN_NUMBERS: ReadonlySet<number> = new Set([
+  TEXT_NOT_STORED,
+  NOT_ONE_ROW,
+  DECIDED_BY_TRIGGER,
+  TRANSACTION_REPLACED,
+  TRANSACTION_ENDED,
+  DEFINITION_MOVED,
+  REACH_MOVED,
+  REACH_UNDELETABLE,
+  NEXT_NOT_INSERTED,
+])
+
+/** The severity of THROW, and of the RAISERROR a deployment words a refusal with (0156). */
+const USER_SEVERITY = 16
 
 function named(pattern: RegExp, message: string): string | undefined {
   return pattern.exec(message)?.[1]
@@ -215,6 +242,35 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
 }
 
 /**
+ * A THROW or RAISERROR the deployment worded for the person (0156), on a
+ * write: a user error, 50000 or above and none of the adapter's own
+ * numbers, at severity 16, whose message starts `formancy: refused: `. Its
+ * reason reaches the person and no log, or it is `refused` when its shape
+ * is not one passed on. `undefined` for any other error, which is classified
+ * as before. The batch's CATCH raises it again as it was (statements.ts),
+ * and replaces it with its own when a trigger ended the transaction, so a
+ * reason never claims "nothing was written" over a COMMIT.
+ */
+function worded(error: ServerError, phase: Phase): RecordFailure | undefined {
+  if (phase !== 'write' || error.number < FIRST_USER_ERROR || OWN_NUMBERS.has(error.number) || error.severity !== USER_SEVERITY) return undefined
+  const read = deploymentRefusal(error.message)
+  if (read.kind === 'none') return undefined
+  if (read.kind === 'unshaped') {
+    return failure(
+      'refused',
+      `The database refused the write with a refusal worded for the person (${String(error.number)}) that is not passed on: ${read.why}.`,
+    )
+  }
+  return {
+    ok: false,
+    code: 'declined',
+    ...(read.column === undefined ? {} : { column: read.column }),
+    reason: read.reason,
+    message: `The database refused the write with a refusal worded for the person (${String(error.number)}), whose reason goes to the person and to no log.`,
+  }
+}
+
+/**
  * A refusal the server reported for this statement, which therefore did not
  * commit: the write batch rolls back on every error it is told of, a
  * trigger's RAISERROR included, and on the errors it cannot catch xact_abort
@@ -225,9 +281,11 @@ function ownError(error: ServerError, written: readonly RecordValue[]): RecordFa
  * CATCH sees its transaction gone and raises its own instead (statements.ts,
  * 0031).
  */
-function refusal(error: ServerError, written: readonly RecordValue[]): RecordFailure {
+function refusal(error: ServerError, phase: Phase, written: readonly RecordValue[]): RecordFailure {
   const own = ownError(error, written)
   if (own !== undefined) return own
+  const reason = worded(error, phase)
+  if (reason !== undefined) return reason
   const { number, message } = error
   switch (number) {
     case 3609:
@@ -297,7 +355,7 @@ function serverError(error: Error): ServerError | undefined {
   const { number, class: severity } = error as Error & { number?: unknown; class?: unknown }
   if (error.name !== 'RequestError' || typeof number !== 'number') return undefined
   if (typeof severity === 'number' && severity >= 20) return undefined
-  return { number, message: error.message }
+  return { number, message: error.message, severity: typeof severity === 'number' ? severity : undefined }
 }
 
 /**
@@ -324,7 +382,7 @@ export function failureFor(error: unknown, phase: Phase, written: readonly Recor
   if (!(error instanceof Error)) throw error
   if (error.name !== 'RequestError') return failure('unavailable', 'SQL Server could not be reached, or no connection came free in time, and nothing was sent.')
   const server = serverError(error)
-  if (server !== undefined) return refusal(server, written)
+  if (server !== undefined) return refusal(server, phase, written)
   return phase === 'write'
     ? failure('unknown-outcome', 'The connection failed after the write was sent; it may have committed. It is not retried.')
     : failure('unavailable', 'The connection failed during the read, which changed nothing.')

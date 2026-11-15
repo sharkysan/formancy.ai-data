@@ -50,6 +50,7 @@ function browseFailure(failure: RecordFailure): { status: number; code: string; 
     case 'unavailable':
       return { status: 503, code: 'unavailable', message: 'The database could not answer now.' }
     default:
+      // `declined` included: only a write is worded for the person (0156).
       throw new Error(`a browse writes nothing and reads no key, so ${failure.code} is an adapter's bug`)
   }
 }

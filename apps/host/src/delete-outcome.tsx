@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { DeleteFlow } from './delete-flow.js'
 import { checkedText, NOT_FOUND } from './deletion.js'
-import { RegionHeading, Words } from './words.js'
+import { DECLINED_BY, RegionHeading, Words } from './words.js'
 import type { RegionLevel } from './words.js'
 
 /**
@@ -14,7 +14,9 @@ import type { RegionLevel } from './words.js'
  *   no longer see; never "Not deleted", never "Deleted". Close the record
  *   takes it from the page, said as closed.
  * - **refused**: "Not deleted", in the warm colour, and the server's sentence
- *   verbatim; stale offers the saved record.
+ *   verbatim; stale offers the saved record. A delete the deployment
+ *   declined (0156) says its reason verbatim and that the words are the
+ *   database's own.
  * - **unknown** (0031): "It may have been deleted", teal, the sentence, and
  *   a check that reads the record and says what the read showed in a status
  *   line already on the page. The keyboard then moves to the region, and no
@@ -48,6 +50,7 @@ export function DeleteOutcome({ flow, level, idBase }: { flow: DeleteFlow; level
           Not deleted
         </RegionHeading>
         <p className="notice-text">{now.message}</p>
+        {now.declined ? <p className="notice-text">{DECLINED_BY}</p> : null}
         <div className="notice-actions">
           {now.stale ? (
             <button type="button" className="button" onClick={flow.load}>

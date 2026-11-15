@@ -133,7 +133,13 @@ server answered, which reports the difference and does not prevent it.
   and a check that lists a column's values --
   each engine's spelling read alike, one form, a listed value stored and
   read back, a value gone from the list refused by the database
-  (`check-lists.ts`, [0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)) -- beside them, and a file of
+  (`check-lists.ts`, [0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)) --
+  and a write a trigger refuses in words for the person -- each write
+  declined with its reason exactly, and a reason without the prefix, with
+  a line break or past what SQL Server's THROW carries whole refused, the
+  bound measured on SQL Server by THROWing each length through the write
+  batch's shape
+  (`declines.ts`, [0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)) -- beside them, and a file of
   records in `packages/data-fixtures/src/exports.ts`: `export: shipments`,
   the bytes both adapters' lists must make through data-core's export, a
   double, a real and a zoneless timestamp's fraction where the engines
