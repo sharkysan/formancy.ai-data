@@ -365,15 +365,18 @@ and CATCH recording the step it stopped at. A step that changes nothing
 is explained after the rollback by the read a write alone asks, pinned as
 the step was. No route takes a save yet.
 
-**The deadline bounds each wait and each statement, not the
-transaction.** No statement starts after it, no lock is waited for longer
-than it, and on PostgreSQL no statement runs longer than it; so a save
-holds its locks for less than twice the deadline and a round trip.
-`DEFAULT_SAVE_DEADLINE_MS` and `SAVE_MAX_ROWS`
+**The deadline bounds each wait and when a step may start, not the
+transaction.** No step starts after it and no lock is waited for longer
+than it, on both engines. On PostgreSQL no statement runs longer than it
+either: one that would is cancelled at its step. On SQL Server one slow
+for another reason than a lock runs to its end, holding its locks, and
+the save is stopped before its next step; such a statement, and a
+batch's compile, are bounded only by mssql's request timeout of 15 s,
+which ends in `unknown-outcome` -- the shared case `slow-statement` holds
+both engines' answer. How long a save holds its locks is not measured
+apart from its whole time. `DEFAULT_SAVE_DEADLINE_MS` and `SAVE_MAX_ROWS`
 (`packages/data-core/src/records/save-limits.ts`) are measured, and say on
-what. On SQL Server a statement slow for another reason than a lock, and
-a batch's compile, are bounded only by mssql's request timeout of 15 s,
-which ends in `unknown-outcome`.
+what: one child's creates, of one shape.
 
 **Held by** the shared cases `SAVE_PARITY`
 (`packages/data-fixtures/src/saves.ts`), which each adapter's
@@ -381,16 +384,22 @@ which ends in `unknown-outcome`.
 assert through `covers()` on both engines -- every change committed, a
 refusal at every step rolling everything back, the pin in each located
 statement and in its explaining read, the bounds, the deadline, two saves
-at once and a lost answer; each adapter's `save-sized.integration.test.ts`
-for the round trips and, on SQL Server, the parameters against
-`saveParameters`; and for the plan, `packages/data-core/src/records/save.test.ts`,
+at once and a lost answer; on SQL Server, the batch of every save its
+save suite plans, and of each size its sized suite saves, against
+`saveParameters`' prediction, and in
+`packages/data-sqlserver/src/save-facts.integration.test.ts` the lock
+facts its batch's checks after only the first step on a table rest on;
+each adapter's `save-sized.integration.test.ts` for the round trips; and
+for the plan, `packages/data-core/src/records/save.test.ts`,
 `together.test.ts` and `menu.test.ts`, with no database.
 
 **What it costs.** What 0155 records: the second of two
 people saving different lines of one order at once is `stale`, the
 record's UPDATE triggers fire on a save of its rows alone, a touch stamps
 nothing, and on SQL Server a trigger that ends the transaction can store a
-save in part.
+save in part, saves of different records wait on each other at the count
+where the child's foreign key has no index, and DELETE taken away while a
+save runs is seen by the first delete of each reach alone.
 
 
 ## 8.7 Audit

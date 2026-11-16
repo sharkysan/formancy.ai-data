@@ -25,8 +25,8 @@ export interface Together {
  * list's page, since a save over a saved record is planned from one page
  * of the child's list holding one row more than `max` (`planSaveList`), and
  * no page holds more than `LIST_PAGE_SIZE`; and no more than
- * `SAVE_MAX_ROWS`, the most lines a save was measured to hold
- * (save-limits.ts), whichever is fewer. The page is the fewer today.
+ * `SAVE_MAX_ROWS`, the most of one child's creates a save was measured to
+ * hold (save-limits.ts), whichever is fewer. The page is the fewer today.
  */
 export const TOGETHER_MAX_ROWS = Math.min(LIST_PAGE_SIZE - 1, SAVE_MAX_ROWS)
 

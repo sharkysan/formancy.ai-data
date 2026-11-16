@@ -959,9 +959,13 @@ and the adapters' transaction, which the route will call.
    outside its bounds thrown, so postgres.js rolls everything back. On SQL
    Server (`packages/data-sqlserver/src/records/save-batch.ts`) it is one
    batch: `set lock_timeout`, the steps in one transaction the batch owns,
-   each followed by the checks a write alone's batch carries, the deadline
-   checked in the batch before each, and CATCH recording the step it
-   stopped at with SQL Server's own number.
+   each followed by the text, row-count and after-trigger version checks a
+   write alone's batch carries, and the first step on each table, and the
+   first delete of each reach, by its definition, INSTEAD OF and reach
+   checks too, which the lock that step leaves holds for the rest (0155);
+   the deadline checked in the batch before each step, and CATCH recording
+   the step it stopped at with SQL Server's own number, message and
+   severity.
 4. The answer is every row as its step left it and the record as read back
    by its key after every step, or the one step that refused the save:
    its failure, translated as a write alone's is and, for a step that
@@ -980,5 +984,6 @@ adapter's `save-sized.integration.test.ts`; and for the plan, by
 `packages/data-core/src/records/save.test.ts` and `together.test.ts`. What
 it costs: two people saving different lines of one order at once are one
 saved and one `stale`; on SQL Server a trigger that ends the transaction
-can store a save in part, and a batch SQL Server has not seen before is
-compiled before it runs (§11.2).
+can store a save in part, a batch SQL Server has not seen before is
+compiled before it runs, and saves of different records wait on each
+other at the count where the child's foreign key has no index (§11.2).

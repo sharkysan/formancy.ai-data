@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:b378be4190faa352c8a4f7f0859c6e1b91dad6dd18e2309e6322e2065c0bda20",
+      "reviewed": "sha256:f40d4aaca8c4fa3692ba517feed1f4bf9a26f1896209c1a31a609963ce8ba97f",
       "limitations": [
         {
           "area": "writes",
@@ -4478,7 +4478,7 @@
         },
         {
           "area": "forms",
-          "says": "A record holds at most TOGETHER_MAX_ROWS rows of a together child: one row less than a list's page, since a save is planned from one page of its rows, and no more than SAVE_MAX_ROWS, the most lines a save was measured to hold on both engines within its default deadline and, on SQL Server, well within mssql's request timeout.",
+          "says": "A record holds at most TOGETHER_MAX_ROWS rows of a together child: one row less than a list's page, since a save is planned from one page of its rows, and no more than SAVE_MAX_ROWS, the most of one child's creates a save was measured to hold on both engines within its default deadline and, on SQL Server, well within mssql's request timeout. A save of several together children, a child's deletes and creates together, up to twice its max steps, and updates and deletes at any size were not measured, and nothing bounds a save's steps across its children.",
           "heldBy": "packages/data-core/src/records/together.test.ts"
         },
         {
@@ -4488,17 +4488,17 @@
         },
         {
           "area": "databases",
-          "says": "On SQL Server a save is one batch held to 2,100 parameters by a prediction of what it binds, which every batch the SQL Server suite builds stays within; a record whose step and together children's rows exceed it offers no save of them, and a batch past it is refused with nothing sent.",
+          "says": "On SQL Server a save is one batch held to 2,100 parameters by a prediction of what it binds, which the batch of every save the SQL Server save suite plans, and of each size its sized suite saves, stays within; a record whose step and together children's rows exceed it offers no save of them, and a batch past it is refused with nothing sent.",
           "heldBy": "packages/data-sqlserver/src/save.integration.test.ts"
         },
         {
           "area": "writes",
-          "says": "A save's deadline, DEFAULT_SAVE_DEADLINE_MS unless the deployment sets another, bounds each lock wait and each statement, not the transaction: a save past it is refused unavailable and rolled back before COMMIT, and holds its locks for less than twice it.",
-          "heldBy": "packages/data-postgres/src/save.integration.test.ts"
+          "says": "A save's deadline, DEFAULT_SAVE_DEADLINE_MS unless the deployment sets another, bounds each lock wait and when a step may start, not the transaction: a save past it is refused unavailable and rolled back before COMMIT. On PostgreSQL it bounds each statement too; on SQL Server a step slow for another reason than a lock, a trigger's work or a count's scan, runs to its end holding its locks, bounded only by mssql's request timeout of 15 s and unknown-outcome past it.",
+          "heldBy": "packages/data-sqlserver/src/save.integration.test.ts"
         },
         {
           "area": "databases",
-          "says": "On SQL Server a save is one batch, which SQL Server compiles the first time it sees it, a compile bounded only by mssql's request timeout of 15 s and answered unknown-outcome past it: measured, the first save of a size took seconds where a save that reused its plan took a fraction of one, and 500 lines did not answer within the timeout.",
+          "says": "On SQL Server a save is one batch whose text follows what the save changes, and SQL Server compiles a text the first time it sees it, a compile bounded only by mssql's request timeout of 15 s and answered unknown-outcome past it: measured, the first save of a size took seconds where a save that reused its plan took a fraction of one, and 500 lines did not answer within the timeout. Saves that change different things send different texts, so many pay the compile, and each leaves a plan in SQL Server's cache.",
           "heldBy": "packages/data-sqlserver/src/save-sized.integration.test.ts"
         },
         {
@@ -4508,13 +4508,23 @@
         },
         {
           "area": "databases",
+          "says": "On SQL Server under locking READ COMMITTED a save's count reads its child's rows under shared locks: where the child's foreign key onto the record has no index, saves of different records wait on each other at the count, and two can deadlock, one answered unavailable.",
+          "heldBy": "packages/data-sqlserver/src/save-facts.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a delete's reach is checked after the first delete of each reach in a save alone, and a DENY DELETE does not wait for the save: DELETE on a table past the root taken away between two deletes of one save is not seen by the second.",
+          "heldBy": "packages/data-sqlserver/src/save-facts.integration.test.ts"
+        },
+        {
+          "area": "databases",
           "says": "On PostgreSQL under any isolation but READ COMMITTED a save takes ROW EXCLUSIVE on every table it writes, the record's among them, which an account granted UPDATE on the version column alone is refused: the account needs a grant to write each table.",
           "heldBy": "packages/data-postgres/src/save-facts.integration.test.ts"
         }
       ]
     },
     "0156": {
-      "reviewed": "sha256:c48fe472732b428f5db051028756fedd9b6078405795e2fa13e8af780a407fff",
+      "reviewed": "sha256:1e8f3bad362776d15c2b4c53da09aaaad37945c589c8c42ff5533e76e35e4fea",
       "limitations": [
         {
           "area": "writes",

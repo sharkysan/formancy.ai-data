@@ -127,9 +127,11 @@ function written(bindings: FormBindings, operation: 'create' | 'update', pinned:
 /**
  * The most parameters one change of a row of a together child binds in a
  * SQL Server save (0155): a prediction of the batch the adapter builds,
- * read from data-sqlserver's statements on 2026-11-15, which every batch
- * data-sqlserver's save suites build is held to -- the batch binds less,
- * since it binds a table's name and definition once rather than per row.
+ * read from data-sqlserver's statements on 2026-11-15, which the batch of
+ * every save data-sqlserver's save suite plans, and each size its sized
+ * suite saves, is held to -- the batch binds
+ * less, since it binds a table's name and definition, and a delete's
+ * reach, once rather than per row.
  * The most of the
  * create, update and delete the form offers: each value it writes, its
  * key, its version, every filter and through value, one per foreign-key

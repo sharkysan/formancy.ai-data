@@ -29,7 +29,7 @@ snapshot.fingerprint // changes when the structure, the account's privileges, or
 // Lookups on a client of their own, which no record statement uses (0061, below).
 const lookupSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data lookups' })
 const lookups = createPostgresLookups(lookupSql) // LookupAdapter: search, resolve, rejects, each with the caller's signal
-const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update, delete
+const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update, delete, save
 await adapter.close()
 ```
 
@@ -517,6 +517,29 @@ connection given a statement within about a millisecond of a network drop
 fails CONNECTION_CLOSED, before the pool has seen the close; from 10 ms on,
 the pool had reconnected. A write sent in that window is reported
 `unknown-outcome` though nothing reached the server.
+
+### A record saved with its rows
+
+`records.save(request)` stores a record and the rows of its together
+children -- a `SaveRequest` data-core's `planSave` made -- in one
+`sql.begin`, sent once and never again, or stores none of it
+([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+The transaction sets `lock_timeout` and `statement_timeout` to the save's
+deadline with `SET LOCAL`, which take no snapshot, and on the locked path
+-- any isolation but READ COMMITTED, or a delete that reaches past its
+root -- takes one `LOCK … IN ROW EXCLUSIVE MODE` of every table it writes,
+which an account granted UPDATE on the version column alone is
+refused, 42501. Then the record's step, each child's `within`, deletes, updates
+and creates, every one pinned to the record's key, each child's count,
+and the record read back by its key, the deadline checked before each
+statement and before COMMIT. A step that changes nothing, a `within` that
+is false and a count outside its bounds roll everything back, and the
+first is explained after the rollback by the read a write alone asks. A
+statement past the deadline is cancelled at its step, `unavailable`; a
+lost answer once the record's step was sent is `unknown-outcome`, and a
+refusal at COMMIT -- a deferred key -- is that refusal, nothing stored.
+What both engines answer is `SAVE_PARITY`'s, held by
+`src/save.integration.test.ts` and `src/save-lost-answer.integration.test.ts`.
 
 ### Discovery reads pg_catalog, as the account the forms will run as
 

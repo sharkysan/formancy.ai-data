@@ -370,13 +370,29 @@ among them, and is refused the same way; the adapters' save suites run
 under READ COMMITTED but for one PostgreSQL case under REPEATABLE READ,
 as an owner, so nothing runs that refusal through the save itself
 ([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
-A save on SQL Server is one batch whose first sighting SQL Server compiles
-before it runs: measured on a Windows 11 workstation on 2026-11-16, a
-batch's first save took seconds where its plan's reuse took a few hundred
+A save on SQL Server is one batch whose text follows what the save
+changes -- how many deletes, updates and creates of each child, which
+columns each update sets -- and SQL Server compiles a text the first time
+it sees it: measured on a Windows 11 workstation on 2026-11-16, a batch's
+first save took seconds where its plan's reuse took a few hundred
 milliseconds, and a batch of 500 lines did not answer within mssql's
 request timeout of 15 s, which is `unknown-outcome`; `SAVE_MAX_ROWS` is
 set below it (`packages/data-core/src/records/save-limits.ts`), and the
 compile is bounded by that timeout alone, not by the save's deadline.
+People who change different things send different texts, so many saves
+pay the compile and each leaves a plan in SQL Server's cache: the reused
+plans' timings are a lower bound, and only one child's creates, of one
+shape, were measured. Under locking READ COMMITTED a save's count reads
+under shared locks, and where the child's foreign key onto the record has
+no index it scans the table and waits on another save's uncommitted rows,
+another record's too; two such saves deadlock, and one is `unavailable`,
+measured with plain statements by
+`packages/data-sqlserver/src/save-facts.integration.test.ts`, which also
+shows an index on the foreign key avoids it. And a save's batch checks a
+delete's reach -- DELETE past its root, and the VIEW DEFINITION its keys
+are read with -- after the first delete of each reach alone: a DENY
+DELETE does not wait for the save, measured there too, so one made
+between two deletes of one save is not seen by the second.
 
 **Access.** Roles and attributes are only as fine-grained as the host's
 token ([0014](../decisions/0014-host-identity-is-verified-offline.md)).
@@ -759,13 +775,17 @@ delete that reaches it, a trigger or another application; on SQL Server a
 trigger that ends the transaction can store a save in part, answered
 `unknown-outcome` -- held by `packages/data-sqlserver/src/save.integration.test.ts`,
 which stores two of three marks that way; a save is held to one batch
-there, by a prediction of its parameters that every batch the suite builds
-stays within; and a record holds at most `TOGETHER_MAX_ROWS` rows of a
-together child: one row less than a list's page, since a save is planned
-from one page of its rows, and within `SAVE_MAX_ROWS`, measured. A save's
-deadline bounds each wait and each statement, so it holds its locks for
-less than twice the deadline; a SQL Server batch's compile is bounded only
-by mssql's request timeout. The plan and both adapters' save are built:
+there, by a prediction of its parameters that the batch of every save the
+suite plans stays within; and a record holds at most `TOGETHER_MAX_ROWS`
+rows of a together child: one row less than a list's page, since a save
+is planned from one page of its rows, and within `SAVE_MAX_ROWS`,
+measured with one child's creates -- a save over several together
+children, or a child's deletes and creates together, is not measured,
+and nothing bounds its steps across children. A save's deadline bounds
+each lock wait and when a step may start; on PostgreSQL each statement
+too, and on SQL Server a statement slow for another reason, and a
+batch's compile, are bounded only by mssql's request timeout, holding
+their locks the while. The plan and both adapters' save are built:
 the route, the host page and the studio follow, and until they do nothing
 published saves this way.
 

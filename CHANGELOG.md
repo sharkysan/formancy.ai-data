@@ -124,7 +124,18 @@ the same day (formancy.ai 0232).
   batch shares, so the two cannot drift apart unseen; a save's batch
   checks each table's definition and INSTEAD OF triggers after the first
   step that writes it rather than after every step, because a batch that
-  repeated them for every row was measured taking seconds to compile.
+  repeated them for every row was measured taking seconds to compile; the
+  lock that first step leaves was measured keeping an ALTER, a unique
+  index, a trigger created or enabled and a foreign key onto the table
+  waiting to the end, and a DENY DELETE not, so DELETE taken away while a
+  save runs is seen by the first delete of each reach alone. A trigger's
+  refusal worded for the person (0156) at a save's step is `declined` with
+  its reason on both engines, as a write alone's is. What it costs on SQL
+  Server, measured: under locking READ COMMITTED, saves of different
+  records wait on each other at the count where the child's foreign key
+  has no index, and two can deadlock, one `unavailable`; and a step slow
+  for another reason than a lock is not stopped by the deadline, only by
+  mssql's request timeout, where PostgreSQL cancels it.
 - **data-core plans a record saved with the rows of its together
   children, and nothing runs it yet** (0155). Why: an order could not be
   held to at least one line, nor stored with its lines all or nothing; the

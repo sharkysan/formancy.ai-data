@@ -58,6 +58,8 @@ rests on them, and names these files in its Verified by.
 | SQL Server | That touch fires the table's AFTER UPDATE trigger once for the row, and in it `UPDATE()` is true for the column set and false for one not set | A record's own triggers fire on a save of its rows alone, and one that refuses a change to a column would refuse every touch of that column |
 | SQL Server | `SET LOCK_TIMEOUT` sent inside `sp_executesql` bounds a lock wait after it in that request, 1222, and ends with the request; sent as a batch of its own, it outlives the request on the pooled session | A save's lock timeout bounds the save, and not the next request on its connection |
 | SQL Server | The race of the fourth row, under locking READ COMMITTED and under READ_COMMITTED_SNAPSHOT: the second waits, then finds no row to move | As the fourth row; and an UPDATE under row versioning still waits for the row it updates |
+| SQL Server | A transaction that wrote a table, or reached it by a cascade that removed no row there, keeps an ALTER of it, a unique index, a trigger created or enabled on it and a foreign key onto it waiting to its end, 1222; a DENY DELETE there does not wait. Measured once the save was built, on 2026-11-16 | A save's batch checks a table's definition, its INSTEAD OF triggers and a delete's reach after the first step on each alone, which holds for the catalog and not for a permission ([11.2](11-risks-and-debt.md#112-known-limitations-by-area)) |
+| SQL Server | Under locking READ COMMITTED a count of one parent's rows waits on another transaction's uncommitted row of another parent where the foreign key has no index, and not where it has one; two such transactions deadlock, 1205. Measured on 2026-11-16 | Saves of different records can wait on each other at the count, and one be answered `unavailable` ([11.2](11-risks-and-debt.md#112-known-limitations-by-area)) |
 
 There is no mocked driver, no `--skip-db` flag and no environment variable
 that turns a suite into a no-op. That no mock exists is **not mechanically
@@ -651,12 +653,18 @@ and a number typed here would drift from the next run.
 - **A save's limits are measured on one workstation.** `SAVE_MAX_ROWS`
   and `DEFAULT_SAVE_DEADLINE_MS` were set from the sized suites' runs on
   a Windows 11 workstation's Docker Desktop, on the default images, and
-  not on the CI runner, which the design asked for: CI runs the sized
-  suites and holds only that a save of `SAVE_MAX_ROWS` lines is stored
-  within the default deadline, not the timings themselves. The cases of a
-  save were watched failing on the default images alone; the other images
-  run them on their legs. No route takes a save yet, so what the server
-  answers with a save's outcome is held by nothing
+  not on the CI runner nor on the oldest images of the matrix, PostgreSQL
+  15 and SQL Server 2019: CI runs the sized suites and holds only that a
+  save of `SAVE_MAX_ROWS` lines is stored within the default deadline,
+  not the timings themselves. What was measured is one child's creates,
+  of one shape; how long a save holds its record's row was not measured
+  apart from the save's whole time. The cases of a save were watched
+  failing on the default images alone; the other images run them on
+  their legs. Two paths of each adapter's save are reached by no test:
+  the record not found by its key once every step ran, and a version
+  that is no number, answered without anything sent. No route takes a
+  save yet, so what the server answers with a save's outcome is held by
+  nothing
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is
