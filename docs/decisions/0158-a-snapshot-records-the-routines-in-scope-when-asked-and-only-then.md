@@ -1,6 +1,6 @@
 # 0158 — A snapshot records the routines in scope when asked, and only then
 
-- **Status:** accepted; extended by [0159](0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md): drift reads a routine an action binds, and between two snapshots that both record routines says one nothing binds, which this record left unsaid
+- **Status:** accepted; amended by [0159](0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md): drift reads a routine an action binds, and a routine nothing binds that is new, changed or gone between two snapshots that both record routines -- which this record held to be no change, since nothing bound one -- is an `info` note
 - **Date:** 2026-11-16
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleName } from 'dom-accessibility-api'
 import { createSnapshot } from '@formancy/data-core'
 import type { DriftChange, MetadataSnapshot } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Drift } from './api.js'
+import { Changes } from './drift-change.js'
 import { audit, generateOrder, goTo, grantOrderDelete, paragraphs, signIn, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import {
@@ -387,5 +388,26 @@ describe('drift', () => {
     await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
     expect(within(drift).getByRole('alert').textContent).toMatch(/is not a form id/)
     expect(plane.requests.length).toBe(sent)
+  })
+})
+
+describe('a routine subject', () => {
+  // A routine an action binds, or one in scope (0159), is named as
+  // `describeRoutine` spells it, PostgreSQL's signature included, so two
+  // overloads are told apart. The change is the server's shape, given as
+  // data: no snapshot the server takes records routines yet. Watched
+  // failing with the routine's case taken out: the subject was read as a
+  // column's, and rendering threw.
+  test('is named by its schema, name and signature', () => {
+    const change: DriftChange = {
+      kind: 'routine-dropped',
+      severity: 'blocking',
+      subject: { kind: 'routine', routine: { schema: 'sales', name: 'ship_order', signature: 'pg_catalog.int8' } },
+      affects: [],
+      message: 'ship is blocked until the form is reviewed.',
+    }
+    const { container } = render(<Changes changes={[change]} published={null} id="routine-changes" heading="What changed" level="h3" />)
+    expect(items(container, 'What changed')).toEqual([written(change, {})])
+    expect(written(change, {})).toContain('on routine sales.ship_order(pg_catalog.int8)')
   })
 })

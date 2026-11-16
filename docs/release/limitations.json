@@ -4614,7 +4614,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:9d857e7ed201ba5afa701245e49ee25597ec01747d8b0840f872ea4f394347eb",
+      "reviewed": "sha256:d8139f1017ddb5d6d3b7781a0131c92fb3182ca66062efdf328e8ad2a1fef356",
       "limitations": [
         {
           "area": "databases",
@@ -4674,7 +4674,7 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:6c1d14c69cd1214532676218cd9cf1d1042f26b11e313eeedfa66b913b522b49",
+      "reviewed": "sha256:320b487cc107c84ca987d82e917ec9cf51afc1e5cc1ab15dc108b7d0f816e34b",
       "limitations": [
         {
           "area": "forms",
@@ -4692,7 +4692,12 @@
         },
         {
           "area": "databases",
-          "says": "A PostgreSQL routine’s parameter keeps no length, precision or scale, so a column passed to one is compared by its kind and range alone.",
+          "says": "A PostgreSQL routine’s parameter keeps no length, precision or scale, so a column passed to one is compared by its kind, range and time zone alone.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a datetime or smalldatetime column is passed only to a parameter of its own type, a smalldatetime never to a datetime2 that would hold it, a column of an alias type over a time or a timestamp to no temporal parameter, and a varchar parameter under a collation that is not UTF-8 takes no nvarchar or UTF-8 column.",
           "heldBy": "packages/data-core/src/generate/actions.test.ts"
         },
         {

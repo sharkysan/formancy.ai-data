@@ -17,43 +17,59 @@
   form); a note names the routine, the move and what the policy does not
   bind, and a routine that reaches past its caller's grants (watched
   failing with the note left out); the dialog is one formancy's validator
-  accepts and the generator writes again byte for byte (watched failing
-  with its layout naming a field twice), and asks a yes or no as a
-  checkbox that starts unticked rather than one a person must tick
-  (watched failing with every field required: the engine reported
-  `required` on an unticked checkbox). Every refusal is a note naming its
-  rule, and the action is left out: a view, no key, no confirmed
+  accepts (watched failing with its layout naming a field twice) -- that a
+  stored dialog is what the generator writes is the server's comparison of
+  the bindings at every write, tested when the server reads `actions` -- and
+  asks a yes or no as a checkbox that starts unticked rather than one a
+  person must tick (watched failing with every field required: the engine
+  reported `required` on an unticked checkbox). Every refusal is a note
+  naming its rule, and the action is left out: a view, no key, no confirmed
   concurrency, a version column the account may not read and UPDATE, a
   version that does not prove the record -- the rule delete keeps, asked
   through the same function -- and a rowversion form without a confirmed
-  touch column (watched failing with each check in `actionUnoffered` and
-  `actionMove` taken out); a snapshot discovered without routines, a
-  routine not in it, and one behind a routines gap, each in its own words
-  (watched failing with each taken out); a routine the account may not
-  execute, a PostgreSQL procedure, a function that returns a value or rows,
-  an OUT, INOUT or VARIADIC parameter, an unnamed one, a domain-typed one
-  (watched failing with each check in `routineProblem` taken out in turn);
-  a SQL Server parameter whose name is not a regular identifier, and a SQL
-  Server function (watched failing with each taken out); a PostgreSQL
-  routine every call of which is ambiguous beside an overload whose further
-  parameters all have defaults (watched failing with `ambiguousBeside`
-  unasked); a parameter given nothing, given twice, one the routine lacks,
-  and one input given to two parameters (watched failing with each check in
-  `parametersFor` taken out); a field that is no column field, a field of
-  another kind, a key column that is not the record's key, an input no
-  dialog field can write, and an attribute given to a yes-or-no parameter
-  (watched failing with each check in `boundSource` taken out). A request
-  that is not one is thrown, naming it: a name no URL can carry, two of one
-  name, a selection's scope, a routine named without its signature, a
-  source of no kind this release reads, an input that is no field key
-  (watched failing with each check in `assertChoices` taken out). A
-  column fits a parameter only where the parameter holds every value it
-  holds -- its length in the same unit, its range, its precision and scale,
-  its float width, its zone (watched failing with each case of
-  `fitProblem` answering null); an input's type is one a dialog field
-  writes (watched failing with the read-only control unasked); a key is
-  held to its parameter as a field is (watched failing with the key's fit
-  unasked).
+  touch column (watched failing with each check in `actionUnoffered` taken
+  out in turn, `actionMove`'s for the version column's access and for the
+  touch column among them); a touch column of a key or a foreign key, a
+  generated one, and one the account may not read and UPDATE (watched
+  failing with `touchColumnProblem` unasked in `actionMove`: each was bound
+  as the move); a snapshot discovered without routines, a routine not in it,
+  and one behind a routines gap, each in its own words (watched failing with
+  each taken out); a routine the account may not execute, a PostgreSQL
+  procedure, a function that returns a value or rows, an OUT, INOUT or
+  VARIADIC parameter, an unnamed one, a domain-typed one (watched failing
+  with each check in `routineProblem` taken out in turn); a binary or a
+  rowversion one, which no adapter's table holds (watched failing with the
+  type check asking for `unsupported` alone: `routineProblem` passed the
+  bytea); a SQL Server parameter whose name is not a regular identifier, and
+  a SQL Server function (watched failing with each taken out); a PostgreSQL
+  routine every call of which by name is ambiguous beside an overload with a
+  parameter of each of its names and types, in any order, and a default for
+  every other (watched failing with `ambiguousBeside` unasked, and with it
+  matching by position: the reordered names were bound), and not beside one
+  a call by name does not choose (watched failing with it matching by
+  position: it answered the renamed overload); a parameter given nothing,
+  given twice, one the routine lacks, and one input given to two parameters
+  (watched failing with each check in `parametersFor` taken out); a field
+  that is no column field, a field of another kind, a key column that is not
+  the record's key, an input no dialog field can write, and an attribute
+  given to a yes-or-no parameter (watched failing with each check in
+  `boundSource` taken out). A request that is not one is thrown, naming it:
+  a name no URL can carry, two of one name, a selection's scope, a routine
+  named without its signature, a source of no kind this release reads, an
+  input that is no field key (watched failing with each check in
+  `assertChoices` taken out). A column fits a parameter only where the
+  parameter holds every value it holds -- its length in the same unit, its
+  range, its precision and scale, its float width, its zone (watched failing
+  with each case of `fitProblem` answering null); a text of a code page only
+  from a text of a code page, however long the parameter (watched failing
+  with that check after the unbounded return: an nvarchar reached
+  varchar(max)); a time or a timestamp on SQL Server at its precision or
+  finer, and a datetime or a smalldatetime only beside its own type (watched
+  failing with the time's case left to the default, the precision
+  uncompared, and the spelling unasked, in turn); an input's type is one a
+  dialog field writes (watched failing with the read-only control unasked);
+  a key is held to its parameter as a field is (watched failing with the
+  key's fit unasked).
   `packages/data-core/src/policy/actions.test.ts` -- an action no grant
   names is nobody's, and a policy without `actions` keeps its meaning
   (watched failing with an absent grant read as every reader's); a role
@@ -79,17 +95,18 @@
   move, and each argument in the routine's order: the key and the amount as
   columns of the locked row, each answer canonical, the actor's id from the
   context (watched failing with the field source not read from the row: the
-  actor's id was passed in its place); a context value goes through its
-  parameter's codec, a UUID in lower case whatever case the token carried
-  (watched failing with the context's text passed as it was). Refused before
-  anything is sent: a key named twice, `duplicate-record` (watched failing
-  with that check taken out: the count check answered in its place); more or
-  fewer than one record (watched failing with the count unchecked); every
-  answer its parameter refuses, collected by input, naming no value (watched
-  failing with the first error returned alone); an answer for no field of
-  the dialog (watched failing with it ignored); a person the policy does not
-  let run it, before any token is read, and a context without its tenant
-  (watched failing with the policy unasked: a garbled token answered); a
+  actor's id was passed to amount in its place, and refused
+  `invalid-context`); a context value goes through its parameter's codec, a
+  UUID in lower case whatever case the token carried (watched failing with
+  the context's text passed as it was). Refused before anything is sent: a
+  key named twice, `duplicate-record` (watched failing with that check taken
+  out: the count check answered in its place); more or fewer than one record
+  (watched failing with the count unchecked); every answer its parameter
+  refuses, collected by input, naming no value (watched failing with the
+  first error returned alone); an answer for no field of the dialog (watched
+  failing with it ignored); a person the policy does not let run it, before
+  any token is read, and a context without its tenant (watched failing with
+  the policy unasked: the garbled token answered, `invalid-record-token`); a
   token, a version, an action or a body that is not one (watched failing
   with each check taken out); a context value its parameter cannot hold,
   naming no value (watched failing with the codec's refusal ignored); a row
@@ -131,23 +148,39 @@
   gap said once (watched failing with gaps unasked); out of scope blocks it
   (watched failing with scope unasked); unknown, where the current snapshot
   records no routines, blocks every action (watched failing with the
-  routines family returning nothing there); made ambiguous by a new
-  overload blocks it, said once on the overload (watched failing with the
-  ambiguity unasked). A routine nothing binds, new, changed or gone between
-  two snapshots that both record routines, is a note (watched failing with
-  a new one stopping an action). A change of the root stops the actions
-  that pass a column their parameter no longer holds, and not the others
-  (watched failing with the column rule taken out); every action where a
-  run cannot move the version, and none for the DELETE grant (watched
-  failing with every privilege change read as the record's address); and
-  every action where the record's key is gone or out of sight (watched
-  failing with the rule for a change that stops update and delete together
-  taken out: the keys gap left both running). `drift/fixture.ts`, which
-  every drift suite passes through, holds that the runtime runs every
-  action review lets run. `packages/data-core/src/drift/diff.test.ts` -- a
-  routine nothing binds that changed between two snapshots that both record
-  routines is a `routine-changed` note, which 0158 left unsaid (watched
-  failing with the notes of unbound routines left out).
+  routines family returning nothing there); made ambiguous by a new overload
+  blocks it, said once on the overload (watched failing with the ambiguity
+  unasked), and by an overload that was there and changed, said as
+  `routine-changed` (watched failing with every such overload called new). A
+  routine nothing binds, new, changed or gone between two snapshots that
+  both record routines, is a note (watched failing with a new one stopping
+  an action). A change of the root stops the actions that pass a column
+  their parameter no longer holds, and not the others (watched failing with
+  the column rule taken out); every action where a run cannot move the
+  version, and none for the DELETE grant (watched failing with every
+  privilege change read as the record's address); every action where the
+  record's key is gone or out of sight (watched failing with the rule for a
+  change that stops update and delete together taken out: the keys gap left
+  both running); every action where the version no longer proves the record
+  -- the key's column no longer numbered, or a new foreign key taking a key
+  its never-repeating default filled -- at review and at the runtime
+  (watched failing with that rule taken out of `rootActionStops`: the
+  actions still ran); and the actions whose touch column the account may no
+  longer UPDATE, or the database now computes, the second at the runtime too
+  (watched failing with `touchColumnProblem` unasked in `stillServes`:
+  `ship` still ran). `drift/fixture.ts`, which every drift suite passes
+  through, holds that the runtime runs every action review lets run (watched
+  failing with `runtimeRoutineStops` stopping every action: "review lets
+  close run and the runtime refuses it").
+  `packages/data-core/src/drift/diff.test.ts` -- a routine nothing binds
+  that changed between two snapshots that both record routines is a
+  `routine-changed` note, which 0158 held to be no change (watched failing
+  with the notes of unbound routines left out).
+  `packages/data-server/src/drift-check.test.ts` and
+  `apps/studio/src/drift.test.tsx` -- a routine subject, given as data, is
+  named as `describeRoutine` spells it, its signature included (watched
+  failing with each one's routine case taken out: the subject was read as a
+  column's, and threw).
 
 ## Context
 
@@ -168,11 +201,18 @@ one: which routines can be bound and how each parameter gets its value,
 the dialog asked first, who may run it, what a run is planned as, and what
 drift stops. The adapters' run -- the transaction, the routine's guard, the
 outcomes -- the route, `data-client`'s call and the studio's and host's
-panes are later records'. Two questions were answered before it was
-written: on a SQL Server form whose concurrency is a rowversion, a run
-moves the rowversion by setting a column to itself, rather than locking
-it alone; and a text the deployment wrote under `formancy: refused: `
-reaches the person from a routine as from a trigger (0156).
+panes are later records'. Two questions were answered before it was written.
+On a SQL Server form whose concurrency is a rowversion, a run moves the
+rowversion by setting a column to itself, rather than locking it alone, and
+the answer chose a column the generator names deterministically -- of no key
+or foreign key, not computed -- shown in the studio. This record narrows
+that to the touch column 0155 confirms and never infers: a second rule for
+the one column a rowversion is moved by could let a run and a save of rows
+fire different triggers' `UPDATE(column)`, or choose a column a trigger
+guards. Its cost is that no rowversion form offers an action until its
+request confirms a touch column. And a text the deployment wrote under
+`formancy: refused: ` reaches the person from a routine as from a trigger
+(0156).
 
 The data server reads a generation request property by property, and a
 stored request that holds one it does not read is refused as not in its
@@ -204,9 +244,9 @@ no `actions`.
    function cannot write; only `in` parameters, all named, of a type the
    adapter's closed table holds (0158); on SQL Server each name a regular
    identifier, which an EXEC passes unquoted; and on PostgreSQL none beside
-   an overload whose arguments begin with all of its own and whose further
-   arguments all have defaults, beside which every call of it is ambiguous,
-   cast or named (0158, R7).
+   an overload with a parameter of each of its names and types, in any
+   order, and a default for every other, beside which every call of it by
+   name -- as a run calls -- is ambiguous (0158, R7).
 3. **Every parameter is mapped exactly once**, none left to a default --
    SQL Server's catalog keeps none (0158) -- from one of five sources,
    each typed by the parameter: `field`, a column a column field of the
@@ -215,9 +255,21 @@ no `actions`.
    context's; `actor`, the actor's id. A column passes only where the
    parameter holds every value it holds -- the kind, the range, the length
    in the same unit, the precision and scale, the float width, the zone
-   (`fitProblem`). A PostgreSQL parameter keeps no length, precision or
-   scale (0158), so there only the kind and the range are compared: the
-   catalog says less, the rule is the same. An input is a type
+   (`fitProblem`). A parameter whose text counts the bytes of a code page
+   takes only a column that counts them too: SQL Server writes a character
+   the page lacks as `?`, without an error, however long the parameter. A
+   time or a timestamp passes at its precision or finer, and SQL Server's
+   datetime and smalldatetime, which keep 1/300 s and whole minutes whatever
+   their scale says (0007), each only beside its own type, told apart by the
+   database's spelling, which the binding keeps beside the type. A
+   PostgreSQL parameter keeps no length, precision or scale (0158), so there
+   only the kind, the range and the zone are compared: the catalog says
+   less, the rule is the same. Which code page a column's own collation, an
+   answer or a context value is in, no fact of the snapshot says: on SQL
+   Server the run checks that each argument of a parameter that counts
+   code-page bytes reads back as it was given, and refuses the run where one
+   does not, as a write checks that its text was stored as sent (0026) -- a
+   duty of the record that adds the adapters' run. An input is a type
    `controlFor` makes a writable field of. An attribute and the actor's id
    are text, and go to a text, whole-number or UUID parameter only.
 4. **A run needs the delete's ground, and moves the version.** An action
@@ -304,22 +356,23 @@ no `actions`.
     0010). A bound routine gone, changed in what a call rests on -- its
     kind, what it returns, its parameters' names, type identities, modes
     and order -- no longer executable, behind a routines gap, out of scope,
-    or made ambiguous by a new overload blocks the actions over it and only
-    them; one that started or stopped reaching past its caller's grants, or
-    changed otherwise, is for review. A change of the root stops every
-    action where it breaks reads or stops update and delete together -- the
-    key and the token a run locates and guards its record by -- or stops
-    delete for another reason than what a delete alone does, and the
-    actions that rest on the column it is about where that column no longer
-    serves them. `DriftVerdict.actions` is the actions still runnable,
-    present exactly when the bindings bind one; a change that stops one
-    blocks. Where the current snapshot records no routines, every bound
-    action stops: whether its routine is there cannot be said. Between two
-    snapshots that both record routines, a routine nothing binds that is
-    new, changed or gone is a note; 0158 said nothing of one. **The body is
-    not compared**: its text is the deployment's logic, and on SQL Server
-    reading it needs VIEW DEFINITION, which an account that may execute
-    need not hold. A changed body is not drift.
+    or made ambiguous by an overload, new or changed, blocks the actions
+    over it and only them; one that started or stopped reaching past its
+    caller's grants, or changed otherwise, is for review. A change of the
+    root stops every action where it breaks reads or stops update and delete
+    together -- the key and the token a run locates and guards its record by
+    -- or stops delete for another reason than what a delete alone does, and
+    the actions that rest on the column it is about where that column no
+    longer serves them. `DriftVerdict.actions` is the actions still
+    runnable, present exactly when the bindings bind one; a change that
+    stops one blocks. Where the current snapshot records no routines, every
+    bound action stops: whether its routine is there cannot be said. Between
+    two snapshots that both record routines, a routine nothing binds that is
+    new, changed or gone is a note; 0158 held each to be no change, since
+    nothing bound one. **The body is not compared**: its text is the
+    deployment's logic, and on SQL Server reading it needs VIEW DEFINITION,
+    which an account that may execute need not hold. A changed body is not
+    drift.
 11. **The wire is declared** (`actions/wire.ts`): `FormAction`, an action
     as a page is offered it; a run's body; its answer, the tokens and never
     a version, since the routine may move it after the run did; and its
@@ -356,10 +409,18 @@ now, so the three cannot disagree.
   parameter, and a yes or no starts as no.
 - **A role granted an action must read every field it passes**, which may
   mean granting an approver read of a field they never see on the page.
-- **A PostgreSQL parameter is compared by kind and range alone**, since
-  pg_proc keeps no length, precision or scale: a `varchar(20)` parameter
-  takes a `text` column, and the database decides what it does with a
-  longer value. SQL Server's sizes are compared.
+- **A PostgreSQL parameter is compared by kind, range and zone alone**,
+  since pg_proc keeps no length, precision or scale: a `varchar(20)`
+  parameter takes a `text` column, and the database decides what it does
+  with a longer value. SQL Server's lengths, precisions and scales are
+  compared.
+- **On SQL Server a datetime or a smalldatetime passes only beside its own
+  type**: a datetime2(0) column never reaches a smalldatetime parameter,
+  which would round it to the minute, and a smalldatetime column never
+  reaches a datetime2 one either, which would hold it. A column of an alias
+  type over a time or a timestamp reaches no temporal parameter, since its
+  spelling names neither its base nor its precision. A varchar parameter
+  under a collation that is not UTF-8 takes no nvarchar or UTF-8 column.
 - **The routine is opaque.** Field grants, state moves and cascades do not
   bind what it does, and a routine with `reach: 'owner'` is not bounded by
   the grants the snapshot records (0027).
@@ -375,9 +436,6 @@ now, so the three cannot disagree.
 - **Rolling back.** A server older than this record refuses a policy and a
   presentation that name actions, as it refuses every property it does not
   read; none can be published before the server reads `actions`.
-- The drift check's lines and the studio's name a routine as
-  `describeRoutine` spells it. Nothing reaches either until a snapshot the
-  server takes records routines, so neither is tested yet.
 
 **What it does not do.** Nothing runs an action: there is no port, no
 adapter run, no route, and `GET /v1/forms/:id` offers none. A selection of
@@ -390,10 +448,11 @@ routine's body is read.
 ## Alternatives considered
 
 **The generator infers a rowversion's touch column**, a column of no key or
-foreign key, not computed, chosen deterministically -- the question's first
-wording. Lost: 0155 confirms one and never infers it, and two rules for the
-one column a rowversion is moved by would let a run and a save fire
-different triggers' `UPDATE(column)`, and choose a column a trigger guards.
+foreign key, not computed, chosen deterministically -- the answer to the
+question, which this record narrows. Lost: 0155 confirms one and never
+infers it, and two rules for the one column a rowversion is moved by would
+let a run and a save fire different triggers' `UPDATE(column)`, and choose a
+column a trigger guards.
 
 **Lock a rowversion record without moving it.** Lost: a second press from
 the same read on another replica would run again, and a lost answer could
@@ -425,7 +484,7 @@ no action.
 **A required checkbox.** Lost: formancy counts it answered only when
 ticked, so every person would be made to tick it.
 
-**Unbound routines left unsaid**, as 0158 left them. Lost: a form whose
+**Unbound routines no change**, as 0158 held them. Lost: a form whose
 snapshot records routines is one an administrator discovered to bind
 them, and a routine that appeared or changed is what they review.
 
@@ -439,7 +498,8 @@ action); 0018 (`planAction`, the planner's order for a run); 0030 (a
 dialog generated into the bindings and served as stored, and its words a
 patch rebased by the action's name and each input's key); 0041 (a run
 decided over the root and the routine as the request describes them);
-0050 (`versionProvesRecord` asked of a run as of a delete); 0155 (the touch
-column a rowversion's run moves); and 0158 (drift reads a routine an action
-binds, and between two snapshots that both record routines says one
-nothing binds).
+0050 (`versionProvesRecord` asked of a run as of a delete); and 0155 (the
+touch column a rowversion's run moves). Amended: 0158, which held a routine
+new, changed or gone between two snapshots that both record routines to be
+no change, since nothing bound one -- now an `info` note -- and under which
+drift now reads a routine an action binds.

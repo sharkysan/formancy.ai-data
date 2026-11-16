@@ -1,7 +1,7 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import type { ActionBinding } from '../actions/types.js'
 import { ACTION_REFRESH, type ActionRefresh, type FormAction } from '../actions/wire.js'
-import { labelFor } from '../generate/names.js'
+import { actionLabel } from '../generate/action-dialog.js'
 import type { FormBindings } from '../generate/types.js'
 import { copyOf, hasKeys, isRecord, isText, same } from './layout.js'
 
@@ -36,11 +36,6 @@ export interface ActionPresentation {
   done?: Text
   refresh?: ActionRefresh[]
   inputs?: ActionInputPresentation[]
-}
-
-/** The words the generator gives an action: its name in words, which its dialog's title is too. */
-export function actionLabel(name: string): string {
-  return labelFor(name)
 }
 
 function inputShapeProblems(entry: unknown, at: string, seen: Set<string>): string[] {

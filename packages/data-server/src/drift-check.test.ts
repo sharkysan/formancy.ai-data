@@ -178,6 +178,36 @@ describe('the drift check', () => {
     expect((await check(['--fail-on', 'review', SERVER, 'employee'])).status).toBe(1)
   })
 
+  // A routine a form's action binds, or one in scope (0159), is printed as
+  // `describeRoutine` names it, PostgreSQL's signature included, so a
+  // pipeline's log tells two overloads apart. The report is the server's
+  // shape, given as data: no snapshot the server takes records routines
+  // yet. Watched failing with the routine's case taken out: the subject was
+  // read as a column's, and the check threw.
+  test('prints a routine subject by its schema, name and signature', async () => {
+    const routine = { schema: 'sales', name: 'ship_order', signature: 'pg_catalog.int8' }
+    const report = {
+      version: 1,
+      blocking: true,
+      changes: [
+        {
+          kind: 'routine-dropped',
+          severity: 'blocking',
+          subject: { kind: 'routine', routine },
+          affects: [],
+          message: 'ship is blocked until the form is reviewed.',
+        },
+      ],
+    }
+    const result = await check(
+      [SERVER, 'employee'],
+      undefined,
+      async () => new Response(JSON.stringify(report), { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain('\n  blocking routine-dropped sales.ship_order(pg_catalog.int8): ship is blocked until the form is reviewed.\n')
+  })
+
   // A form the check could not ask about is never taken for one without
   // drift: an unknown form, a refused token, a server that is not there,
   // and a 200 that is not a report each make the run 2, the others still

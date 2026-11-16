@@ -211,5 +211,5 @@ only enforcement is "we remember" says so plainly.
 | [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted |
 | [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole | accepted; extended by 0159 |
 | [0156](0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md) | A trigger can refuse a write in words the person reads | accepted |
-| [0158](0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | A snapshot records the routines in scope when asked, and only then | accepted; extended by 0159 |
+| [0158](0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | A snapshot records the routines in scope when asked, and only then | accepted; amended by 0159 |
 | [0159](0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md) | A form binds a database routine as an action over the open record | accepted |

@@ -1,5 +1,6 @@
 import type { FormBindings } from '../generate/types.js'
-import { type ActionInputPresentation, actionLabel, type ActionPresentation } from './actions.js'
+import { actionLabel } from '../generate/action-dialog.js'
+import type { ActionInputPresentation, ActionPresentation } from './actions.js'
 import { same } from './layout.js'
 import type { PresentationConflict } from './types.js'
 

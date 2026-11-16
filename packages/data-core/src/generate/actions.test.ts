@@ -19,7 +19,7 @@ import {
 import type { ColumnMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
 import { INT32, orderForm, restrict, snapshot, text } from '../records/test-support.js'
 import type { RoutineMeta } from '../routines.js'
-import { ambiguousBeside, bindAction, fitProblem, inputProblem } from './actions.js'
+import { ambiguousBeside, bindAction, fitProblem, inputProblem, routineProblem } from './actions.js'
 import { generateForm } from './generate.js'
 import { actionUnoffered, deleteUnoffered } from './offers.js'
 import type { GenerationRequest } from './types.js'
@@ -60,8 +60,8 @@ describe('an action the generator binds', () => {
       kind: 'function',
       scope: 'record',
       parameters: [
-        { parameter: 'order_id', typeId: '20', type: SHIP_ORDER.parameters[0]?.type, from: { kind: 'key', column: 'id' } },
-        { parameter: 'tenant', typeId: '23', type: SHIP_ORDER.parameters[1]?.type, from: { kind: 'attribute', attribute: 'tenant' } },
+        { parameter: 'order_id', typeId: '20', databaseType: 'bigint', type: SHIP_ORDER.parameters[0]?.type, from: { kind: 'key', column: 'id' } },
+        { parameter: 'tenant', typeId: '23', databaseType: 'integer', type: SHIP_ORDER.parameters[1]?.type, from: { kind: 'attribute', attribute: 'tenant' } },
       ],
       move: { kind: 'increment', column: 'row_version' },
       dialog: null,
@@ -109,13 +109,15 @@ describe('an action the generator binds', () => {
 
 describe('the dialog', () => {
   // Stored as the base is and served as stored (0030): formancy accepts it,
-  // and a regeneration writes it byte for byte. Watched failing with the
-  // dialog's layout naming a field twice: formancy refused it.
-  test('validates, and is what the generator writes again', () => {
+  // one field per input in the routine's order. What holds a stored dialog
+  // to the generator is the server's comparison of the bindings with what
+  // the generator writes, at every write: tested when the server reads
+  // `actions`, which it does not yet. Watched failing with the dialog's
+  // layout naming a field twice: formancy refused it.
+  test('validates', () => {
     const dialog = actionForm().bindings.actions?.[1]?.dialog
     expect(dialog).not.toBeNull()
     expect(validateSchema(dialog).valid).toBe(true)
-    expect(actionForm().bindings.actions?.[1]?.dialog).toEqual(dialog)
     expect(dialog?.id).toBe('sales-order.close')
     expect(dialog?.model.fields.map((field) => [field.key, field.type, field.required ?? false])).toEqual([
       ['reason', 'textarea', true],
@@ -204,6 +206,35 @@ describe('what the generator refuses, each with the rule', () => {
     )
   })
 
+  // A run sets the confirmed touch column to itself, as a save of rows
+  // does, so it is held to 0155's rule: a column of a key or a foreign key,
+  // which a trigger guarding the record's address would refuse every run
+  // over; a generated one, which no statement sets; one the account may not
+  // read and UPDATE. Watched failing with `touchColumnProblem` unasked in
+  // `actionMove`: each was bound as the move.
+  test('a rowversion form whose touch column a run cannot set', () => {
+    const bigint = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } as const
+    const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', bigint, 'bigint')])
+    const source = withRoutines(
+      snapshot('sqlserver', (objects) => restrict(objects, 'order', 'paid', { update: false })),
+      [ship],
+    )
+    const root = source.objects.find((object) => object.ref.name === 'order') as ObjectMeta
+    const fields = orderForm(source).bindings.fields
+    const bind = (touch: string) =>
+      bindAction(
+        source,
+        root,
+        { identity: ['id'], concurrency: { kind: 'rowversion', column: 'row_version', confirmed: true, touch }, fields },
+        { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] },
+      )
+    expect(bind('id')).toBe('the touch column id is in a key or a foreign key')
+    expect(bind('customer_no')).toBe('the touch column customer_no is in a key or a foreign key')
+    expect(bind('row_version')).toBe('the touch column row_version is generated')
+    expect(bind('paid')).toBe("this connection's account may not both read and update the touch column paid")
+    expect(bind('notes')).toMatchObject({ move: { kind: 'touch', column: 'notes' } })
+  })
+
   // Discovered without routines, the snapshot says nothing of one, and a
   // routine behind a gap or gone cannot be bound: each says why, and the
   // rest of the form is generated. Watched failing with `missing` asked
@@ -241,13 +272,25 @@ describe('what the generator refuses, each with the rule', () => {
   })
 
   // A domain, an enum or a type outside the adapter's table is recorded
-  // unsupported (0158): no cast could be spelled for it. Watched failing
-  // with the unsupported check taken out: the domain was bound.
-  test('a parameter of a domain type', () => {
-    const domain = { ...pgParameter('tenant', 'int4'), typeId: '90001', databaseType: 'sales.tenant_id', type: { kind: 'unsupported' } as const }
-    expect(
-      refusal(routineSnapshot('postgres', [{ ...SHIP_ORDER, parameters: [SHIP_ORDER.parameters[0] as RoutineMeta['parameters'][number], domain] }]), [SHIP]),
-    ).toMatch(/parameter tenant is sales\.tenant_id, which no codec this release has speaks/)
+  // unsupported (0158): no cast could be spelled for it. A binary or a
+  // rowversion, which no adapter's table holds, is refused as a routine
+  // whatever its source, though a snapshot read back from JSON may name
+  // one. Watched failing with the unsupported check taken out: the domain
+  // was bound; and with that check asking for `unsupported` alone:
+  // `routineProblem` passed the bytea.
+  test('a parameter of a type outside the adapter’s table', () => {
+    const typed = (databaseType: string, type: NormalizedType) => ({ ...pgParameter('tenant', 'int4'), typeId: '90001', databaseType, type })
+    const shaped = (parameter: RoutineMeta['parameters'][number]): RoutineMeta => ({
+      ...SHIP_ORDER,
+      parameters: [SHIP_ORDER.parameters[0] as RoutineMeta['parameters'][number], parameter],
+    })
+    expect(refusal(routineSnapshot('postgres', [shaped(typed('sales.tenant_id', { kind: 'unsupported' }))]), [SHIP])).toMatch(
+      /parameter tenant is sales\.tenant_id, which no codec this release has speaks/,
+    )
+    const bytea = shaped(typed('bytea', { kind: 'binary', maxLength: null, fixedLength: false }))
+    expect(routineProblem('postgres', [bytea], bytea)).toMatch(/parameter tenant is bytea, which no codec/)
+    const rowversion = shaped(typed('rowversion', { kind: 'rowversion' }))
+    expect(routineProblem('postgres', [rowversion], rowversion)).toMatch(/parameter tenant is rowversion, which no codec/)
   })
 
   // SQL Server's EXEC passes `@p = @v` with the name as written, which no
@@ -278,18 +321,40 @@ describe('what the generator refuses, each with the rule', () => {
     )
   })
 
-  // Beside `f(int8, int4 default 0)`, every call of `f(int8)` is 42725,
-  // cast or named (0158, R7): a run of it would fail every time. Watched
-  // failing with `ambiguousBeside` answering undefined.
+  // A run calls by named notation, each argument cast (0158, R7). Beside
+  // `f(order_id int8, tenant int4 default 0)`, every such call of
+  // `f(order_id int8)` is 42725, and so is one of `f(order_id, tenant)`
+  // beside `f(tenant, order_id)` of the same types: a run of it would fail
+  // every time. Watched failing with `ambiguousBeside` answering undefined;
+  // and with it matching by position: the reordered names were bound.
   test('a PostgreSQL routine every call of which is ambiguous beside an overload', () => {
     const shorter = pgRoutine('ship_order', [pgParameter('order_id', 'int8')])
     const longer = pgRoutine('ship_order', [pgParameter('order_id', 'int8'), pgParameter('tenant', 'int4', { hasDefault: true })])
     const choice: ActionChoice = { ...SHIP, routine: shorter.ref, parameters: [{ parameter: 'order_id', from: { key: 'id' } }] }
     expect(refusal(routineSnapshot('postgres', [shorter, longer]), [choice])).toMatch(
-      /beside sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4\).*every call of sales\.ship_order\(pg_catalog\.int8\) is ambiguous/,
+      /beside sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4\).*every call of sales\.ship_order\(pg_catalog\.int8\) by name is ambiguous/,
     )
     expect(ambiguousBeside([shorter, { ...longer, parameters: [pgParameter('order_id', 'int8'), pgParameter('tenant', 'int4')] }], shorter)).toBeUndefined()
     expect(ambiguousBeside([longer, shorter], longer)).toBeUndefined()
+    const reordered = pgRoutine('ship_order', [pgParameter('tenant', 'int4'), pgParameter('order_id', 'int8')])
+    expect(refusal(routineSnapshot('postgres', [SHIP_ORDER, reordered, CLOSE_ORDER]), [SHIP])).toMatch(
+      /beside sales\.ship_order\(pg_catalog\.int4, pg_catalog\.int8\).*every call of sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4\) by name/,
+    )
+  })
+
+  // An overload a call by name never weighs as its equal leaves the routine
+  // bound: one whose further parameter follows other names is no candidate,
+  // and one that types a name otherwise is the poorer match for arguments
+  // cast to the bound one's types. Watched failing with `ambiguousBeside`
+  // matching by position: it answered the renamed overload.
+  test('a PostgreSQL routine beside an overload a call by name does not choose', () => {
+    const renamed = pgRoutine('ship_order', [pgParameter('id', 'int8'), pgParameter('tenant_id', 'int4'), pgParameter('note', 'text', { hasDefault: true })])
+    expect(ambiguousBeside([SHIP_ORDER, renamed], SHIP_ORDER)).toBeUndefined()
+    const retyped = pgRoutine('ship_order', [pgParameter('tenant', 'text'), pgParameter('order_id', 'int8')])
+    expect(ambiguousBeside([SHIP_ORDER, retyped], SHIP_ORDER)).toBeUndefined()
+    expect(actionForm(routineSnapshot('postgres', [SHIP_ORDER, renamed, retyped, CLOSE_ORDER]), [SHIP]).bindings.actions?.map((action) => action.name)).toEqual(
+      ['ship'],
+    )
   })
 
   // Every parameter mapped exactly once, and none left to a default: SQL
@@ -355,6 +420,12 @@ describe('what the generator refuses, each with the rule', () => {
 
 describe('the typing of each source', () => {
   const INT8: NormalizedType = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' }
+  /** A column or a parameter of `type`, as the database spells it: what `fitProblem` compares. */
+  const typed = (type: NormalizedType, databaseType: string = type.kind) => ({ databaseType, type })
+  const fits = (held: NormalizedType, parameter: NormalizedType) => fitProblem(typed(held), typed(parameter))
+  const clock = (precision: number | null, withTimeZone = false): NormalizedType => ({ kind: 'timestamp', withTimeZone, precision })
+  const time = (precision: number | null): NormalizedType => ({ kind: 'time', precision })
+
   // A column passes to a parameter only where every value it holds is one
   // the parameter holds -- on SQL Server, whose catalog keeps lengths, a
   // varchar(200) column never reaches a varchar(20) parameter, which would
@@ -362,22 +433,64 @@ describe('the typing of each source', () => {
   // kind and the range are compared. Watched failing with each case of
   // `fitProblem` answering null.
   test('a column fits a parameter only where the parameter holds all it holds', () => {
-    expect(fitProblem(text(200), text(20))).toMatch(/holds values the parameter cannot/)
-    expect(fitProblem(text(20), text(200))).toBeNull()
-    expect(fitProblem(text(20), text(null))).toBeNull()
-    expect(fitProblem(text(null), text(20))).toMatch(/cannot/)
-    expect(fitProblem(text(20, false, 'utf8-bytes'), text(20))).toMatch(/cannot/)
-    expect(fitProblem(INT8, INT32)).toMatch(/cannot/)
-    expect(fitProblem(INT32, INT8)).toBeNull()
-    expect(fitProblem({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: 18, scale: 4 })).toBeNull()
-    expect(fitProblem({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: 10, scale: 2 })).toMatch(/cannot/)
-    expect(fitProblem({ kind: 'decimal', precision: 14, scale: 4 }, { kind: 'decimal', precision: 18, scale: 2 })).toMatch(/cannot/)
-    expect(fitProblem({ kind: 'decimal', precision: null, scale: null }, { kind: 'decimal', precision: 18, scale: 4 })).toMatch(/cannot/)
-    expect(fitProblem({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: null, scale: null })).toBeNull()
-    expect(fitProblem({ kind: 'float', bits: 64 }, { kind: 'float', bits: 32 })).toMatch(/cannot/)
-    expect(fitProblem({ kind: 'timestamp', withTimeZone: true, precision: 6 }, { kind: 'timestamp', withTimeZone: false, precision: 6 })).toMatch(/time zone/)
-    expect(fitProblem({ kind: 'date' }, { kind: 'date' })).toBeNull()
-    expect(fitProblem({ kind: 'date' }, INT32)).toBe('it holds date, and the parameter takes integer')
+    expect(fits(text(200), text(20))).toMatch(/holds values the parameter cannot/)
+    expect(fits(text(20), text(200))).toBeNull()
+    expect(fits(text(20), text(null))).toBeNull()
+    expect(fits(text(null), text(20))).toMatch(/cannot/)
+    expect(fits(text(20, false, 'utf8-bytes'), text(20))).toMatch(/cannot/)
+    expect(fits(INT8, INT32)).toMatch(/cannot/)
+    expect(fits(INT32, INT8)).toBeNull()
+    expect(fits({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: 18, scale: 4 })).toBeNull()
+    expect(fits({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: 10, scale: 2 })).toMatch(/cannot/)
+    expect(fits({ kind: 'decimal', precision: 14, scale: 4 }, { kind: 'decimal', precision: 18, scale: 2 })).toMatch(/cannot/)
+    expect(fits({ kind: 'decimal', precision: null, scale: null }, { kind: 'decimal', precision: 18, scale: 4 })).toMatch(/cannot/)
+    expect(fits({ kind: 'decimal', precision: 14, scale: 2 }, { kind: 'decimal', precision: null, scale: null })).toBeNull()
+    expect(fits({ kind: 'float', bits: 64 }, { kind: 'float', bits: 32 })).toMatch(/cannot/)
+    expect(fits(clock(6, true), clock(6))).toMatch(/time zone/)
+    expect(fits({ kind: 'date' }, { kind: 'date' })).toBeNull()
+    expect(fits({ kind: 'date' }, INT32)).toBe('it holds date, and the parameter takes integer')
+  })
+
+  // A varchar parameter under a collation that is not UTF-8 holds the
+  // characters of its code page alone, and SQL Server converts an nvarchar
+  // to it writing `?` for every other, without an error -- however long
+  // the parameter. Only a text of a code page passes to one; what the
+  // catalog cannot say, which code page, is the run's to check (0159).
+  // Watched failing with the code-page check after the unbounded return:
+  // the nvarchar reached varchar(max).
+  test('a text reaches a parameter of a code page only from a text of a code page', () => {
+    const page = (length: number | null) => text(length, false, 'code-page-bytes')
+    expect(fits(text(20), page(null))).toMatch(/code page may lack, which SQL Server would replace without an error/)
+    expect(fits(text(20, false, 'utf8-bytes'), page(null))).toMatch(/code page may lack/)
+    expect(fits(page(20), page(null))).toBeNull()
+    expect(fits(page(20), text(null))).toBeNull()
+  })
+
+  // SQL Server keeps a temporal parameter's precision: a datetime2(7)
+  // column given to a datetime2(0) parameter, or a time(7) to a time(0),
+  // would be rounded without a word. datetime and smalldatetime keep 1/300 s
+  // and whole minutes though their scale says 3 and 0 (0007), so either
+  // fits its own type alone, a datetime2(3) never a datetime and a
+  // datetime2(0) never a smalldatetime. A PostgreSQL parameter keeps none
+  // (0158) and holds microseconds. Watched failing with each of the time's
+  // case left to the default, the precision uncompared, and the spelling
+  // unasked.
+  test('a time or a timestamp fits a parameter only at its precision or finer', () => {
+    const sqlserver = (databaseType: string, type: NormalizedType) => typed(type, databaseType)
+    expect(fitProblem(sqlserver('datetime2(7)', clock(7)), sqlserver('datetime2(0)', clock(0)))).toMatch(/holds values the parameter cannot/)
+    expect(fitProblem(sqlserver('datetimeoffset(7)', clock(7, true)), sqlserver('datetimeoffset(3)', clock(3, true)))).toMatch(/cannot/)
+    expect(fitProblem(sqlserver('time(7)', time(7)), sqlserver('time(0)', time(0)))).toMatch(/cannot/)
+    expect(fitProblem(sqlserver('datetime2(3)', clock(3)), sqlserver('datetime2(7)', clock(7)))).toBeNull()
+    expect(fitProblem(sqlserver('time(0)', time(0)), sqlserver('time(7)', time(7)))).toBeNull()
+    expect(fitProblem(sqlserver('datetime2(3)', clock(3)), sqlserver('datetime', clock(3)))).toMatch(
+      /it is datetime2\(3\) and the parameter datetime, and SQL Server's datetime and smalldatetime keep 1\/300 s and whole minutes/,
+    )
+    expect(fitProblem(sqlserver('datetime2(0)', clock(0)), sqlserver('smalldatetime', clock(0)))).toMatch(/whole minutes/)
+    expect(fitProblem(sqlserver('datetime', clock(3)), sqlserver('datetime2(3)', clock(3)))).toMatch(/1\/300 s/)
+    expect(fitProblem(sqlserver('sales.stamp', clock(3)), sqlserver('datetime2(7)', clock(7)))).toMatch(/it is sales\.stamp/)
+    expect(fitProblem(sqlserver('datetime', clock(3)), sqlserver('datetime', clock(3)))).toBeNull()
+    expect(fitProblem(typed(clock(3), 'timestamp(3) without time zone'), typed(clock(null), 'timestamp without time zone'))).toBeNull()
+    expect(fitProblem(typed(time(6), 'time without time zone'), typed(time(null), 'time without time zone'))).toBeNull()
   })
 
   // An input is asked by the field `controlFor` makes of its type, written

@@ -60,8 +60,8 @@ describe('a run planned', () => {
   // each argument in the routine's order -- the key and the amount as
   // columns of the locked row, never a value from the browser; each answer
   // canonical; the actor's id from the verified context. Watched failing
-  // with the field source planned as the browser's value: no answer named
-  // it, so the plan had none.
+  // with the field source not read from the row: the actor's id was passed
+  // to amount in its place, and refused `invalid-context`.
   test('is the record, the move and every argument in the routine’s order', () => {
     expect(run('close', { records: ONE, answers: ANSWERS })).toEqual({
       ok: true,
@@ -167,8 +167,8 @@ describe('what a run refuses before anything is sent', () => {
   // Deny by default, decided before the database or the token is looked
   // at: the auditor may not run `close`. And a context that cannot scope
   // the run -- no tenant -- is refused, never given an unscoped one or a
-  // NULL tenant. Watched failing with the policy asked after the tokens:
-  // a garbled token answered first.
+  // NULL tenant. Watched failing with the policy unasked: the garbled
+  // token answered, `invalid-record-token`.
   test('a person the policy does not let run it, or a missing attribute', () => {
     expect(run('close', { records: [{ record: 'garbled', version: '3' }], answers: ANSWERS }, { context: AUDITOR })).toMatchObject({
       ok: false,

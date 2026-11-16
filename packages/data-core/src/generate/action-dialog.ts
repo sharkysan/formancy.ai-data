@@ -17,6 +17,16 @@ import { GENERATED_SPEC_VERSION } from './version.js'
  */
 
 /**
+ * The words the generator gives an action: its name in words, which its
+ * dialog's title and section say, and what a presentation's label is
+ * compared with and rebased against (`presentation/actions.ts`), so the
+ * two cannot spell it differently.
+ */
+export function actionLabel(name: string): string {
+  return labelFor(name)
+}
+
+/**
  * One dialog field: required, so a parameter never passes a NULL its
  * person did not choose -- but a checkbox, which formancy counts as
  * answered only when ticked, starts unticked instead, so false is an
@@ -49,16 +59,15 @@ export function dialogFor(
     const { input } = parameter.from
     fields.push(inputField(input, parameter))
     const control = controlFor(parameter.type, false) as Extract<ReturnType<typeof controlFor>, { field: unknown }>
-    const spelled = routine.parameters.find((candidate) => candidate.name === parameter.parameter)?.databaseType ?? parameter.type.kind
     notes.push({
       subject: `${name}.${input}`,
       kind: 'inferred',
-      message: `Asked of the person before ${name} runs: ${control.describe}, for ${parameter.parameter} of ${describeRoutine(routine.ref)} (${spelled}); label from the input's name.`,
+      message: `Asked of the person before ${name} runs: ${control.describe}, for ${parameter.parameter} of ${describeRoutine(routine.ref)} (${parameter.databaseType}); label from the input's name.`,
     })
     if (control.caveat !== undefined) notes.push({ subject: `${name}.${input}`, kind: 'inferred', message: control.caveat })
   }
   if (fields.length === 0) return null
-  const title = labelFor(name)
+  const title = actionLabel(name)
   return {
     specVersion: GENERATED_SPEC_VERSION,
     id: `${formId}.${name}`,

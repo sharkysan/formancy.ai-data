@@ -80,6 +80,18 @@ browser.
   The snapshot names what the engines disagree on about a column — a text's
   length unit, a binary's padding, an identity ALWAYS or BY DEFAULT, a check
   enforced or not — and `createSnapshot` refuses one stored before it did.
+- **Actions**: a routine of the form's own database bound as an action
+  over the open record
+  ([0159](../../docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
+  `GenerationRequest.actions` names each, a routine and a source for every
+  parameter; `generateForm` binds each into `FormBindings.actions`, with
+  its dialog, or says in a `blocked` note which rule refused it, and
+  `bindAction` and `fitProblem` are those rules. `FormPolicy.actions` names
+  who may run each, which `authorizeAction` and `runnableActions` answer;
+  `planAction` plans a run; `PresentationOverrides.actions` holds its
+  words; drift review reads the routines a form's actions bind, and
+  `DriftVerdict.actions` is those still runnable. Nothing serves or runs
+  an action yet.
 
 ```ts
 import { generateForm } from '@formancy/data-core'

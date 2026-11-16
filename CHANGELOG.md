@@ -93,7 +93,10 @@ the same day (formancy.ai 0232).
   form's actions bind -- `routine-dropped`, `routine-changed`,
   `routine-reach-changed`, `routine-added`, a `routine` subject, and
   `DriftVerdict.actions`, the actions still runnable. A form that binds no
-  action generates, validates and drifts exactly as before. The cost: no
+  action generates and validates as before, and drifts as before unless
+  both snapshots record routines: then every routine change in scope is an
+  `info` note with a `routine` subject, which 0158 held to be no change.
+  The cost: no
   action on a table whose version cannot prove the record; on SQL Server a
   rowversion form needs a confirmed touch column, which the generator does
   not write yet; an attribute an action passes must be one a row filter or

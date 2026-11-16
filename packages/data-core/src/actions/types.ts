@@ -65,6 +65,13 @@ export interface ActionParameter {
   parameter: string
   /** The engine's own identity for the type (0158): the adapter spells the cast from its closed table by this, and from nothing else. */
   typeId: string
+  /**
+   * As the database spells the type, for a person reading a report and
+   * for what the normalised type does not say: SQL Server's datetime and
+   * smalldatetime, whose precision is not their scale (`fitProblem`).
+   * Never put in a statement.
+   */
+  databaseType: string
   type: NormalizedType
   from: BoundSource
 }

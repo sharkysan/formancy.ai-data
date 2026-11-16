@@ -217,7 +217,11 @@ A routine is bound as an action, and nothing runs or shows one yet. An
 action is offered only where a version proves the record, as a delete is;
 on SQL Server's rowversion forms only with a confirmed touch column, which
 the generator does not write yet; a PostgreSQL parameter is compared by
-its kind and range alone; drift review of a form with actions needs a
+its kind, range and zone alone; on SQL Server a datetime or smalldatetime
+column passes only to a parameter of its own type, and a varchar parameter
+under a collation that is not UTF-8 takes no nvarchar column, though which
+code page a column's own collation has is the run's to check, a later
+record's; drift review of a form with actions needs a
 discovery that records routines, which nothing in the server asks for; and
 a routine's body is never compared, so one whose body changed still runs
 ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).

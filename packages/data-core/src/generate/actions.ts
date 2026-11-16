@@ -1,7 +1,7 @@
 import type { ActionBinding, ActionChoice, ActionMove, ActionParameter, BoundSource, ParameterSource } from '../actions/types.js'
 import type { DatabaseKind } from '../adapter.js'
 import type { MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
-import { describeRoutine, recordsRoutines, type RoutineMeta, type RoutineParameter } from '../routines.js'
+import { describeRoutine, recordsRoutines, type RoutineMeta, type RoutineParameter, type RoutineType } from '../routines.js'
 import { gapCovers } from '../snapshot.js'
 import { dialogFor } from './action-dialog.js'
 import { controlFor } from './controls.js'
@@ -30,6 +30,25 @@ const SQLSERVER_PARAMETER = /^@[A-Za-z_][A-Za-z0-9_]{0,127}$/
 
 /** The kinds an attribute or the actor's id -- text in the verified context -- can be given as, through the parameter's codec. */
 const FROM_CONTEXT: ReadonlySet<NormalizedType['kind']> = new Set(['text', 'integer', 'uuid'])
+
+/**
+ * The kinds a parameter can be passed as: those both adapters' routine
+ * type tables normalise to (0158), each a built-in type a cast is spelled
+ * from. Discovery records every other type `unsupported`; a snapshot that
+ * names a binary or a rowversion parameter was not written by it, and no
+ * cast could be spelled for one.
+ */
+const PASSABLE: ReadonlySet<NormalizedType['kind']> = new Set(['text', 'boolean', 'integer', 'decimal', 'float', 'date', 'time', 'timestamp', 'uuid'])
+
+/**
+ * SQL Server's temporal types whose precision is the digits they keep, as
+ * the adapter spells a column or a parameter of one: time(n), datetime2(n)
+ * and datetimeoffset(n). Not datetime and smalldatetime, whose catalog
+ * scale of 3 and 0 is not what they keep -- 1/300 s and whole minutes
+ * (0007) -- nor an alias type, spelled by its own name, which says
+ * neither.
+ */
+const SCALED_CLOCK = /^(?:time|datetime2|datetimeoffset)\(\d\)$/
 
 /** What the generator already decided of the form, which an action rests on. */
 export interface ActionGround {
@@ -89,12 +108,17 @@ function passed(routine: RoutineMeta): RoutineParameter[] {
 }
 
 /**
- * The overload beside which every call of `routine` by its own signature
- * is ambiguous on PostgreSQL (0158, R7): one of its schema and name whose
- * arguments begin with all of this one's, by type, and whose every
- * further argument has a default. Such a call is 42725 whether it is
- * cast or named, so a run of it would fail every time. `undefined` where
- * there is none, and always on SQL Server, which has no overloads.
+ * The overload beside which every run of `routine` is ambiguous on
+ * PostgreSQL (0158, R7), or `undefined`. A run calls by named notation,
+ * each argument cast to its parameter's type, so PostgreSQL weighs every
+ * function of the schema and name with a parameter of each name the call
+ * passes and a default for every other, and prefers the one whose types
+ * match exactly. One with a parameter of each of this one's names and
+ * types, in any order, and a default for every other parameter, matches as
+ * exactly: the call is 42725 every time. One that lacks a name, types one
+ * otherwise or has another parameter without a default is no candidate or
+ * the poorer match. Always `undefined` on SQL Server, which has no
+ * overloads.
  */
 export function ambiguousBeside(routines: readonly RoutineMeta[], routine: RoutineMeta): RoutineMeta | undefined {
   const mine = passed(routine)
@@ -102,9 +126,8 @@ export function ambiguousBeside(routines: readonly RoutineMeta[], routine: Routi
     if (other.ref.schema !== routine.ref.schema || other.ref.name !== routine.ref.name || other.ref.signature === routine.ref.signature) return false
     const theirs = passed(other)
     return (
-      theirs.length > mine.length &&
-      mine.every((parameter, index) => theirs[index]?.typeId === parameter.typeId) &&
-      theirs.slice(mine.length).every((parameter) => parameter.hasDefault === true)
+      mine.every((parameter) => theirs.some((candidate) => candidate.name === parameter.name && candidate.typeId === parameter.typeId)) &&
+      theirs.every((candidate) => candidate.hasDefault === true || mine.some((parameter) => parameter.name === candidate.name))
     )
   })
 }
@@ -127,49 +150,68 @@ export function routineProblem(kind: DatabaseKind, routines: readonly RoutineMet
     if (parameter.name === '') return `${named} has a parameter without a name, and a run passes every parameter by its name`
     if (kind === 'sqlserver' && !SQLSERVER_PARAMETER.test(parameter.name))
       return `${named}'s parameter ${parameter.name} is not a regular identifier, which an EXEC passes by name without quoting`
-    if (parameter.type.kind === 'unsupported')
-      return `${named}'s parameter ${parameter.name} is ${parameter.databaseType}, which no codec this release has speaks`
+    if (!PASSABLE.has(parameter.type.kind)) return `${named}'s parameter ${parameter.name} is ${parameter.databaseType}, which no codec this release has speaks`
   }
   const beside = kind === 'postgres' ? ambiguousBeside(routines, routine) : undefined
   if (beside !== undefined)
-    return `beside ${describeRoutine(beside.ref)}, whose further parameters all have defaults, every call of ${named} is ambiguous, cast or named`
+    return `beside ${describeRoutine(beside.ref)}, which has a parameter of each of its names and types and a default for every other, every call of ${named} by name is ambiguous`
   return null
 }
 
+/** A column or a parameter as `fitProblem` compares it: what it holds, and how the database spells it. */
+export type Fitted = Pick<RoutineType, 'databaseType' | 'type'>
+
 /**
- * Why a column of `held` type cannot be passed to a parameter of type
- * `parameter`, or `null`: the kinds are one, and every value the column
- * holds is one the parameter holds -- its range, its precision and scale,
- * its length in the same unit, its zone. A PostgreSQL parameter keeps no
- * length, precision or scale (0158), so there it is unbounded and only
- * the kind and the range are compared: where the engines differ, it is
- * the catalog that says less, never this rule.
+ * Why column `held` cannot be passed to `parameter`, or `null`: the kinds
+ * are one, and every value the column holds is one the parameter holds --
+ * its range, its precision and scale, its length in the same unit, its
+ * characters, its zone. A PostgreSQL parameter keeps no length, precision
+ * or scale (0158), so there it is unbounded and only the kind, the range
+ * and the zone are compared: where the engines differ, it is the catalog
+ * that says less, never this rule.
  */
-export function fitProblem(held: NormalizedType, parameter: NormalizedType): string | null {
-  if (held.kind !== parameter.kind) return `it holds ${held.kind}, and the parameter takes ${parameter.kind}`
+export function fitProblem(held: Fitted, parameter: Fitted): string | null {
+  const [column, taken] = [held.type, parameter.type]
+  if (column.kind !== taken.kind) return `it holds ${column.kind}, and the parameter takes ${taken.kind}`
   const wider = 'it holds values the parameter cannot'
-  switch (parameter.kind) {
+  switch (taken.kind) {
     case 'text': {
-      const column = held as Extract<NormalizedType, { kind: 'text' }>
-      if (parameter.maxLength === null) return null
-      if (column.maxLength === null || column.lengthUnit !== parameter.lengthUnit || column.maxLength > parameter.maxLength) return wider
+      const text = column as Extract<NormalizedType, { kind: 'text' }>
+      // A text of a code page holds no character outside it, and SQL Server
+      // writes one as `?` without an error (0026): only a text of a code page
+      // passes to one, however long.
+      if (taken.lengthUnit === 'code-page-bytes' && text.lengthUnit !== 'code-page-bytes')
+        return 'it holds characters the parameter’s code page may lack, which SQL Server would replace without an error'
+      if (taken.maxLength === null) return null
+      if (text.maxLength === null || text.lengthUnit !== taken.lengthUnit || text.maxLength > taken.maxLength) return wider
       return null
     }
     case 'integer': {
-      const column = held as Extract<NormalizedType, { kind: 'integer' }>
-      return BigInt(column.min) >= BigInt(parameter.min) && BigInt(column.max) <= BigInt(parameter.max) ? null : wider
+      const integer = column as Extract<NormalizedType, { kind: 'integer' }>
+      return BigInt(integer.min) >= BigInt(taken.min) && BigInt(integer.max) <= BigInt(taken.max) ? null : wider
     }
     case 'decimal': {
-      const column = held as Extract<NormalizedType, { kind: 'decimal' }>
-      if (parameter.precision === null) return null
-      if (column.precision === null) return wider
-      const [scale, given] = [parameter.scale ?? 0, column.scale ?? 0]
-      return column.precision - given <= parameter.precision - scale && given <= scale ? null : wider
+      const decimal = column as Extract<NormalizedType, { kind: 'decimal' }>
+      if (taken.precision === null) return null
+      if (decimal.precision === null) return wider
+      const [scale, given] = [taken.scale ?? 0, decimal.scale ?? 0]
+      return decimal.precision - given <= taken.precision - scale && given <= scale ? null : wider
     }
     case 'float':
-      return (held as Extract<NormalizedType, { kind: 'float' }>).bits <= parameter.bits ? null : wider
-    case 'timestamp':
-      return (held as Extract<NormalizedType, { kind: 'timestamp' }>).withTimeZone === parameter.withTimeZone ? null : 'its time zone is not the parameter’s'
+      return (column as Extract<NormalizedType, { kind: 'float' }>).bits <= taken.bits ? null : wider
+    case 'time':
+    case 'timestamp': {
+      const clock = column as Extract<NormalizedType, { kind: 'time' | 'timestamp' }>
+      if (taken.kind === 'timestamp' && (clock as Extract<NormalizedType, { kind: 'timestamp' }>).withTimeZone !== taken.withTimeZone)
+        return 'its time zone is not the parameter’s'
+      // PostgreSQL keeps none for a parameter (0158), which holds microseconds, as many as any column.
+      if (taken.precision === null) return null
+      if (!SCALED_CLOCK.test(held.databaseType) || !SCALED_CLOCK.test(parameter.databaseType)) {
+        if (held.databaseType === parameter.databaseType) return null
+        return `it is ${held.databaseType} and the parameter ${parameter.databaseType}, and SQL Server's datetime and smalldatetime keep 1/300 s and whole minutes whatever their scale says, so each fits its own type alone`
+      }
+      return clock.precision !== null && clock.precision <= taken.precision ? null : wider
+    }
     default:
       return null
   }
@@ -194,14 +236,16 @@ function boundSource(root: ObjectMeta, ground: ActionGround, parameter: RoutineP
   if ('field' in from) {
     const binding = ground.fields.find((candidate) => candidate.kind === 'column' && candidate.column === from.field)
     if (binding?.kind !== 'column') return `${at} is given ${from.field}, which no column field of this form is bound to`
-    const problem = fitProblem(binding.type, parameter.type)
+    // A column field is bound to a column of the root, as the snapshot holds it (`generateForm`, `prepare`).
+    const column = root.columns.find((candidate) => candidate.name === from.field) as ObjectMeta['columns'][number]
+    const problem = fitProblem(column, parameter)
     return problem === null ? { kind: 'field', field: binding.field, column: from.field } : `${at} is given ${from.field}, and ${problem}`
   }
   if ('key' in from) {
     if (!(ground.identity ?? []).includes(from.key)) return `${at} is given ${from.key}, which is no column of the record's key`
     // The identity is a key of the root's own (`identityFor`), so its every column is one of the root's.
     const column = root.columns.find((candidate) => candidate.name === from.key) as ObjectMeta['columns'][number]
-    const problem = fitProblem(column.type, parameter.type)
+    const problem = fitProblem(column, parameter)
     return problem === null ? { kind: 'key', column: from.key } : `${at} is given ${from.key}, and ${problem}`
   }
   if ('input' in from) {
@@ -233,7 +277,7 @@ function parametersFor(root: ObjectMeta, ground: ActionGround, routine: RoutineM
     if (from === undefined) return `parameter ${parameter.name} is given nothing, and a run leaves no parameter to its default`
     const source = boundSource(root, ground, parameter, from)
     if (typeof source === 'string') return source
-    bound.push({ parameter: parameter.name, typeId: parameter.typeId, type: parameter.type, from: source })
+    bound.push({ parameter: parameter.name, typeId: parameter.typeId, databaseType: parameter.databaseType, type: parameter.type, from: source })
   }
   return bound
 }

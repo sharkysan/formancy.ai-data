@@ -1,7 +1,22 @@
 import { describe, expect, test } from 'vitest'
-import { ACTION_POLICY, actionForm, CLOSE_ORDER, pgParameter, pgRoutine, routineSnapshot, SHIP, SHIP_ORDER, withRoutines } from '../actions/test-actions.js'
-import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
-import { factsSnapshot, restrict, snapshot } from '../records/test-support.js'
+import {
+  ACTION_POLICY,
+  actionForm,
+  CLOSE_ORDER,
+  msParameter,
+  msRoutine,
+  pgParameter,
+  pgRoutine,
+  routineSnapshot,
+  SHIP,
+  SHIP_ORDER,
+  withRoutines,
+} from '../actions/test-actions.js'
+import type { ActionChoice } from '../actions/types.js'
+import { type BoundAction, bindAction } from '../generate/actions.js'
+import type { ConcurrencyBinding, FormBindings } from '../generate/types.js'
+import type { ColumnMeta, MetadataSnapshot, ObjectMeta } from '../metadata.js'
+import { factsSnapshot, INT64, orderForm, restrict, snapshot } from '../records/test-support.js'
 import type { RoutineMeta } from '../routines.js'
 import { createSnapshot } from '../snapshot.js'
 import { diffSnapshots } from './fixture.js'
@@ -138,6 +153,24 @@ describe('a routine an action binds', () => {
     expect(report.changes.map((change) => [change.kind, change.severity])).toEqual([['routine-added', 'blocking']])
     expect(report.actions).toEqual(['close'])
   })
+
+  // An overload that was there and gained a default is not new: it is
+  // said as the change it is, on it, and blocks the action it made
+  // ambiguous. Watched failing with every such overload called new:
+  // `routine-added`.
+  test('made ambiguous by an overload that changed blocks its actions, said as a change', () => {
+    const overload = (hasDefault: boolean) =>
+      pgRoutine('ship_order', [pgParameter('order_id', 'int8'), pgParameter('tenant', 'int4'), pgParameter('note', 'text', { hasDefault })])
+    const report = review(shipped(SHIP_ORDER, overload(true)), shipped(SHIP_ORDER, overload(false)))
+    expect(report.changes.map((change) => [change.kind, change.severity, change.message])).toEqual([
+      [
+        'routine-changed',
+        'blocking',
+        expect.stringMatching(/^sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4, pg_catalog\.text\) changed, and now has a parameter of each/),
+      ],
+    ])
+    expect(report.actions).toEqual(['close'])
+  })
 })
 
 describe('a routine no action binds', () => {
@@ -209,6 +242,95 @@ describe('a change of the root', () => {
       base,
     )
     expect(undeletable.actions).toEqual(['ship', 'close'])
+  })
+
+  // A version that no longer proves the record stops delete for the
+  // record's own sake, not a delete's: an old read would act on a record
+  // created again under its key (0050), so every action stops, at review
+  // and at the runtime, though no action passes a column the change is
+  // about -- here the key's column no longer numbered by the database.
+  // Watched failing with that rule taken out of `rootActionStops`: both
+  // actions still ran.
+  test('stops every action where the version no longer proves the record, its key unnumbered', () => {
+    const unnumbered = withRoutines(
+      snapshot('postgres', (objects) => {
+        ;((objects.find((object) => object.ref.name === 'order') as ObjectMeta).columns[0] as ColumnMeta).generated = 'none'
+      }),
+      [SHIP_ORDER, CLOSE_ORDER],
+    )
+    const report = review(unnumbered)
+    expect(report.actions).toEqual([])
+    expect(report.runtime.actions).toEqual([])
+    expect(report.changes.map((change) => [change.kind, change.severity, change.subject.kind])).toEqual([['column-generation-changed', 'blocking', 'column']])
+  })
+
+  // The same, where a new foreign key takes a key its never-repeating
+  // default filled (0057): a lookup over it would write the key. Watched
+  // failing with that rule taken out of `rootActionStops`: `ship` still
+  // ran.
+  test('stops every action where the version no longer proves the record, its key taken by a foreign key', () => {
+    const uuidKey = (objects: ObjectMeta[]) => {
+      const id = (objects.find((object) => object.ref.name === 'order') as ObjectMeta).columns[0] as ColumnMeta
+      Object.assign(id, { databaseType: 'uuid', type: { kind: 'uuid' }, generated: 'none', hasDefault: true, defaultExpression: 'gen_random_uuid()' })
+    }
+    const shipByUuid = pgRoutine('ship_order', [pgParameter('order_id', 'uuid'), pgParameter('tenant', 'int4')])
+    const ship: ActionChoice = { ...SHIP, routine: shipByUuid.ref }
+    const base = routineSnapshot('postgres', [shipByUuid], uuidKey)
+    const { bindings } = actionForm(base, [ship])
+    expect(bindings.actions?.map((action) => action.name)).toEqual(['ship'])
+    const taken = routineSnapshot('postgres', [shipByUuid], (objects) => {
+      uuidKey(objects)
+      ;(objects.find((object) => object.ref.name === 'order') as ObjectMeta).foreignKeys.push({
+        name: 'fk_order_mirror',
+        columns: ['id'],
+        references: { table: { schema: 'sales', name: 'employee' }, columns: ['id'] },
+        onUpdate: 'no-action',
+        onDelete: 'no-action',
+        enforced: true,
+        validated: true,
+      })
+    })
+    const reviewed = diffSnapshots(base, taken, bindings, ACTION_POLICY)
+    expect(reviewed.actions).toEqual([])
+    expect(reviewed.runtime.actions).toEqual([])
+    expect(reviewed.changes.find((change) => change.subject.kind === 'foreign-key')?.severity).toBe('blocking')
+  })
+
+  // On a rowversion form a run sets the confirmed touch column to itself
+  // (0155): one the account may no longer UPDATE, or one the database now
+  // computes, is one no run can set, so the actions that move by it stop.
+  // A privilege is review's: a request's description of the root carries
+  // none, and the database refuses the run's UPDATE itself (0041); a
+  // computed column is in the description, and the runtime stops the
+  // action too. Watched failing with `touchColumnProblem` unasked in
+  // `stillServes`: `ship` still ran.
+  test('stops the actions whose touch column a run can no longer set', () => {
+    const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', INT64, 'bigint')])
+    const base = withRoutines(snapshot('sqlserver'), [ship])
+    const generated = orderForm(base).bindings
+    const concurrency: ConcurrencyBinding = { ...(generated.concurrency as ConcurrencyBinding), touch: 'notes' }
+    const root = base.objects.find((object) => object.ref.name === 'order') as ObjectMeta
+    const choice: ActionChoice = { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] }
+    const bound = bindAction(base, root, { identity: generated.identity, concurrency, fields: generated.fields }, choice) as BoundAction
+    const bindings: FormBindings = { ...generated, concurrency, actions: [{ ...bound, dialog: null }] }
+    expect(diffSnapshots(base, base, bindings, ACTION_POLICY).actions).toEqual(['ship'])
+    const current = withRoutines(
+      snapshot('sqlserver', (objects) => restrict(objects, 'order', 'notes', { update: false })),
+      [ship],
+    )
+    const report = diffSnapshots(base, current, bindings, ACTION_POLICY)
+    expect(report.actions).toEqual([])
+    expect(report.runtime.actions).toEqual(['ship'])
+    const computed = withRoutines(
+      snapshot('sqlserver', (objects) => {
+        ;((objects.find((object) => object.ref.name === 'order') as ObjectMeta).columns.find((column) => column.name === 'notes') as ColumnMeta).generated =
+          'computed'
+      }),
+      [ship],
+    )
+    const recomputed = diffSnapshots(base, computed, bindings, ACTION_POLICY)
+    expect(recomputed.actions).toEqual([])
+    expect(recomputed.runtime.actions).toEqual([])
   })
 
   // The key a run locates its record by, gone or out of sight: every

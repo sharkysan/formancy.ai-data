@@ -113,12 +113,15 @@ function boundChanges(comparison: Comparison, was: RoutineMeta, is: RoutineMeta,
   }
   const beside = ambiguousBeside(comparison.current.routines ?? [], is)
   if (beside !== undefined && ambiguousBeside(comparison.base.routines ?? [], was) === undefined) {
+    // An overload that was there and changed -- a default added, a parameter renamed -- is not a new routine.
+    const existed = findRoutine(comparison.base, beside.ref) !== undefined
+    const ambiguous = `has a parameter of each of ${named}'s names and types and a default for every other, so every call of ${named} by name is now ambiguous`
     drafts.push(
       draft(
-        'routine-added',
+        existed ? 'routine-changed' : 'routine-added',
         beside.ref,
         actions,
-        `${describeRoutine(beside.ref)} is new, and its further parameters all have defaults, so every call of ${named} is now ambiguous. ${STOPPED(actions)}`,
+        `${describeRoutine(beside.ref)} ${existed ? 'changed, and now' : 'is new, and'} ${ambiguous}. ${STOPPED(actions)}`,
       ),
     )
   }
@@ -259,7 +262,7 @@ function stillServes(
   }
   return action.parameters
     .filter((parameter) => (parameter.from.kind === 'field' || parameter.from.kind === 'key') && parameter.from.column === name)
-    .every((parameter) => column.access.select && fitProblem(column.type, parameter.type) === null)
+    .every((parameter) => column.access.select && fitProblem(column, parameter) === null)
 }
 
 /**
