@@ -206,7 +206,8 @@ On a SQL Server form whose concurrency is a rowversion, a run moves the
 rowversion by setting a column to itself, rather than locking it alone, and
 the answer chose a column the generator names deterministically -- of no key
 or foreign key, not computed -- shown in the studio. This record narrows
-that to the touch column 0155 confirms and never infers: a second rule for
+that to the touch column 0155 confirms and never infers, which Daniel chose
+on 2026-11-16 when asked between the two: a second rule for
 the one column a rowversion is moved by could let a run and a save of rows
 fire different triggers' `UPDATE(column)`, or choose a column a trigger
 guards. Its cost is that no rowversion form offers an action until its
