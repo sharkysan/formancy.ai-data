@@ -19,6 +19,13 @@ interface SqlServerAddress {
   database: string
   encrypt: boolean
   trustServerCertificate: boolean
+  /**
+   * The most connections the pool opens. Absent, mssql's own default, which
+   * no public property of a pool reports: an action's pool is given it
+   * explicitly, so the bound its runs are counted against is a number the
+   * server holds (0160).
+   */
+  poolMax?: number
 }
 
 /** A SQL login: a user and its password. */
@@ -97,7 +104,12 @@ function credentialFor(login: EntraLogin): TokenCredential {
  * tedious's debug output prints a login's password (login7-payload.js).
  */
 export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config {
-  const base = { server: options.host, port: options.port, database: options.database }
+  const base = {
+    server: options.host,
+    port: options.port,
+    database: options.database,
+    ...(options.poolMax === undefined ? {} : { pool: { max: options.poolMax } }),
+  }
   if (options.entra === undefined) {
     const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }
     return { ...base, options: options.encrypt ? { ...tls, connector: encryptedConnector } : tls, user: options.user, password: options.password }

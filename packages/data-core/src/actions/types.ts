@@ -1,16 +1,16 @@
 import type { FormSchema } from '@formancy/spec'
 import type { ApiValue } from '../codecs/codec.js'
 import type { RowFilters } from '../lookup/types.js'
-import type { NormalizedType } from '../metadata.js'
-import type { RecordConcurrency, RecordTarget, RecordValue, Through } from '../records/types.js'
+import type { NormalizedType, ObjectRef } from '../metadata.js'
+import type { DescribedTable, RecordConcurrency, RecordFailure, RecordTarget, RecordValue, Through } from '../records/types.js'
 import type { RoutineMeta, RoutineRef } from '../routines.js'
 
 /*
  * An action (0159): a routine the deployment keeps in its database, bound
  * by an administrator to a form and run over the open record. What the
- * request asks for, what the bindings keep, and what the planner hands an
- * adapter. Nothing runs one yet: the port and both adapters' run are a
- * later record's, and so are the route, the client and the pages.
+ * request asks for, what the bindings keep, what the planner hands an
+ * adapter, and the port both adapters run it through (0160). The route,
+ * the client and the pages are later records'.
  */
 
 /**
@@ -150,4 +150,92 @@ export interface ActionRequest {
   routine: { ref: RoutineRef; kind: RoutineMeta['kind']; arguments: ActionArgument[] }
   /** The `definition`s of the descriptions the run was decided over: it runs only while the table and the routine still have them (0041). */
   definitions: { table: string; routine: string }
+}
+
+/**
+ * Why a run did not commit, as a stable code (0160). Every one but
+ * `unknown-outcome` says the transaction did not commit: nothing the run
+ * or the routine did is kept.
+ *
+ * - `not-found`, `stale`, `version-ended`: the record is not inside the
+ *   person's filters and throughs, its version is not the one sent, or the
+ *   version sent has ended (0113) -- told apart by a read after the
+ *   rollback, as a failed update is (0015). The routine was not called.
+ * - `schema-changed`: the root's definition is not the one the run was
+ *   decided over (0041), the routine's is not, or the call did not resolve
+ *   to it. The routine was not called, or not as bound.
+ * - `permission-denied`: the account may not move the version, lock what
+ *   a through reaches, or EXECUTE the routine.
+ * - `declined`: the routine, or a trigger, refused in words of the
+ *   deployment's own (0156): `reason` is for the person and nobody else.
+ * - `refused`: the routine, or a trigger, raised an error of any other kind
+ *   -- whatever its code, a missing column of the routine's body included,
+ *   since the body is not what the form was published over -- or a SQL
+ *   Server procedure returned a status other than 0, or an argument did
+ *   not reach its parameter as it was given.
+ * - `unavailable`: no connection, or the database said the transaction
+ *   could not complete now -- a deadlock, a lock not granted in time.
+ * - `action-timeout`: PostgreSQL stopped a statement of the run at the
+ *   run's deadline (57014), or nothing of it remained for the call.
+ * - `unknown-outcome`: the answer was lost after the run was sent, a
+ *   SQL Server run passed its deadline, or a procedure ended the
+ *   transaction itself. It may have committed, and it is never sent again.
+ */
+export type ActionFailureCode =
+  | 'not-found'
+  | 'stale'
+  | 'version-ended'
+  | 'schema-changed'
+  | 'permission-denied'
+  | 'declined'
+  | 'refused'
+  | 'unavailable'
+  | 'action-timeout'
+  | 'unknown-outcome'
+
+export interface ActionFailure {
+  ok: false
+  code: ActionFailureCode
+  /** A sentence for a log: the code, where it arose, a column or a routine by name. Never a value, an answer, nor a `declined` reason. */
+  message: string
+  /** `declined` only: the deployment's sentence for the person, never logged and never audited (0156). */
+  reason?: string
+  /** `declined` only: the column `formancy: refused [column]: ` names, which may be no column of the form. */
+  column?: string
+}
+
+/**
+ * What a run answers (0160): each record it addressed, by its key as the
+ * statement that moved it read it, canonical, so a token answered is the
+ * row's own; or why nothing was kept. Never a version: the routine may move
+ * it after the run did.
+ */
+export type ActionOutcome = { ok: true; records: Array<Record<string, ApiValue>> } | ActionFailure
+
+/** The root and the routine as one statement described them (0041), or why they could not be: `schema-changed` for either not described. */
+export type DescribedAction = { ok: true; table: DescribedTable; routine: DescribedRoutine } | RecordFailure
+
+/**
+ * The action half of the database port (0160), which both adapters
+ * implement and one set of shared cases holds alike (`ACTION_PARITY`,
+ * `@formancy/data-fixtures`).
+ *
+ * `describe` reads the root and the routine in one statement, each with
+ * the adapter's own token for the catalog facts it read (`definition`),
+ * which a run is decided over and guarded by.
+ *
+ * `run` is one transaction that locks each record under the person's
+ * filters and throughs at the version they read, holds each through's
+ * target for the run, moves the version (`ActionRequest.move`), then calls
+ * the routine once per record moved, only while the root and the routine
+ * still have the definitions it was decided over -- or nothing. It is sent
+ * once and never again, and takes no signal: a run goes on after its
+ * client leaves, as a write does (0031). `deadlineMs` is the server's, a
+ * whole number of milliseconds from configuration. A database refusal is an
+ * `ActionFailure`; a request no planner makes is thrown before anything is
+ * sent.
+ */
+export interface ActionAdapter {
+  describe(table: ObjectRef, routine: RoutineRef): Promise<DescribedAction>
+  run(request: ActionRequest, deadlineMs: number): Promise<ActionOutcome>
 }

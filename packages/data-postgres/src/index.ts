@@ -1,3 +1,4 @@
+export { createPostgresActions } from './actions/run.js'
 export { createPostgresAdapter } from './adapter.js'
 export { discoverPostgres } from './discovery/discover.js'
 export { createPostgresLookups } from './lookups/lookups.js'

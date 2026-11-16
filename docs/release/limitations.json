@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:7fcd4910378000ffb1291f398454f17d180432bc5147b26bc7102e2c36ab396f",
+      "reviewed": "sha256:0be65b5968151f5b3a8cad20e96e4ae3e52bf7ebe1a871080c683a874132b6c8",
       "limitations": [
         {
           "area": "databases",
@@ -248,7 +248,7 @@
       ]
     },
     "0016": {
-      "reviewed": "sha256:d2d576fdcc0d701244f1b9a3e125c719337586b0ab3e39d70a8de6d49acca1fc",
+      "reviewed": "sha256:46c2824baa0c0cfbad9f17be887b7ba0853c312bbb0a696cdbfede2b9a4c6b26",
       "limitations": [
         {
           "area": "databases",
@@ -290,7 +290,7 @@
       ]
     },
     "0017": {
-      "reviewed": "sha256:d15495b716e8dcb921ba780175403bbd7a2bc88a400387b9a6435d657f568548",
+      "reviewed": "sha256:8ce229070833ff3dfde67a67c3a99cd9b1c62a51a271bfba12bc5495973dbf83",
       "limitations": [
         {
           "area": "writes",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:f12098cbbda1222eb9fcf0c732b0bdb6238476051a589c63a4e5fc2d5563710c",
+      "reviewed": "sha256:45e47565d7de4aa73e29561217957f74b12b61c7a70ce7532b23f54dd593f4cc",
       "limitations": [
         {
           "area": "writes",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:368870a91129e8f65081762ccc74c2582da0c4109027ae2e6ab9b62e168525c0",
+      "reviewed": "sha256:b2404891a7cb4805438ddddcd64a1b98c4ec0b1a5cedc617675baa43baf264fe",
       "limitations": [
         {
           "area": "forms",
@@ -1134,7 +1134,7 @@
       "none": "Superseded by 0118: what generated forms are written in, and what an integrator's renderer must read, are that record's costs now, a whole-number field's fraction included."
     },
     "0043": {
-      "reviewed": "sha256:7a8d70692051659d4f428d8c277446bc3e070719fb671c2f8a21a4e23cdd6a4b",
+      "reviewed": "sha256:67a6508fa9b9839218e1668ecc9fc675bf969f5940aef4cb181e70d6b6c5429f",
       "limitations": [
         {
           "area": "access",
@@ -1873,7 +1873,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:1e2e18265ae7ac576e971cf36f53b2395c8365235a43d1b6510a8e4f2feb810a",
+      "reviewed": "sha256:bcff9350d94c22051432c48c99c499fc2e9c168658c2cf197884c44c9c6abdca",
       "limitations": [
         {
           "area": "server",
@@ -2898,6 +2898,16 @@
         }
       ]
     },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
     "0095": {
       "reviewed": "sha256:db859e16bb9f54e8e366af1076f58703597ccaf6df4218ce958483ccac380cae",
       "limitations": [
@@ -2928,25 +2938,6 @@
         }
       ]
     },
-    "0098": {
-      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
-      "limitations": [
-        {
-          "area": "writes",
-          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
-        }
-      ]
-    },
-    "0094": {
-      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
-      "limitations": [
-        {
-          "area": "host",
-          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
-          "heldBy": "apps/host/src/drill.test.tsx"
-        }
-      ]
-    },
     "0097": {
       "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
       "limitations": [
@@ -2954,6 +2945,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0098": {
+      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
         }
       ]
     },
@@ -2991,6 +2991,24 @@
         {
           "area": "server",
           "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
+        }
+      ]
+    },
+    "0102": {
+      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -3045,24 +3063,6 @@
         {
           "area": "server",
           "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
-        }
-      ]
-    },
-    "0101": {
-      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
-      "limitations": [
-        {
-          "area": "access",
-          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
-        }
-      ]
-    },
-    "0102": {
-      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
-      "limitations": [
-        {
-          "area": "operations",
-          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -4559,7 +4559,7 @@
       ]
     },
     "0156": {
-      "reviewed": "sha256:1e8f3bad362776d15c2b4c53da09aaaad37945c589c8c42ff5533e76e35e4fea",
+      "reviewed": "sha256:f071cc105a2227a4c1fb829c16c1ba8adcc3dd87533e21b0f9edeca8c1bbe361",
       "limitations": [
         {
           "area": "writes",
@@ -4674,7 +4674,7 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:b25c43767a49a8dded6f82f8ba1cfef86631c55f83b7ee686f1256331c076142",
+      "reviewed": "sha256:ea8f8c8665333421bd3305e36b45c112e864b7862d8b326551aff485f4d5a562",
       "limitations": [
         {
           "area": "forms",
@@ -4731,6 +4731,63 @@
         {
           "area": "operations",
           "says": "A server older than 0159 refuses a policy or a presentation that names actions."
+        }
+      ]
+    },
+    "0160": {
+      "reviewed": "sha256:1c3b3e5e8bd50e1b4b22f20170e66c131417af814a408ee80da8de8955c229ee",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "Nothing in the server runs an action yet: both adapters run one, and no route calls them."
+        },
+        {
+          "area": "writes",
+          "says": "A run holds its record, and the parent it is scoped through, until it commits or rolls back, for up to its deadline: a save of the record or a move of the parent waits for it.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Every run fires the root table’s UPDATE triggers, and on a SQL Server rowversion form sets its touch column to itself, a change to temporal history, CDC and change tracking whatever the routine does.",
+          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "On PostgreSQL an action over a form scoped through a parent needs UPDATE on the parent’s table, which a run’s FOR SHARE lock asks; without it every run is refused, and nothing says so before publication.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A run whose answer was lost is reported as possibly run, though on PostgreSQL one cut before its COMMIT was sent was rolled back.",
+          "heldBy": "packages/data-postgres/src/actions-lost-answer.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "On SQL Server any run past its deadline is reported as possibly run, and a run waits for its record’s lock at most half its deadline, a split chosen and not measured.",
+          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "PostgreSQL’s run deadline bounds its two statements, not the eight round trips from BEGIN to COMMIT.",
+          "heldBy": "packages/data-postgres/src/actions-lost-answer.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a procedure’s definition and EXECUTE are checked in the statements just before its EXEC, so one dropped and created again in between is called as created."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a run is refused when an argument to a varchar or char parameter holds a character the database’s code page lacks, whether a person’s answer, a context value or a column under another collation.",
+          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server procedure that commits or rolls back the run’s transaction makes the run’s outcome unknown, though one that rolled back kept nothing.",
+          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Each allowlisted database is given one more pool for actions, three clients on PostgreSQL and two pools on SQL Server, the SQL Server one at ten connections, opened whether or not a form offers an action."
         }
       ]
     }

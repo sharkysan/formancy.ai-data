@@ -208,8 +208,22 @@ runs one yet: the binding and its every refusal by
 `policy/actions.test.ts`, a run's plan by `actions/plan.test.ts`, its words
 by `presentation/actions.test.ts` and drift against it by
 `drift/routines.test.ts`, each case watched failing with its rule taken
-out ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)). What a routine does when an adapter calls it, on
-either engine, is a later record's to measure.
+out ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)). What a run does on
+either engine is held by the shared cases in
+`packages/data-fixtures/src/actions.ts`, `ACTION_PARITY`, over the
+actions schema each fixture container loads
+(`packages/data-fixtures/fixtures/*.actions.sql`), which each adapter's
+`actions.integration.test.ts` and `actions-lost-answer.integration.test.ts`
+assert through `covers()`: a run committed, run twice from one read,
+another tenant's, a parent moved under it, an ended version, the
+deployment's refusal in words and not, a broken body, a routine made
+again or made to reach as its owner, EXECUTE taken away, a lock held and
+a routine past the deadline, and a lost answer. Each suite measures, too,
+the engine facts a run rests on -- lock order, where an error arose, a
+locking clause in EXISTS, SET LOCK_TIMEOUT after an attention, a large
+result set, a pool's reported size, a run's round trips -- each watched
+failing with the opposite asserted on the default image, on 2026-11-16
+([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
 
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on

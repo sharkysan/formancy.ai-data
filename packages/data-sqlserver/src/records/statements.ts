@@ -96,15 +96,23 @@ const PARENT = '[p]'
  * same table compares the parent's key with the record's column and never a
  * row with itself. A record whose foreign key is NULL matches no parent.
  */
-export function throughPredicate(parameters: Parameters, through: ThroughTerms): string {
+export function throughPredicate(parameters: Parameters, through: ThroughTerms, held: boolean = false): string {
   const pairs = through.pairs.map((pair) => `${PARENT}.${quoteName(pair.references)} = ${column(pair.column)}`)
   const terms = through.terms.map((term) => filterPredicate(parameters, `${PARENT}.${quoteName(term.column)}`, term))
-  return `exists (select 1 from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...terms].join(' and ')})`
+  // An action's run holds the parent's row to its COMMIT (0160), so a move of it to another tenant waits for the run.
+  const hint = held ? ' with (holdlock)' : ''
+  return `exists (select 1 from ${quoteTable(through.target)} as ${PARENT}${hint} where ${[...pairs, ...terms].join(' and ')})`
 }
 
-/** What locates a record in every statement but an insert: its key, the trusted filters and every through. */
-export function located(parameters: Parameters, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
-  return [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms), ...through.map((entry) => throughPredicate(parameters, entry))]
+/** What locates a record in every statement but an insert: its key, the trusted filters and every through, each parent `held` for an action's run (0160). */
+export function located(
+  parameters: Parameters,
+  key: readonly RecordValue[],
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  held: boolean = false,
+): string[] {
+  return [...keyPredicates(parameters, key), ...filterPredicates(parameters, terms), ...through.map((entry) => throughPredicate(parameters, entry, held))]
 }
 
 /** The table's quoted name, bound as `object_id` reads it. */

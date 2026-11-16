@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { READER_ACCESS, WRITER_ACCESS } from './access.js'
+import { ACTION_PARITY } from './actions.js'
+import type { ActionCase } from './actions.js'
 import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
@@ -9,6 +11,7 @@ import type { ListedCase } from './check-lists.js'
 import { COLUMN_FILTER_PARITY } from './column-filters.js'
 import type { ColumnFilterCase } from './column-filters.js'
 import {
+  actionCase,
   browseCase,
   cascadeCase,
   columnFilterCase,
@@ -98,6 +101,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   CHECK_LIST_PARITY: (Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
   DECLINE_PARITY: (Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
   SAVE_PARITY: (Object.keys(SAVE_PARITY) as SaveCase[]).map(saveCase),
+  ACTION_PARITY: (Object.keys(ACTION_PARITY) as ActionCase[]).map(actionCase),
   // The comparators' models, through the cases that hold an adapter to them.
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
@@ -162,6 +166,9 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   SAVE_SIZES: 'how many line changes the sized save suites measure (0155)',
   SIZED_ORDER_POLICY: "who may do what with the sized save suites' order form, which no shared case reads",
   SIZED_LINE_POLICY: "who may do what with the sized save suites' line form, which no shared case reads",
+  ACTION_SCOPE: 'a discovery scope',
+  ACTION_CLERK: 'the person who runs in the actions suites (0160)',
+  ACTION_DECLINED_REASON: "what close_order says to the person of an order noted 'refuse'; what a run answers then is ACTION_PARITY's",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
 }
 

@@ -78,8 +78,13 @@ const ROUTINE = `quotename(s.name) + N'.' + quotename(o.name)`
  *
  * A char or varchar parameter takes the database's default collation, so
  * its code page -- what its length counts (0026) -- is the database's.
+ *
+ * Of the routines `where` names, a condition on sys.objects `o` and
+ * sys.schemas `s`: those in scope, for discovery, and the one routine a
+ * run's description reads again (actions/definition.ts, 0160), so the two
+ * cannot read one routine two ways.
  */
-const ROUTINES_SQL = (_scoped: string, schemaList: string): string => `
+export const ROUTINE_ROWS = (where: string): string => `
   select r.object_id, r.schema_name, r.routine_name, r.type, r.access_object, r.can_execute,
     p.parameter_id, p.name as parameter_name, p.user_type_id, p.max_length, p.precision, p.scale, p.is_output,
     t.name as type_name, schema_name(t.schema_id) as type_schema, t.is_user_defined, st.name as system_name,
@@ -92,11 +97,14 @@ const ROUTINES_SQL = (_scoped: string, schemaList: string): string => `
       end as can_execute
     from sys.objects o
     join sys.schemas s on s.schema_id = o.schema_id
-    where o.type in ('P', 'FN', 'IF', 'TF', 'PC', 'FS', 'FT', 'RF') and o.is_ms_shipped = 0 and s.name in (${schemaList})
+    where o.type in ('P', 'FN', 'IF', 'TF', 'PC', 'FS', 'FT', 'RF') and o.is_ms_shipped = 0 and ${where}
   ) r
   left join sys.parameters p on p.object_id = r.object_id and r.type in ('P', 'FN', 'IF', 'TF')
   left join sys.types t on t.user_type_id = p.user_type_id
-  left join sys.types st on st.user_type_id = p.system_type_id
+  left join sys.types st on st.user_type_id = p.system_type_id`
+
+/** Every routine in the schemas the scope names, in object_id and parameter order. */
+const ROUTINES_SQL = (_scoped: string, schemaList: string): string => `${ROUTINE_ROWS(`s.name in (${schemaList})`)}
   order by r.object_id, p.parameter_id`
 
 /** What the statement says of the routine on every one of its rows. */

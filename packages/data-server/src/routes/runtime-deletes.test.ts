@@ -3,13 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, DELETE_REFUSED, describedOf, generateForm } from '@formancy/data-core'
 import type {
+  ActionAdapter,
   ColumnMeta,
   DatabaseAdapter,
   DeleteOutcome,
-  ForeignKeyMeta,
   DeleteRequest,
   Described,
   DescribedTable,
+  ForeignKeyMeta,
   FormPolicy,
   InboundKey,
   LookupAdapter,
@@ -197,7 +198,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
     close: async () => {},
   }
 }

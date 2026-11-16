@@ -1,6 +1,6 @@
 import type { DatabaseAdapter, DatabaseKind } from '@formancy/data-core'
-import { connectPostgres, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
-import { connectSqlServer, createSqlServerAdapter, createSqlServerLookups, createSqlServerRecords } from '@formancy/data-sqlserver'
+import { connectPostgres, createPostgresActions, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
+import { connectSqlServer, createSqlServerActions, createSqlServerAdapter, createSqlServerLookups, createSqlServerRecords } from '@formancy/data-sqlserver'
 import type { EntraLogin } from '@formancy/data-sqlserver'
 import type { ConnectionConfig, ConnectionFactory, ConnectionLogin } from './connections.js'
 
@@ -18,6 +18,20 @@ function sqlLogin(config: ConnectionConfig, password: string | undefined): { use
 /** The application name the lookups' client gives PostgreSQL, so a DBA tells it from the records' in pg_stat_activity (0061). */
 export const POSTGRES_LOOKUPS_APPLICATION = 'formancy-data lookups'
 
+/** The application name the actions' client gives PostgreSQL, so a DBA tells a run's connection from the records' and the lookups' (0160). */
+export const POSTGRES_ACTIONS_APPLICATION = 'formancy-data actions'
+
+/**
+ * How many connections an action's pool opens on SQL Server (0160): mssql's
+ * own default, read in its source (lib/base/connection-pool.js, mssql
+ * 12.7.4: `max: 10`) and set here explicitly, because no public property of
+ * a pool reports its bound -- `size` is how many it holds now -- where
+ * postgres.js reports its own as `options.max` (measured,
+ * actions.integration.test.ts in each adapter). The route will count a run
+ * against it.
+ */
+export const SQLSERVER_ACTION_POOL = 10
+
 /**
  * PostgreSQL. Pinged before it is handed out, so an allowlisted connection that
  * cannot be reached fails here, where the registry retries it next time,
@@ -31,8 +45,12 @@ export const POSTGRES_LOOKUPS_APPLICATION = 'formancy-data lookups'
  * stop only another lookup -- which the adapter runs once more -- and never a
  * record read or write, which 0015 never retries. The cost is up to twice the
  * connections per allowlisted database, each pool at the driver's default.
- * The ping runs on the records' client; a failure ends both. Closing the
- * adapter closes both, each as the adapter closes its own.
+ *
+ * And actions on a third (0160): a run holds its connection and row locks
+ * for up to its deadline, which on the records' client would stall every
+ * read and write of every form on the database. The ping runs on the
+ * records' client; a failure ends all three. Closing the adapter closes
+ * all three, each as the adapter closes its own.
  */
 const openPostgres: ConnectionFactory = async (config, secret) => {
   const { enabled, trust } = tls(config)
@@ -46,21 +64,23 @@ const openPostgres: ConnectionFactory = async (config, secret) => {
   }
   const sql = connectPostgres(options)
   const lookupSql = connectPostgres({ ...options, applicationName: POSTGRES_LOOKUPS_APPLICATION })
+  const actionSql = connectPostgres({ ...options, applicationName: POSTGRES_ACTIONS_APPLICATION })
   const records = createPostgresAdapter(sql)
   const lookups = createPostgresAdapter(lookupSql)
+  const actions = createPostgresAdapter(actionSql)
   const adapter: DatabaseAdapter = {
     ...records,
     close: async () => {
-      await Promise.all([records.close(), lookups.close()])
+      await Promise.all([records.close(), lookups.close(), actions.close()])
     },
   }
   try {
     await adapter.ping()
   } catch (error) {
-    await Promise.all([sql.end({ timeout: 1 }), lookupSql.end({ timeout: 1 })])
+    await Promise.all([sql.end({ timeout: 1 }), lookupSql.end({ timeout: 1 }), actionSql.end({ timeout: 1 })])
     throw error
   }
-  return { adapter, lookups: createPostgresLookups(lookupSql), records: createPostgresRecords(sql) }
+  return { adapter, lookups: createPostgresLookups(lookupSql), records: createPostgresRecords(sql), actions: createPostgresActions(actionSql) }
 }
 
 /** The adapter's login for each allowlist login, kept so that a connection opened again is given the same object. */
@@ -87,14 +107,33 @@ export function entraLogin(login: ConnectionLogin, secret: string | undefined): 
   return made
 }
 
-/** SQL Server: no native module, no ODBC. A SQL login, or an Entra principal, which no test of this release logs in as (0074). */
+/**
+ * SQL Server: no native module, no ODBC. A SQL login, or an Entra
+ * principal, which no test of this release logs in as (0074). One pool for
+ * records and lookups, whose cancel is in-band (0061), and one of its own
+ * for actions, at SQLSERVER_ACTION_POOL connections (0160). Closing the
+ * adapter closes both.
+ */
 const openSqlServer: ConnectionFactory = async (config, secret) => {
   const { enabled, trust } = tls(config)
   const address = { host: config.host, port: config.port, database: config.database, encrypt: enabled, trustServerCertificate: trust }
-  const pool = await connectSqlServer(
-    config.login === undefined ? { ...address, ...sqlLogin(config, secret) } : { ...address, entra: entraLogin(config.login, secret) },
-  )
-  return { adapter: createSqlServerAdapter(pool), lookups: createSqlServerLookups(pool), records: createSqlServerRecords(pool) }
+  const login = config.login === undefined ? { ...address, ...sqlLogin(config, secret) } : { ...address, entra: entraLogin(config.login, secret) }
+  const pool = await connectSqlServer(login)
+  let actionPool: Awaited<ReturnType<typeof connectSqlServer>>
+  try {
+    actionPool = await connectSqlServer({ ...login, poolMax: SQLSERVER_ACTION_POOL })
+  } catch (error) {
+    await pool.close()
+    throw error
+  }
+  const records = createSqlServerAdapter(pool)
+  const adapter: DatabaseAdapter = {
+    ...records,
+    close: async () => {
+      await Promise.all([records.close(), actionPool.close()])
+    },
+  }
+  return { adapter, lookups: createSqlServerLookups(pool), records: createSqlServerRecords(pool), actions: createSqlServerActions(actionPool) }
 }
 
 /**

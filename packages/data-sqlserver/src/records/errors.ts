@@ -121,6 +121,16 @@ const PASSING: ReadonlySet<number> = new Set([
   983, // an availability group database whose replica is in neither role yet
 ])
 
+/**
+ * Whether SQL Server documents an error number as passing (`PASSING`):
+ * what the transaction did, rather than why a statement was refused. An
+ * action's run asks it before where the error arose (actions/errors.ts,
+ * 0160), so a deadlock inside a procedure is still a deadlock.
+ */
+export function passes(number: number): boolean {
+  return PASSING.has(number)
+}
+
 /** The first number SQL Server leaves to users: THROW's and RAISERROR's own. */
 const FIRST_USER_ERROR = 50000
 

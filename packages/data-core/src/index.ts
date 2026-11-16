@@ -39,17 +39,23 @@ export { ambiguousBeside, fitProblem, inputProblem, isParameterSource, routinePr
 export { ACTION_REFRESH } from './actions/wire.js'
 export type { ActionDone, ActionRefresh, ActionRunBody, ActionUnknownOutcome, FormAction } from './actions/wire.js'
 export { ACTION_REFUSED, planAction } from './actions/plan.js'
+export { runFailure } from './actions/failure.js'
 export type { DuplicateRecord, PlannedAction } from './actions/plan.js'
 export type {
+  ActionAdapter,
   ActionArgument,
   ActionBinding,
   ActionChoice,
+  ActionFailure,
+  ActionFailureCode,
   ActionMove,
+  ActionOutcome,
   ActionParameter,
   ActionRecord,
   ActionRequest,
   ArgumentSource,
   BoundSource,
+  DescribedAction,
   DescribedRoutine,
   ParameterChoice,
   ParameterSource,

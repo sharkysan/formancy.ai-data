@@ -119,6 +119,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A catalog the account cannot fully see | a gap in the snapshot, never "no relationships", and when the scope asks for routines never "no routine" | [0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md), [0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | `packages/data-core/src/snapshot.test.ts`, `packages/data-fixtures/src/conformance.test.ts`, `packages/data-sqlserver/src/discovery-routines.integration.test.ts` |
 | A form with no proof against lost updates | create-only, saying why | [0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md) | `packages/data-core/src/generate/generate.test.ts` |
 | A routine an action binds that is gone, changed in what a call rests on, no longer executable, out of sight, or not recorded by the snapshot review is against | the action blocked by review, and only it; a run planned over a routine whose call shape differs from the one the bindings' snapshot holds, or over a root whose change stops the action, refused `drift` -- what a request does when it finds no routine to describe is the route's, a later record's | [0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md) | `packages/data-core/src/drift/routines.test.ts`, `packages/data-core/src/actions/plan.test.ts` |
+| A run whose record is not where its person read it, or whose root or routine is not the one it was decided over | rolled back with nothing called: `not-found`, `stale`, `version-ended` or `schema-changed`; a routine's error of any kind but what passes is the deployment's, `declined` or `refused`, never a 500 | [0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md) | `packages/data-postgres/src/actions.integration.test.ts`, `packages/data-sqlserver/src/actions.integration.test.ts` |
 | A published bundle, on every read | refused with a reason unless it validates | [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md) | `bundle.test.ts` |
 | Drift that blocks an operation | 409 `drift`, nothing written | [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md), [0010](../decisions/0010-drift-is-classified-against-the-bindings.md) | `routes/runtime-drift.integration.test.ts` |
 | A grant whose key now names another column | 422 `keys-reassigned`, nothing written, until someone decides | [0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | `routes/admin-keys-reassigned.integration.test.ts`, `routes/admin-evolution.test.ts` |
@@ -438,6 +439,31 @@ nothing, and on SQL Server a trigger that ends the transaction can store a
 save in part, saves of different records wait on each other at the count
 where the child's foreign key has no index, and DELETE taken away while a
 save runs is seen by the first delete of each reach alone.
+
+**An action's run is one transaction, guarded by its version** ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+It locks the open record under the person's filters and throughs, at the
+version they read, holds the parent each through scopes it by to the end,
+moves the version -- a version column incremented, a rowversion's
+confirmed touch column set to itself -- and calls the routine once, only
+while the root and the routine have the definitions the run was decided
+over. A run from a read the first already moved is `stale`, so a second
+press, a resend or another replica runs it at most once, and a lost answer
+is `unknown-outcome`, never sent again. On PostgreSQL it is two
+statements, each under a statement timeout of what remains of the
+deadline; on SQL Server one batch, its lock wait at most half the
+deadline and the whole under mssql's per-request timeout at it, past
+which a run reads "it may have run".
+
+**Held by** the shared cases `ACTION_PARITY`
+(`packages/data-fixtures/src/actions.ts`), which each adapter's
+`actions.integration.test.ts` and `actions-lost-answer.integration.test.ts`
+assert through `covers()` on both engines.
+
+**What it costs.** What 0160 records: a run holds its record and the
+parent for up to its deadline, fires the root's UPDATE triggers, needs
+UPDATE on a through's parent on PostgreSQL, and over-reports a lost answer
+on PostgreSQL and any run past its deadline on SQL Server as "it may have
+run".
 
 
 ## 8.7 Audit

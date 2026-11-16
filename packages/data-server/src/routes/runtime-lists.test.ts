@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, CURSOR_GONE, describedOf, EMPTY_PRESENTATION, generateForm, LIST_PAGE_SIZE, listColumns } from '@formancy/data-core'
 import type {
+  ActionAdapter,
   ColumnMeta,
   DatabaseAdapter,
   Described,
@@ -270,7 +271,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
     close: async () => {},
   }
 }

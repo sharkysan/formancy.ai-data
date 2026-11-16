@@ -60,9 +60,30 @@ export const NOT_WITHIN_MESSAGE = 'formancy: the record is not one these rows ma
 /** The save passed its deadline before a step (0155): rolled back, before COMMIT was sent. */
 export const PAST_DEADLINE = 51724
 export const PAST_DEADLINE_MESSAGE = 'formancy: the save passed its deadline'
+/** An action's run that moved no record (0160): stale, gone or ended, told apart by a read after. Rolled back, the routine not called. */
+export const ACTION_UNMOVED = 51731
+export const ACTION_UNMOVED_MESSAGE = 'formancy: the run moved no record'
+/** The routine's definition is not the one the run was decided over (0160), just before the EXEC: rolled back, not called. */
+export const ROUTINE_MOVED = 51732
+export const ROUTINE_MOVED_MESSAGE = 'formancy: routine definition moved'
+/** An argument whose parameter counts code-page bytes did not read back as it was given (0159, 0160): rolled back, not called. */
+export const ARGUMENT_CHANGED = 51733
+/** Its message: the index of the argument, in the routine's order. */
+export const ARGUMENT_CHANGED_MESSAGE = /^formancy: an argument did not reach its parameter as given: ([0-9]+)$/
+/** The procedure returned a status other than 0 (0159, 0160): rolled back. */
+export const ROUTINE_STATUS = 51734
+export const ROUTINE_STATUS_MESSAGE = 'formancy: the procedure returned a status other than 0'
+/**
+ * The account may not EXECUTE the procedure (0160), as HAS_PERMS_BY_NAME
+ * answers just before the EXEC: rolled back, not called. Asked, because a
+ * 229 at the EXEC names the procedure in ERROR_PROCEDURE() as one inside it
+ * does (measured, actions.integration.test.ts).
+ */
+export const ROUTINE_DENIED = 51735
+export const ROUTINE_DENIED_MESSAGE = 'formancy: this account may not execute the routine'
 /**
  * Every number above, the ones the batches raise for themselves, a save's
- * among them: errors.ts reads none of them as a deployment's reason for the
+ * and a run's among them: errors.ts reads none of them as a deployment's reason for the
  * person, whatever its message (0156). batch-steps.test.ts fails when a
  * number exported here is left out of it.
  */
@@ -80,6 +101,11 @@ export const OWN_NUMBERS: readonly number[] = [
   COUNT_OUTSIDE,
   NOT_WITHIN,
   PAST_DEADLINE,
+  ACTION_UNMOVED,
+  ROUTINE_MOVED,
+  ARGUMENT_CHANGED,
+  ROUTINE_STATUS,
+  ROUTINE_DENIED,
 ]
 
 /** One column of what a statement returns: its name in the result, its type in a table variable, and the SQL that computes it. */

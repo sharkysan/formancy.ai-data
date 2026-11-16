@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { DatabaseAdapter, LookupAdapter, RecordAdapter } from '@formancy/data-core'
+import type { ActionAdapter, DatabaseAdapter, LookupAdapter, RecordAdapter } from '@formancy/data-core'
 import { SQLSERVER_LOGINS } from '@formancy/data-sqlserver'
 import { describe, expect, test } from 'vitest'
 import type { ConnectionConfig, ConnectionFactory, OpenConnection } from './connections.js'
@@ -27,7 +27,7 @@ function fakeConnection(onClose: () => void = () => {}): OpenConnection {
     },
     close: async () => onClose(),
   } as DatabaseAdapter
-  return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
+  return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
 }
 
 const secrets = { env: { ERP_PASSWORD: 'p@ss' }, readFile: async () => '' }

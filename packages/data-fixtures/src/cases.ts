@@ -2,6 +2,8 @@ import type { DatabaseKind } from '@formancy/data-core'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import type { TestOptions } from 'vitest'
 import { TestRunner } from 'vitest'
+import { ACTION_PARITY } from './actions.js'
+import type { ActionCase } from './actions.js'
 import { BROWSE_PARITY } from './browse.js'
 import type { BrowseCase } from './browse.js'
 import { CASCADE_PARITY } from './cascades.js'
@@ -130,6 +132,8 @@ export const listedCase = (name: ListedCase): string => `check lists: ${name}`
 export const declineCase = (name: DeclineCase): string => `declined: ${name}`
 /** What a save of a record with its rows does on each engine (0155), by the name of its entry in SAVE_PARITY. */
 export const saveCase = (name: SaveCase): string => `saves: ${name}`
+/** What a run of an action over the open record does on each engine (0160), by the name of its entry in ACTION_PARITY. */
+export const actionCase = (name: ActionCase): string => `actions: ${name}`
 
 /**
  * Every case both adapters answer to, in a fixed order: the model's, then
@@ -144,7 +148,8 @@ export const saveCase = (name: SaveCase): string => `saves: ${name}`
  * starts with (0149), then what the server stamps (0153), then what a check
  * that lists a column's values makes of its field (0152), then what a write
  * the deployment refuses in words for the person answers (0156), then what
- * a save of a record with its rows does (0155).
+ * a save of a record with its rows does (0155), then what a run of an
+ * action does (0160).
  * Throws on a duplicate id, which would be two cases the report could not
  * tell apart -- two filter entries with one column and value, say.
  */
@@ -174,6 +179,7 @@ export function sharedCases(): string[] {
     ...(Object.keys(CHECK_LIST_PARITY) as ListedCase[]).map(listedCase),
     ...(Object.keys(DECLINE_PARITY) as DeclineCase[]).map(declineCase),
     ...(Object.keys(SAVE_PARITY) as SaveCase[]).map(saveCase),
+    ...(Object.keys(ACTION_PARITY) as ActionCase[]).map(actionCase),
   ]
   const seen = new Set<string>()
   for (const id of ids) {

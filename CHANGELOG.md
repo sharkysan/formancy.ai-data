@@ -69,6 +69,40 @@ the same day (formancy.ai 0232).
   guide's section 8 says, and until then the door does not forward a save,
   which fails closed. The host page and the studio offer no save yet.
 
+- **Both adapters run an action over the open record** (0160). Why: 0159
+  bound a routine to a form and planned a run, and nothing ran one; how a
+  run locks the record, moves its version, calls the routine and answers is
+  a database's to decide on each engine, and the facts it rests on had not
+  been measured. What an integrator of the adapters notices: data-core's
+  `ActionAdapter` port -- `describe(table, routine)`, the root and the
+  routine in one statement, and `run(request, deadlineMs)`, which answers
+  each record by its key or an `ActionFailure` -- implemented by
+  `createPostgresActions` and `createSqlServerActions`, and `runFailure`,
+  the one mapping of a record failure to a run's. A run is one
+  transaction, sent once and never retried: the record locked under the
+  person's filters and throughs at the version read, the parent it is
+  scoped through held to the end, its version moved, then the routine
+  called only while it is the one the run was decided over, every argument
+  cast to its bound type; an error inside the routine is the deployment's,
+  `declined` under the prefix and `refused` otherwise. On PostgreSQL the
+  deadline is a statement timeout set before each of the run's two
+  statements, `action-timeout` when it passes; on SQL Server the lock waits
+  half the deadline, `unavailable` past it, and a run past the deadline is
+  `unknown-outcome`, as is one whose procedure ended the transaction; a
+  status other than 0 refuses the run, and so does an argument whose
+  varchar parameter's code page lacks a character. `OpenConnection` gains
+  `actions`, which `drivers.ts` opens on a pool of its own -- a third
+  PostgreSQL client named `formancy-data actions`, a second SQL Server pool
+  of ten -- so slow runs cannot stall reads and writes; a fake connection
+  an embedder builds needs one. `connectSqlServer` takes `poolMax`. Every
+  fixture container loads an `actions` schema beside the parity one. The
+  cost: a run holds its record and the parent for up to its deadline; on
+  PostgreSQL a form scoped through a parent needs UPDATE on the parent's
+  table for any run, and the generator does not say so yet; and a
+  PostgreSQL run whose answer was lost is unknown though it never
+  committed. Nothing in the server runs an action yet: the route is a
+  later record's.
+
 - **data-core binds a database routine as an action of a form** (0159).
   Why: administrator-named actions run logic the deployment keeps in its
   database over the open record, and before any adapter runs one, what a

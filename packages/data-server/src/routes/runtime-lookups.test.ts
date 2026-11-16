@@ -3,7 +3,17 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FormPolicy, LookupAdapter, LookupSignal, NormalizedType, ObjectRef, RecordAdapter } from '@formancy/data-core'
+import type {
+  ActionAdapter,
+  ColumnMeta,
+  DatabaseAdapter,
+  FormPolicy,
+  LookupAdapter,
+  LookupSignal,
+  NormalizedType,
+  ObjectRef,
+  RecordAdapter,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -141,7 +151,7 @@ function registry(): ConnectionRegistry {
     scope: () => ({ schemas: ['sales'] }),
     open: async () => {
       if (opening > 0) await new Promise((resolve) => setTimeout(resolve, opening))
-      return { adapter, lookups, records }
+      return { adapter, lookups, records, actions: {} as ActionAdapter }
     },
     close: async () => {},
   }

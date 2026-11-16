@@ -2,7 +2,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, DatabaseKind, DescribedRoot, FormPolicy, LookupAdapter, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type {
+  ActionAdapter,
+  ColumnMeta,
+  DatabaseAdapter,
+  DatabaseKind,
+  DescribedRoot,
+  FormPolicy,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -121,7 +131,7 @@ function registry(kind: DatabaseKind, snapshot: ReturnType<typeof snapshotOf>): 
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' ? { adapter, lookups, records } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
     close: async () => {},
   }
 }

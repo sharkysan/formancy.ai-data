@@ -454,6 +454,40 @@ a save stored in part, `unknown-outcome`. What both engines answer is
 `SAVE_PARITY`'s, held by `src/save.integration.test.ts` and
 `src/save-lost-answer.integration.test.ts`; the lock facts by
 `src/save-facts.integration.test.ts`.
+
+### An action's run
+
+`createSqlServerActions(pool)` runs actions on a pool the composition root
+opens for them alone, `connectSqlServer({ …, poolMax: 10 })`: mssql reports
+no bound for a pool, so it is given one
+([0160](../../docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). `actions.describe(table,
+routine)` reads the root and the procedure in one statement, the procedure
+by OBJECT_ID and discovery's own read of it, with the digest of what a call
+rests on -- its object_id, name and each parameter's name, type, length,
+precision, scale and direction -- and never its text, its `modify_date` or
+EXECUTE AS: every procedure already reaches its owner's tables by
+ownership chaining (0158). `actions.run(request, deadlineMs)` is ONE batch
+sent once with mssql's per-request timeout at the deadline: `SET
+LOCK_TIMEOUT` to half of it, the record locked and moved in one UPDATE
+`WITH (UPDLOCK, HOLDLOCK)` under its key, the person's filters and every
+through, each parent read `WITH (HOLDLOCK)`, at the version read -- a
+version column incremented, or a rowversion's confirmed touch column set
+to itself -- followed by the checks a write's step carries; the
+procedure's digest and EXECUTE, asked of HAS_PERMS_BY_NAME, just before
+the EXEC, a window nothing closes; each argument read into a variable of
+its parameter's exact type, every argument of a varchar or char parameter
+read back as nvarchar and the run refused where its code page changed a
+character; `EXEC @status`, the transaction checked to be still the batch's
+and a status other than 0 refused; COMMIT. CATCH records the step, SQL
+Server's number and the procedure ERROR_PROCEDURE() names, and an error
+inside a procedure or a trigger is the deployment's, `declined` under the
+prefix and `refused` otherwise. The batch's result sets are streamed and a
+procedure's rows dropped as they arrive. A lock wait past LOCK_TIMEOUT is
+`unavailable`; a run past its deadline, and one whose procedure committed
+or rolled back its transaction, is `unknown-outcome`. What both engines
+answer is `ACTION_PARITY`'s, held by `src/actions.integration.test.ts`,
+with the facts a run rests on, and
+`src/actions-lost-answer.integration.test.ts`.
 `cascade.integration.test.ts` holds every case `CASCADE_PARITY` names but
 `lost-answer`, which `records-lost-answer.integration.test.ts` holds.
 
@@ -679,7 +713,13 @@ pinned tenant or on a key that refers to another table's, each as the
 catalog spells it -- with a row of the first read and deleted by its token
 and answered in lower case; and, this engine's own, how it stores and orders
 a uniqueidentifier, and that `newsequentialid()`'s keys rise across
-tenants). It
+tenants), and an action's run over the open record
+(`actions.integration.test.ts` and `actions-lost-answer.integration.test.ts`,
+0160, each case `ACTION_PARITY`'s, and this engine's own: a status other
+than 0, a procedure that commits or rolls back the run's transaction, a
+rowversion form's touch, an argument its parameter's code page cannot
+hold, and the facts a run rests on -- ERROR_PROCEDURE(), SET LOCK_TIMEOUT
+after an attention, a large result set, and a pool's unreported bound). It
 needs Docker and, the first time, a
 pull of about a gigabyte and a half. `encryption.test.ts` needs none: the
 real mssql and tedious against data-fixtures' PRELOGIN stand-in, which
