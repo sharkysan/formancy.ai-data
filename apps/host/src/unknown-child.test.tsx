@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, gridSection, mount, searchRecords, showChild, signIn, stamp } from './test-host.js'
+import { answeredOnce, chooseForm, gridSection, mount, searchRecords, showChild, signIn, stamp, unknownNotice } from './test-host.js'
+import { done, openRows, recordSave, rowAnswer, rowCell, rowsTab, rowTexts } from './test-rows.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -27,7 +28,7 @@ import type { Engine, Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true })
+  plane = await startPlane({ children: true, saves: true })
 })
 
 afterAll(async () => {
@@ -134,5 +135,54 @@ describe.each(ENGINES)('a lost line on $engine (0031, 0047)', (engine) => {
         ).toContain(`Created record k1:${order.slice(3)},5.`),
       ARRIVES,
     )
+  })
+})
+
+describe.each(ENGINES)('a lost save of an order with its lines on $engine (0031, 0155)', (engine) => {
+  // A save of an order with a line changed, its answer lost after it
+  // committed: the page says it may have been saved, with the keyboard on
+  // that, and sends nothing again; its check reads the order alone, which
+  // every save moves -- changed, by this save or another's -- and Load the
+  // saved record opens the order as stored and lists its lines again, the
+  // page's change to them dropped, so what the tab shows is what is stored.
+  test('a lost save checks by the record, then loads the record and its rows', async () => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('lost'), 2)
+    plane.sent.length = 0
+    const user = await openRows(plane, engine, record)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, 'React', `Order line k1:${String(first)}`, 'Quantity', '6')
+    await done(user, 'React', `Order line k1:${String(first)}`)
+    await waitFor(() => expect(rowTexts()[0]?.[4]).toBe('Changed'), ARRIVES)
+    plane.loseSave.set(engine.parity, 'after')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await user.click(recordSave('React'))
+    await waitFor(() => expect(plane.loseSave.has(engine.parity)).toBe(false), ARRIVES)
+    const notice = await waitFor(() => {
+      const found = unknownNotice('React')
+      if (found === null) throw new Error('no unknown notice')
+      return found
+    }, ARRIVES)
+    await waitFor(() => expect(focusedName()).toBe('React It may have been saved'), ARRIVES)
+    await user.click(within(notice).getByRole('button', { name: 'Check whether it was saved' }))
+    await waitFor(
+      () => expect(within(notice).getByRole('status').textContent).toBe('The record has changed since it was read, by this save or by someone else.'),
+      ARRIVES,
+    )
+    await user.click(within(notice).getByRole('button', { name: 'Load the saved record' }))
+    await showChild(user, 'Order line')
+    await waitFor(
+      () =>
+        expect(rowTexts().map((row) => row.slice(1, 5))).toEqual([
+          ['1', '6', '', ''],
+          ['2', '2', '', ''],
+        ]),
+      ARRIVES,
+    )
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 6 },
+      { no: 2, quantity: 2 },
+    ])
+    expect(plane.sent.filter((request) => request.path.endsWith('/records/save'))).toHaveLength(1)
   })
 })

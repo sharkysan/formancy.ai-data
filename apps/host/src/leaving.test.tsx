@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { focusedName } from './test-accessible.js'
-import { answer, dataCell, formLink, gridSection, gridStatus, load, loaded, newRecord, openForm, showChild, shows, unsavedNotice } from './test-host.js'
+import { answer, dataCell, formLink, gridSection, gridStatus, load, loaded, newRecord, openForm, showChild, shows, stamp, unsavedNotice } from './test-host.js'
+import { done, openRows, rowAnswer, rowCell, rowsSay, rowsTab, rowTexts } from './test-rows.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -21,7 +22,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true })
+  plane = await startPlane({ children: true, saves: true })
 })
 
 afterAll(async () => {
@@ -210,5 +211,35 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
     await discard(user, again)
     await shows('React', 'Amount', '')
     await shows('Angular', 'Amount', '')
+  })
+})
+
+describe.each(ENGINES)('leaving an order’s lines on $engine (0155)', (engine) => {
+  // A line changed and one added are the order's work, though no form of
+  // the order's own changed: New record asks first and names them with the
+  // order, Keep editing keeps them, and Discard drops them with it.
+  test('the guard names the order with the changes its lines hold', async () => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('leaving'), 1)
+    const user = await openRows(plane, engine, record)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, 'React', `Order line k1:${String(first)}`, 'Quantity', '3')
+    await done(user, 'React', `Order line k1:${String(first)}`)
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Add Order line' }))
+    await rowAnswer(user, 'Angular', 'New Order line 1', 'Line no', '2')
+    await done(user, 'Angular', 'New Order line 1')
+    await newRecord(user)
+    let notice = await asking()
+    expect(within(notice).getByRole('list').textContent).toBe(`Order ${record} with 1 Order line row added and 1 changed: changes that are not saved.`)
+    await keep(user, notice)
+    expect(focusedName()).toBe('New record')
+    await showChild(user, 'Order line')
+    expect(rowTexts().map((row) => row[4])).toEqual(['Changed', 'New'])
+    await newRecord(user)
+    notice = await asking()
+    await discard(user, notice)
+    await showChild(user, 'Order line')
+    await rowsSay('0 Order line rows; each Order holds 1 to 3.')
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([{ no: 1, quantity: 1 }])
   })
 })

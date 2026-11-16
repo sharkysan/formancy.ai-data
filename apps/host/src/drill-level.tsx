@@ -16,6 +16,7 @@ import { Pane } from './pane.js'
 import { renderersOf } from './panes.js'
 import type { RendererChoice } from './prefs.js'
 import { RecordTabs } from './record-tabs.js'
+import { createSaveSet, isTogether } from './save-set.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import type { Drill, DrillStep } from './use-drill.js'
@@ -73,11 +74,26 @@ export function DrillLevel({
   /** The level's record as stored, which a section's condition is read from (0109); null while it is new. */
   const [stored, setStored] = useState<Readonly<Record<string, unknown>> | null>(step.record === null ? null : step.record.answers)
 
+  // The rows of the level's together children, held for its Save (0155): its children answer after it is placed, so they are read when asked.
+  const togetherNow = useRef<ChildForm[]>([])
+  togetherNow.current = (childForms ?? []).filter(isTogether)
+  const saveSet = useMemo(
+    () => createSaveSet({ client, formId, parentNoun: title, forms: () => togetherNow.current.filter(isTogether) }),
+    [client, formId, title],
+  )
   // Opened once, as the level is placed: with the record read, or new under the parent.
   const sessions = useMemo(
     () =>
       (['react', 'angular'] as const).map((which) => {
-        const session = createSession({ client, formId, definition, renderer: which, namespace: owner, fixed: parentField === null ? [] : [parentField] })
+        const session = createSession({
+          client,
+          formId,
+          definition,
+          renderer: which,
+          namespace: owner,
+          fixed: parentField === null ? [] : [parentField],
+          rows: saveSet.rows,
+        })
         const answers = through.kind === 'child' ? { [through.field]: through.parent } : {}
         if (step.record === null) session.start(answers)
         else session.open(structuredClone(step.record))
@@ -213,6 +229,7 @@ export function DrillLevel({
         drill={drill}
         level={level}
         drilling
+        saveSet={saveSet}
       >
         {(show) => (
           <div className="panes" data-count={renderersOf(renderer).length}>

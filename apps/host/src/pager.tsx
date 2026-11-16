@@ -36,6 +36,7 @@ export function Pager({
   onRetry,
   onPrevious,
   onNext,
+  alone = false,
 }: {
   status: Status
   first: boolean
@@ -48,8 +49,11 @@ export function Pager({
   onRetry: () => void
   onPrevious: () => void
   onNext: () => void
-}): ReactElement {
+  /** A set the page holds, one page of it (0155): no pager, the section's own line saying what it holds. */
+  alone?: boolean
+}): ReactElement | null {
   const id = useId()
+  if (alone) return null
   const why = waits ? (status.help === null ? `${id}-line` : `${id}-line ${id}-help`) : undefined
   return (
     <div className="pager">

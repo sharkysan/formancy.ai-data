@@ -1,6 +1,22 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, waitFor, within } from '@testing-library/react'
-import { answer, chooseCustomer, control, load, newRecord, openWith, RENDERERS, said, save, shows, statuses, unsavedNotice } from './test-host.js'
+import {
+  answer,
+  chooseCustomer,
+  control,
+  load,
+  newRecord,
+  openWith,
+  RENDERERS,
+  said,
+  save,
+  showChild,
+  shows,
+  stamp,
+  statuses,
+  unsavedNotice,
+} from './test-host.js'
+import { done, openRows, rowAnswer, rowCell, rowsTab, rowTexts } from './test-rows.js'
 import type { User } from './test-host.js'
 import { holdingWrites } from './test-network.js'
 import type { Holding } from './test-network.js'
@@ -25,7 +41,7 @@ import type { Engine, Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ saves: true })
 })
 
 afterAll(async () => {
@@ -130,5 +146,55 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
     expect(stored.ok && stored.value.answers['amount']).toBe('6.0000')
     await shows(renderer, 'Amount', '')
     await shows(renderer, 'Customer', '')
+  })
+})
+
+describe.each(ENGINES)('a save of an order with its lines in flight on $engine (0155)', (engine) => {
+  // A second press while the save is out says it sent nothing; a line
+  // typed into meanwhile keeps its newer answers and its mark, with the
+  // stored version applied, and the answer says those changes are not
+  // saved; and the next save, of that line alone, is heard too -- each
+  // answer a change to the pane's line, never the last one's words again.
+  test.each(RENDERERS)('in %s, a second press is busy, a line typed into meanwhile keeps its answers, and every answer is heard', async (renderer) => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('flight'), 2)
+    const holding = holdingWrites(plane.fetch)
+    const user = await openRows(plane, engine, record, undefined, holding.fetch)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    const line = `Order line k1:${String(first)}`
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, renderer, line, 'Quantity', '5')
+    await done(user, renderer, line)
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, renderer)
+    await writesHeld(holding, 1)
+    await said(renderer, /^Saving…$/)
+    await save(user, renderer)
+    await said(renderer, /^The previous save has not been answered yet\. This press sent nothing: press Save again once it has\.$/)
+    expect(holding.held).toHaveLength(1)
+
+    await showChild(user, 'Order line')
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, renderer, line, 'Quantity', '6')
+    await done(user, renderer, line)
+    holding.answer()
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await said(renderer, /^Saved the Order: 1 Order line row changed\. Changes made while it was saving are still in the form, not saved\.$/)
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 5 },
+      { no: 2, quantity: 2 },
+    ])
+    await showChild(user, 'Order line')
+    await waitFor(() => expect(rowTexts()[0]?.slice(1, 5)).toEqual(['1', '6', '', 'Changed']), { timeout: 15_000 })
+
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, renderer)
+    await writesHeld(holding, 1)
+    await said(renderer, /^Saving…$/)
+    holding.answer()
+    await said(renderer, /^Saved the Order: 1 Order line row changed\.$/)
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 6 },
+      { no: 2, quantity: 2 },
+    ])
   })
 })

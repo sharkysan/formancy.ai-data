@@ -34,6 +34,7 @@ import {
 } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import { createWithLine } from './test-rows.js'
 import type { Sent } from './test-fetch.js'
 import type { Plane } from './test-plane.js'
 
@@ -59,7 +60,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true })
+  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true })
 })
 
 afterAll(async () => {
@@ -144,7 +145,7 @@ const JOURNEYS = [
   { ...ENGINES[0], door: "the demo's path", demo: true },
 ]
 
-describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, price, demo }) => {
+describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, price, demo, savedOrder }) => {
   test('only runtime routes under its base, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
     plane.sent.length = 0
     const words = stamp('plane')
@@ -199,6 +200,8 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     await user.click(screen.getByRole('button', { name: 'Delete record' }))
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${record}?` })).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy(), { timeout: 15_000 })
+    // An order created with a line, in one save through the order's own Save (0155).
+    await createWithLine(user, savedOrder, stamp('plane-save'))
     // And on its own origin a price, whose tenant is a column of its own:
     // the demo publishes no form over versions.
     if (door === undefined) await priceJourney(user, price)
@@ -228,17 +231,16 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // And the journey used every one of them, so the table is not satisfied
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused;
-    // and with 0079's for the export removed before Download CSV: export
-    // unused). A change from a date is sent from a price on the page's own
+    // with 0079's for the export removed before Download CSV: export
+    // unused; and with 0155's for the save removed before the page drew a
+    // record's rows as one set: save unused on every door). A save is sent
+    // from an order created with a line through the order's own Save, and
+    // carries the token in its header alone, as below. A change from a date is sent from a price on the page's own
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
     // update and in its change from a date). Through the demo's door it is
-    // the one exception: the demo publishes no form over versions. A save
-    // of a record with its rows is the other, as delete and export each were
-    // until the page had a control for them: the route arrived before the
-    // host page draws a record's rows as one set (0155), and goes from this
-    // set when it does.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['save'] : ['supersede', 'save'])
+    // the one exception: the demo publishes no form over versions.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

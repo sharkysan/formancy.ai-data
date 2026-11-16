@@ -30,12 +30,15 @@ export function ReactForm({
   engine,
   sources,
   offer,
+  submitLabel = 'Save',
   onSubmit,
 }: {
   engine: FormEngine
   sources: OptionsSources
   /** Open under each lookup it names (0141); none where the pane offers none. */
   offer?: LookupOffer | undefined
+  /** What the submit says: Save, or a together row's Done, which sends nothing (0155). */
+  submitLabel?: string
   onSubmit: (outcome: SubmitOutcome) => void
 }): ReactElement {
   const layout = engine.schema().layouts?.[0]?.name
@@ -51,7 +54,7 @@ export function ReactForm({
         <FormancyForm
           {...(layout === undefined ? {} : { layout })}
           {...(fieldAddition === undefined ? {} : { fieldAddition })}
-          submitLabel="Save"
+          submitLabel={submitLabel}
           onSubmit={onSubmit}
         />
       </FormancyProvider>

@@ -1274,6 +1274,15 @@ describe('a save of a record with its rows (0155)', () => {
       body = { ...FORM, together }
       expect(await client.form('pg-line')).toEqual({ ok: true, value: body })
     }
+    // What a row's create takes in a save of its record, which a page draws a
+    // new row with, is named where the form's rows are saved with it, and
+    // nowhere else that offers no create. Watched failing with the save's
+    // create left out of the check: the line form was refused as no form.
+    const created = { ...FORM, writable: { create: ['order', 'quantity'], update: ['quantity'] } }
+    body = { ...created, together: { field: 'order', min: 1, max: 3 } }
+    expect(await client.form('pg-line')).toEqual({ ok: true, value: body })
+    body = { ...created, together: null }
+    expect(await client.form('pg-line')).toMatchObject({ ok: false, code: 'unexpected' })
     const flags = { min: 1, max: 3, created: { create: true }, saved: { create: true, update: true, delete: false } }
     const menu = (together: unknown) => ({
       forms: [

@@ -14,6 +14,12 @@ export interface TabEntry {
    * selected, and the panel is drawn on the next render.
    */
   panel: (show: () => boolean) => ReactNode
+  /**
+   * Drawn with the tabs, hidden until shown, rather than the first time its
+   * tab is shown: a child whose rows are saved with the record (0155), whose
+   * tab the record's Save may have to show, and only a drawn panel can.
+   */
+  eager?: boolean
 }
 
 interface Selection {
@@ -109,7 +115,7 @@ export function TabList({ idBase, labelledBy, start, tabs }: { idBase: string; l
             {...(many ? { role: 'tabpanel', id: panelId(n), 'aria-labelledby': tabId(n), tabIndex: 0 } : {})}
             hidden={!shown}
           >
-            {shown || now.seen.includes(tab.key) ? tab.panel(() => select(tab.key)) : null}
+            {shown || now.seen.includes(tab.key) || tab.eager === true ? tab.panel(() => select(tab.key)) : null}
           </div>
         )
       })}

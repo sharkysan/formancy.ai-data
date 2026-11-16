@@ -12,7 +12,10 @@
 // read only, which Drill down goes down from: a customer, its orders, their
 // lines (0090). The order form is published with two list views and no
 // default (0105), so its grid opens on every record, as every state before
-// the views' found it, and offers the View picker in all of them.
+// the views' found it, and offers the View picker in all of them. And over
+// the parity schema an order and its lines saved with it, one to three of
+// them (0155), as src/test-saves.ts publishes them: a clerk adds and
+// changes lines, and the order's own Save sends them.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -25,6 +28,8 @@ import postgres from 'postgres'
 export const FORM = 'pg-order'
 export const LINES = 'pg-order-line'
 export const CUSTOMERS = 'pg-customer'
+export const SAVED_ORDER = 'pg-saved-order'
+export const SAVED_LINES = 'pg-saved-line'
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
 
 /**
@@ -83,6 +88,17 @@ export async function startPlane() {
         schemas: ['sales'],
         tls: { enabled: false },
       },
+      {
+        id: 'pg-parity',
+        kind: 'postgres',
+        host: url.hostname,
+        port: Number(url.port),
+        database: url.pathname.slice(1),
+        user: decodeURIComponent(url.username),
+        password: 'env:PG_PASSWORD',
+        schemas: ['parity'],
+        tls: { enabled: false },
+      },
     ],
     DRIVER_FACTORIES,
     { env: { PG_PASSWORD: decodeURIComponent(url.password) }, readFile: async () => '' },
@@ -119,14 +135,15 @@ export async function startPlane() {
     if (reply.statusCode >= 300) throw new Error(`${path} answered ${String(reply.statusCode)}: ${reply.body}`)
     return reply.json()
   }
-  const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version', views }) => {
+  const publish = async ({ formId, title, table, lookups, policy, versionColumn = 'row_version', views, connection = 'pg', schema = 'sales', pinned }) => {
     const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
-      connection: 'pg',
-      root: { schema: 'sales', name: table },
+      connection,
+      root: { schema, name: table },
       formId,
       title,
       lookups,
       ...(versionColumn === null ? {} : { versionColumn }),
+      ...(pinned === undefined ? {} : { pinned }),
     })
     // Published as the generator made it (0030 refuses anything but
     // presentation over the generated base), which draws a lookup as a
@@ -138,7 +155,7 @@ export async function startPlane() {
       expectedBase: null,
       bundle: {
         format: 2,
-        connection: 'pg',
+        connection,
         generation: proposal.generation,
         base: form,
         presentation,
@@ -181,6 +198,29 @@ export async function startPlane() {
         lookups: {},
       }),
   })
+  // An order of the parity schema and its lines saved with it, one to three: read through their order, and never deleted here.
+  await publish({
+    formId: SAVED_ORDER,
+    title: 'Order',
+    table: 'saved_order',
+    lookups: [],
+    versionColumn: 'version',
+    connection: 'pg-parity',
+    schema: 'parity',
+    pinned: ['tenant_id'],
+    policy: (bindings) => clerkPolicy(bindings, { lookups: {} }),
+  })
+  await publish({
+    formId: SAVED_LINES,
+    title: 'Order line',
+    table: 'saved_line',
+    lookups: [{ foreignKey: 'fk_saved_line_order', display: ['note'], together: { min: 1, max: 3 } }],
+    versionColumn: 'version',
+    connection: 'pg-parity',
+    schema: 'parity',
+    policy: (bindings) =>
+      clerkPolicy(bindings, { rowFilters: [], lookups: { saved_order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['saved_order'] }),
+  })
   const source = form.model.fields.find((field) => field.key === 'customer').optionsSource
   const sql = postgres(fixture.admin, { onnotice: () => {} })
   return {
@@ -200,6 +240,17 @@ export async function startPlane() {
       return record
     },
     insertCustomer: (no, name) => sql`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`,
+    /** A parity order of tenant 1's noted `note`, with `lines` lines numbered from 1, written by the owner: its token. */
+    savedOrder: async (note, lines) => {
+      const [{ id }] = await sql`insert into parity.saved_order (tenant_id, note) values (1, ${note}) returning id`
+      for (let no = 1; no <= lines; no += 1) await sql`insert into parity.saved_line (order_id, line_no, quantity) values (${id}, ${no}, ${no})`
+      return `k1:${String(id)}`
+    },
+    /** How many parity orders are noted exactly `note`, and how many lines they hold, asked of the owner. */
+    savedWithNote: async (note) =>
+      (
+        await sql`select count(distinct o.id)::int as orders, count(l.id)::int as lines from parity.saved_order as o left join parity.saved_line as l on l.order_id = o.id where o.note = ${note}`
+      )[0],
     /** How many orders have exactly these notes: what the database holds, asked beside the page. */
     ordersWithNotes: async (notes) => (await sql`select count(*)::int as n from sales."order" where notes = ${notes}`)[0].n,
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,

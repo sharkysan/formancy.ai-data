@@ -14,7 +14,7 @@ import { Detail } from './detail.js'
 import type { MasterOpen } from './detail.js'
 import { copiedLine, copyOf, leftOut } from './duplicate.js'
 import { DrillLevel } from './drill-level.js'
-import { FormHead } from './form-head.js'
+import { FormHead, savedWith } from './form-head.js'
 import { columnsOf } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
 import { paneEntry, useGuardContext, useRegistered } from './guard.js'
@@ -32,6 +32,7 @@ import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
 import { RecordTabs } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
+import { createSaveSet, isTogether } from './save-set.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { Split, useLine } from './split.js'
@@ -146,9 +147,16 @@ export function FormView({
   /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
   const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
+  // The rows of the record's together children, held for its Save, which every pane's save carries (0155); its children read when asked.
+  const childrenNow = useRef(childForms)
+  childrenNow.current = childForms
+  const saveSet = useMemo(
+    () => createSaveSet({ client, formId, parentNoun: entry.title, forms: () => childrenNow.current.filter(isTogether) }),
+    [client, formId, entry.title],
+  )
   const sessions = useMemo(
-    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which })),
-    [client, formId, definition],
+    () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which, rows: saveSet.rows })),
+    [client, formId, definition, saveSet],
   )
   const entries = useMemo<PaneEntry[]>(
     () =>
@@ -468,6 +476,7 @@ export function FormView({
         operations={definition.operations}
         layout={layout}
         note={note}
+        together={savedWith(definition, title)}
         headingRef={headingRef}
         onLayout={(next) => onLayout(next, next === 'drill' ? drill.enter(open !== null) : undefined, true)}
       />
@@ -566,6 +575,7 @@ export function FormView({
               drill={drill}
               level={1}
               drilling={drilling}
+              saveSet={saveSet}
             >
               {panes}
             </RecordTabs>

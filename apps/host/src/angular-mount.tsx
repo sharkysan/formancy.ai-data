@@ -26,6 +26,7 @@ export function AngularForm({
   engine,
   sources,
   offer,
+  submitLabel = 'Save',
   onSubmit,
 }: {
   sheet: HTMLFormElement | null
@@ -33,6 +34,8 @@ export function AngularForm({
   sources: OptionsSources
   /** Open under each lookup it names (0141); none where the pane offers none. */
   offer?: LookupOffer | undefined
+  /** What the submit says: Save, or a together row's Done, which sends nothing (0155). Read as the application starts. */
+  submitLabel?: string
   onSubmit: (outcome: SubmitOutcome) => void
 }): ReactElement | null {
   const [problem, setProblem] = useState<string | undefined>(undefined)
@@ -40,6 +43,7 @@ export function AngularForm({
   useEffect(() => {
     submit.current = onSubmit
   }, [onSubmit])
+  const label = useRef(submitLabel)
   const offered = useRef(offer)
   useEffect(() => {
     offered.current = offer
@@ -54,7 +58,7 @@ export function AngularForm({
     // React half paints without waiting, and the bundle splits where the two
     // frameworks meet.
     import('./angular-bootstrap.js')
-      .then(({ mountAngularForm }) => mountAngularForm(sheet, engine, sources, (outcome) => submit.current(outcome), offered.current ?? null))
+      .then(({ mountAngularForm }) => mountAngularForm(sheet, engine, sources, (outcome) => submit.current(outcome), offered.current ?? null, label.current))
       .then((teardown) => {
         if (cancelled) teardown()
         else unmount = teardown
