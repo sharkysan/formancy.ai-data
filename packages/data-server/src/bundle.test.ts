@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
 import type { ColumnMeta, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
@@ -184,6 +186,56 @@ describe('validateBundle', () => {
       ok: false,
       problems: ['bindings version 1 were published before 0027 (per-operation writes); republish the form'],
     })
+  })
+
+  // Every form published before 0158 is a bundle whose snapshot's scope never
+  // asked for routines, and the server hashes that snapshot again on every
+  // read (0019). The file is one such bundle, written by data-server and
+  // data-core at 4a979d6, the release before 0158, with every fact discovery
+  // recorded then: were an absent list hashed as an empty one, or every
+  // scope made to say whether it asked, this bundle would be refused on read
+  // as a snapshot edited after it was taken -- and so would every published
+  // form, until republished.
+  test('a bundle published before 0158 still validates, with the fingerprint it was published with', () => {
+    const stored = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'bundle-before-0158.json'), 'utf8')) as BundleV2
+    expect(stored.snapshot.fingerprint).toBe('4352314541a9b84b83d3311f61160b517d97e332ec5860b2cff7104e1d8a4392')
+    expect(stored.snapshot).not.toHaveProperty('routines')
+    expect(validateBundle(stored)).toEqual({ ok: true, bundle: stored })
+  })
+
+  // A snapshot discovered with routines (0158) is published like any other:
+  // what it records of a routine is in its fingerprint, and the generator
+  // reads none of it, so the form and bindings are the ones the same tables
+  // make without routines -- and a routine edited after discovery is refused
+  // as any edit is.
+  test('a bundle whose snapshot records routines validates, its form the one made without them, and an edited routine is refused', () => {
+    const withRoutines = (): MetadataSnapshot => {
+      const { fingerprint: _fingerprint, ...taken } = snapshot()
+      return createSnapshot({
+        ...taken,
+        scope: { schemas: ['sales'], routines: true },
+        routines: [
+          {
+            ref: { schema: 'sales', name: 'retire_employee', signature: '' },
+            kind: 'procedure',
+            parameters: [{ name: '@employee_id', mode: 'in', databaseType: 'int', typeId: '56:4:10:0', type: INT32 }],
+            effects: 'writes',
+            returns: 'void',
+            result: null,
+            reach: 'owner',
+            executable: true,
+          },
+        ],
+      })
+    }
+    const recorded = good(withRoutines())
+    expect(validateBundle(recorded)).toEqual({ ok: true, bundle: recorded })
+    expect([recorded.form, recorded.bindings.fields]).toEqual([good().form, good().bindings.fields])
+    const edited = copy(recorded)
+    const routine = edited.snapshot.routines?.[0]
+    if (routine !== undefined) routine.executable = false
+    const outcome = validateBundle(edited)
+    expect(outcome.ok ? [] : outcome.problems).toContainEqual(expect.stringMatching(/does not hash to its own fingerprint/))
   })
 
   // A tenant filter on a column the account may not read turns every request

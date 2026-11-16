@@ -23,6 +23,8 @@
 -- cascades, through its deliveries, into their parcels. Neither key is
 -- granted UPDATE: a key is never set.
 --
+-- It may execute sales.ship_order, which the reader may not (0158).
+--
 -- The passwords are fixture constants for a container that lives for one
 -- test run; src/containers.ts holds the same values, and src/load.test.ts
 -- fails if the two drift apart.
@@ -40,4 +42,5 @@ grant select, insert on sales.delivery, sales.parcel to formancy_forms;
 grant update (carrier, shipped_at, row_version) on sales.delivery to formancy_forms;
 grant update (delivery_id, label) on sales.parcel to formancy_forms;
 grant delete on sales.delivery, sales.parcel to formancy_forms;
+grant execute on function sales.ship_order(bigint, integer) to formancy_forms;
 create role formancy_writer login password 'writer-fixture-password' in role formancy_forms;

@@ -13,7 +13,7 @@
 -- security policy shows the writer tenant 1 only. It may delete orders and
 -- their lines (0049), as on PostgreSQL, and holds a delivery's and a parcel's
 -- grants as postgres.restricted.sql does, less the delivery's rowversion
--- (0056).
+-- (0056). It may execute sales.ship_order, as on PostgreSQL (0158).
 create user formancy_reader for login formancy_reader;
 GO
 
@@ -33,6 +33,7 @@ grant select, insert on sales.parcel to formancy_forms;
 grant update (delivery_id, label) on sales.parcel to formancy_forms;
 grant delete on sales.parcel to formancy_forms;
 grant view definition to formancy_forms;
+grant execute on sales.ship_order to formancy_forms;
 create user formancy_writer for login formancy_writer;
 alter role formancy_forms add member formancy_writer;
 GO

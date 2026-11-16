@@ -15,6 +15,7 @@ import type {
   RowSecurity,
   TextLengthUnit,
 } from './metadata.js'
+import { checkedRoutines } from './routines.js'
 import { isServerProduct } from './server.js'
 import type { ServerFacts } from './server.js'
 
@@ -69,6 +70,7 @@ const ASPECTS: Readonly<Record<CoverageAspect, true>> = {
   comments: true,
   'row-security': true,
   'referenced-by': true,
+  routines: true,
 }
 
 /** Every `ReferentialAction`, listed for the same reason. */
@@ -406,7 +408,10 @@ function sortGaps(gaps: readonly CoverageGap[]): CoverageGap[] {
  *
  * The fingerprint is `@formancy/spec`'s canonical SHA-256 — the function
  * formancy hashes a form version with — over the kind, the account's user,
- * the objects and the gaps. Reused rather than rewritten, because canonical
+ * the objects and the gaps, and the routines when the scope asked for them
+ * (0158): absent, the hash is the one a snapshot taken before that record
+ * made, because a canonical hash of an object without a key is the hash it
+ * always was. Reused rather than rewritten, because canonical
  * JSON is exactly the kind of thing that is subtly different the second time
  * it is written. The login and the server version are carried and not hashed
  * (0027): a login mapped to the same user is the same principal, and a patch
@@ -430,10 +435,13 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
   for (const object of input.objects) assertRowSecurity(object, input.gaps)
   assertDeleteFacts(input.objects)
   assertAccount(input)
+  const routines = checkedRoutines(input)
 
   const objects = input.objects.map(sortObject).sort((a, b) => byCodepoint(a.ref.schema, b.ref.schema) || byCodepoint(a.ref.name, b.ref.name))
   const gaps = sortGaps(input.gaps)
-  const scope = { schemas: [...new Set(input.scope.schemas)].sort(byCodepoint) }
+  // Only when asked: a scope taken before 0158 has no such property.
+  const scope = { schemas: [...new Set(input.scope.schemas)].sort(byCodepoint), ...(routines === undefined ? {} : { routines: true as const }) }
+  const recorded = routines === undefined ? {} : { routines }
 
   const account = { user: input.account.user, login: input.account.login }
   // Only when present: a snapshot taken before 0068 has no such property.
@@ -447,7 +455,8 @@ export function createSnapshot(input: Omit<MetadataSnapshot, 'fingerprint'>): Me
     scope,
     objects,
     gaps,
-    fingerprint: schemaHash({ kind: input.kind, account: account.user, objects, gaps }),
+    ...recorded,
+    fingerprint: schemaHash({ kind: input.kind, account: account.user, objects, gaps, ...recorded }),
   }
 }
 

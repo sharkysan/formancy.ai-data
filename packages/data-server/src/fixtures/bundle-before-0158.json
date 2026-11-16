@@ -1,0 +1,390 @@
+{
+  "format": 2,
+  "connection": "erp",
+  "generation": {
+    "connection": "erp",
+    "root": {
+      "schema": "sales",
+      "name": "employee"
+    },
+    "formId": "employee",
+    "title": "Employee",
+    "lookups": [],
+    "pinned": []
+  },
+  "base": {
+    "specVersion": "5",
+    "id": "employee",
+    "title": "Employee",
+    "model": {
+      "fields": [
+        {
+          "key": "id",
+          "label": "Id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "tenant_id",
+          "label": "Tenant id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "name",
+          "label": "Name",
+          "type": "text",
+          "maxLength": 200,
+          "required": true
+        }
+      ]
+    },
+    "layouts": [
+      {
+        "name": "default",
+        "nodes": [
+          {
+            "kind": "section",
+            "label": "Employee",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "tenant_id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "name"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "presentation": {
+    "version": 1,
+    "fields": [],
+    "sections": []
+  },
+  "form": {
+    "specVersion": "5",
+    "id": "employee",
+    "title": "Employee",
+    "model": {
+      "fields": [
+        {
+          "key": "id",
+          "label": "Id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "tenant_id",
+          "label": "Tenant id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "name",
+          "label": "Name",
+          "type": "text",
+          "maxLength": 200,
+          "required": true
+        }
+      ]
+    },
+    "layouts": [
+      {
+        "name": "default",
+        "nodes": [
+          {
+            "kind": "section",
+            "label": "Employee",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "tenant_id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "name"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "bindings": {
+    "version": 2,
+    "root": {
+      "schema": "sales",
+      "name": "employee"
+    },
+    "rootKind": "table",
+    "identity": [
+      "id"
+    ],
+    "concurrency": {
+      "kind": "rowversion",
+      "column": "row_version",
+      "confirmed": true
+    },
+    "operations": {
+      "create": true,
+      "update": true,
+      "delete": true
+    },
+    "fields": [
+      {
+        "kind": "column",
+        "field": "id",
+        "column": "id",
+        "type": {
+          "kind": "integer",
+          "min": "-2147483648",
+          "max": "2147483647"
+        },
+        "nullable": false,
+        "writes": {
+          "create": true,
+          "update": true
+        }
+      },
+      {
+        "kind": "column",
+        "field": "tenant_id",
+        "column": "tenant_id",
+        "type": {
+          "kind": "integer",
+          "min": "-2147483648",
+          "max": "2147483647"
+        },
+        "nullable": false,
+        "writes": {
+          "create": true,
+          "update": true
+        }
+      },
+      {
+        "kind": "column",
+        "field": "name",
+        "column": "name",
+        "type": {
+          "kind": "text",
+          "maxLength": 200,
+          "lengthUnit": "utf16-code-units",
+          "fixedLength": false
+        },
+        "nullable": false,
+        "writes": {
+          "create": true,
+          "update": true
+        }
+      }
+    ],
+    "snapshotFingerprint": "4352314541a9b84b83d3311f61160b517d97e332ec5860b2cff7104e1d8a4392"
+  },
+  "policy": {
+    "version": 1,
+    "operations": {
+      "read": [
+        "clerk"
+      ],
+      "create": [
+        "clerk"
+      ],
+      "update": [
+        "clerk"
+      ]
+    },
+    "fields": {
+      "id": {
+        "read": [
+          "clerk"
+        ],
+        "write": [
+          "clerk"
+        ]
+      },
+      "name": {
+        "read": [
+          "clerk"
+        ],
+        "write": [
+          "clerk"
+        ]
+      },
+      "tenant_id": {
+        "read": [
+          "clerk"
+        ],
+        "write": []
+      }
+    },
+    "rowFilters": [
+      {
+        "column": "tenant_id",
+        "attribute": "tenant"
+      }
+    ],
+    "lookups": {}
+  },
+  "snapshot": {
+    "kind": "sqlserver",
+    "serverVersion": "16.0.4295.3",
+    "server": {
+      "product": "sqlserver",
+      "major": 16,
+      "compatibility": 160
+    },
+    "account": {
+      "user": "dbo",
+      "login": "sa"
+    },
+    "scope": {
+      "schemas": [
+        "sales"
+      ]
+    },
+    "objects": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "employee"
+        },
+        "kind": "table",
+        "comment": null,
+        "columns": [
+          {
+            "name": "id",
+            "ordinal": 1,
+            "databaseType": "integer",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "tenant_id",
+            "ordinal": 2,
+            "databaseType": "integer",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "name",
+            "ordinal": 3,
+            "databaseType": "text",
+            "type": {
+              "kind": "text",
+              "maxLength": 200,
+              "lengthUnit": "utf16-code-units",
+              "fixedLength": false
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "row_version",
+            "ordinal": 4,
+            "databaseType": "rowversion",
+            "type": {
+              "kind": "rowversion"
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "rowversion",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          }
+        ],
+        "primaryKey": {
+          "name": "pk_employee",
+          "columns": [
+            "id"
+          ]
+        },
+        "uniqueKeys": [],
+        "foreignKeys": [],
+        "checks": [],
+        "rowSecurity": "none",
+        "access": {
+          "delete": true
+        },
+        "referencedBy": []
+      }
+    ],
+    "gaps": [],
+    "fingerprint": "4352314541a9b84b83d3311f61160b517d97e332ec5860b2cff7104e1d8a4392"
+  }
+}

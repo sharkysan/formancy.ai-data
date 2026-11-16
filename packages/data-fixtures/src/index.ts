@@ -56,7 +56,7 @@ export {
 } from './containers.js'
 export { DEFAULT_IMAGES, imageMajor, IMAGES_VARIABLE, MATRIX_IMAGES, POSTGRES_IMAGE, selectedImage, selectedImages, SQLSERVER_IMAGE } from './images.js'
 export type { PostgresFixture, SqlServerFixture, SqlServerStart, StartedServer } from './containers.js'
-export { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
+export { restrictedDisagreements, routineDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
 export { defined } from './defined.js'
 export type { DefinedRecords, Undefined } from './defined.js'
 export { connectDocker } from './docker.js'
@@ -69,8 +69,19 @@ export { LIST_PARITY, LIST_ROWS } from './lists.js'
 export type { ListCase } from './lists.js'
 export { readFixture, splitBatches } from './load.js'
 export type { FixtureFile } from './load.js'
-export { FIXTURE_MODEL, FIXTURE_SCOPE } from './model.js'
-export type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedForeignKey, ExpectedObject, ExpectedType } from './model.js'
+export { FIXTURE_MODEL, FIXTURE_ROUTINES, FIXTURE_SCOPE, ROUTINE_SCOPE } from './model.js'
+export type {
+  ExpectedCheck,
+  ExpectedCheckFacts,
+  ExpectedColumn,
+  ExpectedColumnFacts,
+  ExpectedForeignKey,
+  ExpectedObject,
+  ExpectedRoutine,
+  ExpectedRoutineFacts,
+  ExpectedType,
+  FixtureAccount,
+} from './model.js'
 export { DISPLAY_PARITY, FILTER_PARITY, PARITY_SCOPE, REFUSAL_PARITY, TEMPORAL_PARITY } from './parity.js'
 export type { FilterParityCase, ParityFilterColumn, RefusalParityCase } from './parity.js'
 export { renamedColumn } from './rename.js'

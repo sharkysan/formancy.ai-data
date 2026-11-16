@@ -1,8 +1,18 @@
-import type { CheckMeta, ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, ObjectMeta, ObjectRef } from '@formancy/data-core'
-import { findObject, gapCovers } from '@formancy/data-core'
+import type { CheckMeta, ColumnMeta, CoverageGap, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta, ObjectRef, RoutineMeta } from '@formancy/data-core'
+import { describeRoutine, findObject, gapCovers } from '@formancy/data-core'
 import { checkListOf } from './check-lists.js'
-import type { ExpectedCheck, ExpectedCheckFacts, ExpectedColumn, ExpectedColumnFacts, ExpectedObject } from './model.js'
-import { FIXTURE_MODEL } from './model.js'
+import type {
+  ExpectedCheck,
+  ExpectedCheckFacts,
+  ExpectedColumn,
+  ExpectedColumnFacts,
+  ExpectedObject,
+  ExpectedRoutine,
+  ExpectedRoutineFacts,
+  ExpectedType,
+  FixtureAccount,
+} from './model.js'
+import { FIXTURE_MODEL, FIXTURE_ROUTINES } from './model.js'
 
 /**
  * How a snapshot differs from the model, as sentences, one per difference.
@@ -288,20 +298,23 @@ function referrerDisagreements(actual: ObjectMeta, model: readonly ExpectedObjec
   })
 }
 
+/** How a type differs from the model's, for a column and for a routine's parameter alike. */
+function typeDisagreements(actual: { type: NormalizedType; databaseType: string }, expected: ExpectedType, where: string): string[] {
+  // A different kind is one finding. Listing every property the other kind
+  // lacks would bury it under consequences.
+  if (actual.type.kind !== expected.kind)
+    return [`${where} type kind is ${JSON.stringify(actual.type.kind)}, expected ${JSON.stringify(expected.kind)} (database type ${actual.databaseType})`]
+  const type = actual.type as unknown as Record<string, unknown>
+  return Object.entries(expected)
+    .filter(([property, value]) => type[property] !== value)
+    .map(
+      ([property, value]) =>
+        `${where} type ${property} is ${JSON.stringify(type[property])}, expected ${JSON.stringify(value)} (database type ${actual.databaseType})`,
+    )
+}
+
 function columnDisagreements(actual: ColumnMeta, expected: ExpectedColumnFacts, where: string): string[] {
-  const out: string[] = []
-  if (expected.type !== undefined && actual.type.kind !== expected.type.kind) {
-    // A different kind is one finding. Listing every property the other kind
-    // lacks would bury it under consequences.
-    out.push(`${where} type kind is ${JSON.stringify(actual.type.kind)}, expected ${JSON.stringify(expected.type.kind)} (database type ${actual.databaseType})`)
-  } else if (expected.type !== undefined) {
-    const type = actual.type as unknown as Record<string, unknown>
-    for (const [property, value] of Object.entries(expected.type)) {
-      if (type[property] !== value) {
-        out.push(`${where} type ${property} is ${JSON.stringify(type[property])}, expected ${JSON.stringify(value)} (database type ${actual.databaseType})`)
-      }
-    }
-  }
+  const out: string[] = expected.type === undefined ? [] : typeDisagreements(actual, expected.type, where)
   if (expected.nullable !== undefined && actual.nullable !== expected.nullable)
     out.push(`${where} nullable is ${String(actual.nullable)}, expected ${String(expected.nullable)}`)
   if (expected.generated !== undefined && actual.generated !== expected.generated)
@@ -325,6 +338,71 @@ function listDisagreements(found: CheckMeta, expected: ExpectedCheckFacts['liste
   return JSON.stringify(actual) === JSON.stringify(wanted)
     ? []
     : [`${at} reads as ${said(actual)} from ${JSON.stringify(found.expression)}, expected ${said(wanted)}`]
+}
+
+/**
+ * How a snapshot's routines differ from the model's (0158), discovered as
+ * `account`, as sentences, one per difference.
+ *
+ * Every routine the model gives this engine is reported with the model's
+ * facts and whether this account may execute it -- or, for an account that
+ * is not the owner, is absent behind a `routines` gap that covers it: say
+ * the right thing or say you cannot tell (0004). Never missing with nothing
+ * said, which reads as a routine that does not exist. A routine the model
+ * does not have is one from nowhere, and a snapshot whose scope did not ask
+ * for routines says nothing about any. The owner sees every routine, so a
+ * `routines` gap on its snapshot is an adapter that failed to read what it
+ * could.
+ */
+export function routineDisagreements(
+  snapshot: MetadataSnapshot,
+  account: FixtureAccount = 'owner',
+  model: readonly ExpectedRoutine[] = FIXTURE_ROUTINES,
+): string[] {
+  const routines = snapshot.routines
+  if (routines === undefined) return ['the snapshot records no routines: its scope did not ask for them']
+  const expected = model.flatMap((entry) => {
+    const facts = entry.byKind[snapshot.kind]
+    return facts === undefined ? [] : [{ entry, facts, ref: { ...entry.ref, signature: facts.signature } }]
+  })
+  const named = (routine: RoutineMeta, ref: RoutineMeta['ref']) => same(routine.ref, ref) && routine.ref.signature === ref.signature
+  const out = routines
+    .filter((routine) => !expected.some(({ ref }) => named(routine, ref)))
+    .map((routine) => `${describeRoutine(routine.ref)} is reported and the model has no such routine`)
+  for (const { entry, facts, ref } of expected) {
+    const found = routines.find((routine) => named(routine, ref))
+    if (found !== undefined) out.push(...routineFacts(found, entry, facts, account))
+    else if (account === 'owner') out.push(`${describeRoutine(ref)} is missing`)
+    else if (!snapshot.gaps.some((gap) => gap.aspect === 'routines' && gapCovers(gap, entry.ref)))
+      out.push(`${describeRoutine(ref)} is missing, and no gap says the ${account} cannot see it`)
+  }
+  if (account === 'owner') {
+    for (const gap of snapshot.gaps) if (gap.aspect === 'routines') out.push(`unexpected gap on ${placeOf(gap)} (routines): ${gap.detail}`)
+  }
+  return out
+}
+
+function routineFacts(found: RoutineMeta, entry: ExpectedRoutine, facts: ExpectedRoutineFacts, account: FixtureAccount): string[] {
+  const where = describeRoutine(found.ref)
+  const out: string[] = []
+  const compare = (what: string, actual: unknown, wanted: unknown) => {
+    if (actual !== wanted) out.push(`${where} ${what} is ${JSON.stringify(actual)}, expected ${JSON.stringify(wanted)}`)
+  }
+  compare('kind', found.kind, facts.kind)
+  compare('reach', found.reach, facts.reach)
+  compare('effects', found.effects, entry.effects)
+  compare('returns', found.returns, entry.returns)
+  compare(`executable as the ${account}`, found.executable, entry.executable[account])
+  const names = found.parameters.map((parameter) => parameter.name)
+  if (names.join('\u0000') !== facts.names.join('\u0000')) out.push(`${where} parameters are [${names.join(', ')}], expected [${facts.names.join(', ')}]`)
+  entry.parameters.forEach((wanted, index) => {
+    const parameter = found.parameters[index]
+    if (parameter === undefined) return
+    const at = `${where} parameter ${parameter.name}`
+    compare(`parameter ${parameter.name} mode`, parameter.mode, wanted.mode)
+    out.push(...typeDisagreements(parameter, wanted.type, at))
+  })
+  return out
 }
 
 function resolve(column: ExpectedColumn, kind: MetadataSnapshot['kind']): ExpectedColumnFacts {

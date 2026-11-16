@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta, ObjectMeta } from '../metadata.js'
+import type { RoutineMeta } from '../routines.js'
 import { describedOf, diffRootDefinition } from './diff.js'
 import type { DescribedRoot } from './diff.js'
 import {
@@ -17,6 +18,7 @@ import {
   foreignKey,
   gap,
   INT32,
+  INT64,
   kinds,
   named,
   NO_FILTERS,
@@ -331,6 +333,50 @@ describe('diffSnapshots: access', () => {
       message: expect.stringMatching(/a server older than 0049 took it/),
     })
     expect(older.writable).toEqual({ create: true, update: true, delete: false })
+  })
+
+  // Routines are read only when a scope asks (0158), and nothing binds one
+  // yet. A snapshot taken with routines against a base taken without them
+  // holds what the base never looked for: a routine, and on SQL Server a
+  // routines gap for any account without VIEW DEFINITION on the schema. Said
+  // as "it could when the form was generated", every form re-discovered with
+  // routines would report an access problem nobody caused. So drift
+  // compares routines only between two snapshots that both record them: the
+  // gap is no change against a base without them, either way round, and one
+  // that appeared between two that record them is said, and stops nothing.
+  // `diffSnapshots` here also holds every drift suite to the first half
+  // (fixture.ts).
+  test('drift ignores routines unless both snapshots record them', () => {
+    const shipOrder: RoutineMeta = {
+      ref: { schema: 'sales', name: 'ship_order', signature: '' },
+      kind: 'procedure',
+      parameters: [{ name: '@order_id', mode: 'in', databaseType: 'bigint', typeId: '127:8:19:0', type: INT64 }],
+      effects: 'writes',
+      returns: 'void',
+      result: null,
+      reach: 'owner',
+      executable: true,
+    }
+    const hidden = gap(
+      { kind: 'schema', schema: 'sales' },
+      'routines',
+      'Without VIEW DEFINITION on schema sales, a routine this account holds nothing on is not listed.',
+    )
+    const recording = { routines: [shipOrder], gaps: [hidden] }
+    expect(drift(undefined, recording).changes).toEqual([])
+    expect(drift(undefined, {}, ORDER, snapshot(undefined, recording)).changes).toEqual([])
+    const narrowed = drift(undefined, recording, ORDER, snapshot(undefined, { routines: [shipOrder] }))
+    expect(only(narrowed)).toMatchObject({
+      kind: 'access-narrowed',
+      severity: 'info',
+      subject: { kind: 'schema', schema: 'sales' },
+      affects: [],
+      message: expect.stringMatching(/the routines of anything in schema sales.*nothing this form does rests on it/),
+    })
+    expect(narrowed.writable).toEqual({ create: true, update: true, delete: false })
+    // A routine that changed between two snapshots that both record it is
+    // nothing a form binds yet (0158): no change.
+    expect(drift(undefined, { routines: [{ ...shipOrder, executable: false }] }, ORDER, snapshot(undefined, { routines: [shipOrder] })).changes).toEqual([])
   })
 
   // A gap that disappeared means the connection sees more than it did when

@@ -34,6 +34,9 @@
 --   parcel        a foreign key onto delivery's uuid, so a lookup's key is
 --                 one (0056)
 --   customer_summary  a view
+--   ship_order    a routine an action may bind (0158): a function returning
+--                 void here, a procedure on SQL Server, the shape each
+--                 engine's writing action takes, with the same parameters
 --
 -- And one row-level security policy, on customer: the writer
 -- (postgres.restricted.sql) sees tenant 1 only. The container's owner is a
@@ -146,6 +149,16 @@ create view sales.customer_summary as
   from sales.customer c
   left join sales."order" o on o.tenant_id = c.tenant_id and o.customer_no = c.customer_no
   group by c.tenant_id, c.customer_no, c.name;
+
+-- It ships an order of a tenant, moving its version as every writer of order
+-- must. PostgreSQL grants EXECUTE on a function to PUBLIC by default, and
+-- SQL Server grants it to nobody: revoked here, so on both engines the owner
+-- may run it and the writer is granted it (postgres.restricted.sql), and the
+-- reader may not.
+create function sales.ship_order(order_id bigint, tenant integer) returns void
+  language sql
+  as $$ update sales."order" set status = 'shipped', row_version = row_version + 1 where id = order_id and tenant_id = tenant $$;
+revoke execute on function sales.ship_order(bigint, integer) from public;
 
 -- Values at the edges. src/values.ts names each one, so a codec test can ask
 -- for "the largest amount" rather than retyping the digits.

@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import type { ColumnMeta, DatabaseKind, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
+import type { ColumnMeta, CoverageGap, DatabaseKind, InboundKey, MetadataSnapshot, NormalizedType, ObjectMeta, RoutineMeta } from '@formancy/data-core'
 import { createSnapshot, findObject } from '@formancy/data-core'
 import { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
-import { restrictedDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
-import { FIXTURE_MODEL } from './model.js'
+import { restrictedDisagreements, routineDisagreements, snapshotDisagreements, structuralDisagreements } from './conformance.js'
+import { FIXTURE_MODEL, FIXTURE_ROUTINES } from './model.js'
+import type { FixtureAccount } from './model.js'
 
 /**
  * A check as each engine's catalog spells it (0152): a list as the captured
@@ -720,5 +721,146 @@ describe('restrictedDisagreements', () => {
       restrictedDisagreements(snapshot('sqlserver', orderOnly, [{ subject: { kind: 'scope' }, aspect: 'foreign-keys', detail: 'another aspect' }])),
     ).toHaveLength(2)
     expect(restrictedDisagreements(snapshot('postgres', () => {}, [], true))).toEqual(['sales.order says nothing about deleting; it was taken before 0049'])
+  })
+})
+
+/**
+ * The routines a perfect adapter would record of the fixture on `kind`, as
+ * `account` (0158), built from the model itself, so each test below breaks
+ * one thing and proves the comparator notices exactly that.
+ */
+function perfectRoutines(kind: DatabaseKind, account: FixtureAccount): RoutineMeta[] {
+  return FIXTURE_ROUTINES.flatMap((entry) => {
+    const facts = entry.byKind[kind]
+    if (facts === undefined) return []
+    return [
+      {
+        ref: { ...entry.ref, signature: facts.signature },
+        kind: facts.kind,
+        parameters: entry.parameters.map((parameter, index) => ({
+          name: facts.names[index] ?? '',
+          mode: parameter.mode,
+          databaseType: 'fixture',
+          typeId: String(index + 1),
+          type: parameter.type as unknown as NormalizedType,
+        })),
+        effects: entry.effects,
+        returns: entry.returns,
+        result: null,
+        reach: facts.reach,
+        executable: entry.executable[account],
+      },
+    ]
+  })
+}
+
+/** The perfect snapshot, discovered with routines as `account`, its routines `edit`ed. */
+function withRoutines(
+  kind: DatabaseKind,
+  account: FixtureAccount = 'owner',
+  edit: (routines: RoutineMeta[]) => void = () => {},
+  gaps: MetadataSnapshot['gaps'] = [],
+): MetadataSnapshot {
+  const { fingerprint: _fingerprint, ...made } = snapshot(kind, () => {}, gaps)
+  const routines = perfectRoutines(kind, account)
+  edit(routines)
+  return createSnapshot({ ...made, scope: { schemas: ['sales'], routines: true }, routines })
+}
+
+function routineNamed(routines: RoutineMeta[], name: string): RoutineMeta {
+  const found = routines.find((entry) => entry.ref.name === name)
+  if (found === undefined) throw new Error(`no routine ${name}`)
+  return found
+}
+
+describe('routineDisagreements', () => {
+  // The baseline, as the owner and as each restricted account with the
+  // EXECUTE the model gives it. And a snapshot whose scope never asked says
+  // nothing about routines, which is not "none" (0158).
+  test('a perfect snapshot has no disagreements, on either engine, as every account', () => {
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      for (const account of ['owner', 'reader', 'writer'] as const)
+        expect(routineDisagreements(withRoutines(kind, account), account), `${kind} ${account}`).toEqual([])
+    }
+    expect(routineDisagreements(snapshot('postgres'))).toEqual(['the snapshot records no routines: its scope did not ask for them'])
+  })
+
+  // One fixture written twice (0005): ship_order is a function returning
+  // void on PostgreSQL and a procedure on SQL Server, and SQL Server's
+  // security predicate is a routine PostgreSQL's file has no counterpart for.
+  // An adapter that said one engine's edition on the other is a disagreement.
+  test("holds each engine to its own edition of the fixture's routines", () => {
+    const procedure = withRoutines('postgres', 'owner', (routines) => {
+      Object.assign(routineNamed(routines, 'ship_order'), { kind: 'procedure', reach: 'owner' })
+      routines.push({ ...routineNamed(perfectRoutines('sqlserver', 'owner'), 'fn_customer_tenant'), parameters: [] })
+    })
+    expect(routineDisagreements(procedure)).toEqual([
+      'sales.fn_customer_tenant() is reported and the model has no such routine',
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) kind is "procedure", expected "function"',
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) reach is "owner", expected "account"',
+    ])
+    const unread = (routines: RoutineMeta[]) => routines.splice(routines.indexOf(routineNamed(routines, 'fn_customer_tenant')), 1)
+    expect(routineDisagreements(withRoutines('sqlserver', 'owner', unread))).toEqual(['sales.fn_customer_tenant() is missing'])
+  })
+
+  // Each fact a later record binds by: what the routine changes, what it
+  // returns, each parameter's name, mode and type in order, and whether the
+  // account may run it -- a writer that may not, or a reader that may, is
+  // an adapter that asked the wrong question.
+  test('notices each fact of a routine that differs from the model', () => {
+    const changed = withRoutines('sqlserver', 'writer', (routines) => {
+      const ship = routineNamed(routines, 'ship_order')
+      Object.assign(ship, {
+        effects: 'reads',
+        returns: 'scalar',
+        result: { databaseType: 'int', typeId: '56:4:10:0', type: { kind: 'integer', min: '0', max: '1' } },
+      })
+      const [order, tenant] = ship.parameters
+      if (order === undefined || tenant === undefined) throw new Error('ship_order has two parameters')
+      ship.parameters = [
+        { ...order, mode: 'inout' },
+        { ...tenant, name: '@tenant_id', type: { kind: 'text', maxLength: 10, lengthUnit: 'utf16-code-units', fixedLength: false } },
+      ]
+      routineNamed(routines, 'fn_customer_tenant').executable = true
+    })
+    expect(routineDisagreements(changed, 'writer')).toEqual([
+      'sales.ship_order() effects is "reads", expected "writes"',
+      'sales.ship_order() returns is "scalar", expected "void"',
+      'sales.ship_order() parameters are [@order_id, @tenant_id], expected [@order_id, @tenant]',
+      'sales.ship_order() parameter @order_id mode is "inout", expected "in"',
+      'sales.ship_order() parameter @tenant_id type kind is "text", expected "integer" (database type fixture)',
+      'sales.fn_customer_tenant() executable as the writer is true, expected false',
+    ])
+    const narrowed = withRoutines('postgres', 'reader', (routines) => {
+      const [order] = routineNamed(routines, 'ship_order').parameters
+      if (order !== undefined) order.type = { kind: 'integer', min: '-2147483648', max: '2147483647' }
+      routineNamed(routines, 'ship_order').executable = true
+    })
+    expect(routineDisagreements(narrowed, 'reader')).toEqual([
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) executable as the reader is true, expected false',
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) parameter order_id type min is "-2147483648", expected "-9223372036854775808" (database type fixture)',
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) parameter order_id type max is "2147483647", expected "9223372036854775807" (database type fixture)',
+    ])
+  })
+
+  // Say the right thing or say you cannot tell (0004): SQL Server lists no
+  // routine its reader holds nothing on, so absent is right only behind a
+  // routines gap that covers it; absent with nothing said reads as a
+  // routine that does not exist. The owner sees everything, so a gap on its
+  // snapshot, or a routine missing from it, is an adapter that did not read
+  // what it could.
+  test('a routine missing with no gap is a disagreement, and behind a routines gap only for an account that is not the owner', () => {
+    const none = (routines: RoutineMeta[]) => routines.splice(0, routines.length)
+    expect(routineDisagreements(withRoutines('sqlserver', 'reader', none), 'reader')).toEqual([
+      'sales.ship_order() is missing, and no gap says the reader cannot see it',
+      'sales.fn_customer_tenant() is missing, and no gap says the reader cannot see it',
+    ])
+    const hidden: CoverageGap = { subject: { kind: 'schema', schema: 'sales' }, aspect: 'routines', detail: 'no VIEW DEFINITION on sales' }
+    expect(routineDisagreements(withRoutines('sqlserver', 'reader', none, [hidden]), 'reader')).toEqual([])
+    const elsewhere: CoverageGap = { ...hidden, aspect: 'objects' }
+    expect(routineDisagreements(withRoutines('sqlserver', 'reader', none, [elsewhere]), 'reader')).toHaveLength(2)
+    expect(routineDisagreements(withRoutines('sqlserver', 'owner', () => {}, [hidden]))).toEqual([
+      'unexpected gap on schema sales (routines): no VIEW DEFINITION on sales',
+    ])
   })
 })

@@ -1,4 +1,15 @@
-import type { DatabaseKind, Generation, NormalizedTypeKind, ObjectRef, ReferentialAction, RowSecurity, TextLengthUnit } from '@formancy/data-core'
+import type {
+  DatabaseKind,
+  DiscoveryScope,
+  Generation,
+  NormalizedTypeKind,
+  ObjectRef,
+  ParameterMode,
+  ReferentialAction,
+  RoutineMeta,
+  RowSecurity,
+  TextLengthUnit,
+} from '@formancy/data-core'
 
 /**
  * A type, as far as the model cares about it: the kind, and whichever of that
@@ -413,3 +424,70 @@ export const FIXTURE_MODEL: readonly ExpectedObject[] = deepFreeze([
 
 /** The scope the fixture lives in. */
 export const FIXTURE_SCOPE = { schemas: ['sales'] }
+
+/** The same scope, asking for its routines too (0158). */
+export const ROUTINE_SCOPE: DiscoveryScope = { schemas: ['sales'], routines: true }
+
+/** The accounts the fixture creates: its owner, and the two of the restricted files. */
+export type FixtureAccount = 'owner' | 'reader' | 'writer'
+
+/** What one engine says of a routine that the other does not. */
+export interface ExpectedRoutineFacts {
+  kind: RoutineMeta['kind']
+  signature: string
+  reach: RoutineMeta['reach']
+  /** Each parameter's name, in order, as the engine spells it: SQL Server's with its `@`. */
+  names: readonly string[]
+}
+
+export interface ExpectedRoutine {
+  ref: ObjectRef
+  /** In order, as both engines declare them. */
+  parameters: ReadonlyArray<{ type: ExpectedType; mode: ParameterMode }>
+  effects: RoutineMeta['effects']
+  returns: RoutineMeta['returns']
+  /** Whether each account the fixture creates may execute it: the owner may execute every routine, and the restricted files grant the rest. */
+  executable: Readonly<Record<FixtureAccount, boolean>>
+  /**
+   * What each engine says, and so on which engines the routine exists: one
+   * left out is a routine that engine's file does not create, written down
+   * rather than smoothed over.
+   */
+  byKind: Partial<Record<DatabaseKind, ExpectedRoutineFacts>>
+}
+
+/**
+ * What discovery of the fixture's routines must report, on either engine
+ * (0158). `ship_order` is the routine written twice: a function returning
+ * void on PostgreSQL and a procedure on SQL Server, the shape each engine's
+ * writing action takes, typed alike, executable by the owner and the
+ * writer and not by the reader. `fn_customer_tenant` is the predicate of
+ * SQL Server's security policy on customer, an inline table-valued function
+ * PostgreSQL's policy, an expression, has no counterpart for: a routine no
+ * action could bind, recorded all the same. Every SQL Server routine may act
+ * beyond its caller's grants, by ownership chaining.
+ */
+export const FIXTURE_ROUTINES: readonly ExpectedRoutine[] = deepFreeze([
+  {
+    ref: sales('ship_order'),
+    parameters: [
+      { type: INT64, mode: 'in' },
+      { type: INT32, mode: 'in' },
+    ],
+    effects: 'writes',
+    returns: 'void',
+    executable: { owner: true, reader: false, writer: true },
+    byKind: {
+      postgres: { kind: 'function', signature: 'pg_catalog.int8, pg_catalog.int4', reach: 'account', names: ['order_id', 'tenant'] },
+      sqlserver: { kind: 'procedure', signature: '', reach: 'owner', names: ['@order_id', '@tenant'] },
+    },
+  },
+  {
+    ref: sales('fn_customer_tenant'),
+    parameters: [{ type: INT32, mode: 'in' }],
+    effects: 'reads',
+    returns: 'set',
+    executable: { owner: true, reader: false, writer: false },
+    byKind: { sqlserver: { kind: 'function', signature: '', reach: 'owner', names: ['@tenant_id'] } },
+  },
+])

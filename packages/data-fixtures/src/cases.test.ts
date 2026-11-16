@@ -102,6 +102,7 @@ const FAMILIES: Readonly<Record<string, readonly string[]>> = {
   FIXTURE_MODEL: [MODEL_CASES.owner, MODEL_CASES.structure, MODEL_CASES.restricted, MODEL_CASES.described],
   READER_ACCESS: [MODEL_CASES.readerAccess],
   WRITER_ACCESS: [MODEL_CASES.writerAccess],
+  FIXTURE_ROUTINES: [MODEL_CASES.routines, MODEL_CASES.routineAccess],
 }
 
 /** Exports that are not shared expectations, each with why. */
@@ -117,6 +118,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   VERSION_FACTS: 'what the versions of one engine disagree on, each asserted on every leg by the test it names (0067)',
   FIXTURE_SCOPE: 'a discovery scope',
   PARITY_SCOPE: 'a discovery scope',
+  ROUTINE_SCOPE: 'a discovery scope',
   MODEL_CASES: 'the ids themselves',
   UPDATE_RECREATED_CASE: "the id of UPDATE_RECREATED's case",
   SIZED_CUSTOMERS: "what the sized table is generated from (0034); what a lookup on it reads is sizedRowsRead()'s, a function",

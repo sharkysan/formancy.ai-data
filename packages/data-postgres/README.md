@@ -26,6 +26,11 @@ snapshot.objects // tables and views, with columns, keys, foreign keys, checks, 
 snapshot.gaps // what this release could not describe: a foreign table
 snapshot.fingerprint // changes when the structure, the account's privileges, or the account changes
 
+// Asked for, the functions and procedures in scope too, an extension's left out (0158):
+const withRoutines = await adapter.discover({ schemas: ['sales'], routines: true })
+withRoutines.routines // each with its parameters by type oid, what it returns and changes,
+//                       whether it is SECURITY DEFINER, and whether the account may execute it
+
 // Lookups on a client of their own, which no record statement uses (0061, below).
 const lookupSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data lookups' })
 const lookups = createPostgresLookups(lookupSql) // LookupAdapter: search, resolve, rejects, each with the caller's signal

@@ -24,7 +24,7 @@
       "none": "Its user-facing cost, that what is tested is the images of each engine's matrix and no other, is the report's tested-on section, derived from each run, and 0067's, 0073's and 0074's limitations."
     },
     "0004": {
-      "reviewed": "sha256:ca98cd0ed9328133061f0515d273f1173a03c6742880ed018581a29a6ba28a7d",
+      "reviewed": "sha256:94a7235f8bce87b3d84282fe407f5f6e1149820e07fa63b4961979cc12ce4f3b",
       "limitations": [
         {
           "area": "databases",
@@ -33,11 +33,11 @@
       ]
     },
     "0005": {
-      "reviewed": "sha256:60a6548cc03559335f4b7cf23ca9c93a1081da2e147dbc4f725fdad273432ffd",
+      "reviewed": "sha256:80f605dcbd7a07a6387ccf7b3a2ed1e58208c6750ae306a49b04d05363179569",
       "none": "Its costs -- every change to the business model made in three places, two of them in different SQL dialects, and a minute to start both servers -- fall on contributors."
     },
     "0006": {
-      "reviewed": "sha256:c775617ada36bd72678ad88d87892c6d61815d37c3a7bcaee905b29ce09ef55a",
+      "reviewed": "sha256:da44a67ff650d445be006c34f82d92bed7d9164310e1216bff0fbd29621591c6",
       "limitations": [
         {
           "area": "databases",
@@ -62,7 +62,7 @@
       ]
     },
     "0007": {
-      "reviewed": "sha256:1cefb4b99b1a515a0d5d42c108c21aab17749bd680d12a3a6084ecbe5b3ccd83",
+      "reviewed": "sha256:addeafb1a2a5d0c8619a4dbba66b684b3cc046518eebb8fe2fbf9c6227d6526a",
       "limitations": [
         {
           "area": "forms",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:a6dec00c7585d2251aba428aec0b8b3c2a575e6b4d2c90acce6e99ea45c1291b",
+      "reviewed": "sha256:3b51ba77a3ad25c13037284146ddcfd76a517507bad514df3709cf7a5ad141c9",
       "limitations": [
         {
           "area": "forms",
@@ -506,7 +506,7 @@
       ]
     },
     "0027": {
-      "reviewed": "sha256:259cdc0ca18272f01f5fbb34a400e786ff9d7eff73def0483178bf9289e7cdf3",
+      "reviewed": "sha256:bed2e99a6f41171f9162fdd38ecb79669196e7b4d5735fb2bd9f846865cd868d",
       "limitations": [
         {
           "area": "databases",
@@ -4575,6 +4575,51 @@
         {
           "area": "testing",
           "says": "What THROW and RAISERROR carry is measured on SQL Server 2022 (16.0.4295.3) alone, and the adapters' suites for this change were run on each engine’s default image alone."
+        }
+      ]
+    },
+    "0158": {
+      "reviewed": "sha256:ccac2cdda36ff567f994318441c6ef9c98d70040b84a39a3b03ccf8bb3db8a83",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "Routines are read only when a discovery’s scope asks for them, and nothing in the server asks yet, so no snapshot it takes records one and nothing binds, runs or shows a routine."
+        },
+        {
+          "area": "databases",
+          "says": "A snapshot taken without routines says nothing about any; only a new discovery that asks for them records them.",
+          "heldBy": "packages/data-core/src/routines.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0158 refuses every snapshot that records routines, and every form published from one, on every read, until it is upgraded again or the form is published from a discovery that did not ask."
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server account without VIEW DEFINITION on a schema in scope cannot establish that it sees every routine in it, and a snapshot that asks for routines carries a `routines` gap on that schema.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "PostgreSQL keeps no length, precision or scale for a routine’s parameter, so a varchar(20) parameter is recorded as unbounded and a char(n) one as unsupported.",
+          "heldBy": "packages/data-postgres/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "Every SQL Server routine is recorded as reaching past its caller’s grants, by ownership chaining, whether or not it says EXECUTE AS.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server CLR routine is not read, and no gap says one is in scope."
+        },
+        {
+          "area": "databases",
+          "says": "Whether a STABLE PostgreSQL function can write through a VOLATILE one it calls is not checked, though it is recorded as one that reads."
+        },
+        {
+          "area": "testing",
+          "says": "The discovery suites for routines were run on each engine’s default image alone for this change; the other images of the matrix are CI’s."
         }
       ]
     }
