@@ -946,8 +946,10 @@ studio send none yet.
    person's menu through that field, every bundle read as the menu reads
    them (400); and every part's operation under its own form's policy --
    the record's create or update alone, each child's writes in a save --
-   before anything is read (403, at the part). The rest runs once per
-   sending of the write id.
+   before anything is read (403, at the part), then a new record a together
+   child requires rows of from a person the menu offers no create of it
+   (403 at the record, naming no child). The rest runs once per sending of
+   the write id.
 1. Before the transaction the record is read (`readForWrite`), or under a
    new one its table described, and the children that require rows of a
    new record found among every served form (`rowsRequired`); over a saved
@@ -994,10 +996,10 @@ studio send none yet.
    `ref`; or the refusal at the part the step is, in a write alone's
    words for that step's form, a stale step in the save's; or 502
    `unknown-outcome` naming the record and the version sent. The plan's
-   refusals come before any statement, every part's field errors at once,
-   and the membership checks between the plan and the transaction, each
-   at its part. The audit writes one event, `save`, with the row changes'
-   count.
+   refusals come before anything is written, every part's field errors
+   at once, and the membership checks between the plan and the
+   transaction, each at its part. The audit writes one event, `save`,
+   with the row changes' count.
 
 Held by the shared cases in `packages/data-fixtures/src/saves.ts`, which
 each adapter's `save.integration.test.ts` and

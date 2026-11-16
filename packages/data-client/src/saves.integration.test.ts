@@ -102,7 +102,7 @@ describe.each(ENGINES)('a record saved with its rows on $engine', ({ connection 
     expect(await client.reconcile(orders, lost)).toMatchObject({ ok: true, state: 'changed', current: { record, version: changed.record.version } })
   })
 
-  // Past its bound the save is refused before any statement, with the
+  // Past its bound the save is refused before anything is written, with the
   // count, and nothing is stored; the order is never created alone, and a
   // line is never created alone either. Watched failing on the same images
   // with the create route not asking which children require rows: the

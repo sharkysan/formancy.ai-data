@@ -116,14 +116,15 @@ export function requiredOf(
 
 /**
  * Whether `GET /v1/forms/:id` may offer `create` of `parent` to this
- * person, as far as together children are concerned (0155): where none
- * requires rows of its records, as before; otherwise exactly where the
- * menu offers it -- the person can make the save that creates such a
- * record with its rows -- read from the menu's own answer, so the two
- * cannot disagree. A form the menu does not name, which this person may not
- * read, and a store that cannot list its forms offer none: the create
- * route would refuse a plain create of such a record, and the save would
- * find no child to make it with.
+ * person, and the save route take a save that creates one, as far as
+ * together children are concerned (0155): where none requires rows of its
+ * records, as before; otherwise exactly where the menu offers it -- the
+ * person can make the save that creates such a record with its rows --
+ * read from the menu's own answer, so the three cannot disagree. A form
+ * the menu does not name, which this person may not read, and a store that
+ * cannot list its forms offer none: the create route would refuse a plain
+ * create of such a record, and the save route refuses a save that creates
+ * one rather than answer a bound naming a child the person may not read.
  */
 export function createOffered(id: string, parent: PublishedTable, served: readonly ServedForm[] | null): boolean {
   const required = requiredOf(parent, served)
@@ -140,7 +141,10 @@ export function createOffered(id: string, parent: PublishedTable, served: readon
  * offers as published, and the children a page may show under one of its
  * records -- a together child with what this person may do with its rows
  * in a save (0155) -- and nothing about any other form, so the answer is
- * the same to the byte whatever else is published.
+ * the same to the byte whatever else is published, but for one thing: a
+ * form's `create` is left out where a together child requires rows of its
+ * records and this person could not make that save, read whether or not
+ * they may read the child (0155).
  *
  * Every request reads and validates every published form's newest version,
  * and asks the policy of each (0019, 0022): nothing is cached. It asks no

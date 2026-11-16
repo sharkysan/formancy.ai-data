@@ -243,8 +243,9 @@ get*](../../README.md#what-you-get) is the short version, and
   `save` sends, takes the record -- a create, or an update that may change
   nothing -- and the child's creates, updates and deletes, and stores them
   all in one transaction or none, on both engines; a save past the bound,
-  a stale record or row, a refused row, a slow lock are each one refusal
-  naming the part it is about, every part's field errors at once. The
+  a stale record or row and a refused row are each one refusal naming the
+  part it is about, every part's field errors at once, and a save that
+  waits too long for a lock one refusal of the whole save. The
   record's version moves on every save, so two people saving lines of one
   order at once are one saved and one stale, and a save sent again after
   a lost answer is stored at most once. Such a child's rows are never

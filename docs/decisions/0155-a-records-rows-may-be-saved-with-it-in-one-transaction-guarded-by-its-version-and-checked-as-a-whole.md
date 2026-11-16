@@ -206,8 +206,8 @@
   The route: `packages/data-server/src/routes/runtime-save.test.ts`, over
   fake ports -- a new order and its lines sent as one request with the
   configured deadline and answered by ref (with the default deadline
-  sent); fewer rows than the record must hold refused before any
-  statement, the child left out included (with the required children not
+  sent); fewer rows than the record must hold refused before anything is
+  written, the child left out included (with the required children not
   handed to the planner); over a saved order one read, one list of `max +
   1`, the touch, and each change answered in the order sent (with changes
   matched by position); a row its record does not hold 404 at the row
@@ -215,21 +215,32 @@
   400 with nothing read (with a duplicate ref let through); rule 2, a plain
   child, another field and no form 400 (with the child's `together` not
   asked); rule 3, a policy refusal at its part before any read (with the
-  children's operations left to the planner); rule 4, the field that names
-  the record over-posting on a create and when moved, dropped when echoed
-  (with every row read as behind its version); rule 5, one adapter call
-  per write id and another body with it 400 (with `sendOnce` given no id);
+  children's operations left to the planner); a new order from intake,
+  who may create orders and never sees a line, 403 before any read and
+  naming no child (with the check taken out: 422 `too-few-rows` naming
+  the line form, after a describe); rule 4, the field that names the
+  record over-posting on a create and when moved, dropped when echoed
+  (with a new row's answer for it let through, with another value on an
+  update dropped rather than refused, and with every row read as behind
+  its version -- each saved, 200; with the field passed to the update as
+  sent it still passes, the update's own check refusing it); rule 5,
+  one adapter call per write id and another body with it 400 (with
+  `sendOnce` given no id);
   every part's field errors at once (with the parts left out); a
   membership refusal at its row (with the checks unasked); the
   transaction's refusals at their steps -- stale, a unique key, a count, a
   refused `within`, the deadline (with the part left off); a lost answer
   502 naming the record and the version sent (with the version left out);
   the audit one event, a rows count and no value (with `rows` read for
-  exports alone); a together child's create or delete alone 403 (with the
-  planners asking `offers()`); a plain create of a record whose rows are
-  required 403 before any statement (with the create route not asking
-  `rowsRequired`); and the form route's create as the menu's (with
-  `grantedOperations` asked alone). `packages/data-server/src/save-deadline.test.ts`
+  exports alone); a together child's create or delete alone 403, nothing
+  written after the table is described (with the planners asking
+  `offers()`); a plain create of a record whose rows are required 403
+  before any statement (with the create route not asking
+  `rowsRequired`); the form route's create as the menu's (with
+  `grantedOperations` asked alone); and a store that cannot list its
+  forms refusing every plain create and every save 503 with nothing
+  asked, and offering no create (with each null branch read as no child
+  required, one at a time). `packages/data-server/src/save-deadline.test.ts`
   -- the setting's digits only (with any `Number` taken), the start-up
   check only beside SQL Server (with it asked of every allowlist), and the
   server's option held to the same rule (with it unchecked);
@@ -345,7 +356,8 @@ finds such a child among every served bundle, whoever asks, and the
 create route refuses one 403 `operation-unavailable` before any
 statement, in words that name no child; the menu leaves the create out
 where the person could not make the save (`formMenu`), and
-`GET /v1/forms/:id` offers it exactly where the menu does.
+`GET /v1/forms/:id` offers it, and the save route takes a save that
+creates such a record, exactly where the menu does (`createOffered`).
 
 **data-core plans the save, and both adapters run it.** `planSave`
 (`packages/data-core/src/records/save.ts`, one child's steps in
@@ -438,13 +450,18 @@ child a together child of this form in the person's menu through that
 field (400, naming the form and the field sent); every part's operation
 -- the record's create or update alone, each child's create, update or
 delete in the save (`offeredFor`) -- under its own form's policy, before
-anything is read (403, at the part); then the reads -- the record by
+anything is read (403, at the part); then, before anything is read too, a
+new record a together child requires rows of from a person who could not
+make that save, where the menu offers them no create of it
+(`createOffered`), 403 `operation-unavailable` at the record in words that
+name no child, which the planner's bound would name to somebody who may
+not read it (0045); then the reads -- the record by
 `readForWrite`, or its table described; each changed child's rows by
 `planSaveList`, or its table described -- each row's echoes removed
 against its row as listed (0022, 0098), and `planSave` with the
 configured deadline, whose refusals are answered at their parts: every
 part's field errors at once (422 `parts`), a row the list does not hold
-404, a bound broken before any statement 422 with `rows`, and the field
+404, a bound broken before anything is written 422 with `rows`, and the field
 that names the record over-posting where a row sends another value; each
 selection's membership check, by the function a write alone asks, at its
 part; and one call to `RecordAdapter.save`, once per write id
@@ -527,12 +544,20 @@ What it costs, and what it does not do:
 - **A record whose rows are required is not created alone**: the menu
   and the form route leave its create out where the person could not make
   the save, and the create route refuses one whoever asks. So every plain
-  create of every form reads every published form from the store first,
-  as the menu does, and a store that cannot list them refuses the create,
-  503, as nothing can tell; what that read costs a create was not
-  measured. A refused create says only that the record is created with
-  its rows, never which child requires them, since the person may read
-  none.
+  create of every form, and every save, reads and validates every
+  published form from the store first, as the menu does, and a store that
+  cannot list them refuses the create and the save, 503, as nothing can
+  tell, and offers no create. Measured once, on 2026-11-16, in-process
+  through `inject` on a 20-thread i9-10900K under Node 24.21.0, with a
+  file store on local disk, format-2 order forms over the examples'
+  captured PostgreSQL snapshot, a version of 28,236 bytes, and ports that
+  answer at once, the median of 101 creates after 20: a plain create took
+  5.3 ms with one form published, 24 ms with ten and 203 ms with a
+  hundred, and the menu over the same store 2.9, 21 and 202 ms -- about
+  2 ms a published form, the menu's own cost (0045), paid by every create
+  whether or not any together child is published. A refused create says
+  only that the record is created with its rows, never which child
+  requires them, since the person may read none.
 - **A key the database fills by a default that can repeat**, one
   `numbersKey` does not count, cannot be known before the rows'
   statements: such a record is created with no rows saved with it, and
@@ -607,12 +632,28 @@ What it costs, and what it does not do:
   nothing but a timer's longest. The timeout is mssql's default, named in
   `save-deadline.ts` because nothing here sets it, not measured.
 - **A save's answer is kept for a resend as any write's is**, under
-  `MAX_KEPT_BYTES`, and is larger than one record's: how much larger, and
-  how many saves the cap holds, was not measured.
+  `MAX_KEPT_BYTES`, 32 MiB, and `MAX_KEPT`, 10,000 answers, and is larger
+  than one record's. Measured once, on 2026-11-16, through the real server
+  and driver on the default images, postgres:17-alpine and
+  mcr.microsoft.com/mssql/server:2022-latest, saving the fixture's order
+  with its lines, the line form's `max` at `TOGETHER_MAX_ROWS`, 49, and
+  counting the answer as `write-once.ts` does: the order's create alone
+  answered 213 bytes on PostgreSQL and 258 on SQL Server; a save of the
+  order with one line 428 and 518; with 49 lines created 7,508 and 9,758,
+  and with 49 lines changed 6,929 and 9,179 -- about 148 and 193 bytes a
+  line, SQL Server's with the fixture's order numbers near 2^53 and a
+  rowversion in every token and version. So the byte cap holds about
+  4,400 and 3,400 saves of 49 lines, and a save of more than about 21
+  lines on PostgreSQL's fixture, 16 on SQL Server's, fills the byte cap
+  before the count; a record with several together children, or rows
+  with wider values, keeps fewer, and an answer dropped before its ten
+  minutes leaves its resend applied again (0031).
 - **A save names its children by what the menu says**: a child this
   person's menu does not show under the record -- one they may not list, or
   whose field they may not read -- is 400, so a person who may create the
-  record and not read its required rows cannot create it at all.
+  record and not read its required rows cannot create it at all: a save
+  that creates it is refused 403 before anything is read, naming no child,
+  as the plain create is.
 - **Built in part.** The plan, both adapters' save, the generator's and
   the bundle check's part, the route and the client are built; the host
   page and the studio do not offer a save yet, so a together child is

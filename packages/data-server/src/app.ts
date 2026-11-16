@@ -104,7 +104,9 @@ export interface DataServerOptions {
    * `DEFAULT_SAVE_DEADLINE_MS`, measured; the runnable server reads
    * `FORMANCY_DATA_SAVE_DEADLINE_MS` for it, and refuses to start where a
    * SQL Server connection is allowed and twice it is not below mssql's
-   * request timeout (`saveDeadlineFit`).
+   * request timeout (`saveDeadlineFit`). That fit is the runnable server's
+   * check alone: here only the whole number is, so an embedder whose
+   * registry has a SQL Server connection holds its deadline to it.
    */
   runtime?: {
     registry: ConnectionRegistry

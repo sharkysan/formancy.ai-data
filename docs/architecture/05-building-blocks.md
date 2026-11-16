@@ -275,7 +275,7 @@ The routes, one plane per file prefix:
 | `routes/runtime-exports.ts` | runtime | a file of every page, made whole or refused, one export per connection at a time, its labels through `lookupScope` (0079) |
 | `routes/runtime-deletes.ts` | runtime | a delete (0050) |
 | `routes/runtime-supersede.ts` | runtime | a change from a date, read and decided as an update is ([0113](../decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)) |
-| `routes/runtime-save.ts`, `routes/save-body.ts`, `routes/save-answers.ts` | runtime | a record with its together children's rows, in one transaction, once per sending of its write id: the body's shape, each child the menu's, every part's policy before any read, the reads and `planSave`, the membership checks, one call of `RecordAdapter.save`, and its answer or refusal at the part it names (0155) |
+| `routes/runtime-save.ts`, `routes/save-body.ts`, `routes/save-answers.ts` | runtime | a record with its together children's rows, in one transaction, once per sending of its write id: the body's shape, each child the menu's, every part's policy and a new record's create as the menu offers it before any read, the reads and `planSave`, the membership checks, one call of `RecordAdapter.save`, and its answer or refusal at the part it names (0155) |
 | `routes/runtime-lookups.ts`, `routes/abandoned.ts` | runtime | a lookup's query and resolve, stopped in the database when the browser leaves or the deadline passes (0061); `lookupScope`, the one place a lookup's filter is decided, which an export asks too |
 | `routes/write-once.ts`, `routes/runtime-errors.ts` | runtime | a write applied once per sending (0031); a refusal as an HTTP answer that names a rule, never a value (0011) |
 

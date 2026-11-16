@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:d70e6789f019ed83294ac4f856f9fd68c565d3fc040805d011fe6fd7566aadf5",
+      "reviewed": "sha256:7aba7758bd032c3876c631411a9e6612f17b87eafb6245e8ebb3bad298db6d4d",
       "limitations": [
         {
           "area": "writes",
@@ -4524,12 +4524,12 @@
         },
         {
           "area": "writes",
-          "says": "Every plain create reads every published form from the store first, to find a child that requires rows of the record, and is refused 503 when the store cannot list them; what that read costs a create was not measured.",
+          "says": "Every plain create and every save reads and validates every published form from the store first, to find a child that requires rows of the record, and is refused 503 when the store cannot list them: about 2 ms a published form, measured once in-process on one workstation, so a create takes about 200 ms more with a hundred forms published, whether or not any of them is a together child.",
           "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
         },
         {
           "area": "forms",
-          "says": "A save names only the children the person's menu shows under the record, so a person who may create a record but may not list the form of the rows it requires, or read the field that names the record, cannot create it at all.",
+          "says": "A save names only the children the person's menu shows under the record, so a person who may create a record but may not list the form of the rows it requires, or read the field that names the record, cannot create it at all: a save that creates it is refused 403 before anything is read, as the plain create is.",
           "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
         },
         {
@@ -4554,7 +4554,7 @@
         },
         {
           "area": "server",
-          "says": "A save's answer is kept for a resend under the same byte cap as any write's, and is larger than one record's: how much larger, and how many saves the cap holds, was not measured."
+          "says": "A save's answer is kept for a resend under the same byte cap as any write's, 32 MiB: measured once on the fixture's order, a save of 49 lines answered 7,508 bytes on PostgreSQL and 9,758 on SQL Server, about 148 and 193 a line, so the cap holds about 4,400 and 3,400 such saves, fewer with several together children or wider rows, and a resend whose answer was dropped first is applied again."
         }
       ]
     },

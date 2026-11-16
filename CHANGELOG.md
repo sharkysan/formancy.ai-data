@@ -43,21 +43,31 @@ the same day (formancy.ai 0232).
   child carries its `together` flags, absent for every other child, and
   `PublishedForm` gains the required `together`, so a client checking the
   form's shape, this one included, takes no reply from a server before
-  this. Two writes are now refused 403 `operation-unavailable` before any
-  statement: a plain create of a record a together child requires rows of
-  -- it is created with them, in a save -- and a together child's create
-  or delete alone; the menu and the form route leave those creates out
-  where the person could not make the save. Every plain create now reads
-  every published form from the store first, as the menu does, and is
-  refused 503 when the store cannot list them. What operators notice:
+  this. A plain create of a record a together child requires rows of is
+  now refused 403 `operation-unavailable` before any statement -- it is
+  created with them, in a save -- and so is a save that creates one from a
+  person who could not make it, in words that name no child; the menu and
+  the form route leave those creates out where the person could not make
+  the save. A together child's create or delete alone is refused 403
+  `operation-unavailable` too, with nothing written, after its table is
+  described. Every plain create and every save now reads every published
+  form from the store first, as the menu does -- about 2 ms a published
+  form, measured once in-process, so 200 ms more with a hundred -- and is
+  refused 503 when the store cannot list them; the form route then offers
+  no create. What operators notice:
   `FORMANCY_DATA_SAVE_DEADLINE_MS`, how long a save may wait for a lock
   and after which none of its steps starts, `DEFAULT_SAVE_DEADLINE_MS`
   unset; the server refuses to start where a SQL Server
   connection is allowed and twice the deadline is not below mssql's
   15 s request timeout, since past it a save that may commit would be
   unknown where the deadline rolls it back. A save is one audit event,
-  `save`, counting its row changes and naming none. The host page and the
-  studio offer no save yet.
+  `save`, counting its row changes and naming none. Behind Cloudflare
+  ([0037](docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)),
+  the runtime door's pattern, generated from the server's router, now
+  forwards the save, and so does the live demo's Worker; a tunnel keeps the
+  configuration it was given until `tunnel-config` writes it again, as the
+  guide's section 8 says, and until then the door does not forward a save,
+  which fails closed. The host page and the studio offer no save yet.
 
 - **A snapshot records the routines in scope, when its scope asks for
   them** (0158). Why: administrator-named actions will run routines the

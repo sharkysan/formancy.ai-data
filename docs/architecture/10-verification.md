@@ -187,10 +187,12 @@ by `packages/data-core/src/records/save.test.ts`, `together.test.ts` and
 `menu.test.ts`, with no database, and what the generator writes for it by
 `packages/data-core/src/generate/together.test.ts`. The route is held over
 fake ports by `packages/data-server/src/routes/runtime-save.test.ts` -- each
-of its rules in order, a policy refusal before any read, one adapter call
-per write id, every refusal at its part, the 502, the audit's count and no
-value, and the 403s of a together child's create or delete alone and of a
-plain create of a record whose rows are required -- and against both
+of its rules alone, a policy refusal before any read, a new record's save
+refused before any read where the person could not make it, one adapter
+call per write id, every refusal at its part, the 502, the audit's count
+and no value, the 403s of a together child's create or delete alone and of
+a plain create of a record whose rows are required, and a store that
+cannot list its forms refusing every create and save -- and against both
 engines by `e2e-lost-answer.integration.test.ts`, a save whose answer the
 TCP hop dropped sent once; the bundle check by `bundle.test.ts`,
 `routes/admin.test.ts` and `generation.test.ts`; the setting by
@@ -684,9 +686,12 @@ and a number typed here would drift from the next run.
   the record not found by its key once every step ran, and a version
   that is no number, answered without anything sent. The route's
   answers to each outcome are held over fake ports, and against both
-  engines only for a save stored, past its bound, stale and lost; what
-  every plain create's read of the store costs, and how large a save's
-  answer kept for a resend is, were not measured
+  engines only for a save stored, past its bound, stale and lost. What
+  every plain create's read of the store costs, about 2 ms a published
+  form, and how large a save's answer kept for a resend is, 7,508 bytes
+  on PostgreSQL and 9,758 on SQL Server for the fixture's order with 49
+  lines, were measured once by hand on one workstation, and no suite
+  holds either
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is

@@ -21,9 +21,9 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { PublishedBundle } from '../bundle.js'
 import type { OpenConnection } from '../connections.js'
 import { planRefusal, recordFailure } from './runtime-errors.js'
-import { requiredOf } from './runtime-menu.js'
+import { createOffered, requiredOf } from './runtime-menu.js'
 import type { ServedForm } from './runtime-menu.js'
-import { FORMS_UNREAD, memberships, withoutEchoes } from './runtime-writes.js'
+import { CREATED_WITH_ROWS, FORMS_UNREAD, memberships, withoutEchoes } from './runtime-writes.js'
 import type { readForWrite } from './runtime-writes.js'
 import { at, failedAnswer, planAnswer, savedAnswer } from './save-answers.js'
 import type { SaveForms } from './save-answers.js'
@@ -44,12 +44,15 @@ import type { WriteAnswer } from './write-once.js'
  *    them;
  * 3. the policy, for every part, before anything is read: the record's
  *    create or update, each child's create, update or delete in the save
- *    (403, at the part);
+ *    (403, at the part); then a new record a together child requires rows
+ *    of, from a person who could not make that save -- the menu offers
+ *    them no create of it (`createOffered`) -- 403 at the record, naming
+ *    no child, which they may not read;
  * 4. the reads -- the record, or the record's table described; each
  *    changed child's rows of the record, or its table described -- and the
  *    plan (`planSave`), every part's field errors at once (422), a row the
- *    list does not hold not found (404), a bound broken before any
- *    statement (422), and the field that names the record the server's:
+ *    list does not hold not found (404), a bound broken before anything is
+ *    written (422), and the field that names the record the server's:
  *    over-posting where a row's answers carry another value (403);
  * 5. each selection's membership check (422, at its part);
  * 6. the one transaction (`RecordAdapter.save`), answered at the step it
@@ -308,6 +311,10 @@ async function saved(
   if (!named.ok) return named.answer
   const denied = policyRefusal(parent, body, named.value, actor)
   if (denied !== undefined) return denied
+  // A new record a together child requires rows of, from a person who could not make that save, as the menu offers its create: nothing read, and no child named, which they may not read (0045).
+  if ('create' in body.record && !createOffered(request.params.id, parent, served)) {
+    return at(planRefusal('operation-unavailable', CREATED_WITH_ROWS), { record: true })
+  }
 
   const record = await recordInput(steps, parent, open, actor, body, served)
   if (!record.ok) return record.answer

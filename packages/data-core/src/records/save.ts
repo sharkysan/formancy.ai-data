@@ -190,7 +190,7 @@ function boundRefusal(child: SaveChildInput & { together: Together }, creating: 
     return {
       ok: false,
       code: 'too-many-rows',
-      message: `${child.form} holds at most ${String(max)} rows of this record; it would hold ${String(held)}.`,
+      message: `${child.form} holds at most ${String(max)} ${max === 1 ? 'row' : 'rows'} of this record; it would hold ${String(held)}.`,
       at,
       rows,
     }
@@ -198,7 +198,7 @@ function boundRefusal(child: SaveChildInput & { together: Together }, creating: 
     return {
       ok: false,
       code: 'too-few-rows',
-      message: `${child.form} holds at least ${String(min)} rows of this record; it would hold ${String(held)}.`,
+      message: `${child.form} holds at least ${String(min)} ${min === 1 ? 'row' : 'rows'} of this record; it would hold ${String(held)}.`,
       at,
       rows,
     }
@@ -219,7 +219,7 @@ function firstBound(input: SaveInput, children: ReadonlyArray<SaveChildInput & {
   for (const entry of 'create' in input.record ? input.record.create.required : []) {
     if (children.some((child) => child.form === entry.form && child.field === entry.field)) continue
     const rows = { form: entry.form, field: entry.field, min: entry.min, max: entry.max, held: 0 }
-    const message = `${entry.form} holds at least ${String(entry.min)} rows of this record; it would hold 0.`
+    const message = `${entry.form} holds at least ${String(entry.min)} ${entry.min === 1 ? 'row' : 'rows'} of this record; it would hold 0.`
     return { ok: false, code: 'too-few-rows', message, at: { form: entry.form, field: entry.field }, rows }
   }
   for (const child of children) {

@@ -366,12 +366,14 @@ describe('a save of a new record with its rows', () => {
     })
   })
 
-  // An order that must hold a line is refused before any statement when
-  // the save creates none -- and when it leaves the child out altogether,
-  // which nothing else would notice. Watched failing with the record's
-  // required children not handed to the planner: the order was sent with
-  // no line.
-  test('is refused too-few-rows, before any statement, when it creates fewer rows than its record must hold', async () => {
+  // An order that must hold a line is refused before anything is written
+  // when the save creates none -- and when it leaves the child out
+  // altogether, which nothing else would notice. The order's table is
+  // described first, as for every new record's save, and nothing else is
+  // asked: a child named with no change is read not at all. Watched failing
+  // with the record's required children not handed to the planner: the
+  // order was sent with no line.
+  test('is refused too-few-rows, before anything is written, when it creates fewer rows than its record must hold', async () => {
     for (const body of [
       { record: { create: { answers: { notes: 'x' } } }, rows: [] },
       { record: { create: { answers: { notes: 'x' } } }, rows: lines() },
@@ -381,13 +383,13 @@ describe('a save of a new record with its rows', () => {
         422,
         {
           code: 'too-few-rows',
-          message: 'order-line holds at least 1 rows of this record; it would hold 0.',
+          message: 'order-line holds at least 1 row of this record; it would hold 0.',
           at: { form: 'order-line', field: 'order' },
           rows: { form: 'order-line', field: 'order', min: 1, max: 3, held: 0 },
         },
       ])
     }
-    expect(saves).toEqual([])
+    expect(untouched()).toEqual({ describes: 2, reads: 0, lists: 0, saves: 0, writes: [] })
   })
 })
 
@@ -427,9 +429,9 @@ describe('a save over a saved record', () => {
   })
 
   // A row the order's list does not hold -- another order's, or one this
-  // person may not read -- is not found at its part, before any statement:
-  // never forbidden, which would say it exists (0012).
-  test('answers a row its record does not hold not found, at the row, before any statement', async () => {
+  // person may not read -- is not found at its part, before anything is
+  // written: never forbidden, which would say it exists (0012).
+  test('answers a row its record does not hold not found, at the row, before anything is written', async () => {
     const other = lineToken(9)
     const response = await save(SAVED_ORDER([{ update: { record: other, version: V1, answers: { quantity: 5 } } }]))
     expect([response.statusCode, response.json()]).toEqual([
@@ -502,11 +504,34 @@ describe('the rules before anything is read (§5)', () => {
     expect(untouched()).toEqual(NOTHING)
   })
 
+  // A new record a together child requires rows of is saved only by a
+  // person who could make that save, where the menu offers its create:
+  // intake may create orders and never sees a line, so its save of an order
+  // with no rows is refused before anything is read, naming no child. The
+  // planner's too-few-rows would name the line form, its field and its
+  // bounds to somebody who may not read them (0045). Watched failing with
+  // the check taken out: 422 too-few-rows naming order-line, after the
+  // order's table was described.
+  test('a new record whose rows the person could not save with it is 403 before any read, naming no child', async () => {
+    const response = await save({ record: { create: { answers: { notes: 'x' } } }, rows: [] }, 'intake')
+    expect([response.statusCode, response.json()]).toEqual([
+      403,
+      { code: 'operation-unavailable', message: 'A record of this form is created with the rows saved with it, in one save.', at: { record: true } },
+    ])
+    expect(response.body).not.toContain('order-line')
+    expect(untouched()).toEqual(NOTHING)
+  })
+
   // Rule 4: the field that names the record is the server's. A new row
   // that sends it is over-posting at its ref; a row's update may send the
   // record's own token back, which is dropped, and nothing else. Watched
-  // failing with the field passed to the update as sent: the save reached
-  // the port with the line's order written.
+  // failing with a new row's answer for it let through, and with another
+  // value on an update dropped rather than refused: each line was saved,
+  // 200; and with every row read as behind its version: the moved value was
+  // dropped as an echo, and the update reached the port. With the field
+  // passed to the update as sent it still passes: the route drops the echo
+  // first, and the update's own check refuses a field written on create
+  // only.
   test('rule 4: the field that names the record is the server’s', async () => {
     const created = await save({ ...NEW_ORDER, rows: lines({ create: { ref: 'a', answers: { order: ORDER, line_no: 1, quantity: 2 } } }) })
     expect([created.statusCode, created.json()]).toMatchObject([403, { code: 'over-posting', at: { form: 'order-line', field: 'order', ref: 'a' } }])
@@ -558,7 +583,9 @@ describe('what a save is answered with', () => {
   })
 
   // A selection that is not an option is a field error at its row, every
-  // row's at once, nothing sent.
+  // row's at once, nothing sent. Watched failing with the plan's checks
+  // left unasked: the save was sent with the product the check refuses,
+  // and answered 200.
   test('a selection the membership check refuses, at its row', async () => {
     rejected = ['k1:5']
     const response = await save({ ...NEW_ORDER, rows: lines({ create: { ref: 'a', answers: { line_no: 1, quantity: 2, product: 'k1:5' } } }) })
@@ -686,8 +713,11 @@ describe('what a save is answered with', () => {
 describe('the record and its rows on the other routes', () => {
   // A line is created and deleted only with its order: alone, the line
   // form's create and delete are refused and nothing is written, and its
-  // update stays (open question 3 (b)). Watched failing with the planners
-  // asking `offers()`: the line's create reached the port.
+  // update stays (open question 3 (b)). The planner refuses each over the
+  // line's table as described, as it refuses a write a form does not offer
+  // at all, so each describes it once and asks nothing else. Watched
+  // failing with the planners asking `offers()`: the line's create reached
+  // the port.
   test('a per-row create or delete of a together child is 403', async () => {
     const create = await app.inject({
       method: 'POST',
@@ -703,7 +733,7 @@ describe('the record and its rows on the other routes', () => {
       payload: { record: LINE_1, version: V1 },
     })
     expect([remove.statusCode, remove.json().code]).toEqual([403, 'operation-unavailable'])
-    expect(writes).toEqual([])
+    expect(untouched()).toEqual({ describes: 2, reads: 0, lists: 0, saves: 0, writes: [] })
   })
 
   // An order that must hold a line is never created alone, whoever asks,
@@ -735,5 +765,46 @@ describe('the record and its rows on the other routes', () => {
     expect((await opened('order', 'clerk')).together).toBeNull()
     const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as('intake') })).json()
     expect(menu.forms.find((entry: { id: string }) => entry.id === 'order').operations).toEqual(['read'])
+  })
+
+  // A store that cannot list its forms cannot say which children require
+  // rows of a record, so nothing is created on a guess: a plain create of
+  // any form -- the plain lines', which no together child requires rows
+  // of, as the order's -- and a save, with rows and without, are 503 with
+  // nothing described or sent, and the form route offers no create.
+  // Watched failing with each null branch, one at a time, read as no child
+  // required: the plain line's create reached the insert; the save of an
+  // order with no rows was answered 200, the order stored with no line, and
+  // the save with a line 400 naming a child the store had not listed; and
+  // the form route offered the clerk the plain lines' create.
+  test('a store that cannot list its forms refuses every plain create and every save, and offers no create', async () => {
+    const failing: ConfigurationStore = {
+      ...store,
+      list: async () => {
+        throw new Error('the store cannot list its forms')
+      },
+    }
+    const unlisted = await createDataServer({ verifyIdentity, runtime: { registry: registry(), store: failing, saveDeadlineMs: DEADLINE_MS } })
+    try {
+      const sent = (url: string, payload: Record<string, unknown>) => unlisted.inject({ method: 'POST', url, headers: as('clerk'), payload })
+      const UNREAD = { code: 'unavailable', message: 'The forms this one is saved with cannot be read now. Nothing was saved.' }
+      for (const [url, payload] of [
+        ['/v1/forms/plain-line/records/create', { answers: { order: ORDER, line_no: 4, quantity: 1 } }],
+        ['/v1/forms/order/records/create', { answers: { notes: 'alone' } }],
+        ['/v1/forms/order/records/save', NEW_ORDER],
+        ['/v1/forms/order/records/save', { record: { create: { answers: { notes: 'alone' } } }, rows: [] }],
+      ] as const) {
+        const response = await sent(url, payload)
+        expect([response.statusCode, response.json()], url).toEqual([503, UNREAD])
+      }
+      expect(untouched()).toEqual(NOTHING)
+      const listed = (await app.inject({ method: 'GET', url: '/v1/forms/plain-line', headers: as('clerk') })).json().operations as string[]
+      expect(listed).toContain('create')
+      const opened = await unlisted.inject({ method: 'GET', url: '/v1/forms/plain-line', headers: as('clerk') })
+      expect(opened.statusCode, opened.body).toBe(200)
+      expect(opened.json().operations).toEqual(listed.filter((operation) => operation !== 'create'))
+    } finally {
+      await unlisted.close()
+    }
   })
 })

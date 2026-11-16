@@ -374,9 +374,11 @@ is explained after the rollback by the read a write alone asks, pinned as
 the step was. The route sends the request once per write id and never
 again, after every part's policy has been asked before any read, and
 answers a refusal at the part of the body it is about; a lost answer is a
-502 naming the record and the version sent. A together child's rows are
-never created or deleted alone, and a record that must hold some never
-created alone: both 403 before any statement.
+502 naming the record and the version sent. A record that must hold rows
+of a together child is never created alone, and never in a save by a
+person who could not make it: 403 before any statement, naming no child.
+A together child's rows are never created or deleted alone: 403 with
+nothing written, after its table is described.
 
 **The save's deadline is one setting.** `FORMANCY_DATA_SAVE_DEADLINE_MS`,
 read by `main.ts` and parsed in `save-deadline.ts`, `DEFAULT_SAVE_DEADLINE_MS`

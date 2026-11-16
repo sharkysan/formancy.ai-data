@@ -106,7 +106,8 @@ export function failedAnswer(forms: SaveForms, plan: SavePlan, outcome: Exclude<
     const child = childPart(plan, outcome.at.child)
     const { min, max } = (plan.request.children[outcome.at.child] as SavePlan['request']['children'][number]).count
     const code = outcome.held < min ? 'too-few-rows' : 'too-many-rows'
-    const message = `${child.form} holds ${outcome.held < min ? 'at least' : 'at most'} ${String(outcome.held < min ? min : max)} rows of this record; this save would leave it ${String(outcome.held)}.`
+    const bound = outcome.held < min ? min : max
+    const message = `${child.form} holds ${outcome.held < min ? 'at least' : 'at most'} ${String(bound)} ${bound === 1 ? 'row' : 'rows'} of this record; this save would leave it ${String(outcome.held)}.`
     return { status: 422, body: { code, message, at: child, rows: { ...child, min, max, held: outcome.held } } satisfies SaveRefusal }
   }
   return stepAnswer(forms, plan, outcome.at, outcome.failure)

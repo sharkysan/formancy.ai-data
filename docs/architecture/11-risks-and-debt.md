@@ -803,10 +803,15 @@ their locks the while. The plan, both adapters' save, the generator's
 and the bundle check's part, the route and the client are built; the host
 page and the studio follow, and until they do only a page an integrator
 writes saves a record with its rows. A record whose rows are required is
-never created alone, so every plain create of every form reads every
-published form from the store first, and is refused 503 when the store
-cannot list them -- a cost not measured; a person may create such a record
-only where the menu shows them its required child. The save's deadline is
+never created alone, so every plain create of every form, and every
+save, reads every published form from the store first, and is refused
+503 when the store cannot list them -- about 2 ms a published form,
+measured once, the menu's own cost; a person may create such a record
+only where the menu offers them its create. A save's answer is kept for
+a resend under the same 32 MiB as any write's, which holds about 4,400
+saves of 49 lines on PostgreSQL's fixture and 3,400 on SQL Server's,
+measured once; past that the oldest are dropped, and a resend of one is
+applied again. The save's deadline is
 one setting for the server, held below half of mssql's request timeout
 wherever a SQL Server connection is allowed. An older server reading the
 same store serves no together child -- its reading of the request leaves
