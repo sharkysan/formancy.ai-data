@@ -1,4 +1,4 @@
-import { isStampChoice } from '@formancy/data-core'
+import { boundsProblem, isStampChoice } from '@formancy/data-core'
 import type { GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
 import { CONFIGURATION_ID as FORM_ID } from './config-store.js'
 
@@ -32,17 +32,39 @@ function stampsOf(value: unknown): StampChoice[] | undefined | null {
   return value.map((stamp) => ({ column: stamp.column, value: { ...stamp.value }, on: stamp.on }))
 }
 
-function lookupChoices(value: unknown): LookupChoice[] | undefined {
+/**
+ * A lookup's `together` (0155): absent, or exactly `{ min, max }`, whole
+ * numbers a save can hold (`boundsProblem`), read again here so that a hand
+ * edit carries nothing else to a statement; the problem with it otherwise.
+ */
+function togetherOf(value: unknown): { together: LookupChoice['together'] } | { problem: string } {
+  if (value === undefined) return { together: undefined }
+  const problem = boundsProblem(value)
+  if (problem !== null) return { problem }
+  const { min, max } = value as { min: number; max: number }
+  return { together: { min, max } }
+}
+
+/** The lookup choices, or the problem with them: a list of `{ foreignKey, display, section?, together? }`. */
+function lookupChoices(value: unknown): LookupChoice[] | string {
+  const shape = 'lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null }, together?: { min, max } }'
   if (value === undefined) return []
-  if (!Array.isArray(value)) return undefined
+  if (!Array.isArray(value)) return shape
   const choices: LookupChoice[] = []
   for (const entry of value) {
-    if (!isRecord(entry) || typeof entry['foreignKey'] !== 'string') return undefined
+    if (!isRecord(entry) || typeof entry['foreignKey'] !== 'string') return shape
     const display = entry['display']
-    if (!Array.isArray(display) || !display.every((column) => typeof column === 'string')) return undefined
+    if (!Array.isArray(display) || !display.every((column) => typeof column === 'string')) return shape
     const read = sectionOf(entry['section'])
-    if (read === null) return undefined
-    choices.push({ foreignKey: entry['foreignKey'], display: [...display], ...(read.section === undefined ? {} : { section: read.section }) })
+    if (read === null) return shape
+    const together = togetherOf(entry['together'])
+    if ('problem' in together) return `lookups: ${entry['foreignKey']} is saved with its record, and ${together.problem}`
+    choices.push({
+      foreignKey: entry['foreignKey'],
+      display: [...display],
+      ...(read.section === undefined ? {} : { section: read.section }),
+      ...(together.together === undefined ? {} : { together: together.together }),
+    })
   }
   return choices
 }
@@ -54,25 +76,30 @@ function lookupChoices(value: unknown): LookupChoice[] | undefined {
  *
  * Normalised: `lookups` and `pinned` are always lists, `versionColumn` is
  * present only when it is a string, a lookup's `section` only when it
- * marks one (0109), `validity` only when it names a chain (0113), and
- * `stamps` only when it is given (0153), as given. Other properties are not carried, so a
- * stored request that is not equal to its own reading holds something this
- * reading would not have produced -- and a server older than 0153 refuses a
- * stored request that stamps, as it refuses every property it does not read.
+ * marks one (0109), `validity` only when it names a chain (0113),
+ * `stamps` only when it is given (0153), as given, and a lookup's
+ * `together` and `touchColumn` only when they are given (0155). Other
+ * properties are not carried, so a stored request that is not equal to its
+ * own reading holds something this reading would not have produced -- and
+ * a server older than 0153 refuses a stored request that stamps, and one
+ * older than 0155 one that saves rows with their record, as it refuses
+ * every property it does not read.
  */
 export function readGeneration(value: unknown): GenerationReading {
   if (!isRecord(value)) return { ok: false, problems: ['a generation request is an object'] }
   const problems: string[] = []
-  const { connection, root, formId, title, versionColumn, pinned, validity, stamps } = value
+  const { connection, root, formId, title, versionColumn, touchColumn, pinned, validity, stamps } = value
   if (typeof connection !== 'string') problems.push('connection must name a connection')
   if (!isRecord(root) || typeof root['schema'] !== 'string' || typeof root['name'] !== 'string') problems.push('root must be { schema, name }')
   if (typeof formId !== 'string' || !FORM_ID.test(formId)) problems.push('formId must be a lower-case form id')
   if (typeof title !== 'string') problems.push('title must be text')
-  const lookups = lookupChoices(value['lookups'])
-  if (lookups === undefined) problems.push('lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null } }')
+  const read = lookupChoices(value['lookups'])
+  const lookups = typeof read === 'string' ? undefined : read
+  if (typeof read === 'string') problems.push(read)
   const pinnedColumns = pinned === undefined ? [] : Array.isArray(pinned) && pinned.every((name) => typeof name === 'string') ? [...pinned] : undefined
   if (pinnedColumns === undefined) problems.push('pinned must be a list of columns')
   if (versionColumn !== undefined && typeof versionColumn !== 'string') problems.push('versionColumn must name a column')
+  if (touchColumn !== undefined && typeof touchColumn !== 'string') problems.push('touchColumn must name a column')
   const chain = validityOf(validity)
   if (chain === null) problems.push('validity must be { from, to }, two columns')
   const stamped = stampsOf(stamps)
@@ -92,6 +119,7 @@ export function readGeneration(value: unknown): GenerationReading {
       lookups,
       pinned: pinnedColumns,
       ...(typeof versionColumn === 'string' ? { versionColumn } : {}),
+      ...(typeof touchColumn === 'string' ? { touchColumn } : {}),
       ...(chain === undefined ? {} : { validity: chain }),
       ...(stamped === undefined ? {} : { stamps: stamped }),
     },

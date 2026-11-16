@@ -351,6 +351,60 @@ describe('the administrator plane', () => {
     expect(await store.latest('employee')).toBeNull()
   })
 
+  // A lookup saved with its record and a touch column travel through the
+  // administrator's plane as the request declares them (0155): proposed
+  // from the request, published as proposed, and refused at publish where
+  // the bindings say otherwise than the request -- the bounds edited, the
+  // touch column dropped -- or where the generator refuses the request, as
+  // a touch column in the key. Nothing is written for a refusal. Watched
+  // failing with the proposal route's reading leaving `together` out: the
+  // proposal carried no bound, and the published version saved nothing
+  // with its record.
+  test('proposes and publishes a lookup saved with its record and a touch column, and refuses bindings that say otherwise', async () => {
+    department = { region: INT32 }
+    const payload = { ...PROPOSAL, lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'], together: { min: 0, max: 3 } }], touchColumn: 'name' }
+    const proposed = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload })
+    expect(proposed.statusCode, proposed.body).toBe(200)
+    const proposal = proposed.json()
+    expect(proposal.generation).toMatchObject({
+      lookups: [{ foreignKey: 'fk_employee_dept', display: ['name'], together: { min: 0, max: 3 } }],
+      touchColumn: 'name',
+    })
+    expect(proposal.bindings.fields.find((binding: { field: string }) => binding.field === 'dept')).toMatchObject({
+      together: { min: 0, max: 3 },
+      writes: { create: true, update: false },
+    })
+    expect(proposal.bindings.concurrency).toEqual({ kind: 'rowversion', column: 'row_version', confirmed: true, touch: 'name' })
+    const versions = (bundle: unknown) =>
+      app.inject({ method: 'POST', url: '/v1/forms/employee/versions', headers: as('admin'), payload: { expectedBase: null, bundle } })
+
+    const policy = { ...POLICY, lookups: { dept: [] } }
+    const widened = bundleOf(proposal, policy)
+    widened.bindings = JSON.parse(JSON.stringify(proposal.bindings))
+    widened.bindings.fields.find((binding: { field: string }) => binding.field === 'dept').together = { min: 0, max: 4 }
+    const untouched = bundleOf({ ...proposal, generation: { ...proposal.generation, touchColumn: undefined } }, policy)
+    delete untouched.generation.touchColumn
+    for (const [refused, problems] of [
+      [
+        widened,
+        [
+          'generation: chooses a lookup over fk_employee_dept showing name saved with its record, 0 to 3, which the bindings do not have',
+          'generation: the bindings have a lookup over fk_employee_dept showing name saved with its record, 0 to 4, which it does not choose',
+        ],
+      ],
+      [untouched, ['generation: confirms touch column none, and the bindings touch name']],
+    ] as const) {
+      const response = await versions(refused)
+      expect([response.statusCode, response.json().problems]).toEqual([422, problems])
+    }
+    expect(await store.latest('employee')).toBeNull()
+    const keyed = await app.inject({ method: 'POST', url: '/v1/form-proposals', headers: as('admin'), payload: { ...payload, touchColumn: 'id' } })
+    expect([keyed.statusCode, keyed.json().message]).toEqual([422, expect.stringContaining('the touch column id is in a key or a foreign key')])
+
+    const stored = await versions(bundleOf(proposal, policy))
+    expect(stored.statusCode, stored.body).toBe(201)
+  })
+
   // A field moved to another generated section publishes with its move in
   // the presentation, and is served there (0075). The same form without its
   // entry is a layout the presentation does not describe, which the next

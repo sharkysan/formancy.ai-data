@@ -3,7 +3,7 @@ import { connect } from 'node:net'
 import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createSnapshot, DEFAULT_LOOKUP_DEADLINE_MS, EMPTY_PRESENTATION } from '@formancy/data-core'
+import { createSnapshot, DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS, EMPTY_PRESENTATION } from '@formancy/data-core'
 import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
 import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify from 'fastify'
@@ -215,7 +215,13 @@ describe('what holds the trail in place', () => {
 
     const runtime = Fastify()
     void runtime.register(async (instance) => {
-      await runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS })
+      await runtimeRoutes(instance, {
+        registry: registry(),
+        store,
+        authenticate,
+        lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+      })
       instance.get('/v1/forms/:id/unnamed', async () => ({}))
     })
     await expect(runtime.ready()).rejects.toThrow('GET /v1/forms/:id/unnamed has no audit name (0023, 0033)')
@@ -246,7 +252,14 @@ describe('what holds the trail in place', () => {
       plane: 'runtime',
       names: ROUTE_OPERATIONS,
       register: (instance: FastifyInstance, to: AuditSink) =>
-        runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, audit: { sink: to } }),
+        runtimeRoutes(instance, {
+          registry: registry(),
+          store,
+          authenticate,
+          lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+          saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+          audit: { sink: to },
+        }),
     },
   ] as const)('every route the $plane plane registers emits exactly one event, named from its table', async ({ plane, names, register }) => {
     const routes: Array<{ method: string; url: string }> = []
@@ -290,7 +303,14 @@ describe('what holds the trail in place', () => {
         ran = true
         return { archived: true }
       })
-      await runtimeRoutes(instance, { registry: registry(), store, authenticate, lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS, audit: { sink } })
+      await runtimeRoutes(instance, {
+        registry: registry(),
+        store,
+        authenticate,
+        lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+        audit: { sink },
+      })
     })
     await early.ready()
     const response = await early.inject({ method: 'POST', url: '/v1/forms/employee/records/archive', headers: as('clerk') })

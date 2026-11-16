@@ -62,7 +62,9 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
 /**
  * What the stored request alone decides, against the base and bindings it is
  * said to have produced (0030): the title, the root, a confirmed version
- * column, the pins, the lookups, a chain of versions and the stamps (0153). A regeneration generates from this
+ * column and touch column (0155), the pins, the lookups with their
+ * sections and whether each is saved with its record (0155), a chain of
+ * versions and the stamps (0153). A regeneration generates from this
  * request and its draft is checked at publish against the same request, so
  * an edit to it alone would reach the next version unannounced. None of
  * these asks the generator, so a later release cannot fail a stored version
@@ -94,6 +96,11 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
   if (generation.versionColumn === undefined && confirmed !== undefined) {
     problems.push(`generation: confirms no version column, and the bindings use ${confirmed} as a confirmed one`)
   }
+  // A rowversion's touch column (0155) is in the bindings exactly as the request confirms it.
+  const touch = concurrency !== null && typeof concurrency['touch'] === 'string' ? concurrency['touch'] : undefined
+  if (generation.touchColumn !== touch) {
+    problems.push(`generation: confirms touch column ${generation.touchColumn ?? 'none'}, and the bindings touch ${touch ?? 'none'}`)
+  }
 
   // A chain of versions (0113) is in the bindings exactly as the request names it.
   const chain = isRecord(bindings.validity) ? bindings.validity : undefined
@@ -113,17 +120,29 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
       problems.push(`generation: pins ${column}, and its field ${field.field} is written by the form`)
   }
 
-  // Compared as foreign key, display columns and section (0109), the whole of a lookup choice.
-  type Choice = { foreignKey: string; display: readonly string[]; section?: { when: { column: string; value: string } | null } | undefined }
+  // Compared as foreign key, display columns, section (0109) and together (0155), the whole of a lookup choice.
+  type Choice = {
+    foreignKey: string
+    display: readonly string[]
+    section?: { when: { column: string; value: string } | null } | undefined
+    together?: { min: unknown; max: unknown } | undefined
+  }
   const sectionOf = (lookup: Choice) =>
     lookup.section === undefined
       ? null
       : { when: lookup.section.when === null ? null : { column: lookup.section.when.column, value: lookup.section.when.value } }
+  const togetherOf = (lookup: Choice) => (isRecord(lookup.together) ? { min: lookup.together.min, max: lookup.together.max } : null)
   const same = (left: Choice) => (right: Choice) =>
     left.foreignKey === right.foreignKey &&
     canonicalize(left.display) === canonicalize(right.display) &&
-    canonicalize(sectionOf(left)) === canonicalize(sectionOf(right))
-  const shown = (lookup: Choice) => `${lookup.foreignKey} showing ${lookup.display.join(', ')}${lookup.section === undefined ? '' : ' as a section'}`
+    canonicalize(sectionOf(left)) === canonicalize(sectionOf(right)) &&
+    canonicalize(togetherOf(left)) === canonicalize(togetherOf(right))
+  const saved = (lookup: Choice) => {
+    const together = togetherOf(lookup)
+    return together === null ? '' : ` saved with its record, ${String(together.min)} to ${String(together.max)}`
+  }
+  const shown = (lookup: Choice) =>
+    `${lookup.foreignKey} showing ${lookup.display.join(', ')}${lookup.section === undefined ? '' : ' as a section'}${saved(lookup)}`
   const bound = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding] : []))
   for (const lookup of generation.lookups)
     if (!bound.some(same(lookup))) problems.push(`generation: chooses a lookup over ${shown(lookup)}, which the bindings do not have`)

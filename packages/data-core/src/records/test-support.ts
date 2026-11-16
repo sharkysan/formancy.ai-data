@@ -359,8 +359,9 @@ export function edited(bindings: FormBindings, change: (draft: FormBindings) => 
 /**
  * `bindings` with lookup `field` saving the form's rows with the record it
  * references (0155), `min` to `max` of them, and written on create only:
- * what the generator will write for a together choice, which it does not
- * yet, so these suites edit what it writes.
+ * what the generator writes for a together choice, as
+ * `generate/together.test.ts` holds, edited in so a suite can set the
+ * bounds of a form it generated without them.
  */
 export function togetherOn(bindings: FormBindings, field: string, bounds: { min: number; max: number } = { min: 1, max: 3 }): FormBindings {
   return edited(bindings, (draft) => {

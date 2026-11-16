@@ -15,6 +15,7 @@ import {
   stateMoves,
   toFormAnswers,
   todayOf,
+  togetherOf,
   versionFields,
   viewsFor,
   writableFields,
@@ -46,7 +47,8 @@ import { registerExportRoute } from './runtime-exports.js'
 import { registerListRoute } from './runtime-lists.js'
 import { ownViewsOf, registerOwnViewRoutes } from './runtime-own-views.js'
 import { registerLookupRoutes } from './runtime-lookups.js'
-import { menuForms, registerMenuRoute } from './runtime-menu.js'
+import { createOffered, registerMenuRoute, servedForms } from './runtime-menu.js'
+import { registerSaveRoute } from './runtime-save.js'
 import { registerSupersedeRoute } from './runtime-supersede.js'
 import { memberships, readForWrite, registerWriteRoutes, withoutEchoes } from './runtime-writes.js'
 import { createWriteOnce } from './write-once.js'
@@ -66,6 +68,8 @@ export interface RuntimeOptions {
    * membership checks inside a create or an update included (0061).
    */
   lookupDeadlineMs: number
+  /** How long a save may wait for a lock, and after which none of its steps starts (0155). */
+  saveDeadlineMs: number
 }
 
 declare module 'fastify' {
@@ -73,8 +77,9 @@ declare module 'fastify' {
     /**
      * `repeated`: answered with an earlier sending's answer, and nothing
      * asked of the database (0031). `rows`: the records an export wrote
-     * into its file so far (0079). `moved`: whether a planned create or
-     * update moves its policy's state field (0112).
+     * into its file so far (0079), or the row changes a save carried
+     * (0155). `moved`: whether a planned create or update -- or a save's
+     * record -- moves its policy's state field (0112).
      */
     auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null }
   }
@@ -97,6 +102,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/update': 'update',
   'POST /v1/forms/:id/records/delete': 'delete',
   'POST /v1/forms/:id/records/supersede': 'supersede',
+  'POST /v1/forms/:id/records/save': 'save',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
   'POST /v1/forms/:id/views/save': 'view-save',
@@ -147,7 +153,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         status: base.status,
         outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
-        rows: base.operation === 'export' ? (trail.rows ?? 0) : null,
+        rows: base.operation === 'export' || base.operation === 'save' ? (trail.rows ?? 0) : null,
         moved: trail.repeated === true ? null : (trail.moved ?? null),
       }
     },
@@ -356,14 +362,19 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    * a form whose records it can no longer show faithfully is refused, and so
    * is one that leaves this person nothing. Opening a form therefore asks the
    * database, and one that cannot be reached is 503. The form is served with
-   * the defaults this person's create would take, and no other (0149).
+   * the defaults this person's create would take, and no other (0149), and
+   * with the lookup its rows are saved with their record through, if any
+   * (0155).
    */
   app.get<{ Params: { id: string } }>('/v1/forms/:id', async (request, reply) => {
     const bundle = await published(request.params.id, reply)
     if (bundle === undefined) return reply
     const actor = context(request)
-    // What the policy grants of what the form offers, as the menu says it (0045); then what the database allows now.
-    const allowed = grantedOperations(bundle.bindings, bundle.policy, actor)
+    // Every bundle as the menu reads them: for the create a together child narrows, and for the forms each lookup's record opens in (0140, 0155).
+    const served = await servedForms(menu, request)
+    // What the policy grants of what the form offers, as the menu says it (0045), create as the menu narrows it (0155); then what the database allows now.
+    const granted = grantedOperations(bundle.bindings, bundle.policy, actor)
+    const allowed = createOffered(request.params.id, bundle, served) ? granted : granted.filter((operation) => operation !== 'create')
     if (allowed.length === 0) return reply.code(403).send({ code: 'operation-denied', message: 'This form is not available to you.' })
     const open = await connection(bundle, reply)
     if (open === undefined) return reply
@@ -396,9 +407,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const labels = bundle.format === 2 ? (bundle.presentation.states ?? []) : []
     const moves = writable.create !== null || writable.update !== null ? stateMoves(bundle.policy, actor, bundle.bindings, labels) : null
     // The forms each lookup's record opens in, from every bundle as the menu reads them; none when the store cannot list them (0140).
-    const forms = await menuForms(menu, request)
     const opens =
-      forms === null
+      served === null
         ? []
         : lookupOpens(
             {
@@ -410,8 +420,11 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
               policy: bundle.policy,
             },
             actor,
-            forms,
+            served.map((entry) => entry.form),
           )
+    // The lookup this form's rows are saved with their record through (0155); a malformed one, which the bundle check refuses, says none.
+    const saved = togetherOf(bundle.bindings)
+    const together = saved === null || saved === 'malformed' ? null : { field: saved.binding.field, min: saved.min, max: saved.max }
     return {
       // The defaults this person's create would take, and no other (0149): a page draws and submits what it is served.
       form: startingDefaults(bundle.form, writable.create, moves),
@@ -424,6 +437,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       writable,
       moves,
       opens,
+      together,
     } satisfies PublishedForm
   })
 
@@ -463,7 +477,25 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   registerExportRoute(app, { published, connection, context, unread, undecided, answered, lookupDeadlineMs: options.lookupDeadlineMs })
 
   // A record's answers written once per sending of a write id (0031): its echoes removed and its selections checked first.
-  registerWriteRoutes(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, lookupDeadlineMs: options.lookupDeadlineMs })
+  const served = (request: FastifyRequest) => servedForms(menu, request)
+  const { lookupDeadlineMs, saveDeadlineMs } = options
+  registerWriteRoutes(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, lookupDeadlineMs, served })
+
+  // A record and its together children's rows, in one transaction (0155): every part's steps the write routes', in one request.
+  registerSaveRoute(app, {
+    published,
+    connection,
+    context,
+    served,
+    sendOnce,
+    lost,
+    refusal,
+    describedRoot,
+    readForWrite: (bundle, open, actor, record) => readForWrite({ describedRoot }, bundle, open, actor, record),
+    answered,
+    lookupDeadlineMs,
+    saveDeadlineMs,
+  })
 
   // One record, by its token and the version read (0050): the update's steps, a delete's answers.
   registerDeleteRoute(app, { published, connection, context, sendOnce, lost, refusal, answered })

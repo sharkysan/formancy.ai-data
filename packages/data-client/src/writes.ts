@@ -20,14 +20,15 @@ export interface UnknownWrite {
   code: 'unknown-outcome'
   /** The server's sentence when the database lost the answer; the client's own when the page lost it. */
   message: string
-  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113. */
-  operation: 'create' | 'update' | 'delete' | 'supersede'
-  /** Update, delete and supersede: the token sent. Create: the token the server says it would have, or null. */
+  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113, `save` -- a record with its rows -- since 0155. */
+  operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'
+  /** Update, delete and supersede: the token sent. Create: the token the server says it would have, or null. Save: the record's, as an update's or a create's. */
   record: string | null
   /**
    * Update and delete: the version sent -- saving again with exactly it is
    * stored at most once, and deleting again with it deletes nothing else.
-   * Create: null.
+   * Create: null. Save: the record's version sent over a saved record,
+   * which every save moves, and null for a save that creates it.
    */
   version: string | null
   /** `database`: the data server said so (its 502). `transport`: the answer was lost between page and server. */
@@ -49,7 +50,7 @@ export function isUnknownWrite(outcome: { ok: boolean }): outcome is UnknownWrit
 
 /** What a write addressed, as the call knows it: the transport can lose an answer, never the call's own arguments. */
 export interface WriteIntent {
-  operation: 'create' | 'update' | 'delete' | 'supersede'
+  operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'
   record: string | null
   version: string | null
 }
@@ -79,7 +80,8 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  *    server's answer, and the request may have reached it.
  * 2. A 2xx with a record is the record stored -- for a delete, a 2xx with
  *    the deleted row's token and `deleted: true` is the record deleted
- *    (0050); any other 2xx was lost.
+ *    (0050); for a save, a 2xx in the shape `stored` holds, the record and
+ *    its rows as stored (0155); any other 2xx was lost.
  * 3. The data server's 502 `unknown-outcome` with a sentence: the database
  *    lost the answer. What was addressed comes from the body, or the call.
  * 4. A 4xx with a sentence is the server's refusal: nothing was written.
@@ -94,11 +96,21 @@ function lost(intent: WriteIntent, status: number): UnknownWrite {
  */
 export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'delete' }): DeleteOutcome
 export function writeOutcome(answer: WriteAnswer, intent: WriteIntent & { operation: 'create' | 'update' | 'supersede' }): WriteOutcome
-export function writeOutcome(answer: WriteAnswer, intent: WriteIntent): WriteOutcome | DeleteOutcome {
+export function writeOutcome<T>(
+  answer: WriteAnswer,
+  intent: WriteIntent & { operation: 'save' },
+  stored: (body: unknown) => body is T,
+): Outcome<T> | UnknownWrite
+export function writeOutcome(
+  answer: WriteAnswer,
+  intent: WriteIntent,
+  stored?: (body: unknown) => boolean,
+): WriteOutcome | DeleteOutcome | Outcome<unknown> | UnknownWrite {
   if (!answer.answered) return lost(intent, 0)
   const { status, body } = answer
   if (!isRecord(body)) return lost(intent, status)
   if (status >= 200 && status <= 299) {
+    if (stored !== undefined) return stored(body) ? { ok: true, value: body } : lost(intent, status)
     if (intent.operation === 'delete') return isRecordDeleted(body) ? { ok: true, value: body } : lost(intent, status)
     return isFormRecord(body) ? { ok: true, value: body } : lost(intent, status)
   }

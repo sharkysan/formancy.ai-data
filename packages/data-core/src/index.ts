@@ -223,7 +223,16 @@ export { childFields } from './records/children.js'
 export type { ChildLookup, ParentKey, PublishedTable } from './records/children.js'
 export { formMenu, grantedOperations, lookupOpens, menuForm } from './records/menu.js'
 export type { MenuBundle, MenuForm } from './records/menu.js'
-export { menuSaves, menuTogether, rowsRequired, saveParameters, SQLSERVER_MAX_PARAMETERS, togetherChildren } from './records/together.js'
+export {
+  menuSaves,
+  menuTogether,
+  rowsRequired,
+  saveParameters,
+  SQLSERVER_MAX_PARAMETERS,
+  togetherBatchProblem,
+  togetherChildren,
+  togetherPolicyProblems,
+} from './records/together.js'
 export type { MenuSaves, MenuTogether, TogetherChild } from './records/together.js'
 export { planSave, planSaveList } from './records/save.js'
 export { DEFAULT_SAVE_DEADLINE_MS, SAVE_MAX_ROWS } from './records/save-limits.js'

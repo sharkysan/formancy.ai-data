@@ -155,6 +155,65 @@ export function saveParameters(snapshot: MetadataSnapshot, bindings: FormBinding
   return STATEMENT + Math.max(...each)
 }
 
+/**
+ * Why a together child's policy would let a person read some of a record's
+ * rows and not others, or a parent's would pin its touch column -- each a
+ * sentence for the bundle check, on publish and on every read (0155):
+ *
+ * - a row filter on a column outside the together lookup's foreign key, or
+ *   a through by any other field: every row of a record is then read by a
+ *   person or none is, so a count of what they read is every row the
+ *   record has, and a bound the page states holds for whoever reads it;
+ * - a row filter on the touch column, which every save of rows alone sets
+ *   to itself (`pinsTouch`).
+ *
+ * `[]` for a policy that cannot be read, which `validatePolicy` reports.
+ */
+export function togetherPolicyProblems(bindings: FormBindings, policy: FormPolicy): string[] {
+  const parsed = readPolicy(policy).parsed
+  if (parsed === null) return []
+  const problems: string[] = []
+  const touch = bindings.concurrency?.touch
+  if (typeof touch === 'string' && pinsTouch(policy, touch))
+    problems.push(`rowFilters: ${touch} is the touch column, which every save of this form's rows alone sets to itself; a row filter cannot pin it`)
+  const together = togetherOf(bindings)
+  if (together === null || together === 'malformed') return problems
+  const { field, columns } = together.binding
+  for (const rule of parsed.rowFilters) {
+    if (!columns.includes(rule.column))
+      problems.push(
+        `rowFilters: ${rule.column} is outside ${field}'s foreign key, and ${field} is saved with its record: a person could read some of a record's rows and not others, and its bound would count rows they do not see`,
+      )
+  }
+  for (const through of parsed.through) {
+    if (through !== field)
+      problems.push(
+        `through: ${through} scopes the rows by another field than ${field}, which is saved with its record: a person could read some of a record's rows and not others`,
+      )
+  }
+  return problems
+}
+
+/**
+ * Why one SQL Server batch could not hold a save of a together child's
+ * `max` rows, or `null` (0155): the most one change of a row binds
+ * (`saveParameters`), `max` times, past `SQLSERVER_MAX_PARAMETERS`. Asked
+ * at publish, of the child's bundle alone; the menu holds the parent's step
+ * and every together child's rows to the limit together, and the adapter
+ * refuses a batch past it before it is sent. `null` on PostgreSQL, which
+ * sends each statement on its own, and for bindings with no together
+ * lookup a save could hold.
+ */
+export function togetherBatchProblem(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string | null {
+  if (snapshot.kind !== 'sqlserver') return null
+  const together = togetherOf(bindings)
+  if (together === null || together === 'malformed') return null
+  const each = saveParameters(snapshot, bindings, policy)
+  if (together.max * each <= SQLSERVER_MAX_PARAMETERS) return null
+  const fits = Number.isFinite(each) ? Math.floor(SQLSERVER_MAX_PARAMETERS / each) : 0
+  return `${together.binding.field} is saved with its record up to ${String(together.max)} rows, and one change of a row binds up to ${String(each)} parameters on SQL Server, past the ${String(SQLSERVER_MAX_PARAMETERS)} one batch holds; a max of ${String(fits)} or less fits`
+}
+
 /** What a child binds once in a save besides its rows: its count -- the record, its read filters and throughs, `min`, `max` and the limit -- and its `within`, the record under the lookup's filter. */
 function childParameters(policy: FormPolicy, field: string, pin: number): number {
   const filters = filterParameters(policy)
@@ -221,9 +280,9 @@ function requires(key: ParentKey | null, lookup: ChildLookup, min: number): bool
  * references them (`referencingFields`) with a `min` of at least 1, each
  * bundle read alone, whoever the person is -- a bound applies to everyone.
  * The menu leaves out the parent's create where the person could not make
- * that save (`formMenu`). The parent's create route is to refuse a plain
- * create where one is found, from the save's route on, and refuses none
- * yet.
+ * that save (`formMenu`), and the parent's create route refuses a plain
+ * create where one is found: such a record is created with its rows, in a
+ * save, which is planned with the children this finds (`planSave`).
  */
 export function rowsRequired<T extends PublishedTable>(
   parent: PublishedTable,

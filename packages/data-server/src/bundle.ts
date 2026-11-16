@@ -5,6 +5,9 @@ import {
   findObject,
   rowFilterColumnProblem,
   throughProblems,
+  togetherPolicyProblems,
+  togetherProblem,
+  touchColumnProblem,
   validatePolicy,
 } from '@formancy/data-core'
 import type { FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides } from '@formancy/data-core'
@@ -80,7 +83,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *   applied, and the generation request the one this server would store and
  *   the one its base and bindings say they came from (`bundle-format2.ts`).
  *
- * Format 1 is still read, so every version published before 0030 is served.
+ * Format 1 is still read, so every version published before 0030 is served
+ * -- but not one whose bindings save a lookup's rows with their record or
+ * name a touch column (0155): format 1 keeps no generation request, which
+ * is where both are declared and compared.
  *
  * It never throws. A part of another shape than a check reads -- a hand
  * edit's `null` where the bindings' fields belong -- is one more reason the
@@ -143,6 +149,10 @@ function checkedBundle(document: unknown): BundleValidation {
       if (!keys.has(binding.field)) problems.push(`the bindings name ${binding.field}, which the form does not have`)
     }
   }
+  if (format === 1 && savesRows(bindings))
+    problems.push(
+      'format 1 keeps no generation request, which is where a lookup saved with its record and a touch column are declared (0155): publish format 2',
+    )
 
   // A snapshot no catalog could produce cannot be searched for filter columns.
   if (wellFormed) problems.push(...policyProblems(snapshot, bindings, policy))
@@ -153,14 +163,24 @@ function checkedBundle(document: unknown): BundleValidation {
   return problems.length === 0 ? { ok: true, bundle: document as unknown as PublishedBundle } : { ok: false, problems }
 }
 
+/** Whether the bindings save a lookup's rows with their record or name a touch column (0155), whatever shape a hand edit left them in. */
+function savesRows(bindings: FormBindings): boolean {
+  const fields: unknown = bindings.fields
+  const together = Array.isArray(fields) && fields.some((binding) => isRecord(binding) && Object.hasOwn(binding, 'together'))
+  return together || (isRecord(bindings.concurrency) && Object.hasOwn(bindings.concurrency, 'touch'))
+}
+
 /**
  * Everything a policy does not fit: the bindings (`validatePolicy`), the
  * snapshot's columns a row filter compares (`unfilterableColumns`), what
  * the snapshot says of each lookup a through names (`throughProblems`, 0043),
- * and what a delete it grants would also do to other tables
- * (`deleteProblems`, 0050) -- each of which the planner asks too. One
- * function for the bundle check, on publish and on every read, and for the
- * regeneration route's report, so the three cannot disagree about one policy.
+ * what a delete it grants would also do to other tables
+ * (`deleteProblems`, 0050), and a lookup saved with its record that the
+ * bindings or the policy cannot hold (`togetherProblems`, 0155) -- each of
+ * which the planner asks too, but the last's policy half, which only this
+ * asks. One function for the bundle check, on publish and on every read,
+ * and for the regeneration route's report, so the three cannot disagree
+ * about one policy.
  */
 export function policyProblems(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
   return [
@@ -168,6 +188,38 @@ export function policyProblems(snapshot: MetadataSnapshot, bindings: FormBinding
     ...unfilterableColumns(snapshot, bindings, policy),
     ...throughProblems(snapshot, bindings, policy).map((problem) => `policy: ${problem}`),
     ...(isRecord(bindings.root) ? deleteProblems(snapshot, bindings, policy).map((problem) => `policy: ${problem}`) : []),
+    ...togetherProblems(snapshot, bindings, policy),
+  ]
+}
+
+/**
+ * A lookup saved with its record that cannot be held (0155): the bindings,
+ * by the rule the generator writes them by and the planner refuses them by
+ * (`togetherProblem`) -- one lookup at most, bounds a save can hold, written
+ * on create only, a foreign key that is NOT NULL onto another table, no
+ * section, no versions, no row security -- a touch column a touch can set
+ * (`touchColumnProblem`), and the policy, which may narrow a together
+ * child's rows only by the record they belong to, and pins no touch column
+ * (`togetherPolicyProblems`). So a person reads all of a
+ * record's rows or none, and a count of them discloses nothing a list would
+ * not.
+ */
+function togetherProblems(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string[] {
+  const root = isRecord(bindings.root) ? findObject(snapshot, bindings.root) : undefined
+  const held = root === undefined || !Array.isArray(bindings.fields) ? null : togetherProblem(root, bindings)
+  // A touch column is a rowversion's, and one no touch can set -- a key's, a foreign key's, a generated one -- is refused as the generator refuses it.
+  const concurrency: unknown = bindings.concurrency
+  const touched = isRecord(concurrency) && Object.hasOwn(concurrency, 'touch')
+  const touch =
+    root === undefined || !touched
+      ? null
+      : concurrency['kind'] !== 'rowversion'
+        ? 'a touch column is a rowversion’s, and a version column is moved by a save of rows itself'
+        : touchColumnProblem(root, Array.isArray(bindings.identity) ? bindings.identity : [], concurrency['touch'])
+  return [
+    ...(held === null ? [] : [`bindings: ${held}`]),
+    ...(touch === null ? [] : [`bindings: ${touch}`]),
+    ...togetherPolicyProblems(bindings, policy).map((problem) => `policy: ${problem}`),
   ]
 }
 

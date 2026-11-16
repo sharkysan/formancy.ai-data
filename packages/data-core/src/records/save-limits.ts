@@ -63,7 +63,9 @@ export const SAVE_MAX_ROWS = 100
  * another reason than a lock -- a trigger's work, a scan in a count --
  * runs to its end, holding its locks (SAVE_PARITY's `slow-statement`), as
  * the batch's compile before any step does: both are bounded only by
- * mssql's request timeout of 15 s, which is `unknown-outcome`. The route
- * will read another from `FORMANCY_DATA_SAVE_DEADLINE_MS`.
+ * mssql's request timeout of 15 s, which is `unknown-outcome`. The server
+ * reads another from `FORMANCY_DATA_SAVE_DEADLINE_MS`, and refuses to
+ * start where twice it is not below that timeout and a SQL Server
+ * connection is allowed (data-server's `save-deadline.ts`).
  */
 export const DEFAULT_SAVE_DEADLINE_MS = 1900

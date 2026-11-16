@@ -13,6 +13,7 @@ import { lookupDeadlineSetting } from './lookup-deadline.js'
 import { browseRolesSetting } from './browse-roles.js'
 import { publisherRolesSetting } from './publisher-roles.js'
 import { rateLimitSetting } from './rate-limit.js'
+import { saveDeadlineFit, saveDeadlineSetting } from './save-deadline.js'
 import { trustedProxiesSetting } from './trusted-proxies.js'
 
 /**
@@ -39,6 +40,10 @@ import { trustedProxiesSetting } from './trusted-proxies.js'
  *   FORMANCY_DATA_LOOKUP_DEADLINE_MS               how long a lookup statement may run before it is stopped,
  *                                                  1 to 2147483647 ms; default DEFAULT_LOOKUP_DEADLINE_MS, derived
  *                                                  from docs/performance/results.json (0061)
+ *   FORMANCY_DATA_SAVE_DEADLINE_MS                 how long a save of a record with its rows may wait for a lock,
+ *                                                  after which none of its steps starts, 1 to 2147483647 ms, and
+ *                                                  with a SQL Server connection allowed, twice it below mssql's
+ *                                                  15 s request timeout; default DEFAULT_SAVE_DEADLINE_MS (0155)
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -90,6 +95,14 @@ if (!proxies.ok) {
 const deadline = lookupDeadlineSetting(process.env['FORMANCY_DATA_LOOKUP_DEADLINE_MS'])
 if (!deadline.ok) {
   console.error(deadline.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, as the lookup deadline is (save-deadline.ts,
+// 0155); held to the allowlist's engines once it is read, below.
+const saveDeadline = saveDeadlineSetting(process.env['FORMANCY_DATA_SAVE_DEADLINE_MS'])
+if (!saveDeadline.ok) {
+  console.error(saveDeadline.problem)
   process.exit(1)
 }
 
@@ -198,6 +211,17 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
     console.error(environment.join('\n'))
     process.exit(1)
   }
+  // A save deadline a SQL Server save could outlast past mssql's request
+  // timeout -- unknown where it would have been rolled back -- stops the
+  // process here, before any connection opens (save-deadline.ts, 0155).
+  const unfit = saveDeadlineFit(
+    saveDeadline.ms,
+    parsed.connections.map((connection) => connection.kind),
+  )
+  if (unfit !== undefined) {
+    console.error(unfit)
+    process.exit(1)
+  }
   registry = createConnectionRegistry(parsed.connections, DRIVER_FACTORIES)
   untested = untestedLogins(parsed.connections)
   const store = createFileConfigurationStore(storeDirectory)
@@ -213,6 +237,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
     auditKey,
     origins: origins.origins,
     lookupDeadlineMs: deadline.ms,
+    saveDeadlineMs: saveDeadline.ms,
     log: () => app.log,
   })
 }

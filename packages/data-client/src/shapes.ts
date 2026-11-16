@@ -213,6 +213,21 @@ function isOpens(value: unknown): value is PublishedForm['opens'] {
   )
 }
 
+/** Whole numbers `min` and `max` of a together child's rows (0155). */
+function isBounds(value: Record<string, unknown>): boolean {
+  return Number.isSafeInteger(value['min']) && Number.isSafeInteger(value['max'])
+}
+
+/**
+ * The lookup a form's rows are saved with their record through (0155):
+ * `null`, or a field and the bounds. A reply without it is from a server
+ * older than 0155, whose page would offer a new row of a form whose rows
+ * the server creates only with their record.
+ */
+function isTogether(value: unknown): value is PublishedForm['together'] {
+  return value === null || (isRecord(value) && typeof value['field'] === 'string' && isBounds(value))
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -226,7 +241,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isVersions(body['versions'], body['operations'] as unknown[]) &&
     isWritable(body['writable'], body['operations'] as unknown[]) &&
     isMoves(body['moves']) &&
-    isOpens(body['opens'])
+    isOpens(body['opens']) &&
+    isTogether(body['together'])
   )
 }
 
@@ -242,9 +258,23 @@ function isSectionWhen(value: unknown): boolean {
   return typeof equals === 'string' || typeof equals === 'number' || typeof equals === 'boolean'
 }
 
-/** One child: its form and field, whether it is a section (0109), and only a section with a condition. */
+/**
+ * What a person may do with a together child's rows in a save of its
+ * record (0155): absent for any other child; otherwise its bounds and each
+ * flag a yes or no, so a page never draws an Add or a Remove the server
+ * did not say.
+ */
+function isTogetherChild(value: unknown): boolean {
+  if (value === undefined) return true
+  if (!isRecord(value) || !isBounds(value) || !isRecord(value['created']) || !isRecord(value['saved'])) return false
+  const { created, saved } = value
+  return typeof created['create'] === 'boolean' && ['create', 'update', 'delete'].every((flag) => typeof saved[flag] === 'boolean')
+}
+
+/** One child: its form and field, whether it is a section (0109), only a section with a condition, and a together child's flags (0155). */
 function isMenuChild(value: unknown): boolean {
   if (!isRecord(value) || typeof value['form'] !== 'string' || typeof value['field'] !== 'string' || typeof value['one'] !== 'boolean') return false
+  if (!isTogetherChild(value['together'])) return false
   return value['one'] ? isSectionWhen(value['when']) : value['when'] === null
 }
 

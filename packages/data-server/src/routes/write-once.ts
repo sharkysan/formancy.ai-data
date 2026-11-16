@@ -20,7 +20,9 @@ import type { FastifyRequest } from 'fastify'
  * the database -- which is the answer the page should have had. The id is
  * the person's, the form's and the operation's, so another of each is
  * another write -- a delete's included (0050), whose answer is a token and
- * `deleted`, so nothing of a deleted record is kept; and the same id with
+ * `deleted`, so nothing of a deleted record is kept, and a save of a record
+ * with its rows (0155), whose answer is the record and every row it wrote,
+ * kept under the same byte cap as any other; and the same id with
  * another body is refused, because
  * answering it with the first write's answer would say "Created" about
  * something never sent.
@@ -106,7 +108,7 @@ export function createWriteOnce(now: () => number = Date.now) {
      * arrive together cannot both perform.
      */
     async once(
-      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede'; id: string; body: unknown },
+      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'; id: string; body: unknown },
       perform: () => Promise<WriteAnswer>,
     ): Promise<WriteAnswer & { repeated: boolean }> {
       prune()

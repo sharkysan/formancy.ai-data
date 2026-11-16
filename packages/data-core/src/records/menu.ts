@@ -33,11 +33,10 @@ import type { MenuSaves, MenuTogether } from './together.js'
  * and a together child offers no create or delete alone, its rows being
  * added and removed with their record (0155). `GET /v1/forms/:id` narrows
  * this by the database as it is now; the menu says it as it is. One
- * function, so the two cannot disagree about the policy. They can disagree
- * about one create until the save's route lands: the menu leaves out the
- * create of a record a together child requires rows of where the person
- * could not make that save (`formMenu`), and the form route, which asks
- * this alone, does not yet.
+ * function, so the two cannot disagree about the policy. Both narrow it
+ * once more, alike: a record a together child requires rows of is offered
+ * no create where the person could not make the save that creates it with
+ * them (`formMenu`, whose answer the form route reads too).
  */
 export function grantedOperations(bindings: FormBindings, policy: FormPolicy, context: PolicyContext): PolicyOperation[] {
   return OPERATIONS.filter((operation) => (operation === 'read' || offeredFor(bindings, operation, null)) && authorizeOperation(policy, context, operation).ok)
@@ -138,30 +137,40 @@ function sectionWhen(parent: MenuForm, section: SectionBinding): FormMenuChild['
  * by the policy; the database as it is now, which can still refuse a page
  * as drift, is asked when the child form is opened.
  *
- * A form whose records a together child requires rows of (0155) is not
- * offered `create` where this person could not make that save: the child
- * is not one of its children here, or its `TogetherChild` gives them no
- * create of the child's rows with the record -- every such child of every
- * form, read or not, since a bound applies to everyone. The create route
- * is to refuse a plain create of such a record whoever asks, from the
- * save's route on (0155); it refuses none yet.
+ * A child whose rows are saved with the record (0155) carries its
+ * `TogetherChild`: its bounds and what this person may do with its rows in
+ * a save of the record. A form whose records a together child requires
+ * rows of is not offered `create` where this person could not make that
+ * save: the child is not one of its children here, or its `TogetherChild`
+ * gives them no create of the child's rows with the record -- every such
+ * child of every form, read or not, since a bound applies to everyone. The
+ * create route refuses a plain create of such a record whoever asks
+ * (0155): it is created with its rows, in a save.
  */
 
 export function formMenu(forms: readonly MenuForm[]): FormMenu {
   const named = forms.filter((form) => form.operations.includes('read')).sort((left, right) => byCodepoint(left.id, right.id))
   return {
     forms: named.map((parent) => {
+      const saved = togetherChildren(parent, forms)
       const children: FormMenuChild[] = []
       for (const child of named) {
         if (child.listedBy === null) continue
         for (const field of referencingFields(parent.key, child.lookups)) {
           if (!child.listedBy.includes(field)) continue
           const section = child.lookups.find((lookup) => lookup.field === field)?.section ?? null
-          children.push({ form: child.id, field, one: section !== null, when: section === null ? null : sectionWhen(parent, section) })
+          const together = saved.find((entry) => entry.form.id === child.id && entry.field === field)?.together
+          children.push({
+            form: child.id,
+            field,
+            one: section !== null,
+            when: section === null ? null : sectionWhen(parent, section),
+            ...(together === undefined ? {} : { together }),
+          })
         }
       }
       const shown = (id: string, field: string): boolean => children.some((child) => child.form === id && child.field === field)
-      const unsaved = togetherChildren(parent, forms).some((entry) => entry.required && !(shown(entry.form.id, entry.field) && entry.together.created.create))
+      const unsaved = saved.some((entry) => entry.required && !(shown(entry.form.id, entry.field) && entry.together.created.create))
       const operations = unsaved ? parent.operations.filter((operation) => operation !== 'create') : [...parent.operations]
       return { id: parent.id, title: parent.title, group: parent.group, operations, children }
     }),

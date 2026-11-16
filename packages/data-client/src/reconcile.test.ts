@@ -139,6 +139,50 @@ describe('reconcile', () => {
     })
   })
 
+  // A lost save over a saved record carries the record's version, which
+  // every save moves (0155): reconciled as an update, by one read of the
+  // record -- unchanged is the save not visible, and saving again with that
+  // version is stored at most once; changed is this save or another's, and
+  // the host loads the record and its rows. A lost save that creates its
+  // record carries no version: reconciled as a create, by the token the
+  // server promised, or unverifiable where the database numbers the key.
+  // Watched failing with a save read as a create whatever it carried: the
+  // saved order at the version sent was `present`, never `unchanged`.
+  test('a save is reconciled by its record: as an update where it carries a version, as a create where it does not', async () => {
+    const over = unknown({ operation: 'save', message: 'It may have been saved.' })
+    const still = await reading(200, stored('v1'))
+    expect(await createDataClient({ token: () => 't', base: still.base }).reconcile('pg-order', over)).toEqual({
+      ok: true,
+      state: 'unchanged',
+      current: stored('v1'),
+    })
+    expect(still.asked).toEqual(['POST /v1/forms/pg-order/records/read {"record":"k1:7"}'])
+    const moved = await reading(200, stored('v2'))
+    expect(await createDataClient({ token: () => 't', base: moved.base }).reconcile('pg-order', over)).toEqual({
+      ok: true,
+      state: 'changed',
+      current: stored('v2'),
+    })
+
+    const created = unknown({ operation: 'save', record: 'k1:1,8', version: null })
+    const found = await reading(200, { record: 'k1:1,8', version: 'v1', answers: { name: 'Neu GmbH' } })
+    expect(await createDataClient({ token: () => 't', base: found.base }).reconcile('pg-customer', created)).toEqual({
+      ok: true,
+      state: 'present',
+      current: { record: 'k1:1,8', version: 'v1', answers: { name: 'Neu GmbH' } },
+    })
+    const missing = await reading(404, { code: 'not-found', message: 'No such record.' })
+    expect(await createDataClient({ token: () => 't', base: missing.base }).reconcile('pg-customer', created)).toEqual({ ok: true, state: 'absent' })
+    const numbered = await reading(500, {})
+    expect(
+      await createDataClient({ token: () => 't', base: numbered.base }).reconcile('pg-order', unknown({ operation: 'save', record: null, version: null })),
+    ).toEqual({
+      ok: true,
+      state: 'unverifiable',
+    })
+    expect(numbered.asked).toEqual([])
+  })
+
   // A read that is refused says nothing about the write: a person who may
   // create and not read, a database out of reach. Calling that "absent"
   // would invite the duplicate; it is the read's own refusal, for the host

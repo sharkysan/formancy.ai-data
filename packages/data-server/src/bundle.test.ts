@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, generateForm } from '@formancy/data-core'
-import type { ColumnMeta, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType } from '@formancy/data-core'
+import type { ColumnMeta, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot, NormalizedType, ObjectMeta } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
 import type { BundleV1, BundleV2, PublishedBundle } from './bundle.js'
 import { policyProblems, validateBundle } from './bundle.js'
 import { generatedProblems } from './bundle-format2.js'
+import { storable } from './publishing.js'
 
 const INT32: NormalizedType = { kind: 'integer', min: '-2147483648', max: '2147483647' }
 
@@ -957,7 +958,7 @@ describe('a format-2 bundle (0030)', () => {
         const bundle = ordered() as unknown as { generation: { lookups: Array<Record<string, unknown>> } }
         ;(bundle.generation.lookups[0] as Record<string, unknown>)['section'] = section
         expect(refused(bundle as unknown as BundleV2), JSON.stringify(section)).toEqual([
-          'generation: lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null } }',
+          'generation: lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null }, together?: { min, max } }',
         ])
       }
     })
@@ -1000,5 +1001,266 @@ describe('a format-2 bundle (0030)', () => {
     expect(reported.ok).toBe(false)
     expect(reported.ok ? [] : reported.problems).toEqual(policyProblems(loose.snapshot, loose.bindings, loose.policy))
     expect(policyProblems(loose.snapshot, loose.bindings, loose.policy)).toContainEqual('policy: fields.ghost: the form has no field ghost')
+  })
+})
+
+/*
+ * A child saved with its record and a parent with a touch column (0155), as
+ * the bundle check holds them on publish and on every read, and the publish
+ * gate holds one batch's parameters on SQL Server.
+ */
+describe('a lookup saved with its record, and a touch column (0155)', () => {
+  const ROWVERSION: NormalizedType = { kind: 'rowversion' }
+  const NOTE: NormalizedType = { kind: 'text', maxLength: 200, lengthUnit: 'utf16-code-units', fixedLength: false }
+  const sales = (name: string) => ({ schema: 'sales', name })
+  const inbound = (table: string, name: string, columns: string[]) => ({
+    table: sales(table),
+    name,
+    columns,
+    referencedColumns: ['id'],
+    onDelete: 'no-action' as const,
+    onUpdate: 'no-action' as const,
+    enforced: true,
+  })
+  const key = (name: string, columns: string[], target: string) => ({
+    name,
+    columns,
+    references: { table: sales(target), columns: ['id'] },
+    onUpdate: 'no-action' as const,
+    onDelete: 'no-action' as const,
+    enforced: true,
+    validated: true,
+  })
+  const object = (name: string, columns: ColumnMeta[], extra: Partial<ObjectMeta> = {}): ObjectMeta => ({
+    ref: sales(name),
+    kind: 'table',
+    comment: null,
+    columns,
+    primaryKey: { name: `pk_${name}`, columns: ['id'] },
+    uniqueKeys: [],
+    foreignKeys: [],
+    checks: [],
+    rowSecurity: 'none',
+    access: { delete: true },
+    referencedBy: [],
+    ...extra,
+  })
+  /** An order; its lines, with a tenant of their own and a product; a product of a tenant; and a child of sixty numbers, whose rows bind more than one batch holds. */
+  function saved(edit: (objects: ObjectMeta[]) => void = () => {}): MetadataSnapshot {
+    const wide = Array.from({ length: 60 }, (_, index) => column(`n${String(index + 1)}`, index + 3, INT32))
+    const objects = [
+      object(
+        'order',
+        [
+          column('id', 1, INT32, { generated: 'identity-always' }),
+          column('tenant_id', 2, INT32),
+          column('notes', 3, NOTE, { nullable: true }),
+          column('row_version', 4, ROWVERSION, { generated: 'rowversion' }),
+        ],
+        { referencedBy: [inbound('order_line', 'fk_line_order', ['order_id']), inbound('wide', 'fk_wide_order', ['order_id'])] },
+      ),
+      object('product', [column('id', 1, INT32), column('tenant_id', 2, INT32), column('name', 3, NOTE)], {
+        referencedBy: [inbound('order_line', 'fk_line_product', ['product_id'])],
+      }),
+      object(
+        'order_line',
+        [
+          column('order_id', 1, INT32),
+          column('line_no', 2, INT32),
+          column('tenant_id', 3, INT32),
+          column('product_id', 4, INT32, { nullable: true }),
+          column('row_version', 5, ROWVERSION, { generated: 'rowversion' }),
+        ],
+        {
+          primaryKey: { name: 'pk_order_line', columns: ['order_id', 'line_no'] },
+          foreignKeys: [key('fk_line_order', ['order_id'], 'order'), key('fk_line_product', ['product_id'], 'product')],
+        },
+      ),
+      object('wide', [column('id', 1, INT32, { generated: 'identity-always' }), column('order_id', 2, INT32), ...wide], {
+        foreignKeys: [key('fk_wide_order', ['order_id'], 'order')],
+      }),
+    ]
+    edit(objects)
+    return createSnapshot({ kind: 'sqlserver', serverVersion: '16.0', account: { user: 'dbo', login: 'sa' }, scope: { schemas: ['sales'] }, gaps: [], objects })
+  }
+  const TENANT = [{ column: 'tenant_id', attribute: 'tenant' }]
+  const RW = { read: ['clerk'], write: ['clerk'] }
+  const ORDERS: GenerationRequest = {
+    connection: 'erp',
+    root: sales('order'),
+    formId: 'order',
+    title: 'Order',
+    lookups: [],
+    pinned: ['tenant_id'],
+    touchColumn: 'notes',
+  }
+  const LINES: GenerationRequest = {
+    connection: 'erp',
+    root: sales('order_line'),
+    formId: 'order-line',
+    title: 'Order line',
+    lookups: [
+      { foreignKey: 'fk_line_order', display: ['notes'], together: { min: 1, max: 3 } },
+      { foreignKey: 'fk_line_product', display: ['name'] },
+    ],
+    pinned: [],
+  }
+  const wideRequest = (max: number): GenerationRequest => ({
+    connection: 'erp',
+    root: sales('wide'),
+    formId: 'wide',
+    title: 'Wide',
+    lookups: [{ foreignKey: 'fk_wide_order', display: ['notes'], together: { min: 0, max } }],
+    pinned: [],
+  })
+  const ORDER_POLICY: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: { id: { read: ['clerk'], write: [] }, tenant_id: { read: ['clerk'], write: [] }, notes: RW },
+    rowFilters: TENANT,
+    lookups: {},
+  }
+  const LINE_POLICY: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+    fields: { order: RW, line_no: RW, tenant_id: RW, product: RW },
+    rowFilters: [],
+    lookups: { order: TENANT, product: TENANT },
+    through: ['order'],
+  }
+  const WIDE_POLICY: FormPolicy = {
+    version: 1,
+    operations: { read: ['clerk'], create: ['clerk'], update: [] },
+    fields: Object.fromEntries([['order', RW], ...Array.from({ length: 60 }, (_, index) => [`n${String(index + 1)}`, RW])]),
+    rowFilters: [],
+    lookups: { order: TENANT },
+    through: ['order'],
+  }
+  function bundle(request: GenerationRequest, policy: FormPolicy, source: MetadataSnapshot = saved()): BundleV2 {
+    const { form, bindings } = generateForm(source, request)
+    return { format: 2, connection: 'erp', generation: request, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot: source }
+  }
+  const problemsOf = (document: unknown): string[] => {
+    const checked = validateBundle(document)
+    return checked.ok ? [] : checked.problems
+  }
+
+  // The baseline: what the generator writes for a together child and a
+  // touched parent validates and is stored. A check that refused these
+  // would refuse every publish of a saved-with-its-record form.
+  test('a together child and a touched parent, as generated, validate and are stored', () => {
+    for (const document of [bundle(ORDERS, ORDER_POLICY), bundle(LINES, LINE_POLICY)]) {
+      expect(problemsOf(document)).toEqual([])
+      expect(storable(document, document.form.id, () => true)).toMatchObject({ ok: true })
+    }
+  })
+
+  // The request alone declares a together lookup and a touch column, and a
+  // regeneration reads it there: bindings that carry either otherwise than
+  // the request says would reach the next version unannounced, or save rows
+  // with a record nobody chose. Watched failing with `together` left out of
+  // a lookup choice's comparison, and with the touch column left out of
+  // the concurrency's.
+  test('a request and bindings that disagree about together or the touch column are refused', () => {
+    const unchosen = copy(bundle(LINES, LINE_POLICY))
+    delete unchosen.generation.lookups[0]?.together
+    expect(problemsOf(unchosen)).toEqual([
+      'generation: chooses a lookup over fk_line_order showing notes, which the bindings do not have',
+      'generation: the bindings have a lookup over fk_line_order showing notes saved with its record, 1 to 3, which it does not choose',
+    ])
+    const rebound = copy(bundle(LINES, LINE_POLICY))
+    ;(rebound.generation.lookups[0] as { together: { min: number; max: number } }).together = { min: 1, max: 2 }
+    expect(problemsOf(rebound)).toContainEqual(
+      'generation: chooses a lookup over fk_line_order showing notes saved with its record, 1 to 2, which the bindings do not have',
+    )
+    const untouched = copy(bundle(ORDERS, ORDER_POLICY))
+    delete untouched.generation.touchColumn
+    expect(problemsOf(untouched)).toEqual(['generation: confirms touch column none, and the bindings touch notes'])
+    const { touchColumn: _touch, ...plain } = ORDERS
+    const touched = copy(bundle(plain, ORDER_POLICY))
+    touched.generation.touchColumn = 'notes'
+    expect(problemsOf(touched)).toEqual(['generation: confirms touch column notes, and the bindings touch none'])
+  })
+
+  // What a save would count or touch wrongly is refused on every read: a
+  // child's read filter beyond the key it is saved with, or a through by
+  // another field, would let a person read some of a record's rows and not
+  // others; row security would hide rows from every count; a touch column
+  // in a key or one a row filter pins would make a guarding trigger refuse
+  // every save of rows. Watched failing with `togetherProblems` left out of
+  // `policyProblems`: each was served.
+  test('a read filter beyond the together key, a through by another field, row security, and a touch column in a key or a filter are refused', () => {
+    expect(problemsOf(bundle(LINES, { ...LINE_POLICY, rowFilters: TENANT }))).toContainEqual(
+      "policy: rowFilters: tenant_id is outside order's foreign key, and order is saved with its record: a person could read some of a record's rows and not others, and its bound would count rows they do not see",
+    )
+    expect(problemsOf(bundle(LINES, { ...LINE_POLICY, through: ['order', 'product'] }))).toEqual([
+      "policy: through: product scopes the rows by another field than order, which is saved with its record: a person could read some of a record's rows and not others",
+    ])
+    const hidden = copy(bundle(LINES, LINE_POLICY))
+    hidden.snapshot = saved((objects) => {
+      ;(objects.find((entry) => entry.ref.name === 'order_line') as ObjectMeta).rowSecurity = 'applies'
+    })
+    hidden.bindings.snapshotFingerprint = hidden.snapshot.fingerprint
+    expect(problemsOf(hidden)).toContainEqual('bindings: order is saved with its record, and row security on the table would hide rows from every count')
+    const keyed = copy(bundle(ORDERS, ORDER_POLICY))
+    keyed.generation.touchColumn = 'id'
+    if (keyed.bindings.concurrency !== null) keyed.bindings.concurrency.touch = 'id'
+    expect(problemsOf(keyed)).toEqual(['bindings: the touch column id is in a key or a foreign key'])
+    expect(problemsOf(bundle(ORDERS, { ...ORDER_POLICY, rowFilters: [...TENANT, { column: 'notes', attribute: 'tenant' }] }))).toContainEqual(
+      "policy: rowFilters: notes is the touch column, which every save of this form's rows alone sets to itself; a row filter cannot pin it",
+    )
+  })
+
+  // On SQL Server a save is one batch of at most 2,100 parameters, so a
+  // child whose `max` rows alone would bind more is refused at publish --
+  // and only there: what the batch binds is this release's prediction, and
+  // a version stored is still served, its saves refused by the menu and
+  // the adapter instead. Watched failing with the publish gate not asking
+  // `togetherBatchProblem`: the wide child was stored.
+  test('a max past one batch is refused at publish, and still served once stored', () => {
+    const document = bundle(wideRequest(40), WIDE_POLICY)
+    expect(problemsOf(document)).toEqual([])
+    const refused = storable(document, 'wide', () => true)
+    expect(refused).toMatchObject({ ok: false, refusal: { code: 'invalid-bundle' } })
+    expect(refused.ok ? [] : refused.refusal.extra?.['problems']).toEqual([
+      expect.stringMatching(
+        /^bindings: order is saved with its record up to 40 rows, and one change of a row binds up to \d+ parameters on SQL Server, past the 2100 one batch holds; a max of \d+ or less fits$/,
+      ),
+    ])
+    const fits = Number(/a max of (\d+) or less fits/.exec(String((refused.ok ? [] : (refused.refusal.extra?.['problems'] as string[]))[0]))?.[1])
+    expect(storable(bundle(wideRequest(fits), WIDE_POLICY), 'wide', () => true)).toMatchObject({ ok: true })
+    expect(storable(bundle(wideRequest(fits + 1), WIDE_POLICY), 'wide', () => true)).toMatchObject({ ok: false })
+  })
+
+  // Format 1 keeps no generation request, where a together lookup and a
+  // touch column are declared and compared: one carrying either is refused,
+  // not served unchecked. Watched failing with format 1 read as before:
+  // both validated.
+  test('together or a touch column in format 1 is refused', () => {
+    for (const { generation: _generation, base: _base, presentation: _presentation, ...parts } of [bundle(LINES, LINE_POLICY), bundle(ORDERS, ORDER_POLICY)]) {
+      expect(problemsOf({ ...parts, format: 1 })).toContainEqual(
+        'format 1 keeps no generation request, which is where a lookup saved with its record and a touch column are declared (0155): publish format 2',
+      )
+    }
+  })
+
+  // Bounds edited by hand, in the request and the bindings alike, so the
+  // two agree: read again as whole numbers within what a save holds, so no
+  // edit carries anything else towards a statement. Watched failing with
+  // the request's bounds read without `boundsProblem`: only the bindings'
+  // were refused.
+  test('a hand-edited bound is refused on read', () => {
+    const edited = copy(bundle(LINES, LINE_POLICY))
+    ;(edited.generation.lookups[0] as { together: unknown }).together = { min: 0, max: 1000 }
+    ;(edited.bindings.fields.find((entry) => entry.field === 'order') as { together: unknown }).together = { min: 0, max: 1000 }
+    expect(problemsOf(edited)).toEqual(
+      expect.arrayContaining([
+        "generation: lookups: fk_line_order is saved with its record, and its max is above 49, one row less than a list's page",
+        "bindings: order is saved with its record, and its max is above 49, one row less than a list's page",
+      ]),
+    )
+    const fraction = copy(bundle(LINES, LINE_POLICY))
+    ;(fraction.generation.lookups[0] as { together: unknown }).together = { min: 1, max: 2.5 }
+    expect(problemsOf(fraction)).toContainEqual('generation: lookups: fk_line_order is saved with its record, and its bounds are not whole numbers')
   })
 })

@@ -23,6 +23,15 @@ import type { UnknownWrite } from './writes.js'
  *   or the answer was lost before the server could name one. No request is
  *   made; only the person can tell.
  * - a refusal -- the read's own, which says nothing about the write.
+ *
+ * A save of a record with its rows (0155) is reconciled by the record
+ * alone: one over a saved record, which carries the version sent, as an
+ * update -- every save moves the record's version, so `unchanged` is
+ * nothing of it visible and `changed` is this save or another's -- and one
+ * that creates the record as a create. Either says what the record shows
+ * and nothing more of its rows: on SQL Server a trigger that commits can
+ * leave a save stored in part, so a host loads the record and its rows
+ * after `present` or `changed`, and says only what they show.
  */
 export type Reconciliation =
   | { ok: true; state: 'unchanged'; current: FormRecord }
@@ -40,7 +49,7 @@ export async function reconcile(
 ): Promise<Reconciliation> {
   if (unknown.record === null) return { ok: true, state: 'unverifiable' }
   const found = await read(formId, unknown.record)
-  if (unknown.operation === 'create') {
+  if (unknown.operation === 'create' || (unknown.operation === 'save' && unknown.version === null)) {
     if (found.ok) return { ok: true, state: 'present', current: found.value }
     return found.status === 404 && found.code === 'not-found' ? { ok: true, state: 'absent' } : found
   }
