@@ -14,6 +14,7 @@ import {
   versionAccessProblem,
   writesFor,
 } from './access.js'
+import { actionsFor } from './actions.js'
 import { controlFor } from './controls.js'
 import { startWithDefaults } from './defaults.js'
 import { listedControl, listedFor } from './listed.js'
@@ -139,6 +140,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     ...(rules.length === 0 ? {} : { logic: { rules } }),
     layouts: [{ name: 'default', nodes: layoutFor(root, planned) }],
   }
+  const actions = actionsFor(snapshot, root, request, { identity, concurrency, fields: planned.map((entry) => entry.binding) }, notes)
 
   const bindings: FormBindings = {
     version: BINDINGS_VERSION,
@@ -151,6 +153,7 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     snapshotFingerprint: snapshot.fingerprint,
     ...(validity === undefined ? {} : { validity }),
     ...(stamps.length === 0 ? {} : { stamps }),
+    ...(actions.length === 0 ? {} : { actions }),
   }
   // A together lookup the bindings cannot hold is refused by the rule the planner and the bundle check hold them to (0155).
   const unheld = togetherProblem(root, bindings)

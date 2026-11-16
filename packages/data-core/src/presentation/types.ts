@@ -1,6 +1,7 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import type { FieldBinding } from '../generate/types.js'
 import type { StoredListView } from '../runtime.js'
+import type { ActionPresentation } from './actions.js'
 
 /**
  * The version of `PresentationOverrides` this release writes and reads. A
@@ -83,8 +84,8 @@ export interface SectionPresentation {
  * generated section a field is placed in (0075), the views a list of the
  * form's records offers (0105), a field's help text (0119), the fields the
  * Filter panel leaves out (0123), the labels of a state field's states
- * (0129), the group the form is listed under (0143) and a field's starting
- * value (0150). Each entry holds
+ * (0129), the group the form is listed under (0143), a field's starting
+ * value (0150) and the words of the form's actions (0159). Each entry holds
  * only what differs from the base, so a presentation has one spelling.
  */
 export interface PresentationOverrides {
@@ -101,6 +102,8 @@ export interface PresentationOverrides {
   states?: StateLabel[]
   /** The group a list of forms puts the form under, `null` for none; left out for the default, the root schema's name in words, never spelled out (`group.ts`, 0143). */
   group?: string | null
+  /** The words of the form's actions, in the bindings' order; left out when there are none, never `[]` (`actions.ts`, 0159). */
+  actions?: ActionPresentation[]
 }
 
 export type PresentationCheck = { ok: true; presentation: PresentationOverrides } | { ok: false; problems: string[] }
@@ -167,6 +170,10 @@ export type PresentationConflict =
    * the condition, which would show a wider list under the view's name.
    */
   | { kind: 'view-dropped'; view: string; resolution: 'dropped'; message: string }
+  /** An action's words the rebase could not carry (0159): the regenerated bindings bind no action of its name. Dropped whole. */
+  | { kind: 'action-dropped'; action: string; resolution: 'dropped'; message: string }
+  /** The words of one field of an action's dialog the rebase could not carry (0159): the regenerated dialog has no field of its key. */
+  | { kind: 'action-input-dropped'; action: string; input: string; resolution: 'dropped'; message: string }
 
 export interface RebasedPresentation {
   presentation: PresentationOverrides

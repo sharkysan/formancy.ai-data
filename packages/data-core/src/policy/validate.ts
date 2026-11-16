@@ -91,6 +91,67 @@ function fitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
   }
   problems.push(...throughFitProblems(policy, byField))
   problems.push(...transitionFitProblems(policy, byField))
+  problems.push(...actionFitProblems(policy, bindings))
+  return problems
+}
+
+/**
+ * Who may run each action (0159), fitted to the form. Refused: an action
+ * the bindings do not bind; a role that may not read, since a run names the
+ * version its person read; a role that may not read a field the action
+ * passes to its routine, which would hand the routine a value its person
+ * is kept from (0011); an attribute the action passes that no row filter
+ * or through of the form compares with, which a context need not carry
+ * and every run would then be refused for; and, where somebody may run
+ * one, a form whose records nothing scopes while a lookup's options are
+ * filtered -- the delete's rule (`deleteGrantProblems`), for a run is no
+ * more taken back than a delete is. A role needs no update: an action is
+ * an operation of its own.
+ */
+function actionFitProblems(policy: ParsedPolicy, bindings: FormBindings): string[] {
+  const problems: string[] = []
+  const established = new Set([
+    ...policy.rowFilters.map((rule) => rule.attribute),
+    ...policy.through.flatMap((field) => (policy.lookups.get(field) ?? []).map((rule) => rule.attribute)),
+  ])
+  let running = false
+  for (const [name, roles] of policy.actions) {
+    const action = (bindings.actions ?? []).find((candidate) => candidate.name === name)
+    if (action === undefined) {
+      problems.push(`actions.${name}: the form binds no action ${name}`)
+      continue
+    }
+    running ||= roles.size > 0
+    for (const role of [...roles].sort(byCodepoint)) {
+      if (!policy.operations.read.has(role)) {
+        problems.push(`actions.${name} grants ${role}, who may not read with this form: a run names the version its person read`)
+        continue
+      }
+      for (const parameter of action.parameters) {
+        const from = parameter.from
+        if (from.kind === 'field' && policy.fields.get(from.field)?.read.has(role) !== true)
+          problems.push(`actions.${name} grants ${role}, who may not read ${from.field}, which the action passes to its routine`)
+      }
+    }
+    for (const parameter of action.parameters) {
+      const from = parameter.from
+      if (from.kind === 'attribute' && !established.has(from.attribute))
+        problems.push(
+          `actions.${name} passes the context's ${from.attribute}, which no row filter or through of this form compares with, so a context need not carry it`,
+        )
+    }
+  }
+  if (running) {
+    const unscoped = unscopedLookups(bindings, {
+      rowFilters: [...policy.rowFilters],
+      through: [...policy.through],
+      lookups: Object.fromEntries([...policy.lookups].map(([key, rules]) => [key, [...rules]])),
+    })
+    if (unscoped.length > 0)
+      problems.push(
+        `actions grants roles, and nothing scopes the records of this form though the options of ${unscoped.join(' and ')} are filtered, so a run could reach a record of any tenant by its token: scope them with a row filter or a through`,
+      )
+  }
   return problems
 }
 

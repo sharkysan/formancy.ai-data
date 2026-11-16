@@ -66,6 +66,12 @@ create that leaves the field to its default, and a write by another
 application or by SQL, move it unchecked, and a move is a pair of values
 with no condition on anything else
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).
+An action's routine is opaque: it may write fields no grant lets its
+person write, move a state field outside the listed moves, delete through
+keys the policy does not name, and with `reach: 'owner'` act beyond the
+account's own grants; the module holds only what it hands the routine and
+which row it runs over
+([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 
 ### Lost updates and ambiguous writes
 
@@ -205,8 +211,20 @@ replication-filter routine is not read, and only a gap on it says it is
 there; a SQL Server parameter's default is not in its catalog, and is
 recorded as unknown; and every SQL Server routine is read as reaching
 past its caller's grants, by ownership chaining, whether or not it says
-EXECUTE AS. Nothing binds, runs or shows a routine yet
+EXECUTE AS
 ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
+A routine is bound as an action, and nothing runs or shows one yet. An
+action is offered only where a version proves the record, as a delete is;
+on SQL Server's rowversion forms only with a confirmed touch column, which
+the generator does not write yet; a PostgreSQL parameter is compared by
+its kind, range and zone alone; on SQL Server a datetime or smalldatetime
+column passes only to a parameter of its own type, and a varchar parameter
+under a collation that is not UTF-8 takes no nvarchar column, though which
+code page a column's own collation has is the run's to check, a later
+record's; drift review of a form with actions needs a
+discovery that records routines, which nothing in the server asks for; and
+a routine's body is never compared, so one whose body changed still runs
+([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 
 **Forms.** Decimal fields are text inputs, totals over money are not
 offered, a table with a version-looking column is create-only until
@@ -428,6 +446,9 @@ connection's account can read, with no form or policy between; each page
 discovers the scope again, unmeasured, and a view's rows equal in every
 shown column may trade places between pages
 ([0099](../decisions/0099-a-browse-role-reads-any-table-or-views-rows-as-the-connections-account-does.md)).
+A role that may run an action must read every field the action passes,
+and an attribute it passes must be one a row filter or a through compares
+with (0159).
 A client is its address, so people behind one NAT share a rate-limit
 bucket, and nothing reports a trusted-proxy list too wide or too narrow
 ([0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)).

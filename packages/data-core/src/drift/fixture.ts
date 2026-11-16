@@ -296,6 +296,8 @@ function onlyTheRootDefinition(base: MetadataSnapshot, current: MetadataSnapshot
   if (current.server !== undefined && !serverStanding(current.kind, current.server).tested) return false
   if (targets.some((target) => refKey(target) === refKey(root))) return false
   if (JSON.stringify([base.account, base.scope, base.gaps]) !== JSON.stringify([current.account, current.scope, current.gaps])) return false
+  // A routine is review's, beside the root a request describes (0159).
+  if (JSON.stringify(base.routines) !== JSON.stringify(current.routines)) return false
   const others = (snapshot: MetadataSnapshot) => JSON.stringify(snapshot.objects.filter((object) => refKey(object.ref) !== refKey(root)))
   if (others(base) !== others(current)) return false
   const was = findObject(base, root)
@@ -358,6 +360,10 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       !allows(operation, report) || allows(operation, report.runtime),
       `review allows ${operation} and the runtime refuses it: ${JSON.stringify(report.changes.map((change) => change.kind))}`,
     ).toBe(true)
+  }
+  // An action review lets run, a request runs too (0159).
+  for (const action of report.actions ?? []) {
+    expect(report.runtime.actions, `review lets ${action} run and the runtime refuses it`).toContain(action)
   }
   const targets = bindings.fields.flatMap((binding) => (binding.kind === 'lookup' ? [binding.target.table] : []))
   if (onlyTheRootDefinition(base, current, bindings.root, targets)) {

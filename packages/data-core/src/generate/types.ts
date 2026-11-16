@@ -1,4 +1,5 @@
 import type { FormSchema } from '@formancy/spec'
+import type { ActionBinding, ActionChoice } from '../actions/types.js'
 import type { ForeignKeyTarget, NormalizedType, ObjectRef } from '../metadata.js'
 
 /** A foreign key of the root offered as a lookup, and the target columns a person recognises a row by. */
@@ -88,6 +89,13 @@ export interface GenerationRequest {
    * generated field for one is shown and never written.
    */
   stamps?: StampChoice[]
+  /**
+   * Routines the form offers to run over the open record (0159), each a
+   * name, the routine and where every one of its parameters comes from.
+   * The generator binds each it can and says in a `blocked` note why it
+   * refuses any other. Absent, or empty, for a form that offers none.
+   */
+  actions?: ActionChoice[]
 }
 
 /**
@@ -226,6 +234,13 @@ export interface FormBindings {
    * keeps comparing equal to its regeneration.
    */
   stamps?: StampBinding[]
+  /**
+   * The actions the form offers (0159), in the request's order, each with
+   * its routine, its parameters' sources and its generated dialog; absent
+   * for a form that binds none, so every form published before keeps
+   * comparing equal to its regeneration.
+   */
+  actions?: ActionBinding[]
   /** The snapshot this was generated from. Drift review compares against it. */
   snapshotFingerprint: string
 }

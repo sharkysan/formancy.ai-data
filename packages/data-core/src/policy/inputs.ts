@@ -91,6 +91,8 @@ export interface ParsedPolicy {
   cascades: readonly CascadeRule[]
   /** The state field and its moves (0112), each `from`-`to` pair once, its roles a set; null when the policy names none. */
   transitions: { field: string; moves: ReadonlyArray<{ from: string | null; to: string; roles: ReadonlySet<string> }> } | null
+  /** Who may run each action the policy names (0159), by the action's name; empty when it names none. */
+  actions: ReadonlyMap<string, ReadonlySet<string>>
 }
 
 /**
@@ -272,6 +274,30 @@ function readTransitions(value: unknown, problems: string[]): ParsedPolicy['tran
 }
 
 /**
+ * Who may run each action (0159), by name, in codepoint order; an absent
+ * property is none. Own keys only, read as `fields` is, so an action
+ * called `constructor` is the policy's or nobody's.
+ */
+function readActions(value: unknown, problems: string[]): Map<string, ReadonlySet<string>> {
+  const actions = new Map<string, ReadonlySet<string>>()
+  if (value === undefined) return actions
+  if (!isRecord(value)) {
+    problems.push('actions is not an object of action names')
+    return actions
+  }
+  for (const name of Object.keys(value).sort(byCodepoint)) {
+    const entry = value[name]
+    if (!isRecord(entry)) {
+      problems.push(`actions.${name} is not { roles }`)
+      continue
+    }
+    unread(entry, ['roles'], `actions.${name}.`, problems)
+    actions.set(name, readRoles(entry['roles'], `actions.${name}.roles`, problems))
+  }
+  return actions
+}
+
+/**
  * The policy as the rest of this module uses it, or every reason it cannot be.
  *
  * Every problem rather than the first, because a person fixes a policy from
@@ -281,7 +307,7 @@ function readTransitions(value: unknown, problems: string[]): ParsedPolicy['tran
 export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [] } | { parsed: null; problems: string[] } {
   if (!isRecord(policy)) return { parsed: null, problems: ['the policy is not an object'] }
   const problems: string[] = []
-  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades', 'transitions'], '', problems)
+  unread(policy, ['version', 'operations', 'fields', 'rowFilters', 'lookups', 'through', 'cascades', 'transitions', 'actions'], '', problems)
   if (policy['version'] !== 1) problems.push('version is not 1, the only policy version this release reads')
 
   const rawOperations = policy['operations']
@@ -312,7 +338,8 @@ export function readPolicy(policy: unknown): { parsed: ParsedPolicy; problems: [
   const through = readThrough(policy['through'], problems)
   const cascades = readCascades(policy['cascades'], problems)
   const transitions = readTransitions(policy['transitions'], problems)
+  const actions = readActions(policy['actions'], problems)
 
   if (problems.length > 0) return { parsed: null, problems }
-  return { parsed: { operations, fields, rowFilters, lookups, through, cascades, transitions }, problems: [] }
+  return { parsed: { operations, fields, rowFilters, lookups, through, cascades, transitions, actions }, problems: [] }
 }

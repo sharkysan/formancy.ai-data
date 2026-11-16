@@ -1,6 +1,7 @@
 import type { FormSchema, Text } from '@formancy/spec'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import type { FieldAnchor, PresentationOverrides, PresentedForm, SectionAnchor, StartingValue } from './types.js'
+import { actionPresentationProblems, actionShapeProblems } from './actions.js'
 import { fieldAnchor, PRESENTATION_VERSION } from './types.js'
 import { copyOf, describeSection, hasKeys, isRecord, isText, readGeneratedLayout, same } from './layout.js'
 import { groupShapeProblems } from './group.js'
@@ -94,8 +95,10 @@ export function presentationShapeProblems(value: unknown): string[] {
   if (!isRecord(value)) return ['a presentation is an object']
   const problems: string[] = []
   for (const key of Object.keys(value)) {
-    if (!['version', 'fields', 'sections', 'views', 'unfiltered', 'states', 'group'].includes(key)) problems.push(`${key} is not a property of a presentation`)
+    if (!['version', 'fields', 'sections', 'views', 'unfiltered', 'states', 'group', 'actions'].includes(key))
+      problems.push(`${key} is not a property of a presentation`)
   }
+  if (Object.hasOwn(value, 'actions')) problems.push(...actionShapeProblems(value['actions']))
   if (Object.hasOwn(value, 'views')) problems.push(...viewShapeProblems(value['views']))
   if (Object.hasOwn(value, 'unfiltered')) problems.push(...unfilteredShapeProblems(value['unfiltered']))
   if (Object.hasOwn(value, 'states')) problems.push(...stateLabelShapeProblems(value['states']))
@@ -181,7 +184,8 @@ export function applyPresentation(base: FormSchema, presentation: PresentationOv
   const layout = readGeneratedLayout(base)
   if (!layout.ok) return { ok: false, problems: [layout.problem] }
 
-  const problems: string[] = []
+  // An action's words, over what the bindings bind (0159): no field of the form's own.
+  const problems: string[] = actionPresentationProblems(presentation.actions, bindings)
   const form = copyOf(base)
   const nodes = (form.layouts?.[0]?.nodes ?? []) as unknown as Section[]
   const nodeOf = new Map<string, Node>()

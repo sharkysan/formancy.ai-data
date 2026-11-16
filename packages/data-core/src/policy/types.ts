@@ -78,6 +78,15 @@ export interface FieldPolicy {
  * `cascades` names each foreign key a delete may act through, with what it
  * does (0051): optional, absent is none, and refused while nobody may
  * delete.
+ *
+ * `actions` names, for each action the form binds, the roles that may run
+ * it (0159). Optional, and absent -- or an action it does not name -- is
+ * nobody's: a policy written before it keeps its meaning, and a server
+ * older than it refuses a policy that names one. A run is scoped by
+ * `rowFilters` and every `through`, as a read is, and every role it lists
+ * must be granted read, and may read every field the action passes to its
+ * routine. It needs no update: an action is an operation of its own, as a
+ * database grants EXECUTE without UPDATE.
  */
 export interface FormPolicy {
   version: 1
@@ -88,6 +97,12 @@ export interface FormPolicy {
   through?: string[]
   cascades?: CascadeRule[]
   transitions?: TransitionRule
+  actions?: Record<string, ActionGrant>
+}
+
+/** Who may run one action (0159): roles, exact strings, as an operation's are. */
+export interface ActionGrant {
+  roles: string[]
 }
 
 /**

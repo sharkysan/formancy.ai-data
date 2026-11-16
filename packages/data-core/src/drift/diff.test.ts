@@ -374,9 +374,11 @@ describe('diffSnapshots: access', () => {
       message: expect.stringMatching(/the routines of anything in schema sales.*nothing this form does rests on it/),
     })
     expect(narrowed.writable).toEqual({ create: true, update: true, delete: false })
-    // A routine that changed between two snapshots that both record it is
-    // nothing a form binds yet (0158): no change.
-    expect(drift(undefined, { routines: [{ ...shipOrder, executable: false }] }, ORDER, snapshot(undefined, { routines: [shipOrder] })).changes).toEqual([])
+    // A routine that changed between two snapshots that both record it, and
+    // that no action of this form binds, is said and stops nothing (0159).
+    const changed = drift(undefined, { routines: [{ ...shipOrder, executable: false }] }, ORDER, snapshot(undefined, { routines: [shipOrder] }))
+    expect(only(changed)).toMatchObject({ kind: 'routine-changed', severity: 'info', subject: { kind: 'routine', routine: shipOrder.ref } })
+    expect(changed.writable).toEqual({ create: true, update: true, delete: false })
   })
 
   // A gap that disappeared means the connection sees more than it did when

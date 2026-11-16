@@ -1,4 +1,5 @@
 import type { ObjectRef } from '../metadata.js'
+import type { RoutineRef } from '../routines.js'
 
 /**
  * What a change means for the one form it is classified against.
@@ -24,7 +25,7 @@ export type DriftKind =
   | 'root-dropped'
   /** The root is a view where it was a table, or the other way round. */
   | 'root-kind-changed'
-  /** The root, or a lookup's target, is in a schema discovery is no longer approved for. */
+  /** The root, a lookup's target, or a routine an action binds (0159), is in a schema discovery is no longer approved for. */
   | 'scope-narrowed'
   /**
    * Something the form depends on cannot be seen, and a gap says so — or a
@@ -88,6 +89,27 @@ export type DriftKind =
    * always for review. Nothing is stopped for it.
    */
   | 'server-untested'
+  /**
+   * A routine an action binds is gone, and no gap says the account lost
+   * sight of it (0159); or, between two snapshots that both record
+   * routines, one no action binds.
+   */
+  | 'routine-dropped'
+  /**
+   * A routine an action binds changed what a call of it rests on: its kind,
+   * what it returns, or its parameters' names, types, modes or order
+   * (0159); or anything else of one, or of one no action binds. Its body is
+   * never compared.
+   */
+  | 'routine-changed'
+  /** A routine an action binds started or stopped reaching beyond its caller's grants: SECURITY DEFINER (0159). */
+  | 'routine-reach-changed'
+  /**
+   * A routine is new in scope, between two snapshots that both record
+   * routines (0159): an overload beside which a bound routine's every call
+   * is ambiguous, or one nothing binds.
+   */
+  | 'routine-added'
 
 /**
  * What a change is about. An object is two strings and never one dotted
@@ -100,6 +122,8 @@ export type DriftSubject =
   | { kind: 'schema'; schema: string }
   | { kind: 'object'; object: ObjectRef }
   | { kind: 'column' | 'key' | 'foreign-key' | 'check'; object: ObjectRef; name: string }
+  /** A function or procedure, by its schema, name and signature (0159). */
+  | { kind: 'routine'; routine: RoutineRef }
 
 export interface DriftChange {
   kind: DriftKind
@@ -121,6 +145,12 @@ export interface DriftVerdict {
    * whether a change that stops it is `blocking`.
    */
   writable: { create: boolean; update: boolean; delete: boolean }
+  /**
+   * The actions the bindings bind that may still run, in their order
+   * (0159); absent for a form that binds none, so every report on a form
+   * published before is what it was.
+   */
+  actions?: string[]
 }
 
 export interface DriftReport extends DriftVerdict {

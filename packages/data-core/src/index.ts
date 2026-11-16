@@ -34,7 +34,26 @@ export { readCheckList } from './generate/check-lists.js'
 export type { CheckList, ListedLiteral } from './generate/check-lists.js'
 export { listedFor } from './generate/listed.js'
 export type { Listed } from './generate/listed.js'
-export { deleteUnoffered, offeredFor, offers, versionProvesRecord } from './generate/offers.js'
+export { actionMove, actionUnoffered, deleteUnoffered, offeredFor, offers, versionProvesRecord } from './generate/offers.js'
+export { ambiguousBeside, fitProblem, inputProblem, isParameterSource, routineProblem } from './generate/actions.js'
+export { ACTION_REFRESH } from './actions/wire.js'
+export type { ActionDone, ActionRefresh, ActionRunBody, ActionUnknownOutcome, FormAction } from './actions/wire.js'
+export { ACTION_REFUSED, planAction } from './actions/plan.js'
+export type { DuplicateRecord, PlannedAction } from './actions/plan.js'
+export type {
+  ActionArgument,
+  ActionBinding,
+  ActionChoice,
+  ActionMove,
+  ActionParameter,
+  ActionRecord,
+  ActionRequest,
+  ArgumentSource,
+  BoundSource,
+  DescribedRoutine,
+  ParameterChoice,
+  ParameterSource,
+} from './actions/types.js'
 export type { OfferedOperation, WriteScope } from './generate/offers.js'
 export { boundsProblem, TOGETHER_MAX_ROWS, togetherOf, togetherProblem, touchColumnProblem } from './generate/together.js'
 export type { Together } from './generate/together.js'
@@ -64,6 +83,9 @@ export type { DescribedRoot } from './drift/diff.js'
 export type { DriftChange, DriftKind, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './drift/types.js'
 export type { DriftPolicy } from './drift/context.js'
 export { applyPresentation, presentationShapeProblems } from './presentation/apply.js'
+export { actionLabel } from './generate/action-dialog.js'
+export { actionPresentationProblems, actionShapeProblems, presentedActions } from './presentation/actions.js'
+export type { ActionInputPresentation, ActionPresentation } from './presentation/actions.js'
 export { presentationOf } from './presentation/derive.js'
 export { describeReassigned, grantsOnKey, reassignedKeys, rebasePresentation } from './presentation/rebase.js'
 export { EMPTY_PRESENTATION, fieldAnchor, PRESENTATION_VERSION } from './presentation/types.js'
@@ -133,6 +155,7 @@ export type { ApiValue, Codec, CodecOutcome } from './codecs/codec.js'
 export { canonicalFloat32 } from './codecs/numbers.js'
 export { decodeRowversion, encodeRowversion } from './codecs/rowversion.js'
 export {
+  authorizeAction,
   authorizeOperation,
   checkSubmittedFields,
   checkTransition,
@@ -140,6 +163,7 @@ export {
   lookupRowFilter,
   readableFields,
   rowFilter,
+  runnableActions,
   stateField,
   stateMoves,
   throughFilters,
@@ -152,6 +176,7 @@ export { actsOnDelete, deleteEffects, deleteProblems, deleteReach, deleteReview,
 export type { DeleteReachFacts, DeleteReview, ReachedKey } from './policy/cascades.js'
 export type { ThroughKeyType } from './policy/through.js'
 export type {
+  ActionGrant,
   CascadeRule,
   DeleteAction,
   FieldPolicy,

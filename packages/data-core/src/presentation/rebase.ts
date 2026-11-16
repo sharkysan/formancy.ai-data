@@ -3,6 +3,7 @@ import { canonicalize } from '@formancy/spec'
 import type { FieldBinding, FormBindings } from '../generate/types.js'
 import type { FormPolicy } from '../policy/types.js'
 import { applyPresentation } from './apply.js'
+import { carryActions } from './rebase-actions.js'
 import type { GeneratedSection } from './layout.js'
 import { describeSection, describeText, readGeneratedLayout, same } from './layout.js'
 import { placements } from './placement.js'
@@ -49,6 +50,8 @@ const RANK: Record<PresentationConflict['kind'], number> = {
   'view-dropped': 1,
   'default-dropped': 1,
   'default-respelled': 1,
+  'action-dropped': 1,
+  'action-input-dropped': 1,
 }
 
 /** A conflict with where it sorts: field subjects in old-base field order, then sections in old-base order, then views in their order. */
@@ -498,6 +501,13 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     report: (index, conflict) => rebase.add(oldFields.length + before.sections.length + index, conflict),
   })
   const unfiltered = carryUnfiltered(published.presentation.unfiltered ?? [], rebase.follow, regenerated.bindings)
+  // An action's words, by its name and each input's key (0159), said after the views.
+  const viewed = oldFields.length + before.sections.length + (published.presentation.views?.length ?? 0)
+  const actions = carryActions({
+    actions: published.presentation.actions ?? [],
+    bindings: regenerated.bindings,
+    report: (index, conflict) => rebase.add(viewed + index, conflict),
+  })
   const presentation: PresentationOverrides = {
     version: PRESENTATION_VERSION,
     fields,
@@ -508,6 +518,7 @@ export function rebasePresentation(published: Published, regenerated: Regenerate
     ...(published.presentation.states === undefined ? {} : { states: published.presentation.states }),
     // The group is the form's, bound to no field: carried as it is, a cleared one included (0143).
     ...(published.presentation.group === undefined ? {} : { group: published.presentation.group }),
+    ...(actions.length === 0 ? {} : { actions }),
   }
 
   const applied = applyPresentation(regenerated.base, presentation, regenerated.bindings)
