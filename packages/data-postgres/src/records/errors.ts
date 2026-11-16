@@ -143,6 +143,16 @@ export function passing(state: string): boolean {
   return PASSING_CLASSES.has(state.slice(0, 2)) || PASSING_STATES.has(state)
 }
 
+/**
+ * The code a SQLSTATE has an entry of its own for, or `undefined`. An
+ * action's run asks it before what passes (actions/errors.ts), so the
+ * server's own unknown outcome, 40003, is not read as its class, 40, which
+ * passes: one fact, one answer, in this adapter.
+ */
+export function exactCode(state: string): RecordFailureCode | undefined {
+  return BY_STATE.get(state)
+}
+
 /** The code for a SQLSTATE: an exact entry, then its class, then what passes, and `refused` for the rest. */
 function codeOf(state: string): RecordFailureCode {
   const known = BY_STATE.get(state) ?? BY_CLASS.get(state.slice(0, 2))

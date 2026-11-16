@@ -15,13 +15,18 @@ import type { Statement } from '../sql/statement.js'
  *
  * The procedure is found by OBJECT_ID of its quoted name, bound, as the
  * EXEC resolves it. The facts hold its object_id -- a DROP and CREATE gives
- * another -- its schema, name and type, and each parameter's id, name,
- * system and user type, length, precision, scale and direction, in order.
- * Never its text, which is the deployment's logic (0159), never
- * `modify_date`, which an ALTER of the body moves, and never EXECUTE AS:
- * every procedure reaches its owner's tables by ownership chaining
- * whatever it says (0158), so what a run reaches is not moved by it. A
- * grant is not a new definition either.
+ * another -- its schema, name and type, the principal it executes as, and
+ * each parameter's id, name, system and user type, length, precision, scale
+ * and direction, in order. EXECUTE AS is SQL Server's SECURITY DEFINER:
+ * ownership chaining lets every procedure reach its owner's tables (0158),
+ * and stops at dynamic SQL, at an object another principal owns and at
+ * another database, where EXECUTE AS OWNER, or a user named, reaches with
+ * that principal's permissions. sys.sql_modules' `execute_as_principal_id`
+ * -- NULL for the caller, -2 for the owner, else the principal -- is read by
+ * the account the run goes as, in the description and in the run alike, so
+ * it agrees with itself even where that account cannot see it. Never its
+ * text, which is the deployment's logic (0159), and never `modify_date`,
+ * which an ALTER of the body moves. A grant is not a new definition.
  *
  * The description is discovery's own read of the procedure
  * (`ROUTINE_ROWS`, `routinesOf`), scoped to the one object, as FOR JSON,
@@ -31,6 +36,7 @@ import type { Statement } from '../sql/statement.js'
 /** The facts of the procedure whose quoted name the parameter `name` holds, as one JSON text; NULL when there is no such procedure. */
 export function routineFactsOf(name: string): string {
   return `(select o.object_id as [object], rtrim(o.type) as [type], schema_name(o.schema_id) as [schema], o.name as [name],
+    (select m.execute_as_principal_id from sys.sql_modules as m where m.object_id = o.object_id) as [execute_as],
     (select p.parameter_id as [id], p.name as [name], p.system_type_id as [system], p.user_type_id as [user], p.max_length as [length],
       p.precision as [precision], p.scale as [scale], p.is_output as [output], p.is_readonly as [readonly]
       from sys.parameters as p where p.object_id = o.object_id order by p.parameter_id for json path, include_null_values) as [parameters]

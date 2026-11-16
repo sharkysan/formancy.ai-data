@@ -6,9 +6,11 @@
 --
 -- A routine is a procedure, and reaches its owner's tables by ownership
 -- chaining, so formancy_writer needs no grant on call to have a call
--- recorded; it holds SELECT and UPDATE on the tables a run locks and moves,
--- EXECUTE on the schema, and VIEW DEFINITION, so that discovery as the
--- writer reads the schema with no gap. close_order also returns a status
+-- recorded, nor on called, the sequence each procedure draws from as it
+-- begins, which no rollback gives back (NO CACHE, so its last value is the
+-- last one drawn); it holds SELECT and UPDATE on the tables a run locks and
+-- moves, EXECUTE on the schema, and VIEW DEFINITION, so that discovery as
+-- the writer reads the schema with no gap. close_order also returns a status
 -- other than 0, commits or rolls back the run's own transaction, and
 -- returns a result set, as its note asks. broken_order is created while
 -- the column it sets exists, which SQL Server checks at CREATE, and the
@@ -64,10 +66,12 @@ create table actions.ticket (
   row_version rowversion not null
 );
 alter table actions.[order] add obsolete int null;
+create sequence actions.called as bigint start with 1 increment by 1 no cache;
 GO
 create procedure actions.close_order @p_order bigint, @p_note nvarchar(200), @p_actor nvarchar(100), @p_amount decimal(12, 2), @p_tenant int as
 begin
   set nocount on;
+  declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id, note, actor, amount, tenant) values (N'close_order', @p_order, @p_note, @p_actor, @p_amount, @p_tenant);
   if @p_note = N'refuse' throw 50001, N'formancy: refused: This order cannot be closed now.', 1;
   if @p_note = N'plain' throw 50002, N'an error not worded for the person', 1;
@@ -92,6 +96,7 @@ GO
 create procedure actions.broken_order @p_order bigint as
 begin
   set nocount on;
+  declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id) values (N'broken_order', @p_order);
   update actions.[order] set obsolete = 1 where id = @p_order;
 end
@@ -101,6 +106,7 @@ GO
 create procedure actions.reprice @p_price bigint as
 begin
   set nocount on;
+  declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id) values (N'reprice', @p_price);
   update actions.price set amount = amount + 1 where id = @p_price;
 end
@@ -108,6 +114,7 @@ GO
 create procedure actions.label_ticket @p_ticket bigint, @p_label varchar(50), @p_remark varchar(50), @p_actor varchar(50) as
 begin
   set nocount on;
+  declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id, note, actor) values (N'label_ticket', @p_ticket, convert(nvarchar(50), @p_label) + N'|' + convert(nvarchar(50), @p_remark), @p_actor);
   update actions.ticket set note = @p_remark where id = @p_ticket;
 end

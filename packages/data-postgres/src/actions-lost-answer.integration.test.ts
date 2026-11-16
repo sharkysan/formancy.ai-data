@@ -152,20 +152,43 @@ describe('a run whose answer is lost', () => {
   // at 5 or 6 where 2 would do; a run sets it twice, before each of its two
   // statements, and costs 8 from BEGIN to COMMIT, on a connection's first
   // run and on the next alike: each SET's text is new, since it spells the
-  // milliseconds that remain. The round trips are outside the deadline,
-  // which bounds the statements alone. Measured on postgres:17-alpine on
-  // 2026-11-16; watched failing with the second run asserted to cost
-  // none: "expected [ 8, 8 ] to deeply equal [ 8, +0 ]".
+  // milliseconds that remain. On the locked path (0041), a connection under
+  // REPEATABLE READ, the table lock and a third SET after it cost 2 more:
+  // 10. The round trips are outside the deadline, which bounds the
+  // statements alone. Measured on postgres:17-alpine on 2026-11-16; watched
+  // failing with the second run asserted to cost none, "expected [ 8, 8 ]
+  // to deeply equal [ 8, +0 ]", and the locked path asserted at 11, which
+  // it cost 10.
   test('costs its round trips from BEGIN to COMMIT', async () => {
-    const actions = createPostgresActions(viaHop)
-    const runs: number[] = []
-    for (const note of ['counted first', 'counted again']) {
-      const id = await order()
-      const request = await plannedAction(actions, forms.orders, 'close', { record: actionToken(id), version: '1', answers: { note } })
-      const turns = hop.countRoundTrips()
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
-      runs.push(turns())
+    const target = new URL(fixture.writer)
+    const repeatable = postgres({
+      host: '127.0.0.1',
+      port: hop.port,
+      username: decodeURIComponent(target.username),
+      password: decodeURIComponent(target.password),
+      database: target.pathname.slice(1),
+      max: 1,
+      onnotice: () => {},
+      connection: { default_transaction_isolation: 'repeatable read' },
+    })
+    const runs: Record<'readCommitted' | 'locked', number[]> = { readCommitted: [], locked: [] }
+    try {
+      for (const [path, client] of [
+        ['readCommitted', viaHop],
+        ['locked', repeatable],
+      ] as const) {
+        const actions = createPostgresActions(client)
+        for (const note of ['counted first', 'counted again']) {
+          const id = await order()
+          const request = await plannedAction(actions, forms.orders, 'close', { record: actionToken(id), version: '1', answers: { note } })
+          const turns = hop.countRoundTrips()
+          expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
+          runs[path].push(turns())
+        }
+      }
+    } finally {
+      await repeatable.end({ timeout: 1 })
     }
-    expect(runs).toEqual([8, 8])
+    expect(runs).toEqual({ readCommitted: [8, 8], locked: [10, 10] })
   })
 })

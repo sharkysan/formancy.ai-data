@@ -61,11 +61,17 @@ export type ActionExpectation = ActionAnswer | Readonly<Record<DatabaseKind, Act
  * - `recreated`: the routine dropped and created again between the
  *   description and the run: `schema-changed`, not called.
  * - `reach-changed`: the routine made to run as its owner between the
- *   description and the run. The engines differ: PostgreSQL's SECURITY
- *   DEFINER is part of the routine's definition, and the run refuses it;
- *   SQL Server's EXECUTE AS OWNER is not, since every procedure there
- *   already reaches its owner's tables by ownership chaining (0158).
- * - `execute-revoked`: EXECUTE taken from the account: `permission-denied`.
+ *   description and the run -- PostgreSQL's SECURITY DEFINER, SQL Server's
+ *   EXECUTE AS OWNER, which reaches what ownership chaining does not:
+ *   `schema-changed`, not called.
+ * - `execute-revoked`: EXECUTE taken from the account, the only permission
+ *   it held on the routine, asked of the run and of a description after
+ *   it. The engines differ: PostgreSQL's catalog shows the account the
+ *   function still, and the call is refused, `permission-denied`; SQL
+ *   Server shows an account only what it holds a permission on, so the
+ *   procedure is out of its sight as one dropped would be, and nothing the
+ *   account can ask tells the two apart: `schema-changed`, as drift review
+ *   would find it gone.
  * - `held-lock`: another transaction holds the order's row past what the
  *   run waits for it. The engines differ: PostgreSQL's statement timeout,
  *   the deadline, stops the wait (`action-timeout`); SQL Server's lock
@@ -87,8 +93,8 @@ export const ACTION_PARITY = {
   refused: 'refused',
   'missing-column': 'refused',
   recreated: 'schema-changed',
-  'reach-changed': { postgres: 'schema-changed', sqlserver: 'done' },
-  'execute-revoked': 'permission-denied',
+  'reach-changed': 'schema-changed',
+  'execute-revoked': { postgres: 'permission-denied', sqlserver: 'schema-changed' },
   'held-lock': { postgres: 'action-timeout', sqlserver: 'unavailable' },
   'slow-routine': { postgres: 'action-timeout', sqlserver: 'unknown-outcome' },
   'lost-answer': 'unknown-outcome',

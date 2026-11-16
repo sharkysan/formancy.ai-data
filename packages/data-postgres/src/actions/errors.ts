@@ -1,17 +1,18 @@
 import { runFailure } from '@formancy/data-core'
 import type { ActionFailure } from '@formancy/data-core'
-import { aroseInside, passing, recordFailure, sqlState } from '../records/errors.js'
+import { aroseInside, exactCode, passing, recordFailure, sqlState } from '../records/errors.js'
 
 /*
  * What PostgreSQL's errors mean for an action's run (0160): classified by
  * where they arose, which a single write's are not (records/errors.ts).
  *
  * - What the transaction did comes first, wherever the error arose: a
- *   statement stopped at the run's deadline (57014) is `action-timeout`,
- *   and what passes -- a deadlock, a serialization failure, a lock not
- *   granted, a connection gone (08, 40, 53, 57, 58, 28, 55P03 …) -- is
- *   `unavailable`. A connection lost after the run was sent is
- *   `unknown-outcome`.
+ *   statement stopped at the run's deadline (57014) is `action-timeout`;
+ *   the server's own unknown outcome (40003) is `unknown-outcome`, as a
+ *   write's is, before its class is asked; and what passes -- a deadlock,
+ *   a serialization failure, a lock not granted, a connection gone (08,
+ *   40, 53, 57, 58, 28, 55P03 …) -- is `unavailable`. A connection lost
+ *   after the run was sent is `unknown-outcome`.
  * - Inside the routine, or a trigger the run fired, everything else is the
  *   deployment's: `declined` under the prefix (0156), `refused` otherwise,
  *   a missing column of the routine's body included -- never
@@ -43,6 +44,7 @@ export function actionFailure(error: unknown, sent: boolean): ActionFailure {
   if (state === undefined) return runFailure(recordFailure(error, sent ? 'write' : 'read'))
   if (state === '57014')
     return { ok: false, code: 'action-timeout', message: 'PostgreSQL stopped a statement of the run at its deadline (57014); it was rolled back.' }
+  if (exactCode(state) === 'unknown-outcome') return runFailure(recordFailure(error, 'write'))
   if (passing(state)) return { ok: false, code: 'unavailable', message: `PostgreSQL could not complete the run now (${state}); it was rolled back.` }
   if (aroseInside(error)) {
     // A RAISE worded for the person is declined with its reason, as a trigger's on a write is.

@@ -1032,13 +1032,19 @@ drives it the way the route will.
 2. `run(request, deadlineMs)` on PostgreSQL
    (`packages/data-postgres/src/actions/run.ts`) is one `sql.begin`:
    `SET LOCAL statement_timeout` to what remains of the deadline; on the
-   locked path the root locked first (0041); the lock, which selects the
+   locked path the root locked first (0041) and the timeout set again to
+   what remains; the lock, which selects the
    record under the person's filters and throughs, each through's parent
    `FOR SHARE`, at the version read and the open version alone, under the
    root's definition guard, `for no key update` in key order, and moves
    its version; `SET LOCAL statement_timeout` to what remains, nothing
    remaining `action-timeout`; then the call over the moved row, every
-   argument named and cast to its bound type, under the routine's guard.
+   argument named and cast to its bound type, each bound value read from a
+   derived table the planner keeps, under the routine's guard -- on the
+   locked path, whose snapshot is the lock statement's, its whole
+   definition as the catalog cache holds it too. A STRICT routine is
+   refused by the description: PostgreSQL would not call it for a NULL
+   argument.
    Fewer rows or calls than records throws inside the transaction, so it
    rolls back, and a record not moved is explained by the read an update
    alone asks.
@@ -1046,8 +1052,8 @@ drives it the way the route will.
    batch with mssql's per-request timeout at the deadline: `SET
    LOCK_TIMEOUT` to half of it, the record locked and moved in one UPDATE
    `WITH (UPDLOCK, HOLDLOCK)`, each through's parent `WITH (HOLDLOCK)`, and
-   the checks a write's step carries; the procedure's definition and
-   EXECUTE checked; each argument read into a variable of its parameter's
+   the checks a write's step carries; the procedure's definition, EXECUTE
+   AS among it, and EXECUTE checked; each argument read into a variable of its parameter's
    type and, for a code-page parameter, read back; `EXEC @status`, the
    transaction checked to be the batch's and a status other than 0 refused;
    COMMIT. CATCH records the step, SQL Server's number and the procedure
@@ -1055,9 +1061,10 @@ drives it the way the route will.
    rows dropped as they arrive.
 4. The answer is each record by its key as the lock read it, or an
    `ActionFailure`, classified by where the error arose: what the
-   transaction did first, then the adapter's own errors, then inside the
-   routine or a trigger -- `declined` under the prefix (0156), `refused`
-   otherwise -- then the adapter's own statement. Nothing is ever sent
+   transaction did first, then the adapter's own errors, then on SQL
+   Server an EXEC that does not resolve, by the procedure ERROR_PROCEDURE()
+   names, then inside the routine or a trigger -- `declined` under the
+   prefix (0156), `refused` otherwise -- then the adapter's own statement. Nothing is ever sent
    again: a lost answer is `unknown-outcome`, and a run sent again from the
    same read is `stale`, since the first moved the version.
 
@@ -1065,4 +1072,5 @@ Held by the shared cases in `packages/data-fixtures/src/actions.ts`, which
 each adapter's `actions.integration.test.ts` and
 `actions-lost-answer.integration.test.ts` assert through `covers()`, and
 by `packages/data-core/src/actions/failure.test.ts` for the one mapping of
-a refusal.
+a refusal; that a run goes on a client of its own, by
+`packages/data-server/src/drivers.integration.test.ts`.

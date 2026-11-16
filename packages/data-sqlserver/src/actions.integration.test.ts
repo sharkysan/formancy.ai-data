@@ -28,12 +28,16 @@ import { connectSqlServer, createSqlServerActions, discoverSqlServer } from './i
  * engine facts a run rests on, follow them.
  *
  * Every run goes as formancy_writer, the account discovery reads the schema
- * as. Every request is the planner's (`plannedAction`), planned before
- * anything a case changes in the database. The owner inserts what a case
- * starts from, and reads what is stored and which calls each procedure
- * recorded: a procedure "not called" recorded no call, which a rollback
- * would also take away -- so each such case is a run the adapter refused
- * before its EXEC, or whose answer says it rolled back.
+ * as, but where a case says another. Every request is the planner's
+ * (`plannedAction`), planned before anything a case changes in the
+ * database. The owner inserts what a case starts from, and reads what is
+ * stored, which calls each procedure kept, and how many began: each
+ * procedure draws from the sequence actions.called as it begins, which no
+ * rollback gives back, so a procedure "not called" is one that drew
+ * nothing (`counted`), and one called and rolled back drew and kept
+ * nothing. Every case that says "calls nothing" was watched failing on that
+ * count, with the EXEC and its arguments moved before the lock: the answer
+ * the same, the count one.
  *
  * Each case says which failure it prevents and was watched failing on
  * mcr.microsoft.com/mssql/server:2022-latest on 2026-11-16, its rule taken
@@ -103,6 +107,21 @@ async function calls(id: number, routines: readonly string[] = ['close_order', '
     { id, ...Object.fromEntries(routines.map((routine, index) => [`r${String(index)}`, routine])) },
   )
   return rows.map((row) => row.call)
+}
+
+/** How many calls of the actions schema's procedures have begun, as the sequence each draws from as it begins counts them. */
+async function begun(): Promise<number> {
+  const [row] = await query<{ n: string }>(
+    "select convert(nvarchar(20), coalesce(convert(bigint, last_used_value), 0)) as n from sys.sequences where object_id = object_id(N'actions.called')",
+  )
+  return Number((row as { n: string }).n)
+}
+
+/** `run`'s outcome, and how many procedure calls began while it ran: a rollback takes back what a call kept, and never that it began. */
+async function counted<T>(run: () => Promise<T>): Promise<{ outcome: T; begun: number }> {
+  const before = await begun()
+  const outcome = await run()
+  return { outcome, begun: (await begun()) - before }
 }
 
 /** The version token a person read `id` at: a version column's decimal text, or a rowversion's hex. */
@@ -191,7 +210,8 @@ describe('a run over the open record', () => {
   // …(2) } to deeply equal { status: 'closed', …(2) }", the version 1.
   test('commits, moves the version, and gives the routine each value', covers('sqlserver', actionCase('done')), async () => {
     const id = await order()
-    const outcome = await closed(id, 'shipped')
+    const { outcome, begun } = await counted(() => closed(id, 'shipped'))
+    expect(begun).toBe(1)
     expect(actionAnswer(outcome)).toBe(expected('done'))
     expect(outcome).toEqual({ ok: true, records: [{ id: String(id) }] })
     expect(await stored(id)).toEqual({ status: 'closed', note: 'shipped', version: 2 })
@@ -205,7 +225,9 @@ describe('a run over the open record', () => {
     const id = await order()
     const request = await planned('close', id, { note: 'once' })
     expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
-    expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('second-run'))
+    const second = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(second.outcome)).toBe(expected('second-run'))
+    expect(second.begun).toBe(0)
     expect(await calls(id)).toEqual(['close_order:once:clara:12.50:1'])
   })
 
@@ -214,8 +236,9 @@ describe('a run over the open record', () => {
   // of the lock: "expected 'done' to be 'not-found'".
   test("is not-found for another tenant's record, and calls nothing", covers('sqlserver', actionCase('other-tenant')), async () => {
     const id = await order(2)
-    expect(actionAnswer(await closed(id, 'theirs'))).toBe(expected('other-tenant'))
-    expect(await calls(id)).toEqual([])
+    const { outcome, begun } = await counted(() => closed(id, 'theirs'))
+    expect(actionAnswer(outcome)).toBe(expected('other-tenant'))
+    expect(begun).toBe(0)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
 
@@ -235,18 +258,14 @@ describe('a run over the open record', () => {
     const mover = await session()
     try {
       const spid = await spidOf(mover)
-      let movedAt = 0
-      const moving = mover
-        .request()
-        .input('id', mssql.BigInt, parent)
-        .query('update actions.customer set tenant_id = 2 where id = @id')
-        .then(() => (movedAt = performance.now()))
+      const moving = mover.request().input('id', mssql.BigInt, parent).query('update actions.customer set tenant_id = 2 where id = @id')
+      // Seen blocked while the run still holds the parent: the run's COMMIT
+      // releases it before the run's answer arrives, so which answer reaches
+      // this process first says nothing.
       await until(() => blocked(spid), "seen waiting on the run's lock")
       const outcome = await running
-      const ranAt = performance.now()
       await moving
       expect(actionAnswer(outcome)).toBe(expected('parent-moved'))
-      expect(movedAt).toBeGreaterThanOrEqual(ranAt)
     } finally {
       await mover.close()
     }
@@ -263,8 +282,10 @@ describe('a run over the open record', () => {
     )
     await query("insert into actions.price (customer_id, product_no, valid_from, amount) values (@parent, 7, '2026-06-01', 11)", { parent })
     const id = Number((ended as { id: string }).id)
-    expect(actionAnswer(await actions.run(await planned('reprice', id, {}, forms.prices), DEADLINE))).toBe(expected('version-ended'))
-    expect(await calls(id, ['reprice'])).toEqual([])
+    const request = await planned('reprice', id, {}, forms.prices)
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(outcome)).toBe(expected('version-ended'))
+    expect(begun).toBe(0)
   })
 })
 
@@ -275,9 +296,10 @@ describe("a run the deployment's logic refuses", () => {
   // 'refused' to be 'declined'".
   test('is declined with the routine’s words, and keeps nothing', covers('sqlserver', actionCase('declined')), async () => {
     const id = await order()
-    const outcome = await closed(id, 'refuse')
+    const { outcome, begun } = await counted(() => closed(id, 'refuse'))
     expect(actionAnswer(outcome)).toBe(expected('declined'))
     expect(outcome.ok ? undefined : outcome.reason).toBe(ACTION_DECLINED_REASON)
+    expect(begun).toBe(1)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     expect(await calls(id)).toEqual([])
   })
@@ -300,7 +322,10 @@ describe("a run the deployment's logic refuses", () => {
   // "expected 'schema-changed' to be 'refused'".
   test('is refused when the routine’s body references a missing column', covers('sqlserver', actionCase('missing-column')), async () => {
     const id = await order()
-    expect(actionAnswer(await actions.run(await planned('broken', id), DEADLINE))).toBe(expected('missing-column'))
+    const request = await planned('broken', id)
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(outcome)).toBe(expected('missing-column'))
+    expect(begun).toBe(0)
     expect(await calls(id)).toEqual([])
   })
 
@@ -310,7 +335,9 @@ describe("a run the deployment's logic refuses", () => {
   // 'done' to be 'refused'".
   test('is refused, and rolled back, when the procedure returns a status other than 0', async () => {
     const id = await order()
-    expect(actionAnswer(await closed(id, 'status'))).toBe('refused')
+    const { outcome, begun } = await counted(() => closed(id, 'status'))
+    expect(actionAnswer(outcome)).toBe('refused')
+    expect(begun).toBe(1)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     expect(await calls(id)).toEqual([])
   })
@@ -351,44 +378,144 @@ describe('a run whose routine changed after it was described', () => {
     const definition = await closeOrderDefinition()
     await owner.request().batch('drop procedure actions.close_order')
     await owner.request().batch(definition)
-    expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('recreated'))
-    expect(await calls(id)).toEqual([])
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(outcome)).toBe(expected('recreated'))
+    expect(begun).toBe(0)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
 
-  // Made to EXECUTE AS OWNER: no fact a run is decided over moves, since
-  // every procedure already reaches its owner's tables by ownership
-  // chaining (0158), and the run is done. PostgreSQL's SECURITY DEFINER is
-  // refused: the engines differ, and ACTION_PARITY names it. Watched failing
-  // with EXECUTE AS put in the procedure's facts: "expected 'schema-changed'
-  // to be 'done'".
-  test('runs when the routine was made to EXECUTE AS OWNER', covers('sqlserver', actionCase('reach-changed')), async () => {
+  // Made to EXECUTE AS OWNER: SQL Server's SECURITY DEFINER. Ownership
+  // chaining reaches the owner's tables whatever the procedure says
+  // (0158), and stops at dynamic SQL, another owner's objects and another
+  // database, which EXECUTE AS OWNER reaches as the owner: the procedure is
+  // not the one the run was decided over, as on PostgreSQL. Watched failing
+  // with EXECUTE AS left out of the procedure's facts: "expected 'done' to
+  // be 'schema-changed'".
+  test('is schema-changed when the routine was made to EXECUTE AS OWNER, and calls nothing', covers('sqlserver', actionCase('reach-changed')), async () => {
     const id = await order()
     const request = await planned('close', id, { note: 'definer' })
     const definition = await closeOrderDefinition()
     const altered = definition.replace('create procedure', 'alter procedure')
     await owner.request().batch(altered.replace('@p_tenant int as', '@p_tenant int with execute as owner as'))
     try {
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('reach-changed'))
-      expect(await calls(id)).toEqual(['close_order:definer:clara:12.50:1'])
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe(expected('reach-changed'))
+      expect(begun).toBe(0)
     } finally {
       await owner.request().batch(altered)
     }
   })
 
-  // EXECUTE denied: asked of HAS_PERMS_BY_NAME before the EXEC, the
-  // account's grant and not the procedure's refusal. Watched failing with
-  // the question taken out, the EXEC's own 229 naming the procedure:
-  // "expected 'refused' to be 'permission-denied'".
-  test('is permission-denied when EXECUTE was revoked', covers('sqlserver', actionCase('execute-revoked')), async () => {
+  // EXECUTE denied where the schema grants it: the procedure stays in
+  // sight, VIEW DEFINITION and EXECUTE on the schema both reach it, and
+  // HAS_PERMS_BY_NAME is asked before the EXEC, the account's grant and not
+  // the procedure's refusal. Watched failing with the question taken out,
+  // the EXEC's own 229 naming the procedure: "expected 'refused' to be
+  // 'permission-denied'".
+  test('is permission-denied when EXECUTE was denied', async () => {
     const id = await order()
     const request = await planned('close', id, { note: 'revoked' })
     await owner.request().batch('deny execute on actions.close_order to formancy_writer')
     try {
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('execute-revoked'))
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe('permission-denied')
+      expect(begun).toBe(0)
       expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     } finally {
       await owner.request().batch('revoke execute on actions.close_order from formancy_writer')
+    }
+  })
+})
+
+/*
+ * An account whose only permission on the procedure is EXECUTE on it, the
+ * grant a deployment usually makes, beside SELECT, UPDATE and VIEW
+ * DEFINITION on the two tables a run reads, so that it describes the root
+ * as the writer does. SQL Server shows an account only what it holds some
+ * permission on: once that EXECUTE is revoked, the procedure is out of its
+ * sight, as one dropped would be.
+ */
+describe('a run as an account whose only permission on the procedure is EXECUTE', () => {
+  const RUNNER = 'action_runner'
+  const RUNNER_PASSWORD = 'Runner-fixture-password-1'
+  let runner: mssql.ConnectionPool
+  let running: ActionAdapter
+
+  beforeAll(async () => {
+    await owner
+      .request()
+      .batch(
+        `create login ${RUNNER} with password = N'${RUNNER_PASSWORD}', check_policy = off; create user ${RUNNER} for login ${RUNNER}; ` +
+          `grant select, update, view definition on actions.[order] to ${RUNNER}; grant select, update, view definition on actions.customer to ${RUNNER}; ` +
+          `grant execute on actions.close_order to ${RUNNER};`,
+      )
+    runner = await new mssql.ConnectionPool({ ...fixture.admin, user: RUNNER, password: RUNNER_PASSWORD }).connect()
+    running = createSqlServerActions(runner)
+  })
+
+  afterAll(async () => {
+    await runner?.close()
+    await owner.request().batch(`drop user ${RUNNER}; drop login ${RUNNER};`)
+  })
+
+  /** What the runner sees of close_order, and of a procedure that does not exist, by the name a run binds. */
+  async function sight(): Promise<{ id: number | null; perms: number | null; missing: number | null }> {
+    const result = await runner.request().query<{
+      id: number | null
+      perms: number | null
+      missing: number | null
+    }>("select object_id(N'[actions].[close_order]') as [id], has_perms_by_name(N'[actions].[close_order]', N'OBJECT', N'EXECUTE') as [perms], has_perms_by_name(N'[actions].[no_such_procedure]', N'OBJECT', N'EXECUTE') as [missing]")
+    return result.recordset[0] as { id: number | null; perms: number | null; missing: number | null }
+  }
+
+  // EXECUTE revoked, the only permission the account held on the
+  // procedure: OBJECT_ID no longer finds it, as for one dropped, and
+  // HAS_PERMS_BY_NAME answers 0 for it as it does for a name nothing holds.
+  // So nothing the account can ask tells a procedure out of its sight from
+  // one gone, and a run answers both as gone. Measured on
+  // mcr.microsoft.com/mssql/server:2022-latest on 2026-11-16, where NULL for
+  // the name nothing holds, as the documentation's "the securable is not
+  // valid" suggests, was asserted and 0 came back.
+  test('loses sight of the procedure once its only EXECUTE is revoked, and cannot tell that from one that is not there', async () => {
+    const before = await sight()
+    await owner.request().batch(`revoke execute on actions.close_order from ${RUNNER}`)
+    try {
+      expect({ before, after: await sight() }).toEqual({
+        before: { id: expect.any(Number), perms: 1, missing: 0 },
+        after: { id: null, perms: 0, missing: 0 },
+      })
+    } finally {
+      await owner.request().batch(`grant execute on actions.close_order to ${RUNNER}`)
+    }
+  })
+
+  // The shared case, in the grant shape a deployment makes: EXECUTE taken
+  // from the account leaves the procedure out of its sight, so the run and
+  // a description made after the revoke, as the route will make one, find
+  // it gone, `schema-changed`, where PostgreSQL, whose pg_proc the account
+  // still reads, is `permission-denied`: the engines' difference
+  // ACTION_PARITY names. Nothing is called either way. Watched failing
+  // with PostgreSQL's answer asserted: "expected { run: 'schema-changed',
+  // …(1) } to deeply equal { run: 'permission-denied', …(1) }".
+  test('is permission-denied when EXECUTE was revoked', covers('sqlserver', actionCase('execute-revoked')), async () => {
+    const id = await order()
+    const request = await plannedAction(running, forms.orders, 'close', {
+      record: actionToken(id),
+      version: await versionOf('order', id),
+      answers: { note: 'revoked' },
+    })
+    await owner.request().batch(`revoke execute on actions.close_order from ${RUNNER}`)
+    try {
+      const { outcome, begun } = await counted(() => running.run(request, DEADLINE))
+      const described = await running.describe(request.target.table, request.routine.ref)
+      expect({ run: actionAnswer(outcome), described: described.ok ? 'done' : described.code }).toEqual({
+        run: expected('execute-revoked'),
+        described: expected('execute-revoked'),
+      })
+      expect(begun).toBe(0)
+      expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+    } finally {
+      await owner.request().batch(`grant execute on actions.close_order to ${RUNNER}`)
     }
   })
 })
@@ -404,10 +531,11 @@ describe("a run and its deadline, SQL Server's lock timeout and request timeout"
     const holder = await hold(id)
     try {
       const started = performance.now()
-      const outcome = await actions.run(request, 2_000)
+      const { outcome, begun } = await counted(() => actions.run(request, 2_000))
       const waited = performance.now() - started
       expect(actionAnswer(outcome)).toBe(expected('held-lock'))
       expect(waited).toBeLessThan(2_000)
+      expect(begun).toBe(0)
     } finally {
       await holder.release()
     }
@@ -422,7 +550,9 @@ describe("a run and its deadline, SQL Server's lock timeout and request timeout"
   // 'unknown-outcome'".
   test('is unknown-outcome past the deadline, and rolled back', covers('sqlserver', actionCase('slow-routine')), async () => {
     const id = await order()
-    expect(actionAnswer(await closed(id, 'sleep 2.5', 1_000))).toBe(expected('slow-routine'))
+    const { outcome, begun } = await counted(() => closed(id, 'sleep 2.5', 1_000))
+    expect(actionAnswer(outcome)).toBe(expected('slow-routine'))
+    expect(begun).toBe(1)
     await until(async () => (await calls(id)).length === 0 && (await stored(id)).version === 1, 'seen the run rolled back')
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
@@ -451,7 +581,9 @@ describe("a run on SQL Server's own ground", () => {
     const request = await planned('label', id, { remark: 'once' }, tickets())
     expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
     expect(await versionOf('ticket', id)).not.toBe(before)
-    expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('stale')
+    const second = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(second.outcome)).toBe('stale')
+    expect(second.begun).toBe(0)
     expect(await calls(id, ['label_ticket'])).toEqual(['label_ticket:Alpha|once:clara'])
   })
 
@@ -463,17 +595,18 @@ describe("a run on SQL Server's own ground", () => {
   // Watched failing with the read-back checks taken out: "expected 'done'
   // to be 'refused'".
   test('refuses an argument its parameter’s code page cannot hold, whatever its source, and calls nothing', async () => {
+    const answered = async (id: number, remark: string, actor?: string) => {
+      const { outcome, begun } = await counted(() => labelled(id, remark, actor))
+      return { answer: actionAnswer(outcome), begun }
+    }
     const column = await ticket('Ωμέγα')
-    expect(actionAnswer(await labelled(column, 'plain'))).toBe('refused')
-    expect(await calls(column, ['label_ticket'])).toEqual([])
+    expect(await answered(column, 'plain')).toEqual({ answer: 'refused', begun: 0 })
     const answer = await ticket('Alpha')
-    expect(actionAnswer(await labelled(answer, 'Ω'))).toBe('refused')
-    expect(await calls(answer, ['label_ticket'])).toEqual([])
+    expect(await answered(answer, 'Ω')).toEqual({ answer: 'refused', begun: 0 })
     const context = await ticket('Alpha')
-    expect(actionAnswer(await labelled(context, 'plain', 'Ωmega'))).toBe('refused')
-    expect(await calls(context, ['label_ticket'])).toEqual([])
+    expect(await answered(context, 'plain', 'Ωmega')).toEqual({ answer: 'refused', begun: 0 })
     const held = await ticket('Alpha')
-    expect(actionAnswer(await labelled(held, 'Zoë', 'Zoë'))).toBe('done')
+    expect(await answered(held, 'Zoë', 'Zoë')).toEqual({ answer: 'done', begun: 1 })
     expect(await calls(held, ['label_ticket'])).toEqual(['label_ticket:Alpha|Zoë:Zoë'])
   })
 })
@@ -486,6 +619,14 @@ describe("a run on SQL Server's own ground", () => {
  * 2026-11-16.
  */
 describe('what a run rests on', () => {
+  /** The number and ERROR_PROCEDURE() of the error `body` raises, read in CATCH as the run's batch reads them, as the owner. */
+  const procedureOf = async (body: string): Promise<{ number: number; procedure: string | null }> => {
+    const [row] = await query<{ number: number; procedure: string | null }>(
+      `declare @n int, @p nvarchar(128); begin try ${body} end try begin catch select @n = error_number(), @p = error_procedure() end catch; select @n as number, @p as [procedure]`,
+    )
+    return row as { number: number; procedure: string | null }
+  }
+
   // The run tells an error inside a procedure or a trigger from one in its
   // own batch by ERROR_PROCEDURE() (actions/errors.ts): in CATCH it names
   // the procedure, schema and all, for a 207 at its recompilation; the
@@ -496,12 +637,6 @@ describe('what a run rests on', () => {
   // with the trigger asserted schema-qualified, as the procedure is:
   // expected "actions.refuse_customer", received "refuse_customer".
   test('names the procedure or the trigger an error arose in, and nothing for the batch’s own', async () => {
-    const procedureOf = async (body: string): Promise<{ number: number; procedure: string | null }> => {
-      const [row] = await query<{ number: number; procedure: string | null }>(
-        `declare @n int, @p nvarchar(128); begin try ${body} end try begin catch select @n = error_number(), @p = error_procedure() end catch; select @n as number, @p as [procedure]`,
-      )
-      return row as { number: number; procedure: string | null }
-    }
     await owner.request().batch("create trigger actions.refuse_customer on actions.customer after update as throw 50010, N'from a trigger', 1;")
     try {
       expect(await procedureOf('exec actions.broken_order 0;')).toEqual({ number: 207, procedure: 'actions.broken_order' })
@@ -538,13 +673,64 @@ describe('what a run rests on', () => {
     }
   })
 
+  // An EXEC that does not fit the procedure's parameters -- one it lacks
+  // (201), a parameter renamed among them, one it does not have where none
+  // is lacking (8145), too many, by position or by name (8144), any to one
+  // that takes none (8146) -- fails in the procedure's
+  // own context, so ERROR_PROCEDURE() names the procedure called, as it
+  // would an error inside it, and a procedure that calls another badly
+  // names the one it called; an EXEC of no such procedure (2812) names
+  // none, and one inside a procedure names the procedure it is in. So a run
+  // reads where an EXEC failed to resolve by the procedure named and the
+  // step, ahead of where an error arose (actions/errors.ts, errors.test.ts).
+  // Watched failing with 8145 asserted for too many named arguments, and
+  // for a name it does not have beside one it lacks, which SQL Server
+  // answers 8144 and 201: "- "number": 8145, + "number": 8144", then "+
+  // "number": 201".
+  test('names the procedure an EXEC does not fit, the one called, and none for one there is not', async () => {
+    await owner.request().batch('create procedure actions.no_parameters as begin set nocount on; end')
+    await owner.request().batch('create procedure actions.optional_parameter @p int = 0 as begin set nocount on; end')
+    await owner.request().batch('create procedure actions.calls_badly as begin set nocount on; exec actions.reprice; end')
+    await owner.request().batch('create procedure actions.calls_missing as begin set nocount on; exec actions.no_such_procedure; end')
+    try {
+      expect({
+        missing: await procedureOf('exec actions.no_such_procedure;'),
+        lacks: await procedureOf('exec actions.reprice;'),
+        renamed: await procedureOf('exec actions.reprice @p_other = 0;'),
+        unknown: await procedureOf('exec actions.optional_parameter @q = 1;'),
+        many: await procedureOf('exec actions.reprice 0, 1;'),
+        manyNamed: await procedureOf('exec actions.reprice @p_price = 0, @p_other = 1;'),
+        none: await procedureOf('exec actions.no_parameters @p = 1;'),
+        nested: await procedureOf('exec actions.calls_badly;'),
+        nestedMissing: await procedureOf('exec actions.calls_missing;'),
+      }).toEqual({
+        missing: { number: 2812, procedure: null },
+        lacks: { number: 201, procedure: 'actions.reprice' },
+        renamed: { number: 201, procedure: 'actions.reprice' },
+        unknown: { number: 8145, procedure: 'actions.optional_parameter' },
+        many: { number: 8144, procedure: 'actions.reprice' },
+        manyNamed: { number: 8144, procedure: 'actions.reprice' },
+        none: { number: 8146, procedure: 'actions.no_parameters' },
+        nested: { number: 201, procedure: 'actions.reprice' },
+        nestedMissing: { number: 2812, procedure: 'actions.calls_missing' },
+      })
+    } finally {
+      await owner
+        .request()
+        .batch(
+          'drop procedure actions.no_parameters; drop procedure actions.optional_parameter; drop procedure actions.calls_badly; drop procedure actions.calls_missing;',
+        )
+    }
+  })
+
   // A procedure's result set reaches the client whatever the run makes of
   // it. Read as a query, mssql holds every row of it until the batch ends;
-  // the run streams the batch and keeps only its own two result sets, so a
-  // procedure that returns 20,000 rows of 500 characters is run, and
-  // answered, as any other. Watched failing with mssql asserted to hold
-  // none: "expected [ …(20000) ] to have a length of +0 but got 20000".
-  test('holds a whole result set when a batch is read as a query, which a run streams and drops', async () => {
+  // the run streams the batch, and a procedure that returns 20,000 rows of
+  // 500 characters is run, and answered, as any other. That the rows are
+  // dropped as they arrive is results.test.ts's. Watched failing with mssql
+  // asserted to hold none: "expected [ …(20000) ] to have a length of +0
+  // but got 20000".
+  test('holds a whole result set when a batch is read as a query, and a run over a procedure that returns one is answered', async () => {
     const result = await owner.request().query("select top (20000) replicate(N'x', 500) as filler from sys.all_objects as a cross join sys.all_objects as b")
     expect(result.recordset).toHaveLength(20_000)
     const id = await order()

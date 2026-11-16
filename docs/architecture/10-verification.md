@@ -218,11 +218,16 @@ assert through `covers()`: a run committed, run twice from one read,
 another tenant's, a parent moved under it, an ended version, the
 deployment's refusal in words and not, a broken body, a routine made
 again or made to reach as its owner, EXECUTE taken away, a lock held and
-a routine past the deadline, and a lost answer. Each suite measures, too,
-the engine facts a run rests on -- lock order, where an error arose, a
-locking clause in EXISTS, SET LOCK_TIMEOUT after an attention, a large
-result set, a pool's reported size, a run's round trips -- each watched
-failing with the opposite asserted on the default image, on 2026-11-16
+a routine past the deadline, and a lost answer. Whether a routine was
+called is counted by a sequence each fixture routine draws from as it
+begins, which no rollback gives back. Each suite measures, too, the engine
+facts a run rests on -- lock order, where an error arose and an EXEC
+failed to resolve, a locking clause in EXISTS, a procedure out of an
+account's sight, SET LOCK_TIMEOUT after an attention, a large result set,
+a pool's reported size, a run's round trips on both of PostgreSQL's paths
+-- each watched failing with the opposite asserted on the default image,
+on 2026-11-16, and `packages/data-server/src/drivers.integration.test.ts`
+holds the actions' own client on each engine
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
 
 `sharedCases()` derives every case id, and a test declares the ones it

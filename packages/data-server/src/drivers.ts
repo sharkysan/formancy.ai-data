@@ -21,6 +21,9 @@ export const POSTGRES_LOOKUPS_APPLICATION = 'formancy-data lookups'
 /** The application name the actions' client gives PostgreSQL, so a DBA tells a run's connection from the records' and the lookups' (0160). */
 export const POSTGRES_ACTIONS_APPLICATION = 'formancy-data actions'
 
+/** The application name the actions' pool gives SQL Server, `program_name` in sys.dm_exec_sessions, as PostgreSQL's client is named (0160). */
+export const SQLSERVER_ACTIONS_APPLICATION = 'formancy-data actions'
+
 /**
  * How many connections an action's pool opens on SQL Server (0160): mssql's
  * own default, read in its source (lib/base/connection-pool.js, mssql
@@ -111,8 +114,8 @@ export function entraLogin(login: ConnectionLogin, secret: string | undefined): 
  * SQL Server: no native module, no ODBC. A SQL login, or an Entra
  * principal, which no test of this release logs in as (0074). One pool for
  * records and lookups, whose cancel is in-band (0061), and one of its own
- * for actions, at SQLSERVER_ACTION_POOL connections (0160). Closing the
- * adapter closes both.
+ * for actions, at SQLSERVER_ACTION_POOL connections, its sessions named
+ * SQLSERVER_ACTIONS_APPLICATION (0160). Closing the adapter closes both.
  */
 const openSqlServer: ConnectionFactory = async (config, secret) => {
   const { enabled, trust } = tls(config)
@@ -121,7 +124,7 @@ const openSqlServer: ConnectionFactory = async (config, secret) => {
   const pool = await connectSqlServer(login)
   let actionPool: Awaited<ReturnType<typeof connectSqlServer>>
   try {
-    actionPool = await connectSqlServer({ ...login, poolMax: SQLSERVER_ACTION_POOL })
+    actionPool = await connectSqlServer({ ...login, poolMax: SQLSERVER_ACTION_POOL, applicationName: SQLSERVER_ACTIONS_APPLICATION })
   } catch (error) {
     await pool.close()
     throw error

@@ -83,7 +83,16 @@ dropped and created again between them is called as created; a run past
 its deadline, or whose procedure ended the transaction, is
 `unknown-outcome` even where it rolled back, and on PostgreSQL so is a run
 whose answer was lost before its COMMIT was sent. Half the deadline for
-SQL Server's lock wait is chosen, not measured. Nothing in the server runs
+SQL Server's lock wait is chosen, not measured. On PostgreSQL a STRICT
+routine is refused by the run's description, and neither discovery nor
+the generator says so before publication; and a routine with no
+parameter, replaced by an IMMUTABLE one between the description and the
+call, is evaluated while the call is planned, before its guard refuses
+it. On SQL Server, EXECUTE revoked from an account that held no other
+permission on the procedure is answered as the procedure gone,
+`schema-changed`, where PostgreSQL answers `permission-denied`: the
+procedure is out of the account's sight, and nothing it can ask tells
+that from a procedure dropped. Nothing in the server runs
 an action yet, so each action pool opened per database stands idle until
 the route does.
 

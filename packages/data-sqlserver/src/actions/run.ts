@@ -12,6 +12,7 @@ import { fromCanonicalText } from '../sql/values.js'
 import { describeActionStatement, describedRoutineFrom, routineDigest } from './definition.js'
 import { batchFailure } from './errors.js'
 import type { Failed } from './errors.js'
+import { BatchResults, keyColumns } from './results.js'
 import { runBatch } from './statements.js'
 
 /*
@@ -34,7 +35,8 @@ import { runBatch } from './statements.js'
  * the batch's own two is dropped as it arrives: a procedure's result set,
  * which mssql would otherwise hold whole until the batch ended (read in
  * mssql 12.7.4's lib/tedious/request.js, and measured,
- * actions.integration.test.ts).
+ * actions.integration.test.ts). What is kept is results.ts's, held by
+ * results.test.ts.
  */
 
 /**
@@ -45,23 +47,11 @@ import { runBatch } from './statements.js'
  */
 const TimedRequest = mssql.Request as unknown as new (parent: ConnectionPool, overrides: { requestTimeout: number }) => mssql.Request
 
-/** The columns of the batch's two result sets: `@failed`'s, and the moved keys'. */
-const FAILED_COLUMNS = ['step', 'number', 'message', 'severity', 'procedure']
-const keyColumns = (request: ActionRequest): string[] => request.target.identity.map((_, index) => `k${String(index)}`)
-
-const same = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((name, index) => name === right[index])
-
-/** One result set as the stream emitted it: its columns, and its rows where it is one of the batch's own. */
-interface Streamed {
-  columns: string[]
-  rows: Row[]
-}
-
 /**
  * Sends the batch once, its rows streamed: the batch's own two result sets
- * kept, which it selects last, and every other dropped. What the driver
- * rejected the request with -- an error CATCH could not catch, an attention,
- * a connection lost -- is thrown, the first of them.
+ * kept, which it selects last, and every other dropped (results.ts). What
+ * the driver rejected the request with -- an error CATCH could not catch,
+ * an attention, a connection lost -- is thrown, the first of them.
  */
 function sendStreamed(
   pool: ConnectionPool,
@@ -72,18 +62,13 @@ function sendStreamed(
   const sent = new TimedRequest(pool, { requestTimeout: timeoutMs })
   for (const parameter of statement.parameters) sent.input(parameter.name, parameter.type, parameter.value)
   sent.stream = true
-  const keys = keyColumns(request)
-  const sets: Streamed[] = []
+  const results = new BatchResults(keyColumns(request.target.identity))
   let error: Error | undefined
-  let kept: Streamed | undefined
   sent.on('recordset', (columns: Record<string, unknown>) => {
-    const names = Object.keys(columns)
-    const set = { columns: names, rows: [] }
-    sets.push(set)
-    kept = same(names, FAILED_COLUMNS) || same(names, keys) ? set : undefined
+    results.recordset(Object.keys(columns))
   })
   sent.on('row', (row: Row) => {
-    kept?.rows.push(row)
+    results.row(row)
   })
   // mssql emits each error of a request, then `done`: the first is the answer.
   sent.on('error', (failure: unknown) => {
@@ -92,10 +77,7 @@ function sendStreamed(
   return new Promise((resolve, reject) => {
     sent.on('done', () => {
       if (error !== undefined) return reject(error)
-      const [failed, moved] = sets.slice(-2)
-      // The batch always ends with its two: without them, nothing says what it did.
-      if (failed === undefined || moved === undefined || !same(failed.columns, FAILED_COLUMNS) || !same(moved.columns, keys)) return resolve('unanswered')
-      resolve({ failed: failed.rows as unknown as Failed[], moved: moved.rows })
+      resolve(results.answer())
     })
     void sent.query(statement.sql)
   })

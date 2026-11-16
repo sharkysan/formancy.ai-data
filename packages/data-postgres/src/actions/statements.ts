@@ -8,7 +8,8 @@ import { op } from '../sql/catalog.js'
 import { quoteIdentifier, quoteTable } from '../sql/identifiers.js'
 import { Statement } from '../sql/statement.js'
 import { bindText, canonicalText } from '../sql/values.js'
-import { routineFactsOf } from './definition.js'
+import { currentDefinitionOf, routineFactsOf } from './definition.js'
+import type { RoutineDefinition } from './definition.js'
 
 /*
  * The statements of an action's run on PostgreSQL (0160): the statement
@@ -94,11 +95,20 @@ export function lockStatement(
   return { text, params: statement.params }
 }
 
-/** One argument in the call: a column of the locked row, which never leaves the database, or a bound canonical value, each cast to its parameter's type. */
-function argumentSql(statement: Statement, argument: ActionArgument): string {
+/** The derived table the call's bound values are read from, so none reaches the routine as a constant. */
+const GIVEN = '"v"'
+
+/**
+ * One argument in the call, cast to its parameter's type: a column of the
+ * locked row, which never leaves the database, or a bound canonical value,
+ * read from the derived table `GIVEN` and added to `given` as its column.
+ */
+function argumentSql(statement: Statement, argument: ActionArgument, given: string[]): string {
   const cast = castOf(argument.typeId)
   if (argument.from.kind === 'column') return `${column(argument.from.column)}::${cast}`
-  return statement.as(bindText(argument.from.value, argument.type), cast)
+  const name = quoteIdentifier(`v${String(given.length)}`)
+  given.push(`${statement.as(bindText(argument.from.value, argument.type), cast)} as ${name}`)
+  return `${GIVEN}.${name}`
 }
 
 /** The routine as a call names it: its schema and name, each quoted. */
@@ -113,21 +123,39 @@ function routineName(ref: RoutineRef): string {
  * and an overload made after publication is never the better one; over the
  * moved rows, by their keys; and only while the routine the bound
  * signature resolves to has the definition the run was decided over, an
- * uncorrelated subquery that runs before any row is read. A routine dropped
- * and created again, or made SECURITY DEFINER, gives no row and no call:
- * the guard holds exactly as far as the root's does in one statement
- * (0041), no further. One row comes back for each call.
+ * uncorrelated condition that is read before any row is: its facts'
+ * digest, and on the locked path (0041) its whole definition's as the
+ * catalog cache holds it, which the transaction's older snapshot does not
+ * hide (definition.ts). A routine dropped and created again, or changed in
+ * place, gives no row and no call; the guard holds exactly as far as the
+ * root's does in one statement, no further. One row comes back for each
+ * call.
+ *
+ * Every bound value reaches the routine through a derived table the
+ * planner keeps (`offset 0`), never as a constant: PostgreSQL evaluates an
+ * IMMUTABLE function whose arguments are all constants while it plans the
+ * statement, before any guard is read, and a custom plan makes a bound
+ * value one (measured, actions.integration.test.ts). A routine with no
+ * parameter has no argument to keep so, and is the cost 0160 names.
  */
-export function callStatement(request: ActionRequest, moved: ReadonlyArray<readonly RecordValue[]>, routineDigest: string): RecordStatement {
+export function callStatement(
+  request: ActionRequest,
+  moved: ReadonlyArray<readonly RecordValue[]>,
+  routine: RoutineDefinition,
+  path: WritePath,
+): RecordStatement {
   const statement = new Statement()
   const { ref } = request.routine
-  const args = request.routine.arguments.map((argument) => `${quoteIdentifier(argument.parameter)} => ${argumentSql(statement, argument)}`)
+  const given: string[] = []
+  const args = request.routine.arguments.map((argument) => `${quoteIdentifier(argument.parameter)} => ${argumentSql(statement, argument, given)}`)
   const rows = moved.map((key) => `(${located(statement, key, [], []).join(' and ')})`)
-  const guarded = `${digestOf(routineFactsOf(statement, ref))} ${op('=')} ${statement.text(routineDigest)}`
+  const guarded = [`${digestOf(routineFactsOf(statement, ref))} ${op('=')} ${statement.text(routine.facts)}`]
+  if (path === 'locked') guarded.push(`${digestOf(currentDefinitionOf(statement, ref))} ${op('=')} ${statement.text(routine.current)}`)
   const text = [
     `select ${routineName(ref)}(${args.join(', ')})`,
     `from ${quoteTable(request.target.table)} as ${ROW}`,
-    `where (${rows.join(' or ')}) and ${guarded}`,
+    ...(given.length === 0 ? [] : [`cross join (select ${given.join(', ')} offset 0) as ${GIVEN}`]),
+    `where (${rows.join(' or ')}) and ${guarded.join(' and ')}`,
   ].join('\n')
   return { text, params: statement.params }
 }

@@ -26,6 +26,12 @@ interface SqlServerAddress {
    * server holds (0160).
    */
   poolMax?: number
+  /**
+   * The name the pool's sessions give SQL Server, `program_name` in
+   * sys.dm_exec_sessions, so a DBA tells an action's session from the
+   * records' (0160). Absent, mssql's own.
+   */
+  applicationName?: string
 }
 
 /** A SQL login: a user and its password. */
@@ -110,13 +116,14 @@ export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config 
     database: options.database,
     ...(options.poolMax === undefined ? {} : { pool: { max: options.poolMax } }),
   }
+  const named = options.applicationName === undefined ? {} : { appName: options.applicationName }
   if (options.entra === undefined) {
-    const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }
+    const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate, ...named }
     return { ...base, options: options.encrypt ? { ...tls, connector: encryptedConnector } : tls, user: options.user, password: options.password }
   }
   return {
     ...base,
-    options: { encrypt: 'strict', trustServerCertificate: false },
+    options: { encrypt: 'strict', trustServerCertificate: false, ...named },
     authentication: { type: 'token-credential', options: { credential: credentialFor(options.entra) } },
   }
 }

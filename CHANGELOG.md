@@ -85,23 +85,39 @@ the same day (formancy.ai 0232).
   called only while it is the one the run was decided over, every argument
   cast to its bound type; an error inside the routine is the deployment's,
   `declined` under the prefix and `refused` otherwise. On PostgreSQL the
-  deadline is a statement timeout set before each of the run's two
-  statements, `action-timeout` when it passes; on SQL Server the lock waits
-  half the deadline, `unavailable` past it, and a run past the deadline is
-  `unknown-outcome`, as is one whose procedure ended the transaction; a
-  status other than 0 refuses the run, and so does an argument whose
-  varchar parameter's code page lacks a character. `OpenConnection` gains
-  `actions`, which `drivers.ts` opens on a pool of its own -- a third
-  PostgreSQL client named `formancy-data actions`, a second SQL Server pool
-  of ten -- so slow runs cannot stall reads and writes; a fake connection
-  an embedder builds needs one. `connectSqlServer` takes `poolMax`. Every
+  deadline is a statement timeout set before each of the run's statements
+  to what remains of it, the table lock's on the locked path too,
+  `action-timeout` when it passes; a STRICT routine is refused, since
+  PostgreSQL would not call it for a NULL argument and the run would
+  answer done; on the locked path the call is guarded by the routine's
+  whole definition as the catalog cache holds it too, so a routine changed
+  while the run waited for its record is not called; and no bound value
+  reaches a routine as a constant, which an IMMUTABLE one would be
+  evaluated on while the call is planned, before its guard. On SQL Server
+  the lock waits half the deadline, `unavailable` past it, and a run past
+  the deadline is `unknown-outcome`, as is one whose procedure ended the
+  transaction; a status other than 0 refuses the run, and so does an
+  argument whose varchar parameter's code page lacks a character; EXECUTE
+  AS is part of the procedure's definition, so one made to EXECUTE AS
+  OWNER after it was described is not called, as a PostgreSQL function
+  made SECURITY DEFINER is not; and EXECUTE revoked from an account that
+  held no other permission on the procedure is `schema-changed`, where
+  PostgreSQL answers `permission-denied`, because SQL Server hides the
+  procedure from that account as if it were dropped. `OpenConnection`
+  gains `actions`, which `drivers.ts` opens on a pool of its own -- a third
+  PostgreSQL client and a second SQL Server pool of ten, each named
+  `formancy-data actions` to the database -- so slow runs cannot stall
+  reads and writes; a fake connection an embedder builds needs one.
+  `connectSqlServer` takes `poolMax` and `applicationName`. Every
   fixture container loads an `actions` schema beside the parity one. The
   cost: a run holds its record and the parent for up to its deadline; on
   PostgreSQL a form scoped through a parent needs UPDATE on the parent's
-  table for any run, and the generator does not say so yet; and a
-  PostgreSQL run whose answer was lost is unknown though it never
-  committed. Nothing in the server runs an action yet: the route is a
-  later record's.
+  table for any run, and the generator does not say so yet, nor that a
+  STRICT routine is refused; a PostgreSQL run whose answer was lost is
+  unknown though it never committed; and a PostgreSQL routine with no
+  parameter, replaced by an IMMUTABLE one between a run's description and
+  its call, is evaluated before its guard refuses it. Nothing in the
+  server runs an action yet: the route is a later record's.
 
 - **data-core binds a database routine as an action of a form** (0159).
   Why: administrator-named actions run logic the deployment keeps in its

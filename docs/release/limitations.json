@@ -2898,16 +2898,6 @@
         }
       ]
     },
-    "0094": {
-      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
-      "limitations": [
-        {
-          "area": "host",
-          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
-          "heldBy": "apps/host/src/drill.test.tsx"
-        }
-      ]
-    },
     "0095": {
       "reviewed": "sha256:db859e16bb9f54e8e366af1076f58703597ccaf6df4218ce958483ccac380cae",
       "limitations": [
@@ -2938,6 +2928,25 @@
         }
       ]
     },
+    "0098": {
+      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
+        }
+      ]
+    },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
     "0097": {
       "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
       "limitations": [
@@ -2945,15 +2954,6 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
-        }
-      ]
-    },
-    "0098": {
-      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
-      "limitations": [
-        {
-          "area": "writes",
-          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
         }
       ]
     },
@@ -2991,24 +2991,6 @@
         {
           "area": "server",
           "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
-        }
-      ]
-    },
-    "0101": {
-      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
-      "limitations": [
-        {
-          "area": "access",
-          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
-        }
-      ]
-    },
-    "0102": {
-      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
-      "limitations": [
-        {
-          "area": "operations",
-          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -3063,6 +3045,24 @@
         {
           "area": "server",
           "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
+        }
+      ]
+    },
+    "0102": {
+      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -4735,7 +4735,7 @@
       ]
     },
     "0160": {
-      "reviewed": "sha256:1c3b3e5e8bd50e1b4b22f20170e66c131417af814a408ee80da8de8955c229ee",
+      "reviewed": "sha256:ac60e9f53e0350973a4af420f160dad42ab7ea488c22d766ee009ceb3cb67607",
       "limitations": [
         {
           "area": "forms",
@@ -4748,8 +4748,7 @@
         },
         {
           "area": "writes",
-          "says": "Every run fires the root table’s UPDATE triggers, and on a SQL Server rowversion form sets its touch column to itself, a change to temporal history, CDC and change tracking whatever the routine does.",
-          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+          "says": "Every run updates its record’s row to move its version, whatever the routine does -- on a SQL Server rowversion form by setting its touch column to itself -- so the root table’s UPDATE triggers fire, and temporal history, CDC and change tracking see a change, on every run."
         },
         {
           "area": "access",
@@ -4768,7 +4767,7 @@
         },
         {
           "area": "operations",
-          "says": "PostgreSQL’s run deadline bounds its two statements, not the eight round trips from BEGIN to COMMIT.",
+          "says": "PostgreSQL’s run deadline bounds each of its statements, not the round trips between them: eight from BEGIN to COMMIT, ten when the connection’s transactions are REPEATABLE READ or SERIALIZABLE.",
           "heldBy": "packages/data-postgres/src/actions-lost-answer.integration.test.ts"
         },
         {
@@ -4787,7 +4786,27 @@
         },
         {
           "area": "operations",
-          "says": "Each allowlisted database is given one more pool for actions, three clients on PostgreSQL and two pools on SQL Server, the SQL Server one at ten connections, opened whether or not a form offers an action."
+          "says": "Each allowlisted database is given one more pool for actions, three clients on PostgreSQL and two pools on SQL Server, the SQL Server one at ten connections, each named formancy-data actions to the database, opened whether or not a form offers an action.",
+          "heldBy": "packages/data-server/src/drivers.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a STRICT routine is never run, since PostgreSQL would not call it for a NULL argument: a run’s description refuses it, and neither discovery nor the generator says so before publication.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server, EXECUTE revoked from an account that held no other permission on the procedure is answered as the procedure gone, schema-changed, where PostgreSQL answers permission-denied: SQL Server hides the procedure from that account, and nothing it can ask tells the two apart.",
+          "heldBy": "packages/data-sqlserver/src/actions.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL, when the connection’s transactions are REPEATABLE READ or SERIALIZABLE, a run whose routine changed in any way while the run waited for its record, its body included, is refused as changed; the next run is described again.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL a routine with no parameter, replaced by an IMMUTABLE one between a run’s description and its call, is evaluated while the call is planned, before its guard refuses it: it cannot write, and the run is rolled back, but what it raises can reach the person."
         }
       ]
     }

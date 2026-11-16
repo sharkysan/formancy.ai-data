@@ -30,10 +30,13 @@ import { connectPostgres, createPostgresActions, discoverPostgres } from './inde
  * is the planner's (`plannedAction`: the root and the routine described by
  * the adapter, then `planAction`), planned before anything a case changes
  * in the database, as a route plans before it runs. The owner inserts what
- * a case starts from, and reads what is stored and which calls each
- * routine received: a routine "not called" is one that recorded no call,
- * which a rollback would also take away -- so each such case is a run the
- * adapter refused before its call, or whose answer says it rolled back.
+ * a case starts from, and reads what is stored, which calls each routine
+ * kept, and how many began: each routine draws from the sequence
+ * actions.called as it begins, which no rollback gives back, so a routine
+ * "not called" is one that drew nothing (`counted`), and one called and
+ * rolled back drew and kept nothing. Every case that says "calls nothing"
+ * was watched failing on that count, with an unguarded call of the routine
+ * sent before the lock: the answer the same, the count one.
  *
  * Each case says which failure it prevents and was watched failing on
  * postgres:17-alpine on 2026-11-16, its rule taken out and put back.
@@ -92,6 +95,19 @@ async function calls(id: number, routines: readonly string[] = ['close_order', '
   return rows.map((row) => row.call)
 }
 
+/** How many calls of the actions schema's routines have begun, as the sequence each draws from as it begins counts them. */
+async function begun(): Promise<number> {
+  const [row] = await owner<{ n: string }[]>`select (case when is_called then last_value else 0 end)::text as n from actions.called`
+  return Number((row as { n: string }).n)
+}
+
+/** `run`'s outcome, and how many routine calls began while it ran: a rollback takes back what a call kept, and never that it began. */
+async function counted<T>(run: () => Promise<T>): Promise<{ outcome: T; begun: number }> {
+  const before = await begun()
+  const outcome = await run()
+  return { outcome, begun: (await begun()) - before }
+}
+
 /** The version a person read `id` at. */
 async function versionOf(table: 'order' | 'price', id: number): Promise<string> {
   const [row] = await owner<{ version: string }[]>`select version::text as version from ${owner('actions')}.${owner(table)} where id = ${id}`
@@ -147,10 +163,36 @@ async function hold(id: number): Promise<{ release: () => Promise<void> }> {
   }
 }
 
-/** The routine close_order's own CREATE, as the catalog spells it, to make it again. */
+/**
+ * The routine close_order's own CREATE, as the catalog spells it, to make it
+ * again. Found by `to_regprocedure` of a bound signature, which runs each
+ * time: a `'…'::regprocedure` literal is the oid it named when postgres.js
+ * prepared the statement on that connection, which a case that made the
+ * routine again has since dropped.
+ */
 async function closeOrderDefinition(): Promise<string> {
-  const [row] = await owner<{ text: string }[]>`select pg_get_functiondef('actions.close_order(bigint, text, text, numeric, int)'::regprocedure) as text`
-  return (row as { text: string }).text
+  const signature = 'actions.close_order(bigint, text, text, numeric, int)'
+  const [row] = await owner<{ text: string | null }[]>`select pg_get_functiondef(to_regprocedure(${signature})) as text`
+  const text = row?.text
+  if (typeof text !== 'string') throw new Error('close_order is not there to read')
+  return text
+}
+
+/** close_order dropped and made again from `create`, with the fixture's grants, in one transaction. */
+async function remakeCloseOrder(create: string): Promise<void> {
+  await owner.begin(async (tx) => {
+    await tx`drop function actions.close_order(bigint, text, text, numeric, int)`
+    await tx.unsafe(create)
+    await tx`revoke execute on function actions.close_order(bigint, text, text, numeric, int) from public`
+    await tx`grant execute on function actions.close_order(bigint, text, text, numeric, int) to formancy_writer`
+  })
+}
+
+/** `request` with one argument's source replaced, as a binding that gave that parameter another source would plan it. */
+function sourced(request: ActionRequest, parameter: string, from: ActionRequest['routine']['arguments'][number]['from']): ActionRequest {
+  if (!request.routine.arguments.some((argument) => argument.parameter === parameter)) throw new Error(`the request passes no ${parameter}`)
+  const args = request.routine.arguments.map((argument) => (argument.parameter === parameter ? { ...argument, from } : argument))
+  return { ...request, routine: { ...request.routine, arguments: args } }
 }
 
 describe('a run over the open record', () => {
@@ -164,7 +206,8 @@ describe('a run over the open record', () => {
   // overwrite what it did.
   test('commits, moves the version, and gives the routine each value', covers('postgres', actionCase('done')), async () => {
     const id = await order()
-    const outcome = await closed(id, 'shipped')
+    const { outcome, begun } = await counted(() => closed(id, 'shipped'))
+    expect(begun).toBe(1)
     expect(actionAnswer(outcome)).toBe(expected('done'))
     expect(outcome).toEqual({ ok: true, records: [{ id: String(id) }] })
     expect(await stored(id)).toEqual({ status: 'closed', note: 'shipped', version: 2 })
@@ -180,7 +223,9 @@ describe('a run over the open record', () => {
     const id = await order()
     const request = await planned('close', id, { note: 'once' })
     expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
-    expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('second-run'))
+    const second = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(second.outcome)).toBe(expected('second-run'))
+    expect(second.begun).toBe(0)
     expect(await calls(id)).toEqual(['close_order:once:clara:12.50:1'])
   })
 
@@ -191,8 +236,9 @@ describe('a run over the open record', () => {
   // left out of the lock: "expected 'done' to be 'not-found'".
   test("is not-found for another tenant's record, and calls nothing", covers('postgres', actionCase('other-tenant')), async () => {
     const id = await order(2)
-    expect(actionAnswer(await closed(id, 'theirs'))).toBe(expected('other-tenant'))
-    expect(await calls(id)).toEqual([])
+    const { outcome, begun } = await counted(() => closed(id, 'theirs'))
+    expect(actionAnswer(outcome)).toBe(expected('other-tenant'))
+    expect(begun).toBe(0)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
 
@@ -210,14 +256,15 @@ describe('a run over the open record', () => {
       const [found] = await owner<{ n: number }[]>`select count(*)::int as n from pg_stat_activity where wait_event = 'PgSleep'`
       return (found?.n ?? 0) > 0
     }, 'seen the routine running')
-    let movedAt = 0
-    const moving = owner`update actions.customer set tenant_id = 2 where id = ${parent}`.then(() => (movedAt = performance.now()))
+    // Sent now: postgres.js sends a query when it is first awaited.
+    const moving = owner`update actions.customer set tenant_id = 2 where id = ${parent}`.then(() => undefined)
+    // Seen waiting while the run still holds the parent: the run's COMMIT
+    // releases it before the run's answer arrives, so which answer reaches
+    // this process first says nothing.
     await until(() => waitingOnLock('update actions.customer%'), "seen waiting on the run's lock")
     const outcome = await running
-    const ranAt = performance.now()
     await moving
     expect(actionAnswer(outcome)).toBe(expected('parent-moved'))
-    expect(movedAt).toBeGreaterThanOrEqual(ranAt)
   })
 
   // A form over versions (0113) runs over the open version alone: an
@@ -231,23 +278,25 @@ describe('a run over the open record', () => {
       insert into actions.price (customer_id, product_no, valid_from, valid_to, amount) values (${parent}, 7, '2026-01-01', '2026-06-01', 10) returning id`
     await owner`insert into actions.price (customer_id, product_no, valid_from, amount) values (${parent}, 7, '2026-06-01', 11)`
     const id = Number((ended as { id: number }).id)
-    const outcome = await actions.run(await planned('reprice', id, {}, forms.prices), DEADLINE)
+    const request = await planned('reprice', id, {}, forms.prices)
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
     expect(actionAnswer(outcome)).toBe(expected('version-ended'))
-    expect(await calls(id, ['reprice'])).toEqual([])
+    expect(begun).toBe(0)
   })
 })
 
 describe("a run the deployment's logic refuses", () => {
   // The routine's RAISE under `formancy: refused: ` reaches the person, its
-  // words alone, and the run is rolled back: the version where it was and
-  // the routine's own call record gone with it. Watched failing with a
-  // RAISE inside the routine read as any other error there: "expected
-  // 'refused' to be 'declined'".
+  // words alone, and the run is rolled back: the routine called, and the
+  // version where it was and the routine's own call record gone with it.
+  // Watched failing with a RAISE inside the routine read as any other error
+  // there: "expected 'refused' to be 'declined'".
   test('is declined with the routine’s words, and keeps nothing', covers('postgres', actionCase('declined')), async () => {
     const id = await order()
-    const outcome = await closed(id, 'refuse')
+    const { outcome, begun } = await counted(() => closed(id, 'refuse'))
     expect(actionAnswer(outcome)).toBe(expected('declined'))
     expect(outcome.ok ? undefined : outcome.reason).toBe(ACTION_DECLINED_REASON)
+    expect(begun).toBe(1)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     expect(await calls(id)).toEqual([])
   })
@@ -272,9 +321,23 @@ describe("a run the deployment's logic refuses", () => {
   // to be 'refused'".
   test('is refused when the routine’s body references a missing column', covers('postgres', actionCase('missing-column')), async () => {
     const id = await order()
-    const outcome = await actions.run(await planned('broken', id), DEADLINE)
+    const request = await planned('broken', id)
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
     expect(actionAnswer(outcome)).toBe(expected('missing-column'))
+    // PL/pgSQL plans each statement as it reaches it: the routine began, and what it did was rolled back.
+    expect(begun).toBe(1)
     expect(await calls(id)).toEqual([])
+  })
+
+  // The server's own "statement completion unknown", 40003, raised inside
+  // the routine: what the transaction did comes first wherever it arose,
+  // and a write answers 40003 `unknown-outcome` (records/errors.ts), so a
+  // run must too, and never "rolled back" by its class, 40, which passes.
+  // Watched failing with what passes asked first: "expected 'unavailable'
+  // to be 'unknown-outcome'".
+  test('is unknown-outcome when the server says a statement’s completion is unknown', async () => {
+    const id = await order()
+    expect(actionAnswer(await closed(id, 'unknown'))).toBe('unknown-outcome')
   })
 })
 
@@ -288,15 +351,10 @@ describe('a run whose routine changed after it was described', () => {
   test('is schema-changed when the routine was dropped and created again, and calls nothing', covers('postgres', actionCase('recreated')), async () => {
     const id = await order()
     const request = await planned('close', id, { note: 'recreated' })
-    const definition = await closeOrderDefinition()
-    await owner.begin(async (tx) => {
-      await tx`drop function actions.close_order(bigint, text, text, numeric, int)`
-      await tx.unsafe(definition)
-      await tx`revoke execute on function actions.close_order(bigint, text, text, numeric, int) from public`
-      await tx`grant execute on function actions.close_order(bigint, text, text, numeric, int) to formancy_writer`
-    })
-    expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('recreated'))
-    expect(await calls(id)).toEqual([])
+    await remakeCloseOrder(await closeOrderDefinition())
+    const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+    expect(actionAnswer(outcome)).toBe(expected('recreated'))
+    expect(begun).toBe(0)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
 
@@ -310,10 +368,76 @@ describe('a run whose routine changed after it was described', () => {
     const request = await planned('close', id, { note: 'definer' })
     await owner`alter function actions.close_order(bigint, text, text, numeric, int) security definer`
     try {
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('reach-changed'))
-      expect(await calls(id)).toEqual([])
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe(expected('reach-changed'))
+      expect(begun).toBe(0)
     } finally {
       await owner`alter function actions.close_order(bigint, text, text, numeric, int) security invoker`
+    }
+  })
+
+  // PostgreSQL does not call a STRICT function given a NULL argument, and
+  // answers NULL for it: a run over an order whose note is NULL would move
+  // the version, commit and answer done for a call that never ran. So no
+  // run calls a STRICT routine, and the description says so. Watched
+  // failing with STRICT read as nothing in the description: "expected
+  // 'done' to be 'refused'".
+  test('describes a STRICT routine as one no run calls', async () => {
+    const routine = (forms.orders.bindings.actions ?? []).find((action) => action.name === 'close')?.routine
+    if (routine === undefined) throw new Error('the order form binds no close')
+    await owner`alter function actions.close_order(bigint, text, text, numeric, int) strict`
+    try {
+      const described = await actions.describe(forms.orders.bindings.root, routine)
+      expect(described.ok ? 'done' : described.code).toBe('refused')
+    } finally {
+      await owner`alter function actions.close_order(bigint, text, text, numeric, int) called on null input`
+    }
+  })
+
+  // Made STRICT after the description, it is not the routine the run was
+  // decided over. Here the note reaches the routine from the order's own
+  // column, NULL, as a binding of p_note to the note field would plan it.
+  // Watched failing with STRICT left out of the routine's facts: "expected
+  // 'done' to be 'schema-changed'".
+  test('never calls a routine made STRICT after it was described', async () => {
+    const id = await order()
+    const request = sourced(await planned('close', id, { note: 'unused' }), 'p_note', { kind: 'column', column: 'note' })
+    await owner`alter function actions.close_order(bigint, text, text, numeric, int) strict`
+    try {
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe('schema-changed')
+      expect(begun).toBe(0)
+      expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+    } finally {
+      await owner`alter function actions.close_order(bigint, text, text, numeric, int) called on null input`
+    }
+  })
+
+  // PostgreSQL evaluates an IMMUTABLE function whose arguments are all
+  // constants while it plans the statement, before any condition of it is
+  // read, and a custom plan -- postgres.js's first five of a statement --
+  // makes a bound value a constant. A routine whose every argument is a
+  // value, dropped and made again IMMUTABLE between the description and the
+  // run, would run unreviewed and say what it likes to the person, though
+  // its guard then refuses it. The call reads every value from a derived
+  // table the planner keeps, so nothing is evaluated before the guard.
+  // Here close_order is given the key and the amount as values, as a
+  // binding that passed them from the dialog would plan it. Watched failing
+  // with the values bound where they stand: "expected 'declined' to be
+  // 'schema-changed'".
+  test('never runs a routine made IMMUTABLE in its place while the call is planned', async () => {
+    const id = await order()
+    const planning = await planned('close', id, { note: 'folded' })
+    const request = sourced(sourced(planning, 'p_order', { kind: 'value', value: String(id) }), 'p_amount', { kind: 'value', value: '12.50' })
+    const definition = await closeOrderDefinition()
+    await remakeCloseOrder(`create function actions.close_order(p_order bigint, p_note text, p_actor text, p_amount numeric, p_tenant int) returns void
+      language plpgsql immutable as $$ begin perform pg_catalog.nextval('actions.called'); raise exception 'formancy: refused: Never reviewed.'; end $$`)
+    try {
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe('schema-changed')
+      expect(begun).toBe(0)
+    } finally {
+      await remakeCloseOrder(definition)
     }
   })
 
@@ -326,7 +450,9 @@ describe('a run whose routine changed after it was described', () => {
     const request = await planned('close', id, { note: 'revoked' })
     await owner`revoke execute on function actions.close_order(bigint, text, text, numeric, int) from formancy_writer`
     try {
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe(expected('execute-revoked'))
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe(expected('execute-revoked'))
+      expect(begun).toBe(0)
       expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     } finally {
       await owner`grant execute on function actions.close_order(bigint, text, text, numeric, int) to formancy_writer`
@@ -346,7 +472,9 @@ describe('a run whose routine changed after it was described', () => {
       language plpgsql as $$ begin insert into actions.call (routine, record_id, note) values ('overload', p_order, p_note); end $$`)
     await owner`grant execute on function actions.close_order(bigint, text, text, numeric, text) to formancy_writer`
     try {
-      expect(actionAnswer(await actions.run(request, DEADLINE))).toBe('done')
+      const { outcome, begun } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe('done')
+      expect(begun).toBe(1)
       expect(await calls(id)).toEqual(['close_order:overloaded:clara:12.50:1'])
     } finally {
       await owner`drop function actions.close_order(bigint, text, text, numeric, text)`
@@ -367,12 +495,13 @@ describe("a run and its deadline, PostgreSQL's statement timeout", () => {
     const holder = await hold(id)
     const released = new Promise((resolve) => setTimeout(resolve, 2_500)).then(() => holder.release())
     const started = performance.now()
-    const outcome = await actions.run(request, 1_000)
+    const { outcome, begun } = await counted(() => actions.run(request, 1_000))
     const waited = performance.now() - started
     await released
     expect(actionAnswer(outcome)).toBe(expected('held-lock'))
     // Answered at its deadline, not when the holder let go at 2.5 s.
     expect(waited).toBeLessThan(2_000)
+    expect(begun).toBe(0)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
   })
 
@@ -381,7 +510,9 @@ describe("a run and its deadline, PostgreSQL's statement timeout", () => {
   // no statement timeout set: "expected 'done' to be 'action-timeout'".
   test('stops a routine that runs past the deadline', covers('postgres', actionCase('slow-routine')), async () => {
     const id = await order()
-    expect(actionAnswer(await closed(id, 'sleep 2.5', 1_000))).toBe(expected('slow-routine'))
+    const { outcome, begun } = await counted(() => closed(id, 'sleep 2.5', 1_000))
+    expect(actionAnswer(outcome)).toBe(expected('slow-routine'))
+    expect(begun).toBe(1)
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     expect(await calls(id)).toEqual([])
   })
@@ -401,6 +532,148 @@ describe("a run and its deadline, PostgreSQL's statement timeout", () => {
     expect(actionAnswer(outcome)).toBe('action-timeout')
     expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
     expect(await calls(id)).toEqual([])
+  })
+})
+
+/*
+ * The locked path (0041): a connection whose transactions are REPEATABLE
+ * READ, which a composition root may make the default, takes the root's
+ * table lock before the lock statement, whose snapshot is then the
+ * transaction's for the call too. The deadline cases again, a wait for the
+ * table, and a routine changed while the lock waited.
+ */
+describe('a run on the locked path, under REPEATABLE READ', () => {
+  let repeatable: Sql
+  let locked: ActionAdapter
+
+  beforeAll(() => {
+    repeatable = postgres(fixture.writer, { onnotice: () => {}, connection: { default_transaction_isolation: 'repeatable read' } })
+    locked = createPostgresActions(repeatable)
+  })
+
+  afterAll(async () => {
+    await repeatable?.end()
+  })
+
+  /** `close` over `id` with this note, planned on the locked path. */
+  async function plannedLocked(id: number, note: string): Promise<ActionRequest> {
+    return plannedAction(locked, forms.orders, 'close', { record: actionToken(id), version: await versionOf('order', id), answers: { note } })
+  }
+
+  /** Holds the order table in SHARE mode, which a write's ROW EXCLUSIVE waits for, until `release` is called. */
+  async function holdTable(): Promise<{ release: () => Promise<void> }> {
+    const holder = postgres(fixture.admin, { max: 1, onnotice: () => {} })
+    let release!: () => void
+    const released = new Promise<void>((resolve) => (release = resolve))
+    let held!: () => void
+    const holding = new Promise<void>((resolve) => (held = resolve))
+    const done = holder.begin(async (tx) => {
+      await tx`lock table actions."order" in share mode`
+      held()
+      await released
+    })
+    await holding
+    return {
+      release: async () => {
+        release()
+        await done
+        await holder.end()
+      },
+    }
+  }
+
+  // The description was read under REPEATABLE READ, so the run takes the
+  // locked path, and its statements stop at the deadline there as well.
+  // Watched failing, as the next two were, with no statement timeout set on
+  // the locked path: "expected 2512.0608999999986 to be less than 2000".
+  test('stops a lock held past the deadline', async () => {
+    const id = await order()
+    const request = await plannedLocked(id, 'waited')
+    const holder = await hold(id)
+    const released = new Promise((resolve) => setTimeout(resolve, 2_500)).then(() => holder.release())
+    const started = performance.now()
+    const { outcome, begun } = await counted(() => locked.run(request, 1_000))
+    const waited = performance.now() - started
+    await released
+    expect(actionAnswer(outcome)).toBe('action-timeout')
+    expect(waited).toBeLessThan(2_000)
+    expect(begun).toBe(0)
+  })
+
+  // Watched failing: "expected 'done' to be 'action-timeout'".
+  test('stops a routine that runs past the deadline', async () => {
+    const id = await order()
+    const request = await plannedLocked(id, 'sleep 2.5')
+    const { outcome, begun } = await counted(() => locked.run(request, 1_000))
+    expect(actionAnswer(outcome)).toBe('action-timeout')
+    expect(begun).toBe(1)
+    expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+  })
+
+  // Watched failing: "expected 'done' to be 'action-timeout'".
+  test('stops a run whose statements each fit the deadline and together do not', async () => {
+    const id = await order()
+    const request = await plannedLocked(id, 'sleep 1.2')
+    const holder = await hold(id)
+    const released = new Promise((resolve) => setTimeout(resolve, 1_200)).then(() => holder.release())
+    const outcome = await locked.run(request, 2_000)
+    await released
+    expect(actionAnswer(outcome)).toBe('action-timeout')
+    expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+  })
+
+  // The table lock waits behind a SHARE lock as DDL takes it, a second,
+  // and the lock statement then waits for a row held past the deadline:
+  // each is set to what remains, so the run stops at its deadline, where
+  // one SET for both let each wait the whole of it. Watched failing with
+  // the SET after the table lock left out: "expected 3012.673600000002 to
+  // be less than 2700".
+  test('stops at the deadline a wait for the table followed by a wait for the row', async () => {
+    const id = await order()
+    const request = await plannedLocked(id, 'waited')
+    const row = await hold(id)
+    const table = await holdTable()
+    const tableReleased = new Promise((resolve) => setTimeout(resolve, 1_000)).then(() => table.release())
+    // Let go at 4 s whatever the run does, so a run nothing stops ends too.
+    const rowReleased = new Promise((resolve) => setTimeout(resolve, 4_000)).then(() => row.release())
+    const started = performance.now()
+    const outcome = await locked.run(request, 2_000)
+    const waited = performance.now() - started
+    await Promise.all([tableReleased, rowReleased])
+    expect(actionAnswer(outcome)).toBe('action-timeout')
+    expect(waited).toBeLessThan(2_700)
+    expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+  })
+
+  // The lock statement waits for a row another transaction holds and does
+  // not change, which REPEATABLE READ lets through, while close_order is
+  // made SECURITY DEFINER: committed after the transaction's snapshot was
+  // taken, so pg_proc read under it shows the routine as described, while
+  // the call finds the routine through the catalog cache, as it now is.
+  // The call is guarded on this path by the routine's whole definition as
+  // the cache holds it, so nothing is called. Watched failing with that
+  // guard left out: "expected 'done' to be 'schema-changed'".
+  test('never calls a routine changed in place while its lock waited', async () => {
+    const id = await order()
+    const request = await plannedLocked(id, 'definer')
+    const holder = await hold(id)
+    let released = false
+    try {
+      const { outcome, begun } = await counted(async () => {
+        const running = locked.run(request, DEADLINE)
+        await until(() => waitingOnLock('with "locked" as materialized%'), 'seen the lock waiting on the held row')
+        await owner`alter function actions.close_order(bigint, text, text, numeric, int) security definer`
+        released = true
+        await holder.release()
+        return running
+      })
+      expect(actionAnswer(outcome)).toBe('schema-changed')
+      expect(begun).toBe(0)
+      expect(await stored(id)).toMatchObject({ status: 'open', version: 1 })
+    } finally {
+      if (!released) await holder.release()
+      await owner`alter function actions.close_order(bigint, text, text, numeric, int) security invoker`
+    }
   })
 })
 

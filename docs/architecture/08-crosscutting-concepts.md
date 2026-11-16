@@ -449,8 +449,8 @@ while the root and the routine have the definitions the run was decided
 over. A run from a read the first already moved is `stale`, so a second
 press, a resend or another replica runs it at most once, and a lost answer
 is `unknown-outcome`, never sent again. On PostgreSQL it is two
-statements, each under a statement timeout of what remains of the
-deadline; on SQL Server one batch, its lock wait at most half the
+statements -- after a table lock on the locked path -- each under a
+statement timeout of what remains of the deadline; on SQL Server one batch, its lock wait at most half the
 deadline and the whole under mssql's per-request timeout at it, past
 which a run reads "it may have run".
 
@@ -461,9 +461,11 @@ assert through `covers()` on both engines.
 
 **What it costs.** What 0160 records: a run holds its record and the
 parent for up to its deadline, fires the root's UPDATE triggers, needs
-UPDATE on a through's parent on PostgreSQL, and over-reports a lost answer
-on PostgreSQL and any run past its deadline on SQL Server as "it may have
-run".
+UPDATE on a through's parent on PostgreSQL, refuses a STRICT routine
+there, answers EXECUTE revoked as the procedure gone on SQL Server where
+the account held no other permission on it, and over-reports a lost
+answer on PostgreSQL and any run past its deadline on SQL Server as "it
+may have run".
 
 
 ## 8.7 Audit

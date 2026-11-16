@@ -21,7 +21,10 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  * statements, each guarded in itself, and never retried.
  *
  * 1. SET LOCAL statement_timeout to what remains of the deadline.
- * 2. On the locked path (0041), the root locked first, as a write's is.
+ * 2. On the locked path (0041), the root locked first, as a write's is,
+ *    and SET LOCAL statement_timeout again to what remains: the table lock
+ *    waits behind DDL as the record's lock waits behind a row, and each
+ *    statement is bounded by what the one before left.
  * 3. The lock: each record locked in key order and its version moved, its
  *    throughs' parents held FOR SHARE (statements.ts). Fewer rows than
  *    records and nothing is called: rolled back, and a read after tells
@@ -29,8 +32,9 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  *    is (records/explain.ts).
  * 4. SET LOCAL statement_timeout to what remains, by this process's
  *    monotonic clock; nothing remaining is `action-timeout`, nothing
- *    called. The two statements together stay inside the deadline; the
- *    round trips between them and the COMMIT are on top of it.
+ *    called. The statements together stay inside the deadline, each set to
+ *    what the ones before it left; the round trips between them and the
+ *    COMMIT are on top of it.
  * 5. The call, under the routine's guard; fewer calls than records moved
  *    is `schema-changed`, rolled back.
  *
@@ -68,6 +72,12 @@ const NOT_DESCRIBED = {
   ok: false,
   code: 'schema-changed',
   message: 'The catalog does not show the table, or the routine, as discovery describes them.',
+} as const
+const STRICT = {
+  ok: false,
+  code: 'refused',
+  message:
+    'The routine is STRICT: PostgreSQL does not call it when an argument is NULL, and a run would answer done for a call that never ran, so no run calls it (0160).',
 } as const
 
 /** A request no planner makes, refused before anything is sent: a programming error. */
@@ -146,9 +156,19 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
       const row = ran.result.rows[0] as TextRow
       const [facts, digest, spellings, encoding, isolation] = row as [string | null, string | null, string | null, string, string]
       const described = facts === null ? undefined : describedFrom(facts, spellings, encoding, { digest: digest as string, isolation })
-      const [routineFacts, routineDigestText, routineSpellings] = row.slice(DESCRIBED_COLUMNS) as [string | null, string | null, string | null]
-      const callable = describedRoutineFrom(routine, routineFacts, routineDigestText, routineSpellings, textUnitOf(encoding))
+      const [routineFacts, routineDigestText, routineSpellings, current] = row.slice(DESCRIBED_COLUMNS) as [
+        string | null,
+        string | null,
+        string | null,
+        string | null,
+      ]
+      const callable = describedRoutineFrom(
+        routine,
+        { facts: routineFacts, digest: routineDigestText, spellings: routineSpellings, current },
+        textUnitOf(encoding),
+      )
       if (described === undefined || callable === undefined) return NOT_DESCRIBED
+      if (callable === 'strict') return STRICT
       return { ok: true, table: described, routine: callable }
     },
 
@@ -180,14 +200,18 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
           }
           if (left() < 1) throw new Stopped('lock', 'deadline')
           await send('lock', timeoutStatement(left()))
-          if (path === 'locked') await send('lock', rowExclusiveLock([request.target.table]))
+          if (path === 'locked') {
+            await send('lock', rowExclusiveLock([request.target.table]))
+            if (left() < 1) throw new Stopped('lock', 'deadline')
+            await send('lock', timeoutStatement(left()))
+          }
           sent = true
           const moved = await send('lock', lock)
           if (moved.rows.length !== request.records.length) throw new Stopped('lock', 'unmoved')
           const { values: found, keys } = keysOf(request, moved.rows)
           if (left() < 1) throw new Stopped('call', 'deadline')
           await send('call', timeoutStatement(left()))
-          const called = await send('call', callStatement(request, keys, digest))
+          const called = await send('call', callStatement(request, keys, digest, path))
           if (called.rows.length !== keys.length) throw new Stopped('call', 'uncalled')
           return found
         })

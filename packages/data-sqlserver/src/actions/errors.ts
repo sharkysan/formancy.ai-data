@@ -29,17 +29,25 @@ import { RUN_STEPS } from './statements.js'
  * - What the transaction did, wherever it arose: a deadlock, a lock wait
  *   past LOCK_TIMEOUT (1222) and the rest SQL Server documents as passing
  *   are `unavailable`; 3609 is `unknown-outcome`.
+ * - At the EXEC itself, a call that does not resolve is `schema-changed`,
+ *   asked before where an error arose: no such procedure (2812), which
+ *   ERROR_PROCEDURE() names none for, or one whose parameters the EXEC does
+ *   not fit -- one it lacks (201), one it does not have (8145), too many
+ *   (8144), any to one that takes none (8146) -- which SQL Server raises in
+ *   the procedure's own context, so ERROR_PROCEDURE() names the procedure
+ *   called (measured, actions.integration.test.ts). Of those, one the bound
+ *   procedure raised calling another badly names the other, and is its
+ *   own; one it raised calling itself badly reads as the EXEC's, the cost
+ *   of reading the engine's report and no phrase.
  * - Inside a procedure or a trigger -- ERROR_PROCEDURE() names one --
  *   everything else is the deployment's: `declined` under the prefix
  *   (0156), `refused` otherwise, a column missing from the procedure's body
  *   included, never `schema-changed`.
- * - At the EXEC itself, a call that does not resolve -- no such procedure
- *   (2812), a parameter it does not have or lacks (8145, 201, 8144) -- is
- *   `schema-changed`. EXECUTE is asked before the EXEC, by
- *   HAS_PERMS_BY_NAME, and refused as the batch's own `permission-denied`:
- *   a 229 at the EXEC names the procedure as one inside it would. An UPDATE
- *   refused at the lock is `permission-denied` too; anything else is
- *   translated as a write's refusal is.
+ * - EXECUTE is asked before the EXEC, by HAS_PERMS_BY_NAME, and refused as
+ *   the batch's own `permission-denied`: a 229 at the EXEC names the
+ *   procedure as one inside it would. An UPDATE refused at the lock is
+ *   `permission-denied` too; anything else is translated as a write's
+ *   refusal is.
  */
 
 /** A row of the batch's `@failed`: the step it stopped at, SQL Server's number, message and severity, and the procedure it arose in. */
@@ -51,8 +59,19 @@ export interface Failed {
   procedure: string | null
 }
 
-/** The EXEC did not resolve to the bound procedure: none of that name (2812), a parameter it lacks (8145) or does not have (201), or too many (8144). */
-const UNRESOLVED: ReadonlySet<number> = new Set([2812, 8145, 201, 8144])
+/** No procedure of the name the EXEC called: raised in the batch, so ERROR_PROCEDURE() names none. */
+const NO_SUCH_PROCEDURE = 2812
+
+/** An EXEC that does not fit the procedure's parameters, raised in the procedure's context: one it lacks (201), one it does not have (8145), too many (8144), any to one that takes none (8146). */
+const UNFITTED: ReadonlySet<number> = new Set([201, 8145, 8144, 8146])
+
+/** Whether the run's EXEC failed to resolve to the bound procedure, by the step, the number and the procedure ERROR_PROCEDURE() named. */
+function unresolved(first: Failed, request: ActionRequest): boolean {
+  if (first.step !== RUN_STEPS.call) return false
+  if (first.number === NO_SUCH_PROCEDURE) return first.procedure === null
+  const { schema, name } = request.routine.ref
+  return UNFITTED.has(first.number) && first.procedure === `${schema}.${name}`
+}
 
 /** 3609: the transaction ended in a trigger or a procedure, after a COMMIT as after a ROLLBACK (0031). */
 const ENDED_IN_MODULE = 3609
@@ -101,6 +120,12 @@ export function batchFailure(failed: readonly Failed[], request: ActionRequest):
   // The write batch's own errors, and what passes, keep their meaning wherever they arose.
   const written = runFailure(refusal(server, 'write', []))
   if (passes(first.number) || written.code === 'unknown-outcome') return written
+  if (unresolved(first, request))
+    return {
+      ok: false,
+      code: 'schema-changed',
+      message: `The EXEC did not resolve to the bound procedure (${String(first.number)}); nothing was called, and the run was rolled back.`,
+    }
   if (first.procedure !== null) {
     if (written.code === 'declined') return written
     return {
@@ -109,11 +134,5 @@ export function batchFailure(failed: readonly Failed[], request: ActionRequest):
       message: `SQL Server refused the run with error ${String(first.number)}, which arose inside ${first.procedure}, a procedure or a trigger; it was rolled back.`,
     }
   }
-  if (first.step === RUN_STEPS.call && UNRESOLVED.has(first.number))
-    return {
-      ok: false,
-      code: 'schema-changed',
-      message: `The EXEC did not resolve to the bound procedure (${String(first.number)}); nothing was called, and the run was rolled back.`,
-    }
   return written
 }

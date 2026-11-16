@@ -158,30 +158,101 @@ function moveOf(request: ActionRequest): string {
   return `${quoteName(move.column)} = ${column(move.column)}`
 }
 
+/** What the lock step names: the root, its definition's digest, and the moved keys' columns. */
+interface LockParts {
+  table: string
+  root: string
+  keys: Array<{ name: string; expression: string }>
+}
+
+/**
+ * The lock step: LOCK_TIMEOUT to `lockTimeoutMs`, the record locked and
+ * moved in one UPDATE WITH (UPDLOCK, HOLDLOCK) under `where`, its keys
+ * OUTPUT into @moved, then the checks a write's step carries, and
+ * LOCK_TIMEOUT back to -1, the default: the routine's own waits are bounded
+ * by the request's timeout alone.
+ */
+function lockStep(request: ActionRequest, where: readonly string[], parts: LockParts, lockTimeoutMs: number): string[] {
+  const { table, root, keys } = parts
+  return [
+    `set lock_timeout ${String(lockTimeoutMs)};`,
+    'begin transaction;',
+    'set @transaction = current_transaction_id();',
+    `set @step = ${String(RUN_STEPS.lock)};`,
+    `update ${ROW} set ${moveOf(request)} output ${keys.map((key) => key.expression).join(', ')} into @moved (${keys.map((key) => key.name).join(', ')}) ` +
+      `from ${quoteTable(request.target.table)} as ${ROW} with (updlock, holdlock) where ${where.join(' and ')};`,
+    'set @rows = @@rowcount;',
+    SAME_TRANSACTION,
+    ...definitionGuard(table, root),
+    insteadOfGuard(table, 'UPDATE'),
+    `if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`,
+    `if @rows = 0 throw ${String(ACTION_UNMOVED)}, N'${ACTION_UNMOVED_MESSAGE}', 1;`,
+    'set lock_timeout -1;',
+  ]
+}
+
+/**
+ * The routine's guard, just before the EXEC: OBJECT_ID and the
+ * definition's digest, then EXECUTE, as HAS_PERMS_BY_NAME answers it. A
+ * 229 at the EXEC itself names the procedure in ERROR_PROCEDURE() as an
+ * error inside it would, so it is not left to the EXEC. The digest comes
+ * first: SQL Server shows an account only what it holds some permission
+ * on, so a procedure whose only permission there was EXECUTE is, once that
+ * is revoked, out of its sight as one dropped would be, and
+ * HAS_PERMS_BY_NAME answers 0 for both (measured,
+ * actions.integration.test.ts). Nothing the account can ask tells the two
+ * apart, and the run answers both as the procedure gone, `schema-changed`,
+ * as drift review would: the engines' difference ACTION_PARITY names.
+ */
+function guardStep(name: string, bound: string): string[] {
+  return [
+    `set @step = ${String(RUN_STEPS.guard)};`,
+    `set @d = hashbytes('SHA2_256', ${routineFactsOf(name)});`,
+    `if @d is null or @d <> ${bound} throw ${String(ROUTINE_MOVED)}, N'${ROUTINE_MOVED_MESSAGE}', 1;`,
+    `if coalesce(has_perms_by_name(${name}, N'OBJECT', N'EXECUTE'), 0) <> 1 throw ${String(ROUTINE_DENIED)}, N'${ROUTINE_DENIED_MESSAGE}', 1;`,
+  ]
+}
+
+/**
+ * CATCH: the transaction rolled back, and what failed recorded in @failed,
+ * which a rollback does not empty -- a procedure or a trigger that ended
+ * the transaction as that, and the catalog not read, since what came
+ * before it may have committed (0031); a statement of the lock step that
+ * failed against a moved root as the move, as a write's is (0041).
+ */
+function catchBlock(table: string, root: string): string[] {
+  const { set: moved, moved: rootMoved } = definitionMoved(table, root)
+  return [
+    'begin catch',
+    ENDED,
+    'if @@trancount > 0 rollback transaction;',
+    `if ${ENDED_BY_ANOTHER_ERROR} insert @failed values (@step, ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', null, null);`,
+    'else insert @failed values (@step, error_number(), error_message(), error_severity(), error_procedure());',
+    `if @ended = 0 and @step = ${String(RUN_STEPS.lock)} begin ${moved} if ${rootMoved} insert @failed values (@step, ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', null, null); end;`,
+    'end catch;',
+  ]
+}
+
 /**
  * The batch of one run (0160):
  *
- * 1. SET LOCK_TIMEOUT to `lockTimeoutMs`, then the record locked and moved
- *    in one UPDATE, WITH (UPDLOCK, HOLDLOCK), under its key, the person's
- *    filters and every through -- each parent read WITH (HOLDLOCK), so
- *    held to the COMMIT -- at the version they read, the open version
- *    alone on a form over versions (0113); then the checks a write's step
- *    carries: the transaction still the batch's, the root's definition the
- *    one decided over (0041), no INSTEAD OF trigger, one row. None is the
- *    adapter's own error, THROWn, and explained by a read after. Then
- *    LOCK_TIMEOUT back to -1, the default: the routine's own waits are
- *    bounded by the request's timeout alone.
- * 2. The routine's guard: OBJECT_ID and its definition's digest, compared
- *    with the bundle's, just before the EXEC -- unlike the root's, not
- *    inside the statement it guards, and nothing closes the window between
- *    the two: the cost, which 0160 names. Then EXECUTE, as
- *    HAS_PERMS_BY_NAME answers it: a 229 at the EXEC names the procedure in
- *    ERROR_PROCEDURE() as one inside it does, so it is asked first.
+ * 1. The lock step (`lockStep`): the record locked and moved under its key,
+ *    the person's filters and every through -- each parent read WITH
+ *    (HOLDLOCK), so held to the COMMIT -- at the version they read, the
+ *    open version alone on a form over versions (0113); then the checks a
+ *    write's step carries: the transaction still the batch's, the root's
+ *    definition the one decided over (0041), no INSTEAD OF trigger, one
+ *    row. None is the adapter's own error, THROWn, and explained by a read
+ *    after.
+ * 2. The routine's guard (`guardStep`): OBJECT_ID and the definition's
+ *    digest, compared with the bundle's, then EXECUTE, just before the EXEC
+ *    -- unlike the root's, not inside the statement it guards, and nothing
+ *    closes the window between the two: the cost, which 0160 names.
  * 3. Each argument read into a variable of its parameter's type, checked.
  * 4. The EXEC, its status kept; then the transaction still the one the
  *    batch began -- a procedure that ended it may have committed (0031
  *    P8) -- and a status other than 0 THROWn, so the batch rolls back.
- * 5. The COMMIT.
+ * 5. The COMMIT, and CATCH (`catchBlock`).
  */
 export function runBatch(
   request: ActionRequest,
@@ -208,7 +279,6 @@ export function runBatch(
   const bound = parameters.add(mssql.VarBinary(32), routine)
   const args = argumentsOf(parameters, request)
   const exec = request.routine.arguments.map((argument, index) => `${argument.parameter} = @a${String(index)}`)
-  const { set: moved, moved: rootMoved } = definitionMoved(table, root)
   const sql = [
     'set nocount on;',
     'set xact_abort on;',
@@ -217,23 +287,8 @@ export function runBatch(
     `declare @moved table (${keys.map((key) => `${key.name} nvarchar(max)`).join(', ')});`,
     ...args.declared,
     'begin try',
-    `set lock_timeout ${String(lockTimeoutMs)};`,
-    'begin transaction;',
-    'set @transaction = current_transaction_id();',
-    `set @step = ${String(RUN_STEPS.lock)};`,
-    `update ${ROW} set ${moveOf(request)} output ${keys.map((key) => key.expression).join(', ')} into @moved (${keys.map((key) => key.name).join(', ')}) ` +
-      `from ${quoteTable(target.table)} as ${ROW} with (updlock, holdlock) where ${where.join(' and ')};`,
-    'set @rows = @@rowcount;',
-    SAME_TRANSACTION,
-    ...definitionGuard(table, root),
-    insteadOfGuard(table, 'UPDATE'),
-    `if @rows > 1 throw ${String(NOT_ONE_ROW)}, N'${NOT_ONE_ROW_MESSAGE}', 1;`,
-    `if @rows = 0 throw ${String(ACTION_UNMOVED)}, N'${ACTION_UNMOVED_MESSAGE}', 1;`,
-    'set lock_timeout -1;',
-    `set @step = ${String(RUN_STEPS.guard)};`,
-    `set @d = hashbytes('SHA2_256', ${routineFactsOf(name)});`,
-    `if @d is null or @d <> ${bound} throw ${String(ROUTINE_MOVED)}, N'${ROUTINE_MOVED_MESSAGE}', 1;`,
-    `if coalesce(has_perms_by_name(${name}, N'OBJECT', N'EXECUTE'), 0) <> 1 throw ${String(ROUTINE_DENIED)}, N'${ROUTINE_DENIED_MESSAGE}', 1;`,
+    ...lockStep(request, where, { table, root, keys }, lockTimeoutMs),
+    ...guardStep(name, bound),
     `set @step = ${String(RUN_STEPS.arguments)};`,
     ...args.assigned,
     ...args.checks,
@@ -244,15 +299,7 @@ export function runBatch(
     `set @step = ${String(RUN_STEPS.commit)};`,
     'commit transaction;',
     'end try',
-    'begin catch',
-    ENDED,
-    'if @@trancount > 0 rollback transaction;',
-    // A procedure or a trigger that ended the transaction may have committed what came before it (0031): recorded as that, and the catalog not read.
-    `if ${ENDED_BY_ANOTHER_ERROR} insert @failed values (@step, ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', null, null);`,
-    'else insert @failed values (@step, error_number(), error_message(), error_severity(), error_procedure());',
-    // A statement that failed against a moved root is answered as the move, as a write's is (0041).
-    `if @ended = 0 and @step = ${String(RUN_STEPS.lock)} begin ${moved} if ${rootMoved} insert @failed values (@step, ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', null, null); end;`,
-    'end catch;',
+    ...catchBlock(table, root),
     'select [step], [number], [message], [severity], [procedure] from @failed;',
     `select ${keys.map((key) => key.name).join(', ')} from @moved;`,
   ].join('\n')

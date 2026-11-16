@@ -17,9 +17,13 @@
 -- (0050), and versioned by a column the module moves. price is a form over
 -- versions (0113). call is every call a routine of this schema received,
 -- with what it was given: how a case sees whether, and with what, a routine
--- ran. close_order takes one value from each kind of source and does what
--- its note asks: refuse in words for the person, refuse otherwise, sleep,
--- or raise a notice that crosses the wire with the call's answer.
+-- ran and kept what it did. called is a sequence each routine draws from as
+-- it begins: a rollback takes its call away and never the number it drew,
+-- so a case sees a routine called and then rolled back as called, and one
+-- never called as not. close_order takes one value from each kind of
+-- source and does what its note asks: refuse in words for the person,
+-- refuse otherwise, sleep, raise a notice that crosses the wire with the
+-- call's answer, or raise the server's own unknown outcome (40003).
 -- broken_order references a column no table has, which PL/pgSQL finds only
 -- when it runs.
 
@@ -58,8 +62,11 @@ create table actions.call (
   tenant int null
 );
 
+create sequence actions.called;
+
 create function actions.close_order(p_order bigint, p_note text, p_actor text, p_amount numeric, p_tenant int) returns void language plpgsql as $$
 begin
+  perform pg_catalog.nextval('actions.called');
   insert into actions.call (routine, record_id, note, actor, amount, tenant) values ('close_order', p_order, p_note, p_actor, p_amount, p_tenant);
   if p_note = 'refuse' then
     raise exception 'formancy: refused: This order cannot be closed now.';
@@ -69,18 +76,22 @@ begin
     perform pg_catalog.pg_sleep(pg_catalog.substr(p_note, 7)::pg_catalog.float8);
   elsif p_note like 'lost %' then
     raise notice '%', p_note;
+  elsif p_note = 'unknown' then
+    raise exception 'completion unknown' using errcode = '40003';
   end if;
   update actions."order" set status = 'closed', note = p_note where id = p_order;
 end
 $$;
 create function actions.broken_order(p_order bigint) returns void language plpgsql as $$
 begin
+  perform pg_catalog.nextval('actions.called');
   insert into actions.call (routine, record_id) values ('broken_order', p_order);
   update actions."order" set no_such_column = 1 where id = p_order;
 end
 $$;
 create function actions.reprice(p_price bigint) returns void language plpgsql as $$
 begin
+  perform pg_catalog.nextval('actions.called');
   insert into actions.call (routine, record_id) values ('reprice', p_price);
   update actions.price set amount = amount + 1 where id = p_price;
 end
@@ -91,4 +102,5 @@ grant usage on schema actions to formancy_writer;
 grant select on actions.customer, actions."order", actions.price to formancy_writer;
 grant update on actions.customer, actions."order", actions.price to formancy_writer;
 grant insert on actions.call to formancy_writer;
+grant usage on sequence actions.called to formancy_writer;
 grant execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint) to formancy_writer;
