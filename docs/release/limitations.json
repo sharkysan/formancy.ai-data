@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:4a8649679af8477d7dad7172ccb8231006f4c9679ac0b11bf6fcd7fd0b83c6b6",
+      "reviewed": "sha256:aafae2c3b440c1c062a8bbceafc639c49e68a8729d686e67dd1123e6e9d47de4",
       "limitations": [
         {
           "area": "studio",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:f9f2bcc2fa03214a28bc7891601df6afe78b96542cda36f87833c124fa7a0359",
+      "reviewed": "sha256:368870a91129e8f65081762ccc74c2582da0c4109027ae2e6ab9b62e168525c0",
       "limitations": [
         {
           "area": "forms",
@@ -1409,7 +1409,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:984527f0a0606bbeb54839ab1dec985c5c2cccfde7cd270a3bc437c9518e29d8",
+      "reviewed": "sha256:b9759a7aaf25084233f4f5a79f31fd5c98089b9a499718f306d6f43b97204bd9",
       "limitations": [
         {
           "area": "writes",
@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:7aba7758bd032c3876c631411a9e6612f17b87eafb6245e8ebb3bad298db6d4d",
+      "reviewed": "sha256:f9d90bcdb56aff0b577f1292e58fdba9447bcc6b7fa6e08f5e32307c6289f949",
       "limitations": [
         {
           "area": "writes",
