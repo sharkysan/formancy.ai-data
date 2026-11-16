@@ -33,12 +33,13 @@ import { existsStatement } from './statements.js'
  * alone would ask, pinned as the step was.
  */
 
-/** A row of the batch's `@failed`: the step it stopped at, SQL Server's number and message, and the count `@n` held then. */
+/** A row of the batch's `@failed`: the step it stopped at, SQL Server's number, message and severity -- none for a row the batch wrote itself -- and the count `@n` held then. */
 interface Failed {
   step: number
   number: number
   message: string
   held: number | null
+  severity: number | null
 }
 
 const DECLINED_INSERT: RecordFailure = {
@@ -187,7 +188,7 @@ function stepOf(step: BatchStep): SaveStep {
   return step.kind === 'begin' || step.kind === 'commit' ? 'save' : step.at
 }
 
-/** What the batch recorded in CATCH is answered with: the move of the step's table first, then the save's own errors, then SQL Server's own number, translated as a write alone's is. */
+/** What the batch recorded in CATCH is answered with: the move of the step's table first, then the save's own errors, then SQL Server's own number, message and severity, translated as a write alone's refusal is. */
 async function stopped(
   pool: ConnectionPool,
   failed: readonly Failed[],
@@ -211,7 +212,8 @@ async function stopped(
   if (own(NOT_WITHIN, NOT_WITHIN_MESSAGE)) return { ok: false, at: at as { child: number; within: true }, rejected: true }
   if (own(COUNT_OUTSIDE, COUNT_OUTSIDE_MESSAGE)) return { ok: false, at: at as { child: number; count: true }, held: first.held ?? 0 }
   if (own(STEP_UNCHANGED, STEP_UNCHANGED_MESSAGE)) return { ok: false, at, failure: await unchanged(pool, step, record, children) }
-  return { ok: false, at, failure: refusal({ number: first.number, message: first.message, severity: undefined }, 'write', step.assigned) }
+  // A step is a write, so a trigger's THROW worded for the person is declined with its reason, as a write alone's is (0156).
+  return { ok: false, at, failure: refusal({ number: first.number, message: first.message, severity: first.severity ?? undefined }, 'write', step.assigned) }
 }
 
 /** Each child's rows as the batch selected them, after `@failed` and the record: its deletes, its updates and its creates, one result set each. */

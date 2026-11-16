@@ -78,6 +78,15 @@ export type SaveExpectation = SaveAnswer | Readonly<Record<DatabaseKind, SaveAns
  *   deadline: the lock is not waited for longer.
  * - `past-deadline`: three slow marks, each under the deadline, together
  *   past it: stopped before the next statement, nothing stored.
+ * - `slow-statement`: one mark whose trigger takes 2 s, under a deadline
+ *   of 0.5 s. The engines differ, and each says what bounds a statement:
+ *   PostgreSQL's statement timeout cancels it at its step, where SQL
+ *   Server runs it to its end -- nothing bounds a statement there but
+ *   mssql's request timeout -- and stops the save before its next step.
+ *   Nothing stored on either.
+ * - `row-declined`: the second of two marks refused by its trigger in words
+ *   worded for the person (0156), declined at its step with
+ *   SAVE_DECLINED_REASON; nothing stored.
  * - `race`: two saves each adding the last allowed mark, both waiting on a
  *   third transaction that holds the order's row: one saved, one stale, and
  *   the order holds `max` marks.
@@ -108,6 +117,8 @@ export const SAVE_PARITY = {
   'read-back': 'saved',
   'lock-timeout': 'record: unavailable',
   'past-deadline': 'save: unavailable',
+  'slow-statement': { postgres: 'child 0 create 0: unavailable', sqlserver: 'save: unavailable' },
+  'row-declined': 'child 0 create 1: declined',
   race: 'record: stale, saved',
   resend: 'record: stale',
   'lost-answer': 'save: unknown-outcome',
@@ -204,6 +215,9 @@ export const SAVED_BOUNDS = { lines: { min: 0, max: 3 }, marks: { min: 0, max: 3
 
 /** The application lock a race's saves wait for, shared, while a suite holds it exclusively: PostgreSQL's advisory key, SQL Server's resource. */
 export const SAVE_RACE_LOCK = { postgres: 155, sqlserver: 'parity.saved_mark' } as const
+
+/** What the marks' trigger says to the person of a mark noted 'declined', after the prefix both parity SQL files raise it with (0156). */
+export const SAVE_DECLINED_REASON = 'This mark is not taken.'
 
 /**
  * `bindings` with `field` saved with its record, between `bounds`: the hand

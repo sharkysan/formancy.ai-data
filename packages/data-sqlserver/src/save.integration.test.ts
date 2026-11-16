@@ -1,11 +1,12 @@
 import { encodeRowversion, menuSaves, menuTogether, TOGETHER_MAX_ROWS } from '@formancy/data-core'
-import type { RecordAdapter, SaveBody, SaveOutcome, SavePlan, SaveRequest } from '@formancy/data-core'
+import type { PolicyContext, RecordAdapter, SaveBody, SaveOutcome, SavePlan, SaveRequest } from '@formancy/data-core'
 import {
   covers,
   FIXTURE_SCOPE,
   PARITY_SCOPE,
   plannedSave,
   SAVE_CLERK,
+  SAVE_DECLINED_REASON,
   SAVE_RACE_LOCK,
   saveAnswer,
   saveCase,
@@ -115,9 +116,41 @@ async function body(
   return { record: { update: { record: orderToken(id), version: await versionOf(id), answers } }, rows: [{ form: rows, field: 'saved_order', changes }] }
 }
 
-/** `save` planned as the route will plan it. */
+type Form = SavedForms[keyof SavedForms]
+
+/**
+ * `save` planned as the route will plan it, under `parent` with `children`,
+ * and the one batch its request is sent as held to `saveParameters`'
+ * prediction (0155), which the menu and the publish check hold to 2,100:
+ * the parent's step, and for each child the save changes its count and
+ * `within` and each changed row. Every save this suite plans -- every
+ * case's, over each form -- is held so; a request a case edits past what
+ * the planner makes is not planned here, and is not.
+ */
+async function plannedWithin(
+  parent: Form,
+  children: readonly Form[],
+  save: SaveBody,
+  deadlineMs: number = DEADLINE,
+  person: PolicyContext = SAVE_CLERK,
+  via: RecordAdapter = records,
+): Promise<SavePlan> {
+  const made = await plannedSave(via, parent, children, save, deadlineMs, person)
+  const saves = menuSaves({ ...parent, title: parent.id })
+  if (saves === null) throw new Error(`${parent.id} carries no save of its rows`)
+  const predicted = made.request.children.reduce((sum, child) => {
+    const form = children.find(({ bindings: { root } }) => root.schema === child.table.schema && root.name === child.table.name)
+    const together = form === undefined ? null : menuTogether({ ...form, title: form.id }, person)
+    if (together === null) throw new Error(`no together child of ${parent.id} saves ${child.table.name}`)
+    return sum + together.parameters.child + (child.deletes.length + child.updates.length + child.creates.length) * together.parameters.row
+  }, saves.parameters)
+  expect(saveBatchOf(made.request).statement.parameters.length, `what a save of ${parent.id} binds`).toBeLessThanOrEqual(predicted)
+  return made
+}
+
+/** `save` of an order planned as the route will plan it, its batch held to its prediction. */
 async function planned(save: SaveBody, deadlineMs: number = DEADLINE, via: RecordAdapter = records): Promise<SavePlan> {
-  return plannedSave(via, forms.orders, [forms.lines, forms.marks], save, deadlineMs)
+  return plannedWithin(forms.orders, [forms.lines, forms.marks], save, deadlineMs, SAVE_CLERK, via)
 }
 
 async function saved(save: SaveBody, deadlineMs: number = DEADLINE): Promise<SaveOutcome> {
@@ -166,17 +199,11 @@ describe('a save that commits', () => {
   // NULL: "expected 'child 0 create 0: not-null-violation' to be 'saved'".
   test('stores a new account under the code the person typed, and its entries', covers('sqlserver', saveCase('new-typed')), async () => {
     const code = typed('acc')
-    const plan = await plannedSave(
-      records,
-      forms.accounts,
-      [forms.entries],
-      {
-        record: { create: { answers: { code, note: 'typed' } } },
-        rows: [{ form: 'saved-entry', field: 'saved_account', changes: [create('a', { entry_no: 1, amount: 10 }), create('b', { entry_no: 2, amount: 20 })] }],
-      },
-      DEADLINE,
-    )
-    expect(saveAnswer(await records.save(plan.request))).toBe(expected('new-typed'))
+    const made = await plannedWithin(forms.accounts, [forms.entries], {
+      record: { create: { answers: { code, note: 'typed' } } },
+      rows: [{ form: 'saved-entry', field: 'saved_account', changes: [create('a', { entry_no: 1, amount: 10 }), create('b', { entry_no: 2, amount: 20 })] }],
+    })
+    expect(saveAnswer(await records.save(made.request))).toBe(expected('new-typed'))
     const entries = await q<{ entry_no: number }>('select entry_no from parity.saved_entry where account_code = @code order by entry_no', { code })
     expect(entries.map((row) => row.entry_no)).toEqual([1, 2])
   })
@@ -221,9 +248,10 @@ describe('a save that commits', () => {
   // own step, after OUTPUT saw it: the answer is the order read back by its
   // key last, so the total and the version answered are the ones stored, and
   // the next save is not stale. Watched failing on
-  // mcr.microsoft.com/mssql/server:2022-latest with the record read back
-  // before its rows' steps, which left the last count's row count to the
-  // checks after it: "expected 'child 0 count: refused' to be 'saved'".
+  // mcr.microsoft.com/mssql/server:2022-latest with the record's columns
+  // read back before its rows' steps and its row count checked where it is:
+  // "expected { id: '4', tenant_id: '1', …(2) } to match object { note:
+  // 'totalled', total: '8' }", the total 2 from before the lines' trigger.
   test("answers the order as the lines' trigger left it", covers('sqlserver', saveCase('read-back')), async () => {
     const id = await order(1, [[1, 2]])
     const outcome = await saved(
@@ -283,16 +311,37 @@ describe('a save that is refused stores nothing', () => {
   // …(2) }, …(2) } to deeply equal { order: { note: null, …(2) }, …(2) }",
   // the touch and the lines before it stored; and with a step's refusal
   // answered at the save: "expected 'save: check-violation' to be 'child 0
-  // create 1: check-violation'".
-  test.each([
+  // create 1: check-violation'". One test a place, each declaring its own
+  // case: a `test.each` declared none, and the release report had all
+  // three missing on every image.
+  for (const [name, refused] of [
     ['first-row-refused', 0],
     ['middle-row-refused', 1],
     ['last-row-refused', 2],
-  ] as const)('at the %s', async (name, refused) => {
+  ] as const) {
+    test(`at the ${name}`, covers('sqlserver', saveCase(name)), async () => {
+      const id = await order(1)
+      const before = await stored(id)
+      const changes = [0, 1, 2].map((at) => create(String(at), { line_no: at + 1, quantity: at === refused ? -1 : 1 }))
+      expect(saveAnswer(await saved(await body(id, changes)))).toBe(expected(name))
+      expect(await stored(id)).toEqual(before)
+    })
+  }
+
+  // A row's trigger that THROWs in words for the person at severity 16
+  // (0156) is that refusal at the row's step, as a write alone's is:
+  // declined with its reason, from the number, message and severity CATCH
+  // recorded, and the touch and the mark before it rolled back. Watched
+  // failing on mcr.microsoft.com/mssql/server:2022-latest with the
+  // severity left out of what CATCH records: "expected 'child 0 create 1:
+  // refused' to be 'child 0 create 1: declined'", where PostgreSQL
+  // answered declined.
+  test("at a row's step its trigger declines in words for the person", covers('sqlserver', saveCase('row-declined')), async () => {
     const id = await order(1)
     const before = await stored(id)
-    const changes = [0, 1, 2].map((at) => create(String(at), { line_no: at + 1, quantity: at === refused ? -1 : 1 }))
-    expect(saveAnswer(await saved(await body(id, changes)))).toBe(expected(name))
+    const outcome = await saved(await body(id, [create('a', { mark_no: 1 }), create('b', { mark_no: 2, note: 'declined' })], {}, 'saved-mark'))
+    expect(saveAnswer(outcome)).toBe(expected('row-declined'))
+    expect(outcome.ok ? undefined : 'failure' in outcome ? outcome.failure.reason : undefined).toBe(SAVE_DECLINED_REASON)
     expect(await stored(id)).toEqual(before)
   })
 
@@ -439,13 +488,10 @@ describe("a child's bounds, counted once every step ran", () => {
     const save = async (no: number) =>
       records.save(
         (
-          await plannedSave(
-            records,
-            forms.accounts,
-            [forms.entries],
-            { record: await account(), rows: [{ form: 'saved-entry', field: 'saved_account', changes: [await entry(no)] }] },
-            DEADLINE,
-          )
+          await plannedWithin(forms.accounts, [forms.entries], {
+            record: await account(),
+            rows: [{ form: 'saved-entry', field: 'saved_account', changes: [await entry(no)] }],
+          })
         ).request,
       )
     expect(saveAnswer(await save(2))).toBe(expected('at-min'))
@@ -527,6 +573,25 @@ describe("a save's deadline (0155)", () => {
     const marks = [1, 2, 3].map((no) => create(String(no), { mark_no: no, note: 'slow' }))
     expect(saveAnswer(await saved(await body(id, marks, {}, 'saved-mark'), 500))).toBe(expected('past-deadline'))
     expect(await stored(id)).toMatchObject({ marks: [] })
+  })
+
+  // What the deadline does not bound here: a mark whose trigger takes 2 s,
+  // under a deadline of 0.5 s, runs to its end -- SQL Server has no
+  // statement timeout, and only mssql's request timeout of 15 s would stop
+  // it -- holding its locks the while, and the batch's own check stops the
+  // save before its next step, `unavailable`, nothing stored. PostgreSQL
+  // cancels the same statement at its step (the same case there). Watched
+  // failing on mcr.microsoft.com/mssql/server:2022-latest with PostgreSQL's
+  // bound asserted: "expected 2531.928399999997 to be less than 2000".
+  test('lets a slow statement run past the deadline, and stops after it', covers('sqlserver', saveCase('slow-statement')), async () => {
+    const id = await order(1)
+    const made = await planned(await body(id, [create('m', { mark_no: 1, note: 'stuck' })], {}, 'saved-mark'), 500)
+    const start = performance.now()
+    const outcome = await records.save(made.request)
+    const took = performance.now() - start
+    expect(saveAnswer(outcome)).toBe(expected('slow-statement'))
+    expect(took).toBeGreaterThanOrEqual(2000)
+    expect((await stored(id)).marks).toEqual([])
   })
 })
 
@@ -658,49 +723,36 @@ describe('what only SQL Server does with a save', () => {
   })
 
   // `saveParameters` is data-core's prediction of what this batch binds,
-  // which the menu and the publish check hold to 2,100 (0155): every batch a
-  // shared case's kind of save builds binds at most what the prediction says
-  // -- the order's step, each changed row, and each child's count and
-  // `within`. Watched failing on mcr.microsoft.com/mssql/server:2022-latest
+  // which the menu and the publish check hold to 2,100 (0155): every save
+  // this suite plans is held to it (`plannedWithin`), and these three are
+  // the shapes a prediction most easily misses -- a new order's creates, an
+  // update of two fields with a delete and a create, and a touch alone with
+  // one create. Watched failing on mcr.microsoft.com/mssql/server:2022-latest
   // with two values more bound for every step: "an update, a delete and a
-  // create of a saved order: expected 46 to be less than or equal to 45".
+  // create of a saved order: expected 46 to be less than or equal to 45";
+  // and, once every planned save was held, the same: "what a save of
+  // saved-order binds: expected 46 to be less than or equal to 45", with
+  // twenty other cases' saves past it -- the account form's among them,
+  // "what a save of saved-account binds: expected 32 to be less than or
+  // equal to 31".
   test('binds at most what saveParameters predicts', async () => {
     const id = await order(1, [
       [1, 1],
       [2, 1],
     ])
-    const bundle = (form: SavedForms[keyof SavedForms]) => ({ ...form, title: form.id })
-    const saves = menuSaves(bundle(forms.orders))
-    const lines = menuTogether(bundle(forms.lines), SAVE_CLERK)
-    if (saves === null || lines === null) throw new Error('the order form carries no save of its lines')
-    const cases: Array<[string, SaveBody, number]> = [
-      [
-        'three creates of a new order',
-        {
-          record: { create: { answers: { tenant_id: 1, note: 'n' } } },
-          rows: [{ form: 'saved-line', field: 'saved_order', changes: [1, 2, 3].map((no) => create(String(no), { line_no: no, quantity: 1 })) }],
-        },
-        3,
-      ],
-      [
-        'an update, a delete and a create of a saved order',
-        await body(
-          id,
-          [
-            { update: { ...(await line(id, 1)), answers: { quantity: 2, note: 'x' } } },
-            { delete: await line(id, 2) },
-            create('n', { line_no: 3, quantity: 1 }),
-          ],
-          { note: 'p' },
-        ),
-        3,
-      ],
-      ['a touch and one create', await body(id, [create('n', { line_no: 4, quantity: 1 })]), 1],
+    const saves: SaveBody[] = [
+      {
+        record: { create: { answers: { tenant_id: 1, note: 'n' } } },
+        rows: [{ form: 'saved-line', field: 'saved_order', changes: [1, 2, 3].map((no) => create(String(no), { line_no: no, quantity: 1 })) }],
+      },
+      await body(
+        id,
+        [{ update: { ...(await line(id, 1)), answers: { quantity: 2, note: 'x' } } }, { delete: await line(id, 2) }, create('n', { line_no: 3, quantity: 1 })],
+        { note: 'p' },
+      ),
+      await body(id, [create('n', { line_no: 4, quantity: 1 })]),
     ]
-    for (const [name, save, changes] of cases) {
-      const batch = saveBatchOf((await planned(save)).request)
-      expect(batch.statement.parameters.length, name).toBeLessThanOrEqual(saves.parameters + changes * lines.parameters.row + lines.parameters.child)
-    }
+    for (const save of saves) expect((await planned(save)).request.children).toHaveLength(1)
   })
 
   // A batch past the 2,100 parameters one request takes is refused, and
@@ -750,7 +802,7 @@ describe('what only SQL Server does with a save', () => {
       rows: [{ form: 'sales-order-line', field: 'order', changes: [create('a', { line_no: 1, quantity: 1, unit_price: '1.00' })] }],
     }
     const clerk = { actor: { id: 'clara', roles: ['clerk'] }, attributes: { tenant: '1' } }
-    const plan = await plannedSave(records, sales.orders, [sales.lines], save, DEADLINE, clerk)
+    const plan = await plannedWithin(sales.orders, [sales.lines], save, DEADLINE, clerk)
     expect(saveAnswer(await records.save(plan.request))).toBe('saved')
     const [after] = await q<{ version: Buffer }>('select row_version as version from sales.[order] where id = @id', { id })
     expect(after?.version.equals(version)).toBe(false)

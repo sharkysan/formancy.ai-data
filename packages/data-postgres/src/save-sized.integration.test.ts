@@ -130,41 +130,46 @@ describe('a save of an order and its lines on sales.order_line (0155)', () => {
   // on postgres:17-alpine with each line read back after its insert, at
   // every size: "expected 15 to be 14" for one line, "expected 1512 to be
   // 1012" for 500.
-  test.each(SAVE_SIZES)('of %i lines is stored, in one statement per line and a fixed few', async (n) => {
-    const adapter = createPostgresRecords(viaHop)
-    const planning = hop.countRoundTrips()
-    const request = await sized(n, MEASURING, adapter)
-    const before = planning()
-    const turns = hop.countRoundTrips()
-    const sending = performance.now()
-    expect(saveAnswer(await adapter.save(request))).toBe('saved')
-    const first = performance.now() - sending
-    expect(turns()).toBe(2 * n + TURNS_BESIDE_CREATES)
-    expect(before).toBe(4)
+  test.each(SAVE_SIZES)(
+    'of %i lines is stored, in one statement per line and a fixed few',
+    async (n) => {
+      const adapter = createPostgresRecords(viaHop)
+      const planning = hop.countRoundTrips()
+      const request = await sized(n, MEASURING, adapter)
+      const before = planning()
+      const turns = hop.countRoundTrips()
+      const sending = performance.now()
+      expect(saveAnswer(await adapter.save(request))).toBe('saved')
+      const first = performance.now() - sending
+      expect(turns()).toBe(2 * n + TURNS_BESIDE_CREATES)
+      expect(before).toBe(4)
 
-    const times: number[] = []
-    let bytes = 0
-    for (let run = 0; run < RUNS; run += 1) {
-      const timed = await sized(n)
-      const start = performance.now()
-      const outcome = await records.save(timed)
-      times.push(performance.now() - start)
-      expect(saveAnswer(outcome)).toBe('saved')
-      bytes = Buffer.byteLength(JSON.stringify(outcome))
-    }
-    const { p50, p95, p99, max } = percentiles(times)
-    report.push({
-      lines: n,
-      first: Math.round(first),
-      runs: RUNS,
-      p50: Math.round(p50),
-      p95: Math.round(p95),
-      p99: Math.round(p99),
-      max: Math.round(max),
-      turns: 2 * n + TURNS_BESIDE_CREATES,
-      bytes,
-    })
-  })
+      const times: number[] = []
+      let bytes = 0
+      for (let run = 0; run < RUNS; run += 1) {
+        const timed = await sized(n)
+        const start = performance.now()
+        const outcome = await records.save(timed)
+        times.push(performance.now() - start)
+        expect(saveAnswer(outcome)).toBe('saved')
+        bytes = Buffer.byteLength(JSON.stringify(outcome))
+      }
+      const { p50, p95, p99, max } = percentiles(times)
+      report.push({
+        lines: n,
+        first: Math.round(first),
+        runs: RUNS,
+        p50: Math.round(p50),
+        p95: Math.round(p95),
+        p99: Math.round(p99),
+        max: Math.round(max),
+        turns: 2 * n + TURNS_BESIDE_CREATES,
+        bytes,
+      })
+      // 21 saves of 500 lines took about 80 s of the default 120 on the workstation.
+    },
+    300_000,
+  )
 
   // The default deadline admits a save at the cap it was measured with:
   // planned with DEFAULT_SAVE_DEADLINE_MS, SAVE_MAX_ROWS lines are stored.

@@ -365,13 +365,15 @@ create table parity.audited_price (
 -- order's version after the order's own step, as an application's own
 -- trigger would. saved_mark's trigger waits, on a mark noted 'race', for a
 -- shared hold on the application lock 155, which a suite holds exclusively
--- so that two saves are inside their transactions at once; and sleeps
--- 0.2 s on a mark noted 'slow', so a save of several passes its deadline
--- between statements. A mark's number is checked at COMMIT, deferred, as
--- SQL Server cannot: a save that numbers two marks alike is refused by its
--- COMMIT here (save-lost-answer.integration.test.ts). The note columns are
--- varchar, which SQL Server keeps in a code page, so a text not stored as
--- sent refuses a step there.
+-- so that two saves are inside their transactions at once; sleeps 0.2 s
+-- on a mark noted 'slow', so a save of several passes its deadline between
+-- statements, and 2 s on one noted 'stuck', so one statement outlasts it;
+-- and on a mark noted 'declined' raises a refusal worded for the person
+-- (0156), P0001 by RAISE EXCEPTION. A mark's number is checked at COMMIT,
+-- deferred, as SQL Server cannot: a save that numbers two marks alike is
+-- refused by its COMMIT here (save-lost-answer.integration.test.ts). The
+-- note columns are varchar, which SQL Server keeps in a code page, so a
+-- text not stored as sent refuses a step there.
 create table parity.saved_order (
   id int generated always as identity constraint pk_saved_order primary key,
   tenant_id int not null,
@@ -418,6 +420,10 @@ begin
     perform pg_catalog.pg_advisory_xact_lock_shared(155);
   elsif new.note = 'slow' then
     perform pg_catalog.pg_sleep(0.2);
+  elsif new.note = 'stuck' then
+    perform pg_catalog.pg_sleep(2);
+  elsif new.note = 'declined' then
+    raise exception 'formancy: refused: This mark is not taken.';
   end if;
   return null;
 end

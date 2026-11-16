@@ -47,17 +47,22 @@ let viaHop: mssql.ConnectionPool
 
 /** Runs per size: the timings reported are each size's over these. */
 const RUNS = 20
-/** Long enough for the largest size on a loaded runner: a measurement is never cut by the deadline it sets. */
+/**
+ * Long enough for the largest size on a loaded runner: a measurement is
+ * never cut by the deadline it sets, nor by mssql's request timeout of 15 s,
+ * which the first save of 200 lines took a third of on the workstation and
+ * an image never measured might take more of.
+ */
 const MEASURING = 60_000
 const CLERK = { actor: { id: 'clara', roles: ['clerk'] }, attributes: { tenant: '1' } }
 
 beforeAll(async () => {
   fixture = await startSqlServerFixture()
-  owner = await new mssql.ConnectionPool(fixture.admin).connect()
+  owner = await new mssql.ConnectionPool({ ...fixture.admin, requestTimeout: MEASURING }).connect()
   forms = sizedSaveForms(await discoverSqlServer(owner, FIXTURE_SCOPE), TOGETHER_MAX_ROWS)
   records = createSqlServerRecords(owner)
   hop = await startTcpHop({ kind: 'sqlserver', host: fixture.admin.server, port: fixture.admin.port ?? 1433 })
-  viaHop = await new mssql.ConnectionPool({ ...fixture.admin, server: '127.0.0.1', port: hop.port, pool: { max: 1 } }).connect()
+  viaHop = await new mssql.ConnectionPool({ ...fixture.admin, server: '127.0.0.1', port: hop.port, requestTimeout: MEASURING, pool: { max: 1 } }).connect()
   // Connected before anything is counted: the login is no save's turns.
   await viaHop.request().query('select 1')
 })

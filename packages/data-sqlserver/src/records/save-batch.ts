@@ -56,11 +56,13 @@ import type { ExpectedVersion } from './statements.js'
  * owns. Every value is bound, the bounds and the deadline among them; only
  * `set lock_timeout` is spliced, from a whole number the caller checked.
  *
- * CATCH records the step that failed, SQL Server's own number and its
- * message in a table variable, which a rollback does not empty, and the
- * batch selects it rather than rethrow it: so the adapter knows the step and
- * still has the number. The message holds values -- a duplicate key's -- and
- * is read for names only, as a single write's is (errors.ts). What CATCH
+ * CATCH records the step that failed, SQL Server's own number, its message
+ * and its severity in a table variable, which a rollback does not empty, and
+ * the batch selects it rather than rethrow it: so the adapter knows the step
+ * and still has what a single write's refusal is translated from. The
+ * message holds values -- a duplicate key's -- and is read for names only,
+ * as a single write's is (errors.ts), or, from a trigger's THROW at
+ * severity 16 worded for the person, as its reason (0156). What CATCH
  * cannot catch in its scope -- a table missing when its statement compiles,
  * an attention -- reaches the client as an error with no step, and
  * `xact_abort` rolls it back.
@@ -155,7 +157,7 @@ class Builder {
   moves(): string[] {
     return [...this.#tables.values()].map(({ name, definition, steps }) => {
       const { set, moved } = definitionMoved(name, definition)
-      return `if @step in (${steps.join(', ')}) begin ${set} if ${moved} insert @failed values (@step, ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', null); end;`
+      return `if @step in (${steps.join(', ')}) begin ${set} if ${moved} insert @failed values (@step, ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', null, null); end;`
     })
   }
 }
@@ -182,14 +184,22 @@ interface WriteStep {
  * One write step in the batch. The table's definition guard (0041) and its
  * INSTEAD OF guard follow the first step that writes the table, and a
  * delete's reach checks the first delete of that reach, and none after
- * them: that step's statement left the transaction holding IX on the table
- * to its end, which keeps out the Sch-M lock an ALTER, an added key and a
- * CREATE TRIGGER need, so what they checked holds for every later step. A
- * check per step was measured repeating the catalog's facts for each row,
- * the batch growing by about 4.8 KB of SQL a line and taking 8.7 s to
- * compile at 60 lines (mcr.microsoft.com/mssql/server:2022-latest,
- * 2026-11-16). The text check, the row count and the version read after
- * triggers stay every step's own.
+ * them: that step's statement left the transaction holding a lock on the
+ * table, and on every table its cascade reaches, a row removed there or
+ * none, that keeps out to its end an ALTER, a unique index, a trigger
+ * created or enabled and a foreign key added onto the table -- each waits,
+ * measured by save-facts.integration.test.ts -- so what those checks read
+ * of the catalog holds for every later step. A permission does not: a DENY
+ * DELETE made while the save runs does not wait for it (the same file), so
+ * DELETE on a table past its root taken away between two deletes of a
+ * reach is seen by the first alone (0155); whether a DENY of the VIEW
+ * DEFINITION its keys are read with waits was not measured. A check per
+ * step was measured repeating the
+ * catalog's facts for each row, the batch growing by about 4.8 KB of SQL a
+ * line and taking 8.7 s to compile at 60 lines
+ * (mcr.microsoft.com/mssql/server:2022-latest, 2026-11-16). The text
+ * check, the row count and the version read after triggers stay every
+ * step's own.
  */
 function write(batch: Builder, step: WriteStep): void {
   const written = `@w${String(step.number)}`
@@ -443,7 +453,7 @@ export function saveBatch(record: BatchRecord, children: readonly BatchChild[], 
     `set lock_timeout ${String(deadlineMs)};`,
     'declare @start datetime2(7) = sysutcdatetime();',
     'declare @step int = 0, @transaction bigint, @rows int, @ended bit, @d varbinary(32), @n int;',
-    'declare @failed table ([step] int, [number] int, [message] nvarchar(4000), [held] int);',
+    'declare @failed table ([step] int, [number] int, [message] nvarchar(4000), [held] int, [severity] int);',
     ...(batch.clock ? [`declare ${NOW} datetime2(7) = sysutcdatetime();`] : []),
     ...batch.declared,
     'begin try',
@@ -453,11 +463,11 @@ export function saveBatch(record: BatchRecord, children: readonly BatchChild[], 
     ENDED,
     'if @@trancount > 0 rollback transaction;',
     // A trigger that ended the transaction may have committed what came before it (0031): recorded as that, and the catalog not read.
-    `if ${ENDED_BY_ANOTHER_ERROR} begin insert @failed values (@step, ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', @n); end`,
-    'else begin insert @failed values (@step, error_number(), error_message(), @n); end;',
+    `if ${ENDED_BY_ANOTHER_ERROR} begin insert @failed values (@step, ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', @n, null); end`,
+    'else begin insert @failed values (@step, error_number(), error_message(), @n, error_severity()); end;',
     `if @ended = 0 begin ${batch.moves().join(' ')} end;`,
     'end catch;',
-    'select [step], [number], [message], [held] from @failed;',
+    'select [step], [number], [message], [held], [severity] from @failed;',
     `select ${back.map((entry) => entry.name).join(', ')} from @r;`,
     ...batch.selected,
   ].join('\n')

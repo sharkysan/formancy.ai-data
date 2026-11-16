@@ -322,7 +322,8 @@ GO
 -- fit without an error, which the save's text check refuses. The lines'
 -- trigger is one trigger for every event, over `inserted` and `deleted`;
 -- the marks' holds the application lock with sp_getapplock, shared, for
--- the transaction, and sleeps with WAITFOR.
+-- the transaction, sleeps with WAITFOR, and refuses a mark noted
+-- 'declined' with THROW 50001, at severity 16.
 create table parity.saved_order (
   id int identity(1, 1) not null constraint pk_saved_order primary key,
   tenant_id int not null,
@@ -378,6 +379,10 @@ begin
     exec @held = sp_getapplock @Resource = N'parity.saved_mark', @LockMode = N'Shared', @LockOwner = N'Transaction', @LockTimeout = 30000;
   if exists (select 1 from inserted where note = 'slow')
     waitfor delay '00:00:00.200';
+  if exists (select 1 from inserted where note = 'stuck')
+    waitfor delay '00:00:02';
+  if exists (select 1 from inserted where note = 'declined')
+    throw 50001, N'formancy: refused: This mark is not taken.', 1;
 end
 GO
 

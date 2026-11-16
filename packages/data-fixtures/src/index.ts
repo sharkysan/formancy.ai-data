@@ -117,6 +117,7 @@ export {
   percentiles,
   plannedSave,
   SAVE_CLERK,
+  SAVE_DECLINED_REASON,
   SAVE_PARITY,
   SAVE_RACE_LOCK,
   SAVE_SIZES,

@@ -3,6 +3,7 @@ import {
   covers,
   PARITY_SCOPE,
   plannedSave,
+  SAVE_DECLINED_REASON,
   SAVE_RACE_LOCK,
   saveAnswer,
   saveCase,
@@ -255,16 +256,35 @@ describe('a save that is refused stores nothing', () => {
   // Watched failing on postgres:17-alpine, at each place, with every step
   // sent outside the transaction, each its own: "expected { order: { note:
   // null, …(2) }, …(2) } to deeply equal { order: { note: null, …(2) },
-  // …(2) }", the touch and the lines before it stored.
-  test.each([
+  // …(2) }", the touch and the lines before it stored. One test a place,
+  // each declaring its own case: a `test.each` declared none, and the
+  // release report had all three missing on every image.
+  for (const [name, refused] of [
     ['first-row-refused', 0],
     ['middle-row-refused', 1],
     ['last-row-refused', 2],
-  ] as const)('at the %s', async (name, refused) => {
+  ] as const) {
+    test(`at the ${name}`, covers('postgres', saveCase(name)), async () => {
+      const id = await order(1)
+      const before = await stored(id)
+      const changes = [0, 1, 2].map((at) => create(String(at), { line_no: at + 1, quantity: at === refused ? -1 : 1 }))
+      expect(saveAnswer(await saved(await body(id, changes)))).toBe(expected(name))
+      expect(await stored(id)).toEqual(before)
+    })
+  }
+
+  // A row's trigger that refuses in words for the person (0156) is that
+  // refusal at the row's step, as a write alone's is: declined with its
+  // reason, and the touch and the mark before it rolled back. Watched
+  // failing on postgres:17-alpine with a create's error translated as a
+  // read's: "expected 'child 0 create 1: refused' to be 'child 0 create 1:
+  // declined'".
+  test("at a row's step its trigger declines in words for the person", covers('postgres', saveCase('row-declined')), async () => {
     const id = await order(1)
     const before = await stored(id)
-    const changes = [0, 1, 2].map((at) => create(String(at), { line_no: at + 1, quantity: at === refused ? -1 : 1 }))
-    expect(saveAnswer(await saved(await body(id, changes)))).toBe(expected(name))
+    const outcome = await saved(await body(id, [create('a', { mark_no: 1 }), create('b', { mark_no: 2, note: 'declined' })], {}, 'saved-mark'))
+    expect(saveAnswer(outcome)).toBe(expected('row-declined'))
+    expect(outcome.ok ? undefined : 'failure' in outcome ? outcome.failure.reason : undefined).toBe(SAVE_DECLINED_REASON)
     expect(await stored(id)).toEqual(before)
   })
 
@@ -494,6 +514,25 @@ describe("a save's deadline (0155)", () => {
     const marks = [1, 2, 3].map((no) => create(String(no), { mark_no: no, note: 'slow' }))
     expect(saveAnswer(await saved(await body(id, marks, {}, 'saved-mark'), 500))).toBe(expected('past-deadline'))
     expect(await stored(id)).toMatchObject({ marks: [] })
+  })
+
+  // No statement runs longer than the deadline: a mark whose trigger takes
+  // 2 s, under a deadline of 0.5 s, is cancelled at its step by the
+  // statement timeout -- 57014, `unavailable` -- well before its trigger
+  // would end, where SQL Server runs it to its end (the same case there).
+  // Watched failing on postgres:17-alpine with the statement timeout not
+  // set: the statement ran its 2 s and the deadline stopped the save after
+  // it -- "expected 'save: unavailable' to be 'child 0 create 0:
+  // unavailable'".
+  test('stops a statement at the deadline', covers('postgres', saveCase('slow-statement')), async () => {
+    const id = await order(1)
+    const plan = await planned(await body(id, [create('m', { mark_no: 1, note: 'stuck' })], {}, 'saved-mark'), 500)
+    const start = performance.now()
+    const outcome = await records.save(plan.request)
+    const took = performance.now() - start
+    expect(saveAnswer(outcome)).toBe(expected('slow-statement'))
+    expect(took).toBeLessThan(2000)
+    expect((await stored(id)).marks).toEqual([])
   })
 })
 

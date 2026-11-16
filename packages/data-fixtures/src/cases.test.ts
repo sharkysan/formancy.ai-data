@@ -156,6 +156,7 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   SAVE_CLERK: 'the person who saves in the saves suites (0155)',
   SAVED_BOUNDS: "the bounds the saves suites' children are saved with; what a count holds is SAVE_PARITY's",
   SAVE_RACE_LOCK: "the application lock the saves suites' race holds, on each engine; what the race stores is SAVE_PARITY's",
+  SAVE_DECLINED_REASON: "what the marks' trigger says to the person of a mark noted 'declined'; what a save answers then is SAVE_PARITY's",
   SAVE_SIZES: 'how many line changes the sized save suites measure (0155)',
   SIZED_ORDER_POLICY: "who may do what with the sized save suites' order form, which no shared case reads",
   SIZED_LINE_POLICY: "who may do what with the sized save suites' line form, which no shared case reads",
