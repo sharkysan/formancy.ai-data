@@ -821,9 +821,19 @@ each lock wait and when a step may start; on PostgreSQL each statement
 too, and on SQL Server a statement slow for another reason, and a
 batch's compile, are bounded only by mssql's request timeout, holding
 their locks the while. The plan, both adapters' save, the generator's
-and the bundle check's part, the route and the client are built; the host
-page and the studio follow, and until they do only a page an integrator
-writes saves a record with its rows. A record whose rows are required is
+and the bundle check's part, the route, the client and the host page are
+built; the studio follows, and until it does an administrator chooses a
+together child in a generation request of their own. On the host page a
+together child's tab is drawn with the record's tabs, so it lists the
+record's rows as the record opens rather than when first shown -- one
+list more for every record of such a form a person opens, the price of a
+Save that can show the tab it refuses at; a row's form in each renderer
+is its own engine, each answer typed into one copied into the other, and
+a field a rule computes is each form's own; Load the saved record after
+a stale save of rows drops every row's draft with the record's, asking
+nothing more; and Remove is absent at the fewest rows for a new row too,
+as a repeater's is, so a new record at its fewest adds a row before it
+drops one. A record whose rows are required is
 never created alone, so every plain create of every form, and every
 save, reads every published form from the store first, and is refused
 503 when the store cannot list them -- about 2 ms a published form,

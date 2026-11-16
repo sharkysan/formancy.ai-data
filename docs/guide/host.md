@@ -63,6 +63,36 @@ is its foreign key onto the record's, holding at most one row of it -- is
 its one row in its own form instead, in the record's own tab, or Add,
 shown while the record as stored holds the value its generation names
 ([0109](../decisions/0109-a-form-whose-key-is-its-parents-is-a-section-of-the-parents-record.md)).
+
+A child an administrator chose to save with its record -- an order's
+lines, one to twenty of them, say -- is a tab whose rows are held on the
+page until the record's own Save, which sends the record and every changed
+row together, all stored or none ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). Its tab is there at once, a new
+record's too, and lists the record's rows as the record opens. Each row's
+change is said in its own column -- New, Changed, To be deleted, Changed by
+someone else -- and a line under the heading says how many rows there are,
+the fewest and the most the record holds, why Add or Remove is not there,
+and what is held, with Go to Save beside it, which shows the record's tab
+and puts the keyboard on its Save and sends nothing. Add starts a new row
+on a rail below the grid with the keyboard in its first field; a row opens
+there by a click, Space or Enter, in every layout, Drill down included, in
+its own form without the field naming the record, which the save fills
+in; Done closes it, sends nothing, and gives the keyboard back to its row.
+Remove marks a row to be deleted and becomes Undo remove, the keyboard
+left on it; nothing asks first, because nothing is deleted until Save.
+There is no Add at the most rows the record may hold and no Remove at the
+fewest, and neither where the server says you may not, which the line
+says. A row whose form refuses its answers is opened with its problems and
+nothing is sent; a refusal about a row goes onto that row, and one about
+the rows' count onto the tab, the keyboard there. Every save moves the
+record's version, so saving lines of an order someone else saved since is
+stale even where the two of you changed different lines: where you
+changed only lines, Keep my line changes reads the order again and keeps
+each change at the version it was read at, and Save stores them -- but a
+line the other person changed too, said Changed by someone else, is
+refused at that line until Load this line takes it as stored. Such a
+form opened on its own says its rows are added and removed with their
+record, and offers no New and no Delete.
 A form that is its own child -- an employee and their manager -- shows its
 records as a grid or as a tree: the records with no parent, and under each
 record, once it is expanded, those naming it
@@ -289,6 +319,8 @@ Anything on the page that would drop a form holding unsaved changes, a save
 still out or a save that may have been stored -- another row, New record,
 Load, Duplicate record, another form, Back, Sign out, a child row, hiding a renderer, or a
 record created in one renderer, which the other then opens -- asks first,
+naming a record whose rows hold changes with them -- "Order k1:7 with 2
+Order line rows added and 1 to be deleted" --
 and names what was typed while it waited before discarding it; a record
 whose read answers after you have moved on is not opened over what you
 typed since. A reload or a closed tab does not ask.

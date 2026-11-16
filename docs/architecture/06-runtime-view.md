@@ -936,9 +936,9 @@ append only.
 A record and the rows of its together children, saved in one transaction
 and checked as a whole
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
-`POST /v1/forms/:id/records/save` takes one from a page an integrator
-writes, through `@formancy/data-client`'s `save`; the host page and the
-studio send none yet.
+`POST /v1/forms/:id/records/save` takes one through
+`@formancy/data-client`'s `save`, from the host page's own Save or a page
+an integrator writes; the studio does not yet offer the choice.
 
 0. The route (`packages/data-server/src/routes/runtime-save.ts`) checks,
    each answering alone: the body's shape, before the write id is read
@@ -1001,6 +1001,33 @@ studio send none yet.
    transaction, each at its part. The audit writes one event, `save`,
    with the row changes' count.
 
+On the host page (`apps/host/src/together.tsx`, `save-set.ts`) a
+together child's tab is drawn with the record's tabs and lists the
+record's rows as it opens: `list` with `parent` and `limit` `max + 1`,
+held in the page's own set, which the grid is answered from through its
+datasource's seam, asked again from memory each time the set changes. A
+row's change is its forms', one per renderer, each typed into copied into
+the other, and nothing is sent until the record's Save:
+
+1. The record's session (`session.ts`) asks whether the save carries rows
+   -- a change, or a new record a child requires rows of -- and if so
+   takes them, each new or changed row's forms submitted first; a row
+   whose form refuses is opened on its tab's rail, its summary taking the
+   keyboard, and nothing is sent.
+2. One `client.save`: the record's answers where they changed and none
+   where they did not, so the server touches it, and each child's creates
+   by a ref the page mints, updates and deletes by token and the version
+   each row was read at.
+3. The answer goes where it is about: stored, each row takes its stored
+   self -- one typed into meanwhile keeps its newer answers and its mark,
+   the stored version applied -- and the record's line says what was
+   saved; a refusal about a row onto that row, a bound onto the tab, each
+   with the keyboard there; stale at the record, from a save of rows
+   alone, Keep my line changes reads the record again and lists the rows
+   again, each change kept at its version, so the next save is guarded row
+   by row; lost, the record's notice checks by the record alone, and Load
+   the saved record lists its rows again.
+
 Held by the shared cases in `packages/data-fixtures/src/saves.ts`, which
 each adapter's `save.integration.test.ts` and
 `save-lost-answer.integration.test.ts` assert through `covers()`; by each
@@ -1008,8 +1035,13 @@ adapter's `save-sized.integration.test.ts`; for the plan, by
 `packages/data-core/src/records/save.test.ts` and `together.test.ts`; for
 the route, by `packages/data-server/src/routes/runtime-save.test.ts` over
 fake ports and `packages/data-server/src/e2e-lost-answer.integration.test.ts`
-on both engines; and for the client, by
-`packages/data-client/src/saves.integration.test.ts` on both engines. What
+on both engines; for the client, by
+`packages/data-client/src/saves.integration.test.ts` on both engines; and
+for the host page, by `apps/host/src/together.test.tsx`,
+`stale-set.test.tsx` and the save cases of `plane.test.tsx`,
+`page.test.tsx`, `in-flight.test.tsx`, `leaving.test.tsx` and
+`unknown-child.test.tsx` on both engines, and
+`apps/host/scripts/browser/together.mjs` in the browser gate. What
 it costs: two people saving different lines of one order at once are one
 saved and one `stale`; on SQL Server a trigger that ends the transaction
 can store a save in part, a batch SQL Server has not seen before is

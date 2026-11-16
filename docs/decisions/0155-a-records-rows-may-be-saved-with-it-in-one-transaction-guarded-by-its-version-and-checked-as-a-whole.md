@@ -4,9 +4,9 @@
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:** what data-core plans, what both adapters run, what the
-  generator writes and the bundle check holds, the route and the client --
-  the parts of this decision built so far; each later part extends this
-  line when it lands.
+  generator writes and the bundle check holds, the route, the client and
+  the host page -- the parts of this decision built so far; the studio's
+  extends this line when it lands.
   `packages/data-core/src/records/save.test.ts` -- the record's step is
   planned under the order's policy and each line's under the line's, and a
   person one of them refuses is refused at that part (watched failing with
@@ -270,6 +270,65 @@
   the server rebuilt); and the menu and the line form saying the lines are
   saved with their order (with the menu's child left without its
   `together`, data-core rebuilt).
+  What the form route serves a page drawing a new row:
+  `packages/data-server/src/routes/runtime-save.test.ts` -- a together
+  child's `writable.create`, what a row's create in a save takes, served to
+  a clerk who may make it and to an auditor not (with it served for a
+  create alone: the clerk's was null), and
+  `packages/data-client/src/transport.test.ts` -- read where the form's
+  rows are saved with their record and nowhere else that offers no create
+  (with the save's create left out of the check: the line form refused as
+  no form).
+  The host page, on postgres:17-alpine and
+  mcr.microsoft.com/mssql/server:2022-latest, each mutation watched on
+  PostgreSQL: `apps/host/src/together.test.tsx` -- a line changed and one
+  added held on the page, said New and Changed in their column, and saved
+  by the order's own Save in either renderer (with the session never
+  carrying the rows: "Saved." and the lines as they were), the line's form
+  without the field naming the order (with it left in: a Saved order
+  control on the rail), Enter on a line putting the keyboard on the rail's
+  heading, Done back on its row, Add in its first field and Go to Save on
+  the order's Save; Add absent at three lines, Remove at one -- a remover's
+  -- and to a clerk the policy grants no delete, the line saying why (with
+  Remove drawn at the bound: a Remove on the last line; and with the
+  menu's flags ignored: the clerk's line said nothing of removing), Remove
+  marking a line To be deleted and becoming Undo remove with the keyboard
+  on it; and a new order's Save, pressed before its lines' tab was ever
+  shown, refused at that tab with the keyboard on its heading and the
+  bound in the page's words, then created with its line (with the tab
+  drawn only once shown: the order's pane took the refusal; and with the
+  bound in the server's words: the line named the line form's id).
+  `stale-set.test.tsx` -- the second of two saves of different lines of
+  one order stale at the order, Keep my line changes keeping its line,
+  and Save storing it beside the other (with Keep listing the lines
+  afresh: the page's line was gone); a line both changed said Changed by
+  someone else and refused at that line, nothing stored, until Load this
+  line takes it as stored (with the moved line taken at the version it was
+  listed at: marked Changed alone, and, its mark kept, saved over the
+  other person's change with nothing said); and Load the saved record
+  dropping the lines' changes with the order's (with the session loading
+  the record alone: the lines as they were drafted). `plane.test.tsx` --
+  the save sent from the page through every door, the token in its header
+  alone (with 0155's exception removed before the page drew a record's
+  rows as one set: save unused on every door). `page.test.tsx` -- axe and
+  a name on every control in every state of the lines' tab (with Add drawn
+  without a name). `in-flight.test.tsx` -- a second press while the save
+  is out sending nothing, a line typed into meanwhile keeping its newer
+  answer and its mark, every answer heard (with the newer typing dropped
+  for the stored row: the line said nothing of it). `leaving.test.tsx` --
+  New record asking first and naming the order with what its lines hold
+  (with the lines' changes not the guard's: nothing asked).
+  `unknown-child.test.tsx` -- a save whose answer was lost after it
+  committed, sent once, checked by the order, and Load the saved record
+  listing the lines as stored (with the order loaded alone: the line still
+  marked Changed). The host's browser gate,
+  `apps/host/scripts/browser/together.mjs`, in Chromium on this machine and
+  in Firefox and WebKit in CI -- the lines' tab clean at every width down to
+  320 pixels; Add, typing, Done, Go to Save and Save from the keyboard; no
+  rule of host.css on a line's paper; and a new order saved with its line
+  whose answer the hop drops stored once with its line, the page saying it
+  may have been saved, or, where the browser sent it again, that it was
+  created.
 
 ## Context
 
@@ -487,12 +546,54 @@ by the rules every write's answer is read by (0031); `reconcile` reads a
 lost save as an update where it carries a version and as a create where
 it does not, and says what the record shows and nothing of its rows.
 
-**Later parts of the decision**, each its own pull request: the host
-page's pending rows and one Save, and the studio's controls. Until they
-land, the host page lists a together child's rows and edits them one at
-a time, as the form offers, and offers no row's add or removal, nor a New
-of a record whose rows are required -- an integrator's page saves them
-through the route; and an administrator confirms `together` and
+**The host page holds the rows until the record's own Save.** A together
+child's tab (`apps/host/src/together.tsx`) is drawn with the record's
+tabs, not the first time it is shown, and lists the record's rows as it
+opens -- `list` with `parent` and `limit` `max + 1` -- into the page's
+own set (`save-set.ts`, framework-neutral beside `session.ts`), which the
+grid is answered from through its datasource's seam and asked again from
+memory each time the set changes. Each row's change is said in words in a
+column of its own; the tab's line, a polite live region, says how many
+rows there are, the bound, why a control is not there and what is held,
+with Go to Save beside it, which shows the record's tab and puts the
+keyboard on its Save and sends nothing. Add starts a new row, its `ref`
+minted from a counter that never goes back, on a rail with the keyboard in
+its first field; a row opens there by a click, Space or Enter in every
+layout, Drill down included, in the child's own document with the field
+naming the record left out, and Done runs the engine's submit and closes
+the rail where it accepts, sending nothing. Remove marks a row to be
+deleted and becomes Undo remove with the keyboard left on it, asking
+nothing. Add is absent at `max` and Remove at `min` -- a new row's too,
+as a repeater's are (formancy.ai 0184) -- and each is drawn only where the
+menu's `TogetherChild` lets this person; a record holding more than `max`
+shows them read only. A row's draft is its forms, one engine per
+renderer, each answer typed into one copied into the other. The record's
+Save (`session.ts`, through `with-rows.ts`) carries its rows wherever
+they hold a change, or a child requires rows of a new record: each new or
+changed row's forms submitted first, a row refusing opened with its
+summary taking the keyboard and nothing sent; then one `client.save`
+with the record's answers where they changed and none where they did not.
+Its answer goes where it is about: stored, each row takes its stored self,
+or, typed into while the save was out, keeps its newer answers and its
+mark with the stored version, and the record's line says what was saved;
+a refusal about a row onto that row's forms, a bound onto the tab in the
+page's words, each with the keyboard there; stale at the record from a
+save of rows alone, the notice offers Keep my line changes, which reads
+the record again and lists the rows again, every change kept at the
+version it was read at and a row moved or gone since marked changed by
+someone else, so the next save is guarded row by row and Load this line
+takes one row as stored; lost, the record's notice checks by the record
+alone, and Load the saved record lists the rows again. The guard counts
+the rows' changes as the record's work and names them with it. A
+together child opened on its own says its rows are added and removed
+with their record. `GET /v1/forms/:id` serves a together child's
+`writable.create` -- what a row's create in a save takes from this
+person -- where they may make it, though `operations` holds no create, and
+`@formancy/data-client` reads it there and nowhere else, so a page draws a
+new row with the fields its create takes.
+
+**A later part of the decision**, its own pull request: the studio's
+controls. Until it lands, an administrator confirms `together` and
 `touchColumn` in a generation request of their own, which the studio
 does not yet write.
 
@@ -654,10 +755,21 @@ What it costs, and what it does not do:
   record and not read its required rows cannot create it at all: a save
   that creates it is refused 403 before anything is read, naming no child,
   as the plain create is.
+- **The host page lists a together child's rows as the record opens**,
+  since its tab is drawn with the record's tabs so that the record's Save
+  can show it: one list request more for each record of such a form a
+  person opens, whether or not they look at its rows.
+- **A row's two renderers are two engines kept equal.** Each answer typed
+  into one is copied into the other; a field a rule computes is each
+  form's own.
+- **Load the saved record after a stale save drops every row's change**
+  with the record's, asking nothing more, as it drops the record's own.
+- **Remove is absent at `min` for a new row too**, as a repeater's is: a
+  new record at its fewest rows adds one before it drops one.
 - **Built in part.** The plan, both adapters' save, the generator's and
-  the bundle check's part, the route and the client are built; the host
-  page and the studio do not offer a save yet, so a together child is
-  saved with its record only by a page an integrator writes. The limits
+  the bundle check's part, the route, the client and the host page are
+  built; the studio does not offer the choice yet, so an administrator
+  makes a child together in a generation request of their own. The limits
   were measured on one workstation and on the default images alone, not on
   the CI runner, which holds only that a save of `SAVE_MAX_ROWS` lines is
   stored within the default deadline, nor on the oldest images of the

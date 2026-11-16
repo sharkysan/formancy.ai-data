@@ -446,6 +446,18 @@ things are drawn, which jsdom draws nowhere, so the host's
 `grid-widths.test.tsx` holds what AG Grid draws and tells without one
 (`apps/host/scripts/browser/widths.mjs`,
 [0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
+It fails when an order's lines saved with it are not measured clean in
+their tab at every width; when Add from the keyboard does not put it in
+the new line's first field, Done does not give it back to the line's
+row, or Go to Save does not put it on the order's Save; when a rule of
+host.css selects anything on a line's paper in either renderer; and when
+a new order saved with its line whose answer the hop drops after the
+server stored it is not stored once with its one line, or the page does
+not say what is true -- created where the browser sent it again, may
+have been saved, with the keyboard there, where it did not -- each as
+0058's table says of a lost POST on the connection it took
+(`apps/host/scripts/browser/together.mjs`,
+[0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

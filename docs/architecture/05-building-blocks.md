@@ -523,6 +523,16 @@ time its tab is shown and kept after, all of them forgotten for another
 record, and `src/use-grid-sizing.ts` a grid's columns sized only where it
 is drawn, owed while it is hidden, as `src/grid-sizing.ts` decides
 ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md));
+`src/together.tsx` draws a child whose rows are saved with the record --
+its rows in a grid of the page's own set, each change in words, Add and
+Remove inside the bound and the menu's flags, a line saying why, Go to
+Save, and a row open on a rail with Done -- drawn with the tabs rather
+than when first shown, so the record's Save can show it; `src/save-set.ts`
+holds those rows until the record's own Save, framework-neutral beside
+`src/session.ts`, whose save carries them through `src/with-rows.ts` and
+applies its answer to them, Keep my line changes and Load this line among
+it; and `src/rows-said.ts` says what they hold, in the grid, on the line,
+in the guard and after a save ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
 `src/record-tree.tsx` shows a form that is its own child as a tree of its
 records, a level asked for when it is expanded, and `src/tree-lines.ts`
 what it says of a level that holds none

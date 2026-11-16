@@ -4460,12 +4460,37 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:f9d90bcdb56aff0b577f1292e58fdba9447bcc6b7fa6e08f5e32307c6289f949",
+      "reviewed": "sha256:c38bb3b4d35e4588a54f3c1db5f34e76c24978d272cb73f8b03fe9107a59e8dc",
       "limitations": [
         {
           "area": "writes",
-          "says": "A record and its together children's rows are saved through POST /v1/forms/:id/records/save alone: the host page and the studio offer no save yet, so they are saved together only by a page an integrator writes, and an administrator confirms together and a touch column in a generation request of their own.",
-          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
+          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds; an administrator confirms together and a touch column in a generation request of their own, which the studio does not yet write.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Two people saving lines of one order at once: every save moves the order's version, so the second is stale even where the two changed different lines; where it changed only lines, Keep my line changes and Save store them, each line still guarded by the version it was read at, and a line both changed is refused at that line until Load this line takes it as stored.",
+          "heldBy": "apps/host/src/stale-set.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A together child's rows are held on the host page until the record's own Save, nothing of them sent before: a row's Done only closes its form, and leaving the record asks first, naming it with what its rows hold.",
+          "heldBy": "apps/host/src/leaving.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A together child's tab is drawn with the record's tabs, so it lists the record's rows as the record opens, not the first time the tab is shown: one list request more for each record of such a form a person opens.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "On the host page Add is absent at the most rows a record may hold and Remove at the fewest, a new row's too, as a repeater's are: a new record at its fewest rows adds one before it drops one.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "After a stale save of a record with its rows, Load the saved record drops every row's change with the record's, asking nothing more.",
+          "heldBy": "apps/host/src/stale-set.test.tsx"
         },
         {
           "area": "forms",
