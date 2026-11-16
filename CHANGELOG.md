@@ -69,6 +69,38 @@ the same day (formancy.ai 0232).
   guide's section 8 says, and until then the door does not forward a save,
   which fails closed. The host page and the studio offer no save yet.
 
+- **data-core binds a database routine as an action of a form** (0159).
+  Why: administrator-named actions run logic the deployment keeps in its
+  database over the open record, and before any adapter runs one, what a
+  run rests on -- which routines, where each parameter's value comes from,
+  who may run it, and what drift stops -- has to be one decision the
+  generator, the planner and drift review share. What an integrator of
+  data-core notices: `GenerationRequest.actions` names each action, a
+  routine and a source for every parameter -- a column field, a key
+  column, a dialog input, a context attribute or the actor's id -- and
+  `generateForm` binds each into `FormBindings.actions` with its generated
+  dialog, or writes a `blocked` note naming the rule that refused it:
+  only a PostgreSQL function returning void or a SQL Server procedure, of
+  `in` parameters the adapter's type table holds, every one mapped, each
+  source typed by its parameter, on a form whose version proves the record
+  as a delete's must. `FormPolicy.actions` names who may run each, deny by
+  default, a role that may read and never needs update; `authorizeAction`
+  and `runnableActions` answer for one person; `planAction` plans a run,
+  a field or a key passed as a column of the locked row, every other value
+  through its parameter's codec, and a key named twice `duplicate-record`;
+  `PresentationOverrides.actions` holds an action's words over the
+  generated dialog, rebased by name; and drift review reads the routines a
+  form's actions bind -- `routine-dropped`, `routine-changed`,
+  `routine-reach-changed`, `routine-added`, a `routine` subject, and
+  `DriftVerdict.actions`, the actions still runnable. A form that binds no
+  action generates, validates and drifts exactly as before. The cost: no
+  action on a table whose version cannot prove the record; on SQL Server a
+  rowversion form needs a confirmed touch column, which the generator does
+  not write yet; an attribute an action passes must be one a row filter or
+  a through compares with; and a routine's own writes are bound by no grant
+  of the policy. Nothing serves or runs an action yet: the server reads no
+  `actions` in a generation request, so no form it publishes binds one.
+
 - **A snapshot records the routines in scope, when its scope asks for
   them** (0158). Why: administrator-named actions will run routines the
   deployment keeps in its database, and no snapshot said which exist, what

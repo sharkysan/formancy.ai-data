@@ -202,6 +202,15 @@ TCP hop dropped sent once; the bundle check by `bundle.test.ts`,
 shared case: the route and the client sit above the port, where one server
 answers for both engines.
 
+What data-core decides of an action is held with no database, and nothing
+runs one yet: the binding and its every refusal by
+`packages/data-core/src/generate/actions.test.ts`, who may run one by
+`policy/actions.test.ts`, a run's plan by `actions/plan.test.ts`, its words
+by `presentation/actions.test.ts` and drift against it by
+`drift/routines.test.ts`, each case watched failing with its rule taken
+out ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)). What a routine does when an adapter calls it, on
+either engine, is a later record's to measure.
+
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
 each engine and fails a run in which one is missing or failed on either. What

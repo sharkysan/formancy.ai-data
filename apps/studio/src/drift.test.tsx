@@ -136,7 +136,9 @@ function written(change: DriftChange, labels: Record<string, string>): string {
         ? `schema ${change.subject.schema}`
         : change.subject.kind === 'object'
           ? `${change.subject.object.schema}.${change.subject.object.name}`
-          : `${change.subject.object.schema}.${change.subject.object.name}, ${change.subject.kind} ${change.subject.name}`
+          : change.subject.kind === 'routine'
+            ? `routine ${change.subject.routine.schema}.${change.subject.routine.name}(${change.subject.routine.signature})`
+            : `${change.subject.object.schema}.${change.subject.object.name}, ${change.subject.kind} ${change.subject.name}`
   const affects =
     change.affects.length === 0 ? 'Affects no field of this form.' : `Affects ${change.affects.map((key) => `${labels[key] ?? key} (${key})`).join(', ')}.`
   return `${change.severity} ${change.kind} on ${subject}${change.message}${affects}`

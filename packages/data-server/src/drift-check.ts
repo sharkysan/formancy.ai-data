@@ -1,3 +1,4 @@
+import { describeRoutine } from '@formancy/data-core'
 import type { DriftChange, DriftReport, DriftSubject } from '@formancy/data-core'
 import { CONFIGURATION_ID } from './config-store.js'
 
@@ -60,6 +61,9 @@ function subjectOf(subject: DriftSubject): string {
       return subject.schema
     case 'object':
       return `${subject.object.schema}.${subject.object.name}`
+    case 'routine':
+      // A routine an action binds, or one in scope (0159), with PostgreSQL's signature.
+      return describeRoutine(subject.routine)
     default:
       return `${subject.object.schema}.${subject.object.name}.${subject.name}`
   }

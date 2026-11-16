@@ -126,6 +126,35 @@ export function authorizeOperation(policy: FormPolicy, context: PolicyContext, o
 }
 
 /**
+ * Whether the actor may run the action `name` of this form (0159): a role
+ * of theirs is granted it, and the run can be scoped -- the root's row
+ * filter and every through resolve from the context, as for every
+ * operation. Asked before any statement, as `authorizeOperation` is; the
+ * policy is fitted to the form, so an action the bindings do not bind is
+ * refused as the policy that names it is. Read is not asked here: every
+ * role an action names is one that may read, or the policy is refused.
+ */
+export function authorizeAction(policy: FormPolicy, context: PolicyContext, bindings: FormBindings, name: string): PolicyDecision {
+  const prepared = prepare(policy, context, bindings)
+  if (!prepared.ok) return prepared
+  const roles = prepared.policy.actions.get(name)
+  if (roles === undefined || !holds(roles, prepared.actor)) return refuse('operation-denied', `no role of this actor may run ${name} with this form`)
+  const scoped = resolve(prepared.policy.rowFilters, prepared.actor, 'rowFilters')
+  if (!scoped.ok) return scoped
+  const through = resolveThrough(prepared.policy, prepared.actor)
+  return through.ok ? { ok: true } : through
+}
+
+/**
+ * The actions this actor may run, in the bindings' order: each one
+ * `authorizeAction` lets through alone, so what a page offers is that
+ * check's answer and not a second list of it (0117).
+ */
+export function runnableActions(policy: FormPolicy, context: PolicyContext, bindings: FormBindings): string[] {
+  return (bindings.actions ?? []).filter((action) => authorizeAction(policy, context, bindings, action.name).ok).map((action) => action.name)
+}
+
+/**
  * The field keys whose values the actor may see, in the form's order.
  *
  * Deny by default: a field the policy has no entry for is readable by nobody.

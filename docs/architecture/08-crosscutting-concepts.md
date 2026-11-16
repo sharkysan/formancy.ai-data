@@ -118,6 +118,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A lookup past its deadline | 503, the statement stopped in the database | [0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md) | `routes/runtime-lookup-limits.integration.test.ts` |
 | A catalog the account cannot fully see | a gap in the snapshot, never "no relationships", and when the scope asks for routines never "no routine" | [0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md), [0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | `packages/data-core/src/snapshot.test.ts`, `packages/data-fixtures/src/conformance.test.ts`, `packages/data-sqlserver/src/discovery-routines.integration.test.ts` |
 | A form with no proof against lost updates | create-only, saying why | [0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md) | `packages/data-core/src/generate/generate.test.ts` |
+| A routine an action binds that is gone, changed in what a call rests on, no longer executable, out of sight, or not recorded by the snapshot review is against | the action blocked by review and refused `drift` by its planner, and only it | [0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md) | `packages/data-core/src/drift/routines.test.ts`, `packages/data-core/src/actions/plan.test.ts` |
 | A published bundle, on every read | refused with a reason unless it validates | [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md) | `bundle.test.ts` |
 | Drift that blocks an operation | 409 `drift`, nothing written | [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md), [0010](../decisions/0010-drift-is-classified-against-the-bindings.md) | `routes/runtime-drift.integration.test.ts` |
 | A grant whose key now names another column | 422 `keys-reassigned`, nothing written, until someone decides | [0039](../decisions/0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | `routes/admin-keys-reassigned.integration.test.ts`, `routes/admin-evolution.test.ts` |
@@ -163,6 +164,12 @@ closed table of the built-in types a codec speaks, keyed by that identity,
 and a type outside the table is `unsupported`, so no type name a catalog
 holds becomes SQL
 ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
+An action names its routine by the snapshot's schema, name and signature
+and each parameter by the catalog's name and type identity; a run's
+request names the action alone, and its plan hands an adapter a field or a
+key as a column of the locked row, its value never leaving the database,
+and every other value canonical, through its parameter's codec
+([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 
 **The adapter quotes, one part at a time**, never with a helper that splits
 on dots ([0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)):
@@ -296,7 +303,12 @@ never told
 the menu names only the forms a person may read
 ([0045](../decisions/0045-the-runtime-plane-lists-the-forms-a-person-may-read-and-nothing-about-the-others.md));
 a delete reaches other tables only through foreign keys the policy names
-([0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
+([0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md));
+an action is run by the roles the policy names for it and nobody else, each
+of which may read, and may read every field the action passes, and needs
+no update -- what the routine then writes is the deployment's, bound by no
+field grant, state move or cascade of the policy
+([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 Administration is a separate plane held by a role in the same token, and a
 form's policy never grants it
 ([0020](../decisions/0020-administration-is-a-separate-plane.md)).

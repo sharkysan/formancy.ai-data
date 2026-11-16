@@ -27,6 +27,7 @@ import {
 import { accountChanges, privilegeChanges } from './privileges.js'
 import { referrerChanges } from './referrers.js'
 import { checkChanges, lookupTargetChanges, rootRelationshipChanges } from './relationships.js'
+import { rootActionStops, routineChanges, runtimeRoutineStops } from './routines.js'
 import { serverChanges } from './server.js'
 import type { DriftChange, DriftReport, DriftSeverity, DriftSubject, DriftVerdict } from './types.js'
 
@@ -64,6 +65,17 @@ function entered(base: MetadataSnapshot, bindings: FormBindings): { before: Obje
 
 /** What a missing root leaves the runtime: nothing, because a request finds no table to describe and is refused. */
 const NOTHING_LEFT: DriftVerdict = { readable: false, writable: { create: false, update: false, delete: false } }
+
+/** The verdict's actions (0159): those the bindings bind that `keep` keeps, in their order -- absent where they bind none. */
+function actionsOf(bindings: FormBindings, keep: (name: string) => boolean): Pick<DriftVerdict, 'actions'> {
+  return bindings.actions === undefined ? {} : { actions: bindings.actions.map((action) => action.name).filter(keep) }
+}
+
+/** What `finish` reads to decide the actions a change stops: the bindings, and the root as it is now, where there is one. */
+interface ActionLens {
+  bindings: FormBindings
+  after: ObjectMeta | undefined
+}
 
 /**
  * The writes a stop of which is `blocking` (0050): what the form offers,
@@ -105,7 +117,10 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   // fingerprints are one database, whatever the objects passed in say. Not
   // one server: an in-place upgrade keeps the fingerprint (0068).
   if (current.fingerprint === base.fingerprint)
-    return { ...finish(serverChanges(current), offered, policy), runtime: { readable: true, writable: { ...offered } } }
+    return {
+      ...finish(serverChanges(current), offered, policy, { bindings, after: before }),
+      runtime: { readable: true, writable: { ...offered }, ...actionsOf(bindings, () => true) },
+    }
   if (current.kind !== base.kind) {
     throw new Error(`a ${base.kind} snapshot cannot be compared with a ${current.kind} one: a form's bindings belong to one engine`)
   }
@@ -114,8 +129,8 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   // The account is said beside a missing root: under another principal it may be missing for that principal only.
   if (after === undefined) {
     return {
-      ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings), ...serverChanges(current)], offered, policy),
-      runtime: NOTHING_LEFT,
+      ...finish([rootMissing(current, bindings), ...accountChanges(base, current, bindings), ...serverChanges(current)], offered, policy, { bindings, after }),
+      runtime: { ...NOTHING_LEFT, ...actionsOf(bindings, () => false) },
     }
   }
 
@@ -132,13 +147,19 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       ...referrerChanges(comparison),
       // Whether this release was tested on the server is review's alone, never a request's (0068).
       ...serverChanges(current),
+      // The routines the actions bind, and the others in scope (0159).
+      ...routineChanges(comparison),
       // Last: a gap is reported on its own only when no change above gave it as its reason.
       ...gapChanges(comparison),
     ],
     offered,
     policy,
+    { bindings, after },
   )
-  return { ...report, runtime: verdictOf(rootDefinition(base, before, describedOf(current, bindings.root) as DescribedRoot, bindings, policy, offered)) }
+  // A request compares the routine it runs as well as the root (0159).
+  const runtime = verdictOf(rootDefinition(base, before, describedOf(current, bindings.root) as DescribedRoot, bindings, policy, offered))
+  const routines = runtimeRoutineStops(base, current, bindings)
+  return { ...report, runtime: { ...runtime, ...actionsOf(bindings, (name) => runtime.actions?.includes(name) === true && !routines.has(name)) } }
 }
 
 /**
@@ -206,11 +227,12 @@ function rootDefinition(
     ROOT_DEFINITION.flatMap((family) => family(comparison)),
     offered,
     policy,
+    { bindings, after },
   )
 }
 
 function verdictOf(report: DriftVerdict): DriftVerdict {
-  return { readable: report.readable, writable: { ...report.writable } }
+  return { readable: report.readable, writable: { ...report.writable }, ...(report.actions === undefined ? {} : { actions: [...report.actions] }) }
 }
 
 /**
@@ -236,6 +258,14 @@ function assertBindingsMatch(base: MetadataSnapshot, bindings: FormBindings): Ob
   }
   if (bindings.concurrency !== null) column(bindings.concurrency.column)
   if (bindings.identity !== null) identityKeyIn(root, bindings.identity)
+  // An action's routine, its move and every column it passes (0159).
+  for (const action of bindings.actions ?? []) {
+    const { schema, name, signature } = action.routine
+    if (!(base.routines ?? []).some((routine) => routine.ref.schema === schema && routine.ref.name === name && routine.ref.signature === signature))
+      throw new Error(`the bindings name routine ${schema}.${name}(${signature}), which the base snapshot does not have`)
+    column(action.move.column)
+    for (const parameter of action.parameters) if (parameter.from.kind === 'field' || parameter.from.kind === 'key') column(parameter.from.column)
+  }
   return root
 }
 
@@ -290,6 +320,8 @@ const RANK: Record<DriftSeverity, number> = { blocking: 0, review: 1, info: 2 }
 function subjectKey(subject: DriftSubject): string {
   if (subject.kind === 'scope') return ''
   if (subject.kind === 'schema') return subject.schema
+  // A routine sorts in its schema, after the tables and views of its name.
+  if (subject.kind === 'routine') return `${refKey(subject.routine)}\u0000routine\u0000${subject.routine.signature}`
   return subject.kind === 'object' ? refKey(subject.object) : `${refKey(subject.object)}\u0000${subject.kind}\u0000${subject.name}`
 }
 
@@ -301,12 +333,14 @@ function subjectKey(subject: DriftSubject): string {
  * (`counted`); otherwise the change's own lesser severity. The same dropped
  * column is blocking for a form that binds it and a note for one that does not.
  */
-function finish(drafts: readonly Draft[], offered: Offered, policy: Pick<FormPolicy, 'operations'>): Omit<DriftReport, 'runtime'> {
+function finish(drafts: readonly Draft[], offered: Offered, policy: Pick<FormPolicy, 'operations'>, lens: ActionLens): Omit<DriftReport, 'runtime'> {
   const stops = new Set<Operation>(drafts.flatMap(stopped))
   const blocks = counted(offered, policy)
-  const changes: DriftChange[] = drafts.map((draft) => ({
+  // An action is offered by being bound (0159), so a change that stops one blocks.
+  const halted = drafts.map((draft) => rootActionStops(lens.bindings, lens.after, draft))
+  const changes: DriftChange[] = drafts.map((draft, index) => ({
     kind: draft.kind,
-    severity: draft.breaksReads || draft.stops.some((operation) => blocks[operation]) ? 'blocking' : draft.otherwise,
+    severity: draft.breaksReads || draft.stops.some((operation) => blocks[operation]) || (halted[index] ?? []).length > 0 ? 'blocking' : draft.otherwise,
     subject: draft.subject,
     affects: draft.affects,
     message: draft.message,
@@ -327,5 +361,6 @@ function finish(drafts: readonly Draft[], offered: Offered, policy: Pick<FormPol
       update: offered.update && !stops.has('update'),
       delete: offered.delete && !stops.has('delete'),
     },
+    ...actionsOf(lens.bindings, (name) => !halted.some((names) => names.includes(name))),
   }
 }

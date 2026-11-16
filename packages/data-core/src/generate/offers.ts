@@ -1,6 +1,7 @@
+import type { ActionMove } from '../actions/types.js'
 import type { DatabaseKind } from '../adapter.js'
 import type { ColumnMeta, Generation, ObjectMeta } from '../metadata.js'
-import { togetherOf } from './together.js'
+import { togetherOf, touchColumnProblem } from './together.js'
 import type { ConcurrencyBinding, FormBindings } from './types.js'
 
 /** A write a form may offer, as its bindings say: the operations other than read, which every form offers. */
@@ -165,4 +166,56 @@ export function deleteUnoffered(
     return `Delete is not offered: a record of ${table} created again with a deleted record's key starts its ${concurrency.column} where the deleted one did, so a version cannot tell the two apart. A key with an identity column, a key of one column that ${NEVER_REPEATING[kind].named} fills and no foreign key includes, or SQL Server's rowversion, can.`
   }
   return null
+}
+
+/**
+ * How a run of an action moves the record's version (0159), or why it
+ * cannot, as the end of a blocked note: a version column incremented,
+ * which the account must read and UPDATE (0027); or a rowversion moved by
+ * setting its confirmed touch column to itself, the column a save of a
+ * record's rows moves it by (0155), held to the same rule and never
+ * inferred, so a run and a save move one rowversion through one column.
+ */
+export function actionMove(
+  root: ObjectMeta,
+  identity: readonly string[],
+  concurrency: Pick<ConcurrencyBinding, 'kind' | 'column' | 'touch'>,
+): ActionMove | string {
+  if (concurrency.kind === 'version-column') {
+    const column = root.columns.find((candidate) => candidate.name === concurrency.column)
+    if (column?.access.select !== true || !column.access.update)
+      return `this connection's account may not both read and UPDATE ${concurrency.column}, which every run moves`
+    return { kind: 'increment', column: concurrency.column }
+  }
+  if (concurrency.touch === undefined)
+    return `a run moves ${concurrency.column} by setting a confirmed touch column to itself, as a save of a record's rows does (0155), and this form confirms none`
+  const problem = touchColumnProblem(root, identity, concurrency.touch)
+  return problem === null ? { kind: 'touch', column: concurrency.touch } : problem
+}
+
+/**
+ * Why a form offers no action at all, as the generator's blocked note, or
+ * `null` when it may (0159). A run names its record as a delete does, by
+ * the key and the version its person read, and what it does is as opaque
+ * to this module as everything a delete reaches: so it needs a table, a
+ * key, a confirmed token, and a version that proves the record -- the
+ * delete's own rule, `versionProvesRecord`, so the two cannot disagree --
+ * and it moves the version (`actionMove`). The generator writes the note,
+ * and the planner refuses bindings that bind an action this says no to.
+ */
+export function actionUnoffered(
+  kind: DatabaseKind,
+  root: ObjectMeta,
+  identity: readonly string[] | null,
+  concurrency: ConcurrencyBinding | null,
+): string | null {
+  const table = `${root.ref.schema}.${root.ref.name}`
+  if (root.kind === 'view') return `${table} is a view, which no form writes, and every run moves the record's version`
+  if (identity === null) return `no key of ${table} this connection's account may read identifies a record`
+  if (concurrency?.confirmed !== true) return 'no rowversion and no confirmed version column, so a run could not be held to the version its person read'
+  if (!versionProvesRecord(kind, root, identity, concurrency)) {
+    return `a record of ${table} created again with a record's key starts its ${concurrency.column} where the first one did, so a version cannot tell the two apart -- the rule delete keeps. A key with an identity column, a key of one column that ${NEVER_REPEATING[kind].named} fills and no foreign key includes, or SQL Server's rowversion, can`
+  }
+  const move = actionMove(root, identity, concurrency)
+  return typeof move === 'string' ? move : null
 }

@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:7341e9082104c2821a0c5ceb92603e6faef65060c2e7bdd5d98e945fcec64ecc",
+      "reviewed": "sha256:1e58d881f5961ab4cc5a0288318584d714aa271d9de6e82459627dbb9a3c61c8",
       "limitations": [
         {
           "area": "forms",
@@ -113,7 +113,7 @@
       ]
     },
     "0010": {
-      "reviewed": "sha256:3b51ba77a3ad25c13037284146ddcfd76a517507bad514df3709cf7a5ad141c9",
+      "reviewed": "sha256:76cbf4ca5ff372403bfde59c5796cebfe8da0843d81de63798ed54c619d20bcf",
       "limitations": [
         {
           "area": "forms",
@@ -150,7 +150,7 @@
       ]
     },
     "0011": {
-      "reviewed": "sha256:a3ce1e73fdfc7e7ea5f071fa379ecd510dca4e14f674c7b2280a3213e5340594",
+      "reviewed": "sha256:fa7a527c697b0f326bcb777b71d02224789182f7feadbed425eac898c84871e5",
       "limitations": [
         {
           "area": "access",
@@ -336,7 +336,7 @@
       ]
     },
     "0018": {
-      "reviewed": "sha256:207967644ca41af1096f02a5626ed774da15bb6e7a45b52c400509ac1b0f4a9a",
+      "reviewed": "sha256:d35af364b03685a4a394a534c78d8e041b1431757637fd93ba1006e6df1e4f32",
       "limitations": [
         {
           "area": "access",
@@ -4614,7 +4614,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:bae7293abbba915539594ad5175b0975a4d3b0ca48e34a6d4bf0ef80e8350f26",
+      "reviewed": "sha256:9d857e7ed201ba5afa701245e49ee25597ec01747d8b0840f872ea4f394347eb",
       "limitations": [
         {
           "area": "databases",
@@ -4670,6 +4670,62 @@
         {
           "area": "testing",
           "says": "The discovery suites for routines were run on each engine’s default image alone for this change; the other images of the matrix are CI’s."
+        }
+      ]
+    },
+    "0159": {
+      "reviewed": "sha256:6c1d14c69cd1214532676218cd9cf1d1042f26b11e313eeedfa66b913b522b49",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "Nothing serves or runs an action yet: the server reads no actions in a generation request, so no form it publishes binds one."
+        },
+        {
+          "area": "databases",
+          "says": "An action is offered only where a version proves the record, as a delete is, so a table keyed by values people type, with a version column, offers none.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a form whose concurrency is a rowversion offers an action only with a confirmed touch column, which this release’s generator does not yet write, and every run fires the table’s UPDATE triggers and is a change to temporal history, CDC and change tracking.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A PostgreSQL routine’s parameter keeps no length, precision or scale, so a column passed to one is compared by its kind and range alone.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "Every field of an action’s dialog must be answered, a yes or no starting as no, so no dialog passes NULL to a parameter.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "A role that may run an action must be granted read, and may read every field the action passes to its routine; it needs no update.",
+          "heldBy": "packages/data-core/src/policy/actions.test.ts"
+        },
+        {
+          "area": "access",
+          "says": "An attribute an action passes must be one the form’s row filter or a through compares with.",
+          "heldBy": "packages/data-core/src/policy/actions.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "What an action’s routine does is the deployment’s: it may write fields no grant lets the person write, move a state field outside the listed moves, delete through keys the policy does not name, and act beyond the account’s own grants where it reaches as its owner."
+        },
+        {
+          "area": "operations",
+          "says": "Drift review of a form with actions needs a discovery that records routines, and one that does not stops every action; nothing in the server asks for routines yet.",
+          "heldBy": "packages/data-core/src/drift/routines.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A routine’s body is not compared by drift review, so a routine whose body changed and whose signature did not still runs."
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0159 refuses a policy or a presentation that names actions."
         }
       ]
     }

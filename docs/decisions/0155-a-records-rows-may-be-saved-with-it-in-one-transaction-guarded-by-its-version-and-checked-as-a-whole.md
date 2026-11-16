@@ -1,6 +1,6 @@
 # 0155 — A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0159](0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md): a run on a rowversion form moves the rowversion through the confirmed touch column, held to `touchColumnProblem`
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:** what data-core plans, what both adapters run, what the

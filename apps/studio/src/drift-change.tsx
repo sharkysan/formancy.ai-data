@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import { describeRoutine } from '@formancy/data-core'
 import type { DriftChange, DriftSubject } from '@formancy/data-core'
 import type { Published } from './api.js'
 import { describeRef } from './choice.js'
@@ -7,6 +8,8 @@ function describeSubject(subject: DriftSubject): string {
   if (subject.kind === 'scope') return 'the discovery scope'
   if (subject.kind === 'schema') return `schema ${subject.schema}`
   if (subject.kind === 'object') return describeRef(subject.object)
+  // A routine an action binds, or one in scope (0159).
+  if (subject.kind === 'routine') return `routine ${describeRoutine(subject.routine)}`
   return `${describeRef(subject.object)}, ${subject.kind} ${subject.name}`
 }
 

@@ -37,6 +37,12 @@ export interface Draft {
   breaksReads: boolean
   /** The severity when nothing it stops is something this form offers. */
   otherwise: 'review' | 'info'
+  /**
+   * The actions a change to a routine stops (0159). A change to the root
+   * says none here: what it stops of the actions is decided from what it
+   * stops and what it is about, once (`rootActionStops`).
+   */
+  actions?: readonly string[]
 }
 
 /** The writes a change stops: every one, when the form can no longer read what it binds. */
