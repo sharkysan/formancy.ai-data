@@ -930,3 +930,55 @@ Held by `packages/data-core/src/generate/validity.test.ts` and
 `versions.integration.test.ts`; `routes/runtime-supersede.test.ts`;
 `apps/host/src/change.test.tsx`. What it costs: one spelling of a chain,
 append only.
+
+## 6.14 Saving a record with its rows
+
+A record and the rows of its together children, saved in one transaction
+and checked as a whole
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+No route takes a save yet, and no page sends one; what runs is the plan
+and the adapters' transaction, which the route will call.
+
+1. Before the transaction the record's table is described; over a saved
+   record each changed child's rows are listed by `planSaveList`, one page
+   of `max + 1` as the person reads them, which describes the child's
+   table; under a new one each child's table is described.
+2. `planSave` (`packages/data-core/src/records/save.ts`) plans every part
+   with today's planners under its own form's policy and returns one
+   `SaveRequest`: the record's step -- an insert, an update, or the touch
+   that moves its version where its own answers change nothing -- then
+   each changed child, in codepoint order of form and field, its `within`,
+   deletes, updates and creates, each pinned to the record's key; the
+   counts; the record read back by its key; and the deadline.
+3. `RecordAdapter.save` runs it. On PostgreSQL
+   (`packages/data-postgres/src/records/save.ts`) it is one `sql.begin`:
+   `SET LOCAL lock_timeout` and `statement_timeout` to the deadline, on the
+   locked path one `LOCK … IN ROW EXCLUSIVE MODE` of every table it writes,
+   then each step as today's statement, the deadline checked before each,
+   and a step that changes nothing, a `within` that is false or a count
+   outside its bounds thrown, so postgres.js rolls everything back. On SQL
+   Server (`packages/data-sqlserver/src/records/save-batch.ts`) it is one
+   batch: `set lock_timeout`, the steps in one transaction the batch owns,
+   each followed by the checks a write alone's batch carries, the deadline
+   checked in the batch before each, and CATCH recording the step it
+   stopped at with SQL Server's own number.
+4. The answer is every row as its step left it and the record as read back
+   by its key after every step, or the one step that refused the save:
+   its failure, translated as a write alone's is and, for a step that
+   changed nothing, explained after the rollback by the read a write alone
+   asks, pinned as the step was; `within` refused; or a count and how many
+   rows it held. Past the deadline, or a lock not got within it, the save
+   is `unavailable`, rolled back before COMMIT. A connection lost once the
+   record's step was sent, or a batch whose answer was lost, is
+   `unknown-outcome`, and nothing sends it again; sent again with the
+   version it was read at, it is `stale`.
+
+Held by the shared cases in `packages/data-fixtures/src/saves.ts`, which
+each adapter's `save.integration.test.ts` and
+`save-lost-answer.integration.test.ts` assert through `covers()`; by each
+adapter's `save-sized.integration.test.ts`; and for the plan, by
+`packages/data-core/src/records/save.test.ts` and `together.test.ts`. What
+it costs: two people saving different lines of one order at once are one
+saved and one `stale`; on SQL Server a trigger that ends the transaction
+can store a save in part, and a batch SQL Server has not seen before is
+compiled before it runs (§11.2).

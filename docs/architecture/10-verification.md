@@ -39,8 +39,7 @@ such an image as outside the matrix, with its files.
 Some engine facts are measured before anything is designed on them.
 `packages/data-postgres/src/save-facts.integration.test.ts` and
 `packages/data-sqlserver/src/save-facts.integration.test.ts` hold what a
-save of a record with its rows in one transaction, which is not built,
-would rest on: plain statements through each adapter's own driver, on
+save of a record with its rows in one transaction rests on: plain statements through each adapter's own driver, on
 tables of the file's own, with no product code run, on every image of the
 matrix. A measured fact has no code to revert, so each case was watched
 failing with the opposite asserted, on the default images, PostgreSQL
@@ -146,16 +145,38 @@ server answered, which reports the difference and does not prevent it.
   spell a value their own way
   ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
 
-A save of a record with its rows has no shared case yet
-([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)): data-core plans it, and
-`packages/data-core/src/records/save.test.ts`, `together.test.ts` and
-`menu.test.ts` beside it hold the plan with no database -- each part under
-its own form's policy, every field error at once, each child pinned to the
-record by the key it carries, the key bound or taken from the record's step, the touch,
-`within`, the counts and bounds, the order of the steps, what a form offers
-alone and in a save, which children require rows, and what the menu
-offers -- each case watched failing with its rule taken out. Its shared
-cases come with the adapters' save.
+A save of a record with its rows
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md))
+has its shared cases in `packages/data-fixtures/src/saves.ts`,
+`SAVE_PARITY`, over the parity schema's orders, lines, marks, accounts
+and entries: each case's answer written once, as `saveAnswer` renders an
+outcome -- `saved`, or the step it stopped at and why -- and asserted
+through each adapter's `save.integration.test.ts` and
+`save-lost-answer.integration.test.ts`, every request the planner's,
+planned as the route will plan it (`plannedSave`). They hold every change
+committed, on a new record whose key the database numbers, on one whose key
+is typed and on a saved one; a refusal at the record, at `within`, at the
+first, middle and last row and at a count rolling everything back; a stale
+record and a stale row; another record's row `not-found`, by the step and
+by the read that explains it; a unique violation at its step with its
+constraint; a delete and a create of one key; the bounds at and past them;
+a moved definition of a child's table; the record read back as a row's
+trigger left it; a lock not waited for past the deadline, and a save
+stopped between statements once it passed it; two saves at once, one
+stored and one `stale`; a lost answer `unknown-outcome`, sent once; and a
+save sent again `stale`. Beside them, what one engine alone does:
+PostgreSQL's REPEATABLE READ snapshot taken after the save's LOCK and its
+deferred COMMIT refused as that refusal; SQL Server's race under
+READ_COMMITTED_SNAPSHOT, a text not stored as sent, a trigger that commits
+in a step, every batch within `saveParameters`' prediction, a batch past
+2,100 parameters refused unsent, and a rowversion record's touch. Each case
+was watched failing with its rule taken out, on the default images, and its
+comment quotes the run. `save-sized.integration.test.ts` counts a save's
+round trips without a clock and reports its timings, from which
+`SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS` were set
+(`packages/data-core/src/records/save-limits.ts`); the plan alone is held
+by `packages/data-core/src/records/save.test.ts`, `together.test.ts` and
+`menu.test.ts`, with no database.
 
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
@@ -627,14 +648,15 @@ and a number typed here would drift from the next run.
   place; that every server of the matrix encrypts, and its TLS passes the
   adapter's guard, is shown on each image
   ([0081](../decisions/0081-a-sql-login-that-asks-for-tls-is-refused-when-the-server-answers-that-it-will-not-encrypt.md)).
-- **A save is planned and not run.** What data-core plans for a record
-  saved with its rows is held by unit tests alone, and `saveParameters`,
-  its prediction of the SQL Server batch a save will be, is compared with
-  no batch: no adapter builds one yet. Nor does anything hold that the pin
-  each child carries reaches the WHERE that locates each of its rows, or
-  the read that explains one that changed nothing: the request carries it
-  once per child, and only the adapters' save can show it applied
-
+- **A save's limits are measured on one workstation.** `SAVE_MAX_ROWS`
+  and `DEFAULT_SAVE_DEADLINE_MS` were set from the sized suites' runs on
+  a Windows 11 workstation's Docker Desktop, on the default images, and
+  not on the CI runner, which the design asked for: CI runs the sized
+  suites and holds only that a save of `SAVE_MAX_ROWS` lines is stored
+  within the default deadline, not the timings themselves. The cases of a
+  save were watched failing on the default images alone; the other images
+  run them on their legs. No route takes a save yet, so what the server
+  answers with a save's outcome is held by nothing
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is

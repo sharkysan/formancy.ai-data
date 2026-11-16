@@ -106,6 +106,25 @@ the same day (formancy.ai 0232).
   stamped, and on SQL Server an id a code-page column's code page cannot
   hold is the database's 422 on the stamped field rather than
   `unstampable`.
+- **Both adapters save a record with the rows of its together children
+  in one transaction** (0155). Why: data-core planned the save and
+  nothing ran it, and all or nothing is true or not in the database, so
+  the transaction is proven on both engines, against real servers, before
+  a route or a page builds on it. What you notice: nothing on a published
+  form yet -- no route takes a save. For integrators of the adapters and
+  of `@formancy/data-core`: `RecordAdapter` gains a required
+  `save(request: SaveRequest): Promise<SaveOutcome>`, so every
+  implementation of the port, a test's fake among them, must add it;
+  `createPostgresRecords` runs it as one `sql.begin` and
+  `createSqlServerRecords` as one batch, each never sent twice;
+  data-core exports `SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS`,
+  measured, which bound `TOGETHER_MAX_ROWS` and are the deadline the
+  route will default to. On SQL Server a single write's batch now checks
+  the same things in the same order through one set of functions a save's
+  batch shares, so the two cannot drift apart unseen; a save's batch
+  checks each table's definition and INSTEAD OF triggers after the first
+  step that writes it rather than after every step, because a batch that
+  repeated them for every row was measured taking seconds to compile.
 - **data-core plans a record saved with the rows of its together
   children, and nothing runs it yet** (0155). Why: an order could not be
   held to at least one line, nor stored with its lines all or nothing; the

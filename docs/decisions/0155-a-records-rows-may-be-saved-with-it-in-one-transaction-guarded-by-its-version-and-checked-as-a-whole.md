@@ -3,8 +3,9 @@
 - **Status:** accepted
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
-- **Verified by:** what data-core plans, the one part of this decision
-  built so far; each later part extends this line when it lands.
+- **Verified by:** what data-core plans and what both adapters run, the
+  parts of this decision built so far; each later part extends this line
+  when it lands.
   `packages/data-core/src/records/save.test.ts` -- the record's step is
   planned under the order's policy and each line's under the line's, and a
   person one of them refuses is refused at that part (watched failing with
@@ -99,6 +100,55 @@
   `packages/data-postgres/src/save-facts.integration.test.ts` and
   `packages/data-sqlserver/src/save-facts.integration.test.ts`, each case
   watched failing with its opposite asserted, on the default images.
+  What both adapters run is held by the shared cases of `SAVE_PARITY`
+  (`packages/data-fixtures/src/saves.ts`), asserted on each engine through
+  `covers()` by `packages/data-postgres/src/save.integration.test.ts`
+  and `packages/data-sqlserver/src/save.integration.test.ts`, each case
+  watched failing with its rule taken out, on postgres:17-alpine and
+  mcr.microsoft.com/mssql/server:2022-latest, its comment quoting the run:
+  every change committed, on a new order whose key the database numbers
+  (watched failing with that key read wrong, a NULL on SQL Server), on an
+  account whose code is typed (with a known key bound as NULL) and on a
+  saved order (with the deletes not run); a save of rows alone moving the
+  order's version (with the touch taken out); the order read back as a
+  line's trigger left it (with it answered from its own step, or read back
+  before its rows); a delete and a create of one number (with the creates
+  first); a refusal at the order, at `within` and at the first, middle and
+  last line rolling everything back (with the refusal dropped, `within`
+  unasked, and every step its own transaction); a stale order and a stale
+  row (with each version guard out); another order's line `not-found`, by
+  its update or delete and by the read that explains it (with the pin out
+  of each, one at a time); a duplicate line refused at its step with its
+  constraint (with a step's refusal answered at the save); a moved
+  definition of the lines' table (with the guard out); the bounds at and
+  past them, bound and never written into a statement (with `max + 1`,
+  with `min` unasked, with the limit spliced and with bounds that are not
+  whole let through); a lock not waited for past the deadline (with no
+  lock timeout) and a save stopped between statements past it (with the
+  deadline's checks out); and two saves of one order at once, one stored
+  and one `stale` (with the touch out: both stored on PostgreSQL and on
+  SQL Server under READ_COMMITTED_SNAPSHOT, and under SQL Server's locking
+  READ COMMITTED the two counts deadlocked, one chosen to lose). On
+  PostgreSQL alone, REPEATABLE READ's snapshot taken after the save's LOCK
+  (with the timeouts set by a SELECT). On SQL Server alone, a text not
+  stored as sent rolling the save back (with the text checks out), a
+  trigger that commits in a step `unknown-outcome`, the save stored in
+  part (with 3609 answered as a refusal), every batch within
+  `saveParameters`' prediction (with two values more bound for every
+  step), a batch past 2,100 parameters refused unsent (with the guard out,
+  which SQL Server then refused itself), and a rowversion order's touch
+  (with its version guard out). Each adapter's
+  `save-lost-answer.integration.test.ts` -- a save whose answer the TCP hop
+  dropped `unknown-outcome`, sent once (with the adapter sending it again),
+  a save sent again `stale` (with the version guard out), and on
+  PostgreSQL a COMMIT a deferred key refused answered as that refusal with
+  nothing stored (with it answered as a lost connection). Each adapter's
+  `save-sized.integration.test.ts` -- a save's round trips (with a
+  statement more per line on PostgreSQL, one more before the batch on SQL
+  Server) and a save of `SAVE_MAX_ROWS` lines stored within the default
+  deadline (with a deadline of 1 ms). `together.test.ts` -- the cap the
+  fewer of a page less one and `SAVE_MAX_ROWS` (with `SAVE_MAX_ROWS` at 10
+  and the cap the page's alone).
 
 ## Context
 
@@ -165,7 +215,7 @@ requires -- `min` of 1 or more -- is to have no plain create:
 `rowsRequired` finds such a child from the bundles alone, the menu leaves
 the create out now (`formMenu`), and the create route will refuse one.
 
-**data-core plans the save; nothing yet runs it.** `planSave`
+**data-core plans the save, and both adapters run it.** `planSave`
 (`packages/data-core/src/records/save.ts`, one child's steps in
 `save-steps.ts`, the adapters' request in `save-types.ts`, the wire shapes
 in `packages/data-core/src/save.ts`) plans every part with today's
@@ -187,6 +237,32 @@ alone, at its part; a row the record's list does not hold `not-found`; a
 list already above `max`, or a new record's creates outside its bounds or
 without a child that requires rows of it, before any statement.
 `planSaveList` is the list a save is planned over, with `max + 1` rows.
+
+`RecordAdapter.save` runs the request as one transaction, never sent
+twice. On PostgreSQL it is one `sql.begin` on the path the record's
+definition chooses (0041), the locked one under any isolation but READ
+COMMITTED or where a delete reaches past its root (0051): `SET LOCAL`
+lock and statement timeouts of the deadline, on the locked path one
+`LOCK … IN ROW EXCLUSIVE MODE` of every table it writes, then each step
+as today's statement, the deadline checked before each and before COMMIT.
+On SQL Server it is one batch that owns its transaction: `set
+lock_timeout` of the deadline, each step followed by the checks a write
+alone's batch carries -- shared functions (`batch-steps.ts`), the
+definition's and the INSTEAD OF guard after the first step on each table
+only, since that step's IX lock keeps an ALTER and a new trigger out to
+the end -- the deadline checked in the batch before each step, and CATCH
+recording the step it stopped at with SQL Server's own number, translated
+by the rule a single write's refusal is. Each child's pin is added to the
+WHERE that locates each of its rows and to the read that explains one that
+changed nothing, and written into each create. A step that changes
+nothing, a `within` that is false and a count outside its bounds stop the
+save and roll it back; the first is then explained, outside the
+transaction, by the read a write alone asks. The bounds and the limit of
+each count are bound; only the timeouts are spliced, from the deadline's
+whole number. `SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS`
+(`packages/data-core/src/records/save-limits.ts`) are measured, by the
+adapters' sized suites, and `TOGETHER_MAX_ROWS` is the fewer of a page
+less one and `SAVE_MAX_ROWS`.
 
 **A child's pinned column is held through its lookup's filter.** A
 column of a child's foreign key onto the record that the child's policy
@@ -212,13 +288,7 @@ of 2,100 parameters, by `saveParameters`, a prediction of the batch the
 adapter will build. `formMenu` leaves out a parent's create where the
 person could not make the save; nothing sends the flags yet.
 
-**Later parts of the decision**, each its own pull request:
-`RecordAdapter.save` on both engines, one `sql.begin` on the path `pathOf`
-chooses on PostgreSQL and one batch on SQL Server, with a deadline that
-ends the transaction before its commit (0061), applying each child's pin
-to the statement that locates each of its rows and to the read that
-explains one that changed nothing, and `SAVE_MAX_ROWS`, measured, which
-may lower `TOGETHER_MAX_ROWS`; the generator's `together` and
+**Later parts of the decision**, each its own pull request: the generator's `together` and
 `touchColumn`, the bundle check's comparison of both and its refusal of a
 child read policy that narrows by anything but the together key; `POST
 /v1/forms/:id/records/save`, its audit event and `sendOnce`'s `save`
@@ -297,9 +367,10 @@ What it costs, and what it does not do:
   direct together children; sections (0109), trees (0110) and forms over
   versions (0113) are not together.
 - **SQL Server's 2,100 parameters** bound a save: refused in the menu for
-  the parent and its children together, by a prediction the SQL Server
-  suite has yet to hold, so a parent republished with more fields can turn
-  a working together tab read-only. The limit is Microsoft's documented
+  the parent and its children together, by a prediction every batch the
+  SQL Server suite builds stays within, and refused by the adapter before
+  it sends a batch past it; so a parent republished with more fields can
+  turn a working together tab read-only. The limit is Microsoft's documented
   figure, not measured here.
 - **Locks, round trips and the deadline.** A save holds its record's row,
   and every row it writes, for its transaction; before it, one read, one
@@ -307,13 +378,18 @@ What it costs, and what it does not do:
   deadline bounds each statement, not the transaction: a save holds its
   locks for less than twice it, and a SQL Server statement slow for
   another reason than a lock runs into mssql's request timeout and is
-  `unknown-outcome`.
+  `unknown-outcome`. A save on SQL Server is one batch, which SQL Server
+  compiles the first time it sees it: measured, the first save of a size
+  took seconds where one that reused its plan took a fraction of one, a
+  compile the deadline does not bound and mssql's request timeout does,
+  and 500 lines did not answer within it; `SAVE_MAX_ROWS` is set below
+  that (save-limits.ts says on what and when).
 - **The audit trail** will name the record and count the rows, never which.
-- **Built in part.** Until the adapters and the route land, `planSave` is a
-  plan nothing runs: a claim of the shape a save takes, held by unit tests
-  alone, `saveParameters` a prediction nothing compares with a batch, and
-  each child's pin a field of its request, which only the adapters' save
-  can show reaching every statement that locates a row.
+- **Built in part.** The plan and both adapters' save are built; until the
+  route lands nothing calls `RecordAdapter.save` but the suites, and the
+  limits were measured on one workstation, not on the CI runner, which
+  holds only that a save of `SAVE_MAX_ROWS` lines is stored within the
+  default deadline.
 
 ## Alternatives considered
 

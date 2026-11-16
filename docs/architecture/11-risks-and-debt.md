@@ -364,9 +364,19 @@ to write the table will do, as
 [0051](../decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)
 measured. A save of a
 record with its rows
-([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)),
-which is not built, would meet the same lock on the record's table
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md))
+on that path takes the same lock on every table it writes, the record's
+among them, and is refused the same way; the adapters' save suites run
+under READ COMMITTED but for one PostgreSQL case under REPEATABLE READ,
+as an owner, so nothing runs that refusal through the save itself
 ([§10.1](10-verification.md#101-real-servers-both-engines-every-run)).
+A save on SQL Server is one batch whose first sighting SQL Server compiles
+before it runs: measured on a Windows 11 workstation on 2026-11-16, a
+batch's first save took seconds where its plan's reuse took a few hundred
+milliseconds, and a batch of 500 lines did not answer within mssql's
+request timeout of 15 s, which is `unknown-outcome`; `SAVE_MAX_ROWS` is
+set below it (`packages/data-core/src/records/save-limits.ts`), and the
+compile is bounded by that timeout alone, not by the save's deadline.
 
 **Access.** Roles and attributes are only as fine-grained as the host's
 token ([0014](../decisions/0014-host-identity-is-verified-offline.md)).
@@ -746,13 +756,18 @@ saving different lines of one order at once are one saved and one `stale`;
 the bound holds for the writes of the parent's form and the together
 child's, not for another form over the child's table, another form's
 delete that reaches it, a trigger or another application; on SQL Server a
-trigger that ends the transaction can store a save in part; a save is
-held to one batch there, by a prediction of its parameters; and a record
-holds at most one row less than a list's page of a together child
-(`TOGETHER_MAX_ROWS`), since a save is planned from one page of its rows,
-until the adapters' save measures how many one save can hold. Only the
-planning is built: the adapters, the route, the host page and the studio
-follow, and until they do nothing published saves this way.
+trigger that ends the transaction can store a save in part, answered
+`unknown-outcome` -- held by `packages/data-sqlserver/src/save.integration.test.ts`,
+which stores two of three marks that way; a save is held to one batch
+there, by a prediction of its parameters that every batch the suite builds
+stays within; and a record holds at most `TOGETHER_MAX_ROWS` rows of a
+together child: one row less than a list's page, since a save is planned
+from one page of its rows, and within `SAVE_MAX_ROWS`, measured. A save's
+deadline bounds each wait and each statement, so it holds its locks for
+less than twice the deadline; a SQL Server batch's compile is bounded only
+by mssql's request timeout. The plan and both adapters' save are built:
+the route, the host page and the studio follow, and until they do nothing
+published saves this way.
 
 **One verifier, two products, two installs.** The cost of
 [0091](../decisions/0091-the-host-identity-verifier-is-a-package-of-its-own-which-the-server-re-exports.md),

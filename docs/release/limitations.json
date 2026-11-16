@@ -4460,11 +4460,11 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:f94ed9360170ecef5cb89a8e8c98c90925b1c6dff51ec68d05b1444818815c3c",
+      "reviewed": "sha256:b378be4190faa352c8a4f7f0859c6e1b91dad6dd18e2309e6322e2065c0bda20",
       "limitations": [
         {
           "area": "writes",
-          "says": "A record's rows are planned as one save in data-core and run by nothing yet: no adapter saves, no route takes a save and the generator writes no together lookup, so no published form saves a record with its rows."
+          "says": "A record's rows are saved with it in one transaction by both adapters and by no route yet: no route takes a save and the generator writes no together lookup, so no published form saves a record with its rows."
         },
         {
           "area": "forms",
@@ -4478,7 +4478,7 @@
         },
         {
           "area": "forms",
-          "says": "A record holds at most one row less than a list's page of a together child, since a save is planned from one page of its rows, until the adapters' save measures how many rows one save can hold.",
+          "says": "A record holds at most TOGETHER_MAX_ROWS rows of a together child: one row less than a list's page, since a save is planned from one page of its rows, and no more than SAVE_MAX_ROWS, the most lines a save was measured to hold on both engines within its default deadline and, on SQL Server, well within mssql's request timeout.",
           "heldBy": "packages/data-core/src/records/together.test.ts"
         },
         {
@@ -4488,8 +4488,28 @@
         },
         {
           "area": "databases",
-          "says": "On SQL Server a save is held to one batch of 2,100 parameters by a prediction of the batch the adapter will build, which no batch has yet been compared with, and a record whose step and together children's rows exceed it offers no save of them.",
-          "heldBy": "packages/data-core/src/records/together.test.ts"
+          "says": "On SQL Server a save is one batch held to 2,100 parameters by a prediction of what it binds, which every batch the SQL Server suite builds stays within; a record whose step and together children's rows exceed it offers no save of them, and a batch past it is refused with nothing sent.",
+          "heldBy": "packages/data-sqlserver/src/save.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A save's deadline, DEFAULT_SAVE_DEADLINE_MS unless the deployment sets another, bounds each lock wait and each statement, not the transaction: a save past it is refused unavailable and rolled back before COMMIT, and holds its locks for less than twice it.",
+          "heldBy": "packages/data-postgres/src/save.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a save is one batch, which SQL Server compiles the first time it sees it, a compile bounded only by mssql's request timeout of 15 s and answered unknown-outcome past it: measured, the first save of a size took seconds where a save that reused its plan took a fraction of one, and 500 lines did not answer within the timeout.",
+          "heldBy": "packages/data-sqlserver/src/save-sized.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a trigger that ends a save's transaction can leave the save stored in part, answered unknown-outcome.",
+          "heldBy": "packages/data-sqlserver/src/save.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL under any isolation but READ COMMITTED a save takes ROW EXCLUSIVE on every table it writes, the record's among them, which an account granted UPDATE on the version column alone is refused: the account needs a grant to write each table.",
+          "heldBy": "packages/data-postgres/src/save-facts.integration.test.ts"
         }
       ]
     },
