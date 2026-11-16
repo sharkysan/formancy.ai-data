@@ -11,9 +11,12 @@ import type {
   RecordExportQuery,
   RecordList,
   RecordListQuery,
+  SaveBody,
 } from '@formancy/data-core'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
+import { saveOutcome } from './saves.js'
+import type { SaveOutcome } from './saves.js'
 import { isFormMenu, isFormRecord, isLookupResult, isOwnViews, isPublishedForm, isRecordList, isResolved, refusalOf, UNEXPECTED } from './shapes.js'
 import { writeOutcome } from './writes.js'
 import type { DeleteOutcome, UnknownWrite, WriteAnswer, WriteIntent, WriteOutcome } from './writes.js'
@@ -389,6 +392,28 @@ export function createDataClient(options: DataClientOptions) {
       const intent = { operation: 'delete', record: removal.record, version: removal.version } as const
       const answer = await sendWrite(formId, intent, { record: removal.record, version: removal.version })
       return 'sent' in answer ? invalidName : writeOutcome(answer, intent)
+    },
+
+    /**
+     * `POST …/records/save` (0155): a record -- created, or updated only if
+     * it is still at `version`, an update that may change nothing -- and
+     * the rows of its together children, created, updated and deleted, in
+     * one transaction. The answer is the record and every change as
+     * stored, in the order sent; a refusal names the part it is about
+     * (`SaveRefused`); an `UnknownWrite` when nobody can say whether it was
+     * saved, reconciled by the record alone -- a save over a saved record
+     * moved its version, so saving again with the same version is stored
+     * at most once. Exactly the route's two keys are sent, with a write id
+     * of its own.
+     */
+    save: async (formId: string, body: SaveBody): Promise<SaveOutcome> => {
+      const { record } = body
+      const intent = {
+        operation: 'save',
+        ...('update' in record ? { record: record.update.record, version: record.update.version } : { record: null, version: null }),
+      } as const
+      const answer = await sendWrite(formId, intent, { record, rows: body.rows })
+      return 'sent' in answer ? invalidName : saveOutcome(answer, intent)
     },
 
     /**

@@ -15,8 +15,19 @@ import type { PublishedBundle } from '../bundle.js'
 import type { OpenConnection } from '../connections.js'
 import { lookupDeadline } from '../lookup-deadline.js'
 import { NOT_FOUND, planRefusal, recordFailure } from './runtime-errors.js'
+import { requiredOf } from './runtime-menu.js'
+import type { ServedForm } from './runtime-menu.js'
 import { INVALID_WRITE_ID, writeId } from './write-once.js'
 import type { WriteAnswer } from './write-once.js'
+
+/** A plain create of a record a together child requires rows of (0155): it is created with them, in one save. Names no child, which the person may not read. */
+export const CREATED_WITH_ROWS = 'A record of this form is created with the rows saved with it, in one save.'
+
+/** The store could not list the forms a plain create must be checked against (0155), so nothing was sent. */
+export const FORMS_UNREAD: WriteAnswer = {
+  status: 503,
+  body: { code: 'unavailable', message: 'The forms this one is saved with cannot be read now. Nothing was saved.' },
+}
 
 /** What the create and update routes borrow from the runtime plane, so they decide each step as the read route and the delete route do. */
 export interface WriteRouteSteps {
@@ -48,6 +59,8 @@ export interface WriteRouteSteps {
   answered(reply: FastifyReply, answer: WriteAnswer & { repeated?: boolean }): Promise<FastifyReply>
   /** How long each membership check may run before the server stops it (0061). */
   lookupDeadlineMs: number
+  /** Every published form as served, with this person's menu entry, or `null` when the store cannot list them (`servedForms`). */
+  served(request: FastifyRequest): Promise<ServedForm[] | null>
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,7 +87,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * is the planner's to remove, against the same read (0040).
  */
 export function withoutEchoes(
-  bundle: PublishedBundle,
+  bundle: Pick<PublishedBundle, 'bindings' | 'policy'>,
   actor: PolicyContext,
   operation: 'create' | 'update',
   answers: unknown,
@@ -145,8 +158,12 @@ export async function memberships(
  * database nothing (0031). The mirror of `updated`.
  *
  * The policy is asked before any statement, so an actor it refuses reaches
- * none (0041). Then the root is described, the one statement before the
- * planner: a create the description stops is refused there, with no
+ * none (0041). A record a together child requires rows of -- found among
+ * every served form, whoever asks, since a bound applies to everyone -- is
+ * refused next, before any statement: it is created with its rows, in one
+ * save (0155), and a store that cannot list the forms refuses too, since
+ * nothing can tell. Then the root is described, the one statement before
+ * the planner: a create the description stops is refused there, with no
  * membership check and no insert sent, and the insert carries the
  * definition it was decided over.
  */
@@ -160,6 +177,9 @@ async function created(
   const actor = steps.context(request)
   const authorized = authorizeOperation(bundle.policy, actor, 'create')
   if (!authorized.ok) return planRefusal(authorized.code, authorized.message)
+  const required = requiredOf(bundle, await steps.served(request))
+  if (required === null) return FORMS_UNREAD
+  if (required.length > 0) return planRefusal('operation-unavailable', CREATED_WITH_ROWS)
   const root = await steps.describedRoot(bundle, open)
   if (!root.ok) return root.answer
   const plan = planCreate(bundle.snapshot, bundle.bindings, bundle.policy, actor, withoutEchoes(bundle, actor, 'create', answers), root.described)

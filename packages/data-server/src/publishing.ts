@@ -4,6 +4,7 @@ import {
   groupProblems,
   startingStateProblems,
   stateLabelProblems,
+  togetherBatchProblem,
   unfilteredProblems,
   viewProblems,
 } from '@formancy/data-core'
@@ -57,7 +58,11 @@ const INVALID = 'The bundle cannot be published.'
  * 0143), asked here for the same reason: a
  * view a later release no longer runs is not offered, a schema a later
  * release words otherwise leaves a group as it was, and the version is
- * still served.
+ * still served. So is, on SQL Server, a together child's `max` rows within
+ * one batch's parameters (`togetherBatchProblem`, 0155): a prediction of
+ * the batch this release builds, which a later one may bind otherwise --
+ * and where it no longer fits, the menu turns the child's saves off and
+ * the adapter refuses the batch unsent.
  *
  * `unknown` is the sentence for a connection the allowlist does not know:
  * the import says why a name has to match across deployments.
@@ -90,6 +95,8 @@ export function storable(
     ...groupProblems(bundle.presentation.group, bundle.bindings.root, bundle.snapshot.kind),
   ]
   if (views.length > 0) return refused(INVALID, { problems: views.map((problem) => `presentation: ${problem}`) })
+  const batch = togetherBatchProblem(bundle.snapshot, bundle.bindings, bundle.policy)
+  if (batch !== null) return refused(INVALID, { problems: [`bindings: ${batch}`] })
   return { ok: true, bundle }
 }
 

@@ -23,6 +23,7 @@ import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor
 import { deleteUnoffered } from './offers.js'
 import { sectionFor } from './section.js'
 import { stampedOn, stampNote, stampsFor, unstampable } from './stamps.js'
+import { togetherLookup, togetherProblem, touchedConcurrency } from './together.js'
 import { narrowForValidity, validityFor, validityOperations } from './validity.js'
 import type { ConcurrencyBinding, FieldBinding, FormBindings, GeneratedForm, GenerationNote, GenerationRequest, LookupChoice, StampBinding } from './types.js'
 import { BINDINGS_VERSION, GENERATED_SPEC_VERSION } from './version.js'
@@ -87,7 +88,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
   const lookupColumns = new Set(lookups.flatMap((entry) => entry.foreignKey.columns))
   // A pinned column is written from context, so it can no more be the version
   // column than a lookup's column can.
-  const concurrency = concurrencyFor(root, request.versionColumn, identity ?? [], new Set([...lookupColumns, ...pinned]), notes)
+  const found = concurrencyFor(root, request.versionColumn, identity ?? [], new Set([...lookupColumns, ...pinned]), notes)
+  // A rowversion's touch column, confirmed by the request alone (0155).
+  const concurrency = touchedConcurrency(root, found, request.touchColumn, identity ?? [], pinned)
   const validity = validityFor(root, request.validity, concurrency, pinned)
   const chain = validity === undefined ? [] : [validity.from, validity.to, ...validity.key]
   const stamps = stampsFor(root, request, { identity: identity ?? [], versionColumn: concurrency?.column, pinned, lookupColumns, chain })
@@ -149,6 +152,9 @@ export function generateForm(snapshot: MetadataSnapshot, request: GenerationRequ
     ...(validity === undefined ? {} : { validity }),
     ...(stamps.length === 0 ? {} : { stamps }),
   }
+  // A together lookup the bindings cannot hold is refused by the rule the planner and the bundle check hold them to (0155).
+  const unheld = togetherProblem(root, bindings)
+  if (unheld !== null) throw new Error(unheld)
 
   return { form, bindings, notes }
 }
@@ -225,8 +231,8 @@ function planLookup(
   })
   if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   const possible = !isView && columns.every((column) => column.generated === 'none')
-  const writes = writesFor(columns, possible, key, notes)
-  const required = writes.create && columns.every((column) => !column.nullable && !column.hasDefault)
+  const { writes, together } = togetherLookup(choice, writesFor(columns, possible, key, notes), { field: key, target: target.table.name }, notes)
+  const required = writes.create && together === undefined && columns.every((column) => !column.nullable && !column.hasDefault)
 
   return {
     ordinal: columns[0]?.ordinal ?? 0,
@@ -252,6 +258,7 @@ function planLookup(
       nullable,
       writes,
       ...(section === undefined ? {} : { section }),
+      ...(together === undefined ? {} : { together }),
     },
     system: false,
     multiline: false,

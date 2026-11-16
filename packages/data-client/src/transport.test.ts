@@ -139,6 +139,7 @@ describe('when the data server is not what answers', () => {
       writable: { create: null, update: null },
       moves: null,
       opens: [],
+      together: null,
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -460,6 +461,7 @@ describe('across origins (0060)', () => {
       update: () => client.update('pg-order', CHANGE),
       supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
+      save: () => client.save('pg-order', { record: { create: { answers: { notes: 'a' } } }, rows: [] }),
       reconcile: () => client.reconcile('pg-order', lost),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
       resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
@@ -764,6 +766,7 @@ describe('a delete (0050)', () => {
       writable: { create: null, update: null },
       moves: null,
       opens: [],
+      together: null,
     }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
@@ -797,7 +800,7 @@ describe('a delete (0050)', () => {
   // copy nobody decided -- as one from a server older than 0107, which
   // sends nothing, would.
   test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [] }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [], together: null }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -834,7 +837,16 @@ describe('a delete (0050)', () => {
   // a server older than 0113 -- is no form this server sent, and a page
   // that offered a change from it would offer one nobody decided.
   test("a form's versions are null, or the start and end where it offers create and update", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'valid_from', 'valid_to'], list: null, deleting: null, copied: [], moves: null, opens: [] }
+    const FORM = {
+      form: { model: {} },
+      readable: ['id', 'valid_from', 'valid_to'],
+      list: null,
+      deleting: null,
+      copied: [],
+      moves: null,
+      opens: [],
+      together: null,
+    }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
       update: operations.includes('update') ? [] : null,
@@ -873,7 +885,7 @@ describe('a delete (0050)', () => {
   // this server sent, and a page that drew by it would withhold or offer an
   // edit nobody decided. Watched failing with `writable` left unchecked.
   test("a form's writable names fields for exactly the writes it offers", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [] }
+    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [], together: null }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -918,6 +930,7 @@ describe('a delete (0050)', () => {
       versions: null,
       writable: { create: null, update: [] },
       opens: [],
+      together: null,
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -970,6 +983,7 @@ describe('a delete (0050)', () => {
       versions: null,
       writable: { create: null, update: null },
       moves: null,
+      together: null,
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1128,6 +1142,157 @@ describe('a person’s own views (0126)', () => {
     for (const unexpected of [{}, { own: {} }, { own: [{ ...VIEW, default: true }] }, [VIEW]]) {
       answer = unexpected
       expect(await client.saveView('pg-order', VIEW), JSON.stringify(unexpected)).toMatchObject({ ok: false, status: 200, code: 'unexpected' })
+    }
+  })
+})
+
+describe('a save of a record with its rows (0155)', () => {
+  const ROW = { record: 'k1:7,1', version: 'v2', answers: { quantity: 5 } }
+  const SAVED = {
+    record: { record: 'k1:7', version: 'v2', answers: { notes: 'n' } },
+    rows: [{ form: 'pg-line', field: 'order', changes: [{ ref: 'a', row: ROW }, { row: ROW }, { deleted: 'k1:7,2' }] }],
+  }
+  const OVER = { record: { update: { record: 'k1:7', version: 'v1', answers: {} } }, rows: [{ form: 'pg-line', field: 'order', changes: [] }] }
+  const NEW = { record: { create: { answers: { notes: 'n' } } }, rows: [] }
+  const SAVE_LOST = 'The answer to this save was lost between this page and the data server. It may have been saved.'
+
+  // A save is one POST of exactly its two keys, with a write id of its own,
+  // and is done only on the server's `SavedRecord`: the record and every
+  // change as stored. Watched failing with the answer read as a record:
+  // the saved body, which has none at its top, was an unknown write.
+  test('posts the record and its rows with a write id, and is done on the server’s saved answer', async () => {
+    const seen: Array<{ url: string; id: unknown; body: string }> = []
+    const { base } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push({ url: request.url ?? '', id: request.headers[WRITE_ID_HEADER], body })
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(SAVED))
+      })
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.save('pg-order', { ...OVER, extra: 'never sent' } as typeof OVER)).toEqual({ ok: true, value: SAVED })
+    expect(seen).toEqual([{ url: '/v1/forms/pg-order/records/save', id: expect.stringMatching(/^[0-9a-f]{32}$/), body: JSON.stringify(OVER) }])
+  })
+
+  // Every answer is read by 0031's rules: a 2xx that is not a saved answer
+  // -- a record alone, a change of another shape -- may have been stored and
+  // is unknown from the transport, named by what the call addressed: over a
+  // saved record its token and version, under a new one nothing; the
+  // server's 502 is unknown from the database, sent once; nothing answered
+  // is unknown too. Watched failing with the saved shape left unchecked:
+  // a bare record was taken as the save done.
+  test("a save's answers are classified as 0031's: a 2xx not saved, nothing answered and the 502 are unknown, sent once", async () => {
+    for (const body of [ROW, { ...SAVED, rows: [{ form: 'pg-line', field: 'order', changes: [{ ref: 1, row: ROW }] }] }, { record: ROW }]) {
+      const { base } = await serve(json(200, body))
+      expect(await createDataClient({ token: () => 't', base }).save('pg-order', OVER), JSON.stringify(body)).toEqual({
+        ok: false,
+        status: 200,
+        code: 'unknown-outcome',
+        message: SAVE_LOST,
+        operation: 'save',
+        record: 'k1:7',
+        version: 'v1',
+        origin: 'transport',
+      })
+    }
+    const lost = await serve((request) => {
+      void drained(request).then(() => request.socket.destroy())
+    })
+    expect(await createDataClient({ token: () => 't', base: lost.base }).save('pg-order', NEW)).toMatchObject({
+      code: 'unknown-outcome',
+      operation: 'save',
+      record: null,
+      version: null,
+      origin: 'transport',
+    })
+    expect(lost.asked).toHaveLength(1)
+    const message = 'The connection to the database failed after the save was sent. It may have been saved.'
+    const { base, asked } = await serve(json(502, { code: 'unknown-outcome', message, operation: 'save', record: 'k1:7', version: 'v1' }))
+    expect(await createDataClient({ token: () => 't', base }).save('pg-order', OVER)).toEqual({
+      ok: false,
+      status: 502,
+      code: 'unknown-outcome',
+      message,
+      operation: 'save',
+      record: 'k1:7',
+      version: 'v1',
+      origin: 'database',
+    })
+    expect(asked).toHaveLength(1)
+  })
+
+  // A refusal is the server saying nothing was stored, with the part it is
+  // about, so a host puts each sentence beside its row: `at`, every part's
+  // field errors, a child's bound and count. A part of another shape is
+  // left out, never guessed. Watched failing with a save's refusal read as
+  // any write's: `at`, `parts` and `rows` were dropped.
+  test("a refusal carries the part it is about, every part's field errors and a child's bound", async () => {
+    const at = { form: 'pg-line', field: 'order', ref: 'a' }
+    const parts = [{ at, fieldErrors: [{ field: 'line_no', code: 'required', message: 'A value is required.' }] }]
+    const rows = { form: 'pg-line', field: 'order', min: 1, max: 3, held: 4 }
+    for (const [status, body] of [
+      [422, { code: 'invalid-values', message: 'line_no cannot be written', parts }],
+      [409, { code: 'stale', message: 'This record or its rows changed since they were read.', at }],
+      [422, { code: 'too-many-rows', message: 'pg-line holds at most 3 rows.', at: { form: 'pg-line', field: 'order' }, rows }],
+      [403, { code: 'operation-denied', message: 'No.', at: { record: true } }],
+    ] as const) {
+      const { base } = await serve(json(status, body))
+      expect(await createDataClient({ token: () => 't', base }).save('pg-order', OVER), body.code).toEqual({ ok: false, status, ...body })
+    }
+    const { base } = await serve(json(409, { code: 'stale', message: 'Changed.', at: { form: 'pg-line' }, rows: { form: 'pg-line' } }))
+    expect(await createDataClient({ token: () => 't', base }).save('pg-order', OVER)).toEqual({ ok: false, status: 409, code: 'stale', message: 'Changed.' })
+  })
+
+  // A form says whether its rows are saved with their record, and a menu's
+  // child what a person may do with its rows in a save: a reply without
+  // the form's `together`, or with flags that are not yes or no, is no
+  // server's this client knows, and a page drawing an Add from it would
+  // offer what nobody decided. Watched failing with `together` left
+  // unchecked on the form: a reply without it was taken.
+  test("a form's together is null or a field and bounds, and a menu child's flags are each a yes or no", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read', 'update'],
+      readable: ['order'],
+      list: null,
+      deleting: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: ['quantity'] },
+      moves: null,
+      opens: [],
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    for (const together of [undefined, { field: 'order' }, { field: 'order', min: 1, max: '3' }, { min: 1, max: 3 }]) {
+      body = together === undefined ? FORM : { ...FORM, together }
+      expect(await client.form('pg-line'), JSON.stringify(together)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+    for (const together of [null, { field: 'order', min: 1, max: 3 }]) {
+      body = { ...FORM, together }
+      expect(await client.form('pg-line')).toEqual({ ok: true, value: body })
+    }
+    const flags = { min: 1, max: 3, created: { create: true }, saved: { create: true, update: true, delete: false } }
+    const menu = (together: unknown) => ({
+      forms: [
+        {
+          id: 'pg-order',
+          title: 'Order',
+          group: null,
+          operations: ['read'],
+          children: [{ form: 'pg-line', field: 'order', one: false, when: null, together }],
+        },
+      ],
+    })
+    for (const together of [flags, undefined]) {
+      body = menu(together)
+      expect((await client.forms()).ok, JSON.stringify(together)).toBe(true)
+    }
+    for (const together of [null, { ...flags, saved: { create: true, update: true } }, { ...flags, created: { create: 'yes' } }]) {
+      body = menu(together)
+      expect(await client.forms(), JSON.stringify(together)).toMatchObject({ ok: false, code: 'unexpected' })
     }
   })
 })

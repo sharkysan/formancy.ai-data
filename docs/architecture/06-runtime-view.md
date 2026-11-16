@@ -936,13 +936,28 @@ append only.
 A record and the rows of its together children, saved in one transaction
 and checked as a whole
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
-No route takes a save yet, and no page sends one; what runs is the plan
-and the adapters' transaction, which the route will call.
+`POST /v1/forms/:id/records/save` takes one from a page an integrator
+writes, through `@formancy/data-client`'s `save`; the host page and the
+studio send none yet.
 
-1. Before the transaction the record's table is described; over a saved
+0. The route (`packages/data-server/src/routes/runtime-save.ts`) checks,
+   each answering alone: the body's shape, before the write id is read
+   (400, `save-body.ts`); each child a together child of this form in the
+   person's menu through that field, every bundle read as the menu reads
+   them (400); and every part's operation under its own form's policy --
+   the record's create or update alone, each child's writes in a save --
+   before anything is read (403, at the part), then a new record a together
+   child requires rows of from a person the menu offers no create of it
+   (403 at the record, naming no child). The rest runs once per sending of
+   the write id.
+1. Before the transaction the record is read (`readForWrite`), or under a
+   new one its table described, and the children that require rows of a
+   new record found among every served form (`rowsRequired`); over a saved
    record each changed child's rows are listed by `planSaveList`, one page
    of `max + 1` as the person reads them, which describes the child's
-   table; under a new one each child's table is described.
+   table; under a new one each child's table is described. Each answer
+   that only echoes what the record or the row as read holds, in a field
+   the person may not write, is dropped (0022, 0098).
 2. `planSave` (`packages/data-core/src/records/save.ts`) plans every part
    with today's planners under its own form's policy and returns one
    `SaveRequest`: the record's step -- an insert, an update, or the touch
@@ -976,12 +991,25 @@ and the adapters' transaction, which the route will call.
    record's step was sent, or a batch whose answer was lost, is
    `unknown-outcome`, and nothing sends it again; sent again with the
    version it was read at, it is `stale`.
+5. The route answers (`save-answers.ts`): the record read back and each
+   change as stored, in the order the body sent them, each new row by its
+   `ref`; or the refusal at the part the step is, in a write alone's
+   words for that step's form, a stale step in the save's; or 502
+   `unknown-outcome` naming the record and the version sent. The plan's
+   refusals come before anything is written, every part's field errors
+   at once, and the membership checks between the plan and the
+   transaction, each at its part. The audit writes one event, `save`,
+   with the row changes' count.
 
 Held by the shared cases in `packages/data-fixtures/src/saves.ts`, which
 each adapter's `save.integration.test.ts` and
 `save-lost-answer.integration.test.ts` assert through `covers()`; by each
-adapter's `save-sized.integration.test.ts`; and for the plan, by
-`packages/data-core/src/records/save.test.ts` and `together.test.ts`. What
+adapter's `save-sized.integration.test.ts`; for the plan, by
+`packages/data-core/src/records/save.test.ts` and `together.test.ts`; for
+the route, by `packages/data-server/src/routes/runtime-save.test.ts` over
+fake ports and `packages/data-server/src/e2e-lost-answer.integration.test.ts`
+on both engines; and for the client, by
+`packages/data-client/src/saves.integration.test.ts` on both engines. What
 it costs: two people saving different lines of one order at once are one
 saved and one `stale`; on SQL Server a trigger that ends the transaction
 can store a save in part, a batch SQL Server has not seen before is

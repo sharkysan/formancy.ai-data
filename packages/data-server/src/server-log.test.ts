@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { DEFAULT_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
+import { DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -64,6 +64,7 @@ async function runnable(
     auditKey: undefined,
     origins,
     lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+    saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
     // `app` is initialised below, before any request reaches the plane's log.
     log: () => app.log,
   })
@@ -167,6 +168,7 @@ describe("the runnable server's log", () => {
         auditKey: undefined,
         origins: [],
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
         log: () => server.log,
       }).admin,
     ).toBeUndefined()
@@ -219,6 +221,7 @@ describe("the runnable server's log", () => {
         auditKey: undefined,
         origins: [],
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
+        saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
         log: () => plain.log,
       }).admin,
     ).toBeUndefined()

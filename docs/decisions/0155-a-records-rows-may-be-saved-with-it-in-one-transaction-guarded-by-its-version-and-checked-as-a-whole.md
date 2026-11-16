@@ -3,9 +3,10 @@
 - **Status:** accepted
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
-- **Verified by:** what data-core plans and what both adapters run, the
-  parts of this decision built so far; each later part extends this line
-  when it lands.
+- **Verified by:** what data-core plans, what both adapters run, what the
+  generator writes and the bundle check holds, the route and the client --
+  the parts of this decision built so far; each later part extends this
+  line when it lands.
   `packages/data-core/src/records/save.test.ts` -- the record's step is
   planned under the order's policy and each line's under the line's, and a
   person one of them refuses is refused at that part (watched failing with
@@ -165,6 +166,110 @@
   deadline of 1 ms). `together.test.ts` -- the cap the fewer of a page less
   one and `SAVE_MAX_ROWS` (with `SAVE_MAX_ROWS` at 10 and the cap the page's
   alone).
+  What the generator writes and the bundle check holds:
+  `packages/data-core/src/generate/together.test.ts` -- a choice's
+  `together` written as the bindings the suites before it edited in, the
+  field written on create only (watched failing with the choice's bounds
+  not carried), never required in the form, with its note (with `required`
+  decided as for any other lookup), and refused where a save could not
+  hold it -- bounds, a foreign key that can be NULL, row security, the
+  form's own table, two together lookups, a section, a form over versions
+  (with `togetherProblem` not asked of the generated bindings, and with
+  its section and versions checks out); a touch column carried onto a
+  rowversion's concurrency and never inferred (with `touchColumn` not
+  read), and refused in a key, a foreign key, generated, unwritable,
+  pinned, absent or on a version column (with it carried unchecked).
+  `packages/data-core/src/records/menu.test.ts` -- a together child under
+  its record carries its `TogetherChild`, any other child none (with it
+  left off the menu). `packages/data-server/src/bundle.test.ts` -- a
+  together child and a touched parent as generated validate and are stored
+  (with the format-1 refusal asked of every format); a request and
+  bindings that disagree about `together` or the touch column refused
+  (with each left out of the comparison); a read filter beyond the
+  together key, a through by another field, row security, a touch column
+  in a key and one a row filter pins refused on read (with
+  `togetherProblems` left out of `policyProblems`); a `max` past one SQL
+  Server batch refused at publish, at the most that fits stored and one
+  more refused, and still served once stored (with the publish gate not
+  asking `togetherBatchProblem`); either in format 1 refused (with format
+  1 read as before); a hand-edited bound refused on read (with the
+  request's bounds read without `boundsProblem`).
+  `packages/data-server/src/routes/admin.test.ts` -- proposed and
+  published through the administrator's plane, bindings with other bounds
+  or without the touch column refused, a touch column in the key refused
+  by the proposal (with the reading leaving `together` out).
+  `packages/data-server/src/generation.test.ts` -- the reading carries both
+  exactly when given (with `touchColumn` not carried), and a key of a
+  lookup choice the reading does not read leaves the request not in its
+  normalised form, so a server before 0155 serves no together child (with
+  the normalised comparison out).
+  The route: `packages/data-server/src/routes/runtime-save.test.ts`, over
+  fake ports -- a new order and its lines sent as one request with the
+  configured deadline and answered by ref (with the default deadline
+  sent); fewer rows than the record must hold refused before anything is
+  written, the child left out included (with the required children not
+  handed to the planner); over a saved order one read, one list of `max +
+  1`, the touch, and each change answered in the order sent (with changes
+  matched by position); a row its record does not hold 404 at the row
+  (with it answered as any refusal); rule 1, a body that is not one save
+  400 with nothing read (with a duplicate ref let through); rule 2, a plain
+  child, another field and no form 400 (with the child's `together` not
+  asked); rule 3, a policy refusal at its part before any read (with the
+  children's operations left to the planner); a new order from intake,
+  who may create orders and never sees a line, 403 before any read and
+  naming no child (with the check taken out: 422 `too-few-rows` naming
+  the line form, after a describe); rule 4, the field that names the
+  record over-posting on a create and when moved, dropped when echoed
+  (with a new row's answer for it let through, with another value on an
+  update dropped rather than refused, and with every row read as behind
+  its version -- each saved, 200; with the field passed to the update as
+  sent it still passes, the update's own check refusing it); rule 5,
+  one adapter call per write id and another body with it 400 (with
+  `sendOnce` given no id);
+  every part's field errors at once (with the parts left out); a
+  membership refusal at its row (with the checks unasked); the
+  transaction's refusals at their steps -- stale, a unique key, a count, a
+  refused `within`, the deadline (with the part left off); a lost answer
+  502 naming the record and the version sent (with the version left out);
+  the audit one event, a rows count and no value (with `rows` read for
+  exports alone); a together child's create or delete alone 403, nothing
+  written after the table is described (with the planners asking
+  `offers()`); a plain create of a record whose rows are required 403
+  before any statement (with the create route not asking
+  `rowsRequired`); the form route's create as the menu's (with
+  `grantedOperations` asked alone); and a store that cannot list its
+  forms refusing every plain create and every save 503 with nothing
+  asked, and offering no create (with each null branch read as no child
+  required, one at a time). `packages/data-server/src/save-deadline.test.ts`
+  -- the setting's digits only (with any `Number` taken), the start-up
+  check only beside SQL Server (with it asked of every allowlist), and the
+  server's option held to the same rule (with it unchecked);
+  `scripts/server-start.test.mjs` -- the built server stopping at 7,500 ms
+  beside SQL Server, naming the setting, and starting at 7,499 and at
+  8,000 beside PostgreSQL alone (with `main.ts`'s check removed: it
+  listened at 7,500).
+  `packages/data-server/src/e2e-lost-answer.integration.test.ts`, on
+  postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest -- a
+  save whose answer the TCP hop dropped is 502 with the order and the
+  version, sent once; on SQL Server stored once and stale sent again, on
+  PostgreSQL uncommitted and saved sent again (with the route sending it
+  again: the marker crossed twice on both engines).
+  The client: `packages/data-client/src/transport.test.ts` -- a save
+  posted with its two keys and a write id, done only on a saved answer
+  (with it read as a record); a 2xx not saved, a lost connection and the
+  502 unknown, sent once (with the saved shape unchecked); a refusal with
+  its part, parts and bound (with them dropped); a form's `together` and a
+  menu child's flags of the server's shape (with each unchecked).
+  `packages/data-client/src/reconcile.test.ts` -- a save as an update with
+  a version and as a create without one (with every save read as a
+  create). `packages/data-client/src/saves.integration.test.ts`, on the
+  same images -- an order created with its lines, changed in one save,
+  stale sent again and reconciled `changed` (with the client posting to
+  the update route); past its bound, a plain create of the order and a
+  line alone refused (with the create route not asking `rowsRequired`,
+  the server rebuilt); and the menu and the line form saying the lines are
+  saved with their order (with the menu's child left without its
+  `together`, data-core rebuilt).
 
 ## Context
 
@@ -216,6 +321,25 @@ inferred. A record and its together children's rows are then created and
 changed in one save: the record, a create or an update that may change
 nothing, and each child's creates, updates and deletes.
 
+**The generator writes them, and the bundle check holds them.** The
+generator writes a lookup choice's `together` as its binding's bounds,
+the field written on create only and not required in the form -- a save
+supplies it from the record -- and holds the bindings it writes to
+`togetherProblem`, the rule the planner refuses bindings by; it writes a
+`touchColumn` onto a rowversion's concurrency, refusing one in a key or
+a foreign key, a pinned one, a generated one and one the account may not
+both read and update (`touchedConcurrency`). The bundle check, on publish
+and on every read, compares both with the request (`requestProblems`),
+reads the request's bounds again as whole numbers a save can hold, and
+refuses a together child whose read policy narrows by anything but the
+record its rows belong to -- a row filter outside its foreign key, a
+through by another field -- row security on its table, a touch column a
+touch cannot set or a row filter pins (`togetherPolicyProblems`), and a
+format-1 bundle that carries either, since format 1 keeps no request. At
+publish alone, on SQL Server, it refuses a child whose `max` rows would
+bind more than one batch's 2,100 parameters (`togetherBatchProblem`): a
+prediction this release makes, so a version stored is still served.
+
 **The record's version moves on every save.** A save over a saved record
 updates it, or, where its own answers change nothing, touches it: a
 version column incremented, a rowversion's touch column set to itself. The
@@ -227,9 +351,13 @@ read of the record reconciles a lost answer.
 alone.** `offeredFor(bindings, operation, scope)` is what a form offers
 alone (`null`) and in a save (`{ save: field }`); the menu, the form
 route and the planners ask it. A record whose rows a together child
-requires -- `min` of 1 or more -- is to have no plain create:
-`rowsRequired` finds such a child from the bundles alone, the menu leaves
-the create out now (`formMenu`), and the create route will refuse one.
+requires -- `min` of 1 or more -- has no plain create: `rowsRequired`
+finds such a child among every served bundle, whoever asks, and the
+create route refuses one 403 `operation-unavailable` before any
+statement, in words that name no child; the menu leaves the create out
+where the person could not make the save (`formMenu`), and
+`GET /v1/forms/:id` offers it, and the save route takes a save that
+creates such a record, exactly where the menu does (`createOffered`).
 
 **data-core plans the save, and both adapters run it.** `planSave`
 (`packages/data-core/src/records/save.ts`, one child's steps in
@@ -293,8 +421,8 @@ record's value there to the context's, as a selection of another
 tenant's record is not an option when a row is created alone. Nothing
 compares the two again at plan time.
 
-**The menu narrows the parent's create; the flags wait for
-`FormMenuChild.together`.** `togetherChildren` gives each together
+**The menu narrows the parent's create, and says each together child's
+flags.** `togetherChildren` gives each together
 child's `TogetherChild` for one person: in a save that creates the
 record, the child's create with the parent's create and a key the save
 can know before the rows' statements, every key column written or
@@ -305,20 +433,68 @@ update and a touch, which a row filter on the touch column rules out
 parent's step and every together child's `max` rows do not fit one batch
 of 2,100 parameters, by `saveParameters`, a prediction of the batch the
 adapter will build. `formMenu` leaves out a parent's create where the
-person could not make the save; nothing sends the flags yet.
+person could not make the save, and names each together child with its
+`TogetherChild` (`FormMenuChild.together`), which is absent for every
+other child -- not `null`, so a child is read as before 0155 by a page
+that knows nothing of it. `PublishedForm.together` is the lookup a
+form's rows are saved through and its bounds, `null` for every other.
 
-**Later parts of the decision**, each its own pull request: the generator's `together` and
-`touchColumn`, the bundle check's comparison of both and its refusal of a
-child read policy that narrows by anything but the together key; `POST
-/v1/forms/:id/records/save`, its audit event and `sendOnce`'s `save`
-(0023, 0031); the create route's refusal of a plain create where
-`rowsRequired` finds a child, and the form route's matching narrowing of
-`create`, which `grantedOperations` alone does not make;
-`FormMenuChild.together` and `PublishedForm.together`; the host page's
-pending rows and one Save; and the studio's controls. Until they land no
-published form changes behaviour: nothing generates `together`, and the
-bundle check refuses a stored request that carries it, as not in its
-normalised form.
+**The runtime plane saves them in one request.**
+`POST /v1/forms/:id/records/save` (`routes/runtime-save.ts`, its body's
+check in `save-body.ts`, its answers in `save-answers.ts`) takes a
+`SaveBody` and answers in this order, each stage alone: the body's shape
+(400, before the write id is read): a new row's `ref` of 1 to 32 letters,
+digits, `-` or `_`, once in the body, a row's token once in its child,
+each child once, and something saved, else `nothing-to-update`; each
+child a together child of this form in the person's menu through that
+field (400, naming the form and the field sent); every part's operation
+-- the record's create or update alone, each child's create, update or
+delete in the save (`offeredFor`) -- under its own form's policy, before
+anything is read (403, at the part); then, before anything is read too, a
+new record a together child requires rows of from a person who could not
+make that save, where the menu offers them no create of it
+(`createOffered`), 403 `operation-unavailable` at the record in words that
+name no child, which the planner's bound would name to somebody who may
+not read it (0045); then the reads -- the record by
+`readForWrite`, or its table described; each changed child's rows by
+`planSaveList`, or its table described -- each row's echoes removed
+against its row as listed (0022, 0098), and `planSave` with the
+configured deadline, whose refusals are answered at their parts: every
+part's field errors at once (422 `parts`), a row the list does not hold
+404, a bound broken before anything is written 422 with `rows`, and the field
+that names the record over-posting where a row sends another value; each
+selection's membership check, by the function a write alone asks, at its
+part; and one call to `RecordAdapter.save`, once per write id
+(`sendOnce`'s `save`), never again. A refusal of the transaction is
+answered at the step it names, in a write alone's words for that step's
+form -- a delete's as a delete's -- with `at`; a stale step in the save's
+own words, which never say nothing was saved; the save as a whole past
+its deadline or out of reach 503, rolled back. A lost answer is 502
+`unknown-outcome`, `operation: 'save'`, naming the record and the version
+sent, or for a new record what its insert would have made. The audit is
+one event, `operation: 'save'`, the record's keyed hash and `rows`, the
+row changes the body carried, and nothing else of them (0023).
+`FORMANCY_DATA_SAVE_DEADLINE_MS` sets the deadline, `DEFAULT_SAVE_DEADLINE_MS`
+unset; the server refuses to start where a SQL Server connection is
+allowed and twice it is not below mssql's request timeout of 15 s, past
+which a save that may commit would be unknown where the deadline rolls it
+back.
+
+**The client sends a save and reconciles it by the record.**
+`client.save(formId, body)` resolves to the record and its rows as
+stored, a refusal carrying `at`, `parts` and `rows`, or an unknown write,
+by the rules every write's answer is read by (0031); `reconcile` reads a
+lost save as an update where it carries a version and as a create where
+it does not, and says what the record shows and nothing of its rows.
+
+**Later parts of the decision**, each its own pull request: the host
+page's pending rows and one Save, and the studio's controls. Until they
+land, the host page lists a together child's rows and edits them one at
+a time, as the form offers, and offers no row's add or removal, nor a New
+of a record whose rows are required -- an integrator's page saves them
+through the route; and an administrator confirms `together` and
+`touchColumn` in a generation request of their own, which the studio
+does not yet write.
 
 ## Consequences
 
@@ -365,10 +541,23 @@ What it costs, and what it does not do:
   another field, or row security on the child table refuse `together`; a
   multi-tenant child whose tenant column is not part of its foreign key
   onto the record cannot be together.
-- **A record whose rows are required is not to be created alone**: the
-  menu leaves its create out now, the create route will refuse one, and
-  every plain create of every form will read every published form to find
-  out, as the menu does.
+- **A record whose rows are required is not created alone**: the menu
+  and the form route leave its create out where the person could not make
+  the save, and the create route refuses one whoever asks. So every plain
+  create of every form, and every save, reads and validates every
+  published form from the store first, as the menu does, and a store that
+  cannot list them refuses the create and the save, 503, as nothing can
+  tell, and offers no create. Measured once, on 2026-11-16, in-process
+  through `inject` on a 20-thread i9-10900K under Node 24.21.0, with a
+  file store on local disk, format-2 order forms over the examples'
+  captured PostgreSQL snapshot, a version of 28,236 bytes, and ports that
+  answer at once, the median of 101 creates after 20: a plain create took
+  5.3 ms with one form published, 24 ms with ten and 203 ms with a
+  hundred, and the menu over the same store 2.9, 21 and 202 ms -- about
+  2 ms a published form, the menu's own cost (0045), paid by every create
+  whether or not any together child is published. A refused create says
+  only that the record is created with its rows, never which child
+  requires them, since the person may read none.
 - **A key the database fills by a default that can repeat**, one
   `numbersKey` does not count, cannot be known before the rows'
   statements: such a record is created with no rows saved with it, and
@@ -432,13 +621,47 @@ What it costs, and what it does not do:
   save, measured: one made between two deletes of one save is not seen by
   the second. Whether a DENY of VIEW DEFINITION waits was not measured;
   the keys those checks read cannot move until the save ends, measured.
-- **The audit trail** will name the record and count the rows, never which.
-- **Built in part.** The plan and both adapters' save are built; until the
-  route lands nothing calls `RecordAdapter.save` but the suites, and the
-  limits were measured on one workstation and on the default images alone,
-  not on the CI runner, which holds only that a save of `SAVE_MAX_ROWS`
-  lines is stored within the default deadline, nor on the oldest images of
-  the matrix.
+- **The audit trail** names the record and counts the row changes,
+  never which; a save's event names no child form, token or ref, so the
+  trail cannot say which lines a save touched, or which versions of the
+  child forms served it.
+- **A save's deadline is the server's, one value.**
+  `FORMANCY_DATA_SAVE_DEADLINE_MS` is read once at start, for every form;
+  with a SQL Server connection allowed it is at most 7,499 ms, half of
+  mssql's request timeout less one, and on PostgreSQL alone it is held to
+  nothing but a timer's longest. The timeout is mssql's default, named in
+  `save-deadline.ts` because nothing here sets it, not measured.
+- **A save's answer is kept for a resend as any write's is**, under
+  `MAX_KEPT_BYTES`, 32 MiB, and `MAX_KEPT`, 10,000 answers, and is larger
+  than one record's. Measured once, on 2026-11-16, through the real server
+  and driver on the default images, postgres:17-alpine and
+  mcr.microsoft.com/mssql/server:2022-latest, saving the fixture's order
+  with its lines, the line form's `max` at `TOGETHER_MAX_ROWS`, 49, and
+  counting the answer as `write-once.ts` does: the order's create alone
+  answered 213 bytes on PostgreSQL and 258 on SQL Server; a save of the
+  order with one line 428 and 518; with 49 lines created 7,508 and 9,758,
+  and with 49 lines changed 6,929 and 9,179 -- about 148 and 193 bytes a
+  line, SQL Server's with the fixture's order numbers near 2^53 and a
+  rowversion in every token and version. So the byte cap holds about
+  4,400 and 3,400 saves of 49 lines, and a save of more than about 21
+  lines on PostgreSQL's fixture, 16 on SQL Server's, fills the byte cap
+  before the count; a record with several together children, or rows
+  with wider values, keeps fewer, and an answer dropped before its ten
+  minutes leaves its resend applied again (0031).
+- **A save names its children by what the menu says**: a child this
+  person's menu does not show under the record -- one they may not list, or
+  whose field they may not read -- is 400, so a person who may create the
+  record and not read its required rows cannot create it at all: a save
+  that creates it is refused 403 before anything is read, naming no child,
+  as the plain create is.
+- **Built in part.** The plan, both adapters' save, the generator's and
+  the bundle check's part, the route and the client are built; the host
+  page and the studio do not offer a save yet, so a together child is
+  saved with its record only by a page an integrator writes. The limits
+  were measured on one workstation and on the default images alone, not on
+  the CI runner, which holds only that a save of `SAVE_MAX_ROWS` lines is
+  stored within the default deadline, nor on the oldest images of the
+  matrix.
 
 ## Alternatives considered
 

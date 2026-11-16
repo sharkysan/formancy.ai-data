@@ -213,7 +213,19 @@ export function deleteFailure(failure: RecordFailure): HttpRefusal {
  */
 export function unknownOutcome(operation: UnknownOutcome['operation'], record: string | null, version: string | null): { status: 502; body: UnknownOutcome } {
   let message: string
-  if (operation === 'supersede') {
+  if (operation === 'save' && version !== null) {
+    // The record's version moves on every save of it (0155): sent again with
+    // the version sent, a save that committed finds it moved. What is stored
+    // is the record's and its rows' to show, and on SQL Server a trigger that
+    // commits can have stored a part.
+    message =
+      'The connection to the database failed after the save was sent. It may have been saved. Load the record and its rows to see what they hold. Saving again with the same version is safe: it is stored at most once.'
+  } else if (operation === 'save') {
+    message =
+      record === null
+        ? 'The connection to the database failed after the record and its rows were sent. They may have been saved, and the database numbers new records, so only a search of your own can tell.'
+        : 'The connection to the database failed after the record and its rows were sent. They may have been saved: read the record before entering it again.'
+  } else if (operation === 'supersede') {
     // It ended the version sent, or nothing: sent again with that version, a
     // change that committed finds the version moved on (0113).
     message =

@@ -1,14 +1,15 @@
 import type { ObjectMeta } from '../metadata.js'
 import { SAVE_MAX_ROWS } from '../records/save-limits.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
-import type { FieldBinding, FormBindings } from './types.js'
+import type { ConcurrencyBinding, FieldBinding, FieldWrites, FormBindings, GenerationNote, LookupChoice, TogetherBounds } from './types.js'
 
 /*
  * A child's lookup saved with its parent (0155), as the bindings carry it:
- * read, and held to what a save can hold. The generator does not write one
- * yet; the planner reads it back, so a hand edit that breaks any rule here
- * is refused before anything is planned from it, and the rules are the
- * ones the generator will refuse a choice by.
+ * written by the generator where the request's lookup choice says so, read
+ * back, and held to what a save can hold. The generator holds the bindings
+ * it writes to `togetherProblem`, the planner refuses bindings that break
+ * it before anything is planned, and the bundle check on every read, so a
+ * hand edit is refused by the rules the generator refuses a choice by.
  */
 
 type LookupBinding = Extract<FieldBinding, { kind: 'lookup' }>
@@ -96,6 +97,57 @@ export function togetherProblem(root: ObjectMeta, bindings: FormBindings): strin
   if (bindings.validity !== undefined) return `${field} is saved with its record, and a form over versions has no rows saved with a record`
   if (root.rowSecurity !== 'none') return `${field} is saved with its record, and row security on the table would hide rows from every count`
   return null
+}
+
+/**
+ * What a lookup choice's `together` makes of its binding (0155): nothing
+ * where it carries none; otherwise its bounds, as given, and the field
+ * written on create only -- a row's record never changes once the module
+ * created it, so no update of a row alone moves it to another record, past
+ * either one's bound -- and a note saying so. Never required in the form:
+ * a save supplies it from the record, and a row is created in a save
+ * alone. Whether the bounds and the lookup can be held is `togetherProblem`'s,
+ * asked of the bindings the generator writes.
+ */
+export function togetherLookup(
+  choice: Pick<LookupChoice, 'together'>,
+  writes: FieldWrites,
+  subject: { field: string; target: string },
+  notes: GenerationNote[],
+): { writes: FieldWrites; together?: TogetherBounds } {
+  if (choice.together === undefined) return { writes }
+  const { min, max } = choice.together
+  notes.push({
+    subject: subject.field,
+    kind: 'read-only',
+    message: `Saved with its ${subject.target}, in one save, between ${String(min)} and ${String(max)} rows of one: written when a row is created with it, never on update.`,
+  })
+  return { writes: { create: writes.create, update: false }, together: { min, max } }
+}
+
+/**
+ * The root's concurrency with the touch column the request confirms
+ * (0155), or as it is where it confirms none. Never inferred, as a version
+ * column is not: it throws, as the generator does on any request it cannot
+ * honour, where the root's concurrency is no rowversion this connection
+ * reads -- a version column is moved by a save of rows itself -- where the
+ * policy pins the column, and where `touchColumnProblem` refuses it.
+ */
+export function touchedConcurrency(
+  root: ObjectMeta,
+  concurrency: ConcurrencyBinding | null,
+  column: string | undefined,
+  identity: readonly string[],
+  pinned: ReadonlySet<string>,
+): ConcurrencyBinding | null {
+  if (column === undefined) return concurrency
+  if (concurrency?.kind !== 'rowversion')
+    throw new Error(`${column} cannot be the touch column: a touch column is a rowversion's, and ${root.ref.name} has no rowversion this connection reads`)
+  const problem = pinned.has(column)
+    ? `the touch column ${column} is pinned by the policy, and a save of rows would write it`
+    : touchColumnProblem(root, identity, column)
+  if (problem !== null) throw new Error(problem)
+  return { ...concurrency, touch: column }
 }
 
 /**

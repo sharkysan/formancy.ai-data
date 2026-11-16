@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:ca31e952eebc00181f4bd5443f662c01e610d9ef59e0ad0f03e5975888c6966a",
+      "reviewed": "sha256:7fcd4910378000ffb1291f398454f17d180432bc5147b26bc7102e2c36ab396f",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:6433ac5c0c6d2b878249f59c15b99f2ade94dc7ab0b7b1dbe2fdc9339c71cbe5",
+      "reviewed": "sha256:37e53928edae70a9f14e69306b467f3caca9c8d7fdf036cfd624403208abde0a",
       "limitations": [
         {
           "area": "operations",
@@ -624,7 +624,7 @@
       ]
     },
     "0030": {
-      "reviewed": "sha256:09a30add315929e018d727ad4a3bc26e0b450458371a3006b956de25b2feb47c",
+      "reviewed": "sha256:4a8649679af8477d7dad7172ccb8231006f4c9679ac0b11bf6fcd7fd0b83c6b6",
       "limitations": [
         {
           "area": "studio",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:6353a5d64a92a07e62a6b89856b7d6f9d1e1b645373faa58708c0dd8854cfa10",
+      "reviewed": "sha256:f12098cbbda1222eb9fcf0c732b0bdb6238476051a589c63a4e5fc2d5563710c",
       "limitations": [
         {
           "area": "writes",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:1d4f471070e6b239445aada4980c6605efe1176f42c584be61442a3412a7924e",
+      "reviewed": "sha256:f9f2bcc2fa03214a28bc7891601df6afe78b96542cda36f87833c124fa7a0359",
       "limitations": [
         {
           "area": "forms",
@@ -1242,7 +1242,7 @@
       ]
     },
     "0045": {
-      "reviewed": "sha256:a5c2c7770fb904c49f57a26568ebcebfd1a86e98ecd44d94a4e57e73362e50f6",
+      "reviewed": "sha256:c8099595ccc50457ac348bfe2ee0268f13ad76932f3997e9823d2a75f8b0ad22",
       "limitations": [
         {
           "area": "server",
@@ -1409,7 +1409,7 @@
       ]
     },
     "0050": {
-      "reviewed": "sha256:50bb734d59e282d5baba44929c36a7509c66cffcc3c8d7a8c5e903aa26f34667",
+      "reviewed": "sha256:984527f0a0606bbeb54839ab1dec985c5c2cccfde7cd270a3bc437c9518e29d8",
       "limitations": [
         {
           "area": "writes",
@@ -1873,7 +1873,7 @@
       ]
     },
     "0061": {
-      "reviewed": "sha256:773fa0ffab5b048eec87af05147055934dfbdbd15fea1f2cf09ea31d1ce4dbd3",
+      "reviewed": "sha256:1e2e18265ae7ac576e971cf36f53b2395c8365235a43d1b6510a8e4f2feb810a",
       "limitations": [
         {
           "area": "server",
@@ -4460,11 +4460,12 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:f40d4aaca8c4fa3692ba517feed1f4bf9a26f1896209c1a31a609963ce8ba97f",
+      "reviewed": "sha256:7aba7758bd032c3876c631411a9e6612f17b87eafb6245e8ebb3bad298db6d4d",
       "limitations": [
         {
           "area": "writes",
-          "says": "A record's rows are saved with it in one transaction by both adapters and by no route yet: no route takes a save and the generator writes no together lookup, so no published form saves a record with its rows."
+          "says": "A record and its together children's rows are saved through POST /v1/forms/:id/records/save alone: the host page and the studio offer no save yet, so they are saved together only by a page an integrator writes, and an administrator confirms together and a touch column in a generation request of their own.",
+          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
         },
         {
           "area": "forms",
@@ -4473,8 +4474,8 @@
         },
         {
           "area": "forms",
-          "says": "The menu offers the create of a record that a together lookup requires rows of only to a person who could save those rows with it, and to nobody where the record's key is filled by a default that can repeat; the create route does not refuse such a create yet.",
-          "heldBy": "packages/data-core/src/records/menu.test.ts"
+          "says": "A record that a together lookup requires rows of is never created alone: the create route refuses it 403 whoever asks, and the menu and the form route offer its create only to a person who could save those rows with it, and to nobody where the record's key is filled by a default that can repeat.",
+          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
         },
         {
           "area": "forms",
@@ -4520,6 +4521,40 @@
           "area": "databases",
           "says": "On PostgreSQL under any isolation but READ COMMITTED a save takes ROW EXCLUSIVE on every table it writes, the record's among them, which an account granted UPDATE on the version column alone is refused: the account needs a grant to write each table.",
           "heldBy": "packages/data-postgres/src/save-facts.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Every plain create and every save reads and validates every published form from the store first, to find a child that requires rows of the record, and is refused 503 when the store cannot list them: about 2 ms a published form, measured once in-process on one workstation, so a create takes about 200 ms more with a hundred forms published, whether or not any of them is a together child.",
+          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A save names only the children the person's menu shows under the record, so a person who may create a record but may not list the form of the rows it requires, or read the field that names the record, cannot create it at all: a save that creates it is refused 403 before anything is read, as the plain create is.",
+          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A together child whose read policy narrows by anything but the record its rows belong to -- a row filter outside its foreign key onto the record, a through by another field -- or whose table has row security is refused at publish and not served, so a multi-tenant child whose tenant column is not part of that foreign key cannot be saved with its record.",
+          "heldBy": "packages/data-server/src/bundle.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a together child whose max rows alone would bind more than one batch's 2,100 parameters, by this release's prediction, is refused at publish; a version stored before it stopped fitting is still served, and its saves are refused by the menu and the adapter instead.",
+          "heldBy": "packages/data-server/src/bundle.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "FORMANCY_DATA_SAVE_DEADLINE_MS is one deadline for every save the server makes, and with a SQL Server connection allowed the server refuses to start where it is 7,500 ms or more, half of mssql's request timeout of 15 s, which nothing here sets.",
+          "heldBy": "packages/data-server/src/save-deadline.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A save's audit event names its record and counts its row changes, and names no child form, row, token or ref: the trail cannot say which lines a save touched.",
+          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
+        },
+        {
+          "area": "server",
+          "says": "A save's answer is kept for a resend under the same byte cap as any write's, 32 MiB: measured once on the fixture's order, a save of 49 lines answered 7,508 bytes on PostgreSQL and 9,758 on SQL Server, about 148 and 193 a line, so the cap holds about 4,400 and 3,400 such saves, fewer with several together children or wider rows, and a resend whose answer was dropped first is applied again."
         }
       ]
     },

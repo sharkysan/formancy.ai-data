@@ -117,9 +117,13 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
  * with `removable`, `pg-removable` and `ms-removable` over the parity
  * schema's table a clerk may delete from within their tenant (0050); and,
  * with `hops`, `pg-hop-order` and `ms-hop-order` through a TCP hop each, and
- * `pg-hop-removable` and `ms-hop-removable` over `lost.removable` (`Lossy`).
+ * `pg-hop-removable` and `ms-hop-removable` over `lost.removable` (`Lossy`);
+ * and with `saves`, `pg-saved-order` and `ms-saved-order` with
+ * `pg-saved-line` and `ms-saved-line`, an order's lines saved with it, one
+ * to three of them (0155), the order's touch column its notes on SQL
+ * Server.
  */
-export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean; countries?: boolean } = {}): Promise<Plane> {
+export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean; countries?: boolean; saves?: boolean } = {}): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
@@ -214,6 +218,42 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
       expectedBase: null,
       bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
     })
+  }
+  // An order and its lines saved with it (0155): the lines through their order, as above, created and changed only in a save of it.
+  for (const { connection, versionColumn } of options.saves === true ? ENGINES : []) {
+    const concurrency = versionColumn === undefined ? { touchColumn: 'notes' } : { versionColumn }
+    const order = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'sales', name: 'order' },
+      formId: `${connection}-saved-order`,
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...concurrency,
+    })
+    const lines = await admin('/v1/form-proposals', {
+      connection,
+      root: { schema: 'sales', name: 'order_line' },
+      formId: `${connection}-saved-line`,
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'], together: { min: 1, max: 3 } }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    const linePolicy: FormPolicy = {
+      ...clerkPolicy((lines['bindings'] as { fields: FieldBinding[] }).fields),
+      rowFilters: [],
+      lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['order'],
+    }
+    for (const [formId, proposal, policy] of [
+      [`${connection}-saved-order`, order, clerkPolicy((order['bindings'] as { fields: FieldBinding[] }).fields)],
+      [`${connection}-saved-line`, lines, linePolicy],
+    ] as const) {
+      const { form, bindings, snapshot, generation } = proposal
+      await admin(`/v1/forms/${formId}/versions`, {
+        expectedBase: null,
+        bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+      })
+    }
   }
   // A customer form whose lookup reads `sales.country`, which no other form here
   // reads and no write here checks: a suite may hold that table locked

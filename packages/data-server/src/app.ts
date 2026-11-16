@@ -1,5 +1,5 @@
 import rateLimit, { normalizeIP } from '@fastify/rate-limit'
-import { DEFAULT_LOOKUP_DEADLINE_MS } from '@formancy/data-core'
+import { DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS } from '@formancy/data-core'
 import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
@@ -10,6 +10,7 @@ import { crossOrigin, originsProblem } from './cors.js'
 import { lookupDeadlineProblem } from './lookup-deadline.js'
 import { PATH_NOT_PLAIN, plainPath } from './paths.js'
 import { DEFAULT_RATE_LIMIT } from './rate-limit.js'
+import { saveDeadlineProblem } from './save-deadline.js'
 import { adminRoutes } from './routes/admin.js'
 import type { AdminOptions } from './routes/admin.js'
 import { runtimeRoutes } from './routes/runtime.js'
@@ -95,6 +96,17 @@ export interface DataServerOptions {
    * Default `DEFAULT_LOOKUP_DEADLINE_MS`, derived from the published
    * performance figures; the runnable server reads
    * `FORMANCY_DATA_LOOKUP_DEADLINE_MS` for it (main.ts).
+   *
+   * `saveDeadlineMs`: how long a save of a record with its rows may wait
+   * for a lock, and after which none of its steps starts -- past it the
+   * save is rolled back and answered `503 unavailable` (0155). A whole
+   * number from 1 to 2147483647, or the server is not built. Default
+   * `DEFAULT_SAVE_DEADLINE_MS`, measured; the runnable server reads
+   * `FORMANCY_DATA_SAVE_DEADLINE_MS` for it, and refuses to start where a
+   * SQL Server connection is allowed and twice it is not below mssql's
+   * request timeout (`saveDeadlineFit`). That fit is the runnable server's
+   * check alone: here only the whole number is, so an embedder whose
+   * registry has a SQL Server connection holds its deadline to it.
    */
   runtime?: {
     registry: ConnectionRegistry
@@ -102,6 +114,7 @@ export interface DataServerOptions {
     audit?: NonNullable<RuntimeOptions['audit']>
     origins?: readonly string[]
     lookupDeadlineMs?: number
+    saveDeadlineMs?: number
   }
 }
 
@@ -180,6 +193,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   const lookupDeadlineMs = options.runtime?.lookupDeadlineMs ?? DEFAULT_LOOKUP_DEADLINE_MS
   const deadlineRefused = lookupDeadlineProblem('runtime.lookupDeadlineMs', lookupDeadlineMs)
   if (deadlineRefused !== undefined) throw new Error(deadlineRefused)
+  // A save's by its variable's rule (save-deadline.ts): the planner throws on anything else, at every save.
+  const saveDeadlineMs = options.runtime?.saveDeadlineMs ?? DEFAULT_SAVE_DEADLINE_MS
+  const saveRefused = saveDeadlineProblem('runtime.saveDeadlineMs', saveDeadlineMs)
+  if (saveRefused !== undefined) throw new Error(saveRefused)
   // The proxies by the setting's rule (trusted-proxies.ts, 0071): a list
   // that would believe every client about itself stops the server here. A
   // copy is checked and handed to Fastify, as the origins are.
@@ -284,8 +301,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   }
 
   if (options.runtime !== undefined) {
-    const { origins: _offered, lookupDeadlineMs: _checked, ...runtime } = options.runtime
-    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs })
+    const { origins: _offered, lookupDeadlineMs: _checked, saveDeadlineMs: _saveChecked, ...runtime } = options.runtime
+    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs, saveDeadlineMs })
   }
 
   return app

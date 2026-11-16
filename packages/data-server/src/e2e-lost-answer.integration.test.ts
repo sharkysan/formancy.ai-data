@@ -476,4 +476,88 @@ describe.each([
       { operation: 'delete', status: 404, outcome: 'not-found' },
     ])
   })
+
+  // A save of an order with its lines whose answer is lost (0155) is 502,
+  // naming the order and the version sent, and the database was asked
+  // once: the marker -- the order's notes, which the order's own step
+  // sends and its answer echoes -- crossed the hop once. The engines
+  // differ in when that answer comes. SQL Server sends a save as one batch
+  // and answers it after its commit, so the order and its new line are
+  // stored once, and the same save sent again at the version it was read
+  // at is stale: the order's version moved. PostgreSQL answers the order's
+  // step before the lines' and the COMMIT, so the cut leaves the
+  // transaction uncommitted and nothing is stored -- still unknown, as the
+  // locked write is (0031) -- and the same save sent again is then saved.
+  // The trail names the order each time, and counts the save's row changes.
+  test('a save of an order with its lines is 502 with the order and its version, sent once', async () => {
+    const lines = `${connection}-saved-line`
+    const orders = `${connection}-saved-order`
+    const proposed = async (formId: string, generation: Record<string, unknown>): Promise<Proposal> => {
+      const proposal = await call('/v1/form-proposals', admin, { connection, formId, ...generation })
+      expect(proposal.statusCode, proposal.body).toBe(200)
+      return proposal.json<Proposal>()
+    }
+    const order = await proposed(orders, {
+      root: { schema: 'sales', name: 'order' },
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      ...(versionColumn === undefined ? { touchColumn: 'notes' } : { versionColumn }),
+    })
+    const line = await proposed(lines, {
+      root: { schema: 'sales', name: 'order_line' },
+      title: 'Order line',
+      lookups: [{ foreignKey: 'fk_order_line_order', display: ['order_date'], together: { min: 0, max: 3 } }],
+      ...(versionColumn === undefined ? {} : { versionColumn }),
+    })
+    const linePolicy: FormPolicy = { ...clerkPolicy(line.bindings), rowFilters: [], through: ['order'] }
+    for (const [formId, proposal, policy] of [
+      [orders, order, clerkPolicy(order.bindings)],
+      [lines, line, linePolicy],
+    ] as const) {
+      const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(connection, proposal, policy) })
+      expect(published.statusCode, published.body).toBe(201)
+    }
+    const changes = (ref: string, no: number) => [
+      { form: lines, field: 'order', changes: [{ create: { ref, answers: { line_no: no, quantity: 1, unit_price: '2.00' } } }] },
+    ]
+    const created = await call(`/v1/forms/${orders}/records/save`, clerk, {
+      record: { create: { answers: { customer: customerToken, order_date: EDGE_VALUES.orderDate, status: 'placed', amount: '3', notes: 'before' } } },
+      rows: changes('a', 1),
+    })
+    expect(created.statusCode, created.body).toBe(200)
+    const { record, version } = created.json<{ record: { record: string; version: string } }>().record
+    const id = record.replace(/^k1:/, '')
+    const LINES_OF = {
+      pg: 'select count(*)::int as n from sales.order_line where order_id = $1::bigint',
+      ms: 'select count(*) as n from sales.order_line where order_id = cast(@text as bigint)',
+    }
+    const notes = `lost save ${connection} ${String(Date.now())}`
+    const body = { record: { update: { record, version, answers: { notes } } }, rows: changes('b', 2) }
+    const { response, sent } = await sentAndLost(
+      notes,
+      // SQL Server answers after its commit: wait until it is visible. PostgreSQL answered the order's step, and no COMMIT follows it.
+      async () => expect(await count(connection, ORDERS_WITH_NOTES, notes)).toBe(kind === 'sqlserver' ? 1 : 0),
+      () => call(`/v1/forms/${orders}/records/save`, clerk, body),
+    )
+    expect(response.statusCode, response.body).toBe(502)
+    expect(response.json()).toMatchObject({ code: 'unknown-outcome', operation: 'save', record, version })
+    expect(sent()).toBe(1)
+
+    const stored = kind === 'sqlserver' ? 1 : 0
+    await eventually(async () => expect(await count(connection, LINES_OF, id)).toBe(1 + stored))
+    expect(await count(connection, ORDERS_WITH_NOTES, notes)).toBe(stored)
+    const again = await call(`/v1/forms/${orders}/records/save`, clerk, body)
+    expect([again.statusCode, again.json().code ?? 'saved']).toEqual(kind === 'sqlserver' ? [409, 'stale'] : [200, 'saved'])
+    expect(await count(connection, LINES_OF, id)).toBe(2)
+    expect(await count(connection, ORDERS_WITH_NOTES, notes)).toBe(1)
+
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === orders && event.record === recordReference(AUDIT_KEY, record),
+    )
+    expect(trail.map(({ operation, status, outcome, rows }) => ({ operation, status, outcome, rows }))).toEqual([
+      { operation: 'save', status: 200, outcome: 'ok', rows: 1 },
+      { operation: 'save', status: 502, outcome: 'unknown-outcome', rows: 1 },
+      kind === 'sqlserver' ? { operation: 'save', status: 409, outcome: 'stale', rows: 1 } : { operation: 'save', status: 200, outcome: 'ok', rows: 1 },
+    ])
+  })
 })

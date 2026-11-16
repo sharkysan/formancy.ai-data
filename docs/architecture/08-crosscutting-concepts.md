@@ -352,16 +352,17 @@ again, and a create whose key the database numbers cannot be reconciled.
 **A record saved with its rows is one transaction, guarded by its
 version** ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). The
 rows of a together child -- a lookup an administrator marks as saved with
-its record, with bounds -- are to be created, changed and deleted with
-their record or not at all. `planSave` makes the one request: the record's
+its record, with bounds -- are created, changed and deleted with their
+record or not at all, through one request,
+`POST /v1/forms/:id/records/save`. `planSave` makes the one request: the record's
 step, then each changed child's deletes, updates and creates, each the
 request today's planners make under that form's own policy, the child
 pinned to the record's key, then each child's count and the record read
 back. Every plan moves the record's version, by its update or, where its
 own answers change nothing, by a touch -- a version column incremented, a
 rowversion's confirmed touch column set to itself -- so that one row lock
-will serialise every save of its rows, a resend over a saved record will
-be `stale`, and one read will reconcile a lost answer. Each statement is
+serialises every save of its rows, a resend over a saved record is
+`stale`, and one read of the record reconciles a lost answer. Each statement is
 still one guarded statement, none retried. Both adapters run it as one
 transaction (`RecordAdapter.save`): on PostgreSQL one `sql.begin` on the
 path the record's definition chooses, its lock and statement timeouts the
@@ -370,7 +371,22 @@ first; on SQL Server one batch that owns its transaction, its lock
 timeout the deadline, the deadline checked in the batch before each step,
 and CATCH recording the step it stopped at. A step that changes nothing
 is explained after the rollback by the read a write alone asks, pinned as
-the step was. No route takes a save yet.
+the step was. The route sends the request once per write id and never
+again, after every part's policy has been asked before any read, and
+answers a refusal at the part of the body it is about; a lost answer is a
+502 naming the record and the version sent. A record that must hold rows
+of a together child is never created alone, and never in a save by a
+person who could not make it: 403 before any statement, naming no child.
+A together child's rows are never created or deleted alone: 403 with
+nothing written, after its table is described.
+
+**The save's deadline is one setting.** `FORMANCY_DATA_SAVE_DEADLINE_MS`,
+read by `main.ts` and parsed in `save-deadline.ts`, `DEFAULT_SAVE_DEADLINE_MS`
+unset. Where a SQL Server connection is allowed, the server refuses to
+start unless twice it is below mssql's request timeout, since a step may
+start just before the deadline and wait for a lock as long again, and a
+save past that timeout would be `unknown-outcome` where the deadline rolls
+it back.
 
 **The deadline bounds each wait and when a step may start, not the
 transaction.** No step starts after it and no lock is waited for longer
@@ -396,9 +412,12 @@ save suite plans, and of each size its sized suite saves, against
 `saveParameters`' prediction, and in
 `packages/data-sqlserver/src/save-facts.integration.test.ts` the lock
 facts its batch's checks after only the first step on a table rest on;
-each adapter's `save-sized.integration.test.ts` for the round trips; and
+each adapter's `save-sized.integration.test.ts` for the round trips;
 for the plan, `packages/data-core/src/records/save.test.ts`,
-`together.test.ts` and `menu.test.ts`, with no database.
+`together.test.ts` and `menu.test.ts`, with no database; for the route,
+`packages/data-server/src/routes/runtime-save.test.ts` over fake ports,
+`save-deadline.test.ts` for the setting, and
+`e2e-lost-answer.integration.test.ts` for a lost answer on both engines.
 
 **What it costs.** What 0155 records: the second of two
 people saving different lines of one order at once is `stale`, the
@@ -423,8 +442,9 @@ shape. A route registered without an audit name stops its registration, and
 one registered above the hooks is refused 500 `unaudited-route`. A sink that
 throws is logged and does not fail the request. A runtime event carries
 `rows`: for an `export`, the records its file held, or held when it was
-refused, and `null` for every other operation -- a count, never which
-([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)).
+refused, for a `save` the row changes it carried, and `null` for every
+other operation -- a count, never which
+([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md), [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 And `moved`: whether a create or an update moved its policy's state field,
 never from where or to where
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).

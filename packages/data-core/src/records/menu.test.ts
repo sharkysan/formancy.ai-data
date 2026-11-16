@@ -359,6 +359,28 @@ describe('a record whose rows are saved with it (0155)', () => {
     expect(of(noted())).toEqual({ customer: ['read', 'create'], notes: ['read'] })
     expect(of(noted(defaultedNumber))).toEqual({ customer: ['read'], notes: ['read'] })
   })
+
+  // The child under its record says it is saved with it, with its bounds
+  // and what this person may do with its rows in a save, so a page draws
+  // the tab's Add and Remove from the server's word; any other child says
+  // nothing, so it reads as every child before 0155 did. On PostgreSQL the
+  // order's version column is moved by the save itself, so a saved order's
+  // rows may be saved; a clerk whose line policy grants no delete is
+  // offered none. Watched failing with the child's `TogetherChild` left
+  // off the menu: the line child carried no `together`.
+  test('names a together child with its bounds and what this person may do with its rows in a save', () => {
+    const children = (bundles: readonly MenuBundle[]) => menuOf(bundles, CLERK).forms.find((entry) => entry.id === 'order')?.children
+    expect(children([ORDER, lines()])).toEqual([
+      {
+        form: 'order-line',
+        field: 'order',
+        one: false,
+        when: null,
+        together: { min: 1, max: 3, created: { create: true }, saved: { create: true, update: true, delete: false } },
+      },
+    ])
+    expect(children([ORDER, LINES])).toEqual([{ form: 'order-line', field: 'order', one: false, when: null }])
+  })
 })
 
 describe('the forms a lookup opens its record in (0140)', () => {

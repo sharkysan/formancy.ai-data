@@ -20,7 +20,9 @@ import type { FastifyRequest } from 'fastify'
  * the database -- which is the answer the page should have had. The id is
  * the person's, the form's and the operation's, so another of each is
  * another write -- a delete's included (0050), whose answer is a token and
- * `deleted`, so nothing of a deleted record is kept; and the same id with
+ * `deleted`, so nothing of a deleted record is kept, and a save of a record
+ * with its rows (0155), whose answer is the record and every row it wrote,
+ * kept under the same byte cap as any other; and the same id with
  * another body is refused, because
  * answering it with the first write's answer would say "Created" about
  * something never sent.
@@ -49,9 +51,15 @@ export interface WriteAnswer {
  * create answer was 234 to 236 bytes as JSON. Ten minutes is a margin over
  * those milliseconds for a slower client, not a measurement of one; ten
  * thousand such answers are about 2.4 MB, and the byte cap is there for a
- * form whose records are large. Oldest dropped first, so a person sending
- * large records under fresh ids cannot make this server hold more: a resend
- * that arrives after its answer was dropped is applied again.
+ * form whose records are large -- and for a save of a record with its rows
+ * (0155): measured on 2026-11-16 through the real server on the default
+ * images, the fixture's order saved with 49 lines answered 7,508 bytes on
+ * PostgreSQL and 9,758 on SQL Server, so the cap holds about 4,400 and
+ * 3,400 of those, and saves of more than about 21 lines on PostgreSQL,
+ * 16 on SQL Server, fill it before the count does. Oldest dropped first,
+ * so a person sending large records under fresh ids cannot make this
+ * server hold more: a resend that arrives after its answer was dropped is
+ * applied again.
  */
 export const KEEP_MS = 10 * 60_000
 export const MAX_KEPT = 10_000
@@ -106,7 +114,7 @@ export function createWriteOnce(now: () => number = Date.now) {
      * arrive together cannot both perform.
      */
     async once(
-      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede'; id: string; body: unknown },
+      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'; id: string; body: unknown },
       perform: () => Promise<WriteAnswer>,
     ): Promise<WriteAnswer & { repeated: boolean }> {
       prune()

@@ -4,6 +4,7 @@ import { DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 import type { LookupRow } from './lookup/types.js'
 import type { PolicyOperation } from './policy/types.js'
 import type { FieldError, FormRecord } from './records/plan-types.js'
+import type { TogetherChild } from './records/together.js'
 
 /*
  * The runtime plane's replies that have no type of their own elsewhere in the
@@ -202,7 +203,15 @@ export interface Deleting {
  * holds neither `create` nor `update` (0127). `opens` is each lookup field
  * this person may read with the published forms they may read its record
  * in (`lookupOpens`), read from every bundle as the menu reads them, asking
- * no database of any other form; `[]` where none (0140).
+ * no database of any other form; `[]` where none (0140). `together` is the
+ * lookup field through which this form's rows are saved with the record it
+ * references, and their bounds, where they are (0155): such a row is
+ * created and deleted only in a save of its record
+ * (`POST /v1/forms/:id/records/save` on the record's form), never alone,
+ * so `operations` holds neither; `null` for every other form. `operations`
+ * holds no `create` either where a together child requires rows of this
+ * form's records and this person could not make the save that creates one
+ * with them, as the menu says it (0155).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -215,6 +224,7 @@ export interface PublishedForm {
   writable: { create: string[] | null; update: string[] | null }
   moves: StateMoves | null
   opens: LookupOpen[]
+  together: { field: string; min: number; max: number } | null
 }
 
 /**
@@ -241,6 +251,14 @@ export interface FormMenuChild {
    * never a permission.
    */
   when: { field: string; equals: ApiValue } | null
+  /**
+   * Where the child's rows are saved with the record (0155): their bounds,
+   * and what this person may do with them in a save of the record
+   * (`TogetherChild`). Absent for every other child -- and from a server
+   * before 0155, which serves no together child -- so a page draws such a
+   * child's rows as it always has.
+   */
+  together?: TogetherChild
 }
 
 /**
@@ -432,14 +450,19 @@ export interface RuntimeRefusal {
  */
 export interface UnknownOutcome extends RuntimeRefusal {
   code: 'unknown-outcome'
-  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113. */
-  operation: 'create' | 'update' | 'delete' | 'supersede'
-  /** Update, delete and supersede: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. */
+  /** `delete` since 0050, `supersede` -- a change from a date -- since 0113, `save` -- a record with its rows -- since 0155. */
+  operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'
+  /**
+   * Update, delete and supersede: the token sent. Create: `intendedRecord(...)`, or null when the database numbers the key. Save: the
+   * record's, as an update's or a create's.
+   */
   record: string | null
   /**
    * Update and delete: the version sent -- saving again with exactly it is
    * stored at most once, and deleting again with it deletes nothing else.
-   * Create: null.
+   * Create: null. Save: the record's version sent over a saved record --
+   * the record's version moves on every save, so saving again with it is
+   * stored at most once -- and null for a save that creates it.
    */
   version: string | null
 }

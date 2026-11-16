@@ -23,16 +23,18 @@ import type {
  *
  * Each suite starts its own fixture, discovers the parity schema as the
  * owner, generates the forms below over it, inserts what a case starts from
- * as the owner, plans each save as the server's route will (`plannedSave`:
+ * as the owner, plans each save as the server's route does (`plannedSave`:
  * the record's table described, the rows of a saved record listed with
  * `planSaveList`, `planSave`), sends it through its adapter, and reads what
  * is stored as the owner. The answer each case expects is below, rendered
  * by `saveAnswer`. Where the engines differ, the difference is named per
  * engine and written down in each adapter.
  *
- * The generator does not write `together` yet (0155's later parts), so the
- * bundles carry it by the hand edit the generator will make (`savedWith`):
- * the field written on create only, with its bounds.
+ * The bundles carry `together` by the edit the generator makes for a
+ * together choice (`savedWith`): the field written on create only, with
+ * its bounds -- the bindings data-core's `generate/together.test.ts` holds
+ * the generator to -- so each suite sets the bounds a case needs over one
+ * generated form.
  */
 
 /** A save's answer as SAVE_PARITY writes it: `saved`, or the step it stopped at and why. */
@@ -220,9 +222,9 @@ export const SAVE_RACE_LOCK = { postgres: 155, sqlserver: 'parity.saved_mark' } 
 export const SAVE_DECLINED_REASON = 'This mark is not taken.'
 
 /**
- * `bindings` with `field` saved with its record, between `bounds`: the hand
- * edit the generator will make once it writes `together` -- the bounds on
- * the lookup, and the field written on create only (0155).
+ * `bindings` with `field` saved with its record, between `bounds`: what the
+ * generator writes for a together choice -- the bounds on the lookup, and
+ * the field written on create only (0155).
  */
 export function savedWith(bindings: FormBindings, field: string, bounds: { min: number; max: number }): FormBindings {
   const copy = structuredClone(bindings)
@@ -278,7 +280,7 @@ export function savedToken(identity: readonly string[], values: Record<string, s
 }
 
 /**
- * A save planned as the server's route will plan one (0155): the record's
+ * A save planned as the server's route plans one (0155): the record's
  * table described; over a saved record, each changed child's rows listed by
  * `planSaveList` through `records`, as this person reads them, and its
  * table as that list described it; under a new one, each child's table

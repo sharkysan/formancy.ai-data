@@ -27,6 +27,7 @@ export type RuntimeOperation =
   | 'update'
   | 'delete'
   | 'supersede'
+  | 'save'
   | 'lookup-query'
   | 'lookup-resolve'
   | 'view-save'
@@ -77,16 +78,19 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    */
   record: string | null
   /**
-   * `export` only (0079): how many records the file holds -- the whole
-   * file's on `ok`, and on a refusal those written into it before it was
-   * refused, 0 when it was refused before any statement. `null` for every
-   * other operation. A number, never which records: an operator can see
-   * that somebody took ten thousand rows, and the trail is still no copy
-   * of them.
+   * `export` (0079): how many records the file holds -- the whole file's on
+   * `ok`, and on a refusal those written into it before it was refused, 0
+   * when it was refused before any statement. `save` (0155): how many row
+   * changes the save carried -- creates, updates and deletes of its
+   * children's rows, whatever became of them -- 0 for a body that is not
+   * one. `null` for every other operation. A number, never which records:
+   * an operator can see that somebody took ten thousand rows, or changed
+   * twenty lines of an order, and the trail is still no copy of them. A
+   * save's event names no child form, row, token or ref.
    */
   rows: number | null
   /**
-   * `create` and `update` only, on a form whose policy names its state
+   * `create`, `update` and `save` only -- a save's record -- on a form whose policy names its state
    * field's moves (0112): whether the write, as planned, moves that field
    * -- the outcome says whether it was saved, and a move refused is
    * `transition-denied`. `null` for every other operation, a form without

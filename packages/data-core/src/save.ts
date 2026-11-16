@@ -3,9 +3,10 @@ import type { RuntimeRefusal } from './runtime.js'
 
 /*
  * A save of a record with the rows of its together children (0155), as the
- * runtime plane will carry it: declared once, beside `runtime.ts`, so the
- * server that answers it and the client that sends it compile against one
- * shape (0029). No route takes it yet; data-core plans it (`planSave`).
+ * runtime plane carries it: declared once, beside `runtime.ts`, so the
+ * server that answers it (`routes/runtime-save.ts`) and the client that
+ * sends it (`saves.ts`) compile against one shape (0029). data-core plans
+ * it (`planSave`).
  */
 
 /** One change to a row of a together child: a new row with the ref the page minted for it, or a row by its token and the version its person read. */
@@ -25,7 +26,12 @@ export interface SaveBody {
   rows: Array<{ form: string; field: string; changes: SaveChange[] }>
 }
 
-/** 200: the record as the save left it -- read by its key after every row's step -- and each change as stored, in the order sent. */
+/**
+ * 200: the record as the save left it -- read by its key after every row's
+ * step -- and each child and each of its changes as stored, in the order
+ * sent: a new row with the ref the page minted for it, an updated row, or
+ * a deleted row's token as the database held its key.
+ */
 export interface SavedRecord {
   record: FormRecord
   rows: Array<{ form: string; field: string; changes: Array<{ ref: string; row: FormRecord } | { row: FormRecord } | { deleted: string }> }>
