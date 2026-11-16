@@ -2,6 +2,8 @@ import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
 import { offeredFor, type OfferedOperation, type WriteScope } from '../generate/offers.js'
 import { TOGETHER_MAX_ROWS } from '../generate/together.js'
+import { LIST_PAGE_SIZE } from '../runtime.js'
+import { SAVE_MAX_ROWS } from './save-limits.js'
 import type { FieldBinding, FormBindings, GenerationRequest } from '../generate/types.js'
 import type { MetadataSnapshot, ObjectMeta } from '../metadata.js'
 import type { FormPolicy, PolicyContext } from '../policy/types.js'
@@ -118,6 +120,18 @@ describe('the bindings a save is planned from', () => {
   // versions, a table the database hides rows of. Each is refused before
   // anything is planned. Watched failing with `togetherProblem` unasked:
   // every one was prepared.
+  // A together child declares no more rows than one save was measured to
+  // hold, nor more than a list's page less one, whichever is fewer: a cap
+  // above the measured one would let a bundle publish a bound the adapters'
+  // save was never shown to hold within its deadline. Watched failing with
+  // SAVE_MAX_ROWS measured at 10 and the cap the page's alone: "expected 49
+  // to be less than or equal to 10".
+  test('caps a together child at the fewer of a page less one and the rows a save was measured to hold', () => {
+    expect(TOGETHER_MAX_ROWS).toBeLessThanOrEqual(SAVE_MAX_ROWS)
+    expect(TOGETHER_MAX_ROWS).toBeLessThanOrEqual(LIST_PAGE_SIZE - 1)
+    expect([SAVE_MAX_ROWS, LIST_PAGE_SIZE - 1]).toContain(TOGETHER_MAX_ROWS)
+  })
+
   test('refuses a together lookup no save can hold', () => {
     expect(refusal(PG, togetherOn(lineForm(PG).bindings, 'order'))).toBe('prepared')
     expect(refusal(PG, togetherOn(togetherOn(PG_ORDER, 'customer'), 'employee'))).toContain('customer and employee are each saved with their record')

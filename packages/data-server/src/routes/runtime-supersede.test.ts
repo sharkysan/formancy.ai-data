@@ -139,6 +139,9 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('a form over versions offers no delete')
     },
+    save: async () => {
+      throw new Error('a form over versions saves no rows with its records')
+    },
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
   const adapter = {

@@ -3,21 +3,10 @@ import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
 import { bindValue } from '../sql/values.js'
-import {
-  clocked,
-  column,
-  keyPredicates,
-  located,
-  NEXT_NOT_INSERTED,
-  NEXT_NOT_INSERTED_MESSAGE,
-  NOT_ONE_ROW,
-  NOT_ONE_ROW_MESSAGE,
-  ROW,
-  selection,
-  versionIs,
-  writeBatch,
-} from './statements.js'
-import type { Assigned, ExpectedVersion } from './statements.js'
+import { NEXT_NOT_INSERTED, NEXT_NOT_INSERTED_MESSAGE, NOT_ONE_ROW, NOT_ONE_ROW_MESSAGE } from './batch-steps.js'
+import type { Assigned } from './batch-steps.js'
+import { clocked, column, keyPredicates, located, ROW, selection, versionIs, writeBatch } from './statements.js'
+import type { ExpectedVersion } from './statements.js'
 
 /*
  * A change from a date on SQL Server (0113). No one statement here both

@@ -342,7 +342,7 @@ been saved" where nothing was. The write id holds in one process, so a
 resend that reaches another replica, or this one after a restart, is applied
 again, and a create whose key the database numbers cannot be reconciled.
 
-**A record saved with its rows is to be one transaction, guarded by its
+**A record saved with its rows is one transaction, guarded by its
 version** ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). The
 rows of a together child -- a lookup an administrator marks as saved with
 its record, with bounds -- are to be created, changed and deleted with
@@ -355,19 +355,51 @@ own answers change nothing, by a touch -- a version column incremented, a
 rowversion's confirmed touch column set to itself -- so that one row lock
 will serialise every save of its rows, a resend over a saved record will
 be `stale`, and one read will reconcile a lost answer. Each statement is
-still one guarded statement, none retried. data-core plans this alone so
-far: no adapter runs a save, and no route takes one.
+still one guarded statement, none retried. Both adapters run it as one
+transaction (`RecordAdapter.save`): on PostgreSQL one `sql.begin` on the
+path the record's definition chooses, its lock and statement timeouts the
+save's deadline, the locked path's one LOCK of every table it writes
+first; on SQL Server one batch that owns its transaction, its lock
+timeout the deadline, the deadline checked in the batch before each step,
+and CATCH recording the step it stopped at. A step that changes nothing
+is explained after the rollback by the read a write alone asks, pinned as
+the step was. No route takes a save yet.
 
-**Held by**, for the plan alone, `packages/data-core/src/records/save.test.ts`,
-`together.test.ts` and `menu.test.ts` beside it, with no database; the
-transaction itself, the lock and the pin in each located statement by
-nothing until the adapters' save.
+**The deadline bounds each wait and when a step may start, not the
+transaction.** No step starts after it and no lock is waited for longer
+than it, on both engines. On PostgreSQL no statement runs longer than it
+either: one that would is cancelled at its step. On SQL Server one slow
+for another reason than a lock runs to its end, holding its locks, and
+the save is stopped before its next step; such a statement, and a
+batch's compile, are bounded only by mssql's request timeout of 15 s,
+which ends in `unknown-outcome` -- the shared case `slow-statement` holds
+both engines' answer. How long a save holds its locks is not measured
+apart from its whole time. `DEFAULT_SAVE_DEADLINE_MS` and `SAVE_MAX_ROWS`
+(`packages/data-core/src/records/save-limits.ts`) are measured, and say on
+what: one child's creates, of one shape.
+
+**Held by** the shared cases `SAVE_PARITY`
+(`packages/data-fixtures/src/saves.ts`), which each adapter's
+`save.integration.test.ts` and `save-lost-answer.integration.test.ts`
+assert through `covers()` on both engines -- every change committed, a
+refusal at every step rolling everything back, the pin in each located
+statement and in its explaining read, the bounds, the deadline, two saves
+at once and a lost answer; on SQL Server, the batch of every save its
+save suite plans, and of each size its sized suite saves, against
+`saveParameters`' prediction, and in
+`packages/data-sqlserver/src/save-facts.integration.test.ts` the lock
+facts its batch's checks after only the first step on a table rest on;
+each adapter's `save-sized.integration.test.ts` for the round trips; and
+for the plan, `packages/data-core/src/records/save.test.ts`,
+`together.test.ts` and `menu.test.ts`, with no database.
 
 **What it costs.** What 0155 records: the second of two
 people saving different lines of one order at once is `stale`, the
 record's UPDATE triggers fire on a save of its rows alone, a touch stamps
 nothing, and on SQL Server a trigger that ends the transaction can store a
-save in part.
+save in part, saves of different records wait on each other at the count
+where the child's foreign key has no index, and DELETE taken away while a
+save runs is seen by the first delete of each reach alone.
 
 
 ## 8.7 Audit

@@ -20,7 +20,7 @@ import {
   TRANSACTION_ENDED_MESSAGE,
   TRANSACTION_REPLACED,
   TRANSACTION_REPLACED_MESSAGE,
-} from './statements.js'
+} from './batch-steps.js'
 
 /**
  * What SQL Server's refusals mean, as the stable codes of the record port.
@@ -57,7 +57,8 @@ import {
 /** Whether the operation could have changed anything: a write was sent, a read never changes a row. */
 export type Phase = 'read' | 'write'
 
-interface ServerError {
+/** A refusal as SQL Server reports it: its number, and its message, which is read for names only. */
+export interface ServerError {
   number: number
   message: string
   /** The error's severity, tedious's `class`, when the driver reported one. */
@@ -124,7 +125,7 @@ const PASSING: ReadonlySet<number> = new Set([
 const FIRST_USER_ERROR = 50000
 
 /**
- * The numbers the write batches raise for themselves (statements.ts's
+ * The numbers the write batches raise for themselves (batch-steps.ts's
  * OWN_NUMBERS). A customer's trigger may THROW one too, and its error is
  * then refused like any number nobody mapped -- never a reason for the
  * person (0156), whatever its message says: a number the adapter answers by
@@ -275,8 +276,14 @@ function worded(error: ServerError, phase: Phase): RecordFailure | undefined {
  * raises an error of its own never reaches here as that error: the batch's
  * CATCH sees its transaction gone and raises its own instead (statements.ts,
  * 0031).
+ *
+ * One translation for a refusal a request was rejected with and for one a
+ * save's batch recorded in CATCH with the step it stopped at (save.ts,
+ * 0155): the same number and message, so a step's refusal and a single
+ * write's cannot be answered two ways (0017). `written` is the values the
+ * refused statement assigned, in its order.
  */
-function refusal(error: ServerError, phase: Phase, written: readonly RecordValue[]): RecordFailure {
+export function refusal(error: ServerError, phase: Phase, written: readonly RecordValue[]): RecordFailure {
   const own = ownError(error, written)
   if (own !== undefined) return own
   const reason = worded(error, phase)

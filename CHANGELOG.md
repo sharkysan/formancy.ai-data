@@ -106,6 +106,36 @@ the same day (formancy.ai 0232).
   stamped, and on SQL Server an id a code-page column's code page cannot
   hold is the database's 422 on the stamped field rather than
   `unstampable`.
+- **Both adapters save a record with the rows of its together children
+  in one transaction** (0155). Why: data-core planned the save and
+  nothing ran it, and all or nothing is true or not in the database, so
+  the transaction is proven on both engines, against real servers, before
+  a route or a page builds on it. What you notice: nothing on a published
+  form yet -- no route takes a save. For integrators of the adapters and
+  of `@formancy/data-core`: `RecordAdapter` gains a required
+  `save(request: SaveRequest): Promise<SaveOutcome>`, so every
+  implementation of the port, a test's fake among them, must add it;
+  `createPostgresRecords` runs it as one `sql.begin` and
+  `createSqlServerRecords` as one batch, each never sent twice;
+  data-core exports `SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS`,
+  measured, which bound `TOGETHER_MAX_ROWS` and are the deadline the
+  route will default to. On SQL Server a single write's batch now checks
+  the same things in the same order through one set of functions a save's
+  batch shares, so the two cannot drift apart unseen; a save's batch
+  checks each table's definition and INSTEAD OF triggers after the first
+  step that writes it rather than after every step, because a batch that
+  repeated them for every row was measured taking seconds to compile; the
+  lock that first step leaves was measured keeping an ALTER, a unique
+  index, a trigger created or enabled and a foreign key onto the table
+  waiting to the end, and a DENY DELETE not, so DELETE taken away while a
+  save runs is seen by the first delete of each reach alone. A trigger's
+  refusal worded for the person (0156) at a save's step is `declined` with
+  its reason on both engines, as a write alone's is. What it costs on SQL
+  Server, measured: under locking READ COMMITTED, saves of different
+  records wait on each other at the count where the child's foreign key
+  has no index, and two can deadlock, one `unavailable`; and a step slow
+  for another reason than a lock is not stopped by the deadline, only by
+  mssql's request timeout, where PostgreSQL cancels it.
 - **data-core plans a record saved with the rows of its together
   children, and nothing runs it yet** (0155). Why: an order could not be
   held to at least one line, nor stored with its lines all or nothing; the

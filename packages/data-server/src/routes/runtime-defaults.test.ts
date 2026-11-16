@@ -106,6 +106,7 @@ function registry(kind: DatabaseKind, snapshot: ReturnType<typeof snapshotOf>): 
     update: never,
     supersede: never,
     delete: never,
+    save: never,
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
   const adapter = {

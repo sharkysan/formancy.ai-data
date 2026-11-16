@@ -15,9 +15,23 @@ import mssql from 'mssql'
 import { quoteName, quoteTable } from '../sql/quote.js'
 import { Parameters } from '../sql/statement.js'
 import type { Statement } from '../sql/statement.js'
-import { exactText, filterPredicate } from '../sql/filters.js'
-import { bindValue, canonicalText, fromText, isExactKey } from '../sql/values.js'
-import type { ExactKey } from '../sql/values.js'
+import { filterPredicate } from '../sql/filters.js'
+import { bindValue, canonicalText } from '../sql/values.js'
+import {
+  definitionGuard,
+  ENDED,
+  ENDED_BY_ANOTHER_ERROR,
+  insteadOfGuard,
+  SAME_TRANSACTION,
+  TRANSACTION_ENDED,
+  TRANSACTION_ENDED_MESSAGE,
+  NOT_ONE_ROW,
+  NOT_ONE_ROW_MESSAGE,
+  textStored,
+  versionAfterTriggers,
+  versionOf,
+} from './batch-steps.js'
+import type { Assigned, Refind, Selected } from './batch-steps.js'
 import { digestOf, factsOf } from './definition.js'
 
 /**
@@ -25,66 +39,13 @@ import { digestOf, factsOf } from './definition.js'
  * `[found]`, then `[c0]`, `[c1]`, … the canonical text of each requested
  * column, then `[version]` — so one function in records.ts reads all of them.
  *
- * The write batches raise errors of their own, below. A user error number is
- * anybody's — a customer's trigger may THROW 51701 too — so errors.ts takes
- * one as the adapter's only when its message is exactly the adapter's.
+ * The write batches raise errors of their own (batch-steps.ts), and every
+ * step of a batch carries the checks that file holds, which the batch of a
+ * save carries too (save-batch.ts, 0155).
  */
-
-/** Raised when a text column did not store the text it was sent: a varchar whose code page lacks a character, or that drops trailing spaces. */
-export const TEXT_NOT_STORED = 51701
-/** Its message: the index of the written value, in the request's order. */
-export const TEXT_NOT_STORED_MESSAGE = /^formancy: text not stored as sent: ([0-9]+)$/
-/** Raised when an update matched more than one row: an identity that is not a key. */
-export const NOT_ONE_ROW = 51702
-export const NOT_ONE_ROW_MESSAGE = 'formancy: the identity matched more than one row'
-/** Raised when an enabled INSTEAD OF trigger decides what the write stores. An account that cannot see the table is refused before, by the definition's check (0041). */
-export const DECIDED_BY_TRIGGER = 51703
-export const DECIDED_BY_TRIGGER_MESSAGE = 'formancy: an INSTEAD OF trigger decides what this write stores'
-/** Raised when a trigger ended the write's transaction and began another. */
-export const TRANSACTION_REPLACED = 51704
-export const TRANSACTION_REPLACED_MESSAGE = 'formancy: a trigger ended the transaction of the write and began another'
-/** Raised from CATCH when the error came after a trigger had ended the write's transaction: it may have committed (0031). */
-export const TRANSACTION_ENDED = 51705
-export const TRANSACTION_ENDED_MESSAGE = 'formancy: a trigger ended the transaction of the write and then raised an error'
-/** Raised when the table's definition is not the one the write was decided over (0041), after the statement or in CATCH. */
-export const DEFINITION_MOVED = 51706
-export const DEFINITION_MOVED_MESSAGE = 'formancy: table definition moved'
-/** Raised when a delete's account cannot see every key that refers to a table the delete reaches, or one acts on the delete that it was not decided over (0050, 0051). */
-export const REACH_MOVED = 51707
-export const REACH_MOVED_MESSAGE = 'formancy: what refers to the table moved'
-/** Raised when a delete's account may not DELETE from a table past the root the delete reaches (0051). */
-export const REACH_UNDELETABLE = 51708
-export const REACH_UNDELETABLE_MESSAGE = 'formancy: this account may not delete from a table the delete reaches'
-/** A change from a date that ended a version and inserted no next one (0113): rolled back. */
-export const NEXT_NOT_INSERTED = 51709
-export const NEXT_NOT_INSERTED_MESSAGE = 'formancy: a change from a date ended a version and inserted no next one'
-/**
- * Every number above, the ones the batches raise for themselves: errors.ts
- * reads none of them as a deployment's reason for the person, whatever its
- * message (0156). statements.test.ts fails when a number exported here is
- * left out of it.
- */
-export const OWN_NUMBERS: readonly number[] = [
-  TEXT_NOT_STORED,
-  NOT_ONE_ROW,
-  DECIDED_BY_TRIGGER,
-  TRANSACTION_REPLACED,
-  TRANSACTION_ENDED,
-  DEFINITION_MOVED,
-  REACH_MOVED,
-  REACH_UNDELETABLE,
-  NEXT_NOT_INSERTED,
-]
 
 /** A version as it is compared: the 8 bytes of a rowversion, or a version column's decimal string. */
 export type ExpectedVersion = { kind: 'rowversion'; bytes: Buffer } | { kind: 'version-column'; value: string }
-
-/** One column of what a statement returns: its name in the result, its type in a table variable, and the SQL that computes it. */
-export interface Selected {
-  name: string
-  declared: string
-  expression: string
-}
 
 /**
  * What every statement returns, from `source` — `[r].` for the table, `inserted.`
@@ -100,13 +61,6 @@ export function selection(columns: readonly RecordColumn[], concurrency: RecordC
   })
   if (concurrency !== null) selected.push(versionOf(concurrency, source))
   return selected
-}
-
-function versionOf(concurrency: RecordConcurrency, source: string): Selected {
-  const column = `${source}${quoteName(concurrency.column)}`
-  return concurrency.kind === 'rowversion'
-    ? { name: '[version]', declared: 'binary(8)', expression: column }
-    : { name: '[version]', declared: 'nvarchar(20)', expression: `convert(nvarchar(20), ${column})` }
 }
 
 /**
@@ -261,91 +215,6 @@ export function clocked(columns: readonly ClockColumn[] | undefined): Array<[str
   return (columns ?? []).map((entry) => [quoteName(entry.name), clockSql(entry.type)])
 }
 
-/** A value a write assigns — an insert's VALUES or an update's SET — and the SQL it was bound as. */
-export interface Assigned {
-  value: RecordValue
-  sql: string
-}
-
-/** What reads a written row's version back: the key it captures, the variables it holds it in, and the statements. */
-interface Refind {
-  captured: Selected[]
-  declared: string[]
-  statements: string[]
-}
-
-/**
- * Reads the version back from the row itself, after the statement and its
- * AFTER triggers and before the commit. OUTPUT saw the row before a trigger
- * that touches it — an audit column, a version the application's own trigger
- * moves — changed its version again; a token taken from OUTPUT would be stale
- * before anyone held it, and refuse the next save.
- *
- * The row is found by its identity as the statement wrote it, a generated one
- * included, captured as canonical text and converted back as a bound key is,
- * so it is found exactly as a later save names it. The text goes through
- * variables rather than a join on the table variable, whose column would
- * bring the database's collation into the comparison and conflict with a key
- * column's own (468). A target with no identity, or with a key column of
- * another kind — a time or an instant, whose text is cut short, a boolean or
- * a float, which do not travel as text — keeps the version the statement saw.
- */
-function versionAfterTriggers(target: RecordTarget): Refind {
-  const keys = target.identity.map((column, index) => ({
-    column: quoteName(column.name),
-    type: column.type,
-    variable: `@i${String(index)}`,
-    name: `[i${String(index)}]`,
-  }))
-  const exact = (key: (typeof keys)[number]): key is (typeof keys)[number] & { type: ExactKey } => isExactKey(key.type)
-  if (target.concurrency === null || keys.length === 0 || !keys.every(exact)) return { captured: [], declared: [], statements: [] }
-  const where = keys.map((key) => `[stored].${key.column} = ${fromText(key.type, key.variable)}`)
-  const version = versionOf(target.concurrency, '[stored].')
-  return {
-    captured: keys.map((key) => ({ name: key.name, declared: 'nvarchar(max)', expression: canonicalText(key.type, `inserted.${key.column}`) })),
-    declared: [`declare ${keys.map((key) => `${key.variable} nvarchar(max)`).join(', ')};`],
-    statements: [
-      `select ${keys.map((key) => `${key.variable} = ${key.name}`).join(', ')} from @written;`,
-      `update [written] set [version] = ${version.expression} from @written as [written] cross join ${quoteTable(target.table)} as [stored] where ${where.join(' and ')};`,
-    ],
-  }
-}
-
-/**
- * Whether an INSTEAD OF trigger decides what this write stores. Such a
- * trigger runs in place of the statement, and OUTPUT returns the row as if
- * the statement had run — the identity 0, the values before the trigger
- * changed them, a row for an update that changed nothing — so nothing the
- * batch reads says what the trigger stored, and the write is refused.
- *
- * Asked of the catalog after the statement, so a table that is not there has
- * already failed it as schema-changed (208), and after the definition's
- * check, so a table the account writes but cannot see in the catalog --
- * denied VIEW DEFINITION, `object_id` NULL to it -- has already failed that
- * as a moved definition (51706): its facts are NULL. Whether a trigger
- * decides such a write cannot be told, and it is refused either way: fail
- * closed. Before 0041 this check refused it itself, by `object_id` being
- * NULL; that branch could no longer be reached and is gone. The table's
- * name is bound, as `object_id` reads it.
- */
-function insteadOfGuard(name: string, operation: Write['operation']): string {
-  // A change from a date (0113) updates one row and inserts another: a trigger instead of either decides it.
-  const events = operation === 'SUPERSEDE' ? "in (N'UPDATE', N'INSERT')" : `= N'${operation}'`
-  const deciding =
-    'select 1 from sys.triggers as [t] join sys.trigger_events as [e] on [e].[object_id] = [t].[object_id] ' +
-    `where [t].[parent_id] = object_id(${name}) and [t].[is_instead_of_trigger] = 1 and [t].[is_disabled] = 0 and [e].[type_desc] ${events}`
-  return `if exists (${deciding}) throw ${String(DECIDED_BY_TRIGGER)}, N'${DECIDED_BY_TRIGGER_MESSAGE}', 1;`
-}
-
-/**
- * Whether the table still has the definition the write was decided over
- * (0041), as a statement: NULL-safe, because `NULL <> x` is not true and a
- * table the catalog no longer shows hashes to NULL.
- */
-function definitionGuard(table: string, definition: string): string[] {
-  return [`set @d = ${digestOf(factsOf(table))};`, `if @d is null or @d <> ${definition} throw ${String(DEFINITION_MOVED)}, N'${DEFINITION_MOVED_MESSAGE}', 1;`]
-}
-
 /** One write: the statement given its OUTPUT clause, what it assigns, what it returns, and what is checked straight after it. */
 export interface Write {
   target: RecordTarget
@@ -428,24 +297,14 @@ export function writeBatch(
   parameters: Parameters,
   { target, definition, operation, statement, assigned, returned, afterWrite, counted = false, clock = false }: Write,
 ): string {
-  const guarded = assigned.flatMap(({ value, sql }, index) => (value.type.kind === 'text' && value.value !== null ? [{ value, sql, index }] : []))
-  const stored = guarded.map(({ value }, position) => ({
-    name: `[w${String(position)}]`,
-    declared: 'nvarchar(max)',
-    expression: canonicalText(value.type, `inserted.${quoteName(value.name)}`),
-  }))
+  const { stored, checks } = textStored(assigned, '@written')
   // A deleted row's version is the one OUTPUT saw it deleted at: the row is
   // gone, and one a trigger inserted again is another row's to read (0050).
-  const refind: Refind = operation === 'DELETE' ? { captured: [], declared: [], statements: [] } : versionAfterTriggers(target)
+  const refind: Refind = operation === 'DELETE' ? { captured: [], declared: [], statements: [] } : versionAfterTriggers(target, '@written', '')
   const table = tableName(parameters, target.table)
   const moved = definitionGuard(table, parameters.add(mssql.VarBinary(32), definition))
   const captured = [...returned, ...stored, ...refind.captured]
   const output = `output ${captured.map((column) => column.expression).join(', ')} into @written (${captured.map((column) => column.name).join(', ')})`
-  const checks = guarded.map(
-    ({ sql, index }, position) =>
-      `if exists (select 1 from @written where not (${exactText(`[w${String(position)}]`, sql)})) ` +
-      `throw ${String(TEXT_NOT_STORED)}, N'formancy: text not stored as sent: ${String(index)}', 1;`,
-  )
   return [
     'set nocount on;',
     'set xact_abort on;',
@@ -458,7 +317,7 @@ export function writeBatch(
     'set @transaction = current_transaction_id();',
     `${statement(output)};`,
     ...(counted ? [] : ['set @rows = @@rowcount;']),
-    `if coalesce(current_transaction_id(), 0) <> @transaction throw ${String(TRANSACTION_REPLACED)}, N'${TRANSACTION_REPLACED_MESSAGE}', 1;`,
+    SAME_TRANSACTION,
     ...moved,
     insteadOfGuard(table, operation),
     ...afterWrite,
@@ -467,10 +326,9 @@ export function writeBatch(
     'commit transaction;',
     'end try',
     'begin catch',
-    'set @ended = case when coalesce(current_transaction_id(), 0) <> @transaction then 1 else 0 end;',
+    ENDED,
     'if @@trancount > 0 rollback transaction;',
-    `if @ended = 1 and error_number() <> 3609 and not (error_number() = ${String(TRANSACTION_REPLACED)} and error_message() = N'${TRANSACTION_REPLACED_MESSAGE}') ` +
-      `throw ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', 1;`,
+    `if ${ENDED_BY_ANOTHER_ERROR} throw ${String(TRANSACTION_ENDED)}, N'${TRANSACTION_ENDED_MESSAGE}', 1;`,
     'if @ended = 1 throw;',
     ...moved,
     'throw;',

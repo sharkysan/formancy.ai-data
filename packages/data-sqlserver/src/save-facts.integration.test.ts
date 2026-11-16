@@ -10,9 +10,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
  * and to the table's AFTER UPDATE triggers, whether SET LOCK_TIMEOUT sent
  * inside `sp_executesql` ends with its request, and what two saves of one
  * record's rows do when each moves the record's version first, under
- * locking READ COMMITTED and under READ_COMMITTED_SNAPSHOT. Plain statements
- * through mssql, each `query` sent as `sp_executesql` as the adapter's are
- * (sql/statement.ts), on tables of this file's own; no product code runs.
+ * locking READ COMMITTED and under READ_COMMITTED_SNAPSHOT. And, measured
+ * once the save was built on mcr.microsoft.com/mssql/server:2022-latest on
+ * 2026-11-16 (0155): what a save's first write to a table keeps out until
+ * it ends, which the batch's checks after only that first write rest on,
+ * and what a count does beside another record's uncommitted rows. Plain
+ * statements through mssql, each `query` sent as `sp_executesql` as the
+ * adapter's are (sql/statement.ts), or as a batch of its own where the case
+ * says so, on tables of this file's own; no product code runs.
  *
  * Characterisation, as the spike's file is: each case states what the engine
  * does, and a server release that changes an answer fails here by name. A
@@ -322,5 +327,190 @@ describe("two saves of one record's rows, each moving the record's version first
     const after = await stored(7)
     expect(after.lines).toBe(2)
     expect(after.version.equals(before.version)).toBe(false)
+  })
+})
+
+/**
+ * `statement` sent as a batch of its own on a session of its own whose lock
+ * timeout is `ms` -- a SET sent as a batch, which outlives it there, so a
+ * statement that must start its batch, CREATE TRIGGER, can still be
+ * bounded -- answered with every error number SQL Server raised, in its
+ * order, or `done`.
+ */
+async function attempted(statement: string, ms = 500): Promise<number[] | 'done'> {
+  const pool = await connection()
+  try {
+    await pool.request().batch(`set lock_timeout ${String(ms)}`)
+    await pool.request().batch(statement)
+    return 'done'
+  } catch (error) {
+    const { number, precedingErrors = [] } = error as { number?: number; precedingErrors?: Array<{ number?: number }> }
+    return [...precedingErrors.map((preceding) => preceding.number ?? -1), number ?? -1]
+  } finally {
+    await pool.close()
+  }
+}
+
+/** `work` inside a transaction of its own that wrote with `write`, rolled back once `work` answered. */
+async function holding<T>(write: string, work: () => Promise<T>): Promise<T> {
+  const holder = await connection()
+  const tx = new mssql.Transaction(holder)
+  try {
+    await tx.begin()
+    await new mssql.Request(tx).batch(write)
+    return await work()
+  } finally {
+    await tx.rollback()
+    await holder.close()
+  }
+}
+
+describe("what a save's first write to a table keeps out until its transaction ends", () => {
+  beforeAll(async () => {
+    await owner.request().batch(`
+      create table facts.held (id int not null primary key, note nvarchar(20) null);
+      create table facts.held_reference (held_id int not null);
+      create table facts.reach_root (id int not null primary key);
+      create table facts.reach_child (id int identity(1, 1) not null primary key, root_id int not null constraint fk_reach_child_root references facts.reach_root (id) on delete cascade);
+      create table facts.reach_reference (child_id int not null);
+      create user fact_denied without login;
+      insert facts.reach_root (id) values (1), (2);
+      insert facts.reach_child (root_id) values (2);`)
+    await owner.request().batch('create trigger facts.held_instead on facts.held instead of update as begin set nocount on; end')
+    await owner.request().batch('disable trigger facts.held_instead on facts.held')
+  })
+
+  // The save's batch checks a table's definition (0041) and its INSTEAD OF
+  // triggers after the first step that writes it, and not after every later
+  // one, resting on this: that step's statement left the transaction holding
+  // a lock on the table to its end that keeps out what would move either --
+  // an ALTER of its columns, a unique index, a trigger created on it or one
+  // enabled, a foreign key added onto it. Were one let through, a later
+  // step would write a table whose definition, triggers or referrers moved
+  // after the check that passed it. Each waits for the save and gives up at
+  // its lock timeout, 1222; the foreign key's batch then says it could not
+  // create the constraint, 1750. Watched failing with each asserted `done`:
+  // "expected { altered: [ 1222 ], …(4) } to deeply equal { altered:
+  // 'done', …(4) }".
+  test('an ALTER, an index, a trigger made or enabled and a foreign key onto the table each wait for the save', async () => {
+    const answers = await holding('insert facts.held (id) values (1)', async () => ({
+      altered: await attempted('alter table facts.held add extra int null'),
+      indexed: await attempted('create unique index ux_held_note on facts.held (note)'),
+      triggered: await attempted('create trigger facts.held_inserted on facts.held after insert as begin set nocount on; end'),
+      enabled: await attempted('enable trigger facts.held_instead on facts.held'),
+      referenced: await attempted('alter table facts.held_reference add constraint fk_held_reference foreign key (held_id) references facts.held (id)'),
+    }))
+    expect(answers).toEqual({ altered: [1222], indexed: [1222], triggered: [1222], enabled: [1222], referenced: [1222, 1750] })
+  })
+
+  // What a save's later steps do not see: a permission taken away while it
+  // runs. A DENY DELETE on the table its first step wrote does not wait for
+  // it. The batch checks a delete's reach -- that the account may DELETE
+  // from every table past its root, which SQL Server's own cascade never
+  // asks (0051), and that it still sees every key that refers to them --
+  // after the first delete of that reach alone, so a DENY DELETE made
+  // between two deletes of one save is seen by neither the second nor its
+  // cascade. A DENY of VIEW DEFINITION is not tried here. Watched failing
+  // with the DENY asserted to wait: "expected 'done' to be 1222".
+  test('a DENY DELETE on the table does not wait for the save', async () => {
+    const denied = await holding('insert facts.held (id) values (2)', async () => attempted('deny delete on facts.held to fact_denied'))
+    expect(denied).toBe('done')
+  })
+
+  // A delete's reach checks follow the first delete of that reach, so they
+  // rest on its cascade leaving the transaction holding a lock on every
+  // table the cascade reaches, a row of it removed or none: here the root's
+  // row 1, whose cascade finds no row of reach_child to remove. An ALTER of
+  // that table, and a key added onto it that would act on a delete, wait as
+  // they do on a table a step wrote; a DENY DELETE there does not. Watched
+  // failing with the ALTER and the key asserted `done`, and the DENY to wait:
+  // "expected { altered: [ 1222 ], …(2) } to deeply equal { altered:
+  // 'done', …(2) }".
+  test('a cascade that removed no row keeps an ALTER and a key onto the table waiting, and not a DENY DELETE', async () => {
+    const answers = await holding('delete facts.reach_root where id = 1', async () => ({
+      altered: await attempted('alter table facts.reach_child add extra int null'),
+      referenced: await attempted(
+        'alter table facts.reach_reference add constraint fk_reach_reference foreign key (child_id) references facts.reach_child (id) on delete cascade',
+      ),
+      denied: await attempted('deny delete on facts.reach_child to fact_denied'),
+    }))
+    expect(answers).toEqual({ altered: [1222], referenced: [1222, 1750], denied: 'done' })
+  })
+})
+
+describe("a save's count under locking READ COMMITTED", () => {
+  /** The count a save makes of a child's rows (save-batch.ts's `countStep`): at most `max + 1` of them, under the parent's key. */
+  const counted = (table: string): string =>
+    `declare @n int; select @n = count(*) from (select top (@k) 1 as [x] from facts.${table} as [r] where [r].[parent_id] = @parent) as [c]; select @n as [n];`
+
+  beforeAll(async () => {
+    await owner.request().batch(`
+      create table facts.counted_parent (id int not null primary key);
+      create table facts.counted_unindexed (id int identity(1, 1) not null primary key, parent_id int not null references facts.counted_parent (id));
+      create table facts.counted_indexed (id int identity(1, 1) not null primary key, parent_id int not null references facts.counted_parent (id), index ix_counted_indexed_parent (parent_id));
+      insert facts.counted_parent (id) values (1), (2);`)
+  })
+
+  /** The count of `parent`'s rows of `table` on a session whose lock timeout is 500 ms, while another transaction holds a row of the other parent it inserted: the count, or SQL Server's number. */
+  async function countBeside(table: string, parent: number): Promise<number | undefined> {
+    return holding(`insert facts.${table} (parent_id) values (${String(3 - parent)})`, async () => {
+      const pool = await connection()
+      try {
+        await pool.request().batch('set lock_timeout 500')
+        const result = await pool.request().input('k', mssql.Int, 4).input('parent', mssql.Int, parent).query<{ n: number }>(counted(table))
+        return result.recordset[0]?.n
+      } catch (error) {
+        return (error as { number?: number }).number
+      } finally {
+        await pool.close()
+      }
+    })
+  }
+
+  // Saves of different records write different rows, but their counts read
+  // under shared locks: where the child's foreign key has no index the count
+  // scans the table, and waits on a row another save of another record
+  // inserted and has not committed -- 1222 here, at its lock timeout --
+  // where a seek of an index on it reads that record's rows alone and
+  // answers at once. So on SQL Server, without row versioning, saves of
+  // different records of one parent table block each other at the count
+  // unless the child's foreign key is indexed. Watched failing with the
+  // unindexed count asserted to answer: "expected 1222 to be +0".
+  test("waits on another record's uncommitted row where the foreign key has no index, and not where it has", async () => {
+    expect(await countBeside('counted_unindexed', 1)).toBe(1222)
+    expect(await countBeside('counted_indexed', 1)).toBe(0)
+  })
+
+  // And two such saves, each inserting its record's row and then counting,
+  // each wait on the other: SQL Server ends that by choosing one to lose,
+  // 1205, which a save answers `unavailable`. Watched failing with both
+  // asserted to answer: "expected [ 1205 ] to have a length of +0 but got
+  // 1".
+  test('two saves of different records deadlock at their counts where the foreign key has no index', async () => {
+    const pools = [await connection(), await connection()]
+    // Asked before the transaction takes the pool's one connection.
+    const session = await sessionOf(pools[0] as mssql.ConnectionPool)
+    const txs = pools.map((pool) => new mssql.Transaction(pool))
+    try {
+      for (const [index, tx] of txs.entries()) {
+        await tx.begin()
+        await new mssql.Request(tx).query(`insert facts.counted_unindexed (parent_id) values (${String(index + 1)})`)
+      }
+      const count = (index: number): Promise<number | undefined> =>
+        new mssql.Request(txs[index] as mssql.Transaction)
+          .input('k', mssql.Int, 4)
+          .input('parent', mssql.Int, index + 1)
+          .query<{ n: number }>(counted('counted_unindexed'))
+          .then((result) => result.recordset[0]?.n)
+          .catch((error: { number?: number }) => error.number)
+      const first = count(0)
+      await blocked(session)
+      const answers = await Promise.all([first, count(1)])
+      expect(answers.filter((answer) => answer === 1205)).toHaveLength(1)
+      expect(answers.filter((answer) => answer === 1)).toHaveLength(1)
+    } finally {
+      for (const tx of txs) await tx.rollback().catch(() => undefined)
+      await Promise.all(pools.map((pool) => pool.close()))
+    }
   })
 })

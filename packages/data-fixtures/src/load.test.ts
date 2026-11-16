@@ -117,6 +117,11 @@ describe('the fixture files', () => {
       'removable_ruled',
       'removable_self',
       'removable_triggered',
+      'saved_account',
+      'saved_entry',
+      'saved_line',
+      'saved_mark',
+      'saved_order',
       'tenant_item',
     ])
     expect(tables(sqlServer)).toEqual(tables(postgres))

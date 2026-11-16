@@ -256,6 +256,9 @@ function registry(): ConnectionRegistry {
     delete: async () => {
       throw new Error('a list never deletes')
     },
+    save: async () => {
+      throw new Error('a list never saves')
+    },
   }
   const lookups: LookupAdapter = { search: async () => ({ rows: [], hasMore: false, omitted: 0 }), resolve: async () => [], rejects: async () => [] }
   const adapter = {

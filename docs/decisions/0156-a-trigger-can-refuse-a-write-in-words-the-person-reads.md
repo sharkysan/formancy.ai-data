@@ -74,10 +74,12 @@
   added to it). `packages/data-server/src/routes/runtime-deletes.test.ts`
   -- a delete's reason about the record whatever column it names (watched
   failing with it answered as `refused`).
-  `packages/data-sqlserver/src/records/statements.test.ts` --
+  `packages/data-sqlserver/src/records/batch-steps.test.ts` --
   `OWN_NUMBERS`, the numbers `records/errors.ts` reads no reason under, is
-  every user error number `statements.ts` exports (watched failing with
-  `NEXT_NOT_INSERTED` left out of it).
+  every user error number `batch-steps.ts` exports, where the write
+  batches' numbers moved with 0155's save, a save's own among them
+  (watched failing with `NEXT_NOT_INSERTED` left out of it, and again with
+  `PAST_DEADLINE`).
   `apps/host/src/page.test.tsx` -- on both engines, a save and a delete a
   trigger declines say the reason as the trigger wrote it and then that
   it is the database's own, the keyboard on the save's notice; a save
@@ -138,7 +140,7 @@ so a message that only resembles it is what it was.
 | | PostgreSQL | SQL Server |
 |---|---|---|
 | The error | SQLSTATE P0001, `RAISE EXCEPTION` | a user error, 50000 or above, at severity 16: `THROW`, or `RAISERROR(…, 16, …)` |
-| Never | another SQLSTATE, a RAISE with an ERRCODE of its own included | a number the adapter raises for itself (`statements.ts`), whatever follows it; another severity |
+| Never | another SQLSTATE, a RAISE with an ERRCODE of its own included | a number the adapter raises for itself (`batch-steps.ts`), whatever follows it; another severity |
 | Only on | a write: a read's RAISE, from a function a view calls, is `refused` | a write, asked and not provoked: a T-SQL function may not raise |
 
 **What the message says is read once**, `deploymentRefusal` in
@@ -261,7 +263,7 @@ opt-in, and nobody writes it by accident.
 
 **A code of its own per engine** -- a SQLSTATE such as `FR001`, a number
 on SQL Server. Two conventions for one thing, and a number on SQL Server
-is anybody's (`statements.ts`): the prefix is one spelling for both.
+is anybody's (`batch-steps.ts`): the prefix is one spelling for both.
 
 **A prefix matched loosely, or a reason cleaned of what it may not
 hold.** Either puts in front of a person words the deployment did not

@@ -349,11 +349,22 @@ export function lockStatement(table: ObjectRef, mode: 'access share' | 'row excl
  * which came from approved metadata, and are quoted here.
  */
 export function reachLockStatement(reach: ReachTerms): RecordStatement {
-  const tables: ObjectRef[] = []
-  for (const table of [...reach.removed, ...reach.cleared.map((entry) => entry.table)]) {
-    if (!tables.some((known) => known.schema === table.schema && known.name === table.name)) tables.push(table)
+  return rowExclusiveLock([...reach.removed, ...reach.cleared.map((entry) => entry.table)])
+}
+
+/**
+ * ROW EXCLUSIVE on each of `tables`, each once, with every relation below
+ * it, in one statement and in codepoint order of schema and name: what a
+ * delete past its root takes first (above), and what a save on the locked
+ * path takes on every table it writes (save.ts, 0155), so that no two of
+ * them take one set of tables in different orders.
+ */
+export function rowExclusiveLock(tables: readonly ObjectRef[]): RecordStatement {
+  const once: ObjectRef[] = []
+  for (const table of tables) {
+    if (!once.some((known) => known.schema === table.schema && known.name === table.name)) once.push(table)
   }
   const order = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
-  tables.sort((left, right) => order(left.schema, right.schema) || order(left.name, right.name))
-  return { text: `lock table ${tables.map(quoteTable).join(', ')} in row exclusive mode`, params: [] }
+  once.sort((left, right) => order(left.schema, right.schema) || order(left.name, right.name))
+  return { text: `lock table ${once.map(quoteTable).join(', ')} in row exclusive mode`, params: [] }
 }

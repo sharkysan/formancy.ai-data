@@ -418,6 +418,36 @@ refuses a key that follows a cleared column ON UPDATE; then 51708
 table it reaches, whatever other grant it holds there, which SQL Server's
 own cascade never asks. Either rolls back what the cascade did
 ([0051](../../docs/decisions/0051-a-delete-reaches-other-tables-only-through-foreign-keys-the-policy-names.md)).
+
+`records.save(request)` stores a record and the rows of its together
+children -- a `SaveRequest` data-core's `planSave` made -- in ONE batch that
+owns its transaction, sent once and never again, or stores none of it
+([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+The batch sets `lock_timeout` to the save's deadline, then runs the record's
+step, each child's `within`, deletes, updates and creates, every one pinned
+to the record's key, each child's count and the record read back by its key,
+the deadline checked before each step. Every step is followed by the text,
+row-count and after-trigger version checks a write alone's batch makes,
+through the same functions (`records/batch-steps.ts`); the first step on
+each table, and the first delete of each reach, by the definition, INSTEAD
+OF and reach checks too, which the lock that step leaves keeps true to the
+end -- except a permission: a DENY DELETE made while the save runs is not waited
+for, and is seen by the first delete of each reach alone. CATCH records the
+step that failed with SQL Server's number, message and severity, which are
+translated as a write alone's refusal is, a trigger's refusal worded for the
+person (0156) included. What the deadline does not bound is a statement slow
+for another reason than a lock, which runs to its end, nor the batch's
+compile: SQL Server compiles a batch text the first time it sees it,
+measured at seconds for a save of 100 lines or more, and the text follows
+what the save changes. Both are bounded only by mssql's request timeout,
+past which, as for any lost answer, the save is `unknown-outcome`. A batch
+past SQL Server's 2,100 parameters is refused with nothing sent; data-core's
+`saveParameters` predicts what a save binds, and the suite holds the batch
+of every save it plans to it. A trigger that ends the transaction can leave
+a save stored in part, `unknown-outcome`. What both engines answer is
+`SAVE_PARITY`'s, held by `src/save.integration.test.ts` and
+`src/save-lost-answer.integration.test.ts`; the lock facts by
+`src/save-facts.integration.test.ts`.
 `cascade.integration.test.ts` holds every case `CASCADE_PARITY` names but
 `lost-answer`, which `records-lost-answer.integration.test.ts` holds.
 

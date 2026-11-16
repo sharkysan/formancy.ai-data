@@ -353,4 +353,95 @@ create table parity.audited_price (
   constraint pk_audited_price primary key (tenant_id, product_no, valid_from)
 );
 
+-- A record and the rows saved with it (0155), for SAVE_PARITY: an order,
+-- its key numbered by the database, with its lines and its marks; an
+-- account, its key typed, with its entries. Every table is versioned by a
+-- column the module moves, and every row's key is numbered by the
+-- database, so a version proves a row and a delete is offered (0050); a
+-- row's number is unique within its record. An order noted 'refused' is
+-- refused by its own check, so a save can be refused at the record's step.
+-- saved_line's quantity is held to zero or more, so a save can be refused
+-- at any line, and its trigger keeps the order's total and moves the
+-- order's version after the order's own step, as an application's own
+-- trigger would. saved_mark's trigger waits, on a mark noted 'race', for a
+-- shared hold on the application lock 155, which a suite holds exclusively
+-- so that two saves are inside their transactions at once; sleeps 0.2 s
+-- on a mark noted 'slow', so a save of several passes its deadline between
+-- statements, and 2 s on one noted 'stuck', so one statement outlasts it;
+-- and on a mark noted 'declined' raises a refusal worded for the person
+-- (0156), P0001 by RAISE EXCEPTION. A mark's number is checked at COMMIT,
+-- deferred, as SQL Server cannot: a save that numbers two marks alike is
+-- refused by its COMMIT here (save-lost-answer.integration.test.ts). The
+-- note columns are varchar, which SQL Server keeps in a code page, so a
+-- text not stored as sent refuses a step there.
+create table parity.saved_order (
+  id int generated always as identity constraint pk_saved_order primary key,
+  tenant_id int not null,
+  note varchar(50) null constraint ck_saved_order_note check (note <> 'refused'),
+  total int not null default 0,
+  version int not null default 1
+);
+create table parity.saved_line (
+  id int generated always as identity constraint pk_saved_line primary key,
+  order_id int not null constraint fk_saved_line_order references parity.saved_order (id) on delete cascade,
+  line_no int not null,
+  quantity int not null constraint ck_saved_line_quantity check (quantity >= 0),
+  note varchar(50) null,
+  version int not null default 1,
+  constraint uq_saved_line_no unique (order_id, line_no)
+);
+create function parity.total_saved_order() returns trigger language plpgsql as $$
+declare
+  saved int;
+begin
+  if tg_op = 'DELETE' then
+    saved := old.order_id;
+  else
+    saved := new.order_id;
+  end if;
+  update parity.saved_order as o
+    set total = (select coalesce(sum(l.quantity), 0) from parity.saved_line as l where l.order_id = o.id), version = o.version + 1
+    where o.id = saved;
+  return null;
+end
+$$;
+create trigger tr_saved_line_total after insert or update or delete on parity.saved_line for each row execute function parity.total_saved_order();
+create table parity.saved_mark (
+  id int generated always as identity constraint pk_saved_mark primary key,
+  order_id int not null constraint fk_saved_mark_order references parity.saved_order (id) on delete cascade,
+  mark_no int not null,
+  note varchar(50) null,
+  version int not null default 1,
+  constraint uq_saved_mark_no unique (order_id, mark_no) deferrable initially deferred
+);
+create function parity.hold_saved_mark() returns trigger language plpgsql as $$
+begin
+  if new.note = 'race' then
+    perform pg_catalog.pg_advisory_xact_lock_shared(155);
+  elsif new.note = 'slow' then
+    perform pg_catalog.pg_sleep(0.2);
+  elsif new.note = 'stuck' then
+    perform pg_catalog.pg_sleep(2);
+  elsif new.note = 'declined' then
+    raise exception 'formancy: refused: This mark is not taken.';
+  end if;
+  return null;
+end
+$$;
+create trigger tr_saved_mark after insert on parity.saved_mark for each row execute function parity.hold_saved_mark();
+create table parity.saved_account (
+  code varchar(20) not null constraint pk_saved_account primary key,
+  tenant_id int not null,
+  note varchar(50) null,
+  version int not null default 1
+);
+create table parity.saved_entry (
+  id int generated always as identity constraint pk_saved_entry primary key,
+  account_code varchar(20) not null constraint fk_saved_entry_account references parity.saved_account (code),
+  entry_no int not null,
+  amount int not null,
+  version int not null default 1,
+  constraint uq_saved_entry_no unique (account_code, entry_no)
+);
+
 analyze parity.tenant_item;
