@@ -191,11 +191,12 @@ describe('validateBundle', () => {
   // Every form published before 0158 is a bundle whose snapshot's scope never
   // asked for routines, and the server hashes that snapshot again on every
   // read (0019). The file is one such bundle, written by data-server and
-  // data-core at 4a979d6, the release before 0158, with every fact discovery
-  // recorded then: were an absent list hashed as an empty one, or every
-  // scope made to say whether it asked, this bundle would be refused on read
-  // as a snapshot edited after it was taken -- and so would every published
-  // form, until republished.
+  // data-core at 4a979d6, the release before 0158; its snapshot has no gaps,
+  // which snapshot.test.ts's literal holds on an object, a schema and the
+  // scope. Were an absent list hashed as an empty one, or every scope made
+  // to say whether it asked, this bundle would be refused on read as a
+  // snapshot edited after it was taken -- and so would every published form,
+  // until republished.
   test('a bundle published before 0158 still validates, with the fingerprint it was published with', () => {
     const stored = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'bundle-before-0158.json'), 'utf8')) as BundleV2
     expect(stored.snapshot.fingerprint).toBe('4352314541a9b84b83d3311f61160b517d97e332ec5860b2cff7104e1d8a4392')
@@ -218,7 +219,7 @@ describe('validateBundle', () => {
           {
             ref: { schema: 'sales', name: 'retire_employee', signature: '' },
             kind: 'procedure',
-            parameters: [{ name: '@employee_id', mode: 'in', databaseType: 'int', typeId: '56:4:10:0', type: INT32 }],
+            parameters: [{ name: '@employee_id', mode: 'in', databaseType: 'int', typeId: '56:4:10:0', type: INT32, hasDefault: null }],
             effects: 'writes',
             returns: 'void',
             result: null,

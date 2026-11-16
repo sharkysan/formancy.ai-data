@@ -61,6 +61,8 @@ beforeAll(async () => {
       language sql as $$ select $$;
     create function probe.overloaded(n integer) returns void language sql as $$ select $$;
     create function probe.overloaded(n bigint, t text) returns void language sql as $$ select $$;
+    create function probe.defaulted(n integer) returns void language sql as $$ select $$;
+    create function probe.defaulted(n integer, m integer default 0, out doubled integer) language sql as $$ select n * 2 $$;
     create aggregate probe.total(integer) (sfunc = int4pl, stype = integer);
     create function probe.every_type(a bool, b int8, c int2, d int4, e text, f float4, g float8, h varchar, i date, j time, k timestamp,
       l timestamptz, m numeric, n uuid) returns void language sql as $$ select $$;
@@ -230,6 +232,31 @@ describe('which routines are recorded (0158)', () => {
     ])
     expect(Object.keys(shapes)).not.toContain('probe.total(pg_catalog.int4)')
     expect(snapshot.gaps).toEqual([])
+  })
+
+  // Which parameters have a default is pg_proc's `pronargdefaults`, the last
+  // of the arguments a call passes. Recorded because PostgreSQL makes it
+  // decide which call can be made at all: beside an overload that differs
+  // only by a trailing defaulted parameter, every call by the shorter
+  // signature is ambiguous, cast or named -- 42725 -- while the longer one
+  // answers. An OUT parameter takes no value and has none. Without it, a
+  // generator would offer the shorter routine, and every run would fail.
+  test('records which parameters have a default, which makes a call by the shorter of two overloads ambiguous', async () => {
+    const snapshot = await discoverPostgres(owner, { schemas: ['probe'], routines: true })
+    const defaults = (signature: string) => routine(snapshot, 'defaulted', signature).parameters.map((parameter) => [parameter.name, parameter.hasDefault])
+    expect(defaults('pg_catalog.int4')).toEqual([['n', false]])
+    expect(defaults('pg_catalog.int4, pg_catalog.int4')).toEqual([
+      ['n', false],
+      ['m', true],
+      ['doubled', false],
+    ])
+    expect(
+      await Promise.all(
+        ['select probe.defaulted(1)', 'select probe.defaulted(1::pg_catalog.int4)', 'select probe.defaulted(n => 1)', 'select probe.defaulted(1, 2)'].map(
+          (call) => answer(owner, call),
+        ),
+      ),
+    ).toEqual(['42725', '42725', '42725', 'ok'])
   })
 
   // SECURITY DEFINER is what lets a routine act beyond its caller's grants,

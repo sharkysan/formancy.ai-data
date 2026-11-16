@@ -534,7 +534,7 @@
         },
         {
           "area": "access",
-          "says": "REFERENCES and EXECUTE privileges are not described."
+          "says": "REFERENCES is not described, and EXECUTE only on a routine, when a discovery’s scope asks for routines (0158)."
         },
         {
           "area": "access",
@@ -4579,7 +4579,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:ccac2cdda36ff567f994318441c6ef9c98d70040b84a39a3b03ccf8bb3db8a83",
+      "reviewed": "sha256:bae7293abbba915539594ad5175b0975a4d3b0ca48e34a6d4bf0ef80e8350f26",
       "limitations": [
         {
           "area": "databases",
@@ -4611,7 +4611,22 @@
         },
         {
           "area": "databases",
-          "says": "A SQL Server CLR routine is not read, and no gap says one is in scope."
+          "says": "A SQL Server CLR or replication-filter routine in scope is not read: a routines gap on it says it is there, and nothing of what it takes or whether the account may run it.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "SQL Server’s catalog keeps no T-SQL parameter’s default, so whether a SQL Server routine’s parameter has one is recorded as unknown; PostgreSQL’s is recorded.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A SQL Server parameter whose alias or table type the account cannot see is recorded as unsupported, behind a routines gap on its routine.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "What a set-returning routine returns is described only for a PostgreSQL RETURNS TABLE function, and not compared across the engines."
         },
         {
           "area": "databases",

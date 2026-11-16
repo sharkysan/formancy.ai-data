@@ -326,16 +326,21 @@ export interface ObjectMeta {
  * The part of the catalog a gap is about. `row-security`: whether a policy
  * applies could not be established (0027). `referenced-by`: a foreign key
  * that refers to an object may be on a table this connection cannot see, so
- * its `referencedBy` may be short (0049). `routines`: a routine may be
- * hidden from this connection, so `routines` may be short (0158); only a
- * snapshot whose scope asked for routines carries one.
+ * its `referencedBy` may be short (0049). `routines`: on a schema or the
+ * scope, a routine may be hidden from this connection, so `routines` may be
+ * short; on one object, that object is a routine, which is not read or of
+ * which a fact could not be established (0158). Only a snapshot whose scope
+ * asked for routines carries one, and `createSnapshot` refuses one in any
+ * other.
  */
 export type CoverageAspect =
   'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security' | 'referenced-by' | 'routines'
 
 /**
  * What a gap is about: the whole scope (it cannot be placed), one schema, or
- * one object. Schema and object names are the catalog's spelling, as
+ * one object -- for a `routines` gap, a routine, which only SQL Server's
+ * catalog places that way, and whose name no table or view in its schema
+ * can share there (0158). Schema and object names are the catalog's spelling, as
  * ObjectRef's are — on a case-insensitive SQL Server database that may differ
  * from how the scope spells the schema, and it is not compared with it.
  */

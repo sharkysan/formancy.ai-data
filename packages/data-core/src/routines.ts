@@ -9,10 +9,19 @@ import type { DiscoveryScope, MetadataSnapshot, NormalizedType, NormalizedTypeKi
  * execute it. What a later record may bind as an action; nothing binds, runs
  * or shows one yet.
  *
- * Every routine in scope is recorded, the ones no action could bind included,
- * with the facts that say why: a set-returning function, an OUT parameter, a
- * parameter of a type no codec speaks. A routine left out would read as one
- * that does not exist, which is the silent answer (0004).
+ * Every function and procedure in scope that this release reads is
+ * recorded, the ones no action could bind included, with the facts that say
+ * why: a set-returning function, an OUT parameter, a parameter of a type no
+ * codec speaks. One in scope that it does not read -- SQL Server's CLR and
+ * replication-filter routines -- is a `routines` gap on that routine, never
+ * left out with nothing said, which would read as one that does not exist:
+ * the silent answer (0004).
+ *
+ * Not a routine in this contract's sense, and so neither recorded nor
+ * gapped: what is neither a function nor a procedure -- PostgreSQL's
+ * aggregates and window functions, SQL Server's CLR aggregates -- which no
+ * action could ever be; the functions an extension installs; the routines
+ * Microsoft ships.
  */
 
 /**
@@ -50,13 +59,30 @@ export interface RoutineType {
   type: NormalizedType
 }
 
-/** How a parameter passes its value, as the catalog says. A SQL Server OUTPUT parameter also takes one in, and is `inout`. */
+/**
+ * How a parameter passes its value, as the catalog says. A SQL Server OUTPUT
+ * parameter also takes one in, and is `inout`. `table` is PostgreSQL's alone:
+ * a column of what a RETURNS TABLE function returns, which pg_proc files as
+ * an argument. A set's shape is described nowhere else -- not for RETURNS
+ * SETOF, nor for a SQL Server table-valued function -- so it is not a fact
+ * the two engines are compared on.
+ */
 export type ParameterMode = 'in' | 'out' | 'inout' | 'variadic' | 'table'
 
 export interface RoutineParameter extends RoutineType {
   /** As the catalog spells it: SQL Server's with its `@`, and '' for a PostgreSQL parameter declared without a name. */
   name: string
   mode: ParameterMode
+  /**
+   * Whether a call may leave it out, as the catalog says, and `null` where
+   * the catalog does not say. PostgreSQL's: the last `pronargdefaults` of
+   * the arguments a call passes have a default, and no other parameter does.
+   * There it decides more than a dialog: two overloads that differ only by
+   * a trailing parameter with a default make every call by the shorter
+   * signature ambiguous (42725), named or cast. SQL Server's catalog keeps
+   * no T-SQL parameter's default, so every one there is `null`.
+   */
+  hasDefault: boolean | null
 }
 
 export interface RoutineMeta {
@@ -147,9 +173,10 @@ function assertRoutine(kind: DatabaseKind, routine: unknown): RoutineMeta {
   parameters.forEach((parameter: unknown, index) => {
     const at = `${where}: parameter ${String(index + 1)}`
     assertType(at, parameter)
-    const { name, mode } = parameter as Record<string, unknown>
+    const { name, mode, hasDefault } = parameter as Record<string, unknown>
     if (typeof name !== 'string') throw new Error(`${at} has a name that is not a string`)
     if (!isListed(MODES, mode)) throw new Error(`${at} has a mode ${JSON.stringify(mode)} that is not one the contract names`)
+    if (typeof hasDefault !== 'boolean' && hasDefault !== null) throw new Error(`${at} has a default that is neither a boolean nor null`)
   })
   return routine as RoutineMeta
 }
@@ -162,14 +189,18 @@ function assertRoutine(kind: DatabaseKind, routine: unknown): RoutineMeta {
  * reads nothing more and makes the snapshot it made before, to the byte, so
  * every snapshot and bundle stored before this record keeps its fingerprint.
  * An empty list is an answer -- asked, and none in scope -- and is not the
- * absence of one. Read back from JSON, so nothing about the shape is assumed.
+ * absence of one. A `routines` gap is carried only where the scope asked,
+ * too: a server older than this record refuses the aspect, and that cost
+ * stays with the snapshots that asked only while no other carries one. Read
+ * back from JSON, so nothing about the shape is assumed.
  */
-export function checkedRoutines(input: Pick<MetadataSnapshot, 'kind' | 'routines'> & { scope: DiscoveryScope }): RoutineMeta[] | undefined {
+export function checkedRoutines(input: Pick<MetadataSnapshot, 'kind' | 'routines' | 'gaps'> & { scope: DiscoveryScope }): RoutineMeta[] | undefined {
   const asked = (input.scope as { routines?: unknown }).routines
   const routines = input.routines as unknown
   if (asked !== undefined && asked !== true) throw new Error(`the scope asks for routines as ${JSON.stringify(asked)}, which is neither true nor absent`)
   if (asked === undefined) {
     if (routines !== undefined) throw new Error('the snapshot records routines its scope did not ask for')
+    if (input.gaps.some((gap) => gap.aspect === 'routines')) throw new Error('the snapshot has a routines gap and its scope did not ask for routines')
     return undefined
   }
   if (!Array.isArray(routines)) throw new Error('the scope asks for routines and the snapshot has no list of them: an adapter that did not read them')

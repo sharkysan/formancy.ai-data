@@ -743,6 +743,7 @@ function perfectRoutines(kind: DatabaseKind, account: FixtureAccount): RoutineMe
           databaseType: 'fixture',
           typeId: String(index + 1),
           type: parameter.type as unknown as NormalizedType,
+          hasDefault: facts.defaults[index] ?? null,
         })),
         effects: entry.effects,
         returns: entry.returns,
@@ -761,10 +762,11 @@ function withRoutines(
   edit: (routines: RoutineMeta[]) => void = () => {},
   gaps: MetadataSnapshot['gaps'] = [],
 ): MetadataSnapshot {
-  const { fingerprint: _fingerprint, ...made } = snapshot(kind, () => {}, gaps)
+  // The gaps only with the ask: a routines gap is refused in a snapshot whose scope did not ask.
+  const { fingerprint: _fingerprint, ...made } = snapshot(kind)
   const routines = perfectRoutines(kind, account)
   edit(routines)
-  return createSnapshot({ ...made, scope: { schemas: ['sales'], routines: true }, routines })
+  return createSnapshot({ ...made, scope: { schemas: ['sales'], routines: true }, gaps, routines })
 }
 
 function routineNamed(routines: RoutineMeta[], name: string): RoutineMeta {
@@ -818,7 +820,7 @@ describe('routineDisagreements', () => {
       const [order, tenant] = ship.parameters
       if (order === undefined || tenant === undefined) throw new Error('ship_order has two parameters')
       ship.parameters = [
-        { ...order, mode: 'inout' },
+        { ...order, mode: 'inout', hasDefault: false },
         { ...tenant, name: '@tenant_id', type: { kind: 'text', maxLength: 10, lengthUnit: 'utf16-code-units', fixedLength: false } },
       ]
       routineNamed(routines, 'fn_customer_tenant').executable = true
@@ -828,6 +830,7 @@ describe('routineDisagreements', () => {
       'sales.ship_order() returns is "scalar", expected "void"',
       'sales.ship_order() parameters are [@order_id, @tenant_id], expected [@order_id, @tenant]',
       'sales.ship_order() parameter @order_id mode is "inout", expected "in"',
+      'sales.ship_order() parameter @order_id hasDefault is false, expected null',
       'sales.ship_order() parameter @tenant_id type kind is "text", expected "integer" (database type fixture)',
       'sales.fn_customer_tenant() executable as the writer is true, expected false',
     ])
@@ -862,5 +865,23 @@ describe('routineDisagreements', () => {
     expect(routineDisagreements(withRoutines('sqlserver', 'owner', () => {}, [hidden]))).toEqual([
       'unexpected gap on schema sales (routines): no VIEW DEFINITION on sales',
     ])
+  })
+
+  // A gap covers only what the account could not be shown. SQL Server lists
+  // a routine to an account holding EXECUTE on it (0158, R3), and PostgreSQL
+  // lists every routine to every role, so the writer's ship_order missing
+  // behind a routines gap on sales is an adapter hiding what it was shown --
+  // and an action offered to nobody who could run it. The reader, who may
+  // not execute it, may still meet it absent behind that gap.
+  test('a routine the account may execute is a disagreement when missing, even behind a routines gap', () => {
+    const shipOrder = (routines: RoutineMeta[]) => routines.splice(routines.indexOf(routineNamed(routines, 'ship_order')), 1)
+    const hidden: CoverageGap = { subject: { kind: 'schema', schema: 'sales' }, aspect: 'routines', detail: 'no VIEW DEFINITION on sales' }
+    for (const kind of ['postgres', 'sqlserver'] as const) {
+      const where = kind === 'postgres' ? 'sales.ship_order(pg_catalog.int8, pg_catalog.int4)' : 'sales.ship_order()'
+      expect(routineDisagreements(withRoutines(kind, 'writer', shipOrder, [hidden]), 'writer'), kind).toEqual([
+        `${where} is missing, and the writer may execute it, which lists it`,
+      ])
+      expect(routineDisagreements(withRoutines(kind, 'reader', shipOrder, [hidden]), 'reader'), kind).toEqual([])
+    }
   })
 })

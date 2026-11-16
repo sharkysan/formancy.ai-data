@@ -94,7 +94,8 @@ snapshot.gaps // e.g. on sales.order: "fk_order_customer references a table this
 // Asked for, the T-SQL procedures and functions in scope too, none Microsoft shipped (0158):
 const withRoutines = await discoverSqlServer(pool, { schemas: ['sales'], routines: true })
 withRoutines.routines // each with its parameters by user_type_id and size, what it returns and changes, and whether the account may call it
-// and a `routines` gap on each schema in scope without VIEW DEFINITION, where one may be hidden
+// and a `routines` gap on each schema in scope without VIEW DEFINITION, where one may be hidden, and on each
+// CLR or replication-filter routine, which is not read, or routine whose parameter's type the account cannot see
 ```
 
 It reads SQL Server's catalog views, one concern per file under

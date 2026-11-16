@@ -35,7 +35,7 @@ const OBJECTS: ObjectMeta[] = [
 ]
 
 function parameter(name: string, typeId: string, extra: Partial<RoutineParameter> = {}): RoutineParameter {
-  return { name, mode: 'in', databaseType: typeId === '20' ? 'bigint' : 'integer', typeId, type: typeId === '20' ? INT64 : INT32, ...extra }
+  return { name, mode: 'in', databaseType: typeId === '20' ? 'bigint' : 'integer', typeId, type: typeId === '20' ? INT64 : INT32, hasDefault: false, ...extra }
 }
 
 /** The fixture's ship_order as PostgreSQL records it: a function returning void, executable, as its account. */
@@ -89,6 +89,21 @@ describe('routines in a snapshot (0158)', () => {
     )
   })
 
+  // A routines gap is a fact about routines, and only a snapshot whose scope
+  // asked has any. One in a snapshot that did not ask is no adapter's -- and
+  // since a server older than 0158 refuses the aspect, it would carry that
+  // record's rollback cost to a snapshot that never asked for routines,
+  // which is the bound the record names.
+  test('a routines gap in a snapshot whose scope did not ask for routines is refused', () => {
+    const hidden: CoverageGap = { subject: { kind: 'schema', schema: 'sales' }, aspect: 'routines', detail: 'a routine may be hidden' }
+    expect(() => snapshot(undefined, { scope: { schemas: ['sales'] }, gaps: [hidden] })).toThrow(
+      /the snapshot has a routines gap and its scope did not ask for routines/,
+    )
+    expect(snapshot([], { gaps: [hidden] }).gaps).toEqual([hidden])
+    const elsewhere: CoverageGap = { ...hidden, aspect: 'objects' }
+    expect(snapshot(undefined, { scope: { schemas: ['sales'] }, gaps: [elsewhere] }).gaps).toEqual([elsewhere])
+  })
+
   // Two reads of one catalog list routines in whatever order the engine
   // returns them; sorted by codepoint, they hash alike. A parameter's
   // position is what a call passes it by, so the order a routine declares
@@ -122,6 +137,8 @@ describe('routines in a snapshot (0158)', () => {
     expect(snapshot([routine('ship_order', { reach: 'owner' })]).fingerprint).not.toBe(before.fingerprint)
     const retyped = routine('ship_order', { parameters: [parameter('order_id', '20'), parameter('tenant', '1043', { databaseType: 'character varying' })] })
     expect(snapshot([retyped]).fingerprint).not.toBe(before.fingerprint)
+    const defaulted = routine('ship_order', { parameters: [parameter('order_id', '20'), parameter('tenant', '23', { hasDefault: true })] })
+    expect(snapshot([defaulted]).fingerprint).not.toBe(before.fingerprint)
     const gap: CoverageGap = {
       subject: { kind: 'schema', schema: 'sales' },
       aspect: 'routines',
@@ -156,6 +173,12 @@ describe('routines in a snapshot (0158)', () => {
       /parameter 1 has a mode "output" that is not one the contract names/,
     )
     expect(refused({ parameters: [parameter('a', '23', { name: null as never })] })).toThrow(/parameter 1 has a name that is not a string/)
+    expect(refused({ parameters: [parameter('a', '23', { hasDefault: undefined as never })] })).toThrow(
+      /parameter 1 has a default that is neither a boolean nor null/,
+    )
+    expect(refused({ parameters: [parameter('a', '23', { hasDefault: 'yes' as never })] })).toThrow(
+      /parameter 1 has a default that is neither a boolean nor null/,
+    )
     expect(refused({ parameters: [parameter('a', '23', { databaseType: undefined as never })] })).toThrow(/parameter 1 has no database type/)
     expect(refused({ parameters: [parameter('a', '23', { type: { kind: 'json' } as never })] })).toThrow(
       /parameter 1 has a type that is not one the contract names/,
@@ -167,7 +190,9 @@ describe('routines in a snapshot (0158)', () => {
       /SQL Server has no overloads, so a routine's signature is empty/,
     )
     // A parameter declared without a name is one PostgreSQL has, and the
-    // generator's to refuse (0158): recorded, never dropped.
+    // generator's to refuse (0158): recorded, never dropped. A default SQL
+    // Server's catalog does not keep is `null`, an answer of its own.
     expect(snapshot([routine('ship_order', { parameters: [parameter('', '23')] })]).routines?.[0]?.parameters[0]?.name).toBe('')
+    expect(snapshot([routine('ship_order', { parameters: [parameter('a', '23', { hasDefault: null })] })]).routines?.[0]?.parameters[0]?.hasDefault).toBeNull()
   })
 })

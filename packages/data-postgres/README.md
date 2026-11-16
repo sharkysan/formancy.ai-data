@@ -28,8 +28,8 @@ snapshot.fingerprint // changes when the structure, the account's privileges, or
 
 // Asked for, the functions and procedures in scope too, an extension's left out (0158):
 const withRoutines = await adapter.discover({ schemas: ['sales'], routines: true })
-withRoutines.routines // each with its parameters by type oid, what it returns and changes,
-//                       whether it is SECURITY DEFINER, and whether the account may execute it
+withRoutines.routines // each with its parameters by type oid and which have a default, what it
+//                       returns and changes, whether it is SECURITY DEFINER, and whether the account may execute it
 
 // Lookups on a client of their own, which no record statement uses (0061, below).
 const lookupSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data lookups' })

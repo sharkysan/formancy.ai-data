@@ -16,8 +16,9 @@ import { discoverSqlServer } from './index.js'
  * Schema `probe` holds what the fixture does not: a routine of each shape no
  * action could bind, one the reader is granted and one the writer's role is
  * granted and the writer denied, a procedure and a function over a table
- * the reader may not read, and one marked as Microsoft's. None touches
- * `sales`, which stays exactly what the model describes.
+ * the reader may not read, and one marked as Microsoft's. Schema
+ * `replicated` holds a replication-filter procedure beside a plain one.
+ * None touches `sales`, which stays exactly what the model describes.
  */
 let fixture: SqlServerFixture
 let owner: mssql.ConnectionPool
@@ -66,6 +67,7 @@ beforeAll(async () => {
     'create function probe.rows_inline(@n int) returns table as return select @n as n',
     'create function probe.rows_multi(@n int) returns @rows table (n int) as begin insert into @rows values (@n); return end',
     'create procedure probe.with_output @n int, @doubled int output as set @doubled = @n * 2',
+    'create procedure probe.with_default @n int = 0 as set nocount on',
     'create type probe.amount from decimal(14, 2)',
     'create type probe.keys as table (k int)',
     `create procedure probe.typed @a probe.amount, @k probe.keys readonly, @b varbinary(16), @v varchar(20), @nv nvarchar(max), @x decimal(14, 2), @s sysname
@@ -82,6 +84,9 @@ beforeAll(async () => {
     'grant execute on probe.peek_value to formancy_reader',
     'grant execute on probe.denied to formancy_forms',
     'deny execute on probe.denied to formancy_writer',
+    'create schema replicated',
+    'create procedure replicated.plain as set nocount on',
+    'create procedure replicated.filter for replication as return 0',
   )
 })
 
@@ -176,6 +181,21 @@ describe('who may execute a routine, and who can see one (0158)', () => {
     expect(await answer(writer, 'exec probe.denied 1')).toBe('229')
   })
 
+  // A table-valued function is selected from, and takes SELECT, never
+  // EXECUTE, which cannot even be granted on one: an account granted SELECT
+  // on the inline function and nothing on the multi-statement one may call
+  // the first and is refused the second, and discovery says so. An adapter
+  // that asked EXECUTE of every routine would call the first closed.
+  test('a table-valued function is executable by SELECT on it, as a call answers', async () => {
+    const selector = await connectAs('routine_selector', [
+      'grant view definition on schema::probe to routine_selector',
+      'grant select on probe.rows_inline to routine_selector',
+    ])
+    const snapshot = await discoverSqlServer(selector, { schemas: ['probe'], routines: true })
+    expect([routine(snapshot, 'rows_inline').executable, routine(snapshot, 'rows_multi').executable]).toEqual([true, false])
+    expect([await answer(selector, 'select * from probe.rows_inline(1)'), await answer(selector, 'select * from probe.rows_multi(1)')]).toEqual(['ok', '229'])
+  })
+
   // SQL Server lists a routine only to an account that holds a permission
   // on it or VIEW DEFINITION on its schema. The reader, holding EXECUTE on
   // three routines of probe, sees those three, each with its parameters,
@@ -220,6 +240,26 @@ describe('which routines are recorded (0158)', () => {
     expect(marked.recordset[0]?.shipped).toBe(true)
   })
 
+  // A routine this release does not read is one the account can see all
+  // the same: a CLR routine, which no container here can hold without an
+  // assembly, and a procedure made FOR REPLICATION, which can. Left out with
+  // nothing said, a snapshot that asked would say "none" where one is
+  // (0004); a routines gap on the routine says it is there and not read --
+  // and only when the scope asks.
+  test('a replication-filter procedure is not read, and a routines gap on it says it is there', async () => {
+    const snapshot = await discoverSqlServer(owner, { schemas: ['replicated'], routines: true })
+    expect(names(snapshot)).toEqual(['replicated.plain()'])
+    expect(routineGaps(snapshot).map((gap) => [gap.subject, gap.detail])).toEqual([
+      [
+        { kind: 'object', object: { schema: 'replicated', name: 'filter' } },
+        'replicated.filter is a replication-filter procedure, which this release does not read, so it is not among the routines recorded',
+      ],
+    ])
+    expect((await discoverSqlServer(owner, { schemas: ['replicated'] })).gaps).toEqual([])
+    const filed = await owner.request().query<{ type: string }>("select rtrim(type) as type from sys.objects where object_id = object_id(N'replicated.filter')")
+    expect(filed.recordset[0]?.type).toBe('RF')
+  })
+
   // What a later generator will refuse a routine for is recorded, never
   // dropped (0158): a function, which cannot write; a scalar's result; a table-valued function's rows; an
   // OUTPUT parameter; an alias type, a table type, sysname and varbinary,
@@ -249,6 +289,52 @@ describe('which routines are recorded (0158)', () => {
     ])
     expect(routine(snapshot, 'typed').parameters.find((parameter) => parameter.name === '@s')?.typeId).toBe('256:256:0:0')
     expect(routineGaps(snapshot)).toEqual([])
+  })
+
+  // An account may execute a procedure and hold nothing on the alias and
+  // table types its parameters are declared with, and sys.types then does
+  // not show it them. Each such parameter is recorded as unsupported, as
+  // every alias type is, and a routines gap on the procedure says its type
+  // is hidden -- as a column's is (columns.ts) -- rather than a parameter
+  // spelled decimal(14,2) that reads as unsupported with no reason given.
+  test('a parameter whose type the account cannot see is a routines gap on the routine', async () => {
+    const caller = await connectAs('routine_caller', ['grant execute on probe.typed to routine_caller'])
+    const snapshot = await discoverSqlServer(caller, { schemas: ['probe'], routines: true })
+    expect(routine(snapshot, 'typed').parameters.map((parameter) => [parameter.name, parameter.databaseType, parameter.type.kind])).toEqual([
+      ['@a', 'decimal(14,2)', 'unsupported'],
+      ['@k', 'unknown', 'unsupported'],
+      ['@b', 'varbinary(16)', 'unsupported'],
+      ['@v', 'varchar(20)', 'text'],
+      ['@nv', 'nvarchar(max)', 'text'],
+      ['@x', 'decimal(14,2)', 'decimal'],
+      ['@s', 'sysname', 'unsupported'],
+    ])
+    expect(routineGaps(snapshot).map((gap) => [gap.subject, gap.detail])).toEqual([
+      [{ kind: 'schema', schema: 'probe' }, expect.stringMatching(/without VIEW DEFINITION on schema probe/)],
+      [
+        { kind: 'object', object: { schema: 'probe', name: 'typed' } },
+        'parameter @a: its user-defined type is hidden from this account, so it is recorded as unsupported, spelled as its base type decimal(14,2)',
+      ],
+      [
+        { kind: 'object', object: { schema: 'probe', name: 'typed' } },
+        'parameter @k: its user-defined type is hidden from this account, so it is recorded as unsupported',
+      ],
+    ])
+  })
+
+  // SQL Server's catalog keeps no T-SQL parameter's default: sys.parameters'
+  // has_default_value is kept for CLR routines alone, and says 0 for a
+  // parameter a call may leave out. So whether one has a default is `null`,
+  // never `false`, which would be a claim the catalog cannot make -- the
+  // engines differ, and PostgreSQL's pg_proc says.
+  test('a parameter’s default is not known, and is null, though a call may leave it out', async () => {
+    const snapshot = await discoverSqlServer(owner, { schemas: ['probe'], routines: true })
+    expect(routine(snapshot, 'with_default').parameters.map((parameter) => [parameter.name, parameter.hasDefault])).toEqual([['@n', null]])
+    expect(await answer(owner, 'exec probe.with_default')).toBe('ok')
+    const kept = await owner
+      .request()
+      .query<{ kept: boolean }>("select has_default_value as kept from sys.parameters where object_id = object_id(N'probe.with_default')")
+    expect(kept.recordset.map((row) => row.kept)).toEqual([false])
   })
 
   // Ownership chaining, measured rather than assumed: the reader, who may

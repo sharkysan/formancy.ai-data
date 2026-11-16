@@ -25,19 +25,23 @@ the same day (formancy.ai 0232).
   whether the account may run it. What an integrator of discovery notices:
   `DiscoveryScope` takes `routines: true`, and a snapshot discovered with it
   carries `routines`, each a `RoutineMeta` -- its kind, its parameters in
-  order with their modes, what it changes as the engine enforces it, what
-  it returns, whether it reaches as its owner, and whether the account may
-  execute it -- the ones no action could bind included, with the fact that
-  would refuse each. A parameter's `typeId` is the engine's own identity for
-  its type, and a type outside the adapter's closed table of the built-in
-  types a codec speaks is `unsupported`. A new gap aspect, `routines`, says
-  where SQL Server's catalog may hide one. A scope without `routines` reads
-  nothing more and makes the snapshot it made before, to the byte, so every
-  stored snapshot and published form keeps its fingerprint. The cost: a
-  server older than this release refuses every snapshot that records
-  routines, and every form published from one, on every read; and on
-  PostgreSQL a parameter's length, precision and scale are not in the
-  catalog, so `varchar(20)` is recorded as unbounded. Nothing in the server
+  order with their modes and whether each has a default, what it changes
+  as the engine enforces it, what it returns, whether it reaches as its
+  owner, and whether the account may execute it -- the ones no action could
+  bind included, with the fact that would refuse each. A parameter's
+  `typeId` is the engine's own identity for its type, and a type outside
+  the adapter's closed table of the built-in types a codec speaks is
+  `unsupported`. A new gap aspect, `routines`, says where SQL Server's
+  catalog may hide one, and that a CLR or replication-filter routine this
+  release does not read is there; a snapshot whose scope did not ask
+  carries none. A scope without `routines` reads nothing more and makes the
+  snapshot it made before, to the byte, so every stored snapshot and
+  published form keeps its fingerprint. The cost: a server older than this
+  release refuses every snapshot that records routines, and every form
+  published from one, on every read; on PostgreSQL a parameter's length,
+  precision and scale are not in the catalog, so `varchar(20)` is recorded
+  as unbounded; and on SQL Server a parameter's default is not in the
+  catalog, so whether one has a default is `null`. Nothing in the server
   asks for routines yet, and nothing binds, runs or shows one.
 
 - **A trigger can refuse a write in words the person reads** (0156).

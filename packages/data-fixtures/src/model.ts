@@ -438,6 +438,8 @@ export interface ExpectedRoutineFacts {
   reach: RoutineMeta['reach']
   /** Each parameter's name, in order, as the engine spells it: SQL Server's with its `@`. */
   names: readonly string[]
+  /** Whether each parameter, in order, has a default, as the engine's catalog can say it: PostgreSQL's does, and SQL Server's keeps none for T-SQL, so `null`. */
+  defaults: ReadonlyArray<boolean | null>
 }
 
 export interface ExpectedRoutine {
@@ -478,8 +480,8 @@ export const FIXTURE_ROUTINES: readonly ExpectedRoutine[] = deepFreeze([
     returns: 'void',
     executable: { owner: true, reader: false, writer: true },
     byKind: {
-      postgres: { kind: 'function', signature: 'pg_catalog.int8, pg_catalog.int4', reach: 'account', names: ['order_id', 'tenant'] },
-      sqlserver: { kind: 'procedure', signature: '', reach: 'owner', names: ['@order_id', '@tenant'] },
+      postgres: { kind: 'function', signature: 'pg_catalog.int8, pg_catalog.int4', reach: 'account', names: ['order_id', 'tenant'], defaults: [false, false] },
+      sqlserver: { kind: 'procedure', signature: '', reach: 'owner', names: ['@order_id', '@tenant'], defaults: [null, null] },
     },
   },
   {
@@ -488,6 +490,6 @@ export const FIXTURE_ROUTINES: readonly ExpectedRoutine[] = deepFreeze([
     effects: 'reads',
     returns: 'set',
     executable: { owner: true, reader: false, writer: false },
-    byKind: { sqlserver: { kind: 'function', signature: '', reach: 'owner', names: ['@tenant_id'] } },
+    byKind: { sqlserver: { kind: 'function', signature: '', reach: 'owner', names: ['@tenant_id'], defaults: [null] } },
   },
 ])

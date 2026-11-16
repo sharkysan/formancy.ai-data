@@ -39,8 +39,9 @@ import { discoveryRefusal, readServer } from '../server.js'
  * each node table it connects, for any account (referenced-by.ts).
  *
  * When the scope asks, and only then, the T-SQL procedures and functions in
- * scope too, with whether the account may call each (routines.ts, 0158),
- * and a `routines` gap wherever the same filter can have hidden one.
+ * scope too, with whether the account may call each (routines.ts, 0158), a
+ * `routines` gap wherever the same filter can have hidden one, and one on
+ * each routine it shows and this release does not read or cannot describe.
  *
  * A server without sys.edge_constraints -- every SQL Server before 2019 -- is
  * refused before the catalog is read, naming the release it answered (0068):
@@ -104,9 +105,9 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
       ...rowSecurity.gaps,
       ...referencedByGaps(objects.size, visibility),
       ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...referencedBy.gaps, ...checks.gaps]),
-      ...(routines === undefined ? [] : routineGaps(visibility)),
+      ...(routines === undefined ? [] : [...routineGaps(visibility), ...routines.gaps]),
     ],
-    ...(routines === undefined ? {} : { routines }),
+    ...(routines === undefined ? {} : { routines: routines.routines }),
   })
 }
 

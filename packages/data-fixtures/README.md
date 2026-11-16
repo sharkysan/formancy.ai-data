@@ -66,7 +66,8 @@ dropped the key from the end of its order would show on both engines.
   `routineDisagreements(snapshot, account)` holds a snapshot to it as the
   owner, the reader or the writer: each routine with its facts and the
   EXECUTE the account holds, or absent behind a `routines` gap that covers
-  it -- never silence -- for an account that is not the owner.
+  it -- never silence -- for an account that is not the owner and may not
+  execute it.
 - Beside it, the `parity` schema (0028) — `fixtures/postgres.parity.sql` and
   `fixtures/sqlserver.parity.sql`, loaded last — which is outside
   `FIXTURE_SCOPE`, so no snapshot of `sales` sees it. A tenant column under a

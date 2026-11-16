@@ -348,7 +348,11 @@ function listDisagreements(found: CheckMeta, expected: ExpectedCheckFacts['liste
  * facts and whether this account may execute it -- or, for an account that
  * is not the owner, is absent behind a `routines` gap that covers it: say
  * the right thing or say you cannot tell (0004). Never missing with nothing
- * said, which reads as a routine that does not exist. A routine the model
+ * said, which reads as a routine that does not exist; and never missing at
+ * all where the model says the account may execute it, gap or not: SQL
+ * Server lists a routine to an account that holds EXECUTE on it (0158, R3),
+ * and PostgreSQL every routine to every role, so a gap covering one would
+ * be an adapter hiding what it was shown. A routine the model
  * does not have is one from nowhere, and a snapshot whose scope did not ask
  * for routines says nothing about any. The owner sees every routine, so a
  * `routines` gap on its snapshot is an adapter that failed to read what it
@@ -373,6 +377,7 @@ export function routineDisagreements(
     const found = routines.find((routine) => named(routine, ref))
     if (found !== undefined) out.push(...routineFacts(found, entry, facts, account))
     else if (account === 'owner') out.push(`${describeRoutine(ref)} is missing`)
+    else if (entry.executable[account]) out.push(`${describeRoutine(ref)} is missing, and the ${account} may execute it, which lists it`)
     else if (!snapshot.gaps.some((gap) => gap.aspect === 'routines' && gapCovers(gap, entry.ref)))
       out.push(`${describeRoutine(ref)} is missing, and no gap says the ${account} cannot see it`)
   }
@@ -400,6 +405,7 @@ function routineFacts(found: RoutineMeta, entry: ExpectedRoutine, facts: Expecte
     if (parameter === undefined) return
     const at = `${where} parameter ${parameter.name}`
     compare(`parameter ${parameter.name} mode`, parameter.mode, wanted.mode)
+    compare(`parameter ${parameter.name} hasDefault`, parameter.hasDefault, facts.defaults[index])
     out.push(...typeDisagreements(parameter, wanted.type, at))
   })
   return out

@@ -350,7 +350,7 @@ describe('diffSnapshots: access', () => {
     const shipOrder: RoutineMeta = {
       ref: { schema: 'sales', name: 'ship_order', signature: '' },
       kind: 'procedure',
-      parameters: [{ name: '@order_id', mode: 'in', databaseType: 'bigint', typeId: '127:8:19:0', type: INT64 }],
+      parameters: [{ name: '@order_id', mode: 'in', databaseType: 'bigint', typeId: '127:8:19:0', type: INT64, hasDefault: null }],
       effects: 'writes',
       returns: 'void',
       result: null,

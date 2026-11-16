@@ -55,9 +55,10 @@ function routineType(oid: number, spelling: string, textUnit: TextLengthUnit): R
 
 /**
  * The routines discovery reads, of pg_proc `p` in namespace `n`: functions
- * and procedures in scope -- an aggregate or a window function is no routine
- * a statement calls with values -- and none an extension installed, which
- * an extension's upgrade replaces and which are no deployment's logic.
+ * and procedures in scope, and none an extension installed, which an
+ * extension's upgrade replaces and which are no deployment's logic. An
+ * aggregate (`prokind` 'a') or a window function ('w') is neither of the
+ * kinds a `RoutineMeta` is, and could never be an action: not read (0158).
  */
 const IN_SCOPE = (schemas: readonly string[], sql: TransactionSql) => sql`
   n.nspname = any(${schemas})
@@ -78,6 +79,7 @@ interface RoutineRow {
   result_spelling: string
   security_definer: boolean
   executable: boolean
+  defaults: number
 }
 
 interface ParameterRow {
@@ -90,6 +92,26 @@ interface ParameterRow {
 
 /** pg_proc's argument modes, by their one-letter codes. */
 const MODES: Readonly<Record<string, RoutineParameter['mode']>> = { i: 'in', o: 'out', b: 'inout', v: 'variadic', t: 'table' }
+
+/** The modes of the arguments a call passes, which `proargtypes` lists and the only ones a default can belong to. */
+const PASSED: ReadonlySet<RoutineParameter['mode']> = new Set(['in', 'inout', 'variadic'])
+
+type Declared = Omit<RoutineParameter, 'hasDefault'>
+
+/**
+ * Each parameter with whether it has a default: pg_proc counts them, as
+ * `pronargdefaults`, and they are always the last of the arguments a call
+ * passes. An OUT or TABLE parameter takes no value, and has none.
+ */
+function withDefaults(declared: readonly Declared[], defaults: number): RoutineParameter[] {
+  const first = declared.filter((parameter) => PASSED.has(parameter.mode)).length - defaults
+  let passed = 0
+  return declared.map((parameter) => {
+    if (!PASSED.has(parameter.mode)) return { ...parameter, hasDefault: false }
+    passed += 1
+    return { ...parameter, hasDefault: passed > first }
+  })
+}
 
 /**
  * Every function and procedure in scope, with what each takes and returns,
@@ -108,6 +130,10 @@ const MODES: Readonly<Record<string, RoutineParameter['mode']>> = { i: 'in', o: 
  * names and modes are indexed alike, and a name PostgreSQL holds as '' is a
  * parameter declared without one. The signature that tells overloads apart
  * is `proargtypes`, what a call passes, each type qualified by its schema.
+ * Which of them have a default is `pronargdefaults`, recorded because two
+ * overloads that differ by a trailing defaulted parameter make every call by
+ * the shorter signature ambiguous (42725): a fact a generator must refuse
+ * by, and one SQL Server's catalog does not keep (its adapter says `null`).
  *
  * What a routine changes is what the engine enforces: a STABLE or IMMUTABLE
  * routine reads, and anything VOLATILE -- every procedure -- may write.
@@ -137,6 +163,7 @@ export async function readRoutines(sql: TransactionSql, schemas: readonly string
       p.prorettype as result_type,
       pg_catalog.format_type(p.prorettype, null) as result_spelling,
       p.prosecdef as security_definer,
+      p.pronargdefaults::pg_catalog.int4 as defaults,
       pg_catalog.has_schema_privilege(n.oid, 'USAGE') and pg_catalog.has_function_privilege(p.oid, 'EXECUTE') as executable
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
@@ -154,7 +181,7 @@ export async function readRoutines(sql: TransactionSql, schemas: readonly string
     where ${IN_SCOPE(schemas, sql)}
     order by p.oid, a.position`
 
-  const byRoutine = new Map<number, RoutineParameter[]>()
+  const byRoutine = new Map<number, Declared[]>()
   for (const row of parameters) {
     const mode = MODES[row.mode]
     // pg_proc has no other mode; one a later release adds is refused, never guessed.
@@ -170,7 +197,7 @@ export async function readRoutines(sql: TransactionSql, schemas: readonly string
     return {
       ref: { schema: row.schema, name: row.name, signature: row.signature },
       kind: row.kind === 'p' ? 'procedure' : 'function',
-      parameters: byRoutine.get(row.oid) ?? [],
+      parameters: withDefaults(byRoutine.get(row.oid) ?? [], row.defaults),
       effects: row.volatility === 's' || row.volatility === 'i' ? 'reads' : 'writes',
       returns,
       result: returns === 'scalar' ? routineType(row.result_type, row.result_spelling, textUnit) : null,

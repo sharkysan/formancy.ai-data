@@ -120,7 +120,8 @@ server answered, which reports the difference and does not prevent it.
   sentence. `FIXTURE_ROUTINES` says the same of the fixture's routines when
   a scope asks for them, and who of the owner, the reader and the writer
   may execute each, and `routineDisagreements` holds an account that is not
-  the owner to each routine or a `routines` gap that covers it
+  the owner to each routine, or to a `routines` gap that covers one it may
+  not execute
   ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
   Each adapter's discovery suites assert the lists are empty;
   `packages/data-fixtures/src/conformance.test.ts` holds the comparators
