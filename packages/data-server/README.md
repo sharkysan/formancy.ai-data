@@ -212,6 +212,26 @@ existed would be documented and inert.
   names the form's `versions` to whoever may change one
   ([0113](../../docs/decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)).
   `routes/runtime-supersede.test.ts` holds what reaches the port.
+  `POST /v1/forms/:id/records/save` saves a record with the rows of its
+  together children in one transaction
+  ([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)):
+  `{ record: { create: { answers } } | { update: { record, version, answers } }, rows: [{ form, field, changes }] }`,
+  each change `{ create: { ref, answers } }`, `{ update: { record, version, answers } }`
+  or `{ delete: { record, version } }`. In this order, each answering
+  alone: a body of another shape 400, before the write id is read; a child
+  that is not a together child of this form in the person's menu, through
+  that field, 400; a part the policy refuses 403 with `at`, before
+  anything is read; every part's field errors at once 422 with `parts`, a
+  row the record does not hold 404, a bound broken 422 `too-few-rows` or
+  `too-many-rows` with `rows`, a selection that is not an option 422; then
+  one call of the adapter's save, answered 200 with the record and every
+  change as stored in the order sent, or at the step it refused with
+  `at`, 503 past `FORMANCY_DATA_SAVE_DEADLINE_MS`, and 502 naming the
+  record and the version sent where the answer was lost. A together
+  child's create or delete alone, and a plain create of a record one
+  requires rows of, are 403 `operation-unavailable` before any statement.
+  The audit is one `save` event with its row changes' count in `rows`.
+  `routes/runtime-save.test.ts` holds what reaches the port.
   `e2e-lost-answer.integration.test.ts` drops the database's answer after the
   commit, on both engines, and fails if the write crosses to the database a
   second time.
@@ -704,12 +724,15 @@ one-key settings rotate by restart; a key set rotates as below.
 | `FORMANCY_DATA_TRUSTED_PROXIES` | The proxies whose `X-Forwarded-For` the server believes, comma-separated, each an IP address or a CIDR range of either family: `10.0.0.2`, `10.0.0.0/24`, `2001:db8::/64`. Empty or unset, none: every request is its peer's, as before 0071. A request from a listed peer is counted by the rate limit and named in the log by the address it forwarded -- from the right, the first address not in the list. `true`, `*`, a prefix of 0, a hop count, an empty entry, a range with bits set past its prefix (`172.16.238.250/24`, as `ip addr` prints an interface), a netmask, a zone, a port or a name stops the process with a sentence naming the entry by its place. Read at start ([0071](../../docs/decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md)); see *Behind a reverse proxy*, below. |
 | `FORMANCY_DATA_CORS_ORIGINS` | The origins a page may call the runtime plane from, comma-separated, each exactly as a browser sends `Origin`: `https://app.example`, or plain HTTP on `localhost`, `127.0.0.1` or `[::1]`. Empty or unset, none. A wildcard, a pattern, `null`, a path or a spelling no browser sends stops the process, and so does a list without the runtime plane. Read at start ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)); see *Across origins*, below. |
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | How long a lookup statement may run, in milliseconds counted from when the adapter is asked for it, before the server stops it ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)): a whole number from 1 to 2147483647, the longest a Node timer holds. Unset, `DEFAULT_LOOKUP_DEADLINE_MS` from `@formancy/data-core`, the slowest lookup answer `docs/performance.md` measured, which describes that machine and data: a slower or larger deployment raises it. Anything else stops the process with a sentence naming the setting, and `createDataServer` refuses the same as `runtime.lookupDeadlineMs`. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. |
+| `FORMANCY_DATA_SAVE_DEADLINE_MS` | How long a save of a record with its rows (`POST /v1/forms/:id/records/save`) may wait for a lock, in milliseconds, and after which none of its steps starts: past it the save is rolled back and answered `503 unavailable` ([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). A whole number from 1 to 2147483647; unset, `DEFAULT_SAVE_DEADLINE_MS` from `@formancy/data-core`, measured as `save-limits.ts` says. On PostgreSQL it bounds each statement of the save too; on SQL Server it does not, and a statement slow for another reason than a lock runs to mssql's request timeout of 15 s, which nothing here sets. So where the allowlist has a SQL Server connection, twice it must be below that timeout -- 7,499 at most -- or the process stops with a sentence naming the setting, since a save may run nearly twice the deadline before it is rolled back, and past the timeout it would be `unknown-outcome` instead. Anything else stops the process too, and `createDataServer` refuses the same as `runtime.saveDeadlineMs`. It is not a deadline on the whole transaction. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
 refuses, `src/trusted-proxies.test.ts` what the proxy list does,
 `src/cors.test.ts` what the origin list does,
-`src/lookup-deadline.test.ts` what the lookup deadline accepts, and
+`src/lookup-deadline.test.ts` what the lookup deadline accepts,
+`src/save-deadline.test.ts` what the save deadline accepts and when it
+must be below mssql's request timeout, and
 `src/publisher-roles.test.ts` what the publisher roles do.
 
 The log is JSON lines on standard output: Fastify's lines for each request,

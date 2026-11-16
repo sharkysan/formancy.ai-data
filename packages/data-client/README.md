@@ -21,7 +21,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, reconcile, query, resolve }
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, save, reconcile, query, resolve, saveView, removeView }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve, maxRows } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
@@ -46,6 +46,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `update(formId, { record, version, answers })` | `POST /v1/forms/:id/records/update` |
 | `supersede(formId, { record, version, answers })` | `POST /v1/forms/:id/records/supersede` → the next version (0113) |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
+| `save(formId, { record, rows })` | `POST /v1/forms/:id/records/save` → `{ record, rows }`, the record and each change as stored (0155) |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
@@ -158,6 +159,24 @@ lookup's value a record token of each; a reply without it is
 `delete` sends exactly `record` and `version`, with a write id of its own,
 and is done only on the server's `{ record, deleted: true }`, whose token
 is the row the statement deleted.
+
+`save` sends a record -- `{ create: { answers } }` or `{ update: { record,
+version, answers } }` -- and `rows`, each together child's `{ form, field,
+changes }`, its two keys alone, with a write id of its own, and resolves
+to a `SaveOutcome`: done only on the server's `SavedRecord`, the record
+read back and each change as stored in the order sent, a new row with
+the `ref` the page minted for it; a refusal, a `SaveRefused`, that carries
+`at`, the part of the save it is about, `parts`, every part's field
+errors, and `rows`, a child's bound and what the save would leave it,
+where the server says them; or an `UnknownWrite` with `operation: 'save'`,
+which `reconcile` reads by the record alone, as an update where it
+carries the version sent and as a create where it does not
+([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+A form's `together` is the lookup its rows are saved with their record
+through and its bounds, or `null`, and a menu's child carries `together`
+-- its bounds and what this person may do with its rows in a save --
+where it is saved with its record; a form reply without `together` is
+`unexpected`.
 
 `exportRecords` is the file of every record `list` would page through for
 the same `search`, `sort`, `parent` and `filter`, the four keys it sends,

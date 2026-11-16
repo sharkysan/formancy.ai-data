@@ -442,6 +442,7 @@ an adapter or `data-core` reads the environment.
 | `FORMANCY_DATA_TRUSTED_PROXIES` | whose `X-Forwarded-For` is believed | [0071](../decisions/0071-the-server-believes-the-forwarded-address-only-from-the-proxies-an-operator-names.md) | `trusted-proxies.test.ts`; the `container` job |
 | `FORMANCY_DATA_CORS_ORIGINS` | the origins a page may call the runtime plane from | [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md) | `cors.test.ts`, `cross-origin.test.ts`; the `container` job |
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | how long a lookup statement may run | [0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md), [0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md) | `lookup-deadline.test.ts`; the `container` job |
+| `FORMANCY_DATA_SAVE_DEADLINE_MS` | how long a save of a record with its rows may wait for a lock, after which none of its steps starts; held below half of mssql's request timeout where a SQL Server connection is allowed | [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | `save-deadline.test.ts`; the `container` job |
 
 The files named are under `packages/data-server/src/`. Each setting's
 default and spelling, `PORT`'s included, is in

@@ -236,6 +236,23 @@ get*](../../README.md#what-you-get) is the short version, and
   every save on a new connection and never sends one twice, so its page says
   the save may have been saved
   ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
+- **A record is saved with its rows in one request**, on `main` since
+  0.3.0: an order with its lines, its child's lookup marked by an
+  administrator as saved with its record, between a fewest and a most
+  rows. `POST /v1/forms/:id/records/save`, which `@formancy/data-client`'s
+  `save` sends, takes the record -- a create, or an update that may change
+  nothing -- and the child's creates, updates and deletes, and stores them
+  all in one transaction or none, on both engines; a save past the bound,
+  a stale record or row, a refused row, a slow lock are each one refusal
+  naming the part it is about, every part's field errors at once. The
+  record's version moves on every save, so two people saving lines of one
+  order at once are one saved and one stale, and a save sent again after
+  a lost answer is stored at most once. Such a child's rows are never
+  created or deleted alone, and a record that must hold some is never
+  created without them. On SQL Server a trigger that ends the transaction
+  can store a save in part. The host page lists and edits such rows one
+  at a time and saves none together yet
+  ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **A trigger can refuse a write in words the person reads.** A trigger, or
   a function it calls, whose error message starts with exactly
   `formancy: refused: ` has the rest shown to the person who saved, as
@@ -419,6 +436,8 @@ get*](../../README.md#what-you-get) is the short version, and
   delete's only trace is the keyed hash of its token, and without an audit
   key there is none
   ([0050](../decisions/0050-a-record-is-deleted-one-at-a-time-by-its-token-and-the-version-its-person-read.md));
+  a save of a record with its rows counts its row changes and names none
+  ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
   performance measured through the shipped server on both engines, for every
   runtime request but a page of records, a file of them, the menu of forms
   and a delete, and held in CI by rows read and round trips, never a

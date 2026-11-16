@@ -161,7 +161,7 @@ and entries: each case's answer written once, as `saveAnswer` renders an
 outcome -- `saved`, or the step it stopped at and why -- and asserted
 through each adapter's `save.integration.test.ts` and
 `save-lost-answer.integration.test.ts`, every request the planner's,
-planned as the route will plan it (`plannedSave`). They hold every change
+planned as the route plans it (`plannedSave`). They hold every change
 committed, on a new record whose key the database numbers, on one whose key
 is typed and on a saved one; a refusal at the record, at `within`, at the
 first, middle and last row and at a count rolling everything back; a stale
@@ -184,7 +184,21 @@ round trips without a clock and reports its timings, from which
 `SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS` were set
 (`packages/data-core/src/records/save-limits.ts`); the plan alone is held
 by `packages/data-core/src/records/save.test.ts`, `together.test.ts` and
-`menu.test.ts`, with no database.
+`menu.test.ts`, with no database, and what the generator writes for it by
+`packages/data-core/src/generate/together.test.ts`. The route is held over
+fake ports by `packages/data-server/src/routes/runtime-save.test.ts` -- each
+of its rules in order, a policy refusal before any read, one adapter call
+per write id, every refusal at its part, the 502, the audit's count and no
+value, and the 403s of a together child's create or delete alone and of a
+plain create of a record whose rows are required -- and against both
+engines by `e2e-lost-answer.integration.test.ts`, a save whose answer the
+TCP hop dropped sent once; the bundle check by `bundle.test.ts`,
+`routes/admin.test.ts` and `generation.test.ts`; the setting by
+`save-deadline.test.ts`; and the client by
+`packages/data-client/src/transport.test.ts`, `reconcile.test.ts` and
+`saves.integration.test.ts`, the last on both engines. None of these is a
+shared case: the route and the client sit above the port, where one server
+answers for both engines.
 
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
@@ -668,9 +682,11 @@ and a number typed here would drift from the next run.
   failing on the default images alone; the other images run them on
   their legs. Two paths of each adapter's save are reached by no test:
   the record not found by its key once every step ran, and a version
-  that is no number, answered without anything sent. No route takes a
-  save yet, so what the server answers with a save's outcome is held by
-  nothing
+  that is no number, answered without anything sent. The route's
+  answers to each outcome are held over fake ports, and against both
+  engines only for a save stored, past its bound, stale and lost; what
+  every plain create's read of the store costs, and how large a save's
+  answer kept for a resend is, were not measured
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **No gate is required before a merge.** Every gate reports on every pull
   request and fails a release; what stops a red one from being merged is

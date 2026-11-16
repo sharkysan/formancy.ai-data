@@ -153,3 +153,32 @@ describe('the built server, with Entra connections in its allowlist', () => {
     STARTS,
   )
 })
+
+describe('the built server, with a save deadline (0155)', () => {
+  // A save may run nearly twice its deadline before it is rolled back, and
+  // on SQL Server past mssql's request timeout of 15 s it would be unknown
+  // where the deadline rolls it back: with a SQL Server connection allowed
+  // the server stops before it listens where twice the deadline is not
+  // below the timeout, naming the setting, and starts one millisecond
+  // under it; an allowlist of PostgreSQL alone is held to nothing of the
+  // kind. Watched failing with main.ts's fit check removed: the server
+  // listened at 7500.
+  test(
+    'stops at start where twice the save deadline is not below mssql’s request timeout beside SQL Server, and starts below it',
+    async () => {
+      const over = await start({ FORMANCY_DATA_SAVE_DEADLINE_MS: '7500' })
+      expect([over.listening, over.code]).toEqual([false, 1])
+      expect(over.stderr.trim()).toBe(
+        "FORMANCY_DATA_SAVE_DEADLINE_MS is 7500, and with a SQL Server connection allowed twice it must be below mssql's request timeout of 15000 ms: at most 7499.",
+      )
+      const under = await start({ FORMANCY_DATA_SAVE_DEADLINE_MS: '7499' })
+      expect(under.listening, under.stderr).toBe(true)
+      const postgres = [
+        { id: 'erp-pg', kind: 'postgres', host: 'db.example', port: 5432, database: 'erp', user: 'formancy', password: 'env:ERP_PASSWORD', schemas: ['sales'] },
+      ]
+      const alone = await start({ FORMANCY_DATA_SAVE_DEADLINE_MS: '8000' }, postgres)
+      expect(alone.listening, alone.stderr).toBe(true)
+    },
+    STARTS,
+  )
+})

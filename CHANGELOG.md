@@ -18,6 +18,47 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A record is saved with the rows of its together children in one
+  request** (0155). Why: an order could not be held to at least one line
+  and at most a few, nor stored with its lines all or nothing -- a failed
+  third line left the order and two lines stored -- and the plan and both
+  adapters' transaction did it with nothing to call them. What
+  integrators notice: `POST /v1/forms/:id/records/save` takes the record,
+  a create or an update that may change nothing, and each together child's
+  creates (each with a `ref` the page mints), updates and deletes by token
+  and version, in one transaction, sent once per write id and never
+  again; it answers the record read back and every change as stored, in
+  the order sent, or one refusal naming the part it is about in `at` --
+  every part's field errors at once in `parts`, a bound with the count in
+  `rows`, a lost answer 502 naming the record and the version sent, which
+  every save moves, so sending it again is stored at most once.
+  `@formancy/data-client` gains `save` and its `SaveOutcome`, and
+  `reconcile` reads a lost save as an update where it carries a version
+  and as a create where it does not. A lookup choice's `together: { min,
+  max }` and a rowversion's `touchColumn` are now generated, compared by
+  the bundle check and refused where a save could not hold them -- among
+  them a together child whose read policy narrows by anything but its
+  record, row security on its table, and on SQL Server a `max` whose rows
+  would bind more than one batch's 2,100 parameters, at publish. The menu's
+  child carries its `together` flags, absent for every other child, and
+  `PublishedForm` gains the required `together`, so a client checking the
+  form's shape, this one included, takes no reply from a server before
+  this. Two writes are now refused 403 `operation-unavailable` before any
+  statement: a plain create of a record a together child requires rows of
+  -- it is created with them, in a save -- and a together child's create
+  or delete alone; the menu and the form route leave those creates out
+  where the person could not make the save. Every plain create now reads
+  every published form from the store first, as the menu does, and is
+  refused 503 when the store cannot list them. What operators notice:
+  `FORMANCY_DATA_SAVE_DEADLINE_MS`, how long a save may wait for a lock
+  and after which none of its steps starts, `DEFAULT_SAVE_DEADLINE_MS`
+  unset; the server refuses to start where a SQL Server
+  connection is allowed and twice the deadline is not below mssql's
+  15 s request timeout, since past it a save that may commit would be
+  unknown where the deadline rolls it back. A save is one audit event,
+  `save`, counting its row changes and naming none. The host page and the
+  studio offer no save yet.
+
 - **A snapshot records the routines in scope, when its scope asks for
   them** (0158). Why: administrator-named actions will run routines the
   deployment keeps in its database, and no snapshot said which exist, what
@@ -145,7 +186,7 @@ the same day (formancy.ai 0232).
   `createSqlServerRecords` as one batch, each never sent twice;
   data-core exports `SAVE_MAX_ROWS` and `DEFAULT_SAVE_DEADLINE_MS`,
   measured, which bound `TOGETHER_MAX_ROWS` and are the deadline the
-  route will default to. On SQL Server a single write's batch now checks
+  route defaults to. On SQL Server a single write's batch now checks
   the same things in the same order through one set of functions a save's
   batch shares, so the two cannot drift apart unseen; a save's batch
   checks each table's definition and INSTEAD OF triggers after the first
@@ -183,7 +224,7 @@ the same day (formancy.ai 0232).
   most `TOGETHER_MAX_ROWS`, one row less than a list's page; and
   `LookupChoice.together`, `GenerationRequest.touchColumn` and
   `ConcurrencyBinding.touch` are new optional fields. The feature's own
-  line comes with the save's route.
+  line is the save's route's, above.
 - **An administrator gives a field another starting value** (0150). Why:
   since 0149 a new record starts at its column's constant default, which
   was the database's to say -- a column that defaults to `draft` for the

@@ -153,6 +153,11 @@ release; your application's own pages draw records their own way:
   ([0008](./docs/decisions/0008-exact-values-travel-as-strings.md),
   [0015](./docs/decisions/0015-a-record-operation-is-one-guarded-statement.md),
   [0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
+- **A record saved with its rows**, an order with its lines, in one
+  transaction on both engines and held to a bound an administrator
+  chooses: one call of the runtime plane that `@formancy/data-client`
+  makes, and not yet a control of the host page
+  ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **Deletes, copies and files**: a record deleted one at a time, reaching
   other tables only through the foreign keys its policy names; duplicated
   into a new one; and the records a list shows downloaded as one CSV file
@@ -209,6 +214,10 @@ built from this repository and not published as a package:
 
 - No bulk delete and no undo; no file of a record with all its children,
   and no copy of a record with its children.
+- A record's rows are saved with it through the runtime plane alone: the
+  host page lists and edits them one at a time and adds or removes none,
+  and the studio does not yet offer the choice
+  ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one
   ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
@@ -269,8 +278,9 @@ package: build it from this repository, as the composed stack builds it
 since -- among it the studio's Browse step, list views named by an
 administrator and kept by a person, a grid's filter typed as a line, a
 record's child forms in tabs, state moves, versions changed from a date,
-starting values, a select of the values a check lists and the server's
-stamps of who wrote a record and when -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
+starting values, a select of the values a check lists, the server's
+stamps of who wrote a record and when, and a record saved with its rows
+in one request of the runtime plane -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased*, and the examples page and the live demo are deployed from
 `main`. [The status page](./docs/guide/status.md) says what 0.3.0 added
 over 0.2.0, and what is not yet measured or read by hand.
