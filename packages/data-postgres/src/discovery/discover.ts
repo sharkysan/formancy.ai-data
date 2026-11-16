@@ -10,6 +10,7 @@ import { readForeignKeys } from './foreign-keys.js'
 import { readKeys } from './keys.js'
 import { readObjects } from './objects.js'
 import { readKeysBelow, readReferencedBy } from './referenced-by.js'
+import { readRoutines } from './routines.js'
 import { readServer } from '../server.js'
 
 /**
@@ -29,6 +30,9 @@ import { readServer } from '../server.js'
  * account: the gaps a PostgreSQL snapshot carries are what this release does
  * not describe -- a foreign table, and a key that names a partition or an
  * inheriting table rather than the table a delete names (`readKeysBelow`).
+ * When the scope asks, and only then, it reads the functions and procedures
+ * in scope too, with whether the account may execute each (`readRoutines`,
+ * 0158); pg_proc answers for every role, so that needs no gap either.
  *
  * Every catalog query runs in one REPEATABLE READ, read-only transaction, so
  * they all see the catalog as it was at one moment: a column added between
@@ -53,7 +57,7 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
   return sql.begin('isolation level repeatable read read only', async (tx) => {
     await searchCatalogFirst(tx)
     const [{ kind: _kind, version: serverVersion, ...server }, encoding] = await Promise.all([readServer(tx), readEncoding(tx)])
-    const [account, inScope, columns, access, deletes, keys, foreignKeys, referencedBy, keysBelow, checks, comments] = await Promise.all([
+    const [account, inScope, columns, access, deletes, keys, foreignKeys, referencedBy, keysBelow, checks, comments, routines] = await Promise.all([
       readAccount(tx),
       readObjects(tx, schemas),
       readColumns(tx, schemas, textUnitOf(encoding)),
@@ -65,6 +69,8 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
       readKeysBelow(tx, schemas),
       readChecks(tx, schemas),
       readComments(tx, schemas),
+      // Only when asked: a scope that does not ask reads nothing more (0158).
+      scope.routines === true ? readRoutines(tx, schemas, textUnitOf(encoding)) : undefined,
     ])
 
     const objects = inScope.described.map((object): ObjectMeta => {
@@ -96,7 +102,8 @@ export async function discoverPostgres(sql: Sql, scope: DiscoveryScope): Promise
       }
     })
 
-    return createSnapshot({ kind: 'postgres', serverVersion, server, account, scope, objects, gaps: [...inScope.gaps, ...keysBelow] })
+    const gaps = [...inScope.gaps, ...keysBelow]
+    return createSnapshot({ kind: 'postgres', serverVersion, server, account, scope, objects, gaps, ...(routines === undefined ? {} : { routines }) })
   })
 }
 

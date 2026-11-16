@@ -58,13 +58,13 @@ only enforcement is "we remember" says so plainly.
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055; narrowed by 0116 |
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067, 0074; extended by 0073 |
-| [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049 |
-| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056, 0152 |
-| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077 |
-| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068 |
+| [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049, 0158 |
+| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056, 0152, 0158 |
+| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077, 0158 |
+| [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068, 0158 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028; extended by 0079 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109, 0137, 0152, 0155 |
-| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050; extended by 0030, 0051, 0068, 0111, 0152 |
+| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050, 0158; extended by 0030, 0051, 0068, 0111, 0152 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050, 0112 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065, 0126; narrowed by 0062 |
@@ -81,7 +81,7 @@ only enforcement is "we remember" says so plainly.
 | [0024](0024-the-studio-speaks-only-the-admin-plane.md) | The studio speaks only the administrator plane, holds the token in memory, and edits presentation with its own controls | accepted; narrowed by 0030; extended by 0032, 0052, 0058, 0060, 0062, 0065, 0075; palette copy reversed by 0096; extended by 0138 |
 | [0025](0025-each-adapter-owns-its-driver.md) | Each adapter package owns its driver, and one suite runs the whole product on both engines | accepted; extended by 0061, 0074 |
 | [0026](0026-name-every-column-fact-the-engines-disagree-on.md) | Name every column fact the two engines disagree on, and check values in the column's own unit | accepted; narrowed by 0040 |
-| [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049, 0155 |
+| [0027](0027-a-snapshot-says-what-its-account-may-do.md) | A snapshot says what its account may do, and whose it is | accepted; extended by 0049, 0155, 0158 |
 | [0028](0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md) | Row filters, labels and refusals mean the same on both engines | accepted; narrowed by 0067, 0156; extended by 0079 |
 | [0029](0029-a-host-renders-a-published-form-through-one-client.md) | A host renders a published form through one client of the runtime plane | accepted; narrowed by 0031, 0047, 0060, 0066, 0085; extended by 0032, 0058, 0117 |
 | [0030](0030-presentation-is-a-patch-over-the-generated-base.md) | Presentation is a patch over the generated base, kept beside it, and carried to the next base by what each field stands for | accepted; narrowed by 0033, 0039, 0041, 0042, 0066; extended by 0062, 0075, 0105, 0119, 0129, 0143, 0150, 0155 |
@@ -211,3 +211,4 @@ only enforcement is "we remember" says so plainly.
 | [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted |
 | [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole | accepted |
 | [0156](0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md) | A trigger can refuse a write in words the person reads | accepted |
+| [0158](0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | A snapshot records the routines in scope when asked, and only then | accepted |

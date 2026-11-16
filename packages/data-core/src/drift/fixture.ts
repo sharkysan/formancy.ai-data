@@ -15,6 +15,8 @@ import type {
   ObjectRef,
   TextLengthUnit,
 } from '../metadata.js'
+import { recordsRoutines } from '../routines.js'
+import type { RoutineMeta } from '../routines.js'
 import { serverStanding } from '../server.js'
 import type { ServerFacts } from '../server.js'
 import { createSnapshot, findObject, recordsDeleteFacts } from '../snapshot.js'
@@ -159,6 +161,8 @@ export interface Options {
    * foreign keys, beside any the edit placed from outside the snapshot.
    */
   facts?: boolean
+  /** Ask for routines, as a scope may since 0158, and record these. None by default, as no scope asked before then. */
+  routines?: RoutineMeta[]
 }
 
 /** 0049's facts on every object, after `edit`: see `Options.facts`. */
@@ -197,10 +201,11 @@ export function snapshot(edit: (objects: ObjectMeta[]) => void = () => {}, optio
     kind,
     serverVersion: options.serverVersion ?? '16.0.4125',
     account: options.account ?? OWNER,
-    scope: { schemas: options.schemas ?? ['crm', 'sales'] },
+    scope: { schemas: options.schemas ?? ['crm', 'sales'], ...(options.routines === undefined ? {} : { routines: true as const }) },
     objects,
     gaps: options.gaps ?? [],
     ...(options.server === undefined ? {} : { server: options.server }),
+    ...(options.routines === undefined ? {} : { routines: options.routines }),
   })
 }
 
@@ -315,6 +320,12 @@ function withoutDeleteFacts(snapshot: MetadataSnapshot): MetadataSnapshot {
   return createSnapshot({ ...rest, gaps: rest.gaps.filter((gap) => gap.aspect !== 'referenced-by') })
 }
 
+/** `snapshot` as a scope that did not ask for routines would have made it: none, and no `routines` gap (0158). */
+function withoutRoutines(snapshot: MetadataSnapshot): MetadataSnapshot {
+  const { fingerprint: _fingerprint, routines: _routines, scope, ...rest } = JSON.parse(JSON.stringify(snapshot)) as MetadataSnapshot
+  return createSnapshot({ ...rest, scope: { schemas: scope.schemas }, gaps: rest.gaps.filter((gap) => gap.aspect !== 'routines') })
+}
+
 /**
  * `diffSnapshots`, held on every call the drift suites make to what the
  * runtime rests on (0041), so every report any of them builds is a case of
@@ -331,6 +342,10 @@ function withoutDeleteFacts(snapshot: MetadataSnapshot): MetadataSnapshot {
  *   against the same snapshot without them. Otherwise every key that refers
  *   to a table, and every DELETE grant, would be reported as new on every
  *   form published before 0049.
+ * - Against a base whose scope did not ask for routines, the routines a
+ *   current snapshot records change nothing (0158), for the same reason:
+ *   every form published before then would review routines nobody looked
+ *   for as new.
  */
 export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const report = review(base, current, bindings, policy)
@@ -353,6 +368,9 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
       review(base, withoutDeleteFacts(current), bindings, policy),
       'the facts recorded since 0049 changed a report against a base taken before them',
     ).toEqual(report)
+  }
+  if (!recordsRoutines(base) && recordsRoutines(current)) {
+    expect(review(base, withoutRoutines(current), bindings, policy), 'routines changed a report against a base that never asked for them').toEqual(report)
   }
   return report
 }

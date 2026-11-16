@@ -57,6 +57,17 @@ dropped the key from the end of its order would show on both engines.
   fixture grants it, column by column and DELETE by table, with every
   column the model has: an adapter that left out what the account may not
   read, as a privilege-filtered catalog would, disagrees.
+- `FIXTURE_ROUTINES` is the same truth for the fixture's routines, which a
+  scope asks for with `ROUTINE_SCOPE` (0158): `sales.ship_order`, written
+  twice -- a function returning void on PostgreSQL, a procedure on SQL
+  Server, typed alike, which the owner and the writer may execute and the
+  reader may not -- and SQL Server's security predicate on customer,
+  `sales.fn_customer_tenant`, which PostgreSQL's file has no counterpart for.
+  `routineDisagreements(snapshot, account)` holds a snapshot to it as the
+  owner, the reader or the writer: each routine with its facts and the
+  EXECUTE the account holds, or absent behind a `routines` gap that covers
+  it -- never silence -- for an account that is not the owner and may not
+  execute it.
 - Beside it, the `parity` schema (0028) — `fixtures/postgres.parity.sql` and
   `fixtures/sqlserver.parity.sql`, loaded last — which is outside
   `FIXTURE_SCOPE`, so no snapshot of `sales` sees it. A tenant column under a

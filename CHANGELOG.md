@@ -18,6 +18,32 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A snapshot records the routines in scope, when its scope asks for
+  them** (0158). Why: administrator-named actions will run routines the
+  deployment keeps in its database, and no snapshot said which exist, what
+  each takes and returns, whether it may act beyond its caller's grants or
+  whether the account may run it. What an integrator of discovery notices:
+  `DiscoveryScope` takes `routines: true`, and a snapshot discovered with it
+  carries `routines`, each a `RoutineMeta` -- its kind, its parameters in
+  order with their modes and whether each has a default, what it changes
+  as the engine enforces it, what it returns, whether it reaches as its
+  owner, and whether the account may execute it -- the ones no action could
+  bind included, with the fact that would refuse each. A parameter's
+  `typeId` is the engine's own identity for its type, and a type outside
+  the adapter's closed table of the built-in types a codec speaks is
+  `unsupported`. A new gap aspect, `routines`, says where SQL Server's
+  catalog may hide one, and that a CLR or replication-filter routine this
+  release does not read is there; a snapshot whose scope did not ask
+  carries none. A scope without `routines` reads nothing more and makes the
+  snapshot it made before, to the byte, so every stored snapshot and
+  published form keeps its fingerprint. The cost: a server older than this
+  release refuses every snapshot that records routines, and every form
+  published from one, on every read; on PostgreSQL a parameter's length,
+  precision and scale are not in the catalog, so `varchar(20)` is recorded
+  as unbounded; and on SQL Server a parameter's default is not in the
+  catalog, so whether one has a default is `null`. Nothing in the server
+  asks for routines yet, and nothing binds, runs or shows one.
+
 - **A trigger can refuse a write in words the person reads** (0156).
   Why: a trigger's refusal reached nobody -- the person read "The
   database refused this request … Sending it again will be refused the

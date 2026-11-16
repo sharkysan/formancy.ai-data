@@ -116,7 +116,7 @@ person, is validation in that sense: a check that cannot answer refuses.
 | A field nobody granted | readable and writable by nobody | [0011](../decisions/0011-every-operation-carries-a-trusted-policy-context.md) | the same |
 | A lookup that cannot answer | the save is refused | [0012](../decisions/0012-a-lookup-token-is-a-reference-not-a-permission.md), [0022](../decisions/0022-the-runtime-plane-asks-the-policy-every-time.md) | `routes/runtime.test.ts` |
 | A lookup past its deadline | 503, the statement stopped in the database | [0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md) | `routes/runtime-lookup-limits.integration.test.ts` |
-| A catalog the account cannot fully see | a gap in the snapshot, never "no relationships" | [0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md) | `packages/data-core/src/snapshot.test.ts`, `packages/data-fixtures/src/conformance.test.ts` |
+| A catalog the account cannot fully see | a gap in the snapshot, never "no relationships", and when the scope asks for routines never "no routine" | [0004](../decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md), [0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md) | `packages/data-core/src/snapshot.test.ts`, `packages/data-fixtures/src/conformance.test.ts`, `packages/data-sqlserver/src/discovery-routines.integration.test.ts` |
 | A form with no proof against lost updates | create-only, saying why | [0009](../decisions/0009-generation-is-deterministic-and-says-what-it-chose.md) | `packages/data-core/src/generate/generate.test.ts` |
 | A published bundle, on every read | refused with a reason unless it validates | [0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md) | `bundle.test.ts` |
 | Drift that blocks an operation | 409 `drift`, nothing written | [0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md), [0010](../decisions/0010-drift-is-classified-against-the-bindings.md) | `routes/runtime-drift.integration.test.ts` |
@@ -156,6 +156,13 @@ as the column's type, never as text of a query
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md));
 and a form names a connection only by an id the allowlist holds
 ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)).
+A routine's parameter carries the engine's own identity for its type --
+PostgreSQL's oid, SQL Server's user_type_id with its sizes -- and its
+spelling for a person; a cast to it is spelled only from the adapter's
+closed table of the built-in types a codec speaks, keyed by that identity,
+and a type outside the table is `unsupported`, so no type name a catalog
+holds becomes SQL
+([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
 
 **The adapter quotes, one part at a time**, never with a helper that splits
 on dots ([0015](../decisions/0015-a-record-operation-is-one-guarded-statement.md)):

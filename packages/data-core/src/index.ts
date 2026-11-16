@@ -1,6 +1,8 @@
 export { DATABASE_KINDS, isDatabaseKind } from './adapter.js'
 export type { DatabaseAdapter, DatabaseKind, ServerIdentity } from './adapter.js'
 export { createSnapshot, findObject, gapCovers, inSnapshotOrder, isComplete } from './snapshot.js'
+export { describeRoutine } from './routines.js'
+export type { ParameterMode, RoutineMeta, RoutineParameter, RoutineRef, RoutineType } from './routines.js'
 export { isServerProduct, serverName, serverStanding, SQLSERVER_RELEASES, TESTED_SERVERS, UNTESTED_PRODUCTS } from './server.js'
 export type { NamedProduct, ServerFacts, ServerProduct, ServerStanding, TestedServer } from './server.js'
 export type {

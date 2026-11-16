@@ -1,4 +1,5 @@
 import type { CoverageAspect, CoverageGap, CoverageSubject, MetadataSnapshot, ObjectRef } from '../metadata.js'
+import { recordsRoutines } from '../routines.js'
 import { gapCovers, recordsDeleteFacts } from '../snapshot.js'
 import { reachTables } from '../policy/cascades.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, lookups, type Operation, refKey, stopped, WRITES } from './context.js'
@@ -176,8 +177,13 @@ export function gapChanges(comparison: Comparison): Draft[] {
   // A snapshot taken before 0049 never looked for the keys that refer to a
   // table, so a referenced-by gap is compared only between two that did:
   // against one that did not, it is no change in what this connection sees.
+  // So is a routines gap, between two snapshots whose scopes both asked for
+  // routines (0158): one that did not ask never looked.
+  const both = (records: (snapshot: Comparison['base']) => boolean) => records(comparison.base) && records(comparison.current)
+  const deleteFacts = both(recordsDeleteFacts)
+  const routines = both(recordsRoutines)
   const compared = (gaps: readonly CoverageGap[]) =>
-    recordsDeleteFacts(comparison.base) && recordsDeleteFacts(comparison.current) ? gaps : gaps.filter((gap) => gap.aspect !== 'referenced-by')
+    gaps.filter((gap) => (gap.aspect !== 'referenced-by' || deleteFacts) && (gap.aspect !== 'routines' || routines))
   const before = grouped(compared(comparison.base.gaps))
   const after = grouped(compared(comparison.current.gaps))
   const drafts: Draft[] = []

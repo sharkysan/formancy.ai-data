@@ -193,6 +193,20 @@ see is a gap
 That `gen_random_uuid()` and `newsequentialid()` never repeat is their
 design, not something measured here
 ([0057](../decisions/0057-a-key-of-one-column-filled-by-a-never-repeating-default-counts-as-numbered.md)).
+Routines are read only when a scope asks, and a server older than that
+record refuses every snapshot that carries them, and every form published
+from one, on every read, until it is upgraded again or the form is
+published from a discovery that did not ask; a form discovered without
+routines is discovered again before it could offer one. pg_proc keeps no
+length, precision or scale for a parameter, so a PostgreSQL routine's
+varchar(20) is unbounded; whether a STABLE function can write through a
+VOLATILE one it calls is not checked; a SQL Server CLR or
+replication-filter routine is not read, and only a gap on it says it is
+there; a SQL Server parameter's default is not in its catalog, and is
+recorded as unknown; and every SQL Server routine is read as reaching
+past its caller's grants, by ownership chaining, whether or not it says
+EXECUTE AS. Nothing binds, runs or shows a routine yet
+([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
 
 **Forms.** Decimal fields are text inputs, totals over money are not
 offered, a table with a version-looking column is create-only until

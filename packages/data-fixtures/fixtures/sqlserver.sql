@@ -135,6 +135,15 @@ create view sales.customer_summary as
   group by c.tenant_id, c.customer_no, c.name;
 GO
 
+-- postgres.sql's routine, as a procedure: what a writing action binds on SQL
+-- Server (0158). SQL Server writes row_version itself, and grants EXECUTE to
+-- nobody by default, so nothing is revoked.
+create procedure sales.ship_order @order_id bigint, @tenant int
+as
+  set nocount on;
+  update sales.[order] set status = 'shipped' where id = @order_id and tenant_id = @tenant;
+GO
+
 insert into sales.country (iso_code, name) values ('CH', N'Switzerland'), ('DE', N'Germany');
 
 -- Employee 3 names a manager that does not exist; the self-reference is added
@@ -180,7 +189,9 @@ GO
 -- filter predicate hides rows from reads, updates and deletes; it does not
 -- stop an insert, and foreign-key checks are not filtered (B11).
 -- SCHEMABINDING, so no reader needs EXECUTE on the function; it also blocks
--- an ALTER of customer.tenant_id, which nothing in the suites does.
+-- an ALTER of customer.tenant_id, which nothing in the suites does. It is a
+-- routine in sales that PostgreSQL's file, whose policy is an expression,
+-- does not have, and src/model.ts says so (0158).
 create function sales.fn_customer_tenant(@tenant_id int)
 returns table with schemabinding
 as return select 1 as visible where user_name() <> N'formancy_writer' or @tenant_id = 1;

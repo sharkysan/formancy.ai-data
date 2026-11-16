@@ -109,6 +109,8 @@ export interface Visibility {
   denied: Denials
   /** VIEW DEFINITION on the database. */
   canViewDatabase: boolean
+  /** The schemas in scope, as the catalog spells them, this account lacks VIEW DEFINITION on: each lists only what it holds a permission on. */
+  unseenSchemas: string[]
 }
 
 /**
@@ -136,13 +138,12 @@ export async function readObjectVisibility(pool: ConnectionPool, schemas: readon
     pool.request().query<{ hidden: number }>(DENIED_SCHEMAS_SQL),
     pool.request().query<{ can_view_definitions: number | null }>(DATABASE_SQL),
   ])
-  const gaps: CoverageGap[] = rows
-    .filter((row) => row.can_view_definitions !== 1)
-    .map((row) => ({
-      subject: { kind: 'schema', schema: row.name },
-      aspect: 'objects',
-      detail: `without VIEW DEFINITION on schema ${row.name}, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace`,
-    }))
+  const unseenSchemas = rows.filter((row) => row.can_view_definitions !== 1).map((row) => row.name)
+  const gaps: CoverageGap[] = unseenSchemas.map((schema) => ({
+    subject: { kind: 'schema', schema },
+    aspect: 'objects',
+    detail: `without VIEW DEFINITION on schema ${schema}, the catalog lists only the tables and views this account holds a permission on, so one it cannot see is absent without trace`,
+  }))
   const denied: Denials = { objects: deniedObjects.recordset[0]?.hidden ?? 0, schemas: deniedSchemas.recordset[0]?.hidden ?? 0 }
   if (denied.objects > 0) {
     gaps.push({
@@ -151,5 +152,30 @@ export async function readObjectVisibility(pool: ConnectionPool, schemas: readon
       detail: `this account is denied VIEW DEFINITION on ${String(denied.objects)} object(s) it therefore cannot see, and the catalog does not say which schema they are in: any of them may be in scope`,
     })
   }
-  return { gaps, denied, canViewDatabase: database.recordset[0]?.can_view_definitions === 1 }
+  return { gaps, denied, canViewDatabase: database.recordset[0]?.can_view_definitions === 1, unseenSchemas }
+}
+
+/**
+ * What may hide a routine from this account, when the scope asks for
+ * routines (0158): the same check as for a table, from the same answers, so
+ * the two cannot disagree. A routine is a securable in its schema, listed
+ * only to an account that holds a permission on it or VIEW DEFINITION on
+ * the schema; so each schema in scope without VIEW DEFINITION is a gap, and
+ * a VIEW DEFINITION or CONTROL deny on an object, which hides it even under
+ * the schema grant and cannot be placed, is one on the scope.
+ */
+export function routineGaps(visibility: Visibility): CoverageGap[] {
+  const gaps: CoverageGap[] = visibility.unseenSchemas.map((schema) => ({
+    subject: { kind: 'schema', schema },
+    aspect: 'routines',
+    detail: `without VIEW DEFINITION on schema ${schema}, the catalog lists only the routines this account holds a permission on, so one it cannot see is absent without trace`,
+  }))
+  if (visibility.denied.objects > 0) {
+    gaps.push({
+      subject: { kind: 'scope' },
+      aspect: 'routines',
+      detail: `this account is denied VIEW DEFINITION on ${String(visibility.denied.objects)} object(s) it therefore cannot see, and the catalog does not say which schema they are in: any of them may be a routine in scope`,
+    })
+  }
+  return gaps
 }

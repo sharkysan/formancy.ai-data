@@ -11,7 +11,8 @@ import type { ObjectFound } from './objects.js'
 import { readObjects } from './objects.js'
 import { readReferencedBy, referencedByGaps } from './referenced-by.js'
 import { readPolicies, rowSecurityOf } from './row-security.js'
-import { readObjectVisibility } from './visibility.js'
+import { readRoutines } from './routines.js'
+import { readObjectVisibility, routineGaps } from './visibility.js'
 import { discoveryRefusal, readServer } from '../server.js'
 
 /**
@@ -37,6 +38,11 @@ import { discoveryRefusal, readServer } from '../server.js'
  * another. A graph edge constraint, which is not a foreign key, is a gap on
  * each node table it connects, for any account (referenced-by.ts).
  *
+ * When the scope asks, and only then, the T-SQL procedures and functions in
+ * scope too, with whether the account may call each (routines.ts, 0158), a
+ * `routines` gap wherever the same filter can have hidden one, and one on
+ * each routine it shows and this release does not read or cannot describe.
+ *
  * A server without sys.edge_constraints -- every SQL Server before 2019 -- is
  * refused before the catalog is read, naming the release it answered (0068):
  * the one refusal a version meets, and decided by that view, not by a major.
@@ -53,9 +59,12 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
   const refusal = discoveryRefusal(read)
   if (refusal !== undefined) throw new Error(refusal)
   const { kind: _kind, version, ...server } = read.identity
-  if (schemas.length === 0) return createSnapshot({ kind: 'sqlserver', serverVersion: version, server, account, scope, objects: [], gaps: [] })
+  // Asked for and in no schema: none, which is an answer.
+  const asked = scope.routines === true
+  if (schemas.length === 0)
+    return createSnapshot({ kind: 'sqlserver', serverVersion: version, server, account, scope, objects: [], gaps: [], ...(asked ? { routines: [] } : {}) })
 
-  const [objects, columns, keys, foreignKeys, referencedBy, checks, visibility, policed] = await Promise.all([
+  const [objects, columns, keys, foreignKeys, referencedBy, checks, visibility, policed, routines] = await Promise.all([
     readObjects(pool, schemas),
     readColumns(pool, schemas),
     readKeys(pool, schemas),
@@ -64,6 +73,8 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
     readChecks(pool, schemas),
     readObjectVisibility(pool, schemas),
     readPolicies(pool, schemas),
+    // Only when asked: a scope that does not ask reads nothing more (0158).
+    asked ? readRoutines(pool, schemas) : undefined,
   ])
   const rowSecurity = rowSecurityOf(objects.keys(), policed, visibility)
 
@@ -94,7 +105,9 @@ export async function discoverSqlServer(pool: ConnectionPool, scope: DiscoverySc
       ...rowSecurity.gaps,
       ...referencedByGaps(objects.size, visibility),
       ...named(objects, [...columns.gaps, ...foreignKeys.gaps, ...referencedBy.gaps, ...checks.gaps]),
+      ...(routines === undefined ? [] : [...routineGaps(visibility), ...routines.gaps]),
     ],
+    ...(routines === undefined ? {} : { routines: routines.routines }),
   })
 }
 

@@ -54,7 +54,7 @@ declare module 'vitest' {
  * matches the case.
  */
 
-/** The model's comparators, by what they hold an adapter's snapshot to: FIXTURE_MODEL, READER_ACCESS, WRITER_ACCESS. */
+/** The model's comparators, by what they hold an adapter's snapshot to: FIXTURE_MODEL, READER_ACCESS, WRITER_ACCESS, FIXTURE_ROUTINES. */
 export const MODEL_CASES = {
   owner: 'model: the owner discovers the fixture',
   structure: 'model: a reader of the catalog discovers its structure',
@@ -62,6 +62,8 @@ export const MODEL_CASES = {
   readerAccess: "access: the reader's privileges",
   writerAccess: "access: the order form's account's privileges",
   described: 'model: describe reads each fixture table as discovery does',
+  routines: "model: the owner discovers the fixture's routines",
+  routineAccess: "access: who may execute the fixture's routines",
 } as const
 
 export const filterCase = (entry: FilterParityCase): string => `filter: ${entry.column} = ${JSON.stringify(entry.value)}`

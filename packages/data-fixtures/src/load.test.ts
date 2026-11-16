@@ -1,6 +1,8 @@
+import { DATABASE_KINDS } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
 import { READER, WRITER } from './containers.js'
 import { readFixture, splitBatches } from './load.js'
+import { FIXTURE_ROUTINES } from './model.js'
 
 describe('splitBatches', () => {
   // A driver sends GO as text and SQL Server answers with a syntax error. It
@@ -25,19 +27,22 @@ describe('the fixture files', () => {
   // CREATE SCHEMA, CREATE VIEW and CREATE FUNCTION must each open a batch on
   // SQL Server; a GO lost in an edit fails there with an error about the
   // batch, far from here.
-  // CREATE TRIGGER too, which the parity file uses.
-  test('each SQL Server file opens a batch with each CREATE SCHEMA, VIEW, FUNCTION and TRIGGER', () => {
+  // CREATE TRIGGER too, which the parity file uses, and CREATE PROCEDURE,
+  // which the routine the model names is on SQL Server (0158).
+  test('each SQL Server file opens a batch with each CREATE SCHEMA, VIEW, FUNCTION, PROCEDURE and TRIGGER', () => {
     const sales = splitBatches(readFixture('sqlserver.sql'))
     const parity = splitBatches(readFixture('sqlserver.parity.sql'))
     expect(sales.some((batch) => /\bcreate function\b/i.test(batch))).toBe(true)
+    expect(sales.some((batch) => /\bcreate procedure\b/i.test(batch))).toBe(true)
     expect(parity.some((batch) => /\bcreate trigger\b/i.test(batch))).toBe(true)
     for (const batch of [...sales, ...parity]) {
       const body = batch.replaceAll(/--.*$/gm, '').trim().toLowerCase()
-      const opensWith = /^create (schema|view|function|trigger)\b/.test(body)
-      const contains = /\bcreate (schema|view|function|trigger)\b/.test(body)
-      expect(contains ? opensWith : true, `a batch contains CREATE SCHEMA, VIEW, FUNCTION or TRIGGER after its first statement:\n${batch.slice(0, 120)}`).toBe(
-        true,
-      )
+      const opensWith = /^create (schema|view|function|procedure|trigger)\b/.test(body)
+      const contains = /\bcreate (schema|view|function|procedure|trigger)\b/.test(body)
+      expect(
+        contains ? opensWith : true,
+        `a batch contains CREATE SCHEMA, VIEW, FUNCTION, PROCEDURE or TRIGGER after its first statement:\n${batch.slice(0, 120)}`,
+      ).toBe(true)
     }
   })
 
@@ -77,6 +82,21 @@ describe('the fixture files', () => {
     const postgres = tables(readFixture('postgres.sql'))
     expect(postgres).toContain('shipment')
     expect(tables(readFixture('sqlserver.sql'))).toEqual(postgres)
+  })
+
+  // The routines are one model too (0158): a routine one file creates and
+  // the other does not is a conformance failure on one engine, unless the
+  // model writes the difference down. Derived from the CREATE FUNCTION and
+  // CREATE PROCEDURE statements, held to the engines FIXTURE_ROUTINES gives
+  // each routine.
+  test('each edition creates the routines the model gives its engine', () => {
+    const routines = (text: string) =>
+      [...text.replaceAll(/--.*$/gm, '').matchAll(/create\s+(?:function|procedure)\s+sales\.(\w+)/gi)].map((match) => match[1] ?? '').sort()
+    for (const kind of DATABASE_KINDS) {
+      const modelled = FIXTURE_ROUTINES.filter((routine) => routine.byKind[kind] !== undefined).map((routine) => routine.ref.name)
+      expect(routines(readFixture(`${kind}.sql`)), kind).toEqual(modelled.sort())
+    }
+    expect(routines(readFixture('postgres.sql'))).toContain('ship_order')
   })
 
   // The parity files are one schema in two dialects (0028): a table or a

@@ -113,13 +113,19 @@ server answered, which reports the difference and does not prevent it.
   `packages/data-fixtures/fixtures/sqlserver.sql`, with identically named
   constraints, beside a restricted reader and the order form's own account.
   `packages/data-fixtures/src/load.test.ts` holds the two files to the same
-  constraint names.
+  constraint names, and to the routines the model gives each engine.
 - **The neutral truth and one comparator.** `FIXTURE_MODEL` says what
   discovery must report, per engine where the engines genuinely differ, and
   `packages/data-fixtures/src/conformance.ts` reports every disagreement as a
-  sentence. Each adapter's discovery suite asserts the list is empty;
-  `packages/data-fixtures/src/conformance.test.ts` holds the comparator
-  itself.
+  sentence. `FIXTURE_ROUTINES` says the same of the fixture's routines when
+  a scope asks for them, and who of the owner, the reader and the writer
+  may execute each, and `routineDisagreements` holds an account that is not
+  the owner to each routine, or to a `routines` gap that covers one it may
+  not execute
+  ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
+  Each adapter's discovery suites assert the lists are empty;
+  `packages/data-fixtures/src/conformance.test.ts` holds the comparators
+  themselves.
 - **One expectation per shared case**: filters, labels and refusals in
   `packages/data-fixtures/src/parity.ts`
   ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)),

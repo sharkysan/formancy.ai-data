@@ -1,3 +1,4 @@
+import { schemaHash } from '@formancy/spec'
 import { describe, expect, test } from 'vitest'
 import type { ColumnMeta, CoverageGap, MetadataSnapshot, ObjectMeta } from './metadata.js'
 import { createSnapshot, findObject, isComplete } from './snapshot.js'
@@ -62,6 +63,33 @@ describe('createSnapshot', () => {
   test('the server version is not part of the fingerprint', () => {
     const objects = [table('a', [column('x', 1)])]
     expect(snapshot(objects, { serverVersion: '17.7' }).fingerprint).toBe(snapshot(objects).fingerprint)
+  })
+
+  // Every bundle published before 0158 carries a snapshot whose scope never
+  // asked for routines, and the server hashes it again on every read (0019).
+  // A contract that hashed an absent list as an empty one, or wrote the ask
+  // into every scope, would refuse every published form as edited after it
+  // was taken. The literals are what data-core at 4a979d6, the release before
+  // 0158, made of this snapshot -- every fact discovery recorded then: 0049's
+  // on the object, a server (0068), gaps on an object, a schema and the
+  // scope -- its fingerprint, and the canonical hash of the whole snapshot,
+  // which is that snapshot to the byte.
+  test('a scope that does not ask for routines makes the snapshot the release before 0158 made, to the byte', () => {
+    const made = snapshot(
+      [table('a', [column('x', 1), column('y', 2)], { primaryKey: { name: 'pk_a', columns: ['x'] }, access: { delete: true }, referencedBy: [] })],
+      {
+        server: { product: 'postgresql', major: 17 },
+        gaps: [
+          onObject('a', 'checks'),
+          { subject: { kind: 'schema', schema: 'sales' }, aspect: 'objects', detail: 'no VIEW DEFINITION' },
+          { subject: { kind: 'scope' }, aspect: 'referenced-by', detail: 'cannot tell' },
+        ],
+      },
+    )
+    expect(made.fingerprint).toBe('a97e3fa12f73d2222187e9962e173f1bc639f6328b3cca86cbca038cac9dad39')
+    expect(schemaHash(made)).toBe('c1c84bbb1e96ff2e039c9e5212e3f023ee509c03039d368fd214d832efe5f2a4')
+    expect(Object.keys(made)).toEqual(['kind', 'serverVersion', 'server', 'account', 'scope', 'objects', 'gaps', 'fingerprint'])
+    expect(made.scope).toEqual({ schemas: ['sales'] })
   })
 
   // A revoked permission must be noticed as a change, so drift review can say

@@ -1,4 +1,5 @@
 import type { DatabaseKind } from './adapter.js'
+import type { RoutineMeta } from './routines.js'
 import type { ServerFacts } from './server.js'
 
 /**
@@ -325,13 +326,21 @@ export interface ObjectMeta {
  * The part of the catalog a gap is about. `row-security`: whether a policy
  * applies could not be established (0027). `referenced-by`: a foreign key
  * that refers to an object may be on a table this connection cannot see, so
- * its `referencedBy` may be short (0049).
+ * its `referencedBy` may be short (0049). `routines`: on a schema or the
+ * scope, a routine may be hidden from this connection, so `routines` may be
+ * short; on one object, that object is a routine, which is not read or of
+ * which a fact could not be established (0158). Only a snapshot whose scope
+ * asked for routines carries one, and `createSnapshot` refuses one in any
+ * other.
  */
-export type CoverageAspect = 'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security' | 'referenced-by'
+export type CoverageAspect =
+  'objects' | 'columns' | 'keys' | 'foreign-keys' | 'checks' | 'defaults' | 'comments' | 'row-security' | 'referenced-by' | 'routines'
 
 /**
  * What a gap is about: the whole scope (it cannot be placed), one schema, or
- * one object. Schema and object names are the catalog's spelling, as
+ * one object -- for a `routines` gap, a routine, which only SQL Server's
+ * catalog places that way, and whose name no table or view in its schema
+ * can share there (0158). Schema and object names are the catalog's spelling, as
  * ObjectRef's are — on a case-insensitive SQL Server database that may differ
  * from how the scope spells the schema, and it is not compared with it.
  */
@@ -358,6 +367,13 @@ export interface CoverageGap {
 /** The schemas an administrator approved for discovery. An adapter reads nothing outside them. */
 export interface DiscoveryScope {
   schemas: string[]
+  /**
+   * Read the routines in those schemas too (0158). Absent, an adapter reads
+   * nothing more than it did before, and the snapshot is the one it made
+   * before, to the byte: a server older than 0158 refuses a snapshot that
+   * carries routines, so only what asks for them pays that.
+   */
+  routines?: true
 }
 
 /** Whose snapshot this is (0027). */
@@ -393,10 +409,18 @@ export interface MetadataSnapshot {
   objects: ObjectMeta[]
   gaps: CoverageGap[]
   /**
+   * Every function and procedure in scope, the ones no action could bind
+   * included, and whether the account may execute each (0158). Present
+   * exactly when the scope asked for routines: absent is "not read", and an
+   * empty list is "none in scope".
+   */
+  routines?: RoutineMeta[]
+  /**
    * A hash of everything a form binding depends on: the kind, the account's
    * user, the objects — their columns' privileges and row security included,
    * and since 0049 whether the account may delete from each and the keys
-   * that refer to it — and the gaps. A change in what this connection can
+   * that refer to it — the gaps, and the routines when it records them
+   * (0158). A change in what this connection can
    * see or do changes it too, so a revoked permission is noticed as a change
    * — and reported by drift review as a privilege or access problem rather
    * than as a dropped table.
