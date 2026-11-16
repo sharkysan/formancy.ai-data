@@ -135,6 +135,8 @@ export async function startPostgresFixture(image: string = selectedImage('postgr
     await sql.unsafe(readFixture('postgres.restricted.sql'))
     // The parity schema (0028), outside FIXTURE_SCOPE: last, so nothing above can depend on it.
     await sql.unsafe(readFixture('postgres.parity.sql'))
+    // The actions schema (0160), outside every other scope, after the principals it grants to.
+    await sql.unsafe(readFixture('postgres.actions.sql'))
   } finally {
     await sql.end()
   }
@@ -334,6 +336,7 @@ async function loadSqlServerFixture(owner: mssql.config): Promise<number> {
     for (const batch of splitBatches(readFixture('sqlserver.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.restricted.sql'))) await pool.request().batch(batch)
     for (const batch of splitBatches(readFixture('sqlserver.parity.sql'))) await pool.request().batch(batch)
+    for (const batch of splitBatches(readFixture('sqlserver.actions.sql'))) await pool.request().batch(batch)
     const result = await pool.request().query<{ level: number }>('select compatibility_level as level from sys.databases where database_id = db_id()')
     const level = result.recordset[0]?.level
     if (level === undefined) throw new Error('SQL Server answered the compatibility query with no row')

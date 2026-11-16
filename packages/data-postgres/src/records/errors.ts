@@ -133,12 +133,31 @@ function identifier(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined
 }
 
+/**
+ * Whether a SQLSTATE is one that passes (`PASSING_CLASSES`, `PASSING_STATES`):
+ * what the transaction did, rather than why a statement was refused. An
+ * action's run asks it before where the error arose (actions/errors.ts,
+ * 0160), so a deadlock inside a routine is still a deadlock.
+ */
+export function passing(state: string): boolean {
+  return PASSING_CLASSES.has(state.slice(0, 2)) || PASSING_STATES.has(state)
+}
+
+/**
+ * The code a SQLSTATE has an entry of its own for, or `undefined`. An
+ * action's run asks it before what passes (actions/errors.ts), so the
+ * server's own unknown outcome, 40003, is not read as its class, 40, which
+ * passes: one fact, one answer, in this adapter.
+ */
+export function exactCode(state: string): RecordFailureCode | undefined {
+  return BY_STATE.get(state)
+}
+
 /** The code for a SQLSTATE: an exact entry, then its class, then what passes, and `refused` for the rest. */
 function codeOf(state: string): RecordFailureCode {
-  const errorClass = state.slice(0, 2)
-  const known = BY_STATE.get(state) ?? BY_CLASS.get(errorClass)
+  const known = BY_STATE.get(state) ?? BY_CLASS.get(state.slice(0, 2))
   if (known !== undefined) return known
-  return PASSING_CLASSES.has(errorClass) || PASSING_STATES.has(state) ? 'unavailable' : 'refused'
+  return passing(state) ? 'unavailable' : 'refused'
 }
 
 /**
@@ -150,6 +169,11 @@ function codeOf(state: string): RecordFailureCode {
  */
 function insideFunction(error: ServerError): boolean {
   return identifier(error.where) !== undefined
+}
+
+/** Whether the server sent `error` from inside a function -- a routine, or a trigger function -- rather than from the statement this adapter sent: `insideFunction`, for an error of any kind. */
+export function aroseInside(error: unknown): boolean {
+  return isServerError(error) && insideFunction(error)
 }
 
 /**

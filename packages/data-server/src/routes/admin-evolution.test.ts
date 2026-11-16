@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION, presentationOf } from '@formancy/data-core'
 import type {
+  ActionAdapter,
   ColumnMeta,
   DatabaseAdapter,
   FormBindings,
@@ -131,7 +132,7 @@ function registry(): ConnectionRegistry {
     open: async (id) => {
       if (id !== 'erp') return undefined
       if (!reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
     },
     close: async () => {},
   }

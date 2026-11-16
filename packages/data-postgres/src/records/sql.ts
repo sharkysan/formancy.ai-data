@@ -95,19 +95,29 @@ const PARENT = '"p"'
  * never a row with itself. A record whose foreign key is NULL matches no
  * parent, and is outside.
  */
-export function throughSql(statement: Statement, through: ThroughTerms): string {
+export function throughSql(statement: Statement, through: ThroughTerms, held: boolean = false): string {
   const pairs = through.pairs.map((pair) => `${PARENT}.${quoteIdentifier(pair.references)} ${op('=')} ${column(pair.column)}`)
-  return `exists (select from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...filterSql(statement, PARENT, through.terms)].join(' and ')})`
+  // An action's run holds the parent for its transaction (0160): what the record's own writes leave unlocked, above.
+  const share = held ? ` for share of ${PARENT}` : ''
+  return `exists (select from ${quoteTable(through.target)} as ${PARENT} where ${[...pairs, ...filterSql(statement, PARENT, through.terms)].join(' and ')}${share})`
 }
 
 /**
  * The record named by its key, inside the trusted filters and every through:
  * the WHERE of every statement but an insert, and so of the read, the update
  * and the statement that tells a stale update from one aimed at nothing.
+ * `held`: each through's parent locked FOR SHARE, as an action's run locates
+ * its record (0160).
  */
-export function located(statement: Statement, key: readonly RecordValue[], terms: readonly RowFilterTerm[], through: readonly ThroughTerms[]): string[] {
+export function located(
+  statement: Statement,
+  key: readonly RecordValue[],
+  terms: readonly RowFilterTerm[],
+  through: readonly ThroughTerms[],
+  held: boolean = false,
+): string[] {
   const where = key.map((value) => `${column(value.name)} ${op('=')} ${bound(statement, value)}`)
-  return [...where, ...filterSql(statement, ROW, terms), ...through.map((entry) => throughSql(statement, entry))]
+  return [...where, ...filterSql(statement, ROW, terms), ...through.map((entry) => throughSql(statement, entry, held))]
 }
 
 /**

@@ -4,7 +4,7 @@ import type { AddressInfo, Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS, EMPTY_PRESENTATION } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type { ActionAdapter, ColumnMeta, DatabaseAdapter, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
 import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
@@ -107,7 +107,7 @@ function registry(): ConnectionRegistry {
     open: async (id) => {
       if (id !== 'erp') return undefined
       if (!reachable) throw new Error(`ECONNREFUSED ${HOST}:1433`)
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
     },
     close: async () => {},
   }

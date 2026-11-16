@@ -147,4 +147,30 @@ describe('the fixture files', () => {
     expect(tables(sqlServer)).toEqual(tables(postgres))
     expect(names(sqlServer)).toEqual(names(postgres))
   })
+
+  // The actions files are one schema in two dialects (0160), as the parity
+  // files are: a table, a constraint, a routine or the sequence the routines
+  // count their calls by in one only would make a shared case run over two
+  // things. SQL Server's edition adds what only it has, the rowversion form
+  // and its routine, which no shared case reads.
+  // Watched failing on 2026-11-16 with reprice renamed in the T-SQL file:
+  // "expected [ 'broken_order', 'close_order', …(1) ] to deeply equal [
+  // 'broken_order', 'close_order', …(1) ]"; and with the sequence renamed
+  // there: "expected [ 'counted' ] to deeply equal [ 'called' ]".
+  test('both actions editions create the same tables, constraints and routines, and SQL Server its own ticket', () => {
+    const strip = (text: string) => text.replaceAll(/--.*$/gm, '')
+    const of = (kind: RegExp, text: string) => [...strip(text).matchAll(kind)].map((match) => match[1] as string).sort()
+    const tables = /create\s+table\s+actions\.["[]?(\w+)/gi
+    const routines = /create\s+(?:function|procedure)\s+actions\.(\w+)/gi
+    const sequences = /create\s+sequence\s+actions\.(\w+)/gi
+    const names = (text: string) => [...new Set(of(/constraint\s+(\w+)/gi, text))].filter((name) => !name.startsWith('df_'))
+    const postgres = readFixture('postgres.actions.sql')
+    const sqlServer = readFixture('sqlserver.actions.sql')
+    expect(of(tables, postgres)).toEqual(['call', 'customer', 'order', 'price'])
+    expect(of(tables, sqlServer)).toEqual(['call', 'customer', 'order', 'price', 'ticket'])
+    expect(of(routines, sqlServer).filter((name) => name !== 'label_ticket')).toEqual(of(routines, postgres))
+    expect(of(sequences, sqlServer)).toEqual(of(sequences, postgres))
+    expect(of(sequences, postgres)).toEqual(['called'])
+    expect(names(sqlServer).filter((name) => name !== 'pk_ticket')).toEqual(names(postgres))
+  })
 })

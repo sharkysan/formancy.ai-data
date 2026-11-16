@@ -67,7 +67,8 @@ const IN_SCOPE = (schemas: readonly string[], sql: TransactionSql) => sql`
     select from pg_catalog.pg_depend d
     where d.classid = 'pg_catalog.pg_proc'::pg_catalog.regclass and d.objid = p.oid and d.deptype = 'e')`
 
-interface RoutineRow {
+/** A routine as discovery reads it of pg_proc, and as a run's description reads it again (actions/definition.ts). */
+export interface RoutineRow {
   oid: number
   schema: string
   name: string
@@ -82,7 +83,8 @@ interface RoutineRow {
   defaults: number
 }
 
-interface ParameterRow {
+/** One argument of a routine, in the order pg_proc lists it. */
+export interface ParameterRow {
   oid: number
   name: string
   mode: string
@@ -96,7 +98,8 @@ const MODES: Readonly<Record<string, RoutineParameter['mode']>> = { i: 'in', o: 
 /** The modes of the arguments a call passes, which `proargtypes` lists and the only ones a default can belong to. */
 const PASSED: ReadonlySet<RoutineParameter['mode']> = new Set(['in', 'inout', 'variadic'])
 
-type Declared = Omit<RoutineParameter, 'hasDefault'>
+/** A parameter as it is declared, before whether it has a default is counted. */
+export type Declared = Omit<RoutineParameter, 'hasDefault'>
 
 /**
  * Each parameter with whether it has a default: pg_proc counts them, as
@@ -183,26 +186,40 @@ export async function readRoutines(sql: TransactionSql, schemas: readonly string
 
   const byRoutine = new Map<number, Declared[]>()
   for (const row of parameters) {
-    const mode = MODES[row.mode]
-    // pg_proc has no other mode; one a later release adds is refused, never guessed.
-    if (mode === undefined)
-      throw new Error(`a parameter of routine oid ${String(row.oid)} has mode ${JSON.stringify(row.mode)}, which this release does not read`)
     const list = byRoutine.get(row.oid) ?? []
-    list.push({ name: row.name, mode, ...routineType(row.type_oid, row.spelling, textUnit) })
+    list.push(declaredOf(row, textUnit))
     byRoutine.set(row.oid, list)
   }
+  return routines.map((row): RoutineMeta => ({ ...routineOf(row, byRoutine.get(row.oid) ?? [], textUnit), executable: row.executable }))
+}
 
-  return routines.map((row): RoutineMeta => {
-    const returns = row.returns_set ? 'set' : row.result_type === VOID ? 'void' : 'scalar'
-    return {
-      ref: { schema: row.schema, name: row.name, signature: row.signature },
-      kind: row.kind === 'p' ? 'procedure' : 'function',
-      parameters: withDefaults(byRoutine.get(row.oid) ?? [], row.defaults),
-      effects: row.volatility === 's' || row.volatility === 'i' ? 'reads' : 'writes',
-      returns,
-      result: returns === 'scalar' ? routineType(row.result_type, row.result_spelling, textUnit) : null,
-      reach: row.security_definer ? 'owner' : 'account',
-      executable: row.executable,
-    }
-  })
+/** One argument as `RoutineParameter` holds it, but for its default. */
+export function declaredOf(row: Omit<ParameterRow, 'oid'>, textUnit: TextLengthUnit): Declared {
+  const mode = MODES[row.mode]
+  // pg_proc has no other mode; one a later release adds is refused, never guessed.
+  if (mode === undefined) throw new Error(`a routine's parameter has mode ${JSON.stringify(row.mode)}, which this release does not read`)
+  return { name: row.name, mode, ...routineType(row.type_oid, row.spelling, textUnit) }
+}
+
+/**
+ * A routine from its row and its declared arguments, in order: what
+ * discovery records, and what a run's description reads again of the one
+ * routine it calls (actions/definition.ts), so the two cannot normalise a
+ * routine two ways. Whether the account may execute it is the caller's.
+ */
+export function routineOf(
+  row: Omit<RoutineRow, 'oid' | 'executable'>,
+  declared: readonly Declared[],
+  textUnit: TextLengthUnit,
+): Omit<RoutineMeta, 'executable'> {
+  const returns = row.returns_set ? 'set' : row.result_type === VOID ? 'void' : 'scalar'
+  return {
+    ref: { schema: row.schema, name: row.name, signature: row.signature },
+    kind: row.kind === 'p' ? 'procedure' : 'function',
+    parameters: withDefaults(declared, row.defaults),
+    effects: row.volatility === 's' || row.volatility === 'i' ? 'reads' : 'writes',
+    returns,
+    result: returns === 'scalar' ? routineType(row.result_type, row.result_spelling, textUnit) : null,
+    reach: row.security_definer ? 'owner' : 'account',
+  }
 }

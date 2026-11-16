@@ -87,12 +87,14 @@ One path runs through the packages, and most changes touch one step of it.
 
 The ports, each implemented by `data-postgres` and `data-sqlserver`:
 `DatabaseAdapter` (ping, discover), `RecordAdapter` (describe, read, list,
-insert, update, delete) and `LookupAdapter` (search, resolve, rejects). Each
-adapter package exports `connect…`, `create…Adapter`, `create…Records` and
-`create…Lookups` and owns its driver (0025); `data-server/src/drivers.ts` is
-the one place the server meets them. Inside an adapter, `discovery/` holds one
+insert, update, delete), `LookupAdapter` (search, resolve, rejects) and
+`ActionAdapter` (describe, run). Each adapter package exports `connect…`,
+`create…Adapter`, `create…Records`, `create…Lookups` and `create…Actions`
+and owns its driver (0025); `data-server/src/drivers.ts` is the one place
+the server meets them, and opens lookups (on PostgreSQL) and actions on
+clients of their own (0061, 0160). Inside an adapter, `discovery/` holds one
 catalog concern per file, `sql/` the quoting, binding and statement building,
-and `records/` and `lookups/` the operations.
+and `records/`, `lookups/` and `actions/` the operations.
 
 `data-server` is Fastify. `createDataServer` registers the administrator
 plane (`routes/admin*.ts`) only when given a connection registry, a store and

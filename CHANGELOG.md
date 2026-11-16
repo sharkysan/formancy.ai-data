@@ -69,6 +69,56 @@ the same day (formancy.ai 0232).
   guide's section 8 says, and until then the door does not forward a save,
   which fails closed. The host page and the studio offer no save yet.
 
+- **Both adapters run an action over the open record** (0160). Why: 0159
+  bound a routine to a form and planned a run, and nothing ran one; how a
+  run locks the record, moves its version, calls the routine and answers is
+  a database's to decide on each engine, and the facts it rests on had not
+  been measured. What an integrator of the adapters notices: data-core's
+  `ActionAdapter` port -- `describe(table, routine)`, the root and the
+  routine in one statement, and `run(request, deadlineMs)`, which answers
+  each record by its key or an `ActionFailure` -- implemented by
+  `createPostgresActions` and `createSqlServerActions`, and `runFailure`,
+  the one mapping of a record failure to a run's. A run is one
+  transaction, sent once and never retried: the record locked under the
+  person's filters and throughs at the version read, the parent it is
+  scoped through held to the end, its version moved, then the routine
+  called only while it is the one the run was decided over, every argument
+  cast to its bound type; an error inside the routine is the deployment's,
+  `declined` under the prefix and `refused` otherwise. On PostgreSQL the
+  deadline is a statement timeout set before each of the run's statements
+  to what remains of it, the table lock's on the locked path too,
+  `action-timeout` when it passes; a STRICT routine is refused, since
+  PostgreSQL would not call it for a NULL argument and the run would
+  answer done; on the locked path the call is guarded by the routine's
+  whole definition as the catalog cache holds it too, so a routine changed
+  while the run waited for its record is not called; and no bound value
+  reaches a routine as a constant, which an IMMUTABLE one would be
+  evaluated on while the call is planned, before its guard. On SQL Server
+  the lock waits half the deadline, `unavailable` past it, and a run past
+  the deadline is `unknown-outcome`, as is one whose procedure ended the
+  transaction; a status other than 0 refuses the run, and so does an
+  argument whose varchar parameter's code page lacks a character; EXECUTE
+  AS is part of the procedure's definition, so one made to EXECUTE AS
+  OWNER after it was described is not called, as a PostgreSQL function
+  made SECURITY DEFINER is not; and EXECUTE revoked from an account that
+  held no other permission on the procedure is `schema-changed`, where
+  PostgreSQL answers `permission-denied`, because SQL Server hides the
+  procedure from that account as if it were dropped. `OpenConnection`
+  gains `actions`, which `drivers.ts` opens on a pool of its own -- a third
+  PostgreSQL client and a second SQL Server pool of ten, each named
+  `formancy-data actions` to the database -- so slow runs cannot stall
+  reads and writes; a fake connection an embedder builds needs one.
+  `connectSqlServer` takes `poolMax` and `applicationName`. Every
+  fixture container loads an `actions` schema beside the parity one. The
+  cost: a run holds its record and the parent for up to its deadline; on
+  PostgreSQL a form scoped through a parent needs UPDATE on the parent's
+  table for any run, and the generator does not say so yet, nor that a
+  STRICT routine is refused; a PostgreSQL run whose answer was lost is
+  unknown though it never committed; and a PostgreSQL routine with no
+  parameter, replaced by an IMMUTABLE one between a run's description and
+  its call, is evaluated before its guard refuses it. Nothing in the
+  server runs an action yet: the route is a later record's.
+
 - **data-core binds a database routine as an action of a form** (0159).
   Why: administrator-named actions run logic the deployment keeps in its
   database over the open record, and before any adapter runs one, what a

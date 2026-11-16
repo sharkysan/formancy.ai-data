@@ -13,7 +13,7 @@ discovery of the schemas an administrator approved, and both halves of the
 operations port: lookups and records.
 
 ```ts
-import { connectPostgres, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
+import { connectPostgres, createPostgresActions, createPostgresAdapter, createPostgresLookups, createPostgresRecords } from '@formancy/data-postgres'
 
 const sql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true } })
 const adapter = createPostgresAdapter(sql)
@@ -35,6 +35,10 @@ withRoutines.routines // each with its parameters by type oid and which have a d
 const lookupSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data lookups' })
 const lookups = createPostgresLookups(lookupSql) // LookupAdapter: search, resolve, rejects, each with the caller's signal
 const records = createPostgresRecords(sql) // RecordAdapter: describe, read, list, insert, update, delete, save
+
+// Actions on a client of their own, so a run holding its locks stalls no read or write (0160, below).
+const actionSql = connectPostgres({ host, port, database, user, password, tls: { enabled: true, rejectUnauthorized: true }, applicationName: 'formancy-data actions' })
+const actions = createPostgresActions(actionSql) // ActionAdapter: describe, run
 await adapter.close()
 ```
 
@@ -546,6 +550,46 @@ refusal at COMMIT -- a deferred key -- is that refusal, nothing stored.
 What both engines answer is `SAVE_PARITY`'s, held by
 `src/save.integration.test.ts` and `src/save-lost-answer.integration.test.ts`.
 
+### An action's run
+
+`actions.describe(table, routine)` reads the root and the routine in one
+statement: the routine `to_regprocedure` of its bound signature resolves
+to, normalised by discovery's own functions, with the digest of what a
+call rests on -- its oid, name, kind, arguments, result, volatility,
+SECURITY DEFINER, STRICT -- and never its body, and beside it the digest
+of its whole definition as `pg_get_functiondef` prints it from the
+catalog cache, which the locked path's call is guarded by. A STRICT
+routine is refused, `refused`: PostgreSQL does not call one given a NULL
+argument, and the run would answer done. `actions.run(request, deadlineMs)`
+runs a run data-core's `planAction` made in one `sql.begin`, sent once and
+never again, or keeps nothing of it
+([0160](../../docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). `SET LOCAL
+statement_timeout` to what remains of the deadline; on the locked path the
+root locked first and the timeout set again; the lock, which selects the
+record by its key under the person's filters and throughs -- each
+through's parent `FOR SHARE`, which PostgreSQL grants only to an account
+that may UPDATE the parent's table -- at the version read and the open
+version alone, `for no key update` in key order, and moves its version by
+one; `SET LOCAL statement_timeout` to what remains; then the call, `select
+"s"."f"("p" => …)` over the moved row, every argument named and cast to
+its bound type, each bound value read from a derived table behind
+`offset 0` -- the planner evaluates an IMMUTABLE function whose arguments are all
+constants while it plans, before any guard -- under the routine's digest,
+and on the locked path, whose snapshot is the lock statement's, under its
+whole definition's too. A record not moved is explained after the
+rollback, `stale`, `not-found` or `version-ended`; a routine not the one
+decided over is called by no row, `schema-changed`; an error is classified
+by the context field the server fills inside a function, `declined` under
+the prefix and `refused` otherwise, whatever its code; 57014 is
+`action-timeout`, and the server's own unknown outcome, 40003,
+`unknown-outcome`. A lost answer once the lock was sent is
+`unknown-outcome`, though PostgreSQL commits only on the COMMIT sent after
+the call: a cut during the call was measured rolled back. A run costs
+eight round trips from BEGIN to COMMIT, ten on the locked path, outside
+the deadline, which bounds each statement. What both engines answer is
+`ACTION_PARITY`'s, held by `src/actions.integration.test.ts`, with the
+facts a run rests on, and `src/actions-lost-answer.integration.test.ts`.
+
 ### Discovery reads pg_catalog, as the account the forms will run as
 
 `information_schema` is filtered by privilege: an account that may only
@@ -845,6 +889,24 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   answer the hop drops after the commit, counted at the wire; a deferred
   unique constraint refused after the row was sent, with and without the
   answer lost; and a statement timed out while it waits on a lock.
+- `actions.integration.test.ts` — an action's run over the open record
+  (0160), each case `ACTION_PARITY`'s, as the order form's own account:
+  committed with the version moved and every source given, twice from one
+  read, another tenant's, a parent moved while a run holds its child, an
+  ended version, the deployment's refusal in words and not, a body that
+  references a missing column, a routine made again or SECURITY DEFINER,
+  EXECUTE revoked, a lock held and a routine past the deadline; this
+  engine's own, an overload made after publication, two statements each
+  inside the deadline and together past it, the server's own unknown
+  outcome, a STRICT routine, one made IMMUTABLE in its place, and on the
+  locked path the deadline's cases, a wait for the table and then the row,
+  and a routine changed while the lock waited; and the facts a run rests
+  on, each measured: lock order, the context field, a locking clause
+  inside EXISTS and the UPDATE it asks, and postgres.js's reported pool
+  size. Whether a routine was called is counted by a sequence each fixture
+  routine draws from as it begins, which no rollback gives back.
+  `actions-lost-answer.integration.test.ts` loses a run's answer through
+  the hop, and counts a run's round trips on both paths.
 
 ## Licence
 

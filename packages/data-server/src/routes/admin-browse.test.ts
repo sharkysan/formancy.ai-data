@@ -2,7 +2,17 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, DescribedTable, ListOutcome, ListRequest, LookupAdapter, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type {
+  ActionAdapter,
+  ColumnMeta,
+  DatabaseAdapter,
+  DescribedTable,
+  ListOutcome,
+  ListRequest,
+  LookupAdapter,
+  NormalizedType,
+  RecordAdapter,
+} from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
@@ -103,7 +113,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
-    open: async (id) => (id === 'erp' ? { adapter, lookups: {} as LookupAdapter, records } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter } : undefined),
     close: async () => {},
   }
 }

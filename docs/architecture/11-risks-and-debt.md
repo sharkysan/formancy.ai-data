@@ -73,6 +73,29 @@ account's own grants; the module holds only what it hands the routine and
 which row it runs over
 ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 
+**An action's run, accepted rather than fixed** ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). On
+PostgreSQL a run locks a through's parent `FOR SHARE`, which asks UPDATE on
+the parent's table, and the generator does not yet refuse an action whose
+account lacks it: every run of such a form is `permission-denied`, found
+only when one is run. On SQL Server the procedure's definition and EXECUTE
+are checked in the statements just before the EXEC, and a procedure
+dropped and created again between them is called as created; a run past
+its deadline, or whose procedure ended the transaction, is
+`unknown-outcome` even where it rolled back, and on PostgreSQL so is a run
+whose answer was lost before its COMMIT was sent. Half the deadline for
+SQL Server's lock wait is chosen, not measured. On PostgreSQL a STRICT
+routine is refused by the run's description, and neither discovery nor
+the generator says so before publication; and a routine with no
+parameter, replaced by an IMMUTABLE one between the description and the
+call, is evaluated while the call is planned, before its guard refuses
+it. On SQL Server, EXECUTE revoked from an account that held no other
+permission on the procedure is answered as the procedure gone,
+`schema-changed`, where PostgreSQL answers `permission-denied`: the
+procedure is out of the account's sight, and nothing it can ask tells
+that from a procedure dropped. Nothing in the server runs
+an action yet, so each action pool opened per database stands idle until
+the route does.
+
 ### Lost updates and ambiguous writes
 
 *Mitigation, already applied:* a record operation is one guarded statement

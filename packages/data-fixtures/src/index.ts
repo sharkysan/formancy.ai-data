@@ -1,6 +1,19 @@
 export { accessDisagreements, READER_ACCESS, WRITER_ACCESS } from './access.js'
 export type { ExpectedAccess, ExpectedCapability, ExpectedObjectAccess, ExpectedObjectFacts } from './access.js'
 export {
+  ACTION_CLERK,
+  ACTION_DECLINED_REASON,
+  ACTION_PARITY,
+  ACTION_SCOPE,
+  actionAnswer,
+  actionExpected,
+  actionForms,
+  actionToken,
+  plannedAction,
+} from './actions.js'
+export type { ActionAnswer, ActionBundle, ActionCase, ActionExpectation, ActionForms } from './actions.js'
+export {
+  actionCase,
   browseCase,
   covers,
   cascadeCase,

@@ -5,10 +5,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf, EXPORT_MAX_BYTES, generateForm, LIST_PAGE_SIZE } from '@formancy/data-core'
 import type {
+  ActionAdapter,
   ColumnMeta,
   DatabaseAdapter,
-  FieldBinding,
   DescribedTable,
+  FieldBinding,
   FormPolicy,
   ListOutcome,
   ListRequest,
@@ -303,7 +304,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp', 'crm'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records } : undefined),
+    open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
     close: async () => {},
   }
 }

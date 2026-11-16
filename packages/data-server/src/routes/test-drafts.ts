@@ -2,7 +2,16 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, EMPTY_PRESENTATION } from '@formancy/data-core'
-import type { ColumnMeta, DatabaseAdapter, FormBindings, LookupAdapter, MetadataSnapshot, NormalizedType, RecordAdapter } from '@formancy/data-core'
+import type {
+  ActionAdapter,
+  ColumnMeta,
+  DatabaseAdapter,
+  FormBindings,
+  LookupAdapter,
+  MetadataSnapshot,
+  NormalizedType,
+  RecordAdapter,
+} from '@formancy/data-core'
 import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
@@ -103,7 +112,7 @@ export function registry(): ConnectionRegistry {
     open: async (id) => {
       if (!db.allowlist.includes(id)) return undefined
       if (!db.reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
     },
     close: async () => {},
   }

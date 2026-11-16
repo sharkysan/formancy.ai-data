@@ -1,3 +1,4 @@
+export { createSqlServerActions } from './actions/run.js'
 export { createSqlServerAdapter } from './adapter.js'
 export { discoverSqlServer } from './discovery/discover.js'
 export { createSqlServerLookups } from './lookups/lookups.js'

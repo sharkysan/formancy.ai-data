@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createSnapshot, describedOf } from '@formancy/data-core'
 import type {
+  ActionAdapter,
   ApiValue,
   ColumnMeta,
   CoverageGap,
@@ -361,7 +362,8 @@ export async function startPlane(
           return { ok: true, described, rows: page.map((values) => ({ values: read(values), version: null })) }
         },
       } as unknown as RecordAdapter
-      return { adapter, lookups: {} as LookupAdapter, records }
+      // Nor runs an action (0160).
+      return { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter }
     },
     close: async () => {},
   }

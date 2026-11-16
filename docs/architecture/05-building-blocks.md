@@ -123,7 +123,7 @@ Node. Its suites sit beside the modules they test and need no Docker.
 | `codecs/` | `codecFor(column)`: exact numbers as strings, never rounded ([0008](../decisions/0008-exact-values-travel-as-strings.md)); text counted in its column's own unit (0026); dates and times in formancy's shapes, taken from `@formancy/spec` ([formancy.ai 0067](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0067-a-temporal-answer-is-one-fixed-width-string.md)), which both adapters cut a stored instant or time to, so `planUpdate` never writes back an unedited one ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)); a concurrency token as text |
 | `runtime.ts` | The runtime plane's answers, declared once so the server that sends them and the client that reads them compile against one shape ([0029](../decisions/0029-a-host-renders-a-published-form-through-one-client.md)); the write id's header ([0031](../decisions/0031-an-answer-lost-after-a-write-is-unknown.md)), the list's page size, a file's byte budget `EXPORT_MAX_BYTES` and its name `exportFileName` ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)), and the headers a cross-origin request may carry ([0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)) |
 | `save.ts` | A save's body, its answer, the part of it a refusal names and the refusal, beside `runtime.ts` for the route that answers it and the client that sends it (0155) |
-| `actions/` | An action, a routine bound to a form and run over the open record ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)): `types.ts` the request's choice, the binding and the run's planned request; `plan.ts`'s `planAction`, where a run meets the policy, the tokens, the codecs and the bindings, a field or a key passed as a column of the locked row; `wire.ts` the shapes a route and a client will share. Nothing runs one yet |
+| `actions/` | An action, a routine bound to a form and run over the open record ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)): `types.ts` the request's choice, the binding, the run's planned request and `ActionAdapter`, the port both adapters run it through ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)); `plan.ts`'s `planAction`, where a run meets the policy, the tokens, the codecs and the bindings, a field or a key passed as a column of the locked row; `failure.ts`'s `runFailure`, a record failure as a run's, so the adapters cannot read one refusal two ways; `wire.ts` the shapes a route and a client will share. Nothing in the server runs one yet |
 
 Bundle validation is not here. `validateBundle` is the server's
 (`packages/data-server/src/bundle.ts`), and asks this package: the
@@ -139,6 +139,7 @@ every read, and `generateForm` at every write but a restore.
 | `DatabaseAdapter` | `adapter.ts` | `ping`, `discover`, `close` | `createPostgresAdapter` | `createSqlServerAdapter` |
 | `RecordAdapter` | `records/types.ts` | `describe`, `read`, `list`, `insert`, `update`, `supersede`, `delete`, `save` | `createPostgresRecords` | `createSqlServerRecords` |
 | `LookupAdapter` | `lookup/types.ts` | `search`, `resolve`, `rejects`, each with the actor's filters and a signal | `createPostgresLookups` | `createSqlServerLookups` |
+| `ActionAdapter` | `actions/types.ts` | `describe`, the root and the routine in one statement, and `run`, with the server's deadline and no signal | `createPostgresActions` | `createSqlServerActions` |
 
 Records and lookups are ports of their own beside `DatabaseAdapter`, so the
 two halves are built and tested apart; a write is one guarded statement,
@@ -147,6 +148,10 @@ canonical in and out, and never retried
 A save of a record with its rows is `RecordAdapter.save`, the request
 planned in `records/save-types.ts`, which both adapters run as one
 transaction and one set of shared cases holds, `SAVE_PARITY` (0155).
+An action's run is `ActionAdapter.run`, the request planned in
+`actions/plan.ts`, which both adapters run as one transaction that locks
+the record, moves its version and calls the routine, held by
+`ACTION_PARITY` (0160).
 Each port has two implementations and something that fails when they
 disagree, against real servers in every run (0003): discovery answers to
 `FIXTURE_MODEL` through `data-fixtures`' comparators
@@ -187,6 +192,7 @@ operations in `records/` and `lookups/`.
 | `discovery/` | `pg_catalog`, one query per concern, all in one `REPEATABLE READ` read-only transaction ([0006](../decisions/0006-postgres-discovery-reads-pg-catalog.md)): `objects`, `columns`, `types`, `keys`, `foreign-keys`, `checks`, `comments`, `access`, `account`, `referenced-by`, assembled by `discover.ts`; and when the scope asks, `routines`, pg_proc's functions and procedures but an extension's, with `ROUTINE_TYPES`, the closed table of built-in types by oid a cast is spelled from (0158) | the catalog views, one concern per query, side by side and not one consistent read ([0007](../decisions/0007-sqlserver-discovery-and-what-it-hides.md)): `objects`, `columns`, `types`, `keys`, `foreign-keys`, `checks`, `access`, `account`, `referenced-by`, and besides them `visibility.ts` and `row-security.ts` for what a permission-filtered catalog hides, and `catalog.ts` for a gap found before its object has a name; and when the scope asks, `routines`, the T-SQL procedures and functions Microsoft did not ship, each with its parameters in one statement, with `ROUTINE_TYPES` by user_type_id and a gap on each CLR or replication-filter routine it does not read, and `visibility.ts`'s `routineGaps` for one the catalog may hide (0158) |
 | `sql/` | `identifiers.ts` quotes one part at a time; `statement.ts` sends every value as text the server casts, and collects a statement's rows as the driver reads them ([0078](../decisions/0078-a-postgresql-statements-rows-are-collected-as-the-driver-reads-them.md)); `values.ts` reads each column back as canonical text; `catalog.ts` names every function, operator, type and collation in `pg_catalog` ([0016](../decisions/0016-postgres-operations.md)); `filters.ts`, `order.ts` -- the order, and the rows after a row in it ([0108](../decisions/0108-a-forms-list-pages-after-the-last-row-it-showed-found-again-by-its-key.md)) -- `search.ts` | `quote.ts` bracket-quotes as QUOTENAME does; `statement.ts` binds each value under a generated name; `values.ts` ([0017](../decisions/0017-sqlserver-operations.md)); `filters.ts`, `order.ts` -- the order, and the rows after a row in it (0108) -- `search.ts` |
 | `records/` | `records.ts`, `sql.ts`, `requests.ts`; `definition.ts`, the table's definition a write is guarded by (0041); `list.ts`; `filter.ts`, a person's condition as one predicate ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)); `delete.ts`; `errors.ts`; `versions.ts`, a change from a date as one statement that checks itself (0113); `sql.ts`'s `clockSql`, a stamp's clock as `current_timestamp`, a wall clock and a day UTC's (0153); `explain.ts`, the read that tells a write which changed nothing stale from gone, and the path a definition chooses, which a write alone and a save's steps share; `save.ts`, a record with its rows as one `sql.begin`, and `save-sql.ts`, its timeouts, touch, `within`, counts and read-back (0155) | `records.ts`, `statements.ts`, whose `clockSql` is the batch's one reading of `sysutcdatetime()`, an instant at +00:00 (0153); `definition.ts`; `list.ts`; `filter.ts`, the same, a zoneless day's midnight a `datetime2` of the column's scale (0104); `delete.ts`; `errors.ts`; `versions.ts`, a change from a date as two statements in the write batch (0113); `batch-steps.ts`, the adapter's own errors and what every step of a write batch carries -- the transaction's check, the definition's guard, the INSTEAD OF guard, the text check and the version read after triggers -- which a write alone's batch and a save's share; `explain.ts`, the checks before a write is sent and the read that explains one that changed nothing; `save.ts` and `save-batch.ts`, a record with its rows as one batch, CATCH recording the step it stopped at, translated by `errors.ts`' one rule (0155) |
+| `actions/` | `definition.ts`, the routine's facts and digest, found by `to_regprocedure` of its bound signature and read by discovery's own `routineOf`, a STRICT routine refused, and the digest of its whole definition as the catalog cache holds it, which the locked path's call is guarded by; `statements.ts`, the statement timeout, the lock that moves the version with each through's parent `FOR SHARE`, and the call with every argument named and cast, each bound value read from a derived table the planner keeps; `errors.ts`, an error classified by where it arose, by its context field; `run.ts`, `createPostgresActions`, one `sql.begin` of the two (0160) | `definition.ts`, the procedure's facts and digest by OBJECT_ID, and discovery's own `ROUTINE_ROWS` for its description; `statements.ts`, the one batch -- the lock `WITH (UPDLOCK, HOLDLOCK)`, the routine's guard and EXECUTE, each argument into a variable of its parameter's type, a code-page one read back, the EXEC and its status; `errors.ts`, by ERROR_PROCEDURE() and the adapter's own numbers in `batch-steps.ts`; `results.ts`, what a run keeps of its result sets as they stream, every row not its own dropped; `run.ts`, `createSqlServerActions`, the batch sent once at the deadline (0160) |
 | `lookups/` | `lookups.ts`, `sql.ts`, and `cancel.ts`, which stops a statement in the database through three of postgres.js's own properties (0061), sending a cancel again while a delivered one leaves it running ([0121](../decisions/0121-a-postgres-lookups-cancel-is-sent-again-while-a-delivered-one-leaves-it-running.md)) | `lookups.ts`, `statements.ts`; a statement is stopped by `request.cancel()` (0061) |
 
 Where the engines differ, the adapter says so in its own files rather than
@@ -196,7 +202,10 @@ and PostgreSQL's is not, which is why only one adapter has
 PostgreSQL delivers a cancel on a separate connection and a late one stops
 whatever that backend runs next; the server opens that second client in
 `packages/data-server/src/drivers.ts`, at the cost of up to twice the
-connections per database (0061). Each behaviour is held by the package's
+connections per database (0061). Actions run on a client of their own on
+both engines, a third on PostgreSQL and a second pool on SQL Server, so a
+run holding its locks to its deadline cannot stall reads and writes
+(0160). Each behaviour is held by the package's
 `*.integration.test.ts` suites against the images they name (0003).
 
 ### `@formancy/data-identity`
@@ -241,7 +250,7 @@ runtime plane only when given a registry and a store.
 |---|---|
 | `main.ts` | The composition root: every setting is read here, and a missing or malformed one stops the process with a sentence saying which. Turns the planes on, resolves the audit key, says once for each Entra connection that no test logs in as one and stops for a managed identity while `AZURE_FEDERATED_TOKEN_FILE` is set (0074, `scripts/server-start.test.mjs`), reads the key set again on SIGHUP, closes every pool on SIGTERM (0025) |
 | `planes.ts` | `servedPlanes`: one audit sink, the server's log, for both planes ([0033](../decisions/0033-the-administrator-plane-is-audited.md)); out of `main.ts` so `server-log.test.ts` can hold the wiring |
-| `drivers.ts` | `DRIVER_FACTORIES`, the one place the server meets the adapters: per engine, its connection opened through the adapter's own connect function, as a SQL login or, on SQL Server, an Entra principal, one login object for each connection while its secret is the same (0074), pinged, and its ports made (0025) |
+| `drivers.ts` | `DRIVER_FACTORIES`, the one place the server meets the adapters: per engine, its connection opened through the adapter's own connect function, as a SQL login or, on SQL Server, an Entra principal, one login object for each connection while its secret is the same (0074), pinged, and its ports made (0025); actions on a client of their own, each named `formancy-data actions` to its database, SQL Server's sized at `SQLSERVER_ACTION_POOL`, mssql's default, since mssql reports no bound (0160), which `drivers.integration.test.ts` holds against both engines |
 | `connections.ts` | The operator's allowlist, every problem at once, and `createConnectionRegistry`, the only place a connection's name becomes a database ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)). An entry logs in as a SQL login or as an Entra principal, and refuses a key it does not read (0074) |
 | `config-store.ts` | `<root>/<id>/<version>.json`, compare-and-swap by hard link (0013); `drafts()` beside it under review; `people(person)` beside it, a person's own views, each form's newest version alone ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)) |
 | `bundle.ts`, `bundle-format2.ts`, `served-schema.ts`, `generation.ts` | `validateBundle`, on publish and on every read (0019): the form in the spec version the generator writes (0042), the fingerprint, the bindings, the policy, and in format 2 the base with its presentation (0030); a lookup saved with its record and a touch column compared with the request, held to what a save can hold, and refused in format 1 (0155) |
@@ -340,17 +349,20 @@ and asserted by the major its server answered
 and the shared cases for drift, deletes, cascades, uuid keys, what a
 new record starts with, what a check that lists a column's values
 makes of its field, what a write a trigger refuses in words for the person
-answers, and what a save of a record with its rows does, with the forms and
-the plan a save is made through (`drifting.ts`, `deletes.ts`, `cascades.ts`,
-`uuid.ts`, `defaults.ts`, `check-lists.ts`, `declines.ts`, `saves.ts`; 0041,
-0050, 0051, 0056, 0155,
+answers, what a save of a record with its rows does, with the forms and
+the plan a save is made through, and what an action's run does, over the
+actions schema every fixture container loads beside the parity one
+(`fixtures/*.actions.sql`), with the forms and the plan a run is made
+through (`drifting.ts`, `deletes.ts`, `cascades.ts`,
+`uuid.ts`, `defaults.ts`, `check-lists.ts`, `declines.ts`, `saves.ts`,
+`actions.ts`; 0041, 0050, 0051, 0056, 0155, 0160,
 [0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md),
 [0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md),
 [0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)), the model giving each check the list data-core reads out of it; tenant 3's paged customers and orders, a lookup page of each and
 more, which the client's and the host page's suites insert beside the
 model (`paged.ts`, 0085); and for a file of records, `exports.ts`: `EXPORT_PARITY`, the bytes
 both adapters' lists must make through data-core, and `EXPORT_ROWS`, the
-customers whose names a file must quote or neutralise ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)). `load.test.ts` holds both SQL files to the same constraint names.
+customers whose names a file must quote or neutralise ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)). `load.test.ts` holds both SQL files to the same constraint names, and both actions files to the same tables, constraints and routines.
 
 ### `@formancy/data-performance`
 

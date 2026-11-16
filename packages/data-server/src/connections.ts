@@ -1,5 +1,5 @@
 import { isDatabaseKind } from '@formancy/data-core'
-import type { DatabaseAdapter, DatabaseKind, DiscoveryScope, LookupAdapter, RecordAdapter } from '@formancy/data-core'
+import type { ActionAdapter, DatabaseAdapter, DatabaseKind, DiscoveryScope, LookupAdapter, RecordAdapter } from '@formancy/data-core'
 import { resolveSecret } from '@formancy/data-identity'
 import type { SecretSource } from '@formancy/data-identity'
 
@@ -42,11 +42,17 @@ export interface ConnectionConfig {
   tls?: { enabled?: boolean; trustServerCertificate?: boolean }
 }
 
-/** What the server holds for one open connection: the three ports. */
+/**
+ * What the server holds for one open connection: the four ports. `actions`
+ * runs on a pool of its own (0160): a run holds a connection and row locks
+ * for up to its deadline, and on the records' pool a handful of slow runs
+ * would stall every read and write of every form on that database.
+ */
 export interface OpenConnection {
   adapter: DatabaseAdapter
   lookups: LookupAdapter
   records: RecordAdapter
+  actions: ActionAdapter
 }
 
 /**

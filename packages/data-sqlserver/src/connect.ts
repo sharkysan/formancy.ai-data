@@ -19,6 +19,19 @@ interface SqlServerAddress {
   database: string
   encrypt: boolean
   trustServerCertificate: boolean
+  /**
+   * The most connections the pool opens. Absent, mssql's own default, which
+   * no public property of a pool reports: an action's pool is given it
+   * explicitly, so the bound its runs are counted against is a number the
+   * server holds (0160).
+   */
+  poolMax?: number
+  /**
+   * The name the pool's sessions give SQL Server, `program_name` in
+   * sys.dm_exec_sessions, so a DBA tells an action's session from the
+   * records' (0160). Absent, mssql's own.
+   */
+  applicationName?: string
 }
 
 /** A SQL login: a user and its password. */
@@ -97,14 +110,20 @@ function credentialFor(login: EntraLogin): TokenCredential {
  * tedious's debug output prints a login's password (login7-payload.js).
  */
 export function sqlServerConfig(options: SqlServerConnectOptions): mssql.config {
-  const base = { server: options.host, port: options.port, database: options.database }
+  const base = {
+    server: options.host,
+    port: options.port,
+    database: options.database,
+    ...(options.poolMax === undefined ? {} : { pool: { max: options.poolMax } }),
+  }
+  const named = options.applicationName === undefined ? {} : { appName: options.applicationName }
   if (options.entra === undefined) {
-    const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate }
+    const tls = { encrypt: options.encrypt, trustServerCertificate: options.trustServerCertificate, ...named }
     return { ...base, options: options.encrypt ? { ...tls, connector: encryptedConnector } : tls, user: options.user, password: options.password }
   }
   return {
     ...base,
-    options: { encrypt: 'strict', trustServerCertificate: false },
+    options: { encrypt: 'strict', trustServerCertificate: false, ...named },
     authentication: { type: 'token-credential', options: { credential: credentialFor(options.entra) } },
   }
 }
