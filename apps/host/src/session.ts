@@ -1,8 +1,20 @@
 import { createFormEngine, withDefaults } from '@formancy/core'
 import type { FormEngine } from '@formancy/core'
 import { fieldProblems, isUnknownWrite, lookupSources } from '@formancy/data-client'
-import type { DataClient, FormRecord, LookupOperation, PublishedForm, Reconciliation, UnknownWrite, WriteOutcome } from '@formancy/data-client'
+import type {
+  DataClient,
+  FormRecord,
+  LookupOperation,
+  PublishedForm,
+  Reconciliation,
+  SaveRecordChange,
+  UnknownWrite,
+  WriteOutcome,
+} from '@formancy/data-client'
 import type { Work } from './leave.js'
+import type { TakenRows } from './save-set.js'
+import { recordOutcome } from './with-rows.js'
+import type { WithRows } from './with-rows.js'
 import { withMoves } from './moves.js'
 import { disableFields } from './widgets.js'
 
@@ -57,12 +69,31 @@ import { disableFields } from './widgets.js'
  * replaced the form is not applied to the new one but still said
  * (**replaced**): a record created, or a 502's "may have been saved", is
  * something the person needs to hear about the form they left (0015).
+ *
+ * A record whose rows are saved with it (0155) is saved through `rows`
+ * (save-set.ts) whenever its rows hold a change, or a together child
+ * requires rows of a new one: the same decisions, over one
+ * `POST …/records/save` that carries the record -- its answers where they
+ * changed, none where they did not, which moves its version all the same
+ * -- and its rows. A row's form that refuses its answers sends nothing
+ * (**rows**, said by the rows' tab); so does a refusal about a row, which
+ * the tab says where it is; a stale record whose own answers did not
+ * change offers to keep the rows' changes (`keep`). A lost save is
+ * unknown as an update's or a create's is, held as a create is where it
+ * created the record. The rows are one set for every pane of the record,
+ * so a press in one pane while another's save of them is out says busy,
+ * and after another's lost save that created the record says held, until
+ * that pane checks it or is told to enter it again: a second press of the
+ * other renderer's Save would otherwise send the same rows with a second
+ * record.
  */
 
 export type Renderer = 'react' | 'angular'
 
 export type SaveResult =
-  | { kind: 'saved' | 'created' | 'stale' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held'; message: string }
+  | { kind: 'saved' | 'created' | 'refused' | 'declined' | 'busy' | 'replaced' | 'held' | 'rows'; message: string }
+  /** `keep`: a save of the record's rows alone, stale at the record, whose rows' changes can be kept (0155). */
+  | { kind: 'stale'; message: string; keep?: true }
   | { kind: 'invalid'; message: string; declined?: true }
   | { kind: 'unknown'; message: string; unknown: UnknownWrite }
 
@@ -74,6 +105,9 @@ export const NEWER = 'Changes made while it was saving are still in the form, no
 
 /** How an answer for a form Load or New has since replaced begins. */
 export const REPLACED = 'The save sent before this form was replaced:'
+
+/** What a press says when a form of the record's rows refused its answers (0155): that row is opened, its problems said there. */
+export const ROW_REFUSED = 'A row saved with it has answers to fix first: it is open in its tab.'
 
 /** What a press says while a create whose outcome is unknown holds the form. */
 export const HELD = 'Nothing was sent: the last save may have been stored. Check whether it was saved first.'
@@ -136,6 +170,8 @@ export interface SessionOptions {
    * one the person may reference (0043).
    */
   fixed?: readonly string[]
+  /** The rows saved with the record (0155), where it has together children. */
+  rows?: WithRows
 }
 
 /**
@@ -185,7 +221,7 @@ function notAcceptedOn({ form, writable }: PublishedForm, operation: 'create' | 
   return form.model.fields.map((field) => field.key).filter((key) => !accepted.includes(key))
 }
 
-export function createSession({ client, formId, definition, renderer, namespace, fixed = [] }: SessionOptions) {
+export function createSession({ client, formId, definition, renderer, namespace, fixed = [], rows }: SessionOptions) {
   // What this person writes in no operation is drawn as nothing writes it
   // and sent in no body: a renderer submits a disabled field, and a body
   // that echoed it would carry the tenant a token alone carries (0117).
@@ -311,7 +347,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
     if (isUnknownWrite(outcome)) {
       // Nothing is applied: the record and the version stay what they were
       // when it was sent. Only a create holds -- an update protects itself.
-      lost = { write: outcome, generation, held: outcome.operation === 'create' }
+      lost = { write: outcome, generation, held: outcome.operation === 'create' || (outcome.operation === 'save' && outcome.version === null) }
       return { kind: 'unknown', message: outcome.message, unknown: outcome }
     }
     // Stale against the version this form's unknown update sent: the record
@@ -321,7 +357,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
       !outcome.ok &&
       outcome.status === 409 &&
       outcome.code === 'stale' &&
-      (here?.write.operation === 'update' || here?.write.operation === 'supersede') &&
+      (here?.write.operation === 'update' || here?.write.operation === 'supersede' || (here?.write.operation === 'save' && here.write.version !== null)) &&
       here.write.record === at.record &&
       here.write.version === at.version
     ) {
@@ -354,12 +390,23 @@ export function createSession({ client, formId, definition, renderer, namespace,
     return { kind: created ? 'created' : 'saved', message: newer ? `${message} ${NEWER}` : message }
   }
 
-  async function send(engine: FormEngine, generation: number, answers: Record<string, unknown>): Promise<SaveResult> {
+  async function send(engine: FormEngine, generation: number, answers: Record<string, unknown>, taken: TakenRows | null): Promise<SaveResult> {
     // A copy: the answers as submitted, whatever the engine holds by the time the server answers.
     const submitted = structuredClone(answers)
     // And what goes: every answer but those this person writes in no operation (0117).
     const sent = Object.fromEntries(Object.entries(submitted).filter(([key]) => !unwritten.has(key)))
     const { record, version, follows } = state
+    if (taken !== null && rows !== undefined) {
+      // With its rows (0155): its answers where they changed, none where they did not -- a touch, which moves its version.
+      const moved = [...new Set([...Object.keys(submitted), ...Object.keys(baseline)])].some((key) => !same(submitted[key], baseline[key]))
+      const change: SaveRecordChange =
+        record === undefined ? { create: { answers: sent } } : { update: { record, version: version ?? '', answers: moved ? sent : {} } }
+      const outcome = await rows.send(change, taken)
+      const own = recordOutcome(outcome)
+      if (current().generation !== generation) return { kind: 'replaced', message: `${REPLACED} ${said(own, record === undefined)}` }
+      const result = settle(engine, generation, submitted, { record, version }, own, record === undefined)
+      return rows.settle(outcome, taken, result.kind === 'stale' && record !== undefined && !moved ? { ...result, keep: true } : result)
+    }
     // A next version ends the one it follows and is created in one write (0113).
     const outcome =
       follows !== undefined
@@ -443,6 +490,30 @@ export function createSession({ client, formId, definition, renderer, namespace,
       const read = await client.read(formId, state.record)
       if (!read.ok) return read.message
       open(read.value)
+      // The rows saved with it, as stored too: their drafts went with the record's (0155).
+      rows?.reload(read.value.record)
+      return null
+    },
+    /** The guard's owners of the rows saved with the record (0155): what Load the saved record drops with it. */
+    rowOwners: (): string[] => rows?.owners(state.record) ?? [],
+    /** `record` as stored opened over the draft -- an unknown save's check found it -- and its rows listed again with it (0155). */
+    loadStored(record: FormRecord): void {
+      open(record)
+      rows?.reload(record.record)
+    },
+    /**
+     * Keep my line changes (0155): the record read again, at its new version,
+     * and its rows listed again, each change kept at the version it was read
+     * at, so the next save is guarded row by row. Null when it opened;
+     * otherwise the server's sentence.
+     */
+    async keepRows(): Promise<string | null> {
+      const token = state.record
+      if (token === undefined || rows === undefined) return 'There is no saved record to read again.'
+      const read = await client.read(formId, token)
+      if (!read.ok) return read.message
+      open(read.value)
+      await rows.keep(token)
       return null
     },
     /**
@@ -456,12 +527,28 @@ export function createSession({ client, formId, definition, renderer, namespace,
       if (saving?.generation === generation) return { kind: 'busy', message: BUSY }
       if (lostHere()?.held === true) return { kind: 'held', message: HELD }
       if (deleting !== undefined) return { kind: 'held', message: deleting }
-      const promise: Promise<SaveResult | null> = send(engine, generation, submitted.data).finally(() => {
-        // Only its own: a later form's save may hold the guard by now.
-        if (saving?.promise === promise) saving = undefined
-        notify()
-      })
+      // The rows go with it where they hold a change (0155): each changed row's form submitted first, and none refusing.
+      const carried = state.follows === undefined && rows?.carries(state.record) === true
+      // Held by another pane's save of the same rows: the set is the record's, whichever renderer sent it.
+      const held = carried ? (rows?.held(state.record) ?? null) : null
+      if (held === 'busy') return { kind: 'busy', message: BUSY }
+      if (held === 'held') return { kind: 'held', message: HELD }
+      const taken = carried ? (rows?.take(state.record) ?? null) : null
+      if (carried && taken === null) return { kind: 'rows', message: ROW_REFUSED }
+      const promise: Promise<SaveResult | null> = send(engine, generation, submitted.data, taken)
+        .then((result) => {
+          // A record created: the rows held for a new one are its own now, whether or not this save carried them (0155).
+          if (result.kind === 'created' && state.record !== undefined) rows?.created(state.record)
+          return result
+        })
+        .finally(() => {
+          // Only its own: a later form's save may hold the guard by now.
+          if (saving?.promise === promise) saving = undefined
+          notify()
+        })
       saving = { promise, generation }
+      // What holds this save's rows for every other pane: it out, then its loss where it created the record, until checked.
+      if (taken !== null) rows?.holding(state.record, () => (saving?.promise === promise ? 'busy' : lostHere()?.held === true ? 'held' : null))
       notify()
       return promise
     },

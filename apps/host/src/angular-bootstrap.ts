@@ -5,6 +5,7 @@ import { provideFormancy, provideFormancyOptionsSources } from '@formancy/angula
 import type { OptionsSources, SubmitOutcome } from '@formancy/angular'
 import type { FormEngine } from '@formancy/core'
 import { HostAngularForm } from './angular-form.js'
+import { HOST_LABEL } from './angular-label.js'
 import { HOST_OFFER } from './angular-offer.js'
 import { HOST_SAVE } from './angular-save.js'
 import type { LookupOffer } from './lookup-opens.js'
@@ -34,6 +35,7 @@ export async function mountAngularForm(
   sources: OptionsSources,
   save: (outcome: SubmitOutcome) => void,
   offer: LookupOffer | null,
+  label = 'Save',
 ): Promise<() => void> {
   const root = document.createElement('formancy-data-host-form')
   host.append(root)
@@ -47,6 +49,7 @@ export async function mountAngularForm(
         provideFormancyOptionsSources(sources),
         { provide: HOST_SAVE, useValue: save },
         { provide: HOST_OFFER, useValue: offer },
+        { provide: HOST_LABEL, useValue: label },
       ],
     })
     app.bootstrap(HostAngularForm, root)

@@ -1,10 +1,31 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
-import { cleanup, waitFor, within } from '@testing-library/react'
-import { answer, chooseCustomer, control, load, newRecord, openWith, RENDERERS, said, save, shows, statuses, unsavedNotice } from './test-host.js'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import {
+  answer,
+  chooseCustomer,
+  chooseForm,
+  chooseRenderer,
+  control,
+  dataRows,
+  load,
+  mount,
+  newRecord,
+  openWith,
+  RENDERERS,
+  said,
+  save,
+  showChild,
+  shows,
+  signIn,
+  stamp,
+  statuses,
+  unsavedNotice,
+} from './test-host.js'
+import { done, openRows, rowAnswer, rowCell, rowControl, rowsLine, rowsTab, rowTexts } from './test-rows.js'
 import type { User } from './test-host.js'
 import { holdingWrites } from './test-network.js'
 import type { Holding } from './test-network.js'
-import { EDGES, ENGINES, startPlane } from './test-plane.js'
+import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
 
 /*
@@ -25,7 +46,7 @@ import type { Engine, Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane()
+  plane = await startPlane({ saves: true })
 })
 
 afterAll(async () => {
@@ -130,5 +151,128 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
     expect(stored.ok && stored.value.answers['amount']).toBe('6.0000')
     await shows(renderer, 'Amount', '')
     await shows(renderer, 'Customer', '')
+  })
+})
+
+describe.each(ENGINES)('a save of an order with its lines in flight on $engine (0155)', (engine) => {
+  // A second press while the save is out says it sent nothing; a line
+  // typed into meanwhile keeps its newer answers and its mark, with the
+  // stored version applied, and the answer says those changes are not
+  // saved; and the next save, of that line alone, is heard too -- each
+  // answer a change to the pane's line, never the last one's words again
+  // (watched failing with the newer typing dropped for the stored row: the
+  // line said nothing of it).
+  test.each(RENDERERS)('in %s, a second press is busy, a line typed into meanwhile keeps its answers, and every answer is heard', async (renderer) => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('flight'), 2)
+    const holding = holdingWrites(plane.fetch)
+    const user = await openRows(plane, engine, record, undefined, holding.fetch)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    const line = `Order line k1:${String(first)}`
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, renderer, line, 'Quantity', '5')
+    await done(user, renderer, line)
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, renderer)
+    await writesHeld(holding, 1)
+    await said(renderer, /^Saving…$/)
+    await save(user, renderer)
+    await said(renderer, /^The previous save has not been answered yet\. This press sent nothing: press Save again once it has\.$/)
+    expect(holding.held).toHaveLength(1)
+
+    await showChild(user, 'Order line')
+    await user.click(rowCell(String(first)))
+    await rowAnswer(user, renderer, line, 'Quantity', '6')
+    await done(user, renderer, line)
+    holding.answer()
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await said(renderer, /^Saved the Order: 1 Order line row changed\. Changes made while it was saving are still in the form, not saved\.$/)
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 5 },
+      { no: 2, quantity: 2 },
+    ])
+    await showChild(user, 'Order line')
+    await waitFor(() => expect(rowTexts()[0]?.slice(1, 5)).toEqual(['1', '6', '', 'Changed']), { timeout: 15_000 })
+
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, renderer)
+    await writesHeld(holding, 1)
+    await said(renderer, /^Saving…$/)
+    holding.answer()
+    await said(renderer, /^Saved the Order: 1 Order line row changed\.$/)
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 6 },
+      { no: 2, quantity: 2 },
+    ])
+  })
+
+  // A new order's line typed into while the save creating both is out:
+  // the line has no Remove until the save is answered, since one taken off
+  // the page meanwhile would be stored and shown nowhere, and the line says
+  // so; when the answer lands the field being typed into keeps the
+  // keyboard and the lines' tab stays shown, though the line's key became
+  // its token and the order its record; the order is opened without
+  // asking about its own line; and its next Save stores the newer typing
+  // (watched failing with the line's forms keyed by its grid key: the
+  // keyboard was on the page itself; with the record's tabs started again
+  // for the created order: the order's tab was shown; with the created
+  // order's rows another pane's work: the page asked about them, and the
+  // order was not opened; and with Remove drawn while its line was out:
+  // each new line's Remove).
+  test('a new line typed into while its order is created keeps the keyboard, and is saved next', async () => {
+    const holding = holdingWrites(plane.fetch)
+    const user = mount(holding.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.savedOrder)
+    await chooseRenderer(user)
+    await newRecord(user)
+    const note = stamp('flight-new')
+    const paper = await waitFor(() => screen.getByRole('form', { name: 'Order, React' }), { timeout: 15_000 })
+    await user.type(await waitFor(() => within(paper).getByLabelText(/^Note\b/), { timeout: 15_000 }), note)
+    await showChild(user, 'Order line')
+    // Two lines, so that each has its Remove above the order's least.
+    for (const no of ['1', '2']) {
+      await user.click(within(rowsTab()).getByRole('button', { name: 'Add Order line' }))
+      await rowAnswer(user, 'React', `New Order line ${no}`, 'Line no', no)
+      await rowAnswer(user, 'React', `New Order line ${no}`, 'Quantity', '2')
+      await done(user, 'React', `New Order line ${no}`)
+    }
+    expect(within(rowsTab()).getByRole('button', { name: 'Remove New Order line 1' })).toBeTruthy()
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, 'React')
+    await writesHeld(holding, 1)
+
+    await showChild(user, 'Order line')
+    await waitFor(() => expect(rowsLine()).toMatch(/\. The rows in the save still out can be removed once it is answered\. /), { timeout: 15_000 })
+    expect(within(rowsTab()).queryAllByRole('button', { name: /^Remove / })).toEqual([])
+    const grid = within(rowsTab()).getByRole('grid', { name: 'Order line' })
+    const row = dataRows(grid).find((each) => within(each).getAllByRole('gridcell')[1]?.textContent === '1') as HTMLElement
+    await user.click(within(row).getAllByRole('gridcell')[1] as HTMLElement)
+    await rowAnswer(user, 'React', 'New Order line 1', 'Quantity', '25')
+    const typing = rowControl('React', 'New Order line 1', 'Quantity')
+    expect(document.activeElement).toBe(typing)
+    holding.answer()
+    const stored = await waitFor(() => within(rowsTab()).getByRole('form', { name: /^Order line k1:\d+, React$/ }), { timeout: 15_000 })
+    const name = (stored.getAttribute('aria-label') ?? '').replace(/, React$/, '')
+    await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: /^Order k1:\d+$/ })).toBeTruthy(), { timeout: 15_000 })
+    expect(document.activeElement).toBe(rowControl('React', name, 'Quantity'))
+    expect(screen.getByRole('tab', { name: 'Order line' }).getAttribute('aria-selected')).toBe('true')
+    expect(unsavedNotice()).toBeNull()
+    await waitFor(() => expect(rowTexts()[0]?.[4]).toBe('Changed'), { timeout: 15_000 })
+    const order = /(k1:\d+)/.exec(screen.getByRole('heading', { level: 3, name: /^Order k1:\d+$/ }).textContent ?? '')?.[1] ?? ''
+    expect(await plane.db.savedLines(engine.connection, order)).toEqual([
+      { no: 1, quantity: 2 },
+      { no: 2, quantity: 2 },
+    ])
+
+    await done(user, 'React', name)
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, 'React')
+    await writesHeld(holding, 1)
+    holding.answer()
+    await said('React', /^Saved the Order: 1 Order line row changed\.$/)
+    expect(await plane.db.savedLines(engine.connection, order)).toEqual([
+      { no: 1, quantity: 25 },
+      { no: 2, quantity: 2 },
+    ])
   })
 })

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core'
 import type { TemplateRef } from '@angular/core'
 import { FormancyErrorSummary, FormancyForm, injectEngine } from '@formancy/angular'
 import type { FormancyFieldAddition, FormancyFieldAdditionContext } from '@formancy/angular'
+import { HOST_LABEL } from './angular-label.js'
 import { HOST_OFFER } from './angular-offer.js'
 import { HOST_SAVE } from './angular-save.js'
 import { openChoices } from './lookup-opens.js'
@@ -9,7 +10,7 @@ import type { OpenChoice } from './lookup-opens.js'
 
 /**
  * The Angular renderer's half of a pane: the error summary, then the form,
- * with "Save" as its submit. The same two parts, in the same order, as the
+ * with "Save" as its submit -- or a together row's "Done" (0155). The same two parts, in the same order, as the
  * React pane, so a difference on screen is a difference of renderer.
  *
  * The summary is the host's to place -- neither renderer's form includes one
@@ -31,12 +32,13 @@ import type { OpenChoice } from './lookup-opens.js'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormancyErrorSummary, FormancyForm],
-  template: `<ng-template #opens let-path let-field="field">@for (choice of choices(path, field.snapshot().value); track choice.form.id) {<button type="button" (click)="press(path, choice, $event)">{{ choice.label }}</button>}</ng-template><formancy-error-summary /><formancy-form [layout]="layout" submitLabel="Save" [fieldAddition]="additionOf(opens)" (submitted)="save($event)" />`,
+  template: `<ng-template #opens let-path let-field="field">@for (choice of choices(path, field.snapshot().value); track choice.form.id) {<button type="button" (click)="press(path, choice, $event)">{{ choice.label }}</button>}</ng-template><formancy-error-summary /><formancy-form [layout]="layout" [submitLabel]="label" [fieldAddition]="additionOf(opens)" (submitted)="save($event)" />`,
 })
 export class HostAngularForm {
   private readonly engine = injectEngine()
   protected readonly layout = this.engine.schema().layouts?.[0]?.name
   protected readonly save = inject(HOST_SAVE)
+  protected readonly label = inject(HOST_LABEL)
   private readonly offer = inject(HOST_OFFER)
   private addition: FormancyFieldAddition | undefined
 

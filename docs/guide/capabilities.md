@@ -251,8 +251,11 @@ get*](../../README.md#what-you-get) is the short version, and
   a lost answer is stored at most once. Such a child's rows are never
   created or deleted alone, and a record that must hold some is never
   created without them. On SQL Server a trigger that ends the transaction
-  can store a save in part. The host page lists and edits such rows one
-  at a time and saves none together yet
+  can store a save in part. The host page holds such rows in a tab
+  beside the record, each change said in words, Add and Remove drawn only
+  inside the bound and where the person may, until the record's own Save
+  sends them with it; a stale save of lines alone keeps their changes for
+  one more press, each line still guarded by its own version
   ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **A trigger can refuse a write in words the person reads.** A trigger, or
   a function it calls, whose error message starts with exactly

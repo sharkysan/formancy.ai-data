@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import type { DataClient } from '@formancy/data-client'
 import { ChildSection } from './children.js'
@@ -5,12 +6,39 @@ import type { ChildForm, ParentOpen } from './children.js'
 import type { Said } from './leave.js'
 import { OneChild } from './one-child.js'
 import type { RendererChoice } from './prefs.js'
+import { isTogether } from './save-set.js'
+import type { SaveSet } from './save-set.js'
 import { sectionShown } from './section.js'
 import { TabList } from './tab-list.js'
 import type { TabEntry } from './tab-list.js'
 import { childTabs, RECORD_TAB } from './tabs.js'
+import { TogetherSection } from './together.js'
+import { useAfterRender } from './after-render.js'
 import type { Drill } from './use-drill.js'
 import { Words } from './words.js'
+
+/**
+ * What a record's tabs are for (0142), as `RecordTabs`' `record`: another
+ * record starts them again on its own tab, but the record a new one's save
+ * created is that one, stored, and its rows' tab may be where the person is
+ * typing while the save was out (0155). `created()`, called as that record
+ * is opened, says the next one is it.
+ */
+export function useTabStart(open: { kind: string } | null): { start: unknown; created: () => void } {
+  const createdHere = useRef(false)
+  const held = useRef<{ open: { kind: string } | null; start: unknown }>({ open, start: open })
+  if (held.current.open !== open) {
+    const same = createdHere.current && held.current.open?.kind === 'new'
+    held.current = { open, start: same ? held.current.start : open }
+    createdHere.current = false
+  }
+  return {
+    start: held.current.start,
+    created: () => {
+      createdHere.current = true
+    },
+  }
+}
 
 /**
  * A record and its child forms, in tabs beside it (0142): the record's own
@@ -28,6 +56,11 @@ import { Words } from './words.js'
  * of a hidden tab, and a row opened by Enter whose read lands there, show
  * that tab. Another `record`, by identity,
  * starts again on the record's tab (`TabList`'s `start`).
+ *
+ * A child whose rows are saved with the record (0155) is drawn as its
+ * rows held for the record's Save (together.tsx), from `saveSet`, whose
+ * Go to Save shows the record's tab and puts the keyboard on the first
+ * Save of its panes.
  */
 export function RecordTabs({
   client,
@@ -47,6 +80,7 @@ export function RecordTabs({
   drill,
   level,
   drilling,
+  saveSet,
   children,
 }: {
   client: DataClient
@@ -74,10 +108,20 @@ export function RecordTabs({
   /** The level the record is at: 1 for the open record. */
   level: number
   drilling: boolean
+  /** The rows of the record's together children, held for its Save (0155). */
+  saveSet: SaveSet
   /** The record's own panes, given how to show the record's tab, which a pane's refused save shows first. */
   children: (show: () => boolean) => ReactNode
 }): ReactElement {
   const below = parent?.kind === 'record' ? parent.token : 'new'
+  const after = useAfterRender()
+  /** The record's tab shown, as its panel was last drawn with it. */
+  const showRecord = useRef<(() => boolean) | null>(null)
+  /** Go to Save: the record's tab, and the keyboard on the first Save its panes draw; nothing is sent. */
+  const goToSave = (): void => {
+    showRecord.current?.()
+    after(() => document.getElementById(`${idBase}-panel-0`)?.querySelector<HTMLElement>('form.sheet [data-formancy-part="submit"]')?.focus())
+  }
   const sections = (show: () => boolean): ReactNode =>
     parent === null
       ? null
@@ -101,43 +145,67 @@ export function RecordTabs({
     {
       key: RECORD_TAB,
       name: <Words said={heading} />,
-      panel: (show) => (
-        <>
-          {children(show)}
-          {sections(show)}
-        </>
-      ),
+      panel: (show) => {
+        showRecord.current = show
+        return (
+          <>
+            {children(show)}
+            {sections(show)}
+          </>
+        )
+      },
     },
     ...(parent === null
       ? []
       : childTabs(childForms).map(({ key, form, index, twice, name }): TabEntry => ({
           key,
           name,
-          panel: (show) => (
-            <ChildSection
-              key={`${key} ${below}`}
-              client={client}
-              form={form}
-              index={index}
-              twice={twice}
-              parentNoun={parentNoun}
-              parent={parent}
-              renderer={renderer}
-              refit={refit}
-              ownerBase={ownerBase}
-              idBase={childIdBase}
-              onShow={() => {
-                const tabHidden = show()
-                const viewHidden = onShow()
-                return tabHidden || viewHidden
-              }}
-              onTab={show}
-              levels={drill.levels}
-              drill={
-                drilling && parent.kind === 'record' ? drill.section({ level, owner: `${ownerBase}${key}`, form, parentNoun, parent: parent.token }) : undefined
-              }
-            />
-          ),
+          panel: (show) =>
+            isTogether(form) ? (
+              <TogetherSection
+                key={key}
+                client={client}
+                form={form}
+                index={index}
+                parentNoun={parentNoun}
+                parent={parent}
+                heading={heading}
+                renderer={renderer}
+                saveSet={saveSet}
+                refit={refit}
+                ownerBase={ownerBase}
+                idBase={childIdBase}
+                onTab={show}
+                goToSave={goToSave}
+              />
+            ) : (
+              <ChildSection
+                key={`${key} ${below}`}
+                client={client}
+                form={form}
+                index={index}
+                twice={twice}
+                parentNoun={parentNoun}
+                parent={parent}
+                renderer={renderer}
+                refit={refit}
+                ownerBase={ownerBase}
+                idBase={childIdBase}
+                onShow={() => {
+                  const tabHidden = show()
+                  const viewHidden = onShow()
+                  return tabHidden || viewHidden
+                }}
+                onTab={show}
+                levels={drill.levels}
+                drill={
+                  drilling && parent.kind === 'record'
+                    ? drill.section({ level, owner: `${ownerBase}${key}`, form, parentNoun, parent: parent.token })
+                    : undefined
+                }
+              />
+            ),
+          ...(isTogether(form) ? { eager: true } : {}),
         }))),
   ]
   return <TabList idBase={idBase} labelledBy={headingId} start={record} tabs={tabs} />

@@ -757,12 +757,21 @@ describe('the record and its rows on the other routes', () => {
   // line. The line form says it is saved with its order, and offers no
   // create alone. Watched failing with the form route asking
   // `grantedOperations` alone: intake was offered the create.
+  // It serves what a line's create takes in a save all the same, since a
+  // page draws a new line with it, and starts it at the defaults that
+  // create takes (0149): the field naming the order among it, which an
+  // update never takes -- and to an auditor, who creates no line, none.
+  // Watched failing with `writable.create` served for a create alone:
+  // the clerk's was null, so no page could tell what a new line's create
+  // takes.
   test('the form route offers the create the menu does, and the child says it is saved with its record', async () => {
     const opened = async (form: string, token: string) => (await app.inject({ method: 'GET', url: `/v1/forms/${form}`, headers: as(token) })).json()
     expect((await opened('order', 'clerk')).operations).toEqual(['read', 'create', 'update'])
     expect((await opened('order', 'intake')).operations).toEqual(['read'])
     const line = await opened('order-line', 'clerk')
     expect([line.operations, line.together]).toEqual([['read', 'update'], { field: 'order', min: 1, max: 3 }])
+    expect(line.writable).toEqual({ create: ['order', 'line_no', 'quantity', 'product'], update: ['line_no', 'quantity', 'product'] })
+    expect((await opened('order-line', 'auditor')).writable).toEqual({ create: null, update: null })
     expect((await opened('order', 'clerk')).together).toBeNull()
     const menu = (await app.inject({ method: 'GET', url: '/v1/forms', headers: as('intake') })).json()
     expect(menu.forms.find((entry: { id: string }) => entry.id === 'order').operations).toEqual(['read'])

@@ -17,11 +17,12 @@ export interface Holding {
 }
 
 /**
- * `fetch` with every create and update held after the server has answered it:
- * the record is written, and the page does not know yet. That is the moment a
- * person goes on typing, presses Save again or opens another record, and on
- * `app.inject` it otherwise lasts too few ticks to reach. Reads and lookups
- * pass straight through.
+ * `fetch` with every create, update and save of a record with its rows (0155)
+ * held after the server has answered it: the record is written, and the
+ * page does not know yet. That is the moment a person goes on typing,
+ * presses Save again or opens another record, and on `app.inject` it
+ * otherwise lasts too few ticks to reach. Reads and lookups pass straight
+ * through.
  */
 export function holdingWrites(fetch: typeof globalThis.fetch): Holding {
   const waiting: Array<() => void> = []
@@ -30,7 +31,7 @@ export function holdingWrites(fetch: typeof globalThis.fetch): Holding {
     held,
     fetch: async (input, init) => {
       const path = new URL(input instanceof Request ? input.url : String(input), 'http://host.test').pathname
-      if (!/\/records\/(create|update)$/.test(path)) return fetch(input, init)
+      if (!/\/records\/(create|update|save)$/.test(path)) return fetch(input, init)
       const reply = await fetch(input, init)
       held.push(path)
       await new Promise<void>((resolve) => waiting.push(resolve))

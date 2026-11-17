@@ -1,4 +1,5 @@
 import {
+  authorizeOperation,
   copiedFields,
   deleteEffects,
   driftRefusal,
@@ -7,6 +8,7 @@ import {
   listable,
   listColumns,
   NOTHING_LEFT,
+  offeredFor,
   planRead,
   READ_REFUSED,
   readableFields,
@@ -398,9 +400,19 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     const copied = operations.includes('create') ? copiedFields(bundle.snapshot, bundle.bindings, bundle.policy, actor) : null
     // Where a version may be changed from a date: it ends one and creates the next (0113).
     const versions = operations.includes('create') && operations.includes('update') ? versionFields(bundle.bindings) : null
+    // The lookup this form's rows are saved with their record through (0155); a malformed one, which the bundle check refuses, says none.
+    const saved = togetherOf(bundle.bindings)
+    const together = saved === null || saved === 'malformed' ? null : { field: saved.binding.field, min: saved.min, max: saved.max }
+    // A together child's rows are created in a save of their record alone, which this person may make where the policy grants
+    // the create and the database still allows it: what that create takes is what a page draws a new row with (0155).
+    const createsInSave =
+      together !== null &&
+      verdict.writable.create &&
+      offeredFor(bundle.bindings, 'create', { save: together.field }) &&
+      authorizeOperation(bundle.policy, actor, 'create').ok
     // What each write offered accepts from this person, by the check that refuses the rest (0117).
     const writable = {
-      create: operations.includes('create') ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
+      create: operations.includes('create') || createsInSave ? writableFields(bundle.policy, actor, bundle.bindings, 'create') : null,
       update: operations.includes('update') ? writableFields(bundle.policy, actor, bundle.bindings, 'update') : null,
     }
     // The moves this person may make of the state field, where they may write at all (0127), with their states' labels (0129).
@@ -422,9 +434,6 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
             actor,
             served.map((entry) => entry.form),
           )
-    // The lookup this form's rows are saved with their record through (0155); a malformed one, which the bundle check refuses, says none.
-    const saved = togetherOf(bundle.bindings)
-    const together = saved === null || saved === 'malformed' ? null : { field: saved.binding.field, min: saved.min, max: saved.max }
     return {
       // The defaults this person's create would take, and no other (0149): a page draws and submits what it is served.
       form: startingDefaults(bundle.form, writable.create, moves),

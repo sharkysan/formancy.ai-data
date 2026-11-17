@@ -195,7 +195,10 @@ export interface Deleting {
  * the fields of the chain's key, which a next version takes from the one
  * it follows, so a page draws them unwritable (0115). `writable` is the
  * fields this person may give on each write, from `writableFields`: on
- * create `null` exactly when `operations` holds no `create`, on update
+ * create `null` exactly when `operations` holds no `create` and this person
+ * creates none of the form's rows in a save of their record either -- a
+ * together child's rows are created there alone (0155), and a page that
+ * draws a new one draws and sends what that create takes -- on update
  * exactly when it holds no `update` -- so a page draws a field in neither
  * as one nothing writes, and sends it in no body (0117). `moves` is the
  * state field the policy holds to its moves and those this person may make

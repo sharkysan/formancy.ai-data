@@ -18,6 +18,7 @@ import type { RendererChoice } from './prefs.js'
 import { RecordTabs } from './record-tabs.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
+import { useSaveSet } from './together.js'
 import type { Drill, DrillStep } from './use-drill.js'
 import { Words } from './words.js'
 
@@ -73,11 +74,21 @@ export function DrillLevel({
   /** The level's record as stored, which a section's condition is read from (0109); null while it is new. */
   const [stored, setStored] = useState<Readonly<Record<string, unknown>> | null>(step.record === null ? null : step.record.answers)
 
+  // The rows of the level's together children, held for its Save (0155): its children answer after it is placed.
+  const saveSet = useSaveSet(client, formId, title, childForms ?? [])
   // Opened once, as the level is placed: with the record read, or new under the parent.
   const sessions = useMemo(
     () =>
       (['react', 'angular'] as const).map((which) => {
-        const session = createSession({ client, formId, definition, renderer: which, namespace: owner, fixed: parentField === null ? [] : [parentField] })
+        const session = createSession({
+          client,
+          formId,
+          definition,
+          renderer: which,
+          namespace: owner,
+          fixed: parentField === null ? [] : [parentField],
+          rows: saveSet.rows,
+        })
         const answers = through.kind === 'child' ? { [through.field]: through.parent } : {}
         if (step.record === null) session.start(answers)
         else session.open(structuredClone(step.record))
@@ -195,10 +206,11 @@ export function DrillLevel({
           <Words said={line} />
         </p>
       </div>
+      {/* Its tabs are the level's: a record created here is the one it was placed for, so they stay where they are (0155). */}
       <RecordTabs
         client={client}
         childForms={childForms ?? []}
-        record={open}
+        record={step.key}
         heading={heading}
         headingId={headingId}
         idBase={idBase}
@@ -213,6 +225,7 @@ export function DrillLevel({
         drill={drill}
         level={level}
         drilling
+        saveSet={saveSet}
       >
         {(show) => (
           <div className="panes" data-count={renderersOf(renderer).length}>
@@ -223,6 +236,7 @@ export function DrillLevel({
                 <Pane
                   key={session.renderer}
                   session={session}
+                  owner={owner}
                   title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
                   idBase={owner}
                   namedBy={headingId}

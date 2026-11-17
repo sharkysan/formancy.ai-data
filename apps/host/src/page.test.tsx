@@ -18,6 +18,7 @@ import {
   gridStatus,
   keeping,
   load,
+  loaded,
   mount,
   newRecord,
   notice,
@@ -28,6 +29,7 @@ import {
   RENDERERS,
   said,
   save,
+  stamp,
   showChild,
   shows,
   showTab,
@@ -37,6 +39,7 @@ import {
   unsavedNotice,
 } from './test-host.js'
 import { holdingRequests, holdingWrites, losingWrites } from './test-network.js'
+import { done, openRows, rowAnswer, rowCell, rowControl, rowPaper, rowsSay, rowsTab, rowTexts, savedBeside } from './test-rows.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
 import { PREFERENCES } from './prefs.js'
@@ -59,7 +62,7 @@ import { fieldHeading } from '@formancy/data-client'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true })
+  plane = await startPlane({ children: true, deletes: true, saves: true })
 })
 
 afterAll(async () => {
@@ -666,5 +669,71 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(document.cookie).toBe('')
     expect(window.location.href).not.toContain(TOKENS.clerk)
     expect(document.documentElement.outerHTML).not.toContain(TOKENS.clerk)
+  })
+})
+
+describe.each(ENGINES)('an order’s lines saved with it on $engine (0155)', (engine) => {
+  // These states of the lines' tab pass the floor and name every control:
+  // the lines listed with Remove and Go to Save, a line open on the rail in
+  // both renderers with Done, a line to be deleted with Undo remove, the
+  // order's stale notice offering Keep my line changes, a line changed by
+  // someone else open with Load this line, a new line open on the rail
+  // after Add with its own Remove in the grid, that line refused by its
+  // form with its summary of what to fix, a new order refused at its
+  // bound, and an order holding more lines than the form allows, read
+  // only (watched failing with Add drawn without a name).
+  test('every state of an order’s lines passes the floor', async () => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('floor'), 2)
+    const user = await openRows(plane, engine, record, TOKENS.remover)
+    const states = [await floor('lines listed')]
+    const [first, second] = rowTexts().map((row) => String(row[0]))
+    const line = `Order line k1:${String(first)}`
+    await user.click(rowCell(String(first)))
+    await waitFor(() => rowControl('Angular', line, 'Quantity'), { timeout: 15_000 })
+    states.push(await floor('a line open on the rail'))
+    await rowAnswer(user, 'React', line, 'Quantity', '4')
+    await done(user, 'React', line)
+    await user.click(within(rowsTab()).getByRole('button', { name: `Remove Order line k1:${String(second)}` }))
+    await within(rowsTab()).findByRole('button', { name: `Undo remove Order line k1:${String(second)}` }, { timeout: 15_000 })
+    states.push(await floor('a line to be deleted'))
+    await user.click(within(rowsTab()).getByRole('button', { name: `Undo remove Order line k1:${String(second)}` }))
+    await savedBeside(plane, engine, record, 1, 7)
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, 'React')
+    const stale = await waitFor(() => {
+      const found = notice('React')
+      if (found === null) throw new Error('no stale notice')
+      return found
+    })
+    states.push(await floor('the order stale, its line changes to keep'))
+    await user.click(within(stale).getByRole('button', { name: 'Keep my line changes' }))
+    await said('React', /^Read the record again at its new version\./)
+    await showChild(user, 'Order line')
+    await waitFor(() => expect(rowTexts()[0]?.[4]).toBe('Changed by someone else'), { timeout: 15_000 })
+    await user.click(rowCell(String(first)))
+    await within(rowsTab()).findByRole('button', { name: 'Load this line' }, { timeout: 15_000 })
+    states.push(await floor('a line changed by someone else, open'))
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Add Order line' }))
+    await waitFor(() => rowControl('Angular', 'New Order line 1', 'Quantity'), { timeout: 15_000 })
+    await within(rowsTab()).findByRole('button', { name: 'Remove New Order line 1' }, { timeout: 15_000 })
+    states.push(await floor('a new line open on the rail'))
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, 'React')
+    await waitFor(() => within(rowPaper('React', 'New Order line 1')).getByRole('heading', { name: /problems? to fix$/ }), { timeout: 15_000 })
+    states.push(await floor('a new line its form refused'))
+    await newRecord(user)
+    await user.click(within(await waitFor(() => unsavedNotice() as HTMLElement)).getByRole('button', { name: 'Discard and continue' }))
+    await showChild(user, 'Order line')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await save(user, 'Angular')
+    await rowsSay(/this save would leave it 0\.$/)
+    states.push(await floor('a new order refused at its bound'))
+    const over = await plane.db.insertSavedOrder(engine.connection, stamp('floor-over'), 4)
+    await load(user, over)
+    await loaded(over)
+    await showChild(user, 'Order line')
+    await rowsSay(/so they are read only here\.$/)
+    states.push(await floor('an order holding more lines than the form allows'))
+    expect(states).toEqual(states.map(({ state }) => CLEAN(state)))
   })
 })

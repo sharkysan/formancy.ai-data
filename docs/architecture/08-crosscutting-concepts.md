@@ -430,7 +430,15 @@ for the plan, `packages/data-core/src/records/save.test.ts`,
 `together.test.ts` and `menu.test.ts`, with no database; for the route,
 `packages/data-server/src/routes/runtime-save.test.ts` over fake ports,
 `save-deadline.test.ts` for the setting, and
-`e2e-lost-answer.integration.test.ts` for a lost answer on both engines.
+`e2e-lost-answer.integration.test.ts` for a lost answer on both engines;
+for the host page, which holds the rows until the record's own Save and
+sends them with it, `apps/host/src/together.test.tsx` and
+`stale-set.test.tsx` on both engines -- the second of two saves of one
+order's lines stale at the order, Keep my line changes keeping each
+line's change at the version it was read at, and a line both changed
+refused at that line; and `unknown-child.test.tsx`, where a lost save
+that created the record holds a press in either renderer's pane, since
+the rows are one set for both.
 
 **What it costs.** What 0155 records: the second of two
 people saving different lines of one order at once is `stale`, the

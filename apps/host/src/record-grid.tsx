@@ -2,13 +2,13 @@ import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, us
 import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { GridApi } from 'ag-grid-community'
-import type { DataClient, ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import type { ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
 import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STANDING_HELP, STARTED_AGAIN } from './grid-datasource.js'
-import type { DatasourceHooks, GridColumn, GridRow, GridSource } from './grid-datasource.js'
-import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, select } from './grid-options.js'
+import type { DatasourceHooks, GridColumn, GridRow, GridSource, ListClient } from './grid-datasource.js'
+import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, liveDelete, select } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import { filterByExample } from './cell-example.js'
@@ -107,7 +107,8 @@ export interface RecordGridHandle {
 }
 
 export interface RecordGridProps {
-  client: DataClient
+  /** What it lists through: the runtime plane, or a set the page holds -- a together tab's rows (0155), one page, answered from memory. */
+  client: ListClient
   formId: string
   definition: PublishedForm
   columns: readonly GridColumn[]
@@ -161,6 +162,10 @@ export interface RecordGridProps {
   onClearSearch?: () => void
   /** Told whether the grid's first page came back with no rows under a filter: the section's filter offers a way out. */
   onFiltered?: (empty: boolean) => void
+  /** A set the page holds, one page of it (0155): no pager and no line of the grid's own, the section's saying what it holds. */
+  alone?: boolean
+  /** Told each time a page has answered and is drawn: where a section puts the keyboard back on a row its set changed. */
+  onListed?: () => void
 }
 
 export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function RecordGrid(props, handle): ReactElement {
@@ -328,6 +333,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         applySelection()
         fit()
         sizeOnce()
+        latest.current.onListed?.()
         // Columns shown while nothing was listed: sized to these rows, once they are drawn -- or, hidden, owed with the rest.
         sizeWaiting(rows.length)
         // Ask again stays where it was pressed until the answer; then the rows that came.
@@ -461,8 +467,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [sizeColumns],
   )
 
-  // A row's Delete reads the page's handler when pressed: the column is made once per noun.
+  // A row's Delete reads the page's handler when pressed: the column is made once per noun -- and per header and words (0155).
   const removeNoun = props.remove?.noun
+  const removeWorded = props.remove?.said !== undefined
+  const removeHeading = props.remove?.heading
   // A box under each header the section's filter line may name (0132), the keys as one string so the columns are made again only when they change.
   const headerFilters = useContext(HeaderFilterContext)
   const headersNow = useRef(headerFilters)
@@ -482,13 +490,13 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     () =>
       columnDefsOf(
         arranged,
-        removeNoun === undefined ? undefined : { noun: removeNoun, press: (row) => latest.current.remove?.press(row) },
+        removeNoun === undefined ? undefined : liveDelete(() => latest.current.remove, removeNoun, removeWorded, removeHeading),
         new Set(boxedKeys === '' ? [] : boxedKeys.split('\n')),
         // Read, not a dependency: a kept width is drawn when its column is made, and a width set since is the grid's already (0151).
         latest.current.widths,
         floors,
       ),
-    [arranged, removeNoun, boxedKeys, floors],
+    [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors],
   )
 
   // The header's height changes after the well is fitted -- its row of
@@ -560,6 +568,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
       <div className="toolbar">
         {toolbarStart}
         <Pager
+          alone={props.alone === true}
           status={status}
           first={pager.page === 0}
           last={!pager.hasMore}

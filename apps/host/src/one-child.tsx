@@ -193,6 +193,7 @@ export function OneChild({
                 <Pane
                   key={session.renderer}
                   session={session}
+                  owner={owner}
                   title={held.kind === 'record' ? `${title} ${held.token}` : `New ${title}`}
                   level={6}
                   idBase={owner}

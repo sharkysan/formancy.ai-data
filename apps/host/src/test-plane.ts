@@ -16,6 +16,8 @@ import { inject } from 'vitest'
 import { childForms, clerkPolicy, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, STARTING, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
 import { injectingFetch } from './test-fetch.js'
+import { losingSaves, publishSaved, savedDb } from './test-saves.js'
+import type { SavedDb } from './test-saves.js'
 import type { Sent } from './test-fetch.js'
 
 /*
@@ -41,6 +43,8 @@ export const TOKENS = {
   thirdClerk: 'host-test-clerk-tenant-3',
   /** Tenant 1's clerk who keeps views of their own (0126), so no other case meets them. */
   keeper: 'host-test-clerk-tenant-1-keeper',
+  /** Tenant 1's clerk who may also delete an order's lines saved with it (0155), which no other clerk may. */
+  remover: 'host-test-clerk-tenant-1-remover',
 } as const
 
 const verifyIdentity: IdentityVerifier = async (token) => {
@@ -49,6 +53,7 @@ const verifyIdentity: IdentityVerifier = async (token) => {
   if (token === TOKENS.otherClerk) return { ok: true, identity: { actor: { id: 'clerk-2', roles: ['clerk'] }, attributes: { tenant: '2' } } }
   if (token === TOKENS.thirdClerk) return { ok: true, identity: { actor: { id: 'clerk-3', roles: ['clerk'] }, attributes: { tenant: '3' } } }
   if (token === TOKENS.keeper) return { ok: true, identity: { actor: { id: 'clerk-1-keeper', roles: ['clerk'] }, attributes: { tenant: '1' } } }
+  if (token === TOKENS.remover) return { ok: true, identity: { actor: { id: 'clerk-1-remover', roles: ['clerk', 'remover'] }, attributes: { tenant: '1' } } }
   return { ok: false, reason: 'ERR_JWS_INVALID' }
 }
 
@@ -95,7 +100,10 @@ export const PAGED = inject('paged')
  * to create and update without reading or writing its status (0149);
  * `starting` the order form again, which `startPlane({ starting: true })`
  * publishes with `STARTING`, its status started at placed over its
- * column's draft and its group at Online (0150).
+ * column's draft and its group at Online (0150); `savedOrder` and
+ * `savedLines`, which `startPlane({ saves: true })` publishes over the
+ * parity schema's order and its lines, saved with it, one to three of them
+ * (0155).
  */
 export const ENGINES = [
   {
@@ -117,6 +125,8 @@ export const ENGINES = [
     party: 'pg-party',
     company: 'pg-party-company',
     price: 'pg-price',
+    savedOrder: 'pg-saved-order',
+    savedLines: 'pg-saved-line',
   },
   {
     engine: 'SQL Server',
@@ -137,6 +147,8 @@ export const ENGINES = [
     party: 'ms-party',
     company: 'ms-party-company',
     price: 'ms-price',
+    savedOrder: 'ms-saved-order',
+    savedLines: 'ms-saved-line',
   },
 ] as const
 
@@ -168,6 +180,12 @@ export interface Plane {
    * line, all numbers, does not have.
    */
   lose: Map<string, 'after' | 'before'>
+  /**
+   * Connections whose next save of a record with its rows (0155) loses its
+   * answer the same way: `after` the transaction committed, or `before` it
+   * began. The server answers 502 naming the record and the version sent.
+   */
+  loseSave: Map<string, 'after' | 'before'>
   /** The server's store, written straight to as an older release's server wrote it, which this release's routes refuse. */
   store: ConfigurationStore
   /**
@@ -176,7 +194,7 @@ export interface Plane {
    * for each start (0070). Undefined otherwise, and no demo token is accepted.
    */
   demoKey: string | undefined
-  db: {
+  db: SavedDb & {
     /** A customer of tenant 1, written through the database's owner, as another application would. */
     insertCustomer(connection: Engine['connection'], no: number, name: string): Promise<void>
     deleteCustomer(connection: Engine['connection'], no: number): Promise<void>
@@ -240,6 +258,8 @@ export async function startPlane(
     unread?: boolean
     /** An order form whose status starts at placed and whose group at Online, chosen over the generated base (0150). */
     starting?: boolean
+    /** An order and its lines saved with it, one to three of them, over the parity schema (0155). */
+    saves?: boolean
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -258,6 +278,7 @@ export async function startPlane(
   })
   const unreachable = new Set<string>()
   const lose = new Map<string, 'after' | 'before'>()
+  const loseSave = new Map<string, 'after' | 'before'>()
   const registry: ConnectionRegistry = {
     ...real,
     open: async (id) => {
@@ -278,6 +299,7 @@ export async function startPlane(
             }
             return { ok: false, code: 'unknown-outcome', message: 'The connection to the database closed before the answer arrived.' }
           },
+          save: losingSaves(open.records, id, loseSave),
         },
       }
     },
@@ -441,6 +463,7 @@ export async function startPlane(
       bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
     })
   }
+  if (options.saves === true) await publishSaved(admin)
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
@@ -490,9 +513,11 @@ export async function startPlane(
     thirdClerk: createDataClient({ token: () => TOKENS.thirdClerk, fetch: injectingFetch(app, pending) }),
     unreachable,
     lose,
+    loseSave,
     store,
     demoKey,
     db: {
+      ...savedDb(pgAdmin, msAdmin),
       insertCustomer: async (connection, no, name) => {
         if (connection === 'pg') await pgAdmin`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`
         else

@@ -172,6 +172,28 @@ export const DELETE_COLUMN = '~delete'
 export interface RowDelete {
   noun: string
   press(row: GridRow): void
+  /**
+   * What a row's button says and is named, where it is not Delete: a
+   * together tab's Remove and Undo remove (0155); null draws none on that
+   * row -- at a bound, or where the person may not.
+   */
+  said?: (row: GridRow) => { text: string; name: string } | null
+  /** The column's header, where it is not Delete. */
+  heading?: string
+}
+
+/**
+ * A row's Delete that reads the page's handler, and its words, each time it
+ * is pressed or drawn (`now`): the column is made once, and a together
+ * tab's words change with its set (0155).
+ */
+export function liveDelete(now: () => RowDelete | undefined, noun: string, worded: boolean, heading: string | undefined): RowDelete {
+  return {
+    noun,
+    press: (row) => now()?.press(row),
+    ...(worded ? { said: (row: GridRow) => now()?.said?.(row) ?? null } : {}),
+    ...(heading === undefined ? {} : { heading }),
+  }
 }
 
 /**
@@ -216,9 +238,11 @@ function DeleteCell(params: ICellRendererParams<GridRow> & { remove: RowDelete }
   const row = params.data
   if (row === undefined || row.record === null) return null
   const { remove } = params
+  const said = remove.said === undefined ? { text: 'Delete', name: `Delete ${remove.noun} ${row.record}` } : remove.said(row)
+  if (said === null) return null
   return (
-    <button type="button" tabIndex={-1} ref={button} style={DELETE_LOOK} aria-label={`Delete ${remove.noun} ${row.record}`} onClick={() => remove.press(row)}>
-      Delete
+    <button type="button" tabIndex={-1} ref={button} style={DELETE_LOOK} aria-label={said.name} onClick={() => remove.press(row)}>
+      {said.text}
     </button>
   )
 }
@@ -281,10 +305,11 @@ export function columnDefsOf(
     ...fields,
     {
       colId: DELETE_COLUMN,
-      headerName: 'Delete',
-      valueGetter: () => '',
+      headerName: remove.heading ?? 'Delete',
+      // A row's words, so the cell is drawn again when they change: a together tab's Remove becomes Undo remove (0155).
+      valueGetter: (params) => (params.data === undefined ? '' : (remove.said?.(params.data)?.text ?? '')),
       sortable: false,
-      minWidth: headerFloor('Delete', false),
+      minWidth: headerFloor(remove.heading ?? 'Delete', false),
       maxWidth: 160,
       cellRenderer: DeleteCell,
       cellRendererParams: { remove },

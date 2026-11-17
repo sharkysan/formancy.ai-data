@@ -4,6 +4,8 @@ import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
+import { useGuardContext } from './guard.js'
+import type { LeaveRequest } from './leave.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
 import { ServerDid } from './server-did.js'
@@ -24,11 +26,18 @@ export const SAVING = 'Saving…'
 /** What the saved line says once "Load the saved record" has replaced the draft. */
 export const DISCARDED = 'Loaded the saved record. Your changes were discarded.'
 
+/** What the saved line says once Keep my line changes has read the record again (0155). */
+export const KEPT = 'Read the record again at its new version. The changes to its rows are kept, each at the version it was read at: press Save to store them.'
+
+/** What it says once Keep my line changes has read the record again over what was typed into it, which the person said to discard (0155). */
+export const KEPT_DISCARDED =
+  'Read the record again at its new version, and discarded what you typed into it. The changes to its rows are kept, each at the version it was read at: press Save to store them.'
+
 /** What the saved line's colour repeats: the server's answer, a save still out, or a refusal (UX-SPEC §5.11). */
 type Kind = 'answer' | 'pending' | 'refused'
 
-/** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. */
-type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: string; n: number }
+/** What a save opened, and the how-manyth notice it is: a new one is drawn afresh, never over the last one's state. `keep`: a stale save of rows alone, whose changes can be kept (0155). */
+type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: string; n: number; keep?: true }
 
 /**
  * One renderer's half of the page: a region named by its heading, the saved
@@ -61,6 +70,19 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  * (steady-offer.ts), so neither redraws a field for a render of the page,
  * nor Angular starts again.
  *
+ * A save of the record with its rows (0155) that was stale at the record,
+ * its own answers unchanged, offers Keep my line changes beside Load the
+ * saved record: the record read again at its new version, every row's
+ * change kept at the version it was read at, the keyboard on the pane's
+ * heading. A refusal about a row is said on the line alone: the rows' tab
+ * takes the keyboard to it. Both ask the guard first, as anything that
+ * drops work does (0047): Keep my line changes reads the record again over
+ * whatever was typed into this pane since it was saved -- while the save
+ * was out, or since the notice -- and Load the saved record, there or in
+ * the unknown notice, drops every change its rows hold, which sit in
+ * another tab and are easily forgotten. Kept editing, nothing moves, and
+ * the keyboard is back on the button.
+ *
  * Where the record's tabs hide the pane (0142), a refused save's notice,
  * or the renderer's summary of a refused answer, which take the keyboard,
  * show its tab first (`onShow`): nothing hidden takes the keyboard, and a
@@ -68,6 +90,7 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  */
 export function Pane({
   session,
+  owner,
   title,
   level = 4,
   idBase,
@@ -78,6 +101,8 @@ export function Pane({
   onShow,
 }: {
   session: Session
+  /** The guard's name for the pane's record (0047): `master`, a child section's key, or a Drill down level's -- what Keep my line changes asks about. */
+  owner: string
   title: string
   /** The heading's level: under the detail's h3, or a child row's h5 (0047). */
   level?: 4 | 6
@@ -127,6 +152,36 @@ export function Pane({
     onLoaded?.()
   }, [session, say, onLoaded])
 
+  const guard = useGuardContext()
+  /**
+   * `run` once the guard lets `request` through (0047) -- at once where it
+   * is null or drops no work -- with whether work was dropped for it; its
+   * sentence, or null where it ran clean or the person kept editing, which
+   * gives the keyboard back to the button that asked.
+   */
+  const asked = (request: LeaveRequest | null, run: (discarded: boolean) => Promise<string | null>): Promise<string | null> =>
+    new Promise((resolve) => {
+      if (request === null) {
+        void run(false).then(resolve)
+        return
+      }
+      const at = document.activeElement
+      guard.ask(
+        request,
+        (discarded) => void run(discarded).then(resolve),
+        () => {
+          if (at instanceof HTMLElement && at.isConnected) at.focus()
+          resolve(null)
+        },
+      )
+    })
+  /** Load the saved record where the record's rows are saved with it (0155): their changes go too, so the guard names them first. */
+  const reloadRows = (): LeaveRequest | null => {
+    const rows = session.rowOwners()
+    const record = session.state().record
+    return rows.length === 0 || record === undefined ? null : { kind: 'reload-rows', record, rows }
+  }
+
   return (
     <section className="pane" aria-labelledby={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}>
       <div className="pane-top">
@@ -149,15 +204,33 @@ export function Pane({
         say={say}
         offer={steady}
         onAnswer={onAnswer}
-        onReload={async () => {
-          const problem = await session.reload()
-          if (problem === null) loaded()
-          return problem
-        }}
-        onLoad={(record) => {
-          session.open(record)
-          loaded()
-        }}
+        onReload={() =>
+          asked(reloadRows(), async () => {
+            const problem = await session.reload()
+            if (problem === null) loaded()
+            return problem
+          })
+        }
+        onLoad={(record) =>
+          void asked(reloadRows(), async () => {
+            session.loadStored(record)
+            loaded()
+            return null
+          })
+        }
+        onKeep={() =>
+          asked({ kind: 'keep-rows', owner, record: session.state().record ?? '', by: session.renderer }, async (discarded) => {
+            const problem = await session.keepRows()
+            if (problem === null) {
+              setReloaded(session.opened().generation)
+              say(discarded ? KEPT_DISCARDED : KEPT)
+            } else if (discarded) {
+              // The notice went with the form discarded: the line says it.
+              say(problem, 'refused')
+            }
+            return problem
+          })
+        }
         onShow={onShow}
       />
     </section>
@@ -177,6 +250,7 @@ function PaneBody({
   onAnswer,
   onReload,
   onLoad,
+  onKeep,
   onShow,
 }: {
   session: Session
@@ -193,13 +267,15 @@ function PaneBody({
   onAnswer: ((result: SaveResult) => void) | undefined
   onReload: () => Promise<string | null>
   onLoad: (record: FormRecord) => void
+  /** Keep my line changes (0155): null when the record was read again; otherwise the server's sentence. */
+  onKeep: () => Promise<string | null>
   onShow: (() => boolean) | undefined
 }): ReactElement {
   const [notice, setNotice] = useState<Notice | null>(null)
   const opened = useRef(0)
-  const open = (kind: Notice['kind'], message: string): void => {
+  const open = (kind: Notice['kind'], message: string, keep = false): void => {
     opened.current += 1
-    setNotice({ kind, message, n: opened.current })
+    setNotice({ kind, message, n: opened.current, ...(keep ? { keep: true as const } : {}) })
   }
   const [sheet, setSheet] = useState<HTMLFormElement | null>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
@@ -235,7 +311,13 @@ function PaneBody({
     }
     if (result?.kind === 'stale' || result?.kind === 'refused' || result?.kind === 'declined' || result?.kind === 'unknown') {
       say('')
-      open(result.kind, result.message)
+      open(result.kind, result.message, result.kind === 'stale' && result.keep === true)
+      return
+    }
+    // About a row saved with the record (0155): its tab takes the keyboard there, and this line says nothing was saved.
+    if (result?.kind === 'rows') {
+      setNotice(null)
+      say(`Not saved. ${result.message}`, 'refused')
       return
     }
     setNotice(null)
@@ -259,6 +341,11 @@ function PaneBody({
 
   async function reload(): Promise<void> {
     const problem = await onReload()
+    if (problem !== null) open('refused', problem)
+  }
+
+  async function keep(): Promise<void> {
+    const problem = await onKeep()
     if (problem !== null) open('refused', problem)
   }
 
@@ -287,9 +374,20 @@ function PaneBody({
           {notice.kind === 'stale' ? (
             <>
               <p className="notice-text">{DRAFT_KEPT}</p>
-              <button type="button" className="button" onClick={() => void reload()}>
-                Load the saved record
-              </button>
+              {notice.keep === true ? (
+                <div className="notice-actions">
+                  <button type="button" className="button" onClick={() => void keep()}>
+                    Keep my line changes
+                  </button>
+                  <button type="button" className="button" onClick={() => void reload()}>
+                    Load the saved record
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className="button" onClick={() => void reload()}>
+                  Load the saved record
+                </button>
+              )}
             </>
           ) : null}
         </div>

@@ -3426,11 +3426,11 @@
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
     },
     "0117": {
-      "reviewed": "sha256:da0547788159c4c2d91b344da53d03cae7fdc63b5db299c22e6ca21ff46f66b0",
+      "reviewed": "sha256:803d2886b1838d94f69499d8b16c3a2d1569a9bed8979572bb0876ad62727f22",
       "limitations": [
         {
           "area": "server",
-          "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer, as unexpected, so a host upgrades its server before its client.",
+          "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer -- but a together child's create, which a save of its record makes (0155) -- as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         },
         {
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:87aa943fe52e5654104cea8636756bfefa2975c2a42c076ad551540e2b784d60",
+      "reviewed": "sha256:28305d6d6bd3a8c00994741b9cce72558c77b47367df5aa83492ec77ed50c4df",
       "limitations": [
         {
           "area": "forms",
@@ -4460,12 +4460,46 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:f9d90bcdb56aff0b577f1292e58fdba9447bcc6b7fa6e08f5e32307c6289f949",
+      "reviewed": "sha256:dbe3b5733dbdc8a3a70c888affabfd6c7b633550b8b29260e6aed62777b6435e",
       "limitations": [
         {
           "area": "writes",
-          "says": "A record and its together children's rows are saved through POST /v1/forms/:id/records/save alone: the host page and the studio offer no save yet, so they are saved together only by a page an integrator writes, and an administrator confirms together and a touch column in a generation request of their own.",
-          "heldBy": "packages/data-server/src/routes/runtime-save.test.ts"
+          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds; an administrator confirms together and a touch column in a generation request of their own, which the studio does not yet write.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Two people saving lines of one order at once: every save moves the order's version, so the second is stale even where the two changed different lines; where it changed only lines, Keep my line changes and Save store them, each line still guarded by the version it was read at, and a line both changed is refused at that line until Load this line takes it as stored.",
+          "heldBy": "apps/host/src/stale-set.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A together child's rows are held on the host page until the record's own Save, nothing of them sent before: a row's Done only closes its form, and leaving the record asks first, naming it with what its rows hold.",
+          "heldBy": "apps/host/src/leaving.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A together child's tab is drawn with the record's tabs, so it lists the record's rows as the record opens, not the first time the tab is shown: one list request more for each record of such a form a person opens.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "On the host page Add is absent at the most rows a record may hold and Remove at the fewest, a new row's too, as a repeater's are: a new record at its fewest rows adds one before it drops one.",
+          "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "After a stale save of a record with its rows, Keep my line changes keeps none of what was typed into the record itself: where its form holds typing the page asks first, and Discard and continue drops it, nothing merged; and Load the saved record asks first, naming the rows' changes it drops with the record's.",
+          "heldBy": "apps/host/src/stale-set.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A row whose change is in a save of its record still out cannot be removed, nor put back, until that save is answered.",
+          "heldBy": "apps/host/src/in-flight.test.tsx"
+        },
+        {
+          "area": "testing",
+          "says": "No host test reaches a refusal of a save that names a field of a row, which the page puts on that row's field: neither engine names the column of a check or a unique key. Nor does one open a together child's tab in Stacked or Separate views, or on a Drill down level below the record."
         },
         {
           "area": "forms",

@@ -20,7 +20,8 @@ import type { SaveResult, Session, SessionState } from './session.js'
  *   other pane is opened on it as it was stored -- after asking, when one
  *   holds work of its own -- so the heading, every pane and the children
  *   below name one record. Kept editing, nothing moves: the created record
- *   is in the pane that created it, and in the grid.
+ *   is in the pane that created it, and in the grid. Its rows saved with it
+ *   (0155) are its own, not another pane's work, and are not asked about.
  */
 
 /** What opening a record says it did: its token, and whether work was discarded for it. */
@@ -103,8 +104,9 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
     const token = record.record
     // The keyboard was where the save was pressed; Keep editing gives it back there.
     const at = document.activeElement
+    // Its rows saved with it are its own, whichever pane they were typed in (0155): opening it asks nothing about them.
     guard.askOnAnswer(
-      { kind: 'created', owner, record: token, by: from.renderer },
+      { kind: 'created', owner, record: token, by: from.renderer, rows: from.rowOwners() },
       (discarded) => {
         asked.current += 1
         for (const session of sessions) if (session !== from) session.open(from.saved())

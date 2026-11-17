@@ -1,7 +1,24 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { focusedName } from './test-accessible.js'
-import { answeredOnce, chooseForm, gridSection, mount, searchRecords, showChild, signIn, stamp } from './test-host.js'
+import { focusedName, paragraphs } from './test-accessible.js'
+import { CHANGED_SINCE_UNKNOWN } from './session.js'
+import {
+  answeredOnce,
+  chooseForm,
+  chooseRenderer,
+  gridSection,
+  mount,
+  newRecord,
+  notice,
+  said,
+  searchRecords,
+  showChild,
+  signIn,
+  stamp,
+  unknownNotice,
+  unsavedNotice,
+} from './test-host.js'
+import { done, openRows, recordSave, rowAnswer, rowCell, rowsTab, rowTexts } from './test-rows.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Engine, Plane } from './test-plane.js'
@@ -27,7 +44,7 @@ import type { Engine, Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true })
+  plane = await startPlane({ children: true, saves: true })
 })
 
 afterAll(async () => {
@@ -134,5 +151,121 @@ describe.each(ENGINES)('a lost line on $engine (0031, 0047)', (engine) => {
         ).toContain(`Created record k1:${order.slice(3)},5.`),
       ARRIVES,
     )
+  })
+})
+
+describe.each(ENGINES)('a lost save of an order with its lines on $engine (0031, 0155)', (engine) => {
+  /** The order's line `first` changed to `quantity` in React, and the save of it pressed with its answer lost after it committed: its notice. */
+  async function lostChange(user: User, first: string, quantity: string): Promise<HTMLElement> {
+    await user.click(rowCell(first))
+    await rowAnswer(user, 'React', `Order line k1:${first}`, 'Quantity', quantity)
+    await done(user, 'React', `Order line k1:${first}`)
+    await waitFor(() => expect(rowTexts()[0]?.[4]).toBe('Changed'), ARRIVES)
+    plane.loseSave.set(engine.parity, 'after')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await user.click(recordSave('React'))
+    await waitFor(() => expect(plane.loseSave.has(engine.parity)).toBe(false), ARRIVES)
+    return waitFor(() => {
+      const found = unknownNotice('React')
+      if (found === null) throw new Error('no unknown notice')
+      return found
+    }, ARRIVES)
+  }
+
+  // A save of an order with a line changed, its answer lost after it
+  // committed: the page says it may have been saved, with the keyboard on
+  // that, and sends nothing again; its check reads the order alone, which
+  // every save moves -- changed, by this save or another's -- and Load the
+  // saved record, once the guard has asked about the line's change it
+  // drops, opens the order as stored and lists its lines again, so what
+  // the tab shows is what is stored (watched failing with the order loaded
+  // alone: the line still marked Changed; and with Load the saved record
+  // dropping the line's change unasked: no question).
+  test('a lost save checks by the record, then loads the record and its rows', async () => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('lost'), 2)
+    plane.sent.length = 0
+    const user = await openRows(plane, engine, record)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    const notice = await lostChange(user, String(first), '6')
+    await waitFor(() => expect(focusedName()).toBe('React It may have been saved'), ARRIVES)
+    await user.click(within(notice).getByRole('button', { name: 'Check whether it was saved' }))
+    await waitFor(
+      () => expect(within(notice).getByRole('status').textContent).toBe('The record has changed since it was read, by this save or by someone else.'),
+      ARRIVES,
+    )
+    await user.click(within(notice).getByRole('button', { name: 'Load the saved record' }))
+    const asked = await waitFor(() => unsavedNotice() as HTMLElement, ARRIVES)
+    expect(within(asked).getByRole('list').textContent).toBe(`Order ${record} with 1 Order line row changed: changes that are not saved.`)
+    await user.click(within(asked).getByRole('button', { name: 'Discard and continue' }))
+    await showChild(user, 'Order line')
+    await waitFor(
+      () =>
+        expect(rowTexts().map((row) => row.slice(1, 5))).toEqual([
+          ['1', '6', '', ''],
+          ['2', '2', '', ''],
+        ]),
+      ARRIVES,
+    )
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 6 },
+      { no: 2, quantity: 2 },
+    ])
+    expect(plane.sent.filter((request) => request.path.endsWith('/records/save'))).toHaveLength(1)
+  })
+
+  // Saved again at the version the lost save sent, the order is stale --
+  // most likely by that save -- so the page says so and stays unknown,
+  // rather than "Not saved" alone, which would let the person think none
+  // of it was stored (watched failing with that sentence for a lost update
+  // alone: a stale notice took the unknown one's place, over a save that
+  // was stored).
+  test('a lost save of a saved order, saved again, is stale by its own doing and stays unknown', async () => {
+    const record = await plane.db.insertSavedOrder(engine.connection, stamp('lost-again'), 2)
+    const user = await openRows(plane, engine, record)
+    const [first] = rowTexts().map((row) => String(row[0]))
+    await lostChange(user, String(first), '7')
+    await user.click(recordSave('React'))
+    await waitFor(() => expect(paragraphs(unknownNotice('React') as HTMLElement)[0]).toBe(CHANGED_SINCE_UNKNOWN), ARRIVES)
+    expect(notice('React')).toBeNull()
+    expect(await plane.db.savedLines(engine.connection, record)).toEqual([
+      { no: 1, quantity: 7 },
+      { no: 2, quantity: 2 },
+    ])
+  })
+
+  // A new order created with its line, its answer lost after it committed:
+  // a second press sends nothing until it is checked, in the pane that
+  // sent it and in the other renderer's, whose own draft is empty -- the
+  // line is one set for both panes, and a second create would store it
+  // under a second order -- so one order and its one line are stored
+  // (watched failing with a lost save that created the record not held:
+  // the second press said "Created record" and stored a second order with
+  // the line; and with the hold the pane's alone: the Angular pane's press
+  // did).
+  test('a lost create with its line holds every pane until it is checked', async () => {
+    const note = stamp('lost-new')
+    plane.sent.length = 0
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.savedOrder)
+    await chooseRenderer(user)
+    await newRecord(user)
+    const paper = await waitFor(() => screen.getByRole('form', { name: 'Order, React' }), ARRIVES)
+    await user.type(await waitFor(() => within(paper).getByLabelText(/^Note\b/), ARRIVES), note)
+    await showChild(user, 'Order line')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Add Order line' }))
+    await rowAnswer(user, 'React', 'New Order line 1', 'Line no', '1')
+    await rowAnswer(user, 'React', 'New Order line 1', 'Quantity', '3')
+    await done(user, 'React', 'New Order line 1')
+    plane.loseSave.set(engine.parity, 'after')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Go to Save' }))
+    await user.click(recordSave('React'))
+    await waitFor(() => expect(unknownNotice('React')).not.toBeNull(), ARRIVES)
+    for (const renderer of ['React', 'Angular'] as const) {
+      await user.click(recordSave(renderer))
+      await said(renderer, /^Nothing was sent: the last save may have been stored\. Check whether it was saved first\.$/)
+    }
+    expect(await plane.db.countSavedOrders(engine.connection, note)).toBe(1)
+    expect(plane.sent.filter((request) => request.path.endsWith('/records/save'))).toHaveLength(1)
   })
 })
