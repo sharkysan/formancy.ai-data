@@ -76,3 +76,32 @@ describe('the server a discovery was read from', () => {
     expect(await audit()).toEqual([])
   })
 })
+
+describe('the routines a discovery read (0163)', () => {
+  // Asked for, the routines in scope are listed under the tables, each
+  // with what the engine says it is and whether this connection may run
+  // it, and counted in the line that counts the tables; a reader that
+  // cannot see them says so as "cannot tell", never as a schema with none;
+  // and a discovery that did not ask is the pane as it was, which every
+  // README picture of it shows. Watched failing with the routines left out
+  // of the pane: there was no list named Routines.
+  test('are listed when asked for, cannot be told behind a gap, and leave the pane as it was otherwise', async () => {
+    const user = await signIn(plane)
+    await discover(user, 'fixture')
+    expect(screen.queryByRole('heading', { name: 'Routines' })).toBeNull()
+    expect(said('fixture')[0]).toMatch(/ views?\. Discovered as /)
+
+    await user.click(screen.getByRole('checkbox', { name: 'Include routines' }))
+    await discover(user, 'fixture-reader')
+    const listed = screen.getByRole('list', { name: 'Routines' })
+    expect(listed.textContent).toBe(
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) function · returns nothing · may write · order_id bigint, tenant integer · this connection may not execute it',
+    )
+    expect(said('fixture-reader')[0]).toMatch(/ views?, and 1 routine\. Discovered as /)
+    await discover(user, 'fixture-sqlserver-reader')
+    expect(said('fixture-sqlserver-reader')).toContain(
+      'This connection sees no function or procedure in the approved schemas, and cannot tell whether there are any: see what it could not see, above.',
+    )
+    expect(await audit()).toEqual([])
+  })
+})

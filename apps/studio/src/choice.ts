@@ -1,5 +1,6 @@
 import { boundsProblem, findObject, gapCovers, isDisplayType, rowFilterColumnProblem, throughProblems, togetherPolicyProblems } from '@formancy/data-core'
 import type {
+  ActionChoice,
   ColumnMeta,
   CoverageGap,
   ForeignKeyMeta,
@@ -33,6 +34,8 @@ export interface Choice {
   validity: { from: string; to: string } | null
   /** The columns the server stamps (0153), each confirmed here; a column whose name suggests one is never stamped without it. */
   stamps: StampChoice[]
+  /** The routines bound as actions over the open record (0159, 0163), in the snapshot's order: none for anybody, each parameter given its source by the administrator. */
+  actions: ActionChoice[]
 }
 
 /**
@@ -90,7 +93,17 @@ export function choiceFor(ref: ObjectRef, snapshot: MetadataSnapshot): Choice {
     const display = target === undefined ? [] : suggestedDisplay(target, foreignKey.references.columns)
     return display.length === 0 ? [] : [{ foreignKey: foreignKey.name, display }]
   })
-  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, touchColumn: null, validity: null, stamps: [] }
+  return {
+    root: { ...ref },
+    formId: formIdFor(ref),
+    title: titleFor(ref),
+    lookups,
+    versionColumn: null,
+    touchColumn: null,
+    validity: null,
+    stamps: [],
+    actions: [],
+  }
 }
 
 /** The gaps about one object itself, which are what "cannot tell" is made of (0004). */
@@ -262,6 +275,8 @@ export function proposalFor(connection: string, choice: Choice, rowFilters: read
     ...(choice.touchColumn === null ? {} : { touchColumn: choice.touchColumn }),
     ...(choice.validity === null ? {} : { validity: { ...choice.validity } }),
     ...(choice.stamps.length === 0 ? {} : { stamps: choice.stamps.map((stamp) => ({ ...stamp, value: { ...stamp.value } })) }),
+    // None is the property left out, as the server reads a request without them: a request naming one is discovered with the routines (0161).
+    ...(choice.actions.length === 0 ? {} : { actions: choice.actions.map((action) => structuredClone(action)) }),
   }
 }
 

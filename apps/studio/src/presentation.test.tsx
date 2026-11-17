@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, within } from '@testing-library/react'
 import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { nodesOfLayout, layoutChildrenAt } from '@formancy/builder-core'
+import { presentedActions } from '@formancy/data-core'
 import { validateBundle } from '@formancy/data-server'
+import { actionWordsProblems, withInputWords } from './action-words.js'
 import { createAdminClient } from './api.js'
+import type { ProposalRequest } from './api.js'
+import { chooseShipping, SOURCE_OF } from './test-actions.js'
 import { audit, generateOrder, goTo, signIn, writeOrderPolicy } from './test-studio.js'
 import { startPlane, TOKENS } from './test-server.js'
 import type { TestPlane } from './test-server.js'
@@ -271,5 +275,80 @@ describe('presentation', () => {
     })
     expect(bundle.base.model.fields.find((field) => field.key === 'notes')?.label).toBe('Notes')
     expect(screen.queryByRole('alert')).toBeNull()
+  })
+})
+
+describe('the words of an action (0163)', () => {
+  // An action is a routine the bindings hold, and every write compares
+  // them with the generator (0030, 0159): so on this step an action offers
+  // words and nothing else -- its label, the sentences before and after a
+  // run, the views read again, and each question's label and help text --
+  // no select, no button, nothing that names a routine or a parameter. And
+  // what the words make publishes, the bindings' action the proposal's to
+  // the byte, the words beside it and on the dialog a page is offered.
+  // Watched failing with a select of the action's routine added to the
+  // panel (the combobox was counted), and with the words applied to the
+  // bindings' dialog in place of the presentation (the published bindings
+  // were not the proposal's, and the server refused them as not generated).
+  test('are words alone, and publish beside the binding they leave as the generator wrote it', async () => {
+    const user = await signIn(plane)
+    const choose = await chooseShipping(user)
+    await user.selectOptions(within(choose).getByRole('combobox', { name: SOURCE_OF('tenant', 'integer') }), 'Asked in its dialog')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const proposed = plane.requests.findLast((request) => request.path === '/v1/form-proposals')
+    const policy = await writeOrderPolicy(user)
+    await user.type(within(policy).getByLabelText('Roles that may run ship-order'), 'clerk')
+    const presentation = await goTo(user, 'Presentation')
+    const words = within(presentation).getByRole('region', { name: 'Actions' })
+    const named = (role: string) =>
+      within(words)
+        .queryAllByRole(role)
+        .map((element) => computeAccessibleName(element))
+    expect(named('textbox')).toEqual([
+      'Label of the ship-order action',
+      'Asked before it runs for the ship-order action',
+      'Said once it has run for the ship-order action',
+      'Label of tenant in the ship-order dialog',
+      'Help text of tenant in the ship-order dialog',
+    ])
+    expect(named('checkbox')).toEqual(['This form’s list after ship-order', 'Its child grids after ship-order'])
+    for (const role of ['button', 'combobox', 'listbox', 'radio', 'spinbutton', 'link', 'menuitem']) expect(named(role), role).toEqual([])
+    expect(await audit()).toEqual([])
+
+    await user.type(within(words).getByRole('textbox', { name: 'Said once it has run for the ship-order action' }), 'Shipped.')
+    const question = within(words).getByRole('textbox', { name: 'Label of tenant in the ship-order dialog' })
+    await user.clear(question)
+    await user.type(question, 'Which tenant ships it')
+    await user.click(within(words).getByRole('checkbox', { name: 'Its child grids after ship-order' }))
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+
+    const latest = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).latest('sales-order')
+    if (!latest.ok) throw new Error(latest.message)
+    const { bundle } = latest.value
+    if (bundle.format !== 2) throw new Error(`published as format ${String(bundle.format)}, not 2`)
+    expect(validateBundle(bundle).ok).toBe(true)
+    const generated = await createAdminClient({ token: TOKENS.admin, fetch: plane.fetch }).propose(proposed?.body as ProposalRequest)
+    if (!generated.ok) throw new Error(generated.message)
+    expect(bundle.bindings.actions).toEqual(generated.value.bindings.actions)
+    expect(bundle.presentation.actions).toEqual([
+      { action: 'ship-order', done: 'Shipped.', refresh: ['children'], inputs: [{ input: 'tenant', label: 'Which tenant ships it' }] },
+    ])
+    const [offered] = presentedActions(bundle.bindings, bundle.presentation.actions)
+    expect(offered?.dialog?.model.fields.map((field) => [field.key, field.label])).toEqual([['tenant', 'Which tenant ships it']])
+
+    // And what the step says the server refuses of the words -- help text
+    // past formancy's 300 characters, which makes a dialog no renderer
+    // draws -- the server's own check refuses, in the same sentence, so
+    // the two cannot disagree unnoticed. Watched failing with the step's
+    // sentence worded otherwise: "expected [ Array(1) ] to deeply equal [
+    // Array(1) ]".
+    const long = withInputWords(bundle.presentation.actions ?? [], bundle.bindings, 'ship-order', 'tenant', { description: 'x'.repeat(301) })
+    const said = actionWordsProblems(long, bundle.bindings)
+    expect(said).toHaveLength(1)
+    const refused = validateBundle({ ...bundle, presentation: { ...bundle.presentation, actions: long } })
+    expect(refused.ok ? [] : refused.problems).toEqual(said.map((problem) => `presentation: ${problem}`))
   })
 })

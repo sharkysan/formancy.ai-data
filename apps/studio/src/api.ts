@@ -1,4 +1,5 @@
 import type {
+  ActionChoice,
   BrowseQuery,
   DriftChange,
   DriftReport,
@@ -81,6 +82,8 @@ export interface ProposalRequest {
   validity?: { from: string; to: string }
   /** The columns the server stamps, as the administrator confirmed them (0153). */
   stamps?: StampChoice[]
+  /** The routines bound as actions over the open record, as the administrator mapped them (0159, 0163); a request naming one is discovered with the routines in scope (0161). */
+  actions?: ActionChoice[]
 }
 
 /**
@@ -103,7 +106,8 @@ export interface AdminClient {
   whoami(): Promise<Outcome<HostIdentity>>
   connections(): Promise<Outcome<string[]>>
   test(connection: string): Promise<Outcome<ConnectionTest>>
-  metadata(connection: string): Promise<Outcome<MetadataSnapshot>>
+  /** With `routines`, the routines in scope too, which a snapshot records only when asked (0158, 0163). */
+  metadata(connection: string, routines?: boolean): Promise<Outcome<MetadataSnapshot>>
   propose(request: ProposalRequest): Promise<Outcome<Proposal>>
   /**
    * `keysConfirmed`: the keys of a regeneration's `keysReassigned` the person
@@ -243,7 +247,7 @@ export function createAdminClient({ token, fetch, base = '' }: { token: string; 
       return listed.ok ? { ok: true, value: listed.value.connections } : listed
     },
     test: (connection) => call('POST', `/v1/connections/${segment(connection)}/test`),
-    metadata: (connection) => call('GET', `/v1/connections/${segment(connection)}/metadata`),
+    metadata: (connection, routines = false) => call('GET', `/v1/connections/${segment(connection)}/metadata${routines ? '?routines=true' : ''}`),
     propose: (request) => call('POST', '/v1/form-proposals', request),
     publish: (formId, expectedBase, bundle, keysConfirmed = []) =>
       call('POST', `/v1/forms/${segment(formId)}/versions`, { expectedBase, bundle, ...(keysConfirmed.length === 0 ? {} : { keysConfirmed }) }),

@@ -1,5 +1,5 @@
 import { fieldAnchor, grantsOnKey, presentationOf, rebasePresentation } from '@formancy/data-core'
-import type { FormBindings, FormPolicy, StoredListView, PresentationConflict, ReassignedKey } from '@formancy/data-core'
+import type { ActionPresentation, FormBindings, FormPolicy, StoredListView, PresentationConflict, ReassignedKey } from '@formancy/data-core'
 import { canonicalize } from '@formancy/spec'
 import type { FormSchema } from '@formancy/spec'
 import type { Proposal } from './api.js'
@@ -62,7 +62,16 @@ export function freshFields(before: FormBindings, after: FormBindings): string[]
 }
 
 export type CarriedDraft =
-  | { ok: true; form: FormSchema; conflicts: PresentationConflict[]; fresh: string[]; views: StoredListView[]; unfiltered: string[] }
+  | {
+      ok: true
+      form: FormSchema
+      conflicts: PresentationConflict[]
+      fresh: string[]
+      views: StoredListView[]
+      unfiltered: string[]
+      /** The words of the actions the new proposal still binds (0159, 0163). */
+      actions: ActionPresentation[]
+    }
   | { ok: false; message: string }
 
 /**
@@ -72,13 +81,15 @@ export type CarriedDraft =
  * rebase the server's regeneration runs, so "Generate again" and a
  * regeneration carry alike: a view follows the fields it names, and one
  * whose field is gone, or no longer offers what it asks, is dropped and
- * said among the conflicts.
+ * said among the conflicts; an action's words follow it by its name and
+ * each input's key, and those of one no longer bound are dropped and said
+ * (0159).
  *
  * A draft that is not only presentation is refused, saying why, rather than
  * carried without what does not fit.
  */
 export function carryDraft(
-  from: { proposal: Proposal; edited: FormSchema; views: readonly StoredListView[]; unfiltered: readonly string[] },
+  from: { proposal: Proposal; edited: FormSchema; views: readonly StoredListView[]; unfiltered: readonly string[]; actions: readonly ActionPresentation[] },
   to: Proposal,
 ): CarriedDraft {
   const derived = presentationOf(from.proposal.form, from.edited, from.proposal.bindings)
@@ -88,6 +99,7 @@ export function carryDraft(
     ...derived.presentation,
     ...(from.views.length === 0 ? {} : { views: [...from.views] }),
     ...(from.unfiltered.length === 0 ? {} : { unfiltered: [...from.unfiltered] }),
+    ...(from.actions.length === 0 ? {} : { actions: structuredClone([...from.actions]) }),
   }
   // The rebase throws only for a base the generator did not write, which a
   // proposal never is and the derivation above has already read.
@@ -99,6 +111,7 @@ export function carryDraft(
     fresh: freshFields(from.proposal.bindings, to.bindings),
     views: rebased.presentation.views ?? [],
     unfiltered: rebased.presentation.unfiltered ?? [],
+    actions: rebased.presentation.actions ?? [],
   }
 }
 

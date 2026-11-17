@@ -18,6 +18,52 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The studio binds a routine as an action over the open record, grants
+  it, words it and reviews its drift** (0163). Why: the generator, the
+  bundle, both adapters and the runtime plane held an action, and an
+  administrator could name one only in a generation request of their own,
+  which the studio did not write. What an administrator notices: on the
+  Connect step a box, Include routines, unticked, which discovers the
+  functions and procedures of the approved schemas too -- `GET
+  /v1/connections/:id/metadata?routines=true`, any other value refused --
+  and lists them under the tables. On the Choose step an Actions group
+  lists every routine, none ticked; one no run could call is disabled
+  with the generator's reason, and a form that offers none -- no
+  confirmed version, a rowversion with no touch column -- says why in the
+  generator's words. Ticked, an action is named after its routine and
+  each parameter has a select starting at Nothing yet and offering only
+  the sources the generator binds for it: the record's key, a column of
+  it, an answer in the action's dialog, a trusted attribute or the
+  person's id, asked of `sourceProblem`, the generator's rule for one
+  source, which data-core now exports; what the generator refuses of the
+  action as mapped is said under it as it is mapped. On the Policy step,
+  "Roles that may run" each action, refused in `validatePolicy`'s words
+  where a role may not read, and before each grant a note of what the
+  routine does that nothing here binds: field grants, state moves and
+  cascades; over a version column, that a routine writing other rows
+  must increment theirs; on SQL Server, that a RETURN status other than 0
+  refuses the run; and a reach past the connection's grants. On the
+  Presentation step, each action's label, the sentences before and after
+  a run, what is read again and each dialog question's words -- words
+  alone, kept in the spelling the server reads and checked by formancy's
+  validator before Publish sends them. On the Drift step, "Run *name*:
+  still allowed" or blocked, and an action only review stops named among
+  what the server still allows. A regeneration taken up and Generate
+  again keep the actions and their words, and an action chosen over a
+  routine the snapshot no longer records, or on a discovery made without
+  Include routines, stays listed, ticked, to be unticked, since the
+  request still names it. The bundle check now also holds each action's
+  dialog, its words applied, to formancy's validator, on publish and on
+  every read. Why: another client could publish help text past
+  formancy's length, a dialog no renderer draws, which the runtime plane
+  served; now every client is refused it, in the sentence the studio says
+  before it sends. data-core exports `fieldKeyFor` too, the key an
+  answer's dialog field takes from its parameter's name. Costs: every
+  routine in scope is listed, the notice asks for no acknowledgement, two
+  parameters whose names give one field key cannot both be asked, and an
+  action renamed is another action, its words dropped and its grant left
+  to remove.
+
 - **The host page runs an action over the open record** (0162). Why: the
   runtime plane ran an action (0161) and nothing on the page called it,
   so a routine an administrator bound reached a person only through a
@@ -50,7 +96,6 @@ the same day (formancy.ai 0232).
   first. What integrators notice: nothing new on the wire; the page sends
   `POST /v1/forms/:id/actions/:action/run` through `runAction`, as 0161
   built it.
-
 - **The studio offers a form's rows saved with their record, and a
   rowversion's touch column** (0155). Why: the generator, the bundle
   check, the route and the host page all held a child's rows saved with
@@ -183,8 +228,9 @@ the same day (formancy.ai 0232).
   ([0037](docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)),
   the runtime door now forwards the route, and so does the live demo's
   Worker; run `tunnel-config` again, as the guide's section 8 says, or the
-  door does not forward a run, which fails closed. The host page offers no
-  action's control yet, and the studio binds none.
+  door does not forward a run, which fails closed. The host page runs an
+  action from the open record's header (0162), and the studio binds one
+  (0163).
 
 - **A record is saved with the rows of its together children in one
   request** (0155). Why: an order could not be held to at least one line

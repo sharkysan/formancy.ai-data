@@ -10,6 +10,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { createSnapshot } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
 import { APP } from './serve.mjs'
 
@@ -17,6 +18,27 @@ import { APP } from './serve.mjs'
 export const TOKENS = { admin: 'browser-gate-administrator', publisher: 'browser-gate-publisher', browser: 'browser-gate-browser' }
 
 export const snapshot = (name) => JSON.parse(readFileSync(join(APP, 'src', 'fixtures', name), 'utf8'))
+
+/**
+ * A captured database with the fixture's routines in it, as its account's
+ * discovery reports them when its scope asks (0158, 0163): the suite's
+ * `withRoutines` (src/test-routines.ts), from the same file, which
+ * src/fixtures.test.ts holds to the model both adapters answer to. This
+ * copy, and `withoutRoutines` below, are held to the suite's by review
+ * alone: nothing compares the two.
+ */
+export function withRoutines(name) {
+  const { fingerprint: _, ...contents } = snapshot(name)
+  const facts = JSON.parse(readFileSync(join(APP, 'src', 'fixtures', 'routines.json'), 'utf8'))[name]
+  return createSnapshot({ ...contents, scope: { ...contents.scope, routines: true }, routines: facts.routines, gaps: [...contents.gaps, ...facts.gaps] })
+}
+
+/** A database as a discovery whose scope does not ask for routines reads it: the captured file it always was (0158). */
+function withoutRoutines(base) {
+  const { fingerprint: _, routines: _routines, scope, gaps, ...contents } = base
+  const { routines: _asked, ...plain } = scope
+  return createSnapshot({ ...contents, scope: plain, gaps: gaps.filter((gap) => gap.aspect !== 'routines') })
+}
 
 const IDENTITIES = new Map([
   [TOKENS.admin, { actor: { id: 'ada', roles: ['data-admin'] }, attributes: { tenant: '1' } }],
@@ -103,11 +125,11 @@ const records = {
 export async function startPlane({ review = false } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'formancy-data-studio-gate-'))
   const databases = new Map([
-    ['fixture', snapshot('postgres-owner.json')],
-    ['fixture-reader', snapshot('postgres-reader.json')],
-    ['fixture-sqlserver', snapshot('sqlserver-owner.json')],
-    ['fixture-sqlserver-reader', snapshot('sqlserver-reader.json')],
-    ['fixture-writer', snapshot('postgres-writer.json')],
+    ['fixture', withRoutines('postgres-owner.json')],
+    ['fixture-reader', withRoutines('postgres-reader.json')],
+    ['fixture-sqlserver', withRoutines('sqlserver-owner.json')],
+    ['fixture-sqlserver-reader', withRoutines('sqlserver-reader.json')],
+    ['fixture-writer', withRoutines('postgres-writer.json')],
   ])
   const registry = {
     ids: () => [...databases.keys()].sort(),
@@ -119,7 +141,13 @@ export async function startPlane({ review = false } = {}) {
       const adapter = {
         kind: now.kind,
         ping: async () => ({ kind: now.kind, version: now.serverVersion, ...now.server }),
-        discover: async () => databases.get(id),
+        // As the scope asks (0158): one a run put in without routines cannot answer a discovery that asks for them.
+        discover: async (scope) => {
+          const current = databases.get(id)
+          if (scope.routines !== true) return current.routines === undefined ? current : withoutRoutines(current)
+          if (current.routines === undefined) throw new Error(`the snapshot of ${id} records no routines, so nothing can answer a discovery that asks for them`)
+          return current
+        },
         close: async () => {},
       }
       return { adapter, lookups: {}, records }

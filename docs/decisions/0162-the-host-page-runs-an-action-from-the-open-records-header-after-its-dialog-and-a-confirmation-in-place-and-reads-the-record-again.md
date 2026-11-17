@@ -291,7 +291,8 @@ stale because of their own run.
 
 **What it does not do.** No preview the database words before the run, no
 check routine before a write, no handler's steps (the design's phase 2
-and section 8.3); the studio binds no action yet.
+and section 8.3). Binding a routine as an action in the studio is
+[0163](0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)'s.
 
 **Forecloses:** nothing.
 

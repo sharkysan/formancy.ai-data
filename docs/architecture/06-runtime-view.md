@@ -17,6 +17,10 @@ against real servers of both engines
    ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)),
    with a token holding a role in `FORMANCY_DATA_ADMIN_ROLES`
    ([0020](../decisions/0020-administration-is-a-separate-plane.md)).
+   With Include routines ticked the request carries `?routines=true`, and
+   the adapter reads the routines in scope as well
+   ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md),
+   [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
    `discover` in `routes/admin.ts` takes the approved schemas and the ports
    from the allowlist (`connections.ts`): only a listed id opens, on first
    use, through `drivers.ts`, and a failed open is tried again next time
@@ -126,6 +130,8 @@ costs is 0009's and 0042's, under *Forms* in
    fingerprint, the bindings against both, the policy against the bindings
    (0019); then a listed connection, that this server's generator
    writes exactly this base and these bindings (`bundle-format2.ts`, 0030),
+   that each action's dialog, its words applied, is one formancy's
+   validator accepts (0163),
    and that a list of these bindings can run every view the presentation
    names (`viewProblems`,
    [0105](../decisions/0105-a-forms-list-offers-views-its-administrator-named.md)).
@@ -1062,7 +1068,9 @@ other at the count where the child's foreign key has no index (§11.2).
 ## 6.15 Running an action over the open record
 
 A routine the deployment keeps in its database, bound to a form as an
-action (0159) and run by an adapter over the open record
+action (0159) -- in a generation request of its administrator's own, or
+on the studio's Choose step from a discovery that asked for the routines
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)) -- and run by an adapter over the open record
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)),
 through the runtime plane's route
 ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).

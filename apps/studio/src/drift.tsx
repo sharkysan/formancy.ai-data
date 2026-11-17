@@ -53,6 +53,10 @@ function spoken(words: readonly string[]): string {
  * So delete is said exactly as a create or an update is, from the server's
  * verdict, and the sentence says what the statement still refuses rather
  * than the studio deciding, change by change, which of them it would.
+ *
+ * And each action review stops and a run would still be let through
+ * (0159, 0163): the server decides over the root and the routine as each
+ * request describes them, so what stops it is a change only review sees.
  */
 function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: boolean } | undefined, deleting: boolean): string[] {
   const runtime = drift.runtime
@@ -60,6 +64,7 @@ function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: 
     ...(!drift.readable && runtime.readable ? ['read'] : []),
     ...(['create', 'update'] as const).filter((operation) => offered?.[operation] !== false && !drift.writable[operation] && runtime.writable[operation]),
     ...(deleting && !drift.writable.delete && runtime.writable.delete ? ['delete'] : []),
+    ...(runtime.actions ?? []).filter((name) => drift.actions?.includes(name) !== true).map((name) => `running ${name}`),
   ]
 }
 
@@ -240,12 +245,24 @@ function DriftReportView({ drift, published, formId }: { drift: Drift; published
           ? `Nothing this form rests on has changed since version ${String(drift.version)} was published.`
           : `${String(drift.changes.length)} ${drift.changes.length === 1 ? 'change' : 'changes'}, ${String(blocking)} blocking.`}
       </p>
+      {(published?.bundle.bindings.actions ?? []).length === 0 ? null : (
+        <p>
+          The routines its actions run are compared too, by what a call rests on: their parameters, what they return, whether this connection may execute them
+          and whether they act beyond its grants. A routine&rsquo;s body is not compared, so a changed body is no drift.
+        </p>
+      )}
       <h4 id="still-heading">What the published form may still do</h4>
       <ul aria-labelledby="still-heading" className="still">
         <li>Read: {drift.readable ? 'still allowed' : 'blocked by the changes below'}</li>
         <li>Create: {operationState(offered?.create, drift.writable.create)}</li>
         <li>Update: {operationState(offered?.update, drift.writable.update)}</li>
         {deleting ? <li>Delete: {operationState(true, drift.writable.delete)}</li> : null}
+        {/* Each action the published form binds (0163), from the verdict's own list of those still runnable (0159). */}
+        {(published?.bundle.bindings.actions ?? []).map((action) => (
+          <li key={action.name}>
+            Run {action.name}: {operationState(true, drift.actions?.includes(action.name) === true)}
+          </li>
+        ))}
         <li>{drift.blocking ? 'As a whole: not to be used as published until the blocking changes are reviewed.' : 'As a whole: usable as published.'}</li>
         {allowedByServer.length === 0 ? null : (
           <li>

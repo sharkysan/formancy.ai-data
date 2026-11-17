@@ -1,0 +1,289 @@
+{
+  "postgres-owner.json": {
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "ship_order",
+          "signature": "pg_catalog.int8, pg_catalog.int4"
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "order_id",
+            "databaseType": "bigint",
+            "typeId": "20",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "mode": "in",
+            "hasDefault": false
+          },
+          {
+            "name": "tenant",
+            "databaseType": "integer",
+            "typeId": "23",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": false
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "account",
+        "executable": true
+      }
+    ],
+    "gaps": []
+  },
+  "postgres-reader.json": {
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "ship_order",
+          "signature": "pg_catalog.int8, pg_catalog.int4"
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "order_id",
+            "databaseType": "bigint",
+            "typeId": "20",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "mode": "in",
+            "hasDefault": false
+          },
+          {
+            "name": "tenant",
+            "databaseType": "integer",
+            "typeId": "23",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": false
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "account",
+        "executable": false
+      }
+    ],
+    "gaps": []
+  },
+  "postgres-writer.json": {
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "ship_order",
+          "signature": "pg_catalog.int8, pg_catalog.int4"
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "order_id",
+            "databaseType": "bigint",
+            "typeId": "20",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "mode": "in",
+            "hasDefault": false
+          },
+          {
+            "name": "tenant",
+            "databaseType": "integer",
+            "typeId": "23",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": false
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "account",
+        "executable": true
+      }
+    ],
+    "gaps": []
+  },
+  "sqlserver-owner.json": {
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "fn_customer_tenant",
+          "signature": ""
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "@tenant_id",
+            "databaseType": "int",
+            "typeId": "56:4:10:0",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": null
+          }
+        ],
+        "effects": "reads",
+        "returns": "set",
+        "result": null,
+        "reach": "owner",
+        "executable": true
+      },
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "ship_order",
+          "signature": ""
+        },
+        "kind": "procedure",
+        "parameters": [
+          {
+            "name": "@order_id",
+            "databaseType": "bigint",
+            "typeId": "127:8:19:0",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "mode": "in",
+            "hasDefault": null
+          },
+          {
+            "name": "@tenant",
+            "databaseType": "int",
+            "typeId": "56:4:10:0",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": null
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "owner",
+        "executable": true
+      }
+    ],
+    "gaps": []
+  },
+  "sqlserver-reader.json": {
+    "routines": [],
+    "gaps": [
+      {
+        "subject": {
+          "kind": "schema",
+          "schema": "sales"
+        },
+        "aspect": "routines",
+        "detail": "without VIEW DEFINITION on schema sales, the catalog lists only the routines this account holds a permission on, so one it cannot see is absent without trace"
+      }
+    ]
+  },
+  "sqlserver-writer.json": {
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "fn_customer_tenant",
+          "signature": ""
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "@tenant_id",
+            "databaseType": "int",
+            "typeId": "56:4:10:0",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": null
+          }
+        ],
+        "effects": "reads",
+        "returns": "set",
+        "result": null,
+        "reach": "owner",
+        "executable": false
+      },
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "ship_order",
+          "signature": ""
+        },
+        "kind": "procedure",
+        "parameters": [
+          {
+            "name": "@order_id",
+            "databaseType": "bigint",
+            "typeId": "127:8:19:0",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "mode": "in",
+            "hasDefault": null
+          },
+          {
+            "name": "@tenant",
+            "databaseType": "int",
+            "typeId": "56:4:10:0",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "mode": "in",
+            "hasDefault": null
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "owner",
+        "executable": true
+      }
+    ],
+    "gaps": []
+  }
+}

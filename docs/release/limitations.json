@@ -1543,7 +1543,7 @@
       ]
     },
     "0052": {
-      "reviewed": "sha256:6bbcfab0a9931b05c64fb46b45b3231fbe0c4c9103382e765dac919ac030c214",
+      "reviewed": "sha256:1d5f3b2d79983d85ee446ea386985f45360eaf122e92aba938ea0375735e60ce",
       "limitations": [
         {
           "area": "studio",
@@ -2898,6 +2898,16 @@
         }
       ]
     },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
     "0095": {
       "reviewed": "sha256:db859e16bb9f54e8e366af1076f58703597ccaf6df4218ce958483ccac380cae",
       "limitations": [
@@ -2928,25 +2938,6 @@
         }
       ]
     },
-    "0098": {
-      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
-      "limitations": [
-        {
-          "area": "writes",
-          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
-        }
-      ]
-    },
-    "0094": {
-      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
-      "limitations": [
-        {
-          "area": "host",
-          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
-          "heldBy": "apps/host/src/drill.test.tsx"
-        }
-      ]
-    },
     "0097": {
       "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
       "limitations": [
@@ -2954,6 +2945,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0098": {
+      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
         }
       ]
     },
@@ -2991,6 +2991,24 @@
         {
           "area": "server",
           "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
+        }
+      ]
+    },
+    "0102": {
+      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -3045,24 +3063,6 @@
         {
           "area": "server",
           "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
-        }
-      ]
-    },
-    "0101": {
-      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
-      "limitations": [
-        {
-          "area": "access",
-          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
-        }
-      ]
-    },
-    "0102": {
-      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
-      "limitations": [
-        {
-          "area": "operations",
-          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -4668,7 +4668,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:e22ffb0f2eb2b551a2d409920fbb55b120d1278ad9ecf7441c283bc3555ce71a",
+      "reviewed": "sha256:ef482bca7d7453c9c7906306b6434fb67273d4e87a5d933d8d141df27d7ccf85",
       "limitations": [
         {
           "area": "databases",
@@ -4728,12 +4728,8 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:49fcc15d3e7e9736bb5c73fb783b4f637e0d92272f4796dcc45cb37d6722c0c7",
+      "reviewed": "sha256:2a4900d8b599ebfa8eab8c170a5988af9082e2324022959d2e05a36810ecadff",
       "limitations": [
-        {
-          "area": "forms",
-          "says": "An action is published only through a generation request its administrator writes: the studio binds none yet."
-        },
         {
           "area": "databases",
           "says": "An action is offered only where a version proves the record, as a delete is, so a table keyed by values people type, with a version column, offers none.",
@@ -4861,12 +4857,8 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:8507beadca75aff37a8199b711e2bdc37aa6422e2e1f175a60a3f74260dc819c",
+      "reviewed": "sha256:b6de00ea484f7933b1a75ede22d365c3615697c3f6337724a32e8bb9eb465591",
       "limitations": [
-        {
-          "area": "forms",
-          "says": "An action is published only by a client that writes its generation request itself: the studio binds none yet."
-        },
         {
           "area": "forms",
           "says": "A form offers an action by its own table as described when it is opened; a routine that changed since publication is still offered, and its run is refused 409, schema-changed where the bound routine no longer resolves and drift where it resolves to another description.",
@@ -4921,7 +4913,7 @@
       ]
     },
     "0162": {
-      "reviewed": "sha256:86e2f2f874c6ef8a8e56e65b24c98df097d7815cc074da05bb827cc2a43160e2",
+      "reviewed": "sha256:d3d250cfbdec12256ad58ebec71ee8f13887196ac15efaa6f0b81861871bc142",
       "limitations": [
         {
           "area": "host",
@@ -4964,6 +4956,39 @@
           "area": "host",
           "says": "A run whose answer was lost is checked by one read of the record and run again only from the version it sent, so on PostgreSQL a run orphaned by a cut that commits after the check makes Run it again refused as stale.",
           "heldBy": "apps/host/src/actions.test.tsx"
+        }
+      ]
+    },
+    "0163": {
+      "reviewed": "sha256:a4aa7eab5e965428edf9c7a0de99262ee58dbf506782382801b34661d170b803",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The studio reads a connection’s routines only on a discovery made with Include routines ticked on the Connect step, which is unticked whenever the step opens, so a form discovered without them offers no action until its connection is discovered again.",
+          "heldBy": "apps/studio/src/choose-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The Choose step lists every function and procedure in the approved schemas, the ones no run could call too, so a schema of many routines lists as many boxes.",
+          "heldBy": "apps/studio/src/choose-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A parameter asked in an action’s dialog is keyed by formancy’s field key for its name, which is not chosen: two parameters whose names give one key cannot both be asked in one dialog."
+        },
+        {
+          "area": "studio",
+          "says": "The notice of what an action does that nothing binds is drawn beside its grant and asks for no acknowledgement: nothing records that it was read.",
+          "heldBy": "apps/studio/src/policy-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "An action renamed on the Choose step is another action: its words are dropped and its grant is left for the Policy step to remove.",
+          "heldBy": "apps/studio/src/policy-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The Presentation step edits an action’s words as literals: a label or a sentence that is a message reference is shown by its key and replaced by what is typed."
         }
       ]
     }
