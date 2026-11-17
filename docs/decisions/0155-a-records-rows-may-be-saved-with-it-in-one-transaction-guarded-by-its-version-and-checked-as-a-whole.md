@@ -4,9 +4,8 @@
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:** what data-core plans, what both adapters run, what the
-  generator writes and the bundle check holds, the route, the client and
-  the host page -- the parts of this decision built so far; the studio's
-  extends this line when it lands.
+  generator writes and the bundle check holds, the route, the client, the
+  host page and the studio, each named below.
   `packages/data-core/src/records/save.test.ts` -- the record's step is
   planned under the order's policy and each line's under the line's, and a
   person one of them refuses is refused at that part (watched failing with
@@ -84,9 +83,13 @@
   change, 9 a child and 17 for the order's step, fit 2,100 and not one
   line more, where PostgreSQL has no such limit (watched failing with the
   batch's sum unasked, with each child's count and `within` left out of
-  it, and with the pin left out of a row's parameters); and a row's delete
+  it, and with the pin left out of a row's parameters); a row's delete
   reach and its stamps of who add to what it binds (watched failing with
-  each left out).
+  each left out); and `togetherBatchProblem` names the most that fits for
+  a line too wide for one batch at the cap and nothing for a policy that
+  cannot be read, which the bundle check refuses first (watched failing
+  with that policy asked: a batch of Infinity parameters, of which a max
+  of 0 fits).
   `packages/data-core/src/records/menu.test.ts` -- the menu leaves out the
   create of an order whose lines are required exactly where the person
   could not make the save: the line form is not their child of the order,
@@ -385,6 +388,72 @@
   the rail's first field removed, and with Done's and Go to Save's: each
   check found the keyboard on the page itself); in Firefox and WebKit in
   CI alone, where none of its checks was watched failing.
+  The studio, against the real server behind a fake `fetch`:
+  `apps/studio/src/together.test.ts` -- a lookup offered where its key
+  is NOT NULL onto another table (watched failing with the NULL check
+  out: the order's creator offered; with the table check out: an
+  employee's NOT NULL manager offered); the box starting at no row and
+  at the largest max the generator's `boundsProblem` takes (with
+  `SAVE_MAX_ROWS`, which it refuses, and with one row fewer); a touch
+  column offered from the generator's candidates alone, on SQL Server's
+  order `order_date`, `status`, `amount`, `notes` and `group` (with
+  `touchColumnProblem` unasked, and with the pins unasked); a lookup the
+  generator refuses -- row security, a section -- said before its box is
+  ticked (with the unticked lookups unasked); ticked, bounds out of
+  order in the generator's words, a pin outside the record's key in the
+  bundle check's and, on SQL Server, a `max` past one batch in the
+  publish gate's, gone at the max it names (with each source left out in
+  turn); a pinned touch column in the generator's words (with the touch
+  unasked); and nothing said where the request is refused without them
+  (with that request unasked: the box refused with a pin's sentence).
+  `apps/studio/src/choice.test.ts` -- the request carrying a lookup's
+  bounds and the touch column, and neither where none is chosen (with
+  each left out of `proposalFor`); a bound that is no number refused in
+  the server's words (with it unasked); and a through by another field
+  than the together one not offered, in the bundle check's words (with
+  `togetherPolicyProblems` left out of `throughBlocker`).
+  `apps/studio/src/choose-together.test.tsx` -- the box under the
+  order's customer and not its creator (with it drawn under every
+  lookup), once ticked saying that a save holds one level, so a form
+  saved with each order is read-only and, requiring one, leaves no order
+  to create (with those words left out of its description); not offered
+  under row security, its description the generator's sentence (with the
+  blocker not handed to it); two keys NOT NULL onto one table, an
+  order's creator and approver, each box and its group named by its
+  foreign key, and the second refused in the generator's words once the
+  first is ticked (with the key left out: two groups, and two boxes, of
+  one name); a box emptied refused with nothing sent (with the bounds
+  unchecked: the proposal sent with a null and refused 400 in words
+  about the body's shape); a pin outside the key under the box and in
+  the Policy check (with the together rules out of `policyCheck`: the
+  check listed only the undecided order list); a `max` past one batch
+  under the box and on the Publish step, its button disabled and its
+  words saying that the Choose step's Generate starts the presentation
+  afresh (with the Publish step not asking `togetherBatchProblem`: the
+  button enabled); nothing of the batch while a pin's attribute is
+  cleared, the pin's and the batch's words back with it (with
+  `togetherBatchProblem` asking a policy that cannot be read: a batch of
+  Infinity parameters); the touch column's options, none chosen, and a
+  pinned one refused under it (with every readable column listed, and
+  with the refusal not handed to it).
+  `apps/studio/src/journey.test.tsx` -- a rowversion order published
+  with its touch column and its lines with theirs between 1 and 20, the
+  field naming the order written on create only, the store's version the
+  request sent, axe and a name on every control at each new state, and
+  the order regenerated from Drift with its touch column still chosen
+  (with `together`, then `touchColumn`, left out of `proposalFor`: each
+  bundle published without it; with At least's label pointing elsewhere:
+  the state's audit named the box unlabelled; and with the
+  regeneration's touch column left out: None chosen). The studio's
+  browser gate, `apps/studio/scripts/browser/together.mjs` -- the touch
+  column chosen, none chosen first; the lines saved with their order,
+  Space ticking the box and keeping the keyboard on it, the next Tab on
+  At least, At most at the cap; and a delivery's pin refused under the
+  box; each state clean at every width down to 320 pixels -- in Chromium
+  on this machine, its checks watched failing there (with the box
+  remounted as it is ticked: the keyboard dropped, and Tab not on At
+  least; with the starting max one less: At most not at the cap); in
+  Firefox and WebKit in CI alone.
 
 ## Context
 
@@ -673,10 +742,36 @@ whose `writable` named a write `operations` does not hold as `null`;
 `@formancy/data-client` reads it there and nowhere else, so a page draws a
 new row with the fields its create takes.
 
-**A later part of the decision**, its own pull request: the studio's
-controls. Until it lands, an administrator confirms `together` and
-`touchColumn` in a generation request of their own, which the studio
-does not yet write.
+**The studio offers both, and ticks neither.** On the Choose step
+(`apps/studio/src/choose-together.tsx`), under a lookup whose foreign key
+is NOT NULL and onto another table, "Rows of this form are saved with
+their order" is a box, unticked; ticked, "At least" and "At most" are
+number boxes starting at 0 and `TOGETHER_MAX_ROWS`, and the lookup choice
+carries `together`. On a rowversion root this connection reads, "Rows
+saved with these records move the rowversion through" lists the columns
+`touchColumnProblem` takes and no pin holds, none chosen, and the request
+carries `touchColumn`; a regeneration taken up keeps it. What is refused
+of either is asked of the functions the server runs and said in their
+words before anything is sent (`apps/studio/src/together.ts`): the
+generator itself, run in the browser on the request the step would send
+against the snapshot it discovered, asked first without either, so that
+only a refusal they cause is said there; a lookup it would refuse --
+row security, a section, a form over versions, another lookup already
+saved with its record -- is not offered, its box saying why; ticked, the
+generator's refusal of it, or the bundle check's of the policy as it
+stands (`togetherPolicyProblems`) and, on SQL Server, the publish gate's
+(`togetherBatchProblem`), with the most that fits -- neither of a policy
+that cannot be read, which the server refuses before either. Ticked, the
+box also says that a save holds one level: a form saved with this form's
+records then saves none, and where it requires a row, none of these
+records can be created. Where another key that could be saved with its
+record references a table of the same name, the box and its group are
+named by the foreign key too, as the step's other controls of a lookup
+are. A bound that is no number is refused before the request is sent,
+in the words of the server's reading. The Policy step's check asks
+`togetherPolicyProblems` as the server does, and does not offer a through
+by another field, in its words; the Publish step waits on
+`togetherBatchProblem` over the policy as it then stands.
 
 ## Consequences
 
@@ -860,14 +955,36 @@ What it costs, and what it does not do:
   record, is the same `RecordTabs` drawing, which no test opens there.
 - **Remove is absent at `min` for a new row too**, as a repeater's is: a
   new record at its fewest rows adds one before it drops one.
-- **Built in part.** The plan, both adapters' save, the generator's and
-  the bundle check's part, the route, the client and the host page are
-  built; the studio does not offer the choice yet, so an administrator
-  makes a child together in a generation request of their own. The limits
-  were measured on one workstation and on the default images alone, not on
-  the CI runner, which holds only that a save of `SAVE_MAX_ROWS` lines is
-  stored within the default deadline, nor on the oldest images of the
-  matrix.
+- **The studio offers the box under every lookup whose key is NOT NULL
+  onto another table**, so an order is offered to be saved with its
+  customer as a line is with its order; nothing ticks it, and the Choose
+  step is longer under each such lookup. A save holds one level and each
+  bundle is read alone, so nothing refuses publishing both: once the
+  order's form is saved with its customer, a line form saved with its
+  order saves none -- its rows read-only under each order -- and where it
+  requires at least one line, no order can be created at all, through the
+  page or the API. The box says so once it is ticked; nothing on the
+  administrator's plane warns of such a pair, whichever is published
+  first.
+- **The studio's refusals are asked against what it holds.** The
+  generator runs in the browser against the snapshot the Connect step
+  discovered, where the server generates from a discovery of its own:
+  a database changed since is said by Generate, in the server's words.
+  The bundle check and the batch are asked in the Choose step against
+  the policy as it stands, which the Policy and Publish steps ask again.
+  On each change to the choice or the policy the generator runs once
+  without either, once with the touch column, once with the lookup ticked
+  and once for each lookup that could be: a cost not measured.
+- **A touch column is offered from what the catalog says of keys alone.**
+  A check constraint's expression is not parsed, so a column a check names
+  is offered; whether SQL Server evaluates the check again when the column
+  is set to itself is not checked.
+- **Built.** The plan, both adapters' save, the generator's and the bundle
+  check's part, the route, the client, the host page and the studio. The
+  limits were measured on one workstation and on the default images
+  alone, not on the CI runner, which holds only that a save of
+  `SAVE_MAX_ROWS` lines is stored within the default deadline, nor on the
+  oldest images of the matrix.
 
 ## Alternatives considered
 

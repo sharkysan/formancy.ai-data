@@ -96,7 +96,7 @@
       ]
     },
     "0009": {
-      "reviewed": "sha256:1e58d881f5961ab4cc5a0288318584d714aa271d9de6e82459627dbb9a3c61c8",
+      "reviewed": "sha256:2ba5593a1e9c08eddb4cfa2cc981133cfef69660b7296dbc46b9d1858b0a46b5",
       "limitations": [
         {
           "area": "forms",
@@ -4460,12 +4460,22 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:2f768a5f3b1239c73dfa3019b8bea0015793d4cd2863fa5c48d476e6a45f815e",
+      "reviewed": "sha256:fbb37897d811afc32ce6883edb7c8472f170290241c9dc1ca042da945cda24fb",
       "limitations": [
         {
           "area": "writes",
-          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds; an administrator confirms together and a touch column in a generation request of their own, which the studio does not yet write.",
+          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds.",
           "heldBy": "apps/host/src/together.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "An administrator chooses together and a touch column on the studio's Choose step, which ticks and chooses neither.",
+          "heldBy": "apps/studio/src/choose-together.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A save holds one level, and each bundle is read alone: once a form's rows are saved with their record, a form saved with its own records saves none, its rows read-only under each record, and where it requires at least one row, no such record can be created at all, through the page or the API; nothing refuses publishing the two, and the studio says so only once the box is ticked.",
+          "heldBy": "packages/data-core/src/records/together.test.ts"
         },
         {
           "area": "host",
@@ -4589,6 +4599,16 @@
         {
           "area": "server",
           "says": "A save's answer is kept for a resend under the same byte cap as any write's, 32 MiB: measured once on the fixture's order, a save of 49 lines answered 7,508 bytes on PostgreSQL and 9,758 on SQL Server, about 148 and 193 a line, so the cap holds about 4,400 and 3,400 such saves, fewer with several together children or wider rows, and a resend whose answer was dropped first is applied again."
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers a form's rows saved with their record under every lookup whose foreign key is NOT NULL onto another table, and says what the generator, the bundle check and publishing refuse of it before anything is sent: the generator run in the browser against the snapshot the Connect step discovered, and the policy check and SQL Server's batch against the policy as it stands, so a database changed since is said by Generate, and a policy changed later by the Policy and Publish steps.",
+          "heldBy": "apps/studio/src/together.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A touch column is offered from the columns outside every key and foreign key, not generated, not pinned, that the connection may read and update; a column a check constraint names is offered too, since a check's expression is not parsed, and whether SQL Server evaluates the check again when the column is set to itself is not checked.",
+          "heldBy": "apps/studio/src/together.test.ts"
         }
       ]
     },
@@ -4721,7 +4741,7 @@
         },
         {
           "area": "databases",
-          "says": "On SQL Server a form whose concurrency is a rowversion offers an action only with a confirmed touch column, which this release’s generator does not yet write, and every run fires the table’s UPDATE triggers and is a change to temporal history, CDC and change tracking.",
+          "says": "On SQL Server a form whose concurrency is a rowversion offers an action only with a confirmed touch column, which the generator writes only where the request confirms one, and every run fires the table’s UPDATE triggers and is a change to temporal history, CDC and change tracking.",
           "heldBy": "packages/data-core/src/generate/actions.test.ts"
         },
         {

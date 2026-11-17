@@ -99,7 +99,7 @@
   },
   "studio-choose": {
     "file": "docs/images/readme/studio-choose.webp",
-    "captured": "2026-10-30",
+    "captured": "2026-11-17",
     "viewport": {
       "width": 1200,
       "height": 900
@@ -109,10 +109,10 @@
     "timezone": "UTC",
     "css": {
       "width": 874,
-      "height": 634
+      "height": 800
     },
-    "bytes": 94926,
-    "sha256": "18b61afcfdf026139197b3c9e69ec805553d8dda7576b34ec35d218ca27dc232",
+    "bytes": 128786,
+    "sha256": "4496e56d0ab8f494128f5cedae209dcfbbc8ae12449771b6284d140b84ff3ac4",
     "look": {
       "platform": "linux-x64",
       "playwright": "1.63.0",
@@ -124,9 +124,9 @@
       }
     },
     "database": "the captured snapshots apps/studio/src/fixtures/postgres-writer.json and postgres-owner.json (PostgreSQL 17.11) and sqlserver-reader.json (SQL Server 16.0.4295.3)",
-    "stylesheet": "sha256 46dd9db0365d82091e5602bcb4f5e1059968076957a4901943b1b2dce7aa4e48 of src/studio.css with its imports, and @formancy/themes 0.13.0",
+    "stylesheet": "sha256 d89a6bcb895152a090e824916a6de3e5f9c7aecb7918ece93a9cd56254aabbd6 of src/studio.css with its imports, and @formancy/themes 0.13.0",
     "text": {
-      "Lookups": "- group \"Foreign keys to offer as lookups\":\n  - text: Foreign keys to offer as lookups\n  - checkbox \"Offer fk_order_approved_by as a lookup\" [disabled]\n  - text: Offer fk_order_approved_by as a lookup\n  - paragraph: approved_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_created_by as a lookup\" [disabled]\n  - text: Offer fk_order_created_by as a lookup\n  - paragraph: created_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_customer as a lookup\" [checked]\n  - text: Offer fk_order_customer as a lookup\n  - paragraph: tenant_id, customer_no → sales.customer.\n  - group \"Columns to show for fk_order_customer\":\n    - text: Columns to show for fk_order_customer\n    - paragraph: What a person recognises a customer by. The first text column is suggested; confirm or change it.\n    - checkbox \"tenant_id\"\n    - text: tenant_id\n    - checkbox \"customer_no\"\n    - text: customer_no\n    - checkbox \"name\" [checked]\n    - text: name\n    - checkbox \"country_code\" [disabled]\n    - text: country_code This connection may not read it, so it cannot be shown.\n    - checkbox \"credit_limit\" [disabled]\n    - text: credit_limit This connection may not read it, so it cannot be shown.\n    - checkbox \"active\" [disabled]\n    - text: active This connection may not read it, so it cannot be shown.\n    - checkbox \"created_at\" [disabled]\n    - text: created_at This connection may not read it, so it cannot be shown."
+      "Lookups": "- group \"Foreign keys to offer as lookups\":\n  - text: Foreign keys to offer as lookups\n  - checkbox \"Offer fk_order_approved_by as a lookup\" [disabled]\n  - text: Offer fk_order_approved_by as a lookup\n  - paragraph: approved_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_created_by as a lookup\" [disabled]\n  - text: Offer fk_order_created_by as a lookup\n  - paragraph: created_by → sales.employee. id of sales.employee cannot be read by this connection, so its rows cannot be offered.\n  - checkbox \"Offer fk_order_customer as a lookup\" [checked]\n  - text: Offer fk_order_customer as a lookup\n  - paragraph: tenant_id, customer_no → sales.customer.\n  - group \"Columns to show for fk_order_customer\":\n    - text: Columns to show for fk_order_customer\n    - paragraph: What a person recognises a customer by. The first text column is suggested; confirm or change it.\n    - checkbox \"tenant_id\"\n    - text: tenant_id\n    - checkbox \"customer_no\"\n    - text: customer_no\n    - checkbox \"name\" [checked]\n    - text: name\n    - checkbox \"country_code\" [disabled]\n    - text: country_code This connection may not read it, so it cannot be shown.\n    - checkbox \"credit_limit\" [disabled]\n    - text: credit_limit This connection may not read it, so it cannot be shown.\n    - checkbox \"active\" [disabled]\n    - text: active This connection may not read it, so it cannot be shown.\n    - checkbox \"created_at\" [disabled]\n    - text: created_at This connection may not read it, so it cannot be shown.\n  - group \"order saved with its customer\":\n    - text: order saved with its customer\n    - checkbox \"Rows of this form are saved with their customer\"\n    - text: Rows of this form are saved with their customer\n    - paragraph: \"A page lists them under each customer, and the customer’s own Save stores them with it, in one transaction: every change or none. They are then created and deleted only in that save, and still updated one at a time; the field naming the customer is written when a row is created, never after.\""
     }
   },
   "studio-generate": {

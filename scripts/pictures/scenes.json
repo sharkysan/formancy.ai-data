@@ -47,7 +47,7 @@
     "title": "Choose",
     "step": "2. Choose",
     "caption": "As the order form's own account. A foreign key is offered as a lookup only where this account may read its target: `approved_by` and `created_by` point at `sales.employee`, whose rows “cannot be offered”, and the customer columns it may not read “cannot be shown” ([0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
-    "alt": "The lookups group of the Choose step: two employee keys refused because sales.employee cannot be read by this connection, and the customer lookup ticked with name as the column to show and four columns this connection may not read.",
+    "alt": "The lookups group of the Choose step: two employee keys refused because sales.employee cannot be read by this connection, and the customer lookup ticked with name as the column to show, four columns this connection may not read, and the box to save orders with their customer, unticked.",
     "quotes": {
       "cannot be offered": ["Lookups"],
       "cannot be shown": ["Lookups"]

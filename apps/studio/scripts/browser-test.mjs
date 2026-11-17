@@ -19,9 +19,11 @@
 //     rebased, a restore refused, an import refused, a dropped label given,
 //     a draft approved, a browse's condition applied from its line or a
 //     header box, removed, or put back by Undo (0147) -- the keyboard is
-//     somewhere deliberate afterwards, not on the page; and `/` reaches a
+//     somewhere deliberate afterwards, not on the page; `/` reaches a
 //     browse's filter line, Tab its header boxes, and Esc leaves the line
-//     for the grid;
+//     for the grid; and Space on the box that saves a form's rows with
+//     their record ticks it and keeps the keyboard there, the next Tab on
+//     its first bound (0155);
 //   - the paper is the theme's: no rule of studio.css selects anything on the
 //     preview's paper, or on a draft's open for review (0065), so each shows
 //     what the published form will;
@@ -39,7 +41,10 @@
 //     window scrolling in its own region, a sort and a view (0099), and its
 //     filter (0104, 0147): the line's completion open over the grid, a line
 //     applied, one it cannot read and one the server refuses, a header box
-//     applied, a condition removed, and the last removed and put back;
+//     applied, a condition removed, and the last removed and put back; and
+//     on the Choose step a touch column chosen, a form's rows saved with
+//     their record and its bounds, and a pin the server refuses of them,
+//     said under the box (0155);
 //   - every web font the built studio declares had loaded by the end of
 //     each pass, on each origin the pass signed in to, and in the pass that
 //     refuses every font file, none had (0058): a state measured before a
@@ -66,7 +71,8 @@
 //
 // One module per reason to change, under scripts/browser/: the planes, the
 // server of the built page, the stylesheet's reads, the measurements, the
-// journey, the states of review, and a browse.
+// journey, the states of review, a browse, and a form's rows saved with
+// their record.
 //
 // `pnpm test:browser`, which builds first, runs it once per browser
 // scripts/browsers.mjs names through recordedPerBrowser -- Chromium, Firefox
@@ -100,6 +106,7 @@ import { startPlane, TOKENS } from './browser/plane.mjs'
 import { review, signIn } from './browser/review.mjs'
 import { DIST, POLICY, serve } from './browser/serve.mjs'
 import { widths } from './browser/styles.mjs'
+import { together } from './browser/together.mjs'
 
 /** Playwright, for recordedPerBrowser to launch each browser with: the one import of playwright, here where the app declares it. */
 async function load() {
@@ -244,7 +251,7 @@ async function run(gate, browser) {
       gate.check('the studio is sent with the policy nginx.conf sends it', sentWith(response))
       await wayIn(gate, page)
       await measured(gate, page, 'Connect')
-      for (const [state, act] of [...journey(plane, gate.check), ...browse(gate.check)]) {
+      for (const [state, act] of [...journey(plane, gate.check), ...browse(gate.check), ...together(gate.check)]) {
         await act(page)
         await measured(gate, page, state)
       }
@@ -271,7 +278,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the studio's whole journey and a browse, and its states under review, at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
+    `browser checks passed: the studio's whole journey, a browse and a form's rows saved with their record, and its states under review, at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, for the layout, focus and colour facts jsdom cannot represent`,
   )
 }
 

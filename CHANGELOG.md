@@ -18,6 +18,40 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The studio offers a form's rows saved with their record, and a
+  rowversion's touch column** (0155). Why: the generator, the bundle
+  check, the route and the host page all held a child's rows saved with
+  their record, and an administrator could ask for one only in a
+  generation request of their own, which the studio did not write. What an
+  administrator notices: on the Choose step, under a lookup whose foreign
+  key is NOT NULL and onto another table -- an order's customer as well as
+  a line's order -- a box "Rows of this form are saved with their order",
+  never ticked for anybody; ticked, "At least" and "At most", starting at
+  none and at the cap data-core gives, one row less than a list's page,
+  and a sentence saying that a save holds one level: a form saved with
+  this form's records then saves none, and where it requires a row, none
+  of these records can be created -- which nothing refuses at publish. Two
+  such keys onto one table are told apart by their foreign keys. Where the
+  generator would refuse it -- row security on the table, a section, a
+  form over versions, another lookup already saved with its record -- the
+  box is not offered and says why in the generator's words; ticked, what
+  the generator, the bundle check and publishing refuse of it is said
+  under it in theirs as the bounds and the pins change: bounds out of
+  order, a pin outside the record's key, and on SQL Server more rows than
+  one batch's parameters hold, with the most that fits, said of no policy
+  the server cannot read. A box left empty is refused before anything is
+  sent. On a rowversion root, "Rows saved with these records move the
+  rowversion through" lists only the columns the generator takes for a
+  touch -- none in a key or a foreign key, none generated or pinned, one
+  this connection may read and update -- with none chosen; without one, a
+  form's rows are saved with such a record only as it is created. A
+  regeneration keeps the touch column. The Policy step's check now names a
+  policy that narrows such rows by anything but their record, and offers
+  no through by another field, each in the bundle check's words, and the
+  Publish step waits on a max past one batch over the policy as it then
+  stands, saying that the Choose step's Generate, which takes a new max,
+  starts the presentation afresh.
+
 - **The host page saves a record with its rows in the record's own Save**
   (0155). Why: the save route arrived with nothing on the page to call it,
   so an order's lines were still listed and edited one at a time there,
@@ -168,7 +202,7 @@ the same day (formancy.ai 0232).
   forwards the save, and so does the live demo's Worker; a tunnel keeps the
   configuration it was given until `tunnel-config` writes it again, as the
   guide's section 8 says, and until then the door does not forward a save,
-  which fails closed. The studio offers no together child yet.
+  which fails closed; the studio offers the choice, the entry above.
 
 - **Both adapters run an action over the open record** (0160). Why: 0159
   bound a routine to a form and planned a run, and nothing ran one; how a

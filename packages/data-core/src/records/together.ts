@@ -201,16 +201,18 @@ export function togetherPolicyProblems(bindings: FormBindings, policy: FormPolic
  * at publish, of the child's bundle alone; the menu holds the parent's step
  * and every together child's rows to the limit together, and the adapter
  * refuses a batch past it before it is sent. `null` on PostgreSQL, which
- * sends each statement on its own, and for bindings with no together
- * lookup a save could hold.
+ * sends each statement on its own; for bindings with no together lookup a
+ * save could hold; and for a policy that cannot be read, which
+ * `validatePolicy` reports and the bundle check refuses before the publish
+ * gate asks, as `togetherPolicyProblems` leaves it to them.
  */
 export function togetherBatchProblem(snapshot: MetadataSnapshot, bindings: FormBindings, policy: FormPolicy): string | null {
   if (snapshot.kind !== 'sqlserver') return null
   const together = togetherOf(bindings)
-  if (together === null || together === 'malformed') return null
+  if (together === null || together === 'malformed' || readPolicy(policy).parsed === null) return null
   const each = saveParameters(snapshot, bindings, policy)
   if (together.max * each <= SQLSERVER_MAX_PARAMETERS) return null
-  const fits = Number.isFinite(each) ? Math.floor(SQLSERVER_MAX_PARAMETERS / each) : 0
+  const fits = Math.floor(SQLSERVER_MAX_PARAMETERS / each)
   return `${together.binding.field} is saved with its record up to ${String(together.max)} rows, and one change of a row binds up to ${String(each)} parameters on SQL Server, past the ${String(SQLSERVER_MAX_PARAMETERS)} one batch holds; a max of ${String(fits)} or less fits`
 }
 

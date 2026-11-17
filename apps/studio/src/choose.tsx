@@ -1,7 +1,7 @@
-import { useId, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
-import type { ForeignKeyMeta, LookupChoice, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
+import type { ForeignKeyMeta, FormPolicy, LookupChoice, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
 import type { Failure, ProposalRequest } from './api.js'
 import type { Choice } from './choice.js'
 import {
@@ -21,7 +21,10 @@ import {
   versionCandidates,
 } from './choice.js'
 import { StampsChoice } from './choose-stamps.js'
+import { TogetherChoice, TouchChoice } from './choose-together.js'
 import { VersionsChoice } from './choose-versions.js'
+import { togetherCandidate, togetherReasons } from './together.js'
+import type { TogetherReasons } from './together.js'
 
 /** The attribute a newly pinned column is given until somebody types another: the one tenant isolation uses. */
 const DEFAULT_ATTRIBUTE = 'tenant'
@@ -104,11 +107,13 @@ function LookupChoices({
   snapshot,
   root,
   choice,
+  reasons,
   onChoice,
 }: {
   snapshot: MetadataSnapshot
   root: ObjectMeta
   choice: Choice
+  reasons: TogetherReasons
   onChoice: (next: Choice) => void
 }): ReactElement {
   const hidden = gapsAbout(snapshot, root.ref).filter((gap) => gap.aspect === 'foreign-keys')
@@ -144,6 +149,8 @@ function LookupChoices({
           const target = foreignKey.references === null ? undefined : findObject(snapshot, foreignKey.references.table)
           const chosen = choice.lookups.find((lookup) => lookup.foreignKey === foreignKey.name)
           const id = `lookup-${foreignKey.name}`
+          const onLookup = (next: LookupChoice) =>
+            onChoice({ ...choice, lookups: choice.lookups.map((lookup) => (lookup.foreignKey === foreignKey.name ? next : lookup)) })
           const where = foreignKey.references === null ? 'an unknown target' : describeRef(foreignKey.references.table)
           return (
             <div className="choice" key={foreignKey.name}>
@@ -191,12 +198,17 @@ function LookupChoices({
                 </fieldset>
               )}
               {chosen === undefined || target === undefined || !sectionCandidate(root, foreignKey) ? null : (
-                <SectionChoice
+                <SectionChoice id={id} root={root} target={target} lookup={chosen} onLookup={onLookup} />
+              )}
+              {chosen === undefined || target === undefined || !togetherCandidate(root, foreignKey) ? null : (
+                <TogetherChoice
                   id={id}
                   root={root}
                   target={target}
                   lookup={chosen}
-                  onLookup={(next) => onChoice({ ...choice, lookups: choice.lookups.map((lookup) => (lookup.foreignKey === foreignKey.name ? next : lookup)) })}
+                  blocker={reasons.blocked.get(foreignKey.name) ?? null}
+                  refusals={reasons.chosen}
+                  onLookup={onLookup}
                 />
               )}
             </div>
@@ -265,14 +277,30 @@ function Pins({
   )
 }
 
-function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: Choice; onChoice: (next: Choice) => void }): ReactElement {
+function VersionColumn({
+  root,
+  choice,
+  rowFilters,
+  touch,
+  onChoice,
+}: {
+  root: ObjectMeta
+  choice: Choice
+  rowFilters: readonly RowFilterRule[]
+  /** The generator's refusal of the touch column chosen, or `null` (`TogetherReasons.touch`). */
+  touch: string | null
+  onChoice: (next: Choice) => void
+}): ReactElement {
   const rowversion = rowversionOf(root)
   if (rowversion !== undefined) {
     return (
-      <p className="hint">
-        {describeRef(root.ref)} has a rowversion column, <code>{rowversion.name}</code>: the database changes it on every update, so a stale save is detected
-        with nothing to confirm.
-      </p>
+      <>
+        <p className="hint">
+          {describeRef(root.ref)} has a rowversion column, <code>{rowversion.name}</code>: the database changes it on every update, so a stale save is detected
+          with nothing to confirm.
+        </p>
+        <TouchChoice root={root} choice={choice} rowFilters={rowFilters} refusal={touch} onChoice={onChoice} />
+      </>
     )
   }
   return (
@@ -301,9 +329,10 @@ function VersionColumn({ root, choice, onChoice }: { root: ObjectMeta; choice: C
 
 /**
  * Step 3: one root table or view, the relationships to offer as lookups and
- * how each is shown, the columns the policy pins, a version column to
- * confirm when the database keeps none (plan section 3), and the columns
- * the server stamps (0153).
+ * how each is shown, whether the form's rows are saved with the record one
+ * of them references (0155), the columns the policy pins, a version column
+ * to confirm when the database keeps none (plan section 3) or a rowversion's
+ * touch column (0155), and the columns the server stamps (0153).
  *
  * Everything offered comes from the snapshot: a lookup whose target this
  * connection cannot see is listed and disabled with the gap that explains it,
@@ -314,7 +343,7 @@ export function ChooseStep({
   connection,
   choice,
   onChoice,
-  rowFilters,
+  policy,
   onRowFilters,
   generated,
   onGenerate,
@@ -323,7 +352,8 @@ export function ChooseStep({
   connection: string
   choice: Choice | null
   onChoice: (next: Choice) => void
-  rowFilters: readonly RowFilterRule[]
+  /** The policy as it stands: its row filters are the pins chosen here, and what publishing refuses of rows saved with their record is asked against all of it. */
+  policy: FormPolicy
   onRowFilters: (next: RowFilterRule[]) => void
   /** What the form already generated was generated from, which choosing another root replaces. */
   generated: Pick<ProposalRequest, 'connection' | 'root'> | null
@@ -331,7 +361,13 @@ export function ChooseStep({
 }): ReactElement {
   const [pending, setPending] = useState(false)
   const [problems, setProblems] = useState<string[]>([])
+  const rowFilters = policy.rowFilters
   const root = choice === null ? undefined : findObject(snapshot, choice.root)
+  // What the generator and the server refuse of rows saved with their record and of a touch column, asked again on every change to the choice or the policy.
+  const reasons = useMemo(
+    () => (choice === null || root === undefined ? null : togetherReasons(snapshot, root, proposalFor(connection, choice, rowFilters), policy)),
+    [snapshot, root, connection, choice, rowFilters, policy],
+  )
   const tables = snapshot.objects.filter((object) => object.kind === 'table')
   const views = snapshot.objects.filter((object) => object.kind === 'view')
   const selected = root === undefined ? '' : String(snapshot.objects.indexOf(root))
@@ -398,7 +434,7 @@ export function ChooseStep({
           </p>
         )}
       </div>
-      {choice === null || root === undefined ? null : (
+      {choice === null || root === undefined || reasons === null ? null : (
         <>
           <div className="pair">
             <div className="field">
@@ -410,9 +446,9 @@ export function ChooseStep({
               <input id="form-title" value={choice.title} onChange={(event) => onChoice({ ...choice, title: event.target.value })} />
             </div>
           </div>
-          <LookupChoices snapshot={snapshot} root={root} choice={choice} onChoice={onChoice} />
+          <LookupChoices snapshot={snapshot} root={root} choice={choice} reasons={reasons} onChoice={onChoice} />
           <Pins root={root} rowFilters={rowFilters} onRowFilters={onRowFilters} />
-          <VersionColumn root={root} choice={choice} onChoice={onChoice} />
+          <VersionColumn root={root} choice={choice} rowFilters={rowFilters} touch={reasons.touch} onChoice={onChoice} />
           <VersionsChoice root={root} choice={choice} onChoice={onChoice} />
           <StampsChoice root={root} choice={choice} rowFilters={rowFilters} onChoice={onChoice} />
           {problems.length === 0 ? null : (

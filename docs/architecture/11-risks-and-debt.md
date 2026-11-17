@@ -251,9 +251,10 @@ EXECUTE AS
 A routine is bound as an action, and nothing runs or shows one yet. An
 action is offered only where a version proves the record, as a delete is;
 on SQL Server's rowversion forms only with a confirmed touch column, which
-the generator does not write yet; a PostgreSQL parameter is compared by
-its kind, range and zone alone; on SQL Server a datetime or smalldatetime
-column passes only to a parameter of its own type, and a varchar parameter
+the generator writes only where the request confirms one; a PostgreSQL
+parameter is compared by its kind, range and zone alone; on SQL Server a
+datetime or smalldatetime column passes only to a parameter of its own
+type, and a varchar parameter
 under a collation that is not UTF-8 takes no nvarchar column, though which
 code page a column's own collation has is the run's to check, a later
 record's; drift review of a form with actions needs a
@@ -610,6 +611,24 @@ a cell
 That the studio's line keeps the host's keys is held by its suite asserting
 the host's cases one for one; a key the host's line gains and the studio's
 lacks fails nothing, and review holds it.
+The Choose step offers a form's rows saved with their record under every
+lookup whose key is NOT NULL onto another table, an order's customer
+among them, and asks the generator what it refuses of them in the
+browser, against the snapshot the step discovered -- a database changed
+since is said by Generate, from the server's own discovery -- running it
+once more for each lookup that could be ticked on every change to the
+choice, unmeasured; the bundle check and SQL Server's batch are asked there
+against the policy as it stands, and again by the Policy and Publish
+steps. A save holds one level and each bundle is read alone, so nothing
+refuses publishing a form saved with its record beside a form saved with
+its own records: the second then saves none, its rows read-only, and
+where it requires a row, the first form's records cannot be created at
+all; the box says so once it is ticked, and nothing on the administrator's
+plane warns of such a pair. A touch column is offered from what the
+catalog says of keys alone: a column a check constraint names is offered,
+a check's expression being unread, and whether SQL Server evaluates the
+check again when the column is set to itself is not checked
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached
@@ -856,9 +875,8 @@ each lock wait and when a step may start; on PostgreSQL each statement
 too, and on SQL Server a statement slow for another reason, and a
 batch's compile, are bounded only by mssql's request timeout, holding
 their locks the while. The plan, both adapters' save, the generator's
-and the bundle check's part, the route, the client and the host page are
-built; the studio follows, and until it does an administrator chooses a
-together child in a generation request of their own. On the host page a
+and the bundle check's part, the route, the client, the host page and the
+studio are built. On the host page a
 together child's tab is drawn with the record's tabs, so it lists the
 record's rows as the record opens rather than when first shown -- one
 list more for every record of such a form a person opens, the price of a
