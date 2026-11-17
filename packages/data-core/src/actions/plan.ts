@@ -54,8 +54,13 @@ export interface DuplicateRecord {
   records: number[]
 }
 
-/** What a person is told of a selection that names one record twice: by two tokens, or by two keys the database makes one row (0165). */
-export const DUPLICATE_RECORD = 'The selection names one record twice. Nothing was done.'
+/**
+ * What a person is told of a run that names one record twice: by two
+ * tokens, the open record's action's as a selection's (0159), or by two
+ * keys of a selection the database makes one row (0165). It says the
+ * request, which both have, and not the selection, which one has not.
+ */
+export const DUPLICATE_RECORD = 'The request names one record twice. Nothing was done.'
 
 export type PlannedAction = { ok: true; request: ActionRequest } | InvalidValues | PlanRefusal | DuplicateRecord
 
@@ -207,8 +212,6 @@ function recordsOf(
   }
   // An action over the open record runs over exactly one; a selection over one page at most, which readRunBody held the body to.
   if (action.scope === 'record' && decoded.length !== 1) return refuse('invalid-request', 'An action over the open record names exactly one record.')
-  if (decoded.length < 1 || decoded.length > LIST_PAGE_SIZE)
-    return refuse('invalid-request', `A selection names from 1 to ${String(LIST_PAGE_SIZE)} records: the page a list shows.`)
   return { ok: true, records: decoded }
 }
 

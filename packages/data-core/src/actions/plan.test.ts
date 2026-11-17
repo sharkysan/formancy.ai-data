@@ -253,8 +253,9 @@ describe('a run over a selection', () => {
 
   // A selection is rows of the one page a list shows, never a number of
   // its own: a page of records is planned, one more is refused before
-  // anything is described or sent, and so is none. Watched failing on
-  // 2026-11-17 with the bound taken out of readRunBody and the planner:
+  // anything is described or sent, and so is none. readRunBody holds the
+  // bound alone: the planner reads no body it did not let through. Watched
+  // failing on 2026-11-17 with the bound taken out of readRunBody:
   // "expected { ok: true, request: { …(8) } } to match object { ok: false,
   // code: 'invalid-request' }".
   test('is a page of records at most, and one at least', () => {
@@ -292,6 +293,25 @@ describe('a run over a selection', () => {
       )
     expect(once('ship')).toMatchObject({ ok: false, code: 'invalid-request', message: 'An action over the open record names exactly one record.' })
     expect(ship(page(1))).toMatchObject({ ok: true })
+  })
+
+  // The open record's action sent one token twice is the duplicate it was
+  // before selections (0159), in words that fit it: it has no selection,
+  // so a person told "the selection names one record twice" would look
+  // for one that is not there. The words say the request, which a
+  // selection's duplicate has too.
+  test('of the open record, sent one token twice, is duplicate-record in words that name no selection', () => {
+    const [first] = page(1) as [{ record: string; version: string }]
+    const twice = planAction(
+      SOURCE,
+      SELECTION,
+      POLICY,
+      CLERK,
+      'ship',
+      { records: [first, first], answers: {} },
+      { table: described(SOURCE, SELECTION), routine: describedRoutine(SHIP_ORDER) },
+    )
+    expect(twice).toEqual({ ok: false, code: 'duplicate-record', message: 'The request names one record twice. Nothing was done.', records: [0, 1] })
   })
 })
 
