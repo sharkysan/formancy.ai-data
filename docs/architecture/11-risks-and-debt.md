@@ -83,12 +83,17 @@ a whole number by its value, any other key by its canonical text -- and
 not the index's, so two runs that each name one row by another spelling
 a case-insensitive collation equates can deadlock, `unavailable`, rolled
 back; the procedure is called in the order sent, so one refused leaves
-the later ones uncalled, where PostgreSQL promises no order. On
-PostgreSQL two spellings a nondeterministic collation makes one key are
-`refused` and not `duplicate-record`, reasoned and not tested. A refused
-selection is explained by one read per record it did not lock. The
-container suites that hold it were written without a database, and their
-first run is CI's.
+the later ones uncalled, where PostgreSQL promises no order; and a
+procedure that ends the transaction commits every record's version and
+the calls so far, `unknown-outcome`. A through onto the form's own table
+can still deadlock two overlapping selections, its parents locked as
+each record is located, reasoned and not run. On PostgreSQL two
+spellings a nondeterministic collation makes one key are
+`duplicate-record` by reasoning alone, reached by no case; and a record a
+trigger of the lock removes is `schema-changed` there and `refused` on
+SQL Server. A refused selection is explained by one read per record it
+did not lock. The container suites that hold it were written without a
+database, and their first run is CI's.
 
 **An action's run, accepted rather than fixed** ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). On
 PostgreSQL a run locks a through's parent `FOR SHARE`, which asks UPDATE on

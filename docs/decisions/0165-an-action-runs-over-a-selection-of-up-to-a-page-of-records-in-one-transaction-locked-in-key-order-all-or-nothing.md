@@ -16,13 +16,17 @@
   record chosen, in the order sent, each at the version read (watched
   failing with a selection held to one record as the open record is:
   "expected { ok: false, …(2) } to match object { ok: true }"); a page of
-  records is planned, one more and none refused (watched failing with the
-  bound taken out of `readRunBody` and the planner: "expected { ok: true,
+  records is planned, one more and none refused, by `readRunBody` alone,
+  which the planner reads every body through (watched failing with the
+  bound taken out of it: "expected { ok: true,
   request: { …(8) } } to match object { ok: false, code:
   'invalid-request' }"); two tokens of one key are `duplicate-record`
-  naming both (watched failing with the check taken out); and the open
+  naming both (watched failing with the check taken out); the open
   record's action takes one record, whatever the body says (watched
-  failing with every action read as a selection).
+  failing with every action read as a selection); and its one token sent
+  twice is `duplicate-record` in words that name the request, not a
+  selection (watched failing with the selection's words: "expected { ok:
+  false, …(3) } to deeply equal { ok: false, …(3) }").
   `packages/data-core/src/actions/failure.test.ts` -- `unmovedFailure`
   answers a refusal about the run first, then `not-found`, `version-ended`
   and `stale`, each naming its records, and `refused` where nothing was
@@ -45,7 +49,10 @@
   nothing sent; one record named twice is 400 naming both by the tokens
   sent, and a refusal the adapter names records for -- `stale`,
   `duplicate-record` -- names them so (each watched failing with the
-  positions unread: its records []); the trail is one event naming every
+  positions unread: its records []), the open record's action's `stale`
+  and `not-found` naming its one token too (watched failing with the
+  records left out of the answer: "expected [ 409, { code: 'stale', …(1)
+  } ] to deeply equal [ 409, { code: 'stale', …(2) } ]"); the trail is one event naming every
   record by its keyed hash in the order sent and their count, `record`
   null, the open record's action unchanged (watched failing with the
   selection's trail left as the open record's), and without an audit key
@@ -55,12 +62,22 @@
   UPDATE per record in it, whatever order they were sent in (watched
   failing with a whole number ordered by its text, and with the UPDATEs
   written in the order sent: "expected [ +0, 1, 2 ] to deeply equal [ 1,
-  2, +0 ]"). `packages/data-sqlserver/src/actions/errors.test.ts` -- the
+  2, +0 ]"); and every record's arguments are read before the first
+  EXEC, each read found exactly once, and each EXEC given its own record's
+  (watched failing with the arguments read just before each EXEC:
+  "expected [ 'exec', 'exec' ] to deeply equal [ 'read 0', 'found', 'read
+  1', …(5) ]"). `packages/data-sqlserver/src/actions/errors.test.ts` -- the
   batch's own duplicate is `duplicate-record` naming its positions by its
   number and its message both (watched failing with the number read by
-  itself: "expected 'duplicate-record' to be 'refused'").
-  `packages/data-sqlserver/src/records/batch-steps.test.ts` holds the new
-  number among the adapter's own.
+  itself: "expected 'duplicate-record' to be 'refused'"); a record locked
+  and then not found to read its arguments from is `refused` in the
+  adapter's words (watched failing with the number unread: the message
+  was "The database refused the statement with an error of its own
+  (51737)…").
+  `packages/data-sqlserver/src/records/batch-steps.test.ts` holds the two
+  new numbers among the adapter's own (watched failing with both left out
+  of `OWN_NUMBERS`: "expected [ 51701, 51702, 51703, 51704, …(14) ] to
+  deeply equal [ 51701, 51702, 51703, 51704, …(16) ]").
   `packages/data-client/src/transport.test.ts`, run with a configuration
   of its own without the databases its package's suites start, which it
   does not use -- a selection posts every record and is done only on a
@@ -70,7 +87,12 @@
   with a selection action is a form this client knows (watched failing
   with the record scope alone read).
   `packages/data-fixtures/src/load.test.ts` holds SQL Server's tag table
-  and routine to the one place the editions differ.
+  and routine to the one place the editions differ (watched failing with
+  touch_tag left out of what SQL Server alone has: "expected [
+  'broken_order', 'close_order', …(2) ] to deeply equal [ 'broken_order',
+  'close_order', …(1) ]", and with pk_tag: "expected [
+  'fk_order_customer', …(7) ] to deeply equal [ 'fk_order_customer', …(6)
+  ]").
   First run in CI, never run:
   `packages/data-postgres/src/actions-selection.integration.test.ts` and
   `packages/data-sqlserver/src/actions-selection.integration.test.ts` --
@@ -82,16 +104,23 @@
   `stale` naming it, nothing called (`selection-stale`); the routine
   refusing one order of three is `declined` and nothing is kept of any
   (`selection-declined`); a page commits and one more is refused by the
-  planner and by the adapter before any statement (`selection-page`).
+  planner and by the adapter before any statement (`selection-page`);
+  each call raising the other order's amount, each is given the amount
+  its own order held once locked (`selection-as-locked`).
   SQL Server's alone: `alpha` and `ALPHA` under a case-insensitive key
   collation are `duplicate-record` naming both, nothing called, and one
-  spelling alone runs and is answered by the row's own.
+  spelling alone runs and is answered by the row's own; a call that
+  deletes a later record of its selection leaves that record called once,
+  with its own key, never the first twice; and a record a trigger of the
+  lock deleted is `refused`, nothing called.
   `packages/data-client/src/actions.integration.test.ts`, on both engines
   across real HTTP -- a form offers close-all as a selection, one run
   over two orders commits both, and the same run again is 409 `stale`
   naming both; another tenant's order chosen beside the clerk's own is
   404 `not-found` naming it alone, and the clerk's order is kept as it
-  was.
+  was. `apps/host/src/actions.test.tsx`, on both engines -- the open
+  record's header offers close and stamp, and not close-all, close_order
+  bound over a selection on the same form.
 
 ## Context
 
@@ -123,15 +152,22 @@ one is the server's half.
    no record or of more than `LIST_PAGE_SIZE`, so the route answers 400
    before it reads a write id or sends any statement; the planner holds
    the records to the binding's scope -- one for the open record's -- and
-   refuses two tokens of one key 400 `duplicate-record`, "The selection
-   names one record twice. Nothing was done.", naming both, nothing sent.
+   refuses two tokens of one key 400 `duplicate-record`, "The request
+   names one record twice. Nothing was done.", naming both, nothing sent
+   -- the open record's action's words since 0159, which name no
+   selection, since it has none.
 3. **PostgreSQL, unchanged in shape.** 0160's lock statement takes every
    record of the selection, each under the person's filters and throughs
    at the version read, sorted by key before it locks, and moves each
    version; the call statement calls the routine once for each row moved,
-   in an order PostgreSQL does not promise. Which records the lock
-   returned is told by their keys' canonical values, and the answer lists
-   the records in the order sent.
+   in an order PostgreSQL does not promise. Which records each row the
+   lock returned answers to is the lock's own answer: the positions of
+   the records whose key the row equals by the key's own equality, never
+   how either is spelled. A row two records name -- two spellings a
+   nondeterministic collation makes one -- is `duplicate-record` naming
+   them, rolled back before any call, as on SQL Server; the answer lists
+   the records in the order sent. The call statement reads every
+   argument under its one snapshot, taken before any call.
 4. **SQL Server, one UPDATE per record in key order.** The batch moves
    each record in an UPDATE of its own `WITH (UPDLOCK, HOLDLOCK)`, in the
    adapter's key order (`lockOrder`: column by column, a whole number by
@@ -143,8 +179,16 @@ one is the server's half.
    whose key finds a row another record moved, read `WITH (NOLOCK)` since
    it is this transaction's own -- THROWn as 51736 with their positions,
    `duplicate-record`, rolled back before any call; then every record
-   moved. Then, for each record in the order sent, the routine's guard,
-   its arguments read from its row and checked, and its EXEC.
+   moved. Then every record's arguments, read from its locked row by its
+   key into a table variable before the first EXEC -- each read finding
+   exactly one row, or the run is refused as 51737, nothing called -- and
+   checked. Then, for each record in the order sent, the routine's guard,
+   its arguments set from that read, and its EXEC. So every call is given
+   what its row held once locked, never what an earlier call wrote to it,
+   which is what PostgreSQL's one call statement passes; read just before
+   each EXEC, a call that deleted a later record would leave that
+   record's variables at the call before's, a SELECT that finds no row
+   assigning nothing, and the procedure would run twice over one row.
 5. **All or nothing.** Any record's refusal rolls back every record: a
    record not moved -- `not-found`, `stale`, `version-ended` -- is told
    by the read an update alone would ask, one read for each record the
@@ -169,6 +213,8 @@ one is the server's half.
 9. **The host page offers a selection nowhere yet.** The open record's
    header offers the actions over the open record alone; an action over a
    selection belongs above the grid, which the next record draws.
+   `apps/host/src/actions.test.tsx` publishes one on the action order's
+   form and finds it in no control of the header.
 
 Nothing here was measured: it was written without a database, and the
 suites that would measure it run first in CI. PostgreSQL's locking after
@@ -178,11 +224,12 @@ its sort is 0160's measurement, of two rows.
 
 **What it buys.** A routine run once for each of up to a page of
 records, in one transaction on both engines, each record locked under
-the person's policy at the version they read, each version moved, and
-nothing kept unless every record and every call went through; two people
-running over overlapping selections wait for each other rather than
-deadlock on the records they share; and a refusal says which records it
-is about.
+the person's policy at the version they read, each version moved, each
+call given what its record held once locked, and nothing kept unless
+every record and every call went through; two people running over
+overlapping selections wait for each other rather than deadlock on the
+records they share, but for the through below; and a refusal says which
+records it is about.
 
 **What it costs.**
 
@@ -203,8 +250,28 @@ is about.
   can deadlock, answered `unavailable`, rolled back.
 - **On SQL Server each record's lock waits at most half the deadline**,
   and the whole batch the deadline, past which a run reads "it may have
-  run", as 0160's does; the routine's guard sits before each EXEC, so its
+  run", as 0160's does -- a selection still in its lock step, nothing
+  called, included; the routine's guard sits before each EXEC, so its
   window is one per record.
+- **A through onto the form's own table can still deadlock.** The
+  through's parent is locked as each record is located -- on PostgreSQL
+  by an EXISTS the scan evaluates before the rows are sorted and locked,
+  on SQL Server at each record's UPDATE -- not in the parents' own key
+  order, so where a parent row is itself a record of another overlapping
+  selection, two runs can each hold what the other waits for: a deadlock,
+  answered `unavailable` and rolled back. Reasoned from the engines'
+  executors, not run: no form of the fixtures has such a through.
+- **On SQL Server a procedure that ends the transaction commits a
+  selection in part**: a COMMIT inside record k's EXEC commits every
+  record's version, moved by the lock step, and the calls so far; the
+  batch stops there, the later records never called, and the answer is
+  `unknown-outcome`, as 0160's is for one record. Run again from the same
+  read, every record is `stale`, the uncalled ones included.
+- **A call never sees what another wrote to its record's arguments.**
+  Every call is given what its record held once locked, on both engines:
+  a call that changes another record of the selection does not change
+  what that record's call is given, and a call whose record an earlier
+  call deleted is still made, with what its row held.
 - **The calls' order differs.** SQL Server calls in the order sent, so
   one record refused leaves the later ones uncalled; PostgreSQL promises
   no order, and any of a selection's calls may have begun before the one
@@ -213,10 +280,16 @@ is about.
   a page of statements after the rollback, to say which records it is
   about.
 - **On PostgreSQL two spellings a nondeterministic collation makes one
-  key are `refused`, not `duplicate-record`**: the lock finds the row
-  once, and the read after finds the other spelling at its version, which
-  reads as a write the database declined. Reasoned, not tested: no form
-  of the fixtures is keyed so.
+  key are `duplicate-record` by reasoning alone**: the lock's positions
+  are compared by the key's own equality, as SQL Server's are, but no
+  PostgreSQL form of the fixtures is keyed so, and no case reaches it.
+- **A record a trigger of the lock removes is answered two ways.** SQL
+  Server's read of the arguments finds no row and refuses the run,
+  `refused` (51737); PostgreSQL's call statement finds fewer rows than
+  were locked, and answers `schema-changed`, as 0160's does for one
+  record, after calling the routine over the others. Nothing is kept on
+  either. SQL Server's is a case of its suite; PostgreSQL's is reasoned
+  from its code.
 - **A refusal about records carries `records`** for the open record's
   action too, and an action's audit event over a selection a key no other
   event has, which a client or a collector that holds every body or event
@@ -228,12 +301,15 @@ is about.
 - **A server older than 0165 refuses every version whose generation
   request names a selection**, as it refuses every scope it does not run.
 - **The fixtures grew**: SQL Server's actions schema a tag table keyed by
-  text under a case-insensitive collation and a procedure over it, and
-  close_order on both engines refuses an order of amount 66.60.
+  text under a case-insensitive collation and a procedure over it;
+  close_order on both engines refuses an order of amount 66.60 and,
+  noted 'raise others', raises the amount of its customer's other orders,
+  and on SQL Server, noted 'drop others', deletes them.
 
 **What it does not do.** No choice of rows on the host page, no scope in
-the studio, no preview and no check routine. A selection is never split,
-retried or run in part.
+the studio, no preview and no check routine. A selection is never split
+or retried, and never run in part but where a SQL Server procedure ends
+the transaction, above.
 
 **Forecloses:** nothing.
 
@@ -280,7 +356,7 @@ their filters, which a read inside them would not say.
 Extended, not edited away: 0015 (a run bounded to one page of records,
 not one); 0023 (a selection's event names every record by its keyed
 hash); 0031 (a lost selection names every record with its version);
-0079 (all or nothing, applied to a run); 0159 (the scope `selection`,
+0079 (made whole or not at all, applied to a run); 0159 (the scope `selection`,
 bound by the generator); 0160 (both adapters run a selection, locked in
 key order, all or nothing); and 0161 (the route takes a page of records
 for a selection, names a refusal's records and trails every record).

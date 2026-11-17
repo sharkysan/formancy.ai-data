@@ -235,7 +235,7 @@
       ]
     },
     "0015": {
-      "reviewed": "sha256:0be65b5968151f5b3a8cad20e96e4ae3e52bf7ebe1a871080c683a874132b6c8",
+      "reviewed": "sha256:546925c0e0cd25aebeb61645fc36348fecc7da4982e09658f034e99ee77b1663",
       "limitations": [
         {
           "area": "databases",
@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:3b9b26d686e6f6be55bbc34d0b9acfe30829ab0abf282a1a187d90e08400c69d",
+      "reviewed": "sha256:1885c36ad69d534c0da53464fd4e868341378c86f42932c65a481eae4ac27f0c",
       "limitations": [
         {
           "area": "operations",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:0282330ac1c6bf121a5037ef26a02899e4120e9c91f605b7ed1380652cc001bf",
+      "reviewed": "sha256:512d107c1f7bd83087b49b74dcb0ed36a38381b51db8cda5abd0f173698ed9bb",
       "limitations": [
         {
           "area": "writes",
@@ -2575,7 +2575,7 @@
       ]
     },
     "0079": {
-      "reviewed": "sha256:c5c3d62fb10a8628f556e87c346ee9c9b6b8bc436ac780991722102cac302a4f",
+      "reviewed": "sha256:d16554716f997df6803dcb3fabe1d70855a3821b93fe78dd8a79106b90f3714c",
       "limitations": [
         {
           "area": "server",
@@ -4997,7 +4997,7 @@
       "none": "How CI runs the host page's suite, an app that is never published, in two jobs, and how the release report reads them: a contributor meets two check names where there was one and the runner time of a second set of databases. A release's report shows no coverage figure for that suite and says so in its row; nothing a user, integrator or operator installs or runs changes."
     },
     "0165": {
-      "reviewed": "sha256:f3ec3763a04db6d55d0327f9ebe0a5f78d6a3d7aa671870fb61cb27f868992bb",
+      "reviewed": "sha256:acd7e9242fdd76d590a40ae9ead5838b97bcbd277aa20351903b9ee5233d488c",
       "limitations": [
         {
           "area": "operations",
@@ -5024,7 +5024,24 @@
         },
         {
           "area": "databases",
-          "says": "On PostgreSQL two spellings of a key that a nondeterministic collation makes one row are refused rather than answered duplicate-record, which is reasoned and not tested."
+          "says": "On SQL Server a procedure that ends the transaction during a selection commits every record's version and the calls before it, leaves the later records uncalled, and is answered unknown-outcome."
+        },
+        {
+          "area": "databases",
+          "says": "A record that a trigger of the lock removes is answered refused on SQL Server and schema-changed on PostgreSQL, rolled back on both."
+        },
+        {
+          "area": "writes",
+          "says": "Each call of a selection is given what its record held once locked, never what an earlier call of the same run wrote to it, and a record an earlier call deleted is still called.",
+          "heldBy": "packages/data-sqlserver/src/actions-selection.integration.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "Two runs over overlapping selections of a form whose through targets the form's own table can still deadlock, answered unavailable and rolled back, which is reasoned and not run."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL two spellings of a key that a nondeterministic collation makes one row are answered duplicate-record by reasoning alone: no case reaches it."
         },
         {
           "area": "operations",
@@ -5041,7 +5058,8 @@
         },
         {
           "area": "host",
-          "says": "The host page offers an action over a selection nowhere: its open record's header offers the actions over the open record alone, and a selection is run through the runtime plane or @formancy/data-client."
+          "says": "The host page offers an action over a selection nowhere: its open record's header offers the actions over the open record alone, and a selection is run through the runtime plane or @formancy/data-client.",
+          "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
           "area": "operations",

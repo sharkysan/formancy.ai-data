@@ -164,15 +164,15 @@ release; your application's own pages draw records their own way:
   keeps, run over the open record in one transaction on both engines --
   the record locked under the person's policy at the version they read,
   its version moved, the routine called only as it was published -- once
-  per write id, under a deadline; or over a selection of up to a page of
-  records, all locked in key order in one transaction and all kept or
-  none, through the runtime plane and `@formancy/data-client` alone so
-  far: bound in the studio, each parameter
+  per write id, under a deadline: bound in the studio, each parameter
   given only what the generator binds and the grant made after a note of
   what the routine does that nothing here binds; run on the host page
   from the open record's header, after its dialog and a confirmation in
   place, the record read again once it ran; and through
-  `@formancy/data-client`, one call of the runtime plane
+  `@formancy/data-client`, one call of the runtime plane. An action may
+  also run over a selection of up to a page of records, all locked in key
+  order in one transaction and all kept or none, through the runtime
+  plane and `@formancy/data-client` alone so far
   ([0159](./docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](./docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
   [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),

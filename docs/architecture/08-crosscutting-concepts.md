@@ -482,19 +482,24 @@ the page a list shows, each under the person's filters and throughs at
 the version they read: PostgreSQL's one lock statement sorts them by key
 before it locks them, and SQL Server's batch runs one UPDATE per record in
 the adapter's key order, so two runs over overlapping selections wait for
-each other rather than deadlock on the records they share. The routine is
-called once per record, and any record's refusal -- a change since it was
-read, the routine's own -- rolls back every record; a refusal about
-records names them, by data-core's one reading of what each record not
-locked was (`unmovedFailure`). On SQL Server two keys a case-insensitive
-collation makes one row are `duplicate-record`, found among the rows the
-batch moved before any call. **Held by** the shared `selection-*` cases of
+each other rather than deadlock on the records they share -- but where a
+through targets the form's own table, whose parents are locked as each
+record is located rather than in their own key order, and two runs can
+still deadlock, `unavailable`. The routine is called once per record,
+each call given what its record held once locked, and any record's
+refusal -- a change since it was read, the routine's own -- rolls back
+every record; a refusal about records names them, by data-core's one
+reading of what each record not locked was (`unmovedFailure`). Two keys
+the database's own equality makes one row are `duplicate-record`, found
+before any call: on SQL Server among the rows the batch moved, on
+PostgreSQL by the positions the lock returns. **Held by** the shared `selection-*` cases of
 `ACTION_PARITY`, which each adapter's `actions-selection.integration.test.ts`
 asserts through `covers()`, first run in CI, and
 `packages/data-sqlserver/src/actions/statements.test.ts`. **What it
 costs.** Every record is held until the last call returns; there is no
-set-level call; a selection is one page at most; and SQL Server's key
-order is the adapter's own, not the index's.
+set-level call; a selection is one page at most; SQL Server's key order
+is the adapter's own, not the index's; and on SQL Server a procedure
+that ends the transaction commits a selection in part, `unknown-outcome`.
 
 **A run is sent once per write id, under one deadline, and never queued**
 ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). The runtime plane's route answers a sending of a

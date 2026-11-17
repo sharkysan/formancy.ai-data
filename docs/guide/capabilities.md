@@ -339,13 +339,18 @@ get*](../../README.md#what-you-get) is the short version, and
   statement, two tokens of one key 400 `duplicate-record` -- in one
   transaction on both engines: every record locked in key order under the
   person's filters at the version they read, so two runs over
-  overlapping selections wait rather than deadlock, each version moved,
-  and the routine called once for each, all kept or none. One record
+  overlapping selections wait rather than deadlock -- but over a through
+  onto the form's own table -- each version moved, and the routine called
+  once for each, given what its record held once locked, all kept or
+  none. One record
   changed, gone or ended is `stale`, `not-found` or `version-ended`
   naming the records it is about in `records`, by their tokens, and a
-  routine's refusal of one record undoes them all; on SQL Server two keys
-  a case-insensitive collation makes one row are `duplicate-record`,
-  rolled back before any call. Done is every token in the order sent,
+  routine's refusal of one record undoes them all; two keys the
+  database's equality makes one row -- a case-insensitive collation on
+  SQL Server, a nondeterministic one on PostgreSQL -- are
+  `duplicate-record`, rolled back before any call. On SQL Server a
+  procedure that ends the transaction commits a selection in part,
+  answered `unknown-outcome`. Done is every token in the order sent,
   and the trail names every record by its keyed hash and their count.
   `@formancy/data-client`'s `runAction` sends it and reads the records a
   refusal names. Every record is held until the last call returns, and

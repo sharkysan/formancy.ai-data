@@ -250,18 +250,20 @@ port.
 A run over a selection
 ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md))
 is held on both engines by the shared cases `selection-done`,
-`selection-crossed`, `selection-stale`, `selection-declined` and
-`selection-page`, which each adapter's
+`selection-crossed`, `selection-stale`, `selection-declined`,
+`selection-page` and `selection-as-locked`, which each adapter's
 `actions-selection.integration.test.ts` asserts through `covers()`, with
-SQL Server's two keys of one row beside them -- written on 2026-11-17
-without a database, so CI is their first run and none has been watched
-failing yet. What needs no database ran and was watched failing with its
+SQL Server's two keys of one row, a call that deletes a later record and
+a record a trigger removed beside them, and by the host page's header
+that offers no selection (`apps/host/src/actions.test.tsx`) -- written on
+2026-11-17 without a database, so CI is their first run and none has
+been watched failing yet. What needs no database ran and was watched failing with its
 rule taken out on 2026-11-17: the planner's bound, scope and duplicate
 tokens (`packages/data-core/src/actions/plan.test.ts`), the one reading
 of a selection's unmoved records (`failure.test.ts`), the generator's
 binding of the scope (`generate/actions.test.ts`), SQL Server's lock
-order and its duplicate's number (`packages/data-sqlserver/src/actions/statements.test.ts`,
-`errors.test.ts`), the route and the trail over fake ports
+order, its arguments read before the first call and its own numbers (`packages/data-sqlserver/src/actions/statements.test.ts`,
+`errors.test.ts`, `records/batch-steps.test.ts`), the route and the trail over fake ports
 (`packages/data-server/src/routes/runtime-actions-selection.test.ts`), and
 the client's reading (`packages/data-client/src/transport.test.ts`, run
 with a configuration of its own that starts no database).

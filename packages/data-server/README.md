@@ -594,8 +594,12 @@ existed would be documented and inert.
   sending's answer is audited as `repeated`, with the record that answer
   names, so a resend is not counted as a second write (0031). Every runtime
   event carries `rows`: for an `export`, how many records its file held,
-  or held when it was refused, 0 before any statement; `null` for every
-  other operation -- a number, never which records (0079). And `moved`: on
+  or held when it was refused, 0 before any statement; for a `save`, its
+  row changes (0155); for an `action` over a selection, how many records
+  it addressed (0165); `null` for every other operation -- a number,
+  never which records (0079). An `action` over a selection alone names
+  them too, in `records`: each record's keyed hash in the order sent,
+  `null` without an audit key, and its `record` is `null` (0165). And `moved`: on
   a create or an update of a form whose policy names a state field's moves,
   whether the write as planned moves it, `null` otherwise, and for a write
   refused before it was planned or answered again -- whether, never from
