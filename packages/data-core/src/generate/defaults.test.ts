@@ -121,7 +121,15 @@ describe('readConstant (0149)', () => {
     ['sqlserver', '((0))', { kind: 'number', text: '0' }],
     ['sqlserver', '((-1))', { kind: 'number', text: '-1' }],
     ['sqlserver', '((9.5))', { kind: 'number', text: '9.5' }],
-    ['sqlserver', '((9007199254740993))', { kind: 'number', text: '9007199254740993' }],
+    // T-SQL types an integer past int as numeric, and SQL Server writes one
+    // back with a point and nothing after it, as check-lists.ts measured in
+    // a check. Read as no constant, a bigint past int started empty on SQL
+    // Server and at its default on PostgreSQL. Watched failing with the
+    // point unread (null, as this file once spelled the default without
+    // it), and with the point handed on with the digits (a constant of
+    // 9007199254740993., which the bigint's codec refused).
+    ['sqlserver', '((9007199254740993.))', { kind: 'number', text: '9007199254740993' }],
+    ['sqlserver', '((-9007199254740993.))', { kind: 'number', text: '-9007199254740993' }],
   ] as const)('%s reads %s as a constant', (kind, expression, constant) => {
     expect(readConstant(kind, expression)).toEqual(constant)
   })
@@ -155,6 +163,13 @@ describe('readConstant (0149)', () => {
     ['sqlserver', '(NULL)'],
     ['sqlserver', '((1)+(1))'],
     ['sqlserver', '((1.5E3))'],
+    // A point after an integer's digits is how SQL Server writes a whole
+    // numeric, and nothing else is: after a decimal's digits, or with none
+    // before it, it is no literal T-SQL writes back. Watched failing with
+    // the point taken after any number (((9.5.)) was read as 9.5) and
+    // with the digits before it optional (((.)) as a number of no digits).
+    ['sqlserver', '((9.5.))'],
+    ['sqlserver', '((.))'],
     ['sqlserver', "(('draft'))"],
     ['sqlserver', "'draft'::character varying"],
     ['sqlserver', 'true'],
@@ -179,7 +194,7 @@ describe('a new record starts with its column’s constant default (0149)', () =
         col('maybe', { kind: 'boolean' }, pg ? 'false' : '((0))', { nullable: true }),
         col('quantity', INT32, pg ? '1' : '((1))'),
         col('below', INT32, pg ? "'-1'::integer" : '((-1))'),
-        col('big', INT64, pg ? "'9007199254740993'::bigint" : '((9007199254740993))'),
+        col('big', INT64, pg ? "'9007199254740993'::bigint" : '((9007199254740993.))'),
         col('price', { kind: 'decimal', precision: 10, scale: 2 }, pg ? '9.5' : '((9.5))'),
         col('created_at', { kind: 'timestamp', withTimeZone: true, precision: 6 }, pg ? 'now()' : '(sysdatetimeoffset())'),
         col('row_version', INT64, pg ? '1' : '((1))'),
