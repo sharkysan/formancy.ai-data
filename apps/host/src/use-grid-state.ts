@@ -59,7 +59,7 @@ export function useGridState({
   const key = gridKey(section, formId)
   const [state, setState] = useState<GridState>(() => openGrid(parseKept(readPreference(storage, key)), columns, list))
   // What the last change left, so the next builds on it before React has
-  // drawn it: AG Grid tells a header's sort a task late (record-grid.tsx),
+  // drawn it: AG Grid tells a header's sort a task late (use-grid-sort.ts),
   // and a change made in between is kept with it, not lost.
   const now = useRef(state)
 

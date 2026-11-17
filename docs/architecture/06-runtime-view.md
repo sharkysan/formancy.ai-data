@@ -316,13 +316,15 @@ line (0059).
    turned to and a new list's first page are asked for before AG Grid is
    shown them (`askFirst`, `apps/host/src/use-held-rows.ts`), the rows on
    screen staying, the grid's well dimmed and the grid busy, and AG Grid
-   then takes that answer without asking again; a header pressed is
-   answered with the rows on screen until the section's new list has
-   answered; a refusal leaves the rows, and Ask again asks for what was
-   refused; while a refused new list stands Previous rows and Next rows
-   wait for it, and a save's or a delete's reload asks for it, or for a
-   new list on its way. The line then says what the server answered in the room's
-   teal for a moment (`apps/host/src/server-did.tsx`,
+   then takes that answer without asking again; a header pressed is told
+   to the section (`apps/host/src/use-grid-sort.ts`) and answered with the
+   rows on screen until the section's new list has answered; a refusal
+   leaves the rows, and Ask again asks for what was refused; while a
+   refused new list stands Previous rows and Next rows wait for it, and a
+   save's or a delete's reload asks for it, or for a new list on its way.
+   The line then says what the server answered
+   (`apps/host/src/use-grid-line.ts`) in the room's teal for a moment
+   (`apps/host/src/server-did.tsx`,
    [0146](../decisions/0146-the-page-says-what-the-server-did.md)). A form
    that is its own child can show its records as a tree instead
    (`apps/host/src/record-tree.tsx`): each level the same list with
