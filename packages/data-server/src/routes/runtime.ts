@@ -237,6 +237,22 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /**
+   * The answer an earlier sending of this write id and body was given, or
+   * undefined: asked by a route that refuses before `sendOnce` by what the
+   * form says now (0161), so a sending already acted on is answered as it
+   * was.
+   */
+  async function sentBefore(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: `action:${string}`,
+    id: string | undefined,
+  ): Promise<(WriteAnswer & { repeated: true }) | undefined> {
+    const actor = request.identity?.actor.id
+    if (id === undefined || actor === undefined) return undefined
+    return writes.kept({ actor, form: request.params.id, operation, id, body: request.body })
+  }
+
+  /**
    * A drift refusal of the database as it is now (0041), said once in the
    * log with what blocks, by kind and the fields it affects -- never a value,
    * and never the change's message, which names columns and types the person
@@ -532,7 +548,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   })
 
   // An action over the open record, run once per sending in one transaction on a pool of its own (0161).
-  registerActionRoute(app, { published, connection, context, sendOnce, refusal, answered, actionDeadlineMs })
+  registerActionRoute(app, { published, connection, context, sendOnce, sentBefore, refusal, answered, actionDeadlineMs })
 
   // A lookup's options and labels, each one statement that stops when its request is abandoned or its deadline passes (0061).
   registerLookupRoutes(app, { published, connection, context, lookupDeadlineMs: options.lookupDeadlineMs })

@@ -42,7 +42,9 @@ import type { WriteAnswer } from './write-once.js'
  *
  * Steps 5 to 8 run once per sending of the write id (0031): a sending that
  * arrives again is answered with the first one's answer and asks the
- * database nothing; the same id with another body is refused. A run goes on
+ * database nothing -- before 3's binding and 4's policy are asked, so a
+ * form published again between two sendings never refuses a run that was
+ * sent -- and the same id with another body is refused. A run goes on
  * after its client leaves, as a write does, and a lost answer is 502,
  * naming the action and the records with the versions sent, never sent
  * again. Nothing of an answer, an input or a field's value reaches the log
@@ -62,6 +64,12 @@ export interface ActionRouteSteps {
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }>
+  /** The answer an earlier sending of this write id with this body was given, or undefined; nothing is claimed. */
+  sentBefore(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: `action:${string}`,
+    id: string | undefined,
+  ): Promise<(WriteAnswer & { repeated: true }) | undefined>
   /** A planner's refusal as the answer, its drift said in the log first. */
   refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: 'action', plan: PlanRefusal): WriteAnswer
   /** An answer, sent, with what the audit names. */
@@ -208,14 +216,19 @@ export function registerActionRoute(app: FastifyInstance, steps: ActionRouteStep
     const bundle = await steps.published(request.params.id, reply)
     if (bundle === undefined) return reply
     const action = (bundle.bindings.actions ?? []).find((candidate) => candidate.name === request.params.action)
-    if (action === undefined) return steps.answered(reply, planRefusal('operation-unavailable', 'This form offers no such action.'))
     // Named once the form binds it: a name only the URL said is never written to the trail.
-    if (trail !== undefined) trail.action = action.name
+    if (trail !== undefined && action !== undefined) trail.action = action.name
+    // Each action an operation of its own, by the URL's name: the bound one's wherever a run was sent.
+    const operation = `action:${request.params.action}` as const
+    // A sending acted on already is answered as it was, whatever the form published now binds or allows.
+    const earlier = await steps.sentBefore(request, operation, id)
+    if (earlier !== undefined) return steps.answered(reply, earlier)
+    if (action === undefined) return steps.answered(reply, planRefusal('operation-unavailable', 'This form offers no such action.'))
     const allowed = authorizeAction(bundle.policy, steps.context(request), bundle.bindings, action.name)
     if (!allowed.ok) return steps.answered(reply, planRefusal(allowed.code, allowed.message))
     const open = await steps.connection(bundle, reply)
     if (open === undefined) return reply
-    const answer = await steps.sendOnce(request, `action:${action.name}`, id, async () => {
+    const answer = await steps.sendOnce(request, operation, id, async () => {
       const running = inFlight.get(open) ?? 0
       if (running >= open.actionPool) {
         request.log.warn({ form: request.params.id, action: action.name, running }, 'refused: every connection for actions is running one; nothing was sent')

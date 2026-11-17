@@ -10,6 +10,7 @@ import type {
   DatabaseAdapter,
   DiscoveryScope,
   DescribedAction,
+  DescribedRoutine,
   DescribedTable,
   FormPolicy,
   GenerationRequest,
@@ -174,6 +175,10 @@ let runs: ActionRequest[]
 let outcome: ((request: ActionRequest) => Promise<ActionOutcome>) | undefined
 /** The root as the fake catalog describes it now; undefined is as published. */
 let root: ((table: DescribedTable) => DescribedTable) | undefined
+/** The routine as the fake catalog describes it now; undefined is as published, null one the bound signature no longer resolves to. */
+let routineNow: ((routine: DescribedRoutine) => DescribedRoutine | null) | undefined
+/** How many times the fake registry was asked for the connection, whose first opening pings the database. */
+let opened: number
 let pool: number
 let events: RuntimeAuditEvent[]
 /** Every scope the fake catalog was discovered with. */
@@ -205,7 +210,11 @@ function registry(): ConnectionRegistry {
       described += 1
       const found = SNAPSHOT.routines?.find((candidate) => candidate.ref.name === called.name) as RoutineMeta
       const { executable: _executable, ...routineFacts } = found
-      return { ok: true, table: now(table), routine: { ...routineFacts, definition: DEFINITION } }
+      const routine = (routineNow ?? ((same) => same))({ ...routineFacts, definition: DEFINITION })
+      // As both adapters answer a routine their catalog no longer resolves the bound signature to.
+      if (routine === null)
+        return { ok: false, code: 'schema-changed', message: 'The catalog does not show the table, or the routine, as discovery describes them.' }
+      return { ok: true, table: now(table), routine }
     },
     run: async (request, deadlineMs) => {
       runs.push({ ...request, deadline: deadlineMs } as ActionRequest)
@@ -218,13 +227,22 @@ function registry(): ConnectionRegistry {
   }
   const adapter = { kind: 'postgres', ping: async () => ({}), discover, close: async () => {} } as unknown as DatabaseAdapter
   const open = { adapter, lookups: {} as LookupAdapter, records: records as unknown as RecordAdapter, actions, actionPool: pool }
-  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: async (id) => (id === 'erp' ? open : undefined), close: async () => {} }
+  const opens = async (id: string) => {
+    opened += 1
+    return id === 'erp' ? open : undefined
+  }
+  return { ids: () => ['erp'], scope: () => ({ schemas: ['sales'] }), open: opens, close: async () => {} }
 }
 
-function bundle(): BundleV2 {
-  const { form, bindings } = generateForm(SNAPSHOT, REQUEST)
+/** Who may run each action unless a case says otherwise: the clerk, both. */
+const CLERK_RUNS: NonNullable<FormPolicy['actions']> = { close: { roles: ['clerk'] }, ship: { roles: ['clerk'] } }
+
+/** The order form as generated from `request`, every action it names bound, run by whom `actions` names. */
+function bundle(request: GenerationRequest = REQUEST, actions: FormPolicy['actions'] = CLERK_RUNS): BundleV2 {
+  const { form, bindings } = generateForm(SNAPSHOT, request)
   const names = (bindings.actions ?? []).map((action) => action.name)
-  if (names.join() !== 'close,ship') throw new Error(`the generator bound ${names.join() || 'nothing'}`)
+  const named = (request.actions ?? []).map((choice) => choice.name)
+  if (names.join() !== named.join()) throw new Error(`the generator bound ${names.join() || 'nothing'} of ${named.join()}`)
   const read = { read: ['clerk', 'auditor'], write: [] }
   const policy: FormPolicy = {
     version: 1,
@@ -232,9 +250,9 @@ function bundle(): BundleV2 {
     fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, read])),
     rowFilters: [{ column: 'tenant_id', attribute: 'tenant' }],
     lookups: {},
-    actions: { close: { roles: ['clerk'] }, ship: { roles: ['clerk'] } },
+    actions,
   }
-  return { format: 2, connection: 'erp', generation: REQUEST, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot: SNAPSHOT }
+  return { format: 2, connection: 'erp', generation: request, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot: SNAPSHOT }
 }
 
 async function start(): Promise<FastifyInstance> {
@@ -253,6 +271,8 @@ beforeEach(async () => {
   runs = []
   outcome = undefined
   root = undefined
+  routineNow = undefined
+  opened = 0
   pool = 10
   events = []
   scopes = []
@@ -297,16 +317,19 @@ describe('a run of an action over the open record', () => {
   })
 
   // Who may run it is the policy's, asked before the connection is opened
-  // and before any statement (0159): an auditor reads the order and may
-  // not run close, and an action the form does not bind is nobody's. The
-  // auditor is offered neither action. Watched failing with the policy
-  // asked after the description: the auditor's refused run had described
-  // the root and the routine.
+  // -- whose first opening pings the database -- and before any statement
+  // (0159): an auditor reads the order and may not run close, and an
+  // action the form does not bind is nobody's. The auditor is offered
+  // neither action. Watched failing with the policy asked after the
+  // description: the auditor's refused run had described the root and the
+  // routine; and with it asked after the connection was opened: "expected
+  // 1 to be +0".
   test('is refused 403 before any statement to a person the policy does not let run it', async () => {
     const denied = await run(RUN, 'auditor')
     expect([denied.statusCode, denied.json().code]).toEqual([403, 'operation-denied'])
     const unbound = await run(RUN, 'clerk', {}, 'reopen')
     expect([unbound.statusCode, unbound.json()]).toEqual([403, { code: 'operation-unavailable', message: 'This form offers no such action.' }])
+    expect(opened).toBe(0)
     expect(asked()).toEqual({ described: 0, runs: 0 })
     expect(await offered('auditor')).toEqual([])
     expect(await offered('clerk')).toEqual(['close', 'ship'])
@@ -326,6 +349,35 @@ describe('a run of an action over the open record', () => {
     expect(asked()).toEqual({ described: 1, runs: 0 })
     const shipped = await run({ records: RUN.records, answers: {} }, 'clerk', {}, 'ship')
     expect(shipped.statusCode, shipped.body).toBe(200)
+  })
+
+  // GET decides over the root alone and describes no routine (0161's
+  // cost), so an action whose routine changed since publication is still
+  // offered; its run's own description refuses it with nothing sent: 409
+  // `drift` where the bound routine still resolves and is described
+  // otherwise -- here close_order's p_amount a bigint now, as an ALTER
+  // PROCEDURE can leave a parameter on SQL Server -- and 409
+  // `schema-changed` where it no longer resolves, as both adapters answer
+  // a routine dropped, and PostgreSQL one whose argument types changed,
+  // since its bound signature names them. Watched failing with
+  // the plan given the routine as published in place of its description:
+  // the changed routine's run was sent, "expected [ 200, undefined ] to
+  // deeply equal [ 409, 'drift' ]"; and with a description that failed
+  // answered as drift: "expected [ 409, 'drift' ] to deeply equal [ 409,
+  // 'schema-changed' ]".
+  test('whose routine changed since publication, is still offered and refused at its run', async () => {
+    const amount = { typeId: '20', databaseType: 'bigint', type: INT64 }
+    routineNow = (routine) => ({ ...routine, parameters: routine.parameters.map((p) => (p.name === 'p_amount' ? { ...p, ...amount } : p)) })
+    expect(await offered()).toEqual(['close', 'ship'])
+    expect(asked()).toEqual({ described: 0, runs: 0 })
+    const changed = await run(RUN)
+    expect([changed.statusCode, changed.json().code]).toEqual([409, 'drift'])
+    expect(asked()).toEqual({ described: 1, runs: 0 })
+    routineNow = () => null
+    expect(await offered()).toEqual(['close', 'ship'])
+    const gone = await run(RUN)
+    expect([gone.statusCode, gone.json().code]).toEqual([409, 'schema-changed'])
+    expect(asked()).toEqual({ described: 2, runs: 0 })
   })
 
   // Every answer goes through its parameter's codec, and every error is
@@ -356,6 +408,41 @@ describe('a run of an action over the open record', () => {
     expect([other.statusCode, other.json().code]).toEqual([400, 'invalid-request'])
     expect(asked()).toEqual({ described: 1, runs: 1 })
     expect(events.map(({ outcome: said }) => said)).toEqual(['ok', 'repeated', 'invalid-request'])
+  })
+
+  // A sending of a write id this server acted on is answered as it was,
+  // before the form as published now is asked whether it binds the action
+  // or lets this person run it (0031): the form published again with close
+  // nobody's, then with close not bound at all, between two sendings of
+  // one run -- Chromium's resend, or a client reusing its id -- and the
+  // later sendings are still told the run they asked for ran, never a 403
+  // a client reads as nothing done. A fresh id, and the same id with
+  // another body, are refused as the form now says. Watched failing with
+  // the kept answer looked for after the policy: "expected [ 403, …(1) ]
+  // to deeply equal [ 200, { records: [ 'k1:7' ] } ]".
+  test('sent again after the form was published again, is answered as it ran and not by what the form says now', async () => {
+    const id = { 'formancy-write-id': WRITE_ID }
+    const first = await run(RUN, 'clerk', id)
+    expect(first.statusCode, first.body).toBe(200)
+    expect((await store.publish('order', 1, bundle(REQUEST, { ship: { roles: ['clerk'] } }))).ok).toBe(true)
+    const again = await run(RUN, 'clerk', id)
+    expect([again.statusCode, again.json()]).toEqual([200, first.json()])
+    const fresh = await run(RUN, 'clerk', { 'formancy-write-id': 'fedcba9876543210fedcba9876543210' })
+    expect([fresh.statusCode, fresh.json().code]).toEqual([403, 'operation-denied'])
+    const other = await run({ ...RUN, answers: { ...ANSWERS, note: 'other' } }, 'clerk', id)
+    expect([other.statusCode, other.json().code]).toEqual([403, 'operation-denied'])
+    const shipOnly = { ...REQUEST, actions: (REQUEST.actions ?? []).filter((choice) => choice.name === 'ship') }
+    expect((await store.publish('order', 2, bundle(shipOnly, { ship: { roles: ['clerk'] } }))).ok).toBe(true)
+    const unbound = await run(RUN, 'clerk', id)
+    expect([unbound.statusCode, unbound.json()]).toEqual([200, first.json()])
+    expect(asked()).toEqual({ described: 1, runs: 1 })
+    expect(events.map(({ outcome: said, formVersion }) => [said, formVersion])).toEqual([
+      ['ok', 1],
+      ['repeated', 2],
+      ['operation-denied', 2],
+      ['operation-denied', 2],
+      ['repeated', 3],
+    ])
   })
 
   // A run holds a connection of the actions' pool from its description to
@@ -523,6 +610,28 @@ describe('a form published with actions', () => {
       ],
       ['format 1 keeps no generation request, which is where an action is named (0161): publish format 2'],
     ])
+  })
+
+  // A request may name an action's parameters in any order, and the
+  // generator binds them in the routine's: the bundle check compares the
+  // two as sets, so a version whose request listed them otherwise is
+  // served, its action offered and run, and not refused as a hand edit on
+  // every read. Watched failing with the parameters compared in the order
+  // each lists them: "expected [ 500, 'corrupt-bundle' ] to deeply equal [
+  // 200, undefined ]".
+  test('is served whatever order its request names each action’s parameters in', async () => {
+    const reversed = {
+      ...REQUEST,
+      actions: (REQUEST.actions ?? []).map((choice) => ({ ...choice, parameters: [...choice.parameters].reverse() })),
+    }
+    const published = bundle(reversed)
+    expect(published.bindings.actions?.[0]?.parameters.map(({ parameter }) => parameter)).toEqual(CLOSE_ORDER.parameters.map(({ name }) => name))
+    await store.publish('reversed', null, published)
+    const response = await app.inject({ method: 'GET', url: '/v1/forms/reversed', headers: as('clerk') })
+    expect([response.statusCode, response.json().code], response.body).toEqual([200, undefined])
+    expect(response.json<{ actions: Array<{ name: string }> }>().actions.map((action) => action.name)).toEqual(['close', 'ship'])
+    const ran = await app.inject({ method: 'POST', url: '/v1/forms/reversed/actions/close/run', headers: as('clerk'), payload: RUN })
+    expect(ran.statusCode, ran.body).toBe(200)
   })
 
   // A proposal whose request names an action is discovered with the
