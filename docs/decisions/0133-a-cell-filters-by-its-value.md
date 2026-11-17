@@ -43,7 +43,7 @@ grid's line.
 
 **The keyboard stays where the person pointed.** Once the list the
 example asked for answers, the keyboard is back on the row it was pressed
-on, in its column, or on the first row's (`apps/host/src/record-grid.tsx`),
+on, in its column, or on the first row's (`apps/host/src/use-header-filters.ts`),
 so a person can point at one value after another. The grid is described
 by the filter line's hint, which says the key, so a screen reader reads
 it on entering the grid.

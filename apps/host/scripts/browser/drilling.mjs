@@ -46,7 +46,7 @@ const recordsSize = (page) =>
 /**
  * The Records panel's size once it holds still: three reads in a row the
  * same, the grid's first row drawn. A layout draws the grid again, and its
- * well's least height is its header's and a row's (record-grid.tsx's
+ * well's least height is its header's and a row's (use-grid-sizing.ts's
  * `fit`): a first page measures a header whose labels still wrap in
  * columns not yet sized to their rows, and measures it again once they
  * are. Read at once, the two layouts differed by that wrap, 135 and 139
