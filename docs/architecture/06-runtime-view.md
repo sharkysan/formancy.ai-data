@@ -1072,15 +1072,23 @@ through the runtime plane's route
    `POST /v1/forms/:id/actions/:action/run`
    (`packages/data-server/src/routes/runtime-actions.ts`), as data-client's
    `runAction` does: the body's shape, the write id, the binding and the
-   policy, all before the connection is opened; then, once per sending of
-   the write id, a connection of the actions' pool free or 503 with nothing
-   sent, and steps 1 and 2 under `FORMANCY_DATA_ACTION_DEADLINE_MS`.
+   policy, all before the connection is opened -- a sending of the write
+   id the server already acted on answered as it was before the binding
+   is asked, whatever was published since; then, once per sending of the
+   write id, a connection of the actions' pool free or 503 with nothing
+   sent, step 1, and the run, step 2 or 3, under
+   `FORMANCY_DATA_ACTION_DEADLINE_MS`. Step 1's description is not under
+   that deadline: on PostgreSQL nothing bounds it, and on SQL Server
+   mssql's default request timeout does.
 
 1. `describe(table, routine)` reads the root and the routine in one
    statement, each with the adapter's definition token: on PostgreSQL the
    routine `to_regprocedure` of its bound signature resolves to, on SQL
    Server the procedure OBJECT_ID names, each normalised by discovery's
-   own functions. `planAction` decides the run over them (0159).
+   own functions. One the catalog no longer resolves is `schema-changed`,
+   409 with nothing sent; `planAction` decides the run over them (0159),
+   and one that resolves to another description than the bound one is
+   `drift`, 409.
 2. `run(request, deadlineMs)` on PostgreSQL
    (`packages/data-postgres/src/actions/run.ts`) is one `sql.begin`:
    `SET LOCAL statement_timeout` to what remains of the deadline; on the

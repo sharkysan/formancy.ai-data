@@ -4841,27 +4841,45 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:ea534bffb8cdbaee89d2001942aa6a6e4ed7814413fd773215def4c2eefc234e",
+      "reviewed": "sha256:1c2b72e639ef754b2604cbbb52ffbcf9cd3762351f858bf75085dcb34537af60",
       "limitations": [
         {
           "area": "forms",
           "says": "An action is run only by a page an integrator writes, through POST /v1/forms/:id/actions/:action/run or data-client’s runAction: the host page offers no action’s control yet.",
-          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+          "heldBy": "apps/host/src/plane.test.tsx"
         },
         {
           "area": "forms",
-          "says": "A form offers an action by its own table as described when it is opened; a routine that changed since publication is still offered, and its run is refused as drift.",
+          "says": "A form offers an action by its own table as described when it is opened; a routine that changed since publication is still offered, and its run is refused 409, schema-changed where the bound routine no longer resolves and drift where it resolves to another description.",
           "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
         },
         {
           "area": "operations",
-          "says": "Each server runs at most as many actions at once on one database as its actions’ pool holds -- ten on SQL Server, postgres.js’s own ten on PostgreSQL -- and refuses the next 503 at once rather than queue it; replicas each count their own.",
+          "says": "Each server runs at most as many actions at once on one database as its actions’ pool holds, and refuses the next 503 at once rather than queue it.",
           "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
         },
         {
           "area": "operations",
-          "says": "FORMANCY_DATA_ACTION_DEADLINE_MS is 15 seconds unset, chosen and not measured; above 15,000 ms on SQL Server a save waiting on a run may end as possibly saved.",
+          "says": "On SQL Server an actions’ pool opens at most ten connections, so a server runs at most ten actions at once on one such database.",
+          "heldBy": "packages/data-server/src/drivers.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "On PostgreSQL an actions’ client opens at most postgres.js’s own ten connections, so a server runs at most ten actions at once on one such database.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Each replica counts only its own runs, so a database behind several servers may hold that bound in runs from each."
+        },
+        {
+          "area": "operations",
+          "says": "FORMANCY_DATA_ACTION_DEADLINE_MS is 15 seconds unset, chosen and not measured.",
           "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Above 15,000 ms of FORMANCY_DATA_ACTION_DEADLINE_MS, a save on SQL Server waiting on a run may end as possibly saved, which is reasoned and not measured."
         },
         {
           "area": "operations",

@@ -476,9 +476,11 @@ answer on PostgreSQL and any run past its deadline on SQL Server as "it
 may have run".
 
 **A run is sent once per write id, under one deadline, and never queued**
-([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). The runtime plane's route asks the policy before the
-connection is opened, then, once per sending of the write id -- each
-action an operation of its own -- holds a connection of the actions' pool
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). The runtime plane's route answers a sending of a
+write id it already acted on as it was, whatever was published since,
+and otherwise asks the policy before the connection is opened; then,
+once per sending of the write id -- each action an operation of its
+own -- holds a connection of the actions' pool
 for the run from its description to its answer, counted against the bound
 the connection reports, and refuses a run the pool cannot take at once
 503 with nothing sent: a deadline spent in the queue would be spent on
@@ -489,7 +491,7 @@ described by the run. **Held by** `packages/data-server/src/routes/runtime-actio
 and, on both engines, `e2e-lost-answer.integration.test.ts`. **What it
 costs.** A full pool refuses at once however soon a run would answer, each
 replica counts its own runs, and a routine changed since publication is
-offered until its run is refused.
+offered until its run is refused, 409 `schema-changed` or `drift`.
 
 
 ## 8.7 Audit

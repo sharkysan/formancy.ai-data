@@ -15,20 +15,35 @@
   deadline, and answered with the record's token (watched failing with
   the run sent under 15000 in place of the server's deadline); an auditor
   the policy does not let run close, and an action the form does not
-  bind, are 403 before any statement, and neither is offered (watched
-  failing with the policy asked only by the planner, after the
-  description: "expected { described: 1, runs: +0 } to deeply equal {
-  described: +0, runs: +0 }"); an action drift stops is absent from
+  bind, are 403 before the connection is opened and before any
+  statement, and neither is offered (watched failing with the policy
+  asked only by the planner, after the description: "expected {
+  described: 1, runs: +0 } to deeply equal { described: +0, runs: +0 }";
+  and with it asked after the connection was opened: "expected 1 to be
+  +0"); an action drift stops is absent from
   `GET /v1/forms/:id` and its run is 409 `drift`, never sent, while the
   form still reads and the other action runs (watched failing with GET
   offering every runnable action whatever the verdict: "expected [
-  'close', 'ship' ] to deeply equal [ 'ship' ]"); each answer its
-  parameter's codec refuses is 422 by its dialog field, nothing sent
+  'close', 'ship' ] to deeply equal [ 'ship' ]"); an action whose
+  routine changed since publication is still offered, and its run is 409
+  `drift` where the routine resolves to another description and 409
+  `schema-changed` where it no longer resolves, never sent (watched
+  failing with the plan given the routine as published in place of its
+  description: "expected [ 200, undefined ] to deeply equal [ 409,
+  'drift' ]", and with a description that failed answered as drift);
+  each answer its parameter's codec refuses is 422 by its dialog field,
+  nothing sent
   (watched failing with the field errors left out of the 422); one write
   id is one run, its second sending answered with the first's answer,
   and the same id with another body 400 (watched failing with the route
   running without `sendOnce`: "expected { described: 2, runs: 2 } to
-  deeply equal { described: 1, runs: 1 }"); with every connection of the
+  deeply equal { described: 1, runs: 1 }"); a sending of a write id the
+  server ran is answered as it ran after the form is published again
+  with the action nobody's, and again with it unbound, while a fresh id
+  and the same id with another body are refused as the form now says
+  (watched failing with the kept answer looked for after the policy:
+  "expected [ 403, …(1) ] to deeply equal [ 200, { records: [ 'k1:7' ] }
+  ]"); with every connection of the
   actions' pool running one, the next is 503 `unavailable` with nothing
   described or sent, and runs once one answers (watched failing with the
   count taken out: "expected [ 200, undefined ] to deeply equal [ 503,
@@ -48,6 +63,10 @@
   not served (watched failing with the request's actions uncompared,
   "unnamed: expected [ 200, undefined ] to deeply equal [ 500,
   'corrupt-bundle' ]", and with format 1 unchecked, "format-one: …"); a
+  request naming an action's parameters in another order than the
+  routine's is served, its action offered and run (watched failing with
+  the parameters compared in the order each lists them: "expected [ 500,
+  'corrupt-bundle' ] to deeply equal [ 200, undefined ]"); a
   proposal naming an action is discovered with the routines, every other
   without, and a request whose actions are of no shape this release reads
   is 400 before anything is discovered (watched failing with the proposal
@@ -91,7 +110,10 @@
   `scripts/server-start.test.mjs` -- the built server stops at start on an
   action deadline that is not a whole number of milliseconds, quoting it,
   and starts on one that is (watched failing with `main.ts` reading no
-  action deadline: the server listened at "15s").
+  action deadline: the server listened at "15s"); and the gates'
+  `container` job runs the image with it at `abc`, failing unless the
+  server stops naming it (watched failing against an image built before
+  this record: still running after 30 s).
   `deploy/cloudflare/doors.json`, generated from the built server's
   router and held by `scripts/cloudflare/doors.test.mjs`, forwards the
   route at the runtime door; `scripts/live-demo.test.mjs` holds the live
@@ -124,19 +146,24 @@ served and then sends one run, the server keeping nothing between them.
    `operation-unavailable` -- in words that do not repeat the URL's name;
    who may run it (`authorizeAction`), 403 before the connection is
    opened and before any statement; a connection of the actions' pool
-   free (5); the root and the routine described in one statement (0041);
-   the plan (`planAction`): 409 `drift` where the database no longer lets
+   free (5); the root and the routine described in one statement (0041),
+   409 `schema-changed` where either no longer resolves; the plan
+   (`planAction`): 409 `drift` where the database no longer lets
    the action run, 400 `duplicate-record`, 422 `invalid-values` with
    every answer's error by its dialog field; and the run, once.
 2. **Once per write id.** Steps from the pool's count to the run run once
    per sending of a write id (0031), each action an operation of its own,
    `action:<name>`; a sending that arrives again is answered with the
-   first one's answer and asks nothing; the same id with another body is
-   400. A run takes no signal and goes on after its client leaves, as a
-   write does. A lost answer is said once in the log with the adapter's
-   sentence and answered 502 `unknown-outcome` naming the operation
-   `action`, the action and each record with the version sent, and is
-   never sent again.
+   first one's answer and asks nothing -- looked for before the binding
+   and the policy are asked, so a form published again between two
+   sendings of one run, the action unbound or its person's role taken
+   out, never refuses one that was sent, which a client would read as
+   nothing done; the same id with another body is 400, or refused as the
+   form now says. A run takes no signal and goes on after its client
+   leaves, as a write does. A lost answer is said once in the log with
+   the adapter's sentence and answered 502 `unknown-outcome` naming the
+   operation `action`, the action and each record with the version sent,
+   and is never sent again.
 3. **Answers.** Done is 200 `{ records }`, each record's token as the
    statement that moved it read its key, never a version: the run moved
    it, and the routine may have moved it again. Each failure of 0160 is
@@ -156,7 +183,9 @@ served and then sends one run, the server keeping nothing between them.
    a save beside it may, and not a measurement of any action -- none was
    timed for it (2026-11-17). Nothing holds it to mssql's request timeout
    at start, as the save deadline is (0155): a run's batch carries its own
-   request timeout, at the deadline.
+   request timeout, at the deadline. The description before the run is
+   not under it: on PostgreSQL nothing bounds that statement, and on SQL
+   Server mssql's default request timeout does.
 5. **No run waits in the pool's queue.** `OpenConnection.actionPool` is
    how many connections the actions' pool opens at most -- postgres.js's
    `options.max` on PostgreSQL, which it reports, and
@@ -222,9 +251,12 @@ administrator's plane today.
 
 - **`GET /v1/forms/:id` decides over the root alone.** A routine that
   changed since publication is still offered, and its run is refused 409
-  `drift` by its own description: describing every action's routine there
-  would put a statement per action on the actions' pool on every opening
-  of a form.
+  by its own description: `schema-changed` where the bound routine no
+  longer resolves -- dropped, or on PostgreSQL its argument types changed,
+  which its bound signature names -- and `drift` where it resolves to
+  another description. Describing every action's routine there would put
+  a statement per action on the actions' pool on every opening of a
+  form.
 - **A full pool refuses rather than waits.** With ten runs in flight on
   one database, the eleventh is 503 at once, however soon one of the ten
   would answer: a deadline spent in the queue would be spent on nothing
@@ -263,8 +295,17 @@ cancelled, and never sent twice.
 **Ask the policy inside the write id's scope, after the connection**, as
 the delete route does (0050). Lost: opening a connection pings the
 database the first time, and the design asks for 403 before any
-statement; asked first, the policy is still answered again for a second
-sending, the same way.
+statement. Asked first, the policy comes after the answer kept for a
+sending already acted on, which the route looks for without claiming the
+id (`write-once.ts`'s `kept`), so a second sending is still answered
+with the first's whatever was published between them.
+
+**Ask the binding and the policy before the kept answer**, as the route
+was first written. Lost: a form published again between Chromium's
+resend and its first sending's answer -- the action renamed, or the
+person's role taken out of it -- would answer the resend 403 for a run
+that committed, which data-client reads as nothing done, where 0031
+answers a resend with the first sending's answer.
 
 **Let a run wait for a free connection**, as every other operation does
 on its pool. Lost: a run's deadline would be spent in the queue, and a

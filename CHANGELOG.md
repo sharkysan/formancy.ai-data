@@ -77,7 +77,9 @@ the same day (formancy.ai 0232).
   What integrators notice: `POST /v1/forms/:id/actions/:action/run` takes
   `{ records: [{ record, version }], answers }`, exactly one record, and
   runs the action in the adapters' one transaction, sent once per write
-  id -- each action an operation of its own -- and never again; it is 403
+  id -- each action an operation of its own -- and never again, a second
+  sending answered as the first was even after the form is published
+  again; it is 403
   before any statement to a person the policy does not let run it, 409
   `drift` where the database no longer lets it run, 422 with each
   answer's error by its dialog field, and answers 200 `{ records }` with
@@ -88,9 +90,11 @@ the same day (formancy.ai 0232).
   it ran. `GET /v1/forms/:id` gains the required `actions`: those this
   person may run that the table as described leaves runnable, each with
   its words and its dialog; a routine changed since publication is still
-  offered, and its run refused. `@formancy/data-client` gains `runAction`,
-  its `ActionOutcome` and `UnknownAction`, and `isUnknownAction`; a form
-  reply without `actions` is `unexpected` to it. A generation request's
+  offered, and its run refused 409 `schema-changed` or `drift`.
+  `@formancy/data-client` gains `runAction`, its `ActionOutcome` and
+  `UnknownAction`, and `isUnknownAction`; a form reply without `actions`
+  is `unexpected` to it, so a host upgrades its server before its client.
+  A generation request's
   `actions` is now read and held to the bindings, a format-1 bundle
   binding one is not served, and a proposal naming one is discovered with
   the routines in scope, as drift review, a regeneration, a restore and an

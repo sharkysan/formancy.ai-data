@@ -23,6 +23,7 @@ Apache-2.0 `@formancy/spec` for types only.
 ```ts
 createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, save, runAction, reconcile, query, resolve, saveView, removeView }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
+isUnknownAction(outcome) // → whether a run's outcome is an UnknownAction
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve, maxRows } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
 fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applyServerErrors

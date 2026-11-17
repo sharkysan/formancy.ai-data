@@ -230,12 +230,15 @@ holds the actions' own client on each engine
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
 The route that runs one is held over fake ports by
 `packages/data-server/src/routes/runtime-actions.test.ts` -- 403 before
-any statement, an action drift stops neither offered nor run, each
-answer's error by its dialog field, one run per write id, a full pool
-refused with nothing sent, every code's answer, the trail and the log with
-no value, what the server publishes of an action and asks for its
-routines, and the deadline's setting -- and, through 0031's TCP hop on
-both engines, by `e2e-lost-answer.integration.test.ts`, a lost run sent
+the connection is opened and before any statement, an action drift
+stops neither offered nor run, one whose routine changed offered and
+refused at its run, each answer's error by its dialog field, one run per
+write id and its second sending answered as it ran after the form is
+published again, a full pool refused with nothing sent, every code's
+answer, the trail and the log with no value, what the server publishes
+of an action, in whatever order its request names the parameters, and
+asks for its routines, and the deadline's setting -- and, through
+0031's TCP hop on both engines, by `e2e-lost-answer.integration.test.ts`, a lost run sent
 once; the client by `packages/data-client/src/transport.test.ts` and,
 across real HTTP on both engines, `actions.integration.test.ts`; and the
 built server's start by `scripts/server-start.test.mjs`, each watched

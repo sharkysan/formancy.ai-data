@@ -96,10 +96,12 @@ that from a procedure dropped.
 
 **An action's route, accepted rather than fixed** ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
 `GET /v1/forms/:id` decides what it offers over the root alone, so a
-routine changed since publication is offered and its run refused 409
-`drift`. A run the actions' pool cannot take at once is refused 503,
-however soon one in flight would answer, and each replica counts only its
-own runs, so the database may hold the bound times the replicas.
+routine changed since publication is offered and its run refused 409:
+`schema-changed` where the bound routine no longer resolves, `drift`
+where it resolves to another description. A run the actions' pool
+cannot take at once is refused 503, however soon one in flight would
+answer, and each replica counts only its own runs, so the database may
+hold the bound times the replicas.
 `FORMANCY_DATA_ACTION_DEADLINE_MS`'s 15 s is chosen, not measured, and on
 SQL Server a deadline above 15,000 ms lets a save waiting on a run time out
 first, unknown. Nothing in this repository offers a person an action yet:
