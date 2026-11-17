@@ -33,8 +33,11 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  *    back, and a read after tells `stale`, `not-found` and `version-ended`
  *    apart for each record the lock did not return, as an update's nothing
  *    is (records/explain.ts), answered as `unmovedFailure` reads them.
- *    Which records it returned is told by their keys' canonical values,
- *    the key's own equality under a deterministic collation.
+ *    Which records each row it returned answers to is the lock's own
+ *    answer, the positions of the records whose key the row equals by the
+ *    key's own equality; a row two of them name -- two spellings a
+ *    nondeterministic collation makes one -- is `duplicate-record` naming
+ *    them, rolled back before any call, as SQL Server's batch finds it.
  * 4. SET LOCAL statement_timeout to what remains, by this process's
  *    monotonic clock; nothing remaining is `action-timeout`, nothing
  *    called. The statements together stay inside the deadline, each set to
@@ -53,10 +56,10 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  * FATAL, so an unknown outcome, and 15 and 16 lack it.
  */
 
-/** Why a run stopped inside its transaction, thrown there so postgres.js rolls it back: a statement refused, a lock that moved fewer records than were sent -- the rows it did move -- no deadline left for the call, or a call that did not run for every record moved. */
+/** Why a run stopped inside its transaction, thrown there so postgres.js rolls it back: a statement refused, a lock that moved fewer records than were sent -- the positions it did move -- a row two records name, no deadline left for the call, or a call that did not run for every record moved. */
 class Stopped extends Error {
   readonly at: 'lock' | 'call'
-  readonly why: { refused: unknown } | { unmoved: readonly TextRow[] } | 'deadline' | 'uncalled'
+  readonly why: { refused: unknown } | { unmoved: ReadonlySet<number> } | { duplicate: readonly number[] } | 'deadline' | 'uncalled'
 
   constructor(at: Stopped['at'], why: Stopped['why']) {
     super('A run stopped inside its transaction, which rolled back.')
@@ -97,13 +100,24 @@ function checkRequest(request: ActionRequest, deadlineMs: number): void {
   for (const record of request.records) checkKey(request.target, record.key)
 }
 
-/** A key's values as one string, canonical: what tells a record the lock returned from one it did not. */
-const spelled = (key: readonly Pick<RecordValue, 'value'>[]): string => JSON.stringify(key.map((part) => part.value))
+/** A two-keys refusal: the database's equality makes two records of the selection one row. */
+const DUPLICATE: Omit<ActionFailure, 'records'> = {
+  ok: false,
+  code: 'duplicate-record',
+  message: 'Two keys of the selection name one row under the key’s equality; nothing was called, and the run was rolled back.',
+}
+
+/** The positions in the request of the records a row the lock returned answers to: its last column, an array's text, ascending. */
+function positionsOf(request: ActionRequest, row: TextRow): number[] {
+  const text = row[request.target.identity.length + 1] ?? '{}'
+  return text === '{}' ? [] : text.slice(1, -1).split(',').map(Number)
+}
 
 /**
  * Each moved record's key, from the canonical text the lock returned, as a
- * bound key names it, in the order the records were sent: the lock
- * returns them in an order PostgreSQL does not promise.
+ * bound key names it, in the order the records were sent, by the position
+ * the lock said each row answers to: the lock returns them in an order
+ * PostgreSQL does not promise.
  */
 function keysOf(request: ActionRequest, rows: readonly TextRow[]): { values: Array<Record<string, ApiValue>>; keys: RecordValue[][] } {
   const moved = rows.map((row) => {
@@ -113,11 +127,9 @@ function keysOf(request: ActionRequest, rows: readonly TextRow[]): { values: Arr
       value[column.name] = decoded
       return { ...column, value: decoded }
     })
-    return { value, key }
+    return { value, key, at: positionsOf(request, row)[0] ?? request.records.length }
   })
-  const position = new Map(request.records.map((record, index) => [spelled(record.key), index]))
-  const at = (entry: (typeof moved)[number]): number => position.get(spelled(entry.key)) ?? request.records.length
-  const ordered = [...moved].sort((left, right) => at(left) - at(right))
+  const ordered = [...moved].sort((left, right) => left.at - right.at)
   return { values: ordered.map((entry) => entry.value), keys: ordered.map((entry) => entry.key) }
 }
 
@@ -154,9 +166,10 @@ async function answered(sql: Sql, stop: Stopped, on: Explaining): Promise<Action
   const { request, definition, path } = on
   if (stop.why === 'deadline') return NO_TIME_LEFT
   if (stop.why === 'uncalled') return UNCALLED
+  if ('duplicate' in stop.why) return { ...DUPLICATE, records: [...stop.why.duplicate] }
   if ('unmoved' in stop.why) {
-    const moved = new Set(keysOf(request, stop.why.unmoved).keys.map(spelled))
-    return explained(sql, on, true, (position) => !moved.has(spelled((request.records[position] as ActionRequest['records'][number]).key)))
+    const moved = stop.why.unmoved
+    return explained(sql, on, true, (position) => !moved.has(position))
   }
   // Under REPEATABLE READ a lost race at the lock is 40001, as an update's is (0006): a race, whatever the version reads now.
   if (stop.at === 'lock' && sqlState(stop.why.refused) === '40001') return explained(sql, on, false, () => true)
@@ -239,7 +252,10 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
           }
           sent = true
           const moved = await send('lock', lock)
-          if (moved.rows.length !== request.records.length) throw new Stopped('lock', { unmoved: moved.rows })
+          const answering = moved.rows.map((row) => positionsOf(request, row))
+          const twice = answering.filter((positions) => positions.length > 1).flat()
+          if (twice.length > 0) throw new Stopped('lock', { duplicate: [...new Set(twice)].sort((a, b) => a - b) })
+          if (moved.rows.length !== request.records.length) throw new Stopped('lock', { unmoved: new Set(answering.flat()) })
           const { values: found, keys } = keysOf(request, moved.rows)
           if (left() < 1) throw new Stopped('call', 'deadline')
           await send('call', timeoutStatement(left()))

@@ -188,7 +188,8 @@ export interface ActionRequest {
  *   -- whatever its code, a missing column of the routine's body included,
  *   since the body is not what the form was published over -- or a SQL
  *   Server procedure returned a status other than 0, or an argument did
- *   not reach its parameter as it was given.
+ *   not reach its parameter as it was given, or a record the run locked
+ *   was not found by its key to read its arguments from (0165).
  * - `unavailable`: no connection, or the database said the transaction
  *   could not complete now -- a deadlock, a lock not granted in time.
  * - `action-timeout`: PostgreSQL stopped a statement of the run at the
@@ -198,8 +199,8 @@ export interface ActionRequest {
  *   transaction itself. It may have committed, and it is never sent again.
  * - `duplicate-record`: two keys of a selection that the database's own
  *   equality makes one row -- `a` and `A` under a case-insensitive key
- *   collation on SQL Server -- found once both were locked, and rolled back
- *   before any call (0165). Two tokens of one key are the planner's
+ *   collation on SQL Server, or a nondeterministic one on PostgreSQL --
+ *   found once the lock ran, and rolled back before any call (0165). Two tokens of one key are the planner's
  *   refusal, before anything is sent.
  *
  * `not-found`, `stale`, `version-ended` and `duplicate-record` name the
