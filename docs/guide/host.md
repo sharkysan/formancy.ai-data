@@ -291,6 +291,39 @@ done, is checked by reading the record, and is repeated only after asking
 again
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 
+Each action the server offers you on the form -- a routine the database
+keeps, which an administrator bound to it -- is a button in the open
+record's header, named by its label, and only there: a child row and a
+Drill down level offer none. Pressed, it asks in place under the header,
+with no overlay: first its dialog, where it has one, drawn by the
+renderer you chose -- React where both are shown -- on its own paper,
+with Continue; then a confirmation, which names the action and the
+record, says the sentence its administrator wrote or that it runs in the
+database and this page cannot take it back, and lists any form of the
+record holding unsaved work, which the record read again after the run
+replaces. Keep it comes before Run it, and Escape is Keep it. While a
+save of the record is out, Run it says so and sends nothing, and while
+the run is out the record's Save says it sent nothing. Once it ran, it
+says the administrator's sentence or "Done." in teal for a moment, and
+the record is read again, with its row, and the grids of its sections
+where the action names them, so the next Save names the version the run
+moved. The forms the confirmation listed are read again without asking
+you a second time; a form you typed into while the run was out is asked
+about first, and until the record is read again its Save sends nothing
+and says so. If the page is asking you about something else as the run
+answers -- another record you asked for meanwhile -- that question keeps
+the keyboard, and the record is read again once you answer it, unless
+your answer moved on. A read that is refused is said, with the saved
+record offered. A refusal
+is said in the server's words, one the database's rules worded for you
+followed by "This reason is the database's own.", and a stale one offers
+the saved record; an answer it refused by a dialog's field goes back to
+the dialog. A run whose answer was lost may have run: Check whether it
+ran reads the record, and only where it is still at the version the run
+sent does it offer Run it again, which sends that version -- so if the
+first ran after all, the second is refused as changed
+([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+
 New record, and a child's new row, start each field at its column's
 constant default where the form has one -- an order at `draft` -- and a
 save that leaves it sends it. New record starts a field at the starting
@@ -426,8 +459,8 @@ real drivers, with literal tokens and a `fetch` that goes through
 the real server on PostgreSQL, which needs Docker: the workspace in every
 layout down to 320 pixels, Stacked's line moved by its keys and a pointer,
 the grids' keyboard and colours, the record's
-journey, a delete's confirmations and answers, and a file downloaded, its
-bytes the server's.
+journey, a delete's confirmations and answers, an action's dialog,
+confirmation and answers, and a file downloaded, its bytes the server's.
 
 The page has a second build, for the [live demo](live-demo.md):
 `pnpm --filter @formancy/data-host build:demo` writes it to

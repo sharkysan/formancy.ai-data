@@ -320,11 +320,16 @@ get*](../../README.md#what-you-get) is the short version, and
   with Include routines, each parameter offered only the sources the
   generator binds for it, the grant made on the Policy step after a note
   of what the routine does that nothing here binds, its words on the
-  Presentation step, and what drift leaves of it on the Drift step. The
-  host page offers no action's control yet
+  Presentation step, and what drift leaves of it on the Drift step.
+  The host page offers each action in the open record's header, asks its
+  dialog and then a confirmation in place, waits for a save of the record
+  out, reads the record again once it ran, and checks a run whose answer
+  was lost by reading the record, running it again only from the version
+  it sent
   ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
   [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
+  [0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
   [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 - **An instant or a time the person may read and did not change is never
   written back**

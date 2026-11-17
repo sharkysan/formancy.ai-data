@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import type { DataClient, FormRecord } from '@formancy/data-client'
+import type { DataClient, FormRecord, Outcome } from '@formancy/data-client'
 import { useGuardContext } from './guard.js'
 import type { LeaveRequest } from './leave.js'
 import type { SaveResult, Session, SessionState } from './session.js'
@@ -16,6 +16,10 @@ import type { SaveResult, Session, SessionState } from './session.js'
  *   one that arrives while the page waits for the person about something
  *   else. Otherwise the guard is asked again, so work typed while the read
  *   was out is asked about before anything opens over it.
+ * - **A read no request made waits for the person.** The record read again
+ *   after an action ran over it (0162) is not a request of the person's,
+ *   so a question about something else does not drop it: it waits for
+ *   their answer, and opens unless that answer moved the detail on.
  * - **A record created in one pane is the one the detail shows.** Every
  *   other pane is opened on it as it was stored -- after asking, when one
  *   holds work of its own -- so the heading, every pane and the children
@@ -54,6 +58,18 @@ export interface Opening {
     as?: (record: FormRecord) => FormRecord,
     follows?: (record: FormRecord) => SessionState['follows'],
   ): void
+  /**
+   * Read `token` again for `request`, which no request of the person's made
+   * -- the record read again after an action ran over it (0162) -- and open
+   * it in every pane through the guard. An answer while the page waits for
+   * the person about something else waits for their answer; `dropped` says
+   * it was not opened, because the detail was asked for something else
+   * since it was sent, or holds another record by then, or the question it
+   * asked was replaced by another request -- told on Keep editing too,
+   * before `back`. It replaces no read the person asked for: one out before
+   * it still opens when it answers, over this one or instead of it.
+   */
+  readAgain(request: LeaveRequest, token: string, then: ReadHandlers & { dropped: () => void }): void
   /** A request that replaces what the detail shows without a read -- New: an answer still out is dropped. */
   replaced(): void
   /** A save one of the panes answered: a record it created is the detail's, and `opened` says so once the other panes hold it. */
@@ -78,24 +94,49 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
     const mine = asked.current
     void client.read(formId, token).then((answer) => {
       if (asked.current !== mine || guard.waiting()) return
-      if (!answer.ok) {
-        then.refused(answer.message, discarded)
-        return
-      }
-      const record: FormRecord = answer.value
-      // Asked again: the person may have typed while the read was out. A
-      // request made while this question waits replaces it, so its answer
-      // is always this read's. An answer's question: it closes nothing the
-      // person may be answering meanwhile -- a delete's confirmation (0053).
-      guard.askOnAnswer(
-        request,
-        (again) => {
-          for (const session of sessions) session.open(structuredClone(as(record)), follows(record))
-          then.opened({ token: record.record ?? token, discarded: discarded || again }, record)
-        },
-        then.back,
-      )
+      openAnswer(request, token, answer, discarded, then, as, follows)
     })
+  }
+
+  function readAgain(request: LeaveRequest, token: string, then: ReadHandlers & { dropped: () => void }): void {
+    const mine = asked.current
+    void client.read(formId, token).then((answer) => {
+      guard.afterWaiting(() => {
+        if (asked.current !== mine || sessions[0]?.state().record !== token) then.dropped()
+        else openAnswer(request, token, answer, false, then, undefined, undefined, then.dropped)
+      })
+    })
+  }
+
+  /** A read's answer: refused, or opened in every pane once the guard lets it; `cancel`, told when the question it asks is replaced or kept from. */
+  function openAnswer(
+    request: LeaveRequest,
+    token: string,
+    answer: Outcome<FormRecord>,
+    discarded: boolean,
+    then: ReadHandlers,
+    as: (record: FormRecord) => FormRecord = (record) => record,
+    follows: (record: FormRecord) => SessionState['follows'] = () => undefined,
+    cancel?: () => void,
+  ): void {
+    if (!answer.ok) {
+      then.refused(answer.message, discarded)
+      return
+    }
+    const record: FormRecord = answer.value
+    // Asked again: the person may have typed while the read was out. A
+    // request made while this question waits replaces it, so its answer
+    // is always this read's. An answer's question: it closes nothing the
+    // person may be answering meanwhile -- a delete's confirmation (0053).
+    guard.askOnAnswer(
+      request,
+      (again) => {
+        for (const session of sessions) session.open(structuredClone(as(record)), follows(record))
+        then.opened({ token: record.record ?? token, discarded: discarded || again }, record)
+      },
+      then.back,
+      cancel,
+    )
   }
 
   function answered(result: SaveResult, from: Session, opened: (opened: Opened) => void): void {
@@ -120,6 +161,7 @@ export function useOpening({ client, formId, owner, sessions }: { client: DataCl
 
   return {
     read,
+    readAgain,
     replaced: () => {
       asked.current += 1
     },

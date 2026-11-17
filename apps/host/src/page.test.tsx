@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { computeAccessibleName } from 'dom-accessibility-api'
+import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessibility-api'
 import { createFormText } from '@formancy/core/words'
 import { DEFAULT_MAX_PAGE_SIZE } from '@formancy/data-core'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
@@ -39,6 +39,9 @@ import {
   unsavedNotice,
 } from './test-host.js'
 import { holdingRequests, holdingWrites, losingWrites } from './test-network.js'
+import { actionForm, CLOSE_DECLINED, CLOSE_WORDS } from './test-actions.js'
+import { askClose, closed, closeRegion, closing, dialogPaper, openActionOrder, openOrderIn, region, runIt, runsSent } from './test-acting.js'
+import { checkedText } from './running.js'
 import { done, openRows, rowAnswer, rowCell, rowControl, rowPaper, rowsSay, rowsTab, rowTexts, savedBeside } from './test-rows.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
 import type { Plane } from './test-plane.js'
@@ -62,7 +65,7 @@ import { fieldHeading } from '@formancy/data-client'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, saves: true })
+  plane = await startPlane({ children: true, deletes: true, saves: true, actions: true })
 })
 
 afterAll(async () => {
@@ -377,6 +380,118 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.click(within(screen.getByRole('region', { name: `Delete Order ${kept}?` })).getByRole('button', { name: 'Delete it' }))
     await waitFor(() => expect(gridStatus('Records')?.textContent).toMatch(/^Deleted Order /), { timeout: 15_000 })
     expect(await floor('deleted')).toEqual(CLEAN('deleted'))
+  })
+
+  // An action's states, each held to the floor (0162): its dialog drawn by
+  // React and by Angular, Escape there giving the keyboard back to the
+  // action; its confirmation, focused and described by the sentence its
+  // presentation wrote, the next Tab on Keep it -- never the button that
+  // runs -- and Escape there Keep it, nothing sent; with a save of the
+  // order out, Run it waiting and described by why; the run out; done,
+  // described by what the server did; "Not run" in the deployment's words,
+  // as its own, and stale, offering the saved record; and "It may have
+  // run" before and after its check, with Close, then Run it again, the
+  // keyboard on the region while it is out (watched failing on
+  // postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest with
+  // Run it before Keep it: "expected 'Run it' to be 'Keep it'"; and with
+  // the dialog's Keep it drawn without its words: axe's button-name, and
+  // the button unnamed). The confirmation's list of forms, an action with
+  // no dialog and no words of its own, and the states of a check that
+  // found the record changed are held to axe in actions.test.tsx.
+  test("passes the floor in an action's states, its confirmation's next Tab on Keep it", async () => {
+    let hold = false
+    const holding = holdingWrites(plane.fetch)
+    const fetch: typeof globalThis.fetch = (input, init) => (hold ? holding.fetch(input, init) : plane.fetch(input, init))
+    const record = await plane.db.insertActionOrder(connection)
+    const user = await openActionOrder(fetch, { connection }, record, 'React')
+    const close = (): HTMLElement => screen.getByRole('button', { name: CLOSE_WORDS.label })
+    const note = (renderer: 'React' | 'Angular'): Promise<HTMLElement> =>
+      waitFor(() => within(dialogPaper(record, renderer)).getByRole('textbox', { name: /^Note\b/ }), { timeout: 15_000 })
+
+    await user.click(close())
+    await note('React')
+    await waitFor(() => expect(focusedName()).toBe(closing(record)))
+    expect(await floor('an action, asking in React')).toEqual(CLEAN('an action, asking in React'))
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
+    expect(screen.queryByRole('region', { name: closing(record) })).toBeNull()
+
+    await chooseRenderer(user, 'Angular')
+    await user.click(close())
+    await user.type(await note('Angular'), 'checked on the floor')
+    expect(await floor('an action, asking in Angular')).toEqual(CLEAN('an action, asking in Angular'))
+    await user.click(within(dialogPaper(record, 'Angular')).getByRole('button', { name: 'Continue' }))
+    const confirming = await region(closing(record, true))
+    await waitFor(() => expect(focusedName()).toBe(closing(record, true)))
+    expect(computeAccessibleDescription(confirming)).toBe(CLOSE_WORDS.confirm)
+    await user.tab()
+    expect(focusedName()).toBe('Keep it')
+    await user.tab()
+    expect(focusedName()).toBe('Run it')
+    expect(await floor('an action, confirming')).toEqual(CLEAN('an action, confirming'))
+    const kept = plane.sent.length
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
+    expect(screen.queryByRole('region', { name: closing(record, true) })).toBeNull()
+    expect(runsSent(plane, kept)).toBe(0)
+    await askClose(user, record, 'Angular', 'checked on the floor')
+
+    hold = true
+    await answer(user, 'Angular', 'Amount', '14')
+    await save(user, 'Angular')
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    await waitFor(() => expect(within(closeRegion(record, true)).getByRole('button', { name: 'Run it' }).getAttribute('aria-disabled')).toBe('true'))
+    expect(await floor('an action, confirming while a save is out')).toEqual(CLEAN('an action, confirming while a save is out'))
+    holding.answer()
+    await said('Angular', /^Saved\./)
+    await runIt(user, record)
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(await floor('an action, running')).toEqual(CLEAN('an action, running'))
+    holding.answer()
+    hold = false
+    expect(computeAccessibleDescription(await closed(record))).toBe(CLOSE_WORDS.done)
+    expect(await floor('an action, done')).toEqual(CLEAN('an action, done'))
+    await user.click(within(closeRegion(record)).getByRole('button', { name: 'Close' }))
+    await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
+
+    const refusing = await plane.db.insertActionOrder(connection)
+    await openOrderIn(user, { connection }, refusing, 'Angular')
+    await askClose(user, refusing, 'Angular', 'refuse')
+    await runIt(user, refusing)
+    const declined = await region('Not run')
+    expect(paragraphs(declined)).toEqual([CLOSE_DECLINED, DECLINED_BY])
+    expect(await floor('an action, declined')).toEqual(CLEAN('an action, declined'))
+    await user.click(within(declined).getByRole('button', { name: 'Close' }))
+
+    const read = await plane.clerk.read(actionForm({ connection }), refusing)
+    if (!read.ok || read.value.version === null) throw new Error('the order did not read')
+    await plane.clerk.update(actionForm({ connection }), { record: refusing, version: read.value.version, answers: { note: 'changed beside the page' } })
+    await askClose(user, refusing, 'Angular', 'too late')
+    await runIt(user, refusing)
+    const stale = await region('Not run')
+    expect(within(stale).getByRole('button', { name: 'Load the saved record' })).toBeTruthy()
+    expect(await floor('an action, stale')).toEqual(CLEAN('an action, stale'))
+    await user.click(within(stale).getByRole('button', { name: 'Load the saved record' }))
+    await shows('Angular', 'Note', 'changed beside the page')
+
+    plane.runs.lose.set(`${connection}-actions`, 'late')
+    await askClose(user, refusing, 'Angular', 'closed in the end')
+    await runIt(user, refusing)
+    const unknown = await region('It may have run')
+    expect(await floor('an action, may have run')).toEqual(CLEAN('an action, may have run'))
+    await user.click(within(unknown).getByRole('button', { name: 'Check whether it ran' }))
+    await within(unknown).findByText(checkedText({ kind: 'unchanged' }), {}, { timeout: 15_000 })
+    expect(within(unknown).getByRole('button', { name: 'Close' })).toBeTruthy()
+    expect(await floor('an action, may have run, checked')).toEqual(CLEAN('an action, may have run, checked'))
+    // The run held never reaches the database: run again from the version it sent, it is done.
+    plane.runs.late.length = 0
+    hold = true
+    await user.click(within(unknown).getByRole('button', { name: 'Run it again' }))
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(focusedName()).toBe(closing(refusing, true))
+    holding.answer()
+    hold = false
+    await closed(refusing)
   })
 
   // Download CSV's states, each held to the floor (0080): a file in the

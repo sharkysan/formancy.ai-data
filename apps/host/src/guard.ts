@@ -88,12 +88,22 @@ export interface Guard {
   /**
    * `ask`, for a request an answer makes -- a read come back, a record
    * created in a pane -- which closes no confirmation: the person asked for
-   * nothing, and may be answering one.
+   * nothing, and may be answering one. `cancel`, as `ask`'s, is told when
+   * the question is replaced by another before it is answered, and on
+   * Keep editing.
    */
-  askOnAnswer(request: LeaveRequest, proceed: (discarded: boolean) => void, back: () => void): void
+  askOnAnswer(request: LeaveRequest, proceed: (discarded: boolean) => void, back: () => void, cancel?: () => void): void
   pending: Pending | null
   /** Whether a request is waiting for the person now: read when an answer arrives late, outside a render. */
   waiting(): boolean
+  /**
+   * Run `then` once no request waits for the person: at once when none
+   * does, otherwise once the one waiting is answered -- Keep editing, or
+   * Discard and continue once it is carried out. For an answer no request
+   * of the person's made, which a question about something else must not
+   * drop: the record read again after an action ran over it (0162).
+   */
+  afterWaiting(then: () => void): void
   keep: () => void
   discard: () => void
   registry: Registry
@@ -109,6 +119,15 @@ export function useGuard(): Guard {
     setShown(next)
   }, [])
   const asked = useRef(0)
+  /** What waits for the person's answer to the request waiting, in the order it came. */
+  const queued = useRef<Array<() => void>>([])
+  /** Once nothing waits for the person, what waited for that runs. */
+  const settled = useCallback(() => {
+    if (current.current !== null) return
+    const now = queued.current
+    queued.current = []
+    for (const then of now) then()
+  }, [])
 
   /** Every pane the registry holds that `request` would drop with work in it, as it is now. */
   const atRiskNow = useCallback(
@@ -131,12 +150,13 @@ export function useGuard(): Guard {
       if (risky.length === 0) {
         setPending(null)
         proceed(false)
+        settled()
         return
       }
       asked.current += 1
       setPending({ request, risky, proceed, back, cancel, n: asked.current })
     },
-    [atRiskNow, setPending],
+    [atRiskNow, setPending, settled],
   )
 
   const ask = useCallback(
@@ -152,12 +172,21 @@ export function useGuard(): Guard {
 
   const waiting = useCallback(() => current.current !== null, [])
 
+  const afterWaiting = useCallback(
+    (then: () => void) => {
+      queued.current.push(then)
+      settled()
+    },
+    [settled],
+  )
+
   const keep = useCallback(() => {
     const now = current.current
     setPending(null)
     now?.cancel()
     now?.back()
-  }, [setPending])
+    settled()
+  }, [setPending, settled])
 
   const discard = useCallback(() => {
     const now = current.current
@@ -173,9 +202,10 @@ export function useGuard(): Guard {
     setPending(null)
     for (const pane of risky) pane.entry.discard()
     now.proceed(true)
-  }, [atRiskNow, setPending])
+    settled()
+  }, [atRiskNow, setPending, settled])
 
-  return { ask, askOnAnswer, pending, waiting, keep, discard, registry }
+  return { ask, askOnAnswer, pending, waiting, afterWaiting, keep, discard, registry }
 }
 
 export const GuardContext = createContext<Guard | null>(null)

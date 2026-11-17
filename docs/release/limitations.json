@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:6936d00cd623baa5a6ee6a7fa7ffd47615d99dfde5cfb850736ff0164d65fcd6",
+      "reviewed": "sha256:0282330ac1c6bf121a5037ef26a02899e4120e9c91f605b7ed1380652cc001bf",
       "limitations": [
         {
           "area": "writes",
@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:900ab46578cc6f8e72bf225c73126df0c310ceae9c8d7233f458f083c8f2870c",
+      "reviewed": "sha256:f8482e74b3d7c24d2579c2c4f1d6fa9942c4e11dcb7b83cf8ac9ac8fc8a8b8ed",
       "limitations": [
         {
           "area": "host",
@@ -1568,7 +1568,7 @@
       ]
     },
     "0053": {
-      "reviewed": "sha256:4203bd1f063a3b0c337b0be229571a814e9906f0df6e768fb615f9a4b915e0a3",
+      "reviewed": "sha256:c9eca0eb2dc4cc1185808aa3da56f8cd06a644d7a1be542ad2cd1d3888582968",
       "limitations": [
         {
           "area": "host",
@@ -2898,6 +2898,16 @@
         }
       ]
     },
+    "0094": {
+      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
+          "heldBy": "apps/host/src/drill.test.tsx"
+        }
+      ]
+    },
     "0095": {
       "reviewed": "sha256:db859e16bb9f54e8e366af1076f58703597ccaf6df4218ce958483ccac380cae",
       "limitations": [
@@ -2928,25 +2938,6 @@
         }
       ]
     },
-    "0098": {
-      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
-      "limitations": [
-        {
-          "area": "writes",
-          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
-        }
-      ]
-    },
-    "0094": {
-      "reviewed": "sha256:4698363847961760c0d13c633f65e6af92864f77b2a4a1bcc16b429b63f7c27c",
-      "limitations": [
-        {
-          "area": "host",
-          "says": "A row a Drill down level holds, deleted while the person goes down into it and types there, takes that typing with it once the delete is done, without a word; its confirmation named only what the levels held when it was asked or Delete it was pressed.",
-          "heldBy": "apps/host/src/drill.test.tsx"
-        }
-      ]
-    },
     "0097": {
       "reviewed": "sha256:0c8c7a09ddf2eeb15c6d3f259382eb3ab1fb6f5bc555666b9fc56444da3137d2",
       "limitations": [
@@ -2954,6 +2945,15 @@
           "area": "host",
           "says": "In a layout that moves between none of them, Back takes one press for each Separate views view or Drill down level the open form's history holds, shows nothing new on each, and writes the layout shown over those entries, so Forward no longer brings their views or levels back.",
           "heldBy": "apps/host/src/address.test.tsx"
+        }
+      ]
+    },
+    "0098": {
+      "reviewed": "sha256:e450a1885d66d6947beda22b4d5bceb71a559f98c97fb6513227634650212adc",
+      "limitations": [
+        {
+          "area": "writes",
+          "says": "A changed value in a field the person may not write, sent with a version the record no longer holds, is answered 409 stale rather than 403 over-posting, so such tampering is told only that its version is old; nothing is written."
         }
       ]
     },
@@ -2991,6 +2991,24 @@
         {
           "area": "server",
           "says": "A trusted-proxy list that covers all but part of a family's addresses, such as half of IPv4 and a quarter more, still starts: only a list that trusts every IPv4 or every IPv6 peer is refused."
+        }
+      ]
+    },
+    "0101": {
+      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
+      "limitations": [
+        {
+          "area": "access",
+          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
+        }
+      ]
+    },
+    "0102": {
+      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -3045,24 +3063,6 @@
         {
           "area": "server",
           "says": "The values a follow narrows by travel in the browse request's body and stand on the page, while the audit trail names only the connection and the object, never a value, so it cannot tell which row was followed."
-        }
-      ]
-    },
-    "0101": {
-      "reviewed": "sha256:1c672cd217ec47c1ac02dea106e989af667e3c01bd7c02f0ab447d2d895a1757",
-      "limitations": [
-        {
-          "area": "access",
-          "says": "A host token with a space, a newline or padding added on its way to the server, or written in base64 rather than base64url, is refused as malformed, though jose would have read some of those."
-        }
-      ]
-    },
-    "0102": {
-      "reviewed": "sha256:651b8216d37f2d7e7b3e74d424d3baac9f2a645a08d1967874f0c687eaa8aefe",
-      "limitations": [
-        {
-          "area": "operations",
-          "says": "The composed stack does not run the server on a read-only root, though the image starts on one; an operator who wants it adds read_only and keeps the store's volume."
         }
       ]
     },
@@ -4857,13 +4857,8 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:1fbfe0a37d7af4a540e7ad476650ad73fd77a8a4c3b3a7a4ccf6891c523635d1",
+      "reviewed": "sha256:b6de00ea484f7933b1a75ede22d365c3615697c3f6337724a32e8bb9eb465591",
       "limitations": [
-        {
-          "area": "forms",
-          "says": "An action is run only by a page an integrator writes, through POST /v1/forms/:id/actions/:action/run or data-client’s runAction: the host page offers no action’s control yet.",
-          "heldBy": "apps/host/src/plane.test.tsx"
-        },
         {
           "area": "forms",
           "says": "A form offers an action by its own table as described when it is opened; a routine that changed since publication is still offered, and its run is refused 409, schema-changed where the bound routine no longer resolves and drift where it resolves to another description.",
@@ -4914,6 +4909,53 @@
         {
           "area": "operations",
           "says": "A server older than 0161 refuses every version whose generation request names an action, as it refuses every property it does not read."
+        }
+      ]
+    },
+    "0162": {
+      "reviewed": "sha256:d3d250cfbdec12256ad58ebec71ee8f13887196ac15efaa6f0b81861871bc142",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "The host page offers an action only in the open record's detail: a child row's detail, a Drill down level and a selection of rows offer none."
+        },
+        {
+          "area": "host",
+          "says": "Every run on the host page asks for a confirmation first, even where the administrator wrote none, and an action with a dialog asks it after the dialog: two steps.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Where both renderers are shown, an action's dialog is drawn by React alone.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A dialog's answers are dropped without asking by any other request on the page, as a delete's question is closed."
+        },
+        {
+          "area": "host",
+          "says": "After a run the host page reads the record again into its forms, which drops what they held before it without asking again where the confirmation listed them; kept editing when the read asks about a form typed into since, the forms keep the version from before the run and their next Save is stale.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "While a save of the record is out, Run it sends nothing; while a run is out, Save in the record’s forms sends nothing.",
+          "heldBy": "apps/host/src/in-flight.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Once a run is done and until the record is read again, Save in the record’s forms sends nothing, and says so.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Run it again does not wait for a save of the record out: whichever of the two is sent second is refused as stale."
+        },
+        {
+          "area": "host",
+          "says": "A run whose answer was lost is checked by one read of the record and run again only from the version it sent, so on PostgreSQL a run orphaned by a cut that commits after the check makes Run it again refused as stale.",
+          "heldBy": "apps/host/src/actions.test.tsx"
         }
       ]
     },

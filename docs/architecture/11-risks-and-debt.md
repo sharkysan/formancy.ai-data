@@ -506,6 +506,18 @@ not ask before leaving unsaved work
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 There is no bulk delete and no undo
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
+An action is offered in the open record's detail alone, never a child
+row's, a Drill down level's or a selection's; every run asks a
+confirmation, after its dialog where it has one, even where its
+administrator wrote no sentence; under Both its dialog is React's; a
+dialog's answers are dropped without asking by any other request;
+reading the record again after a run drops what its forms held, without
+asking again where the confirmation listed them, and a person who keeps
+editing when it asks about a form typed into since saves stale; and
+`refresh: children`, which lists the record's sections' grids again
+after a run, is held by no test, since no form of the actions schema
+has a child section
+([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
 A record's child forms are tabs beside it, so a child's rows are a press
 away from the record's form, and another record, a record its first save
 created included, opens on its own tab; a Drill down level's section

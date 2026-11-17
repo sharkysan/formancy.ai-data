@@ -89,12 +89,46 @@ describe('what each way of leaving a form discards', () => {
     expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual(['master react'])
     expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'angular' })).toEqual([])
     expect(of({ kind: 'reload-rows', record: 'k1:1', rows: ['saved_line~saved_order'] })).toEqual(['saved_line~saved_order null'])
+    // The record read again after an action over it ran (0162): its own panes, and nothing of its children or its rows.
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order' })).toEqual(['master react'])
     expect(lead({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual([
       'Reading ',
       { code: 'k1:1' },
       " again in React, to keep its rows' changes, closes these forms:",
     ])
     expect(lead({ kind: 'reload-rows', record: 'k1:1', rows: [] })).toEqual(['Loading ', { code: 'k1:1' }, ' as saved, with its rows, closes these forms:'])
+  })
+
+  // Reading the record again after an action ran over it (0162) replaces
+  // what its forms hold, and leaves its deletion out where it is: a read
+  // does not touch it, so it is never asked about, and Discard never drops
+  // its track (watched failing with every renderer's, the deletion's
+  // included: "expected [ 'master react', …(2) ] to deeply equal [ 'master
+  // react', 'master angular' ]").
+  test('the record read again after a run drops its own forms, never its deletion', () => {
+    const deleting: PaneWork[] = [
+      { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' },
+      { owner: 'lines', renderer: 'react', name: ['Order line ', { code: 'k1:1,1' }], work: 'changed' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, deleting).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order' })).toEqual(['master react', 'master angular'])
+  })
+
+  // What the action's confirmation listed, the person agreed to drop when
+  // they ran it: the read after it asks about those forms no more, and
+  // about one that holds work only since (watched failing with nothing
+  // agreed spared: "expected [ 'master react', 'master angular' ] to
+  // deeply equal [ 'master angular' ]").
+  test('the record read again after a run asks only about the forms its confirmation did not list', () => {
+    const both: PaneWork[] = [
+      { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, both).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order', agreed: ['react'] })).toEqual(['master angular'])
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order', agreed: ['react', 'angular'] })).toEqual([])
   })
 
   // The renderer switch hides a renderer's forms everywhere on the page,
@@ -290,6 +324,8 @@ describe('what the notice says', () => {
       unknown: 'a save that may have been stored, not yet checked.',
       deleting: 'a deletion the server has not answered yet.',
       'delete-unknown': 'a deletion that may have been done, not yet checked.',
+      running: 'an action the server has not answered yet.',
+      'run-unknown': 'an action that may have run, not yet checked.',
     })
   })
 })

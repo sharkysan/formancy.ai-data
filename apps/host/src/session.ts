@@ -62,7 +62,8 @@ import { disableFields } from './widgets.js'
  *
  * A submit the engine refused sends nothing: the renderer already says why.
  * So does a press while the record's deletion is out (`hold`, 0053): the
- * update would race the delete.
+ * update would race the delete -- or an action over it (0162), whose run
+ * moves the version the update would name.
  * A press while a save is unanswered sends nothing either, and says so
  * (**busy**): the guard is the form's that set it, so a replaced form's save
  * settling late cannot lift it. And an answer that arrives after Load or New
@@ -260,8 +261,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
   /** The last save of a form whose outcome is unknown, and whether it holds that form. */
   let lost: { write: UnknownWrite; generation: number; held: boolean } | undefined
   const lostHere = () => (lost !== undefined && lost.generation === opened?.generation ? lost : undefined)
-  /** What a press says while the record's deletion is out (0053): set by `hold`, lifted by `release`. */
-  let deleting: string | undefined
+  /** What a press says while the record's deletion, or an action over it, is out (0053, 0162): by what holds it, set by `hold`, lifted by `release`. */
+  const holds = new Map<'delete' | 'action', string>()
   /** A form opened, a save sent or a save answered: each is a change `subscribe`'s listeners hear. */
   const notify = (): void => {
     for (const listener of listeners) listener()
@@ -526,7 +527,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
       const { engine, generation } = current()
       if (saving?.generation === generation) return { kind: 'busy', message: BUSY }
       if (lostHere()?.held === true) return { kind: 'held', message: HELD }
-      if (deleting !== undefined) return { kind: 'held', message: deleting }
+      const holding = [...holds.values()][0]
+      if (holding !== undefined) return { kind: 'held', message: holding }
       // The rows go with it where they hold a change (0155): each changed row's form submitted first, and none refusing.
       const carried = state.follows === undefined && rows?.carries(state.record) === true
       // Held by another pane's save of the same rows: the set is the record's, whichever renderer sent it.
@@ -557,14 +559,15 @@ export function createSession({ client, formId, definition, renderer, namespace,
       return saving !== undefined && saving.generation === opened?.generation
     },
     /**
-     * While the record's deletion is out (0053), a press sends nothing and
-     * says `message`; `release` lifts it, whatever the deletion came to.
+     * While the record's deletion is out (0053), or an action over it (0162),
+     * a press sends nothing and says `message`; `release` lifts what `by`
+     * held, whatever it came to, and leaves the other's.
      */
-    hold(message: string): void {
-      deleting = message
+    hold(message: string, by: 'delete' | 'action' = 'delete'): void {
+      holds.set(by, message)
     },
-    release(): void {
-      deleting = undefined
+    release(by: 'delete' | 'action' = 'delete'): void {
+      holds.delete(by)
     },
     /** This form's last save whose outcome is unknown, if any. */
     unknown: (): UnknownWrite | undefined => lostHere()?.write,

@@ -119,6 +119,36 @@
   color: var(--text);
 }
 
+/* An action that ran (0162): teal, the colour of what the server did, as
+   a save that may have been stored is; its sentence teal for a moment too. */
+.notice[data-kind='done'] {
+  border-color: color-mix(in srgb, var(--server) 40%, transparent);
+  background: color-mix(in srgb, var(--server) 6%, transparent);
+}
+
+.notice[data-kind='done'] .notice-heading {
+  color: var(--server);
+}
+
+/* An action's dialog (0162): its question in the room's edge, and the
+   paper inside it, which is the theme's -- so no notice's type size here,
+   which the paper would inherit. */
+.action-ask {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--edge-strong);
+  border-radius: 10px;
+}
+
+.action-ask:focus {
+  outline: none;
+}
+
+.action-ask .notice-heading {
+  color: var(--text);
+}
+
 /* A record a delete could not find: neither a refusal nor done, so neither
    the warm colour nor teal -- the room's own edge. */
 .notice[data-kind='gone'] {

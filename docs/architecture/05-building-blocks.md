@@ -593,6 +593,11 @@ the browser through an object URL and a clicked `<a download>`
 of leaving a form; `src/delete-flow.ts` and `src/deletion.ts` a delete
 confirmed in place
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md));
+`src/action-flow.ts` and `src/running.ts` an action run over the open
+record -- its dialog, a confirmation in place, the run, the record read
+again, and a lost answer checked by a read -- and `src/action-region.tsx`
+its buttons in the detail's header and its region under it
+([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md));
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival
 whose address names no layout opens in the one the person chose last,

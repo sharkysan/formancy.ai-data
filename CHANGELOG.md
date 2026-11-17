@@ -63,6 +63,39 @@ the same day (formancy.ai 0232).
   parameters whose names give one field key cannot both be asked, and an
   action renamed is another action, its words dropped and its grant left
   to remove.
+
+- **The host page runs an action over the open record** (0162). Why: the
+  runtime plane ran an action (0161) and nothing on the page called it,
+  so a routine an administrator bound reached a person only through a
+  page an integrator wrote. What a person notices: each action the server
+  offers them is a button in the open record's header, beside Duplicate
+  record and Delete record, and only there. Pressed, it asks in place
+  under the header: its dialog first, where it has one, drawn by the
+  renderer they chose -- React where both are shown -- with Continue; then
+  always a confirmation, focused, naming the action and the record, saying
+  the administrator's sentence or the page's own, and listing any form of
+  the record holding unsaved work, which the record read again after the
+  run replaces; Keep it is the next Tab, and Escape is Keep it. While a
+  save of the record is out Run it says so and sends nothing, and while
+  the run is out the record's Save sends nothing either, since each moves
+  the version the other names. Once it ran, the region says so in teal and
+  the record is read again into its forms, with its row and, where the
+  action names them, its sections' grids, so the next Save is not stale
+  against the person's own run: what the confirmation listed is dropped
+  without asking again, a form typed into while the run was out is asked
+  about first, and until the read answers the record's Save sends nothing
+  and says so; a question the page asks meanwhile about something else
+  keeps the keyboard and does not drop the read, which waits for the
+  answer. A read refused is said, and offers the saved record. A refusal
+  is the server's sentence, the
+  database's own reason said as such; a run whose answer was lost says it
+  may have run, and Check whether it ran reads the record, offering Run it
+  again only where it is still at the version sent -- which, if the first
+  ran after all, is refused as changed rather than run twice. Leaving the
+  record while a run is out, or before its lost answer is checked, asks
+  first. What integrators notice: nothing new on the wire; the page sends
+  `POST /v1/forms/:id/actions/:action/run` through `runAction`, as 0161
+  built it.
 - **The studio offers a form's rows saved with their record, and a
   rowversion's touch column** (0155). Why: the generator, the bundle
   check, the route and the host page all held a child's rows saved with
@@ -195,8 +228,9 @@ the same day (formancy.ai 0232).
   ([0037](docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)),
   the runtime door now forwards the route, and so does the live demo's
   Worker; run `tunnel-config` again, as the guide's section 8 says, or the
-  door does not forward a run, which fails closed. The host page offers no
-  action's control yet, and the studio binds none.
+  door does not forward a run, which fails closed. The host page runs an
+  action from the open record's header (0162), and the studio binds one
+  (0163).
 
 - **A record is saved with the rows of its together children in one
   request** (0155). Why: an order could not be held to at least one line

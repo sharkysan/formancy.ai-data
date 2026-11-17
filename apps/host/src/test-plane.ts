@@ -15,6 +15,10 @@ import postgres from 'postgres'
 import { inject } from 'vitest'
 import { childForms, clerkPolicy, offered, ORDER_CASCADES, ORDER_MOVES, ORDER_VIEWS, STARTING, WITHHELD_VIEWS } from './test-forms.js'
 import type { Proposed } from './test-forms.js'
+import { actionDb, losingRuns, publishActions } from './test-actions.js'
+import type { ActionDb, LosingRuns } from './test-actions.js'
+import { orderDb } from './test-orders.js'
+import type { OrderDb } from './test-orders.js'
 import { injectingFetch } from './test-fetch.js'
 import { losingSaves, publishSaved, savedDb } from './test-saves.js'
 import type { SavedDb } from './test-saves.js'
@@ -186,6 +190,8 @@ export interface Plane {
    * began. The server answers 502 naming the record and the version sent.
    */
   loseSave: Map<string, 'after' | 'before'>
+  /** Connections whose next run of an action (0162) loses its answer: see `LosingRuns`. */
+  runs: LosingRuns
   /** The server's store, written straight to as an older release's server wrote it, which this release's routes refuse. */
   store: ConfigurationStore
   /**
@@ -194,26 +200,7 @@ export interface Plane {
    * for each start (0070). Undefined otherwise, and no demo token is accepted.
    */
   demoKey: string | undefined
-  db: SavedDb & {
-    /** A customer of tenant 1, written through the database's owner, as another application would. */
-    insertCustomer(connection: Engine['connection'], no: number, name: string): Promise<void>
-    deleteCustomer(connection: Engine['connection'], no: number): Promise<void>
-    /** How many orders have exactly these notes, asked of the database's owner. */
-    countOrders(connection: Engine['connection'], notes: string): Promise<number>
-    /** `count` orders of tenant 1's, for Muster AG, noted `<notes> <n>`, written by the owner in one statement: more than a page. */
-    insertOrders(connection: Engine['connection'], count: number, notes: string): Promise<void>
-    /** The order `record` names, with no lines, deleted by the owner, as another application would. */
-    deleteOrder(connection: Engine['connection'], record: string): Promise<void>
-    /** A row of `parity.removable_child` that refers to the removable record `record`, with NO ACTION: a delete of it is refused while this row is there. */
-    referToRemovable(connection: Engine['connection'], record: string): Promise<void>
-    /**
-     * An order of tenant 1's approved by employee `approver` -- and created
-     * by `creator`, where one is given -- written by the owner -- the clerk
-     * may only read the form that names approvers -- and its token, which
-     * spells its key.
-     */
-    insertApprovedOrder(connection: Engine['connection'], approver: number, creator?: number | null): Promise<string>
-  }
+  db: SavedDb & ActionDb & OrderDb
   close(): Promise<void>
 }
 
@@ -241,6 +228,7 @@ export interface Plane {
  * published again as `unread` of `ENGINES`, whose status the clerk neither
  * reads nor writes. With `starting` (0150), the order form is published
  * again as `starting` of `ENGINES`, with `STARTING` chosen over its base.
+ * With `actions` (0162), each engine's action order (test-actions.ts).
  */
 export async function startPlane(
   options: {
@@ -260,6 +248,7 @@ export async function startPlane(
     starting?: boolean
     /** An order and its lines saved with it, one to three of them, over the parity schema (0155). */
     saves?: boolean
+    actions?: boolean
   } = {},
 ): Promise<Plane> {
   const { pg, ms } = inject('databases')
@@ -271,6 +260,8 @@ export async function startPlane(
     { id: 'ms', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['sales'], tls: { enabled: false, trustServerCertificate: true } },
     { id: 'pg-parity', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['parity'], tls: { enabled: false } },
     { id: 'ms-parity', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['parity'], tls: { enabled: false, trustServerCertificate: true } },
+    { id: 'pg-actions', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['actions'], tls: { enabled: false } },
+    { id: 'ms-actions', kind: 'sqlserver', ...ms, password: 'env:MS_PASSWORD', schemas: ['actions'], tls: { enabled: false, trustServerCertificate: true } },
   ]
   const real = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: pg.password, MS_PASSWORD: ms.password },
@@ -279,6 +270,7 @@ export async function startPlane(
   const unreachable = new Set<string>()
   const lose = new Map<string, 'after' | 'before'>()
   const loseSave = new Map<string, 'after' | 'before'>()
+  const runs: LosingRuns = { lose: new Map(), late: [] }
   const registry: ConnectionRegistry = {
     ...real,
     open: async (id) => {
@@ -301,6 +293,7 @@ export async function startPlane(
           },
           save: losingSaves(open.records, id, loseSave),
         },
+        actions: losingRuns(open.actions, id, runs),
       }
     },
   }
@@ -464,6 +457,7 @@ export async function startPlane(
     })
   }
   if (options.saves === true) await publishSaved(admin)
+  if (options.actions === true) await publishActions(admin, ENGINES)
   for (const engine of options.children === true ? ENGINES : []) {
     for (const child of childForms(engine, { deletes, deliveries: options.deliveries === true, views })) {
       const { form, bindings, snapshot, generation } = await admin('/v1/form-proposals', {
@@ -514,73 +508,13 @@ export async function startPlane(
     unreachable,
     lose,
     loseSave,
+    runs,
     store,
     demoKey,
     db: {
       ...savedDb(pgAdmin, msAdmin),
-      insertCustomer: async (connection, no, name) => {
-        if (connection === 'pg') await pgAdmin`insert into sales.customer (tenant_id, customer_no, name) values (1, ${no}, ${name})`
-        else
-          await msAdmin
-            .request()
-            .input('no', mssql.Int, no)
-            .input('name', mssql.NVarChar(200), name)
-            .query('insert into sales.customer (tenant_id, customer_no, name) values (1, @no, @name)')
-      },
-      deleteCustomer: async (connection, no) => {
-        if (connection === 'pg') await pgAdmin`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`
-        else await msAdmin.request().input('no', mssql.Int, no).query('delete from sales.customer where tenant_id = 1 and customer_no = @no')
-      },
-      insertOrders: async (connection, count, notes) => {
-        if (connection === 'pg') {
-          await pgAdmin`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, notes) select 1, 1001, date '2026-10-08', 'placed', 1, ${notes} || ' ' || n from generate_series(1, ${count}) as n`
-          return
-        }
-        await msAdmin
-          .request()
-          .input('count', mssql.Int, count)
-          .input('notes', mssql.NVarChar(200), notes)
-          .query(
-            "insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, notes) select 1, 1001, '2026-10-08', 'placed', 1, concat(@notes, ' ', value) from generate_series(1, @count)",
-          )
-      },
-      insertApprovedOrder: async (connection, approver, creator = null) => {
-        if (connection === 'pg') {
-          const [row] = await pgAdmin<
-            Array<{ id: string }>
-          >`insert into sales."order" (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) values (1, 1001, date '2026-10-08', 'placed', 1, ${approver}, ${creator}) returning id::text as id`
-          return `k1:${String(row?.id)}`
-        }
-        const result = await msAdmin
-          .request()
-          .input('approver', mssql.Int, approver)
-          .input('creator', mssql.Int, creator)
-          // Into a table variable: SQL Server refuses an OUTPUT without INTO
-          // on a table with an enabled trigger (334), and the run's setup adds
-          // one to the orders (test-databases.ts, 0156).
-          .query<{ id: string }>(
-            "declare @made table (id bigint); insert into sales.[order] (tenant_id, customer_no, order_date, status, amount, approved_by, created_by) output inserted.id into @made values (1, 1001, '2026-10-08', 'placed', 1, @approver, @creator); select cast(id as nvarchar(40)) as id from @made",
-          )
-        return `k1:${String(result.recordset[0]?.id)}`
-      },
-      referToRemovable: async (connection, record) => {
-        const id = Number(record.slice('k1:'.length))
-        if (connection === 'pg') await pgAdmin`insert into parity.removable_child (removable_id, note) values (${id}, 'refers to it')`
-        else await msAdmin.request().input('id', mssql.Int, id).query("insert into parity.removable_child (removable_id, note) values (@id, N'refers to it')")
-      },
-      deleteOrder: async (connection, record) => {
-        const id = record.slice('k1:'.length)
-        if (connection === 'pg') await pgAdmin`delete from sales."order" where id = ${id}::bigint`
-        else await msAdmin.request().input('id', mssql.BigInt, id).query('delete from sales.[order] where id = @id')
-      },
-      countOrders: async (connection, notes) => {
-        if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from sales."order" where notes = ${notes}`)[0]?.n ?? 0
-        const result = await msAdmin
-          .request()
-          .input('notes', mssql.NVarChar(mssql.MAX), notes)
-          .query<{ n: number }>('select count(*) as n from sales.[order] where notes = @notes')
-        return result.recordset[0]?.n ?? 0
-      },
+      ...actionDb(pgAdmin, msAdmin),
+      ...orderDb(pgAdmin, msAdmin),
     },
     close: async () => {
       await Promise.allSettled([...pending])
