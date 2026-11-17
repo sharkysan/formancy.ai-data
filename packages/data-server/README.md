@@ -118,6 +118,12 @@ existed would be documented and inert.
   publication and drift, for a host token holding an administrator role
   ([0020](../../docs/decisions/0020-administration-is-a-separate-plane.md)).
   Registered only when the server is given a registry, a store and those roles.
+  `GET /v1/connections/:id/metadata?routines=true` discovers with the
+  routines in scope as well; without the query the snapshot is the one it
+  always was, and any other value of `routines` is 400 `invalid-request`
+  before anything is discovered
+  ([0158](../../docs/decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md),
+  [0163](../../docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
   Since [0030](../../docs/decisions/0030-presentation-is-a-patch-over-the-generated-base.md):
   `GET /v1/forms/:id/versions` and `GET /v1/forms/:id/versions/:n` list and
   read versions, each validated as the latest is; `POST
@@ -276,7 +282,11 @@ existed would be documented and inert.
   the bundle check, a format-1 bundle binding one is not served, and a
   proposal naming one is discovered with the routines in scope -- as drift
   review, a regeneration, a restore and an import are of a version whose
-  snapshot recorded them.
+  snapshot recorded them. The bundle check also holds each action's dialog,
+  its presentation's words applied, to formancy's validator, on publish and
+  on every read, as it holds the form: help text past formancy's length
+  makes a dialog no renderer draws, and is refused for every client
+  ([0163](../../docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 
   A lookup's statement stops when its request is abandoned or its deadline
   passes ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). The route passes the adapter a signal that aborts

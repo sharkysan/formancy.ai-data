@@ -15,7 +15,12 @@
   the administrator's trail (watched failing with the query ignored:
   "expected [ { schemas: [ 'sales' ] }, …(1) ] to deeply equal [ Array(2)
   ]"; and with any value read as a yes: "?routines=false: expected [ 200,
-  undefined ] to deeply equal [ 400, 'invalid-request' ]").
+  undefined ] to deeply equal [ 400, 'invalid-request' ]"); and a version
+  whose action words make a dialog formancy's validator refuses -- help
+  text past its length -- is refused by the bundle check, on publish and
+  on every read, in the studio's sentence (watched failing with the
+  dialogs left unvalidated: "expected [] to deeply equal [
+  StringMatching{…} ]").
   `packages/data-core/src/generate/actions.test.ts` -- `sourceProblem`,
   asked of one parameter and one source, answers null exactly where the
   generator binds the action with that source and otherwise the rule its
@@ -53,22 +58,46 @@
   candidate offered: "expected [ 'Nothing yet', 'Key id', …(10) ] to not
   include 'Key id'", and with the note left out); a name the generator
   throws is said in its words as it is typed (watched failing with the
-  throw unasked); and what is chosen is sent and bound (watched failing
-  with `actions` left out of `proposalFor`).
+  throw unasked); what is chosen is sent and bound (watched failing with
+  `actions` left out of `proposalFor`); an action over a routine no longer
+  recorded stays ticked, and unticked by Space leaves the keyboard on the
+  box before it (watched failing with it left where the box was: "expected
+  'the page itself' to be 'Offer sales.ship_order(…'"); one the generator
+  now refuses, unticked, leaves it on the Actions group rather than on a
+  disabled box (watched failing with it left on the box); and on a
+  discovery without routines a chosen action stays listed, is sent while
+  ticked and is unticked there (watched failing with it unlisted: "Unable
+  to find an accessible element with the role "checkbox"").
   `apps/studio/src/actions.test.ts` -- a name starts as the routine's, as
   a URL carries it, apart from the names taken (watched failing with the
   taken names unasked); the parameters keep the routine's order (watched
-  failing with a source appended as chosen); and a routine is described
-  as its engine says it (watched failing with its reach left out).
+  failing with a source appended as chosen); a routine is described as
+  its engine says it (watched failing with its reach left out); a source
+  chosen that the generator now refuses stays offered, last where it is
+  no candidate (watched failing with it unasked: "expected [
+  'field:tenant_id', …(6) ] to include 'field:amount'"); a parameter
+  named `in` is asked as `in_` and bound (watched failing with the name
+  used as it is: "input "in" is not a field key formancy accepts"); and a
+  routine no run could call is refused while the rest of the choice is
+  (watched failing with nothing said where the request without actions
+  throws).
   `apps/studio/src/policy-actions.test.tsx` -- the notice says what applies
   to the routine and the engine, and no more (watched failing with each
-  of its three conditions forced in turn); the roles typed are the grant,
+  of its three conditions forced in turn), comes before its grant and is
+  read with the grant's box (watched failing with the grant drawn first:
+  "expected +0 to be truthy", and with the box described by nothing); the
+  roles typed are the grant,
   refused in `validatePolicy`'s words where they may not read, and an
   emptied list leaves `actions` out of the policy (watched failing with
   it kept: the published policy had `actions`); and a grant left from a
   generation that bound the action is removed by its button, the
   keyboard on the policy check (watched failing with the stray grants
-  left out of the fieldset).
+  left out of the fieldset); and Generate again keeps an action's words
+  by its name, and of one renamed on the Choose step drops them, said
+  among what was not carried, its grant left to remove (watched failing
+  with the words left out of the draft Generate again makes, and of what
+  `carryDraft` rebases: "expected <input …(3)></input> to have property
+  "value" with value 'Ship it'").
   `apps/studio/src/action-words.test.ts` -- a label, a sentence, the views
   and a question's words are kept only where they say something the
   generator's do not, in the server's one spelling (watched failing with
@@ -80,7 +109,10 @@
   on the Presentation step, and what they make publishes beside a binding
   the proposal's to the byte (watched failing with a select of the routine
   added to the panel, and with the words applied to the bindings' dialog:
-  the server refused the bundle).
+  the server refused the bundle); and what the step says the server
+  refuses of the words, the server's bundle check refuses in the same
+  sentence (watched failing with the step's worded otherwise: "expected [
+  Array(1) ] to deeply equal [ Array(1) ]").
   `apps/studio/src/drift.test.tsx` -- each action is said under what the
   form may still do, the routines' comparison above it, and one only
   review stops is said as the server still allowing it (watched failing
@@ -167,9 +199,12 @@ but the rule for a trusted attribute and the actor's id was not.
    `sourceProblem`, the generator's own rule for one parameter and one
    source, now exported, says nothing. A key column is offered as the key
    alone, which any reader may pass. A source chosen that the generator
-   now refuses stays listed, so its refusal can be answered. The dialog
-   field an answer fills takes its key from the parameter's name, without
-   SQL Server's `@`; its words are the Presentation step's.
+   now refuses -- a column of another type, or one no longer bound --
+   stays listed, so its refusal can be answered. The dialog field an
+   answer fills takes formancy's field key for the parameter's name
+   without SQL Server's `@`, by the generator's own rule, `fieldKeyFor`,
+   now exported: `in` is asked as `in_`; its words are the Presentation
+   step's.
 4. **The action as mapped is the generator's to judge.** The generator
    runs in the browser on the request the step would send, as the server
    runs it on a proposal: its blocked note about an action -- a parameter
@@ -178,8 +213,14 @@ but the rule for a trusted attribute and the actor's id was not.
    URL carries, two of one name -- is said under the fieldset. The
    request carries `actions` only where one is chosen, in the snapshot's
    order of their routines; a regeneration taken up, and Generate again,
-   keep them, and a routine no longer recorded stays listed with its box
-   ticked, to be unticked.
+   keep them. An action chosen over a routine the snapshot no longer
+   records, or over any once the connection is discovered again without
+   them, stays listed with its box ticked, to be unticked, since the
+   request still names it and the server, discovering the routines for
+   it, binds it. An untick that takes a box away, or leaves it disabled
+   -- a routine the generator now refuses -- puts the keyboard on the next
+   box that can be pressed, else the one before, else the Actions group,
+   never on the page.
 5. **Who may run it is granted on the Policy step, after what it does is
    said.** "Who may run each action" holds a list of roles per action the
    form binds, nobody's until one is typed; an emptied list is no entry,
@@ -190,8 +231,9 @@ but the rule for a trusted attribute and the actor's id was not.
    in its words, and the Publish step waits on it. A grant for an action
    the form no longer binds is listed to be removed, and the keyboard goes
    to the policy check once the last is. Before each grant, as 0052 says
-   what a delete also does, a note says what the module neither sees nor
-   bounds, each line where it applies: it calls this routine over the open
+   what a delete also does, and read with the grant's box, so a screen
+   reader that tabs to it hears it, a note says what the module neither
+   sees nor bounds, each line where it applies: it calls this routine over the open
    record after moving the version, in one transaction, and cannot see
    what the routine does; field grants, state moves and the policy's
    cascades do not bind it; over a version column, a routine writing
@@ -209,9 +251,12 @@ but the rule for a trusted attribute and the actor's id was not.
    the generator's words do not, in the bindings' and the dialog's order
    -- and what the server's shape and fit checks, or formancy's validator
    over the dialog a page is served, refuse of it is said there, and the
-   Publish step waits on it. The bundle sends it as
-   `presentation.actions`, and leaves the bindings as the generator wrote
-   them.
+   Publish step waits on it. The last is the server's too: its bundle
+   check, on publish and on every read, holds each action's dialog, its
+   words applied, to formancy's validator, as it holds the form, so a
+   dialog no renderer draws is refused for every client, in the sentence
+   the studio says. The bundle sends it as `presentation.actions`, and
+   leaves the bindings as the generator wrote them.
 7. **The Drift step says what each action may still do.** Under what the
    published form may still do, "Run *name*: still allowed" or "blocked by
    the changes below", from the verdict's own list (0159); an action
@@ -241,10 +286,13 @@ disagree about what will publish.
 - **The notice asks for nothing.** It is drawn beside the grant, and no
   box records that it was read: the policy holds no acknowledgement, and
   a box that wrote nothing would only look like one.
-- **An answer's dialog field is keyed by its parameter's name**, without
-  `@`, and is not chosen: a parameter whose name formancy does not accept
-  as a field key cannot be asked in a dialog, and the generator's throw
-  says so.
+- **An answer's dialog field is keyed by its parameter's name**, as
+  formancy's field key for it, and is not chosen: two parameters whose
+  names give one key -- `in` and `in_` -- cannot both be asked in one
+  dialog, and the generator's note says so.
+- **The bundle check validates each action's dialog** on every read, as
+  it validates the form: unmeasured, and a dialog formancy refuses is a
+  version not served, as a form it refuses is.
 - **An action is named by the administrator, and a name is its identity.**
   Renamed on the Choose step, it is another action: its words are dropped
   by the rebase and its grant is left as a stray for the Policy step to
@@ -314,4 +362,5 @@ action does that nothing binds, as it says what a delete also does);
 0158 (the administrator plane's discovery asks for the routines when the
 studio does); 0159 (the studio binds, grants, words and reviews what it
 decides); and 0161 (an action is published by the studio, where its
-costs said only a client writing its own request could).
+costs said only a client writing its own request could, and the bundle
+check holds the dialog its words make to formancy's validator).

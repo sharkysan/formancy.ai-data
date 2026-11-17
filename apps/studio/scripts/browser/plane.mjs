@@ -22,8 +22,10 @@ export const snapshot = (name) => JSON.parse(readFileSync(join(APP, 'src', 'fixt
 /**
  * A captured database with the fixture's routines in it, as its account's
  * discovery reports them when its scope asks (0158, 0163): the suite's
- * `withRoutines` (src/test-server.ts), from the same file, which
- * src/fixtures.test.ts holds to the model both adapters answer to.
+ * `withRoutines` (src/test-routines.ts), from the same file, which
+ * src/fixtures.test.ts holds to the model both adapters answer to. This
+ * copy, and `withoutRoutines` below, are held to the suite's by review
+ * alone: nothing compares the two.
  */
 export function withRoutines(name) {
   const { fingerprint: _, ...contents } = snapshot(name)

@@ -634,9 +634,9 @@ An action is offered only from a discovery made with Include routines
 ticked, which it is not when the Connect step opens; the Choose step then
 lists every routine in scope, the ones no run could call too, however
 many, and runs the generator again on every change to the choice,
-unmeasured. A dialog question is keyed by its parameter's name, unchosen,
-so a parameter whose name formancy refuses as a field key cannot be
-asked; an action renamed is another action, its words dropped and its
+unmeasured. A dialog question is keyed by formancy's field key for its
+parameter's name, unchosen, so two parameters whose names give one key
+cannot both be asked; an action renamed is another action, its words dropped and its
 grant left to remove; and the note of what an action does is drawn beside
 its grant and asks for no acknowledgement. The studio's suite discovers
 routines made from the shared model, not captured, held by the

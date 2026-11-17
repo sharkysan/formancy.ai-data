@@ -64,7 +64,7 @@ function stillAllowedByServer(drift: Drift, offered: { create: boolean; update: 
     ...(!drift.readable && runtime.readable ? ['read'] : []),
     ...(['create', 'update'] as const).filter((operation) => offered?.[operation] !== false && !drift.writable[operation] && runtime.writable[operation]),
     ...(deleting && !drift.writable.delete && runtime.writable.delete ? ['delete'] : []),
-    ...(runtime.actions ?? []).filter((name) => drift.actions?.includes(name) !== true).map((name) => `run ${name}`),
+    ...(runtime.actions ?? []).filter((name) => drift.actions?.includes(name) !== true).map((name) => `running ${name}`),
   ]
 }
 

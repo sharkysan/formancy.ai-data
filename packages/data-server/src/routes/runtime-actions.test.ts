@@ -29,6 +29,7 @@ import { actionDeadlineSetting, DEFAULT_ACTION_DEADLINE_MS } from '../action-dea
 import { createDataServer } from '../app.js'
 import type { AuditSink, RuntimeAuditEvent } from '../audit.js'
 import { recordReference } from '../audit.js'
+import { validateBundle } from '../bundle.js'
 import type { BundleV2 } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
@@ -612,6 +613,25 @@ describe('a form published with actions', () => {
     ])
   })
 
+  // A page is served an action's dialog with the presentation's words
+  // applied, and a word formancy's validator refuses -- help text past the
+  // 300 characters it holds -- makes a dialog no renderer draws: refused
+  // by the bundle check, on publish and on every read, for every client,
+  // as a form formancy refuses is, and in the sentence the studio says
+  // before it sends one (0163). Watched failing with the dialogs left
+  // unvalidated: "expected [] to deeply equal [ StringMatching{…} ]".
+  test('is served only where every dialog its words make is one formancy’s validator accepts', async () => {
+    const good = bundle()
+    const words = [{ action: 'close', inputs: [{ input: 'note', description: 'x'.repeat(301) }] }]
+    const worded = { ...good, presentation: { ...good.presentation, actions: words } }
+    expect(validateBundle({ ...worded, presentation: { ...good.presentation, actions: [{ action: 'close', label: 'Close it' }] } }).ok).toBe(true)
+    const checked = validateBundle(worded)
+    expect(checked.ok ? [] : checked.problems).toEqual([expect.stringMatching(/^presentation: the dialog of close, at \/model\/fields\/0\/description: /)])
+    await store.publish('worded', null, worded)
+    const response = await app.inject({ method: 'GET', url: '/v1/forms/worded', headers: as('clerk') })
+    expect([response.statusCode, response.json().code]).toEqual([500, 'corrupt-bundle'])
+  })
+
   // A request may name an action's parameters in any order, and the
   // generator binds them in the routine's: the bundle check compares the
   // two as sets, so a version whose request listed them otherwise is
@@ -666,6 +686,31 @@ describe('a form published with actions', () => {
     }
   })
 
+  // A form discovered with routines is discovered with them again
+  // wherever a version of it is compared with the database: drift review,
+  // a regeneration, a restore and an import's gate -- the last of which is
+  // also a draft's under review. Without them every action would be found
+  // unknown and blocking, a regeneration would bind none, and no version
+  // with an action could pass the gate. Watched failing with each of the
+  // four discovering as every other, in turn: its scope asked for no
+  // routine.
+  test('is discovered with its routines by review, a regeneration, a restore and an import', async () => {
+    const admin = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
+    try {
+      const post = (url: string, body: unknown = {}) => admin.inject({ method: 'POST', url, headers: as('admin'), payload: body as Record<string, unknown> })
+      expect((await post('/v1/forms/order/drift')).statusCode).toBe(200)
+      expect((await post('/v1/forms/order/regenerations')).statusCode).toBe(200)
+      expect((await post('/v1/forms/order/restorations', { version: 1, expectedBase: 1 })).statusCode).toBe(201)
+      const imported = await post('/v1/forms/order/imports', { expectedBase: 2, bundle: bundle() })
+      expect(imported.statusCode, imported.body).toBe(201)
+      expect(scopes).toEqual(Array.from({ length: 4 }, () => ({ schemas: ['sales'], routines: true })))
+    } finally {
+      await admin.close()
+    }
+  })
+})
+
+describe('GET /v1/connections/:id/metadata?routines=true', () => {
   // The studio's "Include routines" (0163): a connection's discovery asks
   // for the routines in scope with `routines=true`, and otherwise is the
   // one it always was, so a page that never asks reads the snapshot it
@@ -674,7 +719,7 @@ describe('a form published with actions', () => {
   // names it as every discovery. Watched failing with the query ignored:
   // the scope asked for no routine, so the Choose step had none to offer;
   // and with any value read as a yes: `routines=false` discovered them.
-  test('is discovered with the routines for the studio when it asks, and only then', async () => {
+  test('discovers with the routines in scope when the studio asks, and only then', async () => {
     const trail: Array<Record<string, unknown>> = []
     const admin = await createDataServer({
       verifyIdentity,
@@ -708,29 +753,6 @@ describe('a form published with actions', () => {
         ['discovery', 400],
         ['discovery', 400],
       ])
-    } finally {
-      await admin.close()
-    }
-  })
-
-  // A form discovered with routines is discovered with them again
-  // wherever a version of it is compared with the database: drift review,
-  // a regeneration, a restore and an import's gate -- the last of which is
-  // also a draft's under review. Without them every action would be found
-  // unknown and blocking, a regeneration would bind none, and no version
-  // with an action could pass the gate. Watched failing with each of the
-  // four discovering as every other, in turn: its scope asked for no
-  // routine.
-  test('is discovered with its routines by review, a regeneration, a restore and an import', async () => {
-    const admin = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
-    try {
-      const post = (url: string, body: unknown = {}) => admin.inject({ method: 'POST', url, headers: as('admin'), payload: body as Record<string, unknown> })
-      expect((await post('/v1/forms/order/drift')).statusCode).toBe(200)
-      expect((await post('/v1/forms/order/regenerations')).statusCode).toBe(200)
-      expect((await post('/v1/forms/order/restorations', { version: 1, expectedBase: 1 })).statusCode).toBe(201)
-      const imported = await post('/v1/forms/order/imports', { expectedBase: 2, bundle: bundle() })
-      expect(imported.statusCode, imported.body).toBe(201)
-      expect(scopes).toEqual(Array.from({ length: 4 }, () => ({ schemas: ['sales'], routines: true })))
     } finally {
       await admin.close()
     }

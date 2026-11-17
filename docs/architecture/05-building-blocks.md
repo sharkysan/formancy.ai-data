@@ -253,7 +253,7 @@ runtime plane only when given a registry and a store.
 | `drivers.ts` | `DRIVER_FACTORIES`, the one place the server meets the adapters: per engine, its connection opened through the adapter's own connect function, as a SQL login or, on SQL Server, an Entra principal, one login object for each connection while its secret is the same (0074), pinged, and its ports made (0025); actions on a client of their own, each named `formancy-data actions` to its database, SQL Server's sized at `SQLSERVER_ACTION_POOL`, mssql's default, since mssql reports no bound (0160), which `drivers.integration.test.ts` holds against both engines |
 | `connections.ts` | The operator's allowlist, every problem at once, and `createConnectionRegistry`, the only place a connection's name becomes a database ([0019](../decisions/0019-a-published-form-is-checked-every-time-it-is-read.md)). An entry logs in as a SQL login or as an Entra principal, and refuses a key it does not read (0074) |
 | `config-store.ts` | `<root>/<id>/<version>.json`, compare-and-swap by hard link (0013); `drafts()` beside it under review; `people(person)` beside it, a person's own views, each form's newest version alone ([0126](../decisions/0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md)) |
-| `bundle.ts`, `bundle-format2.ts`, `served-schema.ts`, `generation.ts` | `validateBundle`, on publish and on every read (0019): the form in the spec version the generator writes (0042), the fingerprint, the bindings, the policy, and in format 2 the base with its presentation (0030); a lookup saved with its record and a touch column compared with the request, held to what a save can hold, and refused in format 1 (0155) |
+| `bundle.ts`, `bundle-format2.ts`, `served-schema.ts`, `generation.ts` | `validateBundle`, on publish and on every read (0019): the form in the spec version the generator writes (0042), the fingerprint, the bindings, the policy, and in format 2 the base with its presentation (0030); a lookup saved with its record and a touch column compared with the request, held to what a save can hold, and refused in format 1 (0155); each action's dialog, its words applied, against formancy's validator (0163) |
 | `published.ts` | `loadPublished` and `loadVersion`: one read, validated, for both planes |
 | `publishing.ts`, `reassigned.ts` | What a version must be to be written and what the database must be to serve it, shared by publish, restore and import ([0062](../decisions/0062-a-published-version-moves-between-deployments-as-its-version-file.md)); the keys a publish must confirm (0039); on SQL Server a together child's `max` rows within one batch, at a write alone (0155) |
 | `governance.ts`, `drafts.ts`, `publisher-roles.ts` | Publication under review ([0065](../decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)): `GRANTS` classifies every administrator operation and `refusalFor` is the one decision; each form's drafts are numbered entries beside its versions, their state derived on every read; the setting that turns review on |
@@ -474,8 +474,8 @@ words before anything is sent
 `src/connect.tsx`'s Include routines asks the discovery for the routines
 in scope, which `src/metadata.tsx` lists, `src/choose-actions.tsx`
 offers each as an action over the open record, ticking none, with
-`src/actions.ts` asking data-core's `routineProblem`, `actionUnoffered`
-and `sourceProblem` and the generator itself, in the browser, what each
+`src/actions.ts` asking data-core's `routineProblem`, `actionUnoffered`,
+`sourceProblem` and `fieldKeyFor` and the generator itself, in the browser, what each
 refuses, `src/policy-actions.tsx` grants each after a note of what it
 does that nothing binds, `src/presentation-actions.tsx` and
 `src/action-words.ts` hold its words to the server's spelling, and

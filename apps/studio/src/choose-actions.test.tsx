@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import { computeAccessibleDescription } from 'dom-accessibility-api'
+import { createSnapshot } from '@formancy/data-core'
+import type { RoutineMeta } from '@formancy/data-core'
 import { OFFER_SHIP_ORDER, SHIP_ORDER, SOURCE_OF, chooseShipping, discoverRoutines } from './test-actions.js'
-import { audit, discover, offerOnly, signIn, step, unnamed } from './test-studio.js'
+import { audit, discover, focusedName, goTo, offerOnly, signIn, step, unnamed } from './test-studio.js'
 import type { User } from './test-studio.js'
-import { startPlane } from './test-server.js'
+import { OWNER_ROUTINES, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -37,6 +39,21 @@ async function choose(user: User, connection: string, root = 'sales.order', fore
 }
 
 const actions = (here: HTMLElement) => within(here).getByRole('group', { name: 'Actions' })
+
+/** The owner's database with its routines as `change` leaves them: what the fixture's next discovery reads. */
+function routinesNow(change: (routine: RoutineMeta) => RoutineMeta): void {
+  const { fingerprint: _, ...contents } = structuredClone(OWNER_ROUTINES)
+  plane.databases.set('fixture', createSnapshot({ ...contents, routines: (contents.routines ?? []).map(change) }))
+}
+
+/** ship_order's order_id, a bigint, as the owner's discovery reads it. */
+const SHIP_ORDER_PARAMETER = (): RoutineMeta['parameters'][number] => OWNER_ROUTINES.routines?.[0]?.parameters[0] as RoutineMeta['parameters'][number]
+
+/** Space on `box`, as the keyboard unticks it. */
+async function pressSpace(user: User, box: HTMLElement): Promise<void> {
+  box.focus()
+  await user.keyboard(' ')
+}
 const offered = (select: HTMLElement) =>
   within(select)
     .getAllByRole<HTMLOptionElement>('option')
@@ -205,5 +222,92 @@ describe('an action chosen', () => {
     await user.click(within(step('Choose')).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     expect(plane.requests.findLast((request) => request.path === '/v1/form-proposals')?.body).not.toHaveProperty('actions')
+  })
+
+  // The fixture's ship_order taken out and one of another signature put
+  // in, as an overload replaced: the action chosen over the old one stays
+  // listed, ticked, saying its routine is gone in the generator's words,
+  // since the request still names it; and Space, unticking it, takes its
+  // box away and leaves the keyboard on the box before it, never on the
+  // page. Watched failing with the keyboard left where the box was:
+  // "expected 'the page itself' to be 'Offer sales.ship_order(pg_catalog.int…'".
+  test('over a routine no longer recorded stays ticked, and unticked leaves the keyboard on the box before it', async () => {
+    const user = await signIn(plane)
+    await chooseShipping(user)
+    const bigint = SHIP_ORDER_PARAMETER()
+    routinesNow((routine) => ({
+      ...routine,
+      ref: { ...routine.ref, signature: 'pg_catalog.int8, pg_catalog.int8' },
+      parameters: routine.parameters.map((parameter) => ({ ...bigint, name: parameter.name })),
+    }))
+    await goTo(user, 'Connect')
+    await discoverRoutines(user)
+    const here = await goTo(user, 'Choose')
+    const gone = within(here).getByRole<HTMLInputElement>('checkbox', { name: OFFER_SHIP_ORDER })
+    expect(gone.checked).toBe(true)
+    expect(computeAccessibleDescription(gone)).toBe(
+      `ship-order: this connection’s routines no longer include it. Action ship-order is not offered: ${SHIP_ORDER} is not in the snapshot.`,
+    )
+    await pressSpace(user, gone)
+    expect(within(here).queryByRole('checkbox', { name: OFFER_SHIP_ORDER })).toBeNull()
+    expect(focusedName()).toBe('Offer sales.ship_order(pg_catalog.int8, pg_catalog.int8) as an action')
+  })
+
+  // EXECUTE taken back, as drift review finds it: the action chosen keeps
+  // its box, ticked and enabled to be unticked, with the generator's
+  // refusal of the routine and its note under the action; unticked, the
+  // box is disabled, and the keyboard goes to the Actions group rather
+  // than staying on a box it cannot press. Watched failing with the
+  // keyboard left on it: "expected 'Offer sales.ship_order(pg_catalog.int…'
+  // to be 'Actions'".
+  test('over a routine the generator now refuses is unticked with the keyboard kept in its group', async () => {
+    const user = await signIn(plane)
+    await chooseShipping(user)
+    routinesNow((routine) => ({ ...routine, executable: false }))
+    await goTo(user, 'Connect')
+    await discoverRoutines(user)
+    const here = await goTo(user, 'Choose')
+    const box = within(here).getByRole<HTMLInputElement>('checkbox', { name: OFFER_SHIP_ORDER })
+    expect([box.checked, box.disabled]).toEqual([true, false])
+    expect(computeAccessibleDescription(box)).toContain(`The generator refuses it: this connection's account may not execute ${SHIP_ORDER}.`)
+    expect(within(actions(here)).getByText(/^Action ship-order is not offered: this connection's account may not execute/)).toBeTruthy()
+    await pressSpace(user, box)
+    expect([box.checked, box.disabled]).toEqual([false, true])
+    expect(focusedName()).toBe('Actions')
+  })
+
+  // The same connection discovered again without Include routines keeps
+  // the choice, and the request still names the action, which the server
+  // discovers the routines for and binds: so the step lists it, ticked,
+  // saying so, rather than offering no action while Generate sends one;
+  // and unticked by Space, it is sent no more, the keyboard in the Actions
+  // group. Watched failing with the chosen actions left unlisted on a
+  // snapshot without routines: "Unable to find an accessible element with
+  // the role "checkbox" and name "Offer sales.ship_order(…) as an action".
+  test('on a discovery without routines stays listed, is sent while ticked, and is unticked there', async () => {
+    const user = await signIn(plane)
+    await chooseShipping(user)
+    await goTo(user, 'Connect')
+    expect(screen.getByRole<HTMLInputElement>('checkbox', { name: 'Include routines' }).checked).toBe(false)
+    await discover(user)
+    const here = await goTo(user, 'Choose')
+    expect(within(actions(here)).getByText(/^fixture was discovered without its routines/)).toBeTruthy()
+    const box = within(here).getByRole<HTMLInputElement>('checkbox', { name: OFFER_SHIP_ORDER })
+    expect(box.checked).toBe(true)
+    expect(computeAccessibleDescription(box)).toBe(
+      'ship-order: still chosen, and sent with the request, which the server discovers with the routines to bind it: this discovery did not read them.',
+    )
+    await user.click(within(here).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const proposed = () => plane.requests.findLast((request) => request.path === '/v1/form-proposals')?.body as { actions?: Array<{ name: string }> }
+    expect(proposed().actions?.map((action) => action.name)).toEqual(['ship-order'])
+    expect(step('Generate').textContent).toContain(`Runs ${SHIP_ORDER} over the open record`)
+
+    const again = await goTo(user, 'Choose')
+    await pressSpace(user, within(again).getByRole('checkbox', { name: OFFER_SHIP_ORDER }))
+    expect(focusedName()).toBe('Actions')
+    await user.click(within(again).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    expect(proposed()).not.toHaveProperty('actions')
   })
 })

@@ -443,7 +443,7 @@ describe('a published form’s actions (0163)', () => {
       .map((item) => item.textContent)
     expect(still).toContain('Run ship-order: blocked by the changes below')
     expect(still.find((line) => line?.startsWith('The server still allows'))).toMatch(
-      /^The server still allows run ship-order: what blocks it is a change it does not compare/,
+      /^The server still allows running ship-order: what blocks it is a change it does not compare/,
     )
     expect(await audit()).toEqual([])
   })

@@ -4918,7 +4918,7 @@
       ]
     },
     "0163": {
-      "reviewed": "sha256:52f70a74ef5073edace50d83d4dd603a07a72a06cc4a7142f120f88563486ae2",
+      "reviewed": "sha256:a4aa7eab5e965428edf9c7a0de99262ee58dbf506782382801b34661d170b803",
       "limitations": [
         {
           "area": "studio",
@@ -4932,7 +4932,7 @@
         },
         {
           "area": "studio",
-          "says": "A parameter asked in an action’s dialog is keyed by its name without SQL Server’s @, which is not chosen: one whose name formancy refuses as a field key cannot be asked."
+          "says": "A parameter asked in an action’s dialog is keyed by formancy’s field key for its name, which is not chosen: two parameters whose names give one key cannot both be asked in one dialog."
         },
         {
           "area": "studio",

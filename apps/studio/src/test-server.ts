@@ -15,7 +15,6 @@ import type {
   RecordAdapter,
   RecordFilter,
   ReferentialAction,
-  RoutineMeta,
   ServerFacts,
 } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
@@ -23,10 +22,10 @@ import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@
 import owner from './fixtures/postgres-owner.json'
 import reader from './fixtures/postgres-reader.json'
 import writer from './fixtures/postgres-writer.json'
-import routineFacts from './fixtures/routines.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
 import sqlserverWriter from './fixtures/sqlserver-writer.json'
+import { withoutRoutines, withRoutines } from './test-routines.js'
 
 /**
  * The real data server, behind a fake `fetch`, for the studio's suite.
@@ -76,35 +75,6 @@ export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
 export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
 /** SQL Server as the order form's own account, which reads no employee: what the getting-started guide's `ms` connection sees (0138). */
 export const SQLSERVER_WRITER_SNAPSHOT = readSnapshot(sqlserverWriter)
-
-/** A captured file, by its name, which `fixtures/routines.json` keys what its account's discovery reports of the routines by. */
-export type CapturedFile = keyof typeof routineFacts
-
-/**
- * A captured snapshot as its account's discovery reports it when its scope
- * asks for the routines too (0158): the fixture's `ship_order`, and on SQL
- * Server the security policy's predicate, each with whether the account
- * may execute it, and the gap where the account cannot see one. Made here,
- * from `fixtures/routines.json`, never captured: the captures were taken
- * before discovery read routines, and taking them again starts both
- * engines. fixtures.test.ts holds every fact `routineDisagreements` reads
- * -- the comparator both adapters' discovery suites answer to -- to the
- * shared model, and that without its routines each is the captured file
- * to the byte; the type ids, which it does not read, are each engine's
- * own for its built-in types.
- */
-export function withRoutines(base: MetadataSnapshot, file: CapturedFile): MetadataSnapshot {
-  const { fingerprint: _, ...contents } = structuredClone(base)
-  const facts = structuredClone(routineFacts[file]) as { routines: RoutineMeta[]; gaps: CoverageGap[] }
-  return createSnapshot({ ...contents, scope: { ...contents.scope, routines: true }, routines: facts.routines, gaps: [...contents.gaps, ...facts.gaps] })
-}
-
-/** `base` as a discovery whose scope does not ask for routines makes it (0158): no routine, and no gap about them. */
-export function withoutRoutines(base: MetadataSnapshot): MetadataSnapshot {
-  const { fingerprint: _, routines: _routines, scope, gaps, ...contents } = structuredClone(base)
-  const { routines: _asked, ...plain } = scope
-  return createSnapshot({ ...contents, scope: plain, gaps: gaps.filter((gap) => gap.aspect !== 'routines') })
-}
 
 /** Each captured database as it is, routines included: what a discovery that asks for them reads (0158). */
 export const OWNER_ROUTINES = withRoutines(OWNER_SNAPSHOT, 'postgres-owner.json')

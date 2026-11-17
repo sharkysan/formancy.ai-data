@@ -171,7 +171,10 @@ parameter a select starting at Nothing yet and offering only what the
 generator binds for its type: the record's key, a column of it, an answer
 in the action's dialog, a trusted attribute -- named, starting at
 `tenant` -- or the signed-in person's id. Until each has one, the
-generator's note under it says which is missing. On the Policy step,
+generator's note under it says which is missing. An action chosen stays
+listed, ticked, when its routine is no longer in the snapshot or the
+connection was discovered again without Include routines, since what you
+generate still names it: untick it there to leave it out. On the Policy step,
 "Roles that may run ship-order" is the grant, which needs read and not
 update, and above it a note says what the routine does that nothing here
 binds: it calls the routine after moving the record's version, field

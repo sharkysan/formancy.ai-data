@@ -48,11 +48,21 @@ the same day (formancy.ai 0232).
   alone, kept in the spelling the server reads and checked by formancy's
   validator before Publish sends them. On the Drift step, "Run *name*:
   still allowed" or blocked, and an action only review stops named among
-  what the server still allows. A regeneration taken up keeps the actions
-  and their words. Costs: every routine in scope is listed, the notice
-  asks for no acknowledgement, a dialog question is keyed by its
-  parameter's name, and an action renamed is another action, its grant
-  left to remove.
+  what the server still allows. A regeneration taken up and Generate
+  again keep the actions and their words, and an action chosen over a
+  routine the snapshot no longer records, or on a discovery made without
+  Include routines, stays listed, ticked, to be unticked, since the
+  request still names it. The bundle check now also holds each action's
+  dialog, its words applied, to formancy's validator, on publish and on
+  every read. Why: another client could publish help text past
+  formancy's length, a dialog no renderer draws, which the runtime plane
+  served; now every client is refused it, in the sentence the studio says
+  before it sends. data-core exports `fieldKeyFor` too, the key an
+  answer's dialog field takes from its parameter's name. Costs: every
+  routine in scope is listed, the notice asks for no acknowledgement, two
+  parameters whose names give one field key cannot both be asked, and an
+  action renamed is another action, its words dropped and its grant left
+  to remove.
 - **The studio offers a form's rows saved with their record, and a
   rowversion's touch column** (0155). Why: the generator, the bundle
   check, the route and the host page all held a child's rows saved with

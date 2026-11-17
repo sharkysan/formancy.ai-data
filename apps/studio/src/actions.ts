@@ -1,4 +1,4 @@
-import { actionUnoffered, generateForm, routineProblem, sourceProblem } from '@formancy/data-core'
+import { actionUnoffered, fieldKeyFor, generateForm, routineProblem, sourceProblem } from '@formancy/data-core'
 import type { ActionChoice, ActionGround, MetadataSnapshot, ObjectMeta, ParameterSource, RoutineMeta, RoutineParameter, RoutineRef } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
@@ -41,9 +41,14 @@ export function actionNameFor(routine: RoutineMeta, taken: readonly string[]): s
   return name
 }
 
-/** The dialog field a parameter asked of the person is: its name without SQL Server's `@`, which the generator labels in words. */
+/**
+ * The dialog field a parameter asked of the person is: formancy's field key
+ * for its name without SQL Server's `@`, by the generator's own rule
+ * (`fieldKeyFor`), which accepts no other -- so `in` is asked as `in_` and
+ * `"Ship Date"` as `_Ship_Date_`, each labelled in words from its key.
+ */
 export function inputFor(parameter: RoutineParameter): string {
-  return parameter.name.replace(/^@/, '')
+  return fieldKeyFor(parameter.name.replace(/^@/, ''))
 }
 
 /** The attribute a parameter given a trusted attribute starts with: the one tenant isolation uses, as a pin starts with. */
@@ -81,8 +86,9 @@ function sourceLabel(from: ParameterSource): string {
  * own rule for one source. A key column is offered as the key alone,
  * which any reader may pass, never again as a column the policy must let
  * them read. `current`, where the choice gives it one the generator now
- * refuses, stays listed, so the refusal said under the action can be
- * answered here.
+ * refuses -- a column of another type, or one no longer bound -- stays
+ * listed, last where it is no candidate, so the select still shows it and
+ * the refusal said under the action can be answered here.
  */
 export function sourceOptions(root: ObjectMeta, ground: ActionGround, parameter: RoutineParameter, current: ParameterSource | undefined): SourceOption[] {
   const key = ground.identity ?? []
@@ -93,8 +99,10 @@ export function sourceOptions(root: ObjectMeta, ground: ActionGround, parameter:
     { attribute: current !== undefined && 'attribute' in current ? current.attribute : STARTING_ATTRIBUTE },
     { actor: 'id' },
   ]
-  return candidates
-    .filter((from) => sourceProblem(root, ground, parameter, from) === null || (current !== undefined && sourceValue(current) === sourceValue(from)))
+  const chosen = current === undefined ? null : sourceValue(current)
+  const listed = chosen === null || candidates.some((from) => sourceValue(from) === chosen) ? candidates : [...candidates, current as ParameterSource]
+  return listed
+    .filter((from) => sourceProblem(root, ground, parameter, from) === null || sourceValue(from) === chosen)
     .map((from) => ({ value: sourceValue(from), label: sourceLabel(from), from }))
 }
 
@@ -129,15 +137,10 @@ function generated(snapshot: MetadataSnapshot, request: ProposalRequest): Return
  * without its actions; each routine, asked of `routineProblem`; and each
  * action as mapped, the generator's own blocked note on the whole request
  * -- or, where it throws, that sentence, which the server answers 422
- * with. Where the request without actions is refused itself, nothing is
- * said here.
+ * with. Where the request without actions is refused itself, only the
+ * routines' refusals are said, which rest on nothing else.
  */
 export function actionReasons(snapshot: MetadataSnapshot, root: ObjectMeta, request: ProposalRequest): ActionReasons {
-  const { actions = [], ...plain } = request
-  const base = generated(snapshot, plain)
-  if ('refused' in base) return NOTHING
-  const { identity, concurrency, fields } = base.bindings
-  const ground: ActionGround = { identity, concurrency, fields }
   const all = snapshot.routines ?? []
   const routines = new Map(
     all.flatMap((routine) => {
@@ -145,6 +148,11 @@ export function actionReasons(snapshot: MetadataSnapshot, root: ObjectMeta, requ
       return problem === null ? [] : [[routineKey(routine.ref), problem] as const]
     }),
   )
+  const { actions = [], ...plain } = request
+  const base = generated(snapshot, plain)
+  if ('refused' in base) return { ...NOTHING, routines }
+  const { identity, concurrency, fields } = base.bindings
+  const ground: ActionGround = { identity, concurrency, fields }
   const chosen = new Map<string, string>()
   let thrown: string | null = null
   if (actions.length > 0) {

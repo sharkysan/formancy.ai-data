@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ReactElement } from 'react'
 import { actionLabel } from '@formancy/data-core'
-import type { ActionBinding, ActionPresentation, ActionRefresh, FormBindings } from '@formancy/data-core'
+import type { ActionBinding, ActionInputPresentation, ActionPresentation, ActionRefresh, FormBindings } from '@formancy/data-core'
 import type { ActionEdit, InputEdit } from './action-words.js'
 import { actionWordsProblems, shown, withActionWords, withInputWords } from './action-words.js'
 
@@ -47,6 +47,50 @@ function WordsInput({
       <p id={`${id}-hint`} className="hint">
         {hint}
       </p>
+    </div>
+  )
+}
+
+/** One question of an action's dialog: its label and its help text, each the generator's until typed over. */
+function QuestionWords({
+  id,
+  name,
+  field,
+  words,
+  onInput,
+}: {
+  id: string
+  name: string
+  field: NonNullable<ActionBinding['dialog']>['model']['fields'][number]
+  words: ActionInputPresentation | undefined
+  onInput: (input: string, edit: InputEdit) => void
+}): ReactElement {
+  const help = words?.description === null ? '' : shown(words?.description ?? field.description)
+  return (
+    <div>
+      <WordsInput
+        id={`${id}-label`}
+        label={
+          <>
+            Label of {field.key} <span className="visually-hidden">in the {name} dialog</span>
+          </>
+        }
+        value={shown(words?.label ?? field.label)}
+        hint={`Empty, it is “${shown(field.label)}”, the generator’s.`}
+        onWords={(label) => onInput(field.key, { label })}
+      />
+      <WordsInput
+        id={`${id}-help`}
+        label={
+          <>
+            Help text of {field.key} <span className="visually-hidden">in the {name} dialog</span>
+          </>
+        }
+        value={help}
+        hint="Read under the question, and with it by a screen reader. Empty, there is none."
+        multiline
+        onWords={(description) => onInput(field.key, { description })}
+      />
     </div>
   )
 }
@@ -111,38 +155,16 @@ function ActionWords({
           </div>
         ))}
       </fieldset>
-      {(binding.dialog?.model.fields ?? []).map((field) => {
-        const words = entry?.inputs?.find((candidate) => candidate.input === field.key)
-        const at = `${id}-input-${field.key}`
-        const help = words?.description === null ? '' : shown(words?.description ?? field.description)
-        return (
-          <div key={field.key} className="placed">
-            <WordsInput
-              id={`${at}-label`}
-              label={
-                <>
-                  Label of {field.key} {hidden(`in the ${name} dialog`)}
-                </>
-              }
-              value={shown(words?.label ?? field.label)}
-              hint={`Empty, it is “${shown(field.label)}”, the generator’s.`}
-              onWords={(label) => onInput(field.key, { label })}
-            />
-            <WordsInput
-              id={`${at}-help`}
-              label={
-                <>
-                  Help text of {field.key} {hidden(`in the ${name} dialog`)}
-                </>
-              }
-              value={help}
-              hint="Read under the question, and with it by a screen reader. Empty, there is none."
-              multiline
-              onWords={(description) => onInput(field.key, { description })}
-            />
-          </div>
-        )
-      })}
+      {(binding.dialog?.model.fields ?? []).map((field) => (
+        <QuestionWords
+          key={field.key}
+          id={`${id}-input-${field.key}`}
+          name={name}
+          field={field}
+          words={entry?.inputs?.find((candidate) => candidate.input === field.key)}
+          onInput={onInput}
+        />
+      ))}
     </fieldset>
   )
 }

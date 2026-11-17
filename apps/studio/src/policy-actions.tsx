@@ -23,12 +23,12 @@ function moved(binding: ActionBinding): string {
  * must move theirs; on SQL Server a RETURN status other than 0 refuses the
  * run; and a routine that reaches past its caller's grants does.
  */
-function Notice({ binding, snapshot, root }: { binding: ActionBinding; snapshot: MetadataSnapshot; root: string }): ReactElement {
-  const id = `action-${binding.name}-notice`
+function Notice({ id, binding, snapshot, root }: { id: string; binding: ActionBinding; snapshot: MetadataSnapshot; root: string }): ReactElement {
+  const heading = `${id}-heading`
   const routine = snapshot.routines?.find((candidate) => sameRoutine(candidate.ref, binding.routine))
   return (
-    <div className="notice" role="note" aria-labelledby={id}>
-      <p id={id}>
+    <div className="notice" role="note" id={id} aria-labelledby={heading}>
+      <p id={heading}>
         <strong>What {binding.name} does is the deployment&rsquo;s</strong>
       </p>
       <ul>
@@ -47,7 +47,7 @@ function Notice({ binding, snapshot, root }: { binding: ActionBinding; snapshot:
         ) : null}
         {snapshot.kind === 'sqlserver' ? (
           <li>
-            A RETURN status other than 0 refuses the run, which is rolled back: a procedure that returns one for any other reason is refused on its first run.
+            A RETURN status other than 0 refuses the run, which is rolled back: a procedure that returns one for any other reason is refused whenever it does.
           </li>
         ) : null}
         {routine?.reach === 'owner' ? (
@@ -66,7 +66,9 @@ function Notice({ binding, snapshot, root }: { binding: ActionBinding; snapshot:
 /**
  * Who may run each action the form binds (0159), as `FormPolicy.actions`
  * holds it: a list of roles per action, nobody's until one is typed, and
- * before each the notice of what it does that nothing here binds (0163).
+ * before each the notice of what it does that nothing here binds (0163),
+ * read with the box too, so a screen reader that tabs to the grant hears
+ * it.
  * Whether a grant fits -- a role that may not read, or may not read a
  * field the action passes -- is `validatePolicy`'s, said by the policy
  * check in its words. A grant for an action the form no longer binds,
@@ -107,13 +109,14 @@ export function ActionGrants({
       </p>
       {bound.map((binding) => (
         <div className="choice" key={binding.name}>
+          <Notice id={`action-${binding.name}-notice`} binding={binding} snapshot={snapshot} root={root} />
           <RolesInput
             id={`action-${binding.name}-roles`}
             label={`Roles that may run ${binding.name}`}
             roles={policy.actions?.[binding.name]?.roles ?? []}
             onRoles={(roles) => onPolicy(withActionRoles(policy, binding.name, roles))}
+            describedBy={`action-${binding.name}-notice`}
           />
-          <Notice binding={binding} snapshot={snapshot} root={root} />
         </div>
       ))}
       {strays.length === 0 ? null : (

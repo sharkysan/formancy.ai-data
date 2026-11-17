@@ -36,10 +36,10 @@ import {
   SQLSERVER_SNAPSHOT,
   SQLSERVER_WRITER_ROUTINES,
   SQLSERVER_WRITER_SNAPSHOT,
-  withoutRoutines,
   WRITER_ROUTINES,
   WRITER_SNAPSHOT,
 } from './test-server.js'
+import { withoutRoutines } from './test-routines.js'
 
 /**
  * The databases the suite's server discovers are captured from the shared

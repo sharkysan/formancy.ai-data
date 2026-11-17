@@ -4,6 +4,7 @@ import { computeAccessibleDescription, computeAccessibleName } from 'dom-accessi
 import { nodesOfLayout, layoutChildrenAt } from '@formancy/builder-core'
 import { presentedActions } from '@formancy/data-core'
 import { validateBundle } from '@formancy/data-server'
+import { actionWordsProblems, withInputWords } from './action-words.js'
 import { createAdminClient } from './api.js'
 import type { ProposalRequest } from './api.js'
 import { chooseShipping, SOURCE_OF } from './test-actions.js'
@@ -337,5 +338,17 @@ describe('the words of an action (0163)', () => {
     ])
     const [offered] = presentedActions(bundle.bindings, bundle.presentation.actions)
     expect(offered?.dialog?.model.fields.map((field) => [field.key, field.label])).toEqual([['tenant', 'Which tenant ships it']])
+
+    // And what the step says the server refuses of the words -- help text
+    // past formancy's 300 characters, which makes a dialog no renderer
+    // draws -- the server's own check refuses, in the same sentence, so
+    // the two cannot disagree unnoticed. Watched failing with the step's
+    // sentence worded otherwise: "expected [ Array(1) ] to deeply equal [
+    // Array(1) ]".
+    const long = withInputWords(bundle.presentation.actions ?? [], bundle.bindings, 'ship-order', 'tenant', { description: 'x'.repeat(301) })
+    const said = actionWordsProblems(long, bundle.bindings)
+    expect(said).toHaveLength(1)
+    const refused = validateBundle({ ...bundle, presentation: { ...bundle.presentation, actions: long } })
+    expect(refused.ok ? [] : refused.problems).toEqual(said.map((problem) => `presentation: ${problem}`))
   })
 })

@@ -120,7 +120,8 @@ export function withInputWords(
  * (`actionPresentationProblems`), the checks a publish runs -- and of each
  * dialog with them applied, in formancy's validator's -- the dialog a page
  * is served (`presentedActions`), which no renderer draws once a word of
- * it is one formancy refuses.
+ * it is one formancy refuses, and which the server's bundle check refuses
+ * in this sentence (data-server's `bundle-format2.ts`, 0163).
  */
 export function actionWordsProblems(actions: readonly ActionPresentation[], bindings: Pick<FormBindings, 'actions'>): string[] {
   if (actions.length === 0) return []
