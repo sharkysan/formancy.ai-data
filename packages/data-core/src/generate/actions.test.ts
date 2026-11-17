@@ -18,8 +18,8 @@ import {
 } from '../actions/test-actions.js'
 import type { ColumnMeta, MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
 import { INT32, orderForm, restrict, snapshot, text } from '../records/test-support.js'
-import type { RoutineMeta } from '../routines.js'
-import { ambiguousBeside, bindAction, fitProblem, inputProblem, routineProblem } from './actions.js'
+import type { RoutineMeta, RoutineParameter } from '../routines.js'
+import { ambiguousBeside, bindAction, fitProblem, inputProblem, routineProblem, sourceProblem } from './actions.js'
 import { generateForm } from './generate.js'
 import { actionUnoffered, deleteUnoffered } from './offers.js'
 import type { GenerationRequest } from './types.js'
@@ -40,6 +40,14 @@ function refusal(source: MetadataSnapshot, actions: ActionChoice[], edit: (reque
   const names = new Set(actions.map((action) => action.name))
   expect(generated.bindings.actions?.some((action) => names.has(action.name)) ?? false, 'a refused action was bound').toBe(false)
   return generated.notes.find((note) => names.has(note.subject) && note.kind === 'blocked')?.message
+}
+
+/** `null` where the generator binds `action`, otherwise the rule its blocked note names: the note without its opening and its full stop. */
+function refusalOrBound(source: MetadataSnapshot, action: ActionChoice): string | null {
+  const generated = generateForm(source, orderRequest(source, [action]))
+  if (generated.bindings.actions?.some((bound) => bound.name === action.name) === true) return null
+  const note = generated.notes.find((entry) => entry.subject === action.name && entry.kind === 'blocked')?.message ?? ''
+  return note.slice(`Action ${action.name} is not offered: `.length, -1)
 }
 
 /** The fixture's order discovered with one routine more. */
@@ -401,6 +409,36 @@ describe('what the generator refuses, each with the rule', () => {
     expect(refusal(plus(), [withSource('urgent', { attribute: 'tenant' })])).toMatch(
       /parameter urgent takes boolean, and the verified context's attribute tenant is text/,
     )
+  })
+
+  // The studio offers a parameter only the sources it asks `sourceProblem`
+  // of and hears no refusal (0163): so the function must answer, one
+  // parameter and one source at a time, exactly what the generator binds
+  // and the end of the note it refuses with, or the studio would offer a
+  // source the generator refuses, or hide one it binds. Watched failing
+  // with `sourceProblem` answering null for every source: the field of
+  // another kind was offered.
+  test('a source asked of one parameter alone, as the studio asks it, is refused in the generator’s words', () => {
+    const source = plus()
+    const { bindings } = generateForm(source, orderRequest(source, []))
+    const root = source.objects.find((object) => object.ref.name === 'order') as ObjectMeta
+    const ground = { identity: bindings.identity, concurrency: bindings.concurrency, fields: bindings.fields }
+    const named = (name: string) => CLOSE_ORDER.parameters.find((parameter) => parameter.name === name) as RoutineParameter
+    const sources: Array<[string, ActionChoice['parameters'][number]['from']]> = [
+      ['amount', { field: 'customer_no' }],
+      ['amount', { field: 'order_date' }],
+      ['amount', { field: 'amount' }],
+      ['order_id', { key: 'tenant_id' }],
+      ['order_id', { key: 'id' }],
+      ['urgent', { attribute: 'tenant' }],
+      ['urgent', { input: 'urgent' }],
+      ['closed_by', { actor: 'id' }],
+    ]
+    for (const [parameter, from] of sources) {
+      const choice: ActionChoice = { ...CLOSE, parameters: CLOSE.parameters.map((entry) => (entry.parameter === parameter ? { parameter, from } : entry)) }
+      const note = refusalOrBound(source, choice)
+      expect(sourceProblem(root, ground, named(parameter), from), `${parameter} from ${JSON.stringify(from)}`).toBe(note)
+    }
   })
 
   // A request no generator could honour is thrown, naming it, before

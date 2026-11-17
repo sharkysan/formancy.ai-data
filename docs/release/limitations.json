@@ -1543,7 +1543,7 @@
       ]
     },
     "0052": {
-      "reviewed": "sha256:6bbcfab0a9931b05c64fb46b45b3231fbe0c4c9103382e765dac919ac030c214",
+      "reviewed": "sha256:1d5f3b2d79983d85ee446ea386985f45360eaf122e92aba938ea0375735e60ce",
       "limitations": [
         {
           "area": "studio",
@@ -4668,7 +4668,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:e22ffb0f2eb2b551a2d409920fbb55b120d1278ad9ecf7441c283bc3555ce71a",
+      "reviewed": "sha256:ef482bca7d7453c9c7906306b6434fb67273d4e87a5d933d8d141df27d7ccf85",
       "limitations": [
         {
           "area": "databases",
@@ -4728,12 +4728,8 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:49fcc15d3e7e9736bb5c73fb783b4f637e0d92272f4796dcc45cb37d6722c0c7",
+      "reviewed": "sha256:2a4900d8b599ebfa8eab8c170a5988af9082e2324022959d2e05a36810ecadff",
       "limitations": [
-        {
-          "area": "forms",
-          "says": "An action is published only through a generation request its administrator writes: the studio binds none yet."
-        },
         {
           "area": "databases",
           "says": "An action is offered only where a version proves the record, as a delete is, so a table keyed by values people type, with a version column, offers none.",
@@ -4861,7 +4857,7 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:1c2b72e639ef754b2604cbbb52ffbcf9cd3762351f858bf75085dcb34537af60",
+      "reviewed": "sha256:1fbfe0a37d7af4a540e7ad476650ad73fd77a8a4c3b3a7a4ccf6891c523635d1",
       "limitations": [
         {
           "area": "forms",
@@ -4918,6 +4914,39 @@
         {
           "area": "operations",
           "says": "A server older than 0161 refuses every version whose generation request names an action, as it refuses every property it does not read."
+        }
+      ]
+    },
+    "0163": {
+      "reviewed": "sha256:52f70a74ef5073edace50d83d4dd603a07a72a06cc4a7142f120f88563486ae2",
+      "limitations": [
+        {
+          "area": "studio",
+          "says": "The studio reads a connection’s routines only on a discovery made with Include routines ticked on the Connect step, which is unticked whenever the step opens, so a form discovered without them offers no action until its connection is discovered again.",
+          "heldBy": "apps/studio/src/choose-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The Choose step lists every function and procedure in the approved schemas, the ones no run could call too, so a schema of many routines lists as many boxes.",
+          "heldBy": "apps/studio/src/choose-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "A parameter asked in an action’s dialog is keyed by its name without SQL Server’s @, which is not chosen: one whose name formancy refuses as a field key cannot be asked."
+        },
+        {
+          "area": "studio",
+          "says": "The notice of what an action does that nothing binds is drawn beside its grant and asks for no acknowledgement: nothing records that it was read.",
+          "heldBy": "apps/studio/src/policy-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "An action renamed on the Choose step is another action: its words are dropped and its grant is left for the Policy step to remove.",
+          "heldBy": "apps/studio/src/policy-actions.test.tsx"
+        },
+        {
+          "area": "studio",
+          "says": "The Presentation step edits an action’s words as literals: a label or a sentence that is a message reference is shown by its key and replaced by what is typed."
         }
       ]
     }

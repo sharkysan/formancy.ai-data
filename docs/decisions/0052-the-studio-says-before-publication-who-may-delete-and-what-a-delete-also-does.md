@@ -1,6 +1,6 @@
 # 0052 — The studio says before publication who may delete and what a delete also does, and asks for each foreign key by name
 
-- **Status:** accepted; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): its two Policy states in the studio's browser gate run in Chromium, Firefox and Linux WebKit
+- **Status:** accepted; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): its two Policy states in the studio's browser gate run in Chromium, Firefox and Linux WebKit; extended by [0163](0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md): before an action is granted the studio says what it does that nothing binds, as it says what a delete also does
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**

@@ -18,6 +18,41 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **The studio binds a routine as an action over the open record, grants
+  it, words it and reviews its drift** (0163). Why: the generator, the
+  bundle, both adapters and the runtime plane held an action, and an
+  administrator could name one only in a generation request of their own,
+  which the studio did not write. What an administrator notices: on the
+  Connect step a box, Include routines, unticked, which discovers the
+  functions and procedures of the approved schemas too -- `GET
+  /v1/connections/:id/metadata?routines=true`, any other value refused --
+  and lists them under the tables. On the Choose step an Actions group
+  lists every routine, none ticked; one no run could call is disabled
+  with the generator's reason, and a form that offers none -- no
+  confirmed version, a rowversion with no touch column -- says why in the
+  generator's words. Ticked, an action is named after its routine and
+  each parameter has a select starting at Nothing yet and offering only
+  the sources the generator binds for it: the record's key, a column of
+  it, an answer in the action's dialog, a trusted attribute or the
+  person's id, asked of `sourceProblem`, the generator's rule for one
+  source, which data-core now exports; what the generator refuses of the
+  action as mapped is said under it as it is mapped. On the Policy step,
+  "Roles that may run" each action, refused in `validatePolicy`'s words
+  where a role may not read, and before each grant a note of what the
+  routine does that nothing here binds: field grants, state moves and
+  cascades; over a version column, that a routine writing other rows
+  must increment theirs; on SQL Server, that a RETURN status other than 0
+  refuses the run; and a reach past the connection's grants. On the
+  Presentation step, each action's label, the sentences before and after
+  a run, what is read again and each dialog question's words -- words
+  alone, kept in the spelling the server reads and checked by formancy's
+  validator before Publish sends them. On the Drift step, "Run *name*:
+  still allowed" or blocked, and an action only review stops named among
+  what the server still allows. A regeneration taken up keeps the actions
+  and their words. Costs: every routine in scope is listed, the notice
+  asks for no acknowledgement, a dialog question is keyed by its
+  parameter's name, and an action renamed is another action, its grant
+  left to remove.
 - **The studio offers a form's rows saved with their record, and a
   rowversion's touch column** (0155). Why: the generator, the bundle
   check, the route and the host page all held a child's rows saved with

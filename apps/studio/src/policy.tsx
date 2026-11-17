@@ -6,6 +6,7 @@ import { describeRef, throughBlocker } from './choice.js'
 import { DeleteReach } from './delete-reach.js'
 import { labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
+import { ActionGrants } from './policy-actions.js'
 import { LookupFilters, RowFilters } from './policy-filters.js'
 import {
   boundColumns,
@@ -160,8 +161,8 @@ export function PolicyStep({
   return (
     <>
       <p className="lede">
-        Who may read, create, update and delete with this form, field by field, and which rows of {describeRef(bindings.root)} and of each lookup it reaches.
-        Roles are the names your host puts in its tokens, separated by commas.
+        Who may read, create, update and delete with this form{(bindings.actions ?? []).length === 0 ? '' : ' and run its actions'}, field by field, and which
+        rows of {describeRef(bindings.root)} and of each lookup it reaches. Roles are the names your host puts in its tokens, separated by commas.
       </p>
       <PolicyCheck problems={problems} />
       <ReassignedKeys keys={reassigned} after={CHECK} onDecide={decide} />
@@ -184,6 +185,7 @@ export function PolicyStep({
         </p>
       </fieldset>
       <DeleteReach bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
+      <ActionGrants bindings={bindings} snapshot={snapshot} policy={policy} onPolicy={onPolicy} check={CHECK} />
 
       <fieldset>
         <legend>Fields</legend>

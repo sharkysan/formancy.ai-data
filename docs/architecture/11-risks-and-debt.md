@@ -105,8 +105,9 @@ hold the bound times the replicas.
 `FORMANCY_DATA_ACTION_DEADLINE_MS`'s 15 s is chosen, not measured, and on
 SQL Server a deadline above 15,000 ms lets a save waiting on a run time out
 first, unknown. Nothing in this repository offers a person an action yet:
-the host page has no control and the studio binds none, so an action is
-published only through a generation request its administrator writes.
+the host page has no control. The studio binds one, as a generation
+request an administrator writes does
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 
 ### Lost updates and ambiguous writes
 
@@ -629,6 +630,18 @@ catalog says of keys alone: a column a check constraint names is offered,
 a check's expression being unread, and whether SQL Server evaluates the
 check again when the column is set to itself is not checked
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+An action is offered only from a discovery made with Include routines
+ticked, which it is not when the Connect step opens; the Choose step then
+lists every routine in scope, the ones no run could call too, however
+many, and runs the generator again on every change to the choice,
+unmeasured. A dialog question is keyed by its parameter's name, unchosen,
+so a parameter whose name formancy refuses as a field key cannot be
+asked; an action renamed is another action, its words dropped and its
+grant left to remove; and the note of what an action does is drawn beside
+its grant and asks for no acknowledgement. The studio's suite discovers
+routines made from the shared model, not captured, held by the
+comparator both adapters answer to for every fact it reads
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached

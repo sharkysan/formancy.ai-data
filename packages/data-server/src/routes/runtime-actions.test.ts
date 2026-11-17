@@ -666,6 +666,53 @@ describe('a form published with actions', () => {
     }
   })
 
+  // The studio's "Include routines" (0163): a connection's discovery asks
+  // for the routines in scope with `routines=true`, and otherwise is the
+  // one it always was, so a page that never asks reads the snapshot it
+  // read before; any other value is refused before anything is
+  // discovered, rather than read as either. The administrator's trail
+  // names it as every discovery. Watched failing with the query ignored:
+  // the scope asked for no routine, so the Choose step had none to offer;
+  // and with any value read as a yes: `routines=false` discovered them.
+  test('is discovered with the routines for the studio when it asks, and only then', async () => {
+    const trail: Array<Record<string, unknown>> = []
+    const admin = await createDataServer({
+      verifyIdentity,
+      admin: {
+        registry: registry(),
+        store,
+        adminRoles: ['data-admin'],
+        audit: {
+          sink: (event) => {
+            trail.push({ ...event })
+          },
+        },
+      },
+    })
+    try {
+      const read = (query: string) => admin.inject({ method: 'GET', url: `/v1/connections/erp/metadata${query}`, headers: as('admin') })
+      const asked = await read('?routines=true')
+      expect(asked.statusCode, asked.body).toBe(200)
+      expect(asked.json<{ routines?: unknown[] }>().routines).toHaveLength(2)
+      expect((await read('')).statusCode).toBe(200)
+      expect(scopes).toEqual([{ schemas: ['sales'], routines: true }, { schemas: ['sales'] }])
+      for (const query of ['?routines=false', '?routines=1', '?routines=']) {
+        const refused = await read(query)
+        expect([refused.statusCode, refused.json<{ code: string }>().code], query).toEqual([400, 'invalid-request'])
+      }
+      expect(scopes).toHaveLength(2)
+      expect(trail.map((event) => [event['operation'], event['status']])).toEqual([
+        ['discovery', 200],
+        ['discovery', 200],
+        ['discovery', 400],
+        ['discovery', 400],
+        ['discovery', 400],
+      ])
+    } finally {
+      await admin.close()
+    }
+  })
+
   // A form discovered with routines is discovered with them again
   // wherever a version of it is compared with the database: drift review,
   // a regeneration, a restore and an import's gate -- the last of which is

@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { createBuilderSession } from '@formancy/builder-core'
 import type { BuilderSession } from '@formancy/builder-core'
 import { defaultGroup, formGroup } from '@formancy/data-core'
-import type { FormPolicy, MetadataSnapshot, StateLabel, StoredListView } from '@formancy/data-core'
+import type { ActionPresentation, FormPolicy, MetadataSnapshot, StateLabel, StoredListView } from '@formancy/data-core'
 import type { Regeneration } from '@formancy/data-server'
 import { reviewedBy } from './api.js'
 import { BrowseStep } from './browse.js'
@@ -79,6 +79,8 @@ interface Generated {
   states: StateLabel[]
   /** The group the form is listed under (0143), as its box shows it: the default until another is typed, `null` for none; the publish leaves the default out. */
   group: string | null
+  /** The words of its actions (0159, 0163), in the bindings' order, each only what differs from the generator's; `[]` for none, which the publish leaves out. */
+  actions: ActionPresentation[]
   carried: Carried | null
 }
 
@@ -161,6 +163,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       unfiltered: [],
       states: [],
       group: defaultGroup(outcome.value.bindings.root, outcome.value.snapshot.kind),
+      actions: [],
       carried: null,
     })
     setPolicy((previous) => withRequiredLookupPins(previous, outcome.value.bindings))
@@ -179,7 +182,13 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const outcome = await client.propose(request)
     if (!outcome.ok) return outcome.message
     const carried = carryDraft(
-      { proposal: previous.proposal, edited: previous.session.exportDocument(), views: previous.views, unfiltered: previous.unfiltered },
+      {
+        proposal: previous.proposal,
+        edited: previous.session.exportDocument(),
+        views: previous.views,
+        unfiltered: previous.unfiltered,
+        actions: previous.actions,
+      },
       outcome.value,
     )
     if (!carried.ok) return carried.message
@@ -193,6 +202,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       states: previous.states,
       // So is the group, the form's and no field's (0143); another root starts afresh in Choose.
       group: previous.group,
+      // An action's words follow it by its name, as a regeneration carries them (0159).
+      actions: carried.actions,
       carried: carriedAgain(previous.carried, previous.proposal.bindings, carried, outcome.value.bindings),
     })
     setPolicy((current) => withRequiredLookupPins(current, outcome.value.bindings))
@@ -217,6 +228,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const validity = generation.validity ?? null
     // So are the stamps (0153): left out, the next version would let a person type who created a record.
     const stamps = generation.stamps ?? []
+    // And the actions (0163): left out, the next version would bind none of them.
+    const actions = generation.actions ?? []
     const request: ProposalRequest = {
       connection,
       root,
@@ -228,10 +241,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       ...(touchColumn === null ? {} : { touchColumn }),
       ...(validity === null ? {} : { validity }),
       ...(stamps.length === 0 ? {} : { stamps }),
+      ...(actions.length === 0 ? {} : { actions }),
     }
     setDiscovered({ connection, snapshot })
     // A lookup's `together` rides on its choice, as its section does.
-    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, touchColumn, validity, stamps } })
+    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, touchColumn, validity, stamps, actions } })
     setPolicy(withRequiredLookupPins(regeneration.policy, bindings))
     setGenerated({
       request,
@@ -241,6 +255,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       unfiltered: regeneration.presentation.unfiltered ?? [],
       states: regeneration.presentation.states ?? [],
       group: formGroup(regeneration.presentation.group, bindings.root, snapshot.kind),
+      actions: regeneration.presentation.actions ?? [],
       carried: {
         from: `version ${String(version)}`,
         version,
@@ -273,6 +288,11 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
   /** The labels typed under State labels (0129). */
   function statesChosen(states: StateLabel[]): void {
     setGenerated((previous) => (previous === null ? previous : { ...previous, states }))
+  }
+
+  /** The words of the form's actions, typed in the Presentation step (0163). */
+  function actionsWorded(actions: ActionPresentation[]): void {
+    setGenerated((previous) => (previous === null ? previous : { ...previous, actions }))
   }
 
   /** The group typed, or cleared by No group (0143). */
@@ -326,7 +346,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
         )
     }
     if (generated === null) return null
-    const { proposal, session, request, views, unfiltered, states, group, carried } = generated
+    const { proposal, session, request, views, unfiltered, states, group, actions, carried } = generated
     const open = asked(carried, policy)
     switch (current) {
       case 'generate':
@@ -365,6 +385,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             engine={proposal.snapshot.kind}
             group={group}
             onGroup={groupChosen}
+            actions={actions}
+            onActions={actionsWorded}
             carried={carried}
           />
         )
@@ -381,6 +403,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             unfiltered={unfiltered}
             states={states}
             group={group}
+            actions={actions}
             policy={policy}
             stale={stale}
             regeneratedFrom={carried?.version ?? null}

@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
-import { findObject, serverStanding } from '@formancy/data-core'
+import { describeRoutine, findObject, serverStanding } from '@formancy/data-core'
 import type { ColumnMeta, CoverageGap, DatabaseKind, ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
+import { routineFacts, routineKey } from './actions.js'
 import { describeRef, gapsAbout, gapsHiding } from './choice.js'
 
 /** How a database kind is written for a person. */
@@ -148,6 +149,39 @@ function ObjectDetails({ snapshot, object }: { snapshot: MetadataSnapshot; objec
 }
 
 /**
+ * The functions and procedures a discovery that asked for them read
+ * (0158, 0163), each with what it is and whether this connection may
+ * execute it; nothing for one that did not ask, which says nothing about
+ * any. None seen behind a routines gap is said as "cannot tell", which the
+ * gaps above name.
+ */
+function Routines({ snapshot }: { snapshot: MetadataSnapshot }): ReactElement | null {
+  const routines = snapshot.routines
+  if (routines === undefined) return null
+  const hidden = snapshot.gaps.some((gap) => gap.aspect === 'routines')
+  return (
+    <>
+      <h4 id="routines-heading">Routines</h4>
+      {routines.length === 0 ? (
+        <p className={hidden ? 'cannot-tell' : 'none'}>
+          {hidden
+            ? 'This connection sees no function or procedure in the approved schemas, and cannot tell whether there are any: see what it could not see, above.'
+            : 'No function or procedure in the approved schemas.'}
+        </p>
+      ) : (
+        <ul className="routines" aria-labelledby="routines-heading">
+          {routines.map((routine) => (
+            <li key={routineKey(routine.ref)}>
+              <code>{describeRoutine(routine.ref)}</code> {routineFacts(routine)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
+/**
  * Step 2's result: what a connection can see, with what it cannot see
  * first -- after the server it was read from, and whether this release was
  * tested on it when it was not.
@@ -163,7 +197,9 @@ export function MetadataView({ connection, snapshot }: { connection: string; sna
       <h3 id="seen-heading">What {connection} can see</h3>
       <p>
         {ENGINE_NAMES[snapshot.kind]} {snapshot.serverVersion}, schemas {snapshot.scope.schemas.join(', ')}: {tables} {tables === 1 ? 'table' : 'tables'} and{' '}
-        {views} {views === 1 ? 'view' : 'views'}. Discovered as <code>{user}</code>
+        {views} {views === 1 ? 'view' : 'views'}
+        {snapshot.routines === undefined ? null : `, and ${String(snapshot.routines.length)} ${snapshot.routines.length === 1 ? 'routine' : 'routines'}`}.
+        Discovered as <code>{user}</code>
         {login === user ? null : (
           <>
             , connected as <code>{login}</code>
@@ -181,6 +217,7 @@ export function MetadataView({ connection, snapshot }: { connection: string; sna
           </li>
         ))}
       </ul>
+      <Routines snapshot={snapshot} />
     </section>
   )
 }

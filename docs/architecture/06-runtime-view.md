@@ -1062,7 +1062,9 @@ other at the count where the child's foreign key has no index (§11.2).
 ## 6.15 Running an action over the open record
 
 A routine the deployment keeps in its database, bound to a form as an
-action (0159) and run by an adapter over the open record
+action (0159) -- in a generation request of its administrator's own, or
+on the studio's Choose step from a discovery that asked for the routines
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)) -- and run by an adapter over the open record
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)),
 through the runtime plane's route
 ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).

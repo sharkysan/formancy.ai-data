@@ -196,8 +196,12 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     return tested
   })
 
-  app.get<{ Params: { id: string } }>('/v1/connections/:id/metadata', async (request, reply) => {
-    const snapshot = await discover(request.params.id, reply)
+  // With `?routines=true`, the studio's "Include routines" (0163): the routines in scope too, which a snapshot records only when asked (0158).
+  app.get<{ Params: { id: string }; Querystring: Record<string, unknown> }>('/v1/connections/:id/metadata', async (request, reply) => {
+    const asked = request.query.routines
+    if (asked !== undefined && asked !== 'true')
+      return refuse(reply, 400, 'invalid-request', 'Expected routines=true, or no query, to discover the routines in scope too.')
+    const snapshot = await discover(request.params.id, reply, asked === 'true')
     return snapshot ?? reply
   })
 

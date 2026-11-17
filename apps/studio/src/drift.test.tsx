@@ -6,10 +6,12 @@ import type { DriftChange, MetadataSnapshot } from '@formancy/data-core'
 import { createAdminClient } from './api.js'
 import type { Drift } from './api.js'
 import { Changes } from './drift-change.js'
+import { generateShipping } from './test-actions.js'
 import { audit, generateOrder, goTo, grantOrderDelete, paragraphs, signIn, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import {
   onServer,
+  OWNER_ROUTINES,
   OWNER_SNAPSHOT,
   READER_SNAPSHOT,
   startPlane,
@@ -409,5 +411,40 @@ describe('a routine subject', () => {
     const { container } = render(<Changes changes={[change]} published={null} id="routine-changes" heading="What changed" level="h3" />)
     expect(items(container, 'What changed')).toEqual([written(change, {})])
     expect(written(change, {})).toContain('on routine sales.ship_order(pg_catalog.int8)')
+  })
+})
+
+describe('a published form’s actions (0163)', () => {
+  // Each action the form binds is said under what the form may still do,
+  // from the verdict's own list of those still runnable (0159), and with
+  // the routines compared said above it. EXECUTE taken back stops it in
+  // review, while the server, which leaves that to the database, still
+  // lets a run through: said as the server still allowing it, as a write
+  // only review stops is. Watched failing with the server's own verdict
+  // of an action unread: nothing said the server still allows the run.
+  test('are said by what each may still do, and where only review stops one', async () => {
+    const user = await signIn(plane)
+    await generateShipping(user)
+    const policy = await writeOrderPolicy(user)
+    await user.type(within(policy).getByLabelText('Roles that may run ship-order'), 'clerk')
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+    const { fingerprint: _, ...contents } = structuredClone(OWNER_ROUTINES)
+    plane.databases.set('fixture', createSnapshot({ ...contents, routines: (contents.routines ?? []).map((routine) => ({ ...routine, executable: false })) }))
+    const drift = await goTo(user, 'Drift')
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
+    expect(paragraphs(report)).toContain(
+      'The routines its actions run are compared too, by what a call rests on: their parameters, what they return, whether this connection may execute them and whether they act beyond its grants. A routine’s body is not compared, so a changed body is no drift.',
+    )
+    const still = within(within(report).getByRole('list', { name: 'What the published form may still do' }))
+      .getAllByRole('listitem')
+      .map((item) => item.textContent)
+    expect(still).toContain('Run ship-order: blocked by the changes below')
+    expect(still.find((line) => line?.startsWith('The server still allows'))).toMatch(
+      /^The server still allows run ship-order: what blocks it is a change it does not compare/,
+    )
+    expect(await audit()).toEqual([])
   })
 })

@@ -11,10 +11,12 @@ import {
   POSTGRES_IMAGE,
   READER_ACCESS,
   restrictedDisagreements,
+  routineDisagreements,
   snapshotDisagreements,
   SQLSERVER_IMAGE,
   WRITER_ACCESS,
 } from '@formancy/data-fixtures'
+import type { FixtureAccount } from '@formancy/data-fixtures'
 import { describe, expect, test } from 'vitest'
 import owner from './fixtures/postgres-owner.json'
 import reader from './fixtures/postgres-reader.json'
@@ -23,12 +25,19 @@ import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
 import sqlserverWriter from './fixtures/sqlserver-writer.json'
 import {
+  OWNER_ROUTINES,
   OWNER_SNAPSHOT,
+  READER_ROUTINES,
   READER_SNAPSHOT,
   readSnapshot,
+  SQLSERVER_READER_ROUTINES,
   SQLSERVER_READER_SNAPSHOT,
+  SQLSERVER_ROUTINES,
   SQLSERVER_SNAPSHOT,
+  SQLSERVER_WRITER_ROUTINES,
   SQLSERVER_WRITER_SNAPSHOT,
+  withoutRoutines,
+  WRITER_ROUTINES,
   WRITER_SNAPSHOT,
 } from './test-server.js'
 
@@ -143,5 +152,39 @@ describe('the captured snapshots', () => {
         expect(serverStanding(kind, snapshot.server)).toMatchObject({ tested: true })
       }
     }
+  })
+})
+
+/** Each captured database with its routines, as the suite's discovery reads it when asked, and the account it was captured as. */
+const WITH_ROUTINES: ReadonlyArray<[string, MetadataSnapshot, MetadataSnapshot, FixtureAccount]> = [
+  ['the owner', OWNER_ROUTINES, OWNER_SNAPSHOT, 'owner'],
+  ['the restricted reader', READER_ROUTINES, READER_SNAPSHOT, 'reader'],
+  ['the writer', WRITER_ROUTINES, WRITER_SNAPSHOT, 'writer'],
+  ['the SQL Server owner', SQLSERVER_ROUTINES, SQLSERVER_SNAPSHOT, 'owner'],
+  ['the SQL Server reader', SQLSERVER_READER_ROUTINES, SQLSERVER_READER_SNAPSHOT, 'reader'],
+  ['the SQL Server writer', SQLSERVER_WRITER_ROUTINES, SQLSERVER_WRITER_SNAPSHOT, 'writer'],
+]
+
+describe('the routines the suite’s discovery reports when asked (0158, 0163)', () => {
+  // The captures predate routines, so what each account's discovery says
+  // of them is made in test-server.ts, from fixtures/routines.json. Every
+  // fact the comparator both adapters' discovery suites answer to reads is
+  // held to the shared model here: a routine the account may not execute
+  // on SQL Server absent behind a gap, on PostgreSQL listed and not
+  // executable. Without this the studio's actions would be proved against
+  // routines nobody's database has. Watched failing with the PostgreSQL
+  // reader's ship_order made executable: "sales.ship_order(pg_catalog.int8,
+  // pg_catalog.int4) executable as the reader is true, expected false".
+  test.each(WITH_ROUTINES)('%s: says what the model says of each routine, as that account', (_who, routines, _captured, account) => {
+    expect(routineDisagreements(routines, account)).toEqual([])
+  })
+
+  // A scope that does not ask reads nothing more and makes the snapshot it
+  // made before, to the byte (0158): the suite's discovery strips what it
+  // added, so every case that never asks for routines discovers the
+  // captured file it always did. Watched failing with the routines gap
+  // kept: the SQL Server reader's fingerprint moved.
+  test.each(WITH_ROUTINES)('%s: asked without routines, is the captured file to the byte', (_who, routines, captured) => {
+    expect(withoutRoutines(routines)).toEqual(captured)
   })
 })

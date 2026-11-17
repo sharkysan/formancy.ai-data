@@ -501,6 +501,12 @@ column is chosen before anybody chose one; when Space on the box does not
 tick it and keep the keyboard on it, or the next Tab does not reach At
 least; and when At most does not start at data-core's
 `TOGETHER_MAX_ROWS` (`apps/studio/scripts/browser/together.mjs`, 0155).
+It fails too when the Choose step with an action's parameters given, the
+Policy step with its grant and notice, or the Presentation step with its
+words is not measured clean at every width; when Space on a routine's box
+does not tick it and keep the keyboard on it, or the next Tab does not
+reach the action's name; and when the action as mapped is still refused
+(`apps/studio/scripts/browser/actions.mjs`, 0163).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

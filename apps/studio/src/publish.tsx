@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
 import { defaultGroup, presentationOf, statesOf, togetherBatchProblem, unfilteredProblems, viewProblems } from '@formancy/data-core'
-import type { DriftChange, DriftReport, FormPolicy, ReassignedKey, StateLabel, StoredListView } from '@formancy/data-core'
+import type { ActionPresentation, DriftChange, DriftReport, FormPolicy, ReassignedKey, StateLabel, StoredListView } from '@formancy/data-core'
+import { actionWordsProblems } from './action-words.js'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
 import { useDocument } from './document.js'
@@ -139,6 +140,7 @@ export function PublishStep({
   unfiltered = [],
   states = [],
   group,
+  actions = [],
   policy,
   stale,
   regeneratedFrom = null,
@@ -161,6 +163,8 @@ export function PublishStep({
   states?: readonly StateLabel[]
   /** The group the Presentation step's box shows (0143), `null` for none; left out, the default, which the publish leaves out too. */
   group?: string | null
+  /** The words of the form's actions typed in the Presentation step (0163); none, the property left out. */
+  actions?: readonly ActionPresentation[]
   policy: FormPolicy
   stale: boolean
   /** The version the draft was regenerated from, which is its base; `null` for a draft generated afresh. */
@@ -213,6 +217,7 @@ export function PublishStep({
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
     ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
     ...unfilteredProblems(unfiltered, proposal.bindings).map((problem) => `A field left out of the Filter panel the server refuses: ${problem}`),
+    ...actionWordsProblems(actions, proposal.bindings).map((problem) => `Words of an action the server refuses: ${problem}`),
     batch === null
       ? null
       : `Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate the form again there, which starts its presentation afresh.`,
@@ -255,6 +260,8 @@ export function PublishStep({
       ...(unfiltered.length === 0 ? {} : { unfiltered: [...unfiltered] }),
       ...(labelled.length === 0 ? {} : { states: labelled }),
       ...listed,
+      // No words, the property left out (0159): the server refuses `[]`.
+      ...(actions.length === 0 ? {} : { actions: structuredClone([...actions]) }),
     }
     const bundle: Bundle = { format: 2, connection, generation, base: form, presentation, form: session.exportDocument(), bindings, policy, snapshot }
     const sent: Published = { version: expected ?? 0, bundle }

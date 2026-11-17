@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { createSnapshot } from '@formancy/data-core'
+import { chooseShipping, OFFER_SHIP_ORDER, SHIP_ORDER, SOURCE_OF } from './test-actions.js'
 import {
   audit,
   discover,
@@ -18,7 +20,7 @@ import {
 } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { orderBundle, publishReviewed, PUBLISHER_REQUIRED, readOnly } from './test-review.js'
-import { OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
+import { OWNER_ROUTINES, OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
@@ -368,6 +370,105 @@ describe('the journey of a record and the rows saved with it (0155)', () => {
     await screen.findByRole('main', { name: 'Presentation' })
     const again = await goTo(user, 'Choose')
     expect(within(again).getByRole<HTMLSelectElement>('combobox', { name: touch }).value).toBe('status')
+  })
+})
+
+describe('the journey of an action over the open record (0163)', () => {
+  // The fixture's ship_order, discovered with Include routines, offered on
+  // the order with its key and the trusted tenant, granted to clerks after
+  // the notice of what it does that nothing here binds, worded, and
+  // published as chosen -- its request, its binding, its words and its
+  // grant each in the version the store wrote -- with axe and a name on
+  // every control at each new state, and only the administrator plane
+  // called. Then the Drift step says it still runs, and that it stops once
+  // the routine is dropped, with the change that stops it; and the form
+  // regenerated and taken up keeps it chosen and worded. Watched failing
+  // with `actions` left out of takeUp (the regenerated order's box was
+  // unticked), with the words left out of the publish (the version
+  // carried no `actions` in its presentation), and with the Drift step's
+  // line for an action left out ("Run ship-order" was not on the page).
+  test('chooses, grants, words and publishes an action, and its drift and regeneration keep it', async () => {
+    const user = await signIn(plane)
+    const record = async (name: string) => {
+      expect({ [name]: [...(await audit()), ...unnamed()] }).toEqual({ [name]: [] })
+    }
+    const choose = await chooseShipping(user)
+    await record('Choose, an action over the order')
+    await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    await record('Generate, an action bound')
+
+    const policy = await writeOrderPolicy(user)
+    const notice = within(policy).getByRole('note', { name: 'What ship-order does is the deployment’s' })
+    expect(notice.textContent).toContain(`It calls ${SHIP_ORDER} over the open record after incrementing row_version, in one transaction.`)
+    await user.type(within(policy).getByLabelText('Roles that may run ship-order'), 'clerk')
+    await waitFor(() => expect(within(within(policy).getByRole('region', { name: 'Policy check' })).getByRole('status').textContent).toMatch(/fits this form/))
+    await record('Policy, an action granted')
+
+    const presentation = await goTo(user, 'Presentation')
+    const words = within(presentation).getByRole('region', { name: 'Actions' })
+    const label = within(words).getByRole('textbox', { name: 'Label of the ship-order action' })
+    await user.clear(label)
+    await user.type(label, 'Ship it')
+    await user.type(within(words).getByRole('textbox', { name: 'Asked before it runs for the ship-order action' }), 'Ship this order now?')
+    await user.click(within(words).getByRole('checkbox', { name: 'This form’s list after ship-order' }))
+    await record('Presentation, an action worded')
+
+    const publish = await goTo(user, 'Publish')
+    await user.click(await within(publish).findByRole('button', { name: 'Publish version 1' }))
+    await within(publish).findByText('Published version 1 of sales-order.')
+    await record('Publish, an action')
+    const stored = JSON.parse(await readFile(join(plane.root, 'sales-order', '1.json'), 'utf8')) as {
+      generation: { actions?: unknown }
+      bindings: { actions?: Array<{ name: string; routine: unknown }> }
+      presentation: { actions?: unknown }
+      policy: { actions?: unknown }
+    }
+    expect(stored.generation.actions).toEqual([
+      {
+        name: 'ship-order',
+        routine: { schema: 'sales', name: 'ship_order', signature: 'pg_catalog.int8, pg_catalog.int4' },
+        scope: 'record',
+        parameters: [
+          { parameter: 'order_id', from: { key: 'id' } },
+          { parameter: 'tenant', from: { attribute: 'tenant' } },
+        ],
+      },
+    ])
+    expect(stored.bindings.actions?.map((action) => [action.name, action.routine])).toEqual([
+      ['ship-order', { schema: 'sales', name: 'ship_order', signature: 'pg_catalog.int8, pg_catalog.int4' }],
+    ])
+    expect(stored.presentation.actions).toEqual([{ action: 'ship-order', label: 'Ship it', confirm: 'Ship this order now?', refresh: ['list'] }])
+    expect(stored.policy.actions).toEqual({ 'ship-order': { roles: ['clerk'] } })
+
+    const drift = await goTo(user, 'Drift')
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    const report = await within(drift).findByRole('region', { name: 'Version 1 of sales-order, against the database now' })
+    expect(within(report).getByText('Run ship-order: still allowed')).toBeTruthy()
+    await record('Drift, an action')
+    const { fingerprint: _, ...contents } = structuredClone(OWNER_ROUTINES)
+    plane.databases.set('fixture', createSnapshot({ ...contents, routines: [] }))
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    await waitFor(() => expect(within(drift).getByText('Run ship-order: blocked by the changes below')).toBeTruthy())
+    expect(drift.textContent).toContain(`routine-dropped on routine ${SHIP_ORDER}`)
+    await record('Drift, an action blocked')
+
+    plane.databases.set('fixture', OWNER_ROUTINES)
+    await user.click(within(drift).getByRole('button', { name: 'Regenerate, keeping your presentation' }))
+    const regenerated = await within(drift).findByRole('region', { name: /^Regenerated from version 1$/ })
+    await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
+    await screen.findByRole('main', { name: 'Presentation' })
+    expect(within(step('Presentation')).getByRole<HTMLInputElement>('textbox', { name: 'Label of the ship-order action' }).value).toBe('Ship it')
+    const again = await goTo(user, 'Choose')
+    expect(within(again).getByRole<HTMLInputElement>('checkbox', { name: OFFER_SHIP_ORDER }).checked).toBe(true)
+    expect(within(again).getByRole<HTMLSelectElement>('combobox', { name: SOURCE_OF('order_id', 'bigint') }).value).toBe('key:id')
+
+    const calls = plane.requests.map((request) => `${request.method} ${request.path}`)
+    expect(calls.filter((call) => !ADMIN_PLANE.some((route) => route.test(call)))).toEqual([])
+    // Discovered with its routines on asking, and no other request carries a query.
+    expect(plane.requests.flatMap((request) => (request.query === undefined ? [] : [`${request.path}${request.query}`]))).toEqual([
+      '/v1/connections/fixture/metadata?routines=true',
+    ])
   })
 })
 

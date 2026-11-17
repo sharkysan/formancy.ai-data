@@ -15,6 +15,7 @@ import type {
   RecordAdapter,
   RecordFilter,
   ReferentialAction,
+  RoutineMeta,
   ServerFacts,
 } from '@formancy/data-core'
 import { createDataServer, createFileConfigurationStore } from '@formancy/data-server'
@@ -22,6 +23,7 @@ import type { ConfigurationStore, ConnectionRegistry, IdentityVerifier } from '@
 import owner from './fixtures/postgres-owner.json'
 import reader from './fixtures/postgres-reader.json'
 import writer from './fixtures/postgres-writer.json'
+import routineFacts from './fixtures/routines.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
 import sqlserverWriter from './fixtures/sqlserver-writer.json'
@@ -74,6 +76,43 @@ export const SQLSERVER_SNAPSHOT = readSnapshot(sqlserver)
 export const SQLSERVER_READER_SNAPSHOT = readSnapshot(sqlserverReader)
 /** SQL Server as the order form's own account, which reads no employee: what the getting-started guide's `ms` connection sees (0138). */
 export const SQLSERVER_WRITER_SNAPSHOT = readSnapshot(sqlserverWriter)
+
+/** A captured file, by its name, which `fixtures/routines.json` keys what its account's discovery reports of the routines by. */
+export type CapturedFile = keyof typeof routineFacts
+
+/**
+ * A captured snapshot as its account's discovery reports it when its scope
+ * asks for the routines too (0158): the fixture's `ship_order`, and on SQL
+ * Server the security policy's predicate, each with whether the account
+ * may execute it, and the gap where the account cannot see one. Made here,
+ * from `fixtures/routines.json`, never captured: the captures were taken
+ * before discovery read routines, and taking them again starts both
+ * engines. fixtures.test.ts holds every fact `routineDisagreements` reads
+ * -- the comparator both adapters' discovery suites answer to -- to the
+ * shared model, and that without its routines each is the captured file
+ * to the byte; the type ids, which it does not read, are each engine's
+ * own for its built-in types.
+ */
+export function withRoutines(base: MetadataSnapshot, file: CapturedFile): MetadataSnapshot {
+  const { fingerprint: _, ...contents } = structuredClone(base)
+  const facts = structuredClone(routineFacts[file]) as { routines: RoutineMeta[]; gaps: CoverageGap[] }
+  return createSnapshot({ ...contents, scope: { ...contents.scope, routines: true }, routines: facts.routines, gaps: [...contents.gaps, ...facts.gaps] })
+}
+
+/** `base` as a discovery whose scope does not ask for routines makes it (0158): no routine, and no gap about them. */
+export function withoutRoutines(base: MetadataSnapshot): MetadataSnapshot {
+  const { fingerprint: _, routines: _routines, scope, gaps, ...contents } = structuredClone(base)
+  const { routines: _asked, ...plain } = scope
+  return createSnapshot({ ...contents, scope: plain, gaps: gaps.filter((gap) => gap.aspect !== 'routines') })
+}
+
+/** Each captured database as it is, routines included: what a discovery that asks for them reads (0158). */
+export const OWNER_ROUTINES = withRoutines(OWNER_SNAPSHOT, 'postgres-owner.json')
+export const READER_ROUTINES = withRoutines(READER_SNAPSHOT, 'postgres-reader.json')
+export const WRITER_ROUTINES = withRoutines(WRITER_SNAPSHOT, 'postgres-writer.json')
+export const SQLSERVER_ROUTINES = withRoutines(SQLSERVER_SNAPSHOT, 'sqlserver-owner.json')
+export const SQLSERVER_READER_ROUTINES = withRoutines(SQLSERVER_READER_SNAPSHOT, 'sqlserver-reader.json')
+export const SQLSERVER_WRITER_ROUTINES = withRoutines(SQLSERVER_WRITER_SNAPSHOT, 'sqlserver-writer.json')
 
 /**
  * The owner's snapshot with a customer's `kind` and its company details: a
@@ -198,7 +237,7 @@ const verifyIdentity: IdentityVerifier = async (token) => {
 export interface TestPlane {
   /** The `fetch` the studio is given: every call is answered by the real server. */
   fetch: typeof fetch
-  /** Each connection's database as it is now. A test replaces one to make drift. */
+  /** Each connection's database as it is now, its routines in it where its account's discovery reports them (`withRoutines`). A test replaces one to make drift. */
   databases: Map<string, MetadataSnapshot>
   /** Connections whose database does not answer. */
   unreachable: Set<string>
@@ -218,8 +257,8 @@ export interface TestPlane {
   rows: Map<string, Array<Record<string, ApiValue>>>
   /** Connections the operator has taken out of the allowlist since the server started. */
   removed: Set<string>
-  /** Every request the studio made, as method and path, in order, with the JSON body it sent, if any. */
-  requests: Array<{ method: string; path: string; body?: unknown }>
+  /** Every request the studio made, as method and path, in order, with its query and the JSON body it sent, if any. */
+  requests: Array<{ method: string; path: string; query?: string; body?: unknown }>
   /**
    * Hold every request whose path matches until `release` is called: the
    * server is slow, and the studio is seen while it waits.
@@ -310,12 +349,12 @@ export async function startPlane(
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
   const databases = new Map<string, MetadataSnapshot>([
-    ['fixture', OWNER_SNAPSHOT],
-    ['fixture-reader', READER_SNAPSHOT],
-    ['fixture-sqlserver', SQLSERVER_SNAPSHOT],
-    ['fixture-sqlserver-reader', SQLSERVER_READER_SNAPSHOT],
-    ['fixture-writer', WRITER_SNAPSHOT],
-    ['fixture-sqlserver-writer', SQLSERVER_WRITER_SNAPSHOT],
+    ['fixture', OWNER_ROUTINES],
+    ['fixture-reader', READER_ROUTINES],
+    ['fixture-sqlserver', SQLSERVER_ROUTINES],
+    ['fixture-sqlserver-reader', SQLSERVER_READER_ROUTINES],
+    ['fixture-writer', WRITER_ROUTINES],
+    ['fixture-sqlserver-writer', SQLSERVER_WRITER_ROUTINES],
     ...(options.sections === true ? [['fixture-sections', SECTIONS_SNAPSHOT] as const] : []),
     ...(options.versions === true ? [['fixture-versions', VERSIONS_SNAPSHOT] as const] : []),
   ])
@@ -344,7 +383,13 @@ export async function startPlane(
           if (now.server === undefined) throw new Error(`the snapshot of ${id} records no server, so nothing can answer its ping`)
           return { kind: now.kind, version: now.serverVersion, ...now.server }
         },
-        discover: async () => databases.get(id) ?? now,
+        // As a scope asks (0158): a database a test put in without routines cannot answer one that asks for them.
+        discover: async (scope) => {
+          const current = databases.get(id) ?? now
+          if (scope.routines !== true) return current.routines === undefined ? current : withoutRoutines(current)
+          if (current.routines === undefined) throw new Error(`the snapshot of ${id} records no routines, so nothing can answer a discovery that asks for them`)
+          return current
+        },
         close: async () => {},
       }
       // The administrator plane never touches a lookup, and reads records only to browse them (0099), narrowed or not (0103), filtered or not (0104).
@@ -380,7 +425,12 @@ export async function startPlane(
   const fetch: typeof globalThis.fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input), 'http://studio.test')
     const method = (init?.method ?? 'GET').toUpperCase()
-    requests.push({ method, path: url.pathname, ...(typeof init?.body === 'string' ? { body: JSON.parse(init.body) as unknown } : {}) })
+    requests.push({
+      method,
+      path: url.pathname,
+      ...(url.search === '' ? {} : { query: url.search }),
+      ...(typeof init?.body === 'string' ? { body: JSON.parse(init.body) as unknown } : {}),
+    })
     if (held?.path.test(url.pathname) === true) await held.until
     const headers: Record<string, string> = {}
     new Headers(init?.headers).forEach((value, name) => {

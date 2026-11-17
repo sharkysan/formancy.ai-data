@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactElement } from 'react'
 import { isLayoutContainer } from '@formancy/builder-core'
 import type { BuilderSession, CommandOutcome } from '@formancy/builder-core'
-import type { DatabaseKind, FormBindings, FormPolicy, GenerationNote, StateLabel, StoredListView } from '@formancy/data-core'
+import type { ActionPresentation, DatabaseKind, FormBindings, FormPolicy, GenerationNote, StateLabel, StoredListView } from '@formancy/data-core'
 import type { FormSchema, LayoutNode } from '@formancy/spec'
 import { CarriedPanel } from './carried.js'
 import type { Carried } from './carry.js'
@@ -10,6 +10,7 @@ import { helpTextOf, labelOf, useDocument } from './document.js'
 import { useFocusAfterRender } from './focus.js'
 import { GroupPanel } from './group.js'
 import { ListViewsPanel } from './list-views.js'
+import { ActionsPanel } from './presentation-actions.js'
 import { StartingValueControl, startNote } from './starting-value.js'
 import { StateLabelsPanel } from './state-labels.js'
 
@@ -133,8 +134,9 @@ function HelpTextInput({
  * from another (0030) lists what could not be carried above the controls,
  * and what it offers is a label too. Below them, the list views (0105):
  * presentation of the form's list rather than of the form, named by the
- * fields' labels as this step has them; the state labels (0129); and the
- * group a list of forms puts it under (0143).
+ * fields' labels as this step has them; the state labels (0129); the
+ * group a list of forms puts it under (0143); and the words of its
+ * actions (0163), which name no routine and type no field.
  */
 export function PresentationStep({
   session,
@@ -151,6 +153,8 @@ export function PresentationStep({
   engine,
   group,
   onGroup,
+  actions = [],
+  onActions = () => {},
   carried = null,
 }: {
   session: BuilderSession
@@ -173,6 +177,9 @@ export function PresentationStep({
   /** The group the form is listed under (0143), as its box shows it: the default until another is typed, `null` for none. */
   group: string | null
   onGroup: (group: string | null) => void
+  /** The words of the form's actions (0163), each only what differs from the generator's. */
+  actions?: readonly ActionPresentation[]
+  onActions?: (next: ActionPresentation[]) => void
   carried?: Carried | null
 }): ReactElement {
   const document = useDocument(session)
@@ -369,6 +376,7 @@ export function PresentationStep({
       <ListViewsPanel bindings={bindings} document={document} views={views} onViews={onViews} unfiltered={unfiltered} onUnfiltered={onUnfiltered} />
       <StateLabelsPanel policy={policy} labels={states} onLabels={onStates} />
       <GroupPanel root={bindings.root} engine={engine} group={group} onGroup={onGroup} />
+      <ActionsPanel bindings={bindings} actions={actions} onActions={onActions} />
     </>
   )
 }

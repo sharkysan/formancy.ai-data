@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react'
 import type { FormEvent, ReactElement } from 'react'
 import { findObject } from '@formancy/data-core'
 import type { ForeignKeyMeta, FormPolicy, LookupChoice, MetadataSnapshot, ObjectMeta, RowFilterRule } from '@formancy/data-core'
+import { actionReasons } from './actions.js'
 import type { Failure, ProposalRequest } from './api.js'
 import type { Choice } from './choice.js'
 import {
@@ -20,6 +21,7 @@ import {
   suggestedDisplay,
   versionCandidates,
 } from './choice.js'
+import { ActionsChoice } from './choose-actions.js'
 import { StampsChoice } from './choose-stamps.js'
 import { TogetherChoice, TouchChoice } from './choose-together.js'
 import { VersionsChoice } from './choose-versions.js'
@@ -332,7 +334,8 @@ function VersionColumn({
  * how each is shown, whether the form's rows are saved with the record one
  * of them references (0155), the columns the policy pins, a version column
  * to confirm when the database keeps none (plan section 3) or a rowversion's
- * touch column (0155), and the columns the server stamps (0153).
+ * touch column (0155), the columns the server stamps (0153), and the
+ * routines it runs as actions over the open record (0163).
  *
  * Everything offered comes from the snapshot: a lookup whose target this
  * connection cannot see is listed and disabled with the gap that explains it,
@@ -367,6 +370,11 @@ export function ChooseStep({
   const reasons = useMemo(
     () => (choice === null || root === undefined ? null : togetherReasons(snapshot, root, proposalFor(connection, choice, rowFilters), policy)),
     [snapshot, root, connection, choice, rowFilters, policy],
+  )
+  // What the generator refuses of the actions (0163), asked again on every change to the choice or the pins.
+  const refusals = useMemo(
+    () => (choice === null || root === undefined ? null : actionReasons(snapshot, root, proposalFor(connection, choice, rowFilters))),
+    [snapshot, root, connection, choice, rowFilters],
   )
   const tables = snapshot.objects.filter((object) => object.kind === 'table')
   const views = snapshot.objects.filter((object) => object.kind === 'view')
@@ -434,7 +442,7 @@ export function ChooseStep({
           </p>
         )}
       </div>
-      {choice === null || root === undefined || reasons === null ? null : (
+      {choice === null || root === undefined || reasons === null || refusals === null ? null : (
         <>
           <div className="pair">
             <div className="field">
@@ -451,6 +459,7 @@ export function ChooseStep({
           <VersionColumn root={root} choice={choice} rowFilters={rowFilters} touch={reasons.touch} onChoice={onChoice} />
           <VersionsChoice root={root} choice={choice} onChoice={onChoice} />
           <StampsChoice root={root} choice={choice} rowFilters={rowFilters} onChoice={onChoice} />
+          <ActionsChoice snapshot={snapshot} connection={connection} root={root} choice={choice} reasons={refusals} onChoice={onChoice} />
           {problems.length === 0 ? null : (
             <div role="alert" className="problem-box">
               <p>The form was not generated:</p>

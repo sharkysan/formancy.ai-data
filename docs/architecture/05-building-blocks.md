@@ -471,6 +471,16 @@ browser, the bundle check's `togetherPolicyProblems` and the publish
 gate's `togetherBatchProblem` what each refuses of them, said in their
 words before anything is sent
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
+`src/connect.tsx`'s Include routines asks the discovery for the routines
+in scope, which `src/metadata.tsx` lists, `src/choose-actions.tsx`
+offers each as an action over the open record, ticking none, with
+`src/actions.ts` asking data-core's `routineProblem`, `actionUnoffered`
+and `sourceProblem` and the generator itself, in the browser, what each
+refuses, `src/policy-actions.tsx` grants each after a note of what it
+does that nothing binds, `src/presentation-actions.tsx` and
+`src/action-words.ts` hold its words to the server's spelling, and
+`src/drift.tsx` says what drift leaves of it
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request
