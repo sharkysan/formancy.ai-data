@@ -62,16 +62,23 @@ async function writeLinePolicy(user: User): Promise<HTMLElement> {
 describe('the box under a lookup', () => {
   // Offered under a key NOT NULL onto another table -- the order's
   // customer -- and under no other, never ticked; ticked, its bounds start
-  // at none required and at the cap data-core gives; unticked, they are
-  // gone. Watched failing with the box drawn under every lookup: the
-  // order's creator, which may be NULL, had one.
+  // at none required and at the cap data-core gives, and the box says what
+  // a save one level deep costs an order: nothing refuses publishing a
+  // form saved with each order beside it, whose rows are then read-only
+  // and, where it requires one, leave no order to create. Unticked, the
+  // bounds are gone. Watched failing with the box drawn under every
+  // lookup: the order's creator, which may be NULL, had one; and with the
+  // level's words left out of the box's description.
   test('is offered under a NOT NULL lookup onto another table, unticked, its bounds at none and the cap', async () => {
     const user = await signIn(plane)
     const here = await choose(user, 'fixture', 'sales.order', ['fk_order_customer', 'fk_order_created_by'])
     expect(box(here, 'customer').checked).toBe(false)
-    expect(within(here).queryByRole('checkbox', { name: 'Rows of this form are saved with their employee' })).toBeNull()
+    expect(within(here).queryByRole('checkbox', { name: /^Rows of this form are saved with their employee/ })).toBeNull()
     await user.click(box(here, 'customer'))
     expect(bounds(here)).toEqual(['0', String(TOGETHER_MAX_ROWS)])
+    expect(computeAccessibleDescription(box(here, 'customer'))).toContain(
+      'Once this is ticked, another form’s rows saved with each order are read-only under it, and where that form requires at least one, no order can be created; and where the customer’s own form saves its rows with another record, these are read-only too. Publishing refuses neither.',
+    )
     expect(await audit()).toEqual([])
     expect(unnamed()).toEqual([])
     await user.click(box(here, 'customer'))
@@ -89,6 +96,34 @@ describe('the box under a lookup', () => {
     expect(refused.disabled).toBe(true)
     expect(computeAccessibleDescription(refused)).toContain(
       'The generator refuses it: order is saved with its record, and row security on the table would hide rows from every count.',
+    )
+    expect(await audit()).toEqual([])
+  })
+
+  // An order's creator and approver, both NOT NULL onto employee here:
+  // each box, and the group around it, is told apart by its foreign key,
+  // as every other control of a lookup on this step is, while the
+  // customer's, alone onto its table, keeps the table's name. Ticked, the
+  // creator's makes the approver's one the generator refuses, said before
+  // anybody ticks it. Watched failing with the foreign key left out: two
+  // groups "order saved with its employee", each holding a box of one
+  // name, which no role and name could tell apart.
+  test('tells two boxes onto one table apart by their foreign keys, and refuses a second ticked', async () => {
+    const user = await signIn(plane)
+    const keys = ['fk_order_created_by', 'fk_order_approved_by']
+    const here = await choose(user, TOGETHER_CONNECTION, 'sales.order', [...keys, 'fk_order_customer'])
+    const boxes = keys.map((key) =>
+      within(within(here).getByRole('group', { name: `order saved with its employee (${key})` })).getByRole<HTMLInputElement>('checkbox', {
+        name: `Rows of this form are saved with their employee (${key})`,
+      }),
+    )
+    expect(box(here, 'customer').checked).toBe(false)
+    expect(unnamed()).toEqual([])
+    const [created, approved] = boxes as [HTMLInputElement, HTMLInputElement]
+    await user.click(created)
+    expect(approved.disabled).toBe(true)
+    expect(computeAccessibleDescription(approved)).toMatch(
+      /The generator refuses it: .+ are each saved with their record, and one lookup of a form at most is\.$/,
     )
     expect(await audit()).toEqual([])
   })
@@ -145,9 +180,11 @@ describe('what the server refuses at publish, said on the box', () => {
 
   // Lines too wide for one SQL Server batch at the cap: said under the box
   // in the publish gate's words, gone at the max it names, and generated
-  // at the cap, the Publish step waits on it with the same words. Watched
-  // failing with the Publish step not asking togetherBatchProblem: its
-  // button was enabled.
+  // at the cap, the Publish step waits on it with the same words, and says
+  // that the Choose step's Generate, the one way to a new max, starts the
+  // presentation afresh -- a draft taken up from Drift loses what it
+  // carried there. Watched failing with the Publish step not asking
+  // togetherBatchProblem: its button was enabled.
   test('a max past one batch, under the box and on the Publish step', async () => {
     const user = await signIn(plane)
     const here = await choose(user, TOGETHER_CONNECTION, 'sales.order_line', ['fk_order_line_order'])
@@ -171,8 +208,30 @@ describe('what the server refuses at publish, said on the box', () => {
       within(within(publish).getByRole('note'))
         .getAllByRole('listitem')
         .map((item) => item.textContent),
-    ).toEqual([`Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate again.`])
+    ).toEqual([
+      `Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate the form again there, which starts its presentation afresh.`,
+    ])
     expect(await audit()).toEqual([])
+  })
+
+  // A pin's attribute cleared while it is retyped leaves a policy the
+  // server cannot read, which it refuses before it asks about any batch:
+  // nothing is said of the batch then, since lowering At most would not
+  // answer it, and the pin's words come back with the attribute. Watched
+  // failing with togetherBatchProblem asking that policy: "binds up to
+  // Infinity parameters on SQL Server ...; a max of 0 or less fits".
+  test('nothing of the batch while a pin has no attribute', async () => {
+    const user = await signIn(plane)
+    const here = await choose(user, TOGETHER_CONNECTION, 'sales.order_line', ['fk_order_line_order'])
+    await user.click(box(here, 'order'))
+    await user.click(within(here).getByRole('checkbox', { name: 'Pin quantity' }))
+    const attribute = within(here).getByRole('textbox', { name: 'Attribute quantity is pinned to' })
+    const pinned = blocks(here)
+    expect(pinned.map((sentence) => sentence?.split(':')[0])).toEqual(['The server refuses the policy with it', 'Publishing refuses it'])
+    await user.clear(attribute)
+    expect(blocks(here)).toEqual([])
+    await user.type(attribute, 'tenant')
+    expect(blocks(here)).toEqual(pinned)
   })
 })
 

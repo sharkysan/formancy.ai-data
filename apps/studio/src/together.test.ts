@@ -3,11 +3,11 @@
 // Node rather than jsdom: what the Choose step says of rows saved with
 // their record is plain data, asked of data-core's own functions.
 import { describe, expect, test } from 'vitest'
-import { findObject, TOGETHER_MAX_ROWS } from '@formancy/data-core'
+import { boundsProblem, findObject } from '@formancy/data-core'
 import type { FormPolicy, LookupChoice, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 import { EMPTY_POLICY } from './policy-model.js'
-import { OWNER_SNAPSHOT, SQLSERVER_SNAPSHOT } from './test-server.js'
+import { OWNER_SNAPSHOT, SECTIONS_SNAPSHOT, SQLSERVER_SNAPSHOT } from './test-server.js'
 import { TOGETHER_SNAPSHOT } from './test-together.js'
 import { STARTING_BOUNDS, togetherCandidate, togetherReasons, touchCandidates } from './together.js'
 
@@ -57,12 +57,15 @@ describe('which lookups are offered to be saved with their record', () => {
     expect(offered(TOGETHER_SNAPSHOT, 'employee', 'fk_employee_manager')).toBe(false)
   })
 
-  // The box starts at no row required and at the cap data-core gives, the
-  // most one save can hold: watched failing with SAVE_MAX_ROWS, 100, which
-  // the generator refuses as above a page less one -- every box ticked
-  // would have started refused.
-  test('starts at none required and the cap', () => {
-    expect(STARTING_BOUNDS).toEqual({ min: 0, max: TOGETHER_MAX_ROWS })
+  // The box starts at no row required and at the largest max the
+  // generator's own rule takes, one row less than a list's page: watched
+  // failing with SAVE_MAX_ROWS, 100, which that rule refuses -- every box
+  // ticked would have started refused -- and with one row fewer, a max
+  // below the most a record may hold through the form.
+  test('starts at none required and the largest max the generator takes', () => {
+    expect(STARTING_BOUNDS.min).toBe(0)
+    expect(boundsProblem(STARTING_BOUNDS)).toBeNull()
+    expect(boundsProblem({ ...STARTING_BOUNDS, max: STARTING_BOUNDS.max + 1 })).not.toBeNull()
   })
 })
 
@@ -90,6 +93,19 @@ describe('what is refused of them, and in whose words', () => {
       fk_delivery_order: 'order is saved with its record, and row security on the table would hide rows from every count',
     })
     expect(reasons(SQLSERVER_SNAPSHOT, request('delivery', [DELIVERY_ORDER])).blocked).toEqual({})
+  })
+
+  // A customer's company details, whose key is its foreign key onto the
+  // customer: shown as a section of each customer, its box is not offered,
+  // in the generator's words, and offered again once it is not a section.
+  // Watched failing with the lookups not asked unticked: nothing said
+  // until the box was ticked.
+  test('a section, before its box is ticked', () => {
+    const plain: LookupChoice = { foreignKey: 'fk_customer_company_customer', display: ['name'] }
+    expect(reasons(SECTIONS_SNAPSHOT, request('customer_company', [{ ...plain, section: { when: null } }])).blocked).toEqual({
+      fk_customer_company_customer: "customer is saved with its record and is a section, and a section's lookup cannot be both",
+    })
+    expect(reasons(SECTIONS_SNAPSHOT, request('customer_company', [plain])).blocked).toEqual({})
   })
 
   // Ticked: bounds out of order are the generator's to refuse, a pin

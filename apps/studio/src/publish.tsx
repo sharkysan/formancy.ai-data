@@ -213,7 +213,9 @@ export function PublishStep({
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
     ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
     ...unfilteredProblems(unfiltered, proposal.bindings).map((problem) => `A field left out of the Filter panel the server refuses: ${problem}`),
-    batch === null ? null : `Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate again.`,
+    batch === null
+      ? null
+      : `Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate the form again there, which starts its presentation afresh.`,
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
   const next = (expected ?? 0) + 1

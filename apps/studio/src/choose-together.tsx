@@ -4,7 +4,7 @@ import { TOGETHER_MAX_ROWS } from '@formancy/data-core'
 import type { LookupChoice, ObjectMeta, RowFilterRule, TogetherBounds } from '@formancy/data-core'
 import type { Choice } from './choice.js'
 import { describeRef } from './choice.js'
-import { readableRowversion, STARTING_BOUNDS, touchCandidates } from './together.js'
+import { readableRowversion, STARTING_BOUNDS, togetherCandidate, touchCandidates } from './together.js'
 
 /** A bound as typed: a box left empty is no number, which the step refuses in the server's words rather than reading it as 0. */
 function bound(text: string): number {
@@ -75,10 +75,29 @@ function Bounds({
 }
 
 /**
+ * Whether another key of `root` that could be saved with its record
+ * references a table of the same name as `foreignKey` does, so that two
+ * boxes would read alike and need their foreign keys to be told apart, as
+ * every other control of a lookup on the step is named by its key.
+ */
+function namedAlike(root: ObjectMeta, foreignKey: string, target: string): boolean {
+  return root.foreignKeys.some((other) => other.name !== foreignKey && other.references?.table.name === target && togetherCandidate(root, other))
+}
+
+/**
  * Whether the form's rows are saved with the record a lookup references
  * (0155): a box, offered under a lookup whose foreign key is NOT NULL and
  * onto another table, and once ticked the bounds, starting at no row
- * required and the cap data-core gives. Never ticked for anybody.
+ * required and the cap data-core gives. Never ticked for anybody. Where
+ * another such key references a table of the same name, the group and the
+ * box name this one's foreign key too.
+ *
+ * Ticked, it also says what a save one level deep costs: a form whose
+ * rows are saved with this one's records then saves none, and where it
+ * requires rows, no record of this form can be created; and where the
+ * referenced table's own form is saved with another record, this form's
+ * rows are saved with none either. Nothing refuses either at publish,
+ * each bundle being read alone.
  *
  * Where the generator would refuse it -- row security on the table, a
  * section, a form over versions, another lookup already saved with its
@@ -110,10 +129,13 @@ export function TogetherChoice({
   const box = `${id}-together`
   const name = target.ref.name
   const refused = together === undefined ? blocker : null
+  const key = namedAlike(root, lookup.foreignKey, name) ? `(${lookup.foreignKey})` : null
+  const described = [`${box}-about`, ...(together === undefined ? [] : [`${box}-level`]), ...(refused === null ? [] : [`${box}-refused`])]
   return (
     <fieldset className="nested">
       <legend>
         {root.ref.name} saved with its {name}
+        {key === null ? null : ` ${key}`}
       </legend>
       <div className="check">
         <input
@@ -121,15 +143,30 @@ export function TogetherChoice({
           id={box}
           checked={together !== undefined}
           disabled={refused !== null}
-          aria-describedby={refused === null ? `${box}-about` : `${box}-about ${box}-refused`}
+          aria-describedby={described.join(' ')}
           onChange={(event) => onLookup(event.target.checked ? { ...plain, together: { ...STARTING_BOUNDS } } : plain)}
         />
-        <label htmlFor={box}>Rows of this form are saved with their {name}</label>
+        <label htmlFor={box}>
+          Rows of this form are saved with their {name}
+          {key === null ? null : (
+            <>
+              {' '}
+              <span className="visually-hidden">{key}</span>
+            </>
+          )}
+        </label>
       </div>
       <p id={`${box}-about`} className="hint">
         A page lists them under each {name}, and the {name}&rsquo;s own Save stores them with it, in one transaction: every change or none. They are then
         created and deleted only in that save, and still updated one at a time; the field naming the {name} is written when a row is created, never after.
       </p>
+      {together === undefined ? null : (
+        <p id={`${box}-level`} className="hint">
+          A save holds one level, so a form whose rows are saved with their record has none saved with its own. Once this is ticked, another form&rsquo;s rows
+          saved with each {root.ref.name} are read-only under it, and where that form requires at least one, no {root.ref.name} can be created; and where the{' '}
+          {name}&rsquo;s own form saves its rows with another record, these are read-only too. Publishing refuses neither.
+        </p>
+      )}
       {refused === null ? null : (
         <p id={`${box}-refused`} className="cannot-tell">
           The generator refuses it: {refused}.
@@ -180,8 +217,8 @@ export function TouchChoice({
   if (offered.length === 0) {
     return (
       <p className="hint">
-        No column of {where} can carry a save of its records&rsquo; rows alone: each is in a key or a foreign key, generated, or one this connection may not
-        both read and update. Rows of a form saved with these records are saved only as a record is created.
+        No column of {where} can carry a save of its records&rsquo; rows alone: each is in a key or a foreign key, generated, pinned, or one this connection may
+        not both read and update. Rows of a form saved with these records are saved only as a record is created.
       </p>
     )
   }

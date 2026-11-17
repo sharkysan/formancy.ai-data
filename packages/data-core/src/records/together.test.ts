@@ -11,7 +11,15 @@ import { planDelete } from './delete.js'
 import { grantedOperations, menuForm, type MenuBundle } from './menu.js'
 import { planCreate, planUpdate } from './plan.js'
 import { prepare } from './prepare.js'
-import { type MenuSaves, type MenuTogether, rowsRequired, saveParameters, SQLSERVER_MAX_PARAMETERS, togetherChildren } from './together.js'
+import {
+  type MenuSaves,
+  type MenuTogether,
+  rowsRequired,
+  saveParameters,
+  SQLSERVER_MAX_PARAMETERS,
+  togetherBatchProblem,
+  togetherChildren,
+} from './together.js'
 import {
   actor,
   CLERK,
@@ -376,5 +384,30 @@ describe('TogetherChild', () => {
     }
     // The update's three columns set and who changed it, beside the 5 located and the 2 of every statement.
     expect(saveParameters(stamped, togetherOn(generateForm(stamped, request).bindings, 'order'), DELETE_LINES)).toBe(2 + 3 + 1 + 5)
+  })
+})
+
+describe('togetherBatchProblem', () => {
+  // A line too wide for one batch at the cap is refused with the most that
+  // fits, and a policy that cannot be read is not the batch's to refuse:
+  // validatePolicy reports it, and the bundle check refuses it before the
+  // publish gate asks, so a step that asks both says the policy alone,
+  // never a batch of Infinity parameters that a max of 0 would fit.
+  // Watched failing with the unreadable policy asked: "binds up to
+  // Infinity parameters on SQL Server, past the 2100 one batch holds; a
+  // max of 0 or less fits".
+  test('says the most that fits, and nothing of a policy that cannot be read', () => {
+    const wide = factsSnapshot('sqlserver', (objects) => {
+      const line = objects.find((object) => object.ref.name === 'order_line') as ObjectMeta
+      for (let index = 1; index <= 45; index += 1) line.columns.push(col(`extra_${String(index)}`, line.columns.length + 1, INT32, { nullable: true }))
+    })
+    const bindings = togetherOn(lineForm(wide).bindings, 'order', { min: 0, max: TOGETHER_MAX_ROWS })
+    const each = saveParameters(wide, bindings, DELETE_LINES)
+    expect(togetherBatchProblem(wide, bindings, DELETE_LINES)).toBe(
+      `order is saved with its record up to ${String(TOGETHER_MAX_ROWS)} rows, and one change of a row binds up to ${String(each)} parameters on SQL Server, past the ${String(SQLSERVER_MAX_PARAMETERS)} one batch holds; a max of ${String(Math.floor(SQLSERVER_MAX_PARAMETERS / each))} or less fits`,
+    )
+    const unreadable: FormPolicy = { ...DELETE_LINES, rowFilters: [{ column: 'tenant_id', attribute: '' }] }
+    expect(saveParameters(wide, bindings, unreadable)).toBe(Number.POSITIVE_INFINITY)
+    expect(togetherBatchProblem(wide, bindings, unreadable)).toBeNull()
   })
 })

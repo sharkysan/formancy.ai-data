@@ -135,8 +135,12 @@ On the Choose step, under a lookup whose foreign key is NOT NULL and onto
 another table, "Rows of this form are saved with their order" makes the
 form's rows ones a host page holds under each order and stores with the
 order's own Save, in one transaction; ticked, "At least" and "At most" say
-how many each order holds, starting at none and at the most one save
-holds. Nothing ticks it for you. Where the generator would refuse it
+how many each order holds, starting at none and at the cap data-core
+gives, one row less than a list's page. Nothing ticks it for you. Ticked,
+it says that a save holds one level: a form saved with each line then
+saves none, and where it requires a row, no line can be created -- which
+nothing refuses when either is published. Two keys onto one table are
+told apart by their foreign keys. Where the generator would refuse it
 -- row security on the table, a section, a form over versions, another
 lookup already ticked -- the box is not offered and says why in the
 generator's words; ticked, what the generator, the bundle check and

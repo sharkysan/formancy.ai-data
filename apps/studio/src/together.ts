@@ -12,7 +12,7 @@ import type { ProposalRequest } from './api.js'
  * is sent.
  */
 
-/** The bounds a lookup takes once its box is ticked: no row required, and the most one save can hold, the cap data-core gives (`TOGETHER_MAX_ROWS`). */
+/** The bounds a lookup takes once its box is ticked: no row required, and the most a record may hold through the form, the cap data-core gives (`TOGETHER_MAX_ROWS`), one row less than a list's page. */
 export const STARTING_BOUNDS = { min: 0, max: TOGETHER_MAX_ROWS } as const
 
 /**
@@ -96,8 +96,10 @@ const NOTHING: TogetherReasons = { blocked: new Map(), chosen: [], touch: null }
  *   as it stands narrowing its rows by anything but their record
  *   (`togetherPolicyProblems`, the bundle check's), and on SQL Server more
  *   than one batch's parameters (`togetherBatchProblem`, the publish
- *   gate's). The policy can change after this step, and the Policy and
- *   Publish steps ask both again.
+ *   gate's) -- neither said of a policy that cannot be read, a pin's
+ *   attribute cleared, which the server refuses before either. The policy
+ *   can change after this step, and the Policy and Publish steps ask both
+ *   again.
  * - The touch column: the generator's refusal of it alone.
  */
 export function togetherReasons(snapshot: MetadataSnapshot, root: ObjectMeta, request: ProposalRequest, policy: FormPolicy): TogetherReasons {

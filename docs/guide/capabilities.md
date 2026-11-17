@@ -201,15 +201,19 @@ get*](../../README.md#what-you-get) is the short version, and
   0.3.0: on the Choose step, under a lookup whose foreign key is NOT NULL
   and onto another table, "Rows of this form are saved with their order",
   never ticked for anybody, and its "At least" and "At most", starting at
-  none and at the most one save holds; and on a rowversion table, the
-  column a save of a record's rows alone sets to itself, chosen from the
-  generator's candidates alone, none chosen first. What the generator, the
-  bundle check and publishing would refuse of either is said before
-  anything is sent, in their words: a lookup the generator refuses -- row
-  security on the table, a section, a form over versions, another lookup
-  saved with its record -- is not offered, and under one ticked, bounds
-  out of order, a pin outside the record's key, and on SQL Server more
-  rows than one batch's parameters hold, with the most that fits. The
+  none and at the cap data-core gives, one row less than a list's page;
+  and on a rowversion table, the column a save of a record's rows alone
+  sets to itself, chosen from the generator's candidates alone, none
+  chosen first. What the generator, the bundle check and publishing would
+  refuse of either is said before anything is sent, in their words: a
+  lookup the generator refuses -- row security on the table, a section, a
+  form over versions, another lookup saved with its record -- is not
+  offered, and under one ticked, bounds out of order, a pin outside the
+  record's key, and on SQL Server more rows than one batch's parameters
+  hold, with the most that fits. A save holds one level, and nothing
+  refuses publishing a form saved with its record beside one saved with
+  its own records, whose rows are then read-only and, where it requires a
+  row, leave those records uncreatable: the box says so once ticked. The
   generator is asked in the browser against the snapshot the step
   discovered, so a database changed since is said by Generate; a check
   constraint's expression is not read, so a column a check names is

@@ -16,8 +16,10 @@ export const EXTRA_LINE_COLUMNS = 45
  * `EXTRA_LINE_COLUMNS` more decimals, so that one change of a line binds
  * more parameters than one batch holds at the cap; and
  * `sales.employee.manager_id` NOT NULL, a key onto its own table that
- * nothing else stops being saved with its record. Made the one way a
- * snapshot is made, as `SECTIONS_SNAPSHOT` is.
+ * nothing else stops being saved with its record; and `sales.order`'s
+ * `created_by` and `approved_by` NOT NULL, two keys onto one table, each
+ * of which could be saved with its record. Made the one way a snapshot is
+ * made, as `SECTIONS_SNAPSHOT` is.
  */
 export const TOGETHER_SNAPSHOT: MetadataSnapshot = (() => {
   const { fingerprint: _fingerprint, ...contents } = SQLSERVER_SNAPSHOT
@@ -35,5 +37,6 @@ export const TOGETHER_SNAPSHOT: MetadataSnapshot = (() => {
   }
   const manager = table('employee').columns.find((column) => column.name === 'manager_id') as ColumnMeta
   manager.nullable = false
+  for (const column of table('order').columns) if (column.name === 'created_by' || column.name === 'approved_by') column.nullable = false
   return createSnapshot({ ...contents, objects })
 })()
