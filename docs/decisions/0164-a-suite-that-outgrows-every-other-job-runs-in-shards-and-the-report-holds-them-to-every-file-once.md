@@ -45,11 +45,11 @@
   also with the flag that sets it forced false).
   `scripts/release-report/render.test.mjs` -- the row names its shards and
   says its coverage is not merged (watched failing with each removed).
-  **Not yet shown by GitHub:** that the two `include` entries make two legs
-  and the step under `if: matrix.shard` runs in those alone, that the job's
-  name renders as `test (@formancy/data-host, 1/2)`, and what each shard
-  takes; the first run of the shards shows all of it, and its run id and
-  times belong here when it has.
+  **Shown by GitHub** in pull request #204's run 44154593962 and main's
+  run 44169472167 (both 2026-11-17): the two `include` entries made two
+  legs, named `test (@formancy/data-host, 1/2)` and `(…, 2/2)`, and the
+  step under `if: matrix.shard` ran in those two and was skipped in every
+  other leg of the job. What each shard took is under *What it buys*.
 
 ## Context
 
@@ -108,20 +108,41 @@ checks all read it.
 
 ## Consequences
 
-**What it buys.** Predicted, not measured: shard 1/2's 46 files took 3626 s
-of run 44027383496's file time and 2/2's 45 took 3101 s; at that run's 2.92
-files at a time, their spans come near 1241 s and 1062 s, and their tasks,
-with the 28 s that run's task spent outside its span, near 1270 s and
-1090 s, about 21 and 18 minutes, so the run's longest job would be WebKit's
-browser leg again. That run came before 0162 added its files, which the
-split places wherever their paths hash. The first run of the shards
-measures them.
+**What it buys.** Predicted before the first run: shard 1/2's 46 files took
+3626 s of run 44027383496's file time and 2/2's 45 took 3101 s; at that
+run's 2.92 files at a time, their spans come near 1241 s and 1062 s, and
+their tasks, with the 28 s that run's task spent outside its span, near
+1270 s and 1090 s, about 21 and 18 minutes, so the run's longest job would
+be WebKit's browser leg again. That run came before 0162 added its files,
+which the split places wherever their paths hash.
+
+Measured, from each shard's results artefact (each file's start to its
+end, and the turbo task's) and the job's times as GitHub's API gives them,
+on the suite's 93 files, 47 in shard 1/2 and 46 in 2/2:
+
+| Run (2026-11-17) | Shard | File time | Span | Files at a time | Task | Job |
+| --- | --- | --- | --- | --- | --- | --- |
+| 44154593962, pull request #204 | 1/2 | 3960 s | 1343 s | 2.95 | 1371 s | 23 min 30 s |
+| | 2/2 | 2110 s | 728 s | 2.90 | 761 s | 13 min 16 s |
+| 44169472167, main at #206 | 1/2 | 2251 s | 771 s | 2.92 | 797 s | 14 min 4 s |
+| | 2/2 | 1689 s | 583 s | 2.90 | 612 s | 10 min 55 s |
+
+The files at a time came out as predicted; the split did not. Shard 1/2
+held 65 % and 57 % of the two runs' file time, where the prediction gave
+it 54 %: its `page.test.tsx` took 971 s and 540 s and `drill.test.tsx`
+702 s and 394 s, the suite's two longest files in both runs. The same 47
+files took 1.76 times as long on one runner as on the other, so a runner's
+speed moves a shard's job by more than the split does. On main's run the
+longest job was WebKit's browser leg, 30 min 24 s; on #204's, shard 1/2,
+23 min 30 s, beside WebKit's 24 min 42 s.
 
 **What it costs.** The host's suite takes two runners where it took one, and
 each installs, builds what the host depends on, pulls SQL Server's image of
 about a gigabyte and a half and starts both databases. On run 44027383496
 the whole suite's job spent 36 s outside its task and its task 25 s before
-its first file; the runner time the second set adds is not measured yet.
+its first file. Measured on the two runs above, each shard's job spent 35
+to 47 s outside its task and its task 25 to 32 s before its first file, so
+the second set adds about 60 to 80 s of a runner's time to a run.
 
 The split is vitest's, by a hash of each path and not by time: shard 1/2
 holds both of that run's longest files, `page.test.tsx` at 784 s and

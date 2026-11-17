@@ -152,12 +152,13 @@ jobs:
     # still a limit a hung suite reaches; the host's suite in two jobs is the
     # fix that shortens the run rather than waiting longer for it.
     #
-    # So it runs in two shards (0164). Predicted, not measured, from run
-    # 44027383496's per-file times, which came before 0162 added its files:
-    # shard 1/2's 46 files took 3626 s of file time and 2/2's 45 took 3101 s,
-    # run 2.92 at a time, which puts their spans near 1241 s and 1062 s, and
-    # their tasks about 28 s longer, near 21 and 18 minutes. The first run of
-    # the shards measures them; the limit stays 60 until it has.
+    # So it runs in two shards (0164), predicted near 21 and 18 minutes from
+    # run 44027383496's per-file times. Measured on 2026-11-17, shard 1/2's
+    # job took 23 min 30 s in run 44154593962 and 14 min 4 s in 44169472167,
+    # and 2/2's 13 min 16 s and 10 min 55 s: the same 47 files of 1/2 took
+    # 1.76 times as long on one runner as on the other. 60 stays, two and a
+    # half times the slower, since a runner's speed alone moved one shard
+    # that far; a third shard is the step when one nears it.
     timeout-minutes: 60
     strategy:
       # Every suite reports, rather than the first failure cancelling the rest.

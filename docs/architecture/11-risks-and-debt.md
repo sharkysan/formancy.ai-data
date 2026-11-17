@@ -970,8 +970,10 @@ when #202 raised the limit to 60
 It now runs in two shards, each a job on a runner of its own
 (`.github/workflows/gates.yml`;
 [0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md)),
-predicted near 21 and 18 minutes from the 2026-11-17 run's file times,
-before 0162 added its files, and not yet measured. Accepted with it: two runners pulling SQL Server's image and
+predicted near 21 and 18 minutes from the 2026-11-17 run's file times and
+measured the same day at 23 min 30 s and 13 min 16 s in one run and
+14 min 4 s and 10 min 55 s in the next: the same files, on runners of
+different speed. Accepted with it: two runners pulling SQL Server's image and
 starting both databases where one did; a split vitest makes by a hash of
 each path, not by time, which puts both of that run's longest files in one
 shard and moves when a file is added; and no coverage figure for the
