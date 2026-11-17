@@ -462,8 +462,9 @@ browser's save of an object URL, which jsdom cannot make, so the host's
 when a header pressed with its list held leaves the grid without the rows
 it showed, its well not dimmed while it waits or still dimmed once it
 answers, a text in the dimmed well below 4.5:1 -- axe's audit of the well,
-and the header's and a cell's text composed at its opacity from the pixels
-painted before and during the dim -- or AG Grid not busy while it waits; when the line that says
+and a header's and a cell's text the well shows, each found again where
+the press moved it, composed at its opacity from the pixels painted in it
+before and during the dim -- or AG Grid not busy while it waits; when the line that says
 the answer is not the room's teal as it is said, which axe measures there
 since the gate waits for every animation to end before its own audit, or
 has not faded from where it began three fifths through its moment, or has

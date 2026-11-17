@@ -3,10 +3,10 @@
 // states left: every record, no sort. A header pressed with the list it asks
 // for held: the grid keeps the rows it showed, its well is dimmed and AG
 // Grid says it is busy, every text in the dimmed well still at 4.5:1 --
-// axe's own audit of the well, which reads its opacity, and the header's
-// and a cell's text, which axe cannot decide behind AG Grid's layers,
-// composed at the well's opacity from the pixels painted before and during
-// the dim -- and once the list is let go the sorted rows are
+// axe's own audit of the well, which reads its opacity, and a header's
+// and a cell's text the well shows, which axe cannot decide behind AG
+// Grid's layers, composed at the well's opacity from the pixels painted in
+// each before and during the dim -- and once the list is let go the sorted rows are
 // shown, the well no longer dimmed and nothing busy. The line that says so
 // is drawn in the room's teal -- the colour room.css gives --server --
 // which axe finds at 4.5:1 or more on its glass, and three fifths through
@@ -18,11 +18,14 @@
 //
 // What the accessibility tree cannot say, read from the document and said
 // where it is read: the well's opacity, which no role carries -- the well is
-// the grid's nearest `.grid-bench` -- and the teal's element in the line,
-// the `.server-did` the page draws its words in, and its animation.
+// the grid's nearest `.grid-bench` -- whether the well shows a header or a
+// cell, which is where the browser hit-tests a point inside it to it, the
+// scroll of what holds the well, which `inView` moves and puts back, and
+// the teal's element in the line, the `.server-did` the page draws its
+// words in, and its animation.
 
 import { FORM } from './plane.mjs'
-import { audit, contrast, dataRows, painted, parseColor, until } from './measure.mjs'
+import { audit, contrast, dataRows, paintedWhere, parseColor, until } from './measure.mjs'
 
 const LISTS = `**/v1/forms/${FORM}/records/list`
 const records = (page) => page.getByRole('region', { name: 'Records', exact: true })
@@ -83,23 +86,107 @@ function tealAt(page, share) {
 }
 
 /**
- * The Records grid's first header and first data cell with text: a point
- * inside each, clear of its text, where `decide` reads a grid's background
- * too, and each text's colour as the browser computes it.
+ * The Records grid's headers and data cells with text that its well shows:
+ * each with a point inside it, clear of its text, where `decide` reads a
+ * grid's background too, its text's colour as the browser computes it, and
+ * where it stands -- its row's `aria-rowindex` and its own `aria-colindex`
+ * -- for `whereNow`. Not the header the press goes to, which the press
+ * focuses and draws its sort in, and no cell with a control in it, whose
+ * text is the control's.
+ *
+ * Shown is where the browser hit-tests the point to the text's element. A
+ * header or a cell in the document is not always on screen: the grid
+ * scrolls sideways inside its well, and AG Grid keeps a column scrolled past
+ * the well's edge in the document. The views' states leave the orders
+ * scrolled sideways, and at 1440 by 900 the first header, Id, lay past the
+ * well's left edge, its point on the Forms navigation beside it, which no
+ * dim reaches (measured 2026-11-17 in Chromium on Windows): the check read
+ * the navigation, and failed once the action order's entry in it moved a
+ * link's words under the point.
  */
-const gridTexts = (page) =>
-  grid(page).evaluate((root) => {
-    const header = root.querySelector('[role="columnheader"]')
-    const cell = [...root.querySelectorAll('[role="row"]')]
-      .map((row) => row.querySelector('[role="gridcell"]'))
-      .find((each) => each !== null && (each.textContent ?? '').trim() !== '' && each.querySelector('input') === null)
-    return [header, cell]
-      .filter((each) => each !== null && each !== undefined)
-      .map((element) => {
+const gridTexts = async (page) =>
+  grid(page).evaluate(
+    (root, pressed) => {
+      const pointIn = (element) => {
         const box = element.getBoundingClientRect()
-        return { name: (element.textContent ?? '').trim().slice(0, 30), color: getComputedStyle(element).color, point: { x: box.left + 4, y: box.top + 4 } }
-      })
+        return { x: box.left + 4, y: box.top + 4 }
+      }
+      const shown = (element) => {
+        const point = pointIn(element)
+        return element.contains(document.elementFromPoint(point.x, point.y))
+      }
+      const said = (element) => (element.textContent ?? '').trim() !== ''
+      const placed = (element) => element.hasAttribute('aria-colindex') && element.closest('[role="row"]')?.hasAttribute('aria-rowindex') === true
+      const headers = [...root.querySelectorAll('[role="columnheader"]')].filter((each) => each !== pressed && said(each) && placed(each) && shown(each))
+      const cells = [...root.querySelectorAll('[role="gridcell"]')].filter(
+        (each) => said(each) && placed(each) && each.querySelector('input, select, textarea, button, a') === null && shown(each),
+      )
+      return [...headers, ...cells].map((element) => ({
+        kind: headers.includes(element) ? 'header' : 'cell',
+        name: (element.textContent ?? '').trim().slice(0, 30),
+        color: getComputedStyle(element).color,
+        point: pointIn(element),
+        row: element.closest('[role="row"]').getAttribute('aria-rowindex'),
+        column: element.getAttribute('aria-colindex'),
+      }))
+    },
+    await header(page).elementHandle(),
+  )
+
+/**
+ * Where each of `texts` is now, at the same place inside it, or null where
+ * the well no longer shows it there. Found again by where it stands and what
+ * it says, since the press moves the well down -- 144 pixels at 1440 by 900,
+ * measured 2026-11-17 in Chromium on Windows, so a point read before it lies
+ * on something else during the dim -- and AG Grid draws the rows it keeps in
+ * cells of new elements.
+ */
+const whereNow = (page, texts) =>
+  grid(page).evaluate(
+    (root, kept) =>
+      kept.map(({ kind, name, row, column }) => {
+        const role = kind === 'header' ? 'columnheader' : 'gridcell'
+        const element = [
+          ...root.querySelectorAll(`[role="row"][aria-rowindex="${CSS.escape(row)}"] [role="${role}"][aria-colindex="${CSS.escape(column)}"]`),
+        ].find((each) => (each.textContent ?? '').trim().slice(0, 30) === name)
+        if (element === undefined) return null
+        const box = element.getBoundingClientRect()
+        const point = { x: box.left + 4, y: box.top + 4 }
+        return element.contains(document.elementFromPoint(point.x, point.y)) ? point : null
+      }),
+    texts,
+  )
+
+/**
+ * `read` with the well wholly in view, by the scroll of what holds it -- the
+ * Records panel, which scrolls inside itself side by side, and the window --
+ * never of the grid's own, whose scroll is part of the state measured, and
+ * with the pointer in the window's corner, off the grid, so that no row is
+ * drawn hovered: as a person scrolls to the rows to read them. Each
+ * scroller is put back after. The press moves the well down, and at 1440 by
+ * 900 the panel's foot then showed only the top 9.5 pixels of the first row
+ * (measured 2026-11-17 in Chromium on Windows).
+ */
+async function inView(page, read) {
+  await page.mouse.move(0, 0)
+  await well(page).evaluate((element) => {
+    const held = []
+    for (let at = element.parentElement; at !== null; at = at.parentElement) held.push({ at, left: at.scrollLeft, top: at.scrollTop })
+    window.formancyGateScrolled = held
+    element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   })
+  try {
+    return await read()
+  } finally {
+    await page.evaluate(() => {
+      for (const { at, left, top } of window.formancyGateScrolled ?? []) {
+        at.scrollLeft = left
+        at.scrollTop = top
+      }
+      window.formancyGateScrolled = undefined
+    })
+  }
+}
 
 /**
  * Each of `texts` as the dimmed well draws it, against what was painted
@@ -152,10 +239,11 @@ export function waitingJourney(_plane, { check }) {
       async (page) => {
         await answered(page)
         const before = await shown(page)
-        const texts = await gridTexts(page)
-        const plain = await painted(
-          page,
-          texts.map((text) => text.point),
+        const { texts, colours: plain } = await inView(page, () =>
+          paintedWhere(page, async () => {
+            const found = await gridTexts(page)
+            return { texts: found, points: found.map((text) => text.point) }
+          }),
         )
         const held = []
         let asked = () => {}
@@ -177,21 +265,28 @@ export function waitingJourney(_plane, { check }) {
             const busy = (await grid(page).getAttribute('aria-busy')) === 'true' ? null : 'aria-busy was not true while it was asked for'
             // Every text in the dimmed well at 4.5:1: axe's own, which reads the well's opacity, and the grid's texts it cannot decide behind AG Grid's layers, composed here.
             const wellAudit = await audit(page, await well(page).elementHandle())
+            // The first header and the first cell the well showed before the press and still shows, each read where it is now.
+            const whileDimmed = await inView(page, () =>
+              paintedWhere(page, async () => {
+                const now = await whereNow(page, texts)
+                const at = ['header', 'cell'].map((kind) => texts.findIndex((text, index) => text.kind === kind && now[index] !== null))
+                return { at, points: at.filter((index) => index !== -1).map((index) => now[index]) }
+              }),
+            )
+            const missing = ['header', 'cell'].filter((_, index) => whileDimmed.at[index] === -1)
+            const measuring = whileDimmed.at.filter((index) => index !== -1)
             const ratios = dimmedRatios(
-              texts,
-              plain,
-              await painted(
-                page,
-                texts.map((text) => text.point),
-              ),
+              measuring.map((index) => texts[index]),
+              measuring.map((index) => plain[index]),
+              whileDimmed.colours,
               await drawnOpacity(page),
             )
             const low = ratios.filter((entry) => entry.ratio < 4.5)
             const readable =
               wellAudit.violations.length > 0
                 ? wellAudit.violations.join('; ')
-                : ratios.length < 2
-                  ? `only ${String(ratios.length)} of the grid's texts was found`
+                : missing.length > 0
+                  ? `no ${missing.join(' and no ')} of the grid's was shown in the well both before the press and while dimmed`
                   : low.length > 0
                     ? low.map((entry) => `${entry.name} ${String(entry.ratio)}:1`).join('; ')
                     : null
