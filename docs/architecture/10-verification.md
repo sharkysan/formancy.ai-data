@@ -202,8 +202,7 @@ TCP hop dropped sent once; the bundle check by `bundle.test.ts`,
 shared case: the route and the client sit above the port, where one server
 answers for both engines.
 
-What data-core decides of an action is held with no database, and nothing
-runs one yet: the binding and its every refusal by
+What data-core decides of an action is held with no database: the binding and its every refusal by
 `packages/data-core/src/generate/actions.test.ts`, who may run one by
 `policy/actions.test.ts`, a run's plan by `actions/plan.test.ts`, its words
 by `presentation/actions.test.ts` and drift against it by
@@ -229,6 +228,24 @@ a pool's reported size, a run's round trips on both of PostgreSQL's paths
 on 2026-11-16, and `packages/data-server/src/drivers.integration.test.ts`
 holds the actions' own client on each engine
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+The route that runs one is held over fake ports by
+`packages/data-server/src/routes/runtime-actions.test.ts` -- 403 before
+the connection is opened and before any statement, an action drift
+stops neither offered nor run, one whose routine changed offered and
+refused at its run, each answer's error by its dialog field, one run per
+write id and its second sending answered as it ran after the form is
+published again, a full pool refused with nothing sent, every code's
+answer, the trail and the log with no value, what the server publishes
+of an action, in whatever order its request names the parameters, and
+asks for its routines, and the deadline's setting -- and, through
+0031's TCP hop on both engines, by `e2e-lost-answer.integration.test.ts`, a lost run sent
+once; the client by `packages/data-client/src/transport.test.ts` and,
+across real HTTP on both engines, `actions.integration.test.ts`; and the
+built server's start by `scripts/server-start.test.mjs`, each watched
+failing with its rule taken out on 2026-11-17
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+None of these is a shared case: the route and the client sit above the
+port.
 
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on

@@ -276,6 +276,29 @@ get*](../../README.md#what-you-get) is the short version, and
   function's own SQL error is a refusal now, where it was a server error
   that the page read as "it may have been saved"
   ([0156](../decisions/0156-a-trigger-can-refuse-a-write-in-words-the-person-reads.md)).
+- **An action runs a routine your database keeps over the open record**,
+  on `main` since 0.3.0: a PostgreSQL function returning void or a SQL
+  Server procedure, bound by an administrator to a form with a source for
+  every parameter -- a field, a key, a dialog's answer, the person's
+  context or who they are -- and offered by `GET /v1/forms/:id` in
+  `actions` to the people its policy names, with the dialog asked first.
+  `POST /v1/forms/:id/actions/:action/run`, which `@formancy/data-client`'s
+  `runAction` sends, runs it in one transaction on both engines: the
+  record locked under the person's filters at the version they read, its
+  version moved, the routine called only as it was published and given
+  nothing the person may not read, or nothing at all. It is sent once per
+  write id and never again, under `FORMANCY_DATA_ACTION_DEADLINE_MS`, on
+  a pool of its own that never queues a run: a run with every connection
+  busy is refused at once. The answer is the record's token, a refusal in
+  the server's words or the routine's own under `formancy: refused: `,
+  or a lost answer that names the action and the version sent, so the
+  same run sent again is refused as changed if it ran. What the routine
+  does is the deployment's: field grants, state moves and the policy's
+  cascades do not bind it. The host page offers no action's control yet,
+  and the studio binds none
+  ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
+  [0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
+  [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).

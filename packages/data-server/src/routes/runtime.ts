@@ -43,6 +43,7 @@ import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
 import { auditedForm, auditRequests, recordReference } from '../audit.js'
 import { loadPublished } from '../published.js'
+import { formActions, registerActionRoute } from './runtime-actions.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
 import { NOT_FOUND, planRefusal, recordFailure, unknownOutcome } from './runtime-errors.js'
 import { registerExportRoute } from './runtime-exports.js'
@@ -72,6 +73,8 @@ export interface RuntimeOptions {
   lookupDeadlineMs: number
   /** How long a save may wait for a lock, and after which none of its steps starts (0155). */
   saveDeadlineMs: number
+  /** How long a run of an action may take before the database stops it (0161). */
+  actionDeadlineMs: number
 }
 
 declare module 'fastify' {
@@ -81,9 +84,10 @@ declare module 'fastify' {
      * asked of the database (0031). `rows`: the records an export wrote
      * into its file so far (0079), or the row changes a save carried
      * (0155). `moved`: whether a planned create or update -- or a save's
-     * record -- moves its policy's state field (0112).
+     * record -- moves its policy's state field (0112). `action`: the name
+     * of the action run, once the form binds it (0161).
      */
-    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null }
+    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null; action?: string }
   }
 }
 
@@ -105,6 +109,7 @@ export const ROUTE_OPERATIONS: Readonly<Record<string, RuntimeOperation>> = {
   'POST /v1/forms/:id/records/delete': 'delete',
   'POST /v1/forms/:id/records/supersede': 'supersede',
   'POST /v1/forms/:id/records/save': 'save',
+  'POST /v1/forms/:id/actions/:action/run': 'action',
   'POST /v1/forms/:id/lookups/:source/query': 'lookup-query',
   'POST /v1/forms/:id/lookups/:source/resolve': 'lookup-resolve',
   'POST /v1/forms/:id/views/save': 'view-save',
@@ -157,6 +162,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         record: recordReference(key, trail.record),
         rows: base.operation === 'export' || base.operation === 'save' ? (trail.rows ?? 0) : null,
         moved: trail.repeated === true ? null : (trail.moved ?? null),
+        ...(trail.action === undefined ? {} : { action: trail.action }),
       }
     },
   })
@@ -221,13 +227,29 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   async function sendOnce(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: UnknownOutcome['operation'],
+    operation: UnknownOutcome['operation'] | `action:${string}`,
     id: string | undefined,
     perform: () => Promise<WriteAnswer>,
   ): Promise<WriteAnswer & { repeated?: boolean }> {
     const actor = request.identity?.actor.id
     if (id === undefined || actor === undefined) return perform()
     return writes.once({ actor, form: request.params.id, operation, id, body: request.body }, perform)
+  }
+
+  /**
+   * The answer an earlier sending of this write id and body was given, or
+   * undefined: asked by a route that refuses before `sendOnce` by what the
+   * form says now (0161), so a sending already acted on is answered as it
+   * was.
+   */
+  async function sentBefore(
+    request: FastifyRequest<{ Params: { id: string } }>,
+    operation: `action:${string}`,
+    id: string | undefined,
+  ): Promise<(WriteAnswer & { repeated: true }) | undefined> {
+    const actor = request.identity?.actor.id
+    if (id === undefined || actor === undefined) return undefined
+    return writes.kept({ actor, form: request.params.id, operation, id, body: request.body })
   }
 
   /**
@@ -238,7 +260,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
    */
   function driftAnswer(
     request: FastifyRequest<{ Params: { id: string } }>,
-    operation: PolicyOperation | 'list' | 'form',
+    operation: PolicyOperation | 'list' | 'form' | 'action',
     changes: readonly DriftChange[] | undefined,
     message: string,
   ): WriteAnswer {
@@ -255,7 +277,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
   }
 
   /** A planner's refusal as the answer, its drift said in the log first, under the operation the audit names. */
-  function refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'list', plan: PlanRefusal): WriteAnswer {
+  function refusal(request: FastifyRequest<{ Params: { id: string } }>, operation: PolicyOperation | 'list' | 'action', plan: PlanRefusal): WriteAnswer {
     return plan.code === 'drift' && plan.drift !== undefined ? driftAnswer(request, operation, plan.drift, plan.message) : planRefusal(plan.code, plan.message)
   }
 
@@ -447,6 +469,8 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
       moves,
       opens,
       together,
+      // The actions this person may run, as the root as described now leaves them runnable (0161).
+      actions: formActions(bundle, actor, verdict),
     } satisfies PublishedForm
   })
 
@@ -487,7 +511,7 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
 
   // A record's answers written once per sending of a write id (0031): its echoes removed and its selections checked first.
   const served = (request: FastifyRequest) => servedForms(menu, request)
-  const { lookupDeadlineMs, saveDeadlineMs } = options
+  const { lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs } = options
   registerWriteRoutes(app, { published, connection, context, sendOnce, lost, refusal, describedRoot, answered, lookupDeadlineMs, served })
 
   // A record and its together children's rows, in one transaction (0155): every part's steps the write routes', in one request.
@@ -522,6 +546,9 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
     withoutEchoes,
     memberships: (open, checks, log) => memberships(open, checks, log, options.lookupDeadlineMs),
   })
+
+  // An action over the open record, run once per sending in one transaction on a pool of its own (0161).
+  registerActionRoute(app, { published, connection, context, sendOnce, sentBefore, refusal, answered, actionDeadlineMs })
 
   // A lookup's options and labels, each one statement that stops when its request is abandoned or its deadline passes (0061).
   registerLookupRoutes(app, { published, connection, context, lookupDeadlineMs: options.lookupDeadlineMs })

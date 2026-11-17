@@ -21,8 +21,9 @@ Apache-2.0 `@formancy/spec` for types only.
 ## What it exports
 
 ```ts
-createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, save, reconcile, query, resolve, saveView, removeView }
+createDataClient({ token, base?, fetch? }) // → { forms, form, read, list, exportRecords, create, update, supersede, delete, save, runAction, reconcile, query, resolve, saveView, removeView }
 isUnknownWrite(outcome) // → whether a create, update or delete's outcome is an UnknownWrite
+isUnknownAction(outcome) // → whether a run's outcome is an UnknownAction
 lookupSources(client, formId, form, operation | () => operation) // → { [source]: { resolve, maxRows } }
 sourceNames(form)       // → every optionsSource the document names, once each, in document order
 fieldProblems(refusal)  // → { [field]: [sentence, …] }, for engine.applyServerErrors
@@ -38,7 +39,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | Function | Route |
 |---|---|
 | `forms(signal?)` | `GET /v1/forms` → `{ forms: [{ id, title, operations, children }] }` |
-| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable, moves }` |
+| `form(formId)` | `GET /v1/forms/:id` → `{ form, operations, readable, list, deleting, copied, versions, writable, moves, opens, together, actions }` |
 | `read(formId, record)` | `POST /v1/forms/:id/records/read` |
 | `list(formId, query?, signal?)` | `POST /v1/forms/:id/records/list` → `{ rows, hasMore }` |
 | `exportRecords(formId, query?, signal?)` | `POST /v1/forms/:id/records/export` → `{ file, name }`, a `Blob` of CSV and `<form id>.csv` |
@@ -47,6 +48,7 @@ only for an abort the caller asked for, with the AbortError it raised.
 | `supersede(formId, { record, version, answers })` | `POST /v1/forms/:id/records/supersede` → the next version (0113) |
 | `delete(formId, { record, version })` | `POST /v1/forms/:id/records/delete` → `{ record, deleted: true }` |
 | `save(formId, { record, rows })` | `POST /v1/forms/:id/records/save` → `{ record, rows }`, the record and each change as stored (0155) |
+| `runAction(formId, name, { records, answers })` | `POST /v1/forms/:id/actions/:action/run` → `{ records }`, each record's token (0161) |
 | `reconcile(formId, unknown)` | `POST /v1/forms/:id/records/read`, or nothing when there is no token |
 | `query(formId, source, { operation, search, offset?, limit? }, signal?)` | `POST /v1/forms/:id/lookups/:source/query` |
 | `resolve(formId, source, { operation, tokens }, signal?)` | `POST /v1/forms/:id/lookups/:source/resolve` |
@@ -177,6 +179,27 @@ through and its bounds, or `null`, and a menu's child carries `together`
 -- its bounds and what this person may do with its rows in a save --
 where it is saved with its record; a form reply without `together` is
 `unexpected`.
+
+`runAction` runs an action a form offers in `actions` over the open
+record: `records`, exactly one `{ record, version }` at the version its
+person read, and `answers`, the action's dialog by field key, its two
+keys alone, with a write id of its own. It resolves to an `ActionOutcome`:
+done only on a token for every record it addressed -- never a version,
+since the run moved it and the routine may have moved it again, so a page
+reads the record again; a refusal, the server's code and sentence --
+`declined` in the deployment's own words, `stale` from a read the run
+or anybody moved, `unavailable` when the server's actions' pool is busy,
+`action-timeout` when PostgreSQL stopped it at its deadline, nothing done
+by any; or an `UnknownAction` -- `ok: false`, `operation: 'action'`, the
+action and each record with the version sent, from the call's own
+arguments -- whenever what answered was not the data server saying what
+happened. Running it again from those versions is refused `stale` if the
+first ran; `isUnknownAction` tells one apart, and nothing here sends it
+again
+([0161](../../docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+A form's `actions` is each action this person may run, its words, its
+dialog or `null`, and what to read again after it; a form reply without
+`actions` is `unexpected`.
 
 `exportRecords` is the file of every record `list` would page through for
 the same `search`, `sort`, `parent` and `filter`, the four keys it sends,

@@ -113,7 +113,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp'],
     scope: (id) => (id === 'erp' ? { schemas: ['sales'] } : undefined),
-    open: async (id) => (id === 'erp' ? { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter, actionPool: 0 } : undefined),
     close: async () => {},
   }
 }

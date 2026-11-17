@@ -94,7 +94,7 @@ function registry(database: Database, allowlist: readonly string[]): ConnectionR
     open: async (id) => {
       if (!allowlist.includes(id)) return undefined
       if (!database.reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter, actionPool: 0 }
     },
     close: async () => {},
   }

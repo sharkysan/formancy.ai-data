@@ -22,8 +22,10 @@ import type { FastifyRequest } from 'fastify'
  * another write -- a delete's included (0050), whose answer is a token and
  * `deleted`, so nothing of a deleted record is kept, and a save of a record
  * with its rows (0155), whose answer is the record and every row it wrote,
- * kept under the same byte cap as any other; and the same id with
- * another body is refused, because
+ * kept under the same byte cap as any other -- and a run of an action
+ * (0161), each action an operation of its own, `action:<name>`, whose
+ * answer is the tokens it addressed; and the same id with another body is
+ * refused, because
  * answering it with the first write's answer would say "Created" about
  * something never sent.
  *
@@ -93,6 +95,21 @@ interface Kept {
   bytes: number
 }
 
+/** Whose sending of what: another person, form, operation or id is another write. */
+interface Scope {
+  actor: string
+  form: string
+  operation: 'create' | 'update' | 'delete' | 'supersede' | 'save' | `action:${string}`
+  id: string
+  body: unknown
+}
+
+const keyOf = (scope: Scope): string => JSON.stringify([scope.actor, scope.form, scope.operation, scope.id])
+const digestOf = (body: unknown): string =>
+  createHash('sha256')
+    .update(JSON.stringify(body) ?? '')
+    .digest('hex')
+
 export function createWriteOnce(now: () => number = Date.now) {
   const kept = new Map<string, Kept>()
   let bytes = 0
@@ -113,15 +130,10 @@ export function createWriteOnce(now: () => number = Date.now) {
      * check and the claim are one synchronous step, so two sendings that
      * arrive together cannot both perform.
      */
-    async once(
-      scope: { actor: string; form: string; operation: 'create' | 'update' | 'delete' | 'supersede' | 'save'; id: string; body: unknown },
-      perform: () => Promise<WriteAnswer>,
-    ): Promise<WriteAnswer & { repeated: boolean }> {
+    async once(scope: Scope, perform: () => Promise<WriteAnswer>): Promise<WriteAnswer & { repeated: boolean }> {
       prune()
-      const key = JSON.stringify([scope.actor, scope.form, scope.operation, scope.id])
-      const digest = createHash('sha256')
-        .update(JSON.stringify(scope.body) ?? '')
-        .digest('hex')
+      const key = keyOf(scope)
+      const digest = digestOf(scope.body)
       const earlier = kept.get(key)
       if (earlier !== undefined) {
         if (earlier.digest !== digest) return { ...REUSED_WRITE_ID, repeated: false }
@@ -141,6 +153,22 @@ export function createWriteOnce(now: () => number = Date.now) {
         () => {},
       )
       return { ...(await answer), repeated: false }
+    },
+
+    /**
+     * The answer an earlier sending of this id with this body was given,
+     * with `repeated` -- awaited, if it is still with the database -- or
+     * undefined when none is kept, or when the one kept is another body's,
+     * which `once` refuses. Nothing is claimed: for a route that refuses
+     * before `once` by what the form says now (0161), so a sending already
+     * acted on is answered as it was whatever was published since, and a
+     * fresh one is refused as the form says.
+     */
+    async kept(scope: Scope): Promise<(WriteAnswer & { repeated: true }) | undefined> {
+      prune()
+      const earlier = kept.get(keyOf(scope))
+      if (earlier === undefined || earlier.digest !== digestOf(scope.body)) return undefined
+      return { ...(await earlier.answer), repeated: true }
     },
   }
 }

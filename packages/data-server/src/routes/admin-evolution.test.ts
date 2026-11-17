@@ -132,7 +132,7 @@ function registry(): ConnectionRegistry {
     open: async (id) => {
       if (id !== 'erp') return undefined
       if (!reachable) throw new Error('ECONNREFUSED 10.0.0.5:1433')
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter, actionPool: 0 }
     },
     close: async () => {},
   }

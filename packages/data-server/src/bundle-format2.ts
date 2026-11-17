@@ -1,5 +1,5 @@
-import { applyPresentation, findObject, generateForm, presentationShapeProblems } from '@formancy/data-core'
-import type { FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides, StampChoice } from '@formancy/data-core'
+import { actionChoiceOf, applyPresentation, findObject, generateForm, presentationShapeProblems } from '@formancy/data-core'
+import type { ActionChoice, FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides, StampChoice } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
 import type { BundleV2 } from './bundle.js'
@@ -64,7 +64,7 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
  * said to have produced (0030): the title, the root, a confirmed version
  * column and touch column (0155), the pins, the lookups with their
  * sections and whether each is saved with its record (0155), a chain of
- * versions and the stamps (0153). A regeneration generates from this
+ * versions, the stamps (0153) and the actions (0161). A regeneration generates from this
  * request and its draft is checked at publish against the same request, so
  * an edit to it alone would reach the next version unannounced. None of
  * these asks the generator, so a later release cannot fail a stored version
@@ -148,7 +148,29 @@ function requestProblems(generation: GenerationRequest, base: FormSchema, bindin
     if (!bound.some(same(lookup))) problems.push(`generation: chooses a lookup over ${shown(lookup)}, which the bindings do not have`)
   for (const lookup of bound)
     if (!generation.lookups.some(same(lookup))) problems.push(`generation: the bindings have a lookup over ${shown(lookup)}, which it does not choose`)
+  problems.push(...actionProblems(generation, bindings))
   return problems
+}
+
+/** A choice as one string, its parameters in their names' order: a request may list them in any order, and the bindings keep the routine's. */
+function choiceKey(choice: ActionChoice): string {
+  const parameters = [...choice.parameters].sort((left, right) => (left.parameter < right.parameter ? -1 : left.parameter > right.parameter ? 1 : 0))
+  return canonicalize({ ...choice, parameters })
+}
+
+/**
+ * Every action the bindings bind is one the request names, as it names it
+ * (0161): its routine, its scope and each parameter's source. Not the
+ * other way: the generator leaves out an action it refuses, with a note,
+ * and the form is still generated (0159), so a request may name more than
+ * the bindings bind.
+ */
+function actionProblems(generation: GenerationRequest, bindings: FormBindings): string[] {
+  const named = new Map((generation.actions ?? []).map((choice) => [choice.name, choiceKey(choice)]))
+  const bound = Array.isArray(bindings.actions) ? bindings.actions : []
+  return bound
+    .filter((action) => named.get(action.name) !== choiceKey(actionChoiceOf(action)))
+    .map((action) => `generation: the bindings bind action ${action.name}, which it does not name as they bind it`)
 }
 
 /** Whether the snapshot's root has a rowversion column; false for a snapshot no catalog could produce. */

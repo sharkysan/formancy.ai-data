@@ -47,12 +47,17 @@ export interface ConnectionConfig {
  * runs on a pool of its own (0160): a run holds a connection and row locks
  * for up to its deadline, and on the records' pool a handful of slow runs
  * would stall every read and write of every form on that database.
+ * `actionPool` is how many connections that pool opens at most, as the
+ * driver reports it or the factory set it: the most runs the runtime plane
+ * lets be in flight on it at once, so that no run waits in the pool's queue
+ * with its deadline running (0161). 0 lets none run.
  */
 export interface OpenConnection {
   adapter: DatabaseAdapter
   lookups: LookupAdapter
   records: RecordAdapter
   actions: ActionAdapter
+  actionPool: number
 }
 
 /**

@@ -70,6 +70,55 @@ the same day (formancy.ai 0232).
   what a new row's create takes, nor start one at its columns' defaults,
   which the form is served with only where that create takes them (0149).
 
+- **The runtime plane runs an action over the open record** (0161). Why:
+  both adapters ran an action (0160) and nothing called them, nor could a
+  form bind one -- the server read no `actions` in a generation request
+  -- so a routine the deployment keeps could not be offered to anybody.
+  What integrators notice: `POST /v1/forms/:id/actions/:action/run` takes
+  `{ records: [{ record, version }], answers }`, exactly one record, and
+  runs the action in the adapters' one transaction, sent once per write
+  id -- each action an operation of its own -- and never again, a second
+  sending answered as the first was even after the form is published
+  again; it is 403
+  before any statement to a person the policy does not let run it, 409
+  `drift` where the database no longer lets it run, 422 with each
+  answer's error by its dialog field, and answers 200 `{ records }` with
+  each record's token, a refusal in the server's words or 422 `declined`
+  in the deployment's, 503 `action-timeout` where PostgreSQL stopped it at
+  its deadline, or 502 `unknown-outcome` naming the action and each record
+  with the version sent, so the same run sent again is refused `stale` if
+  it ran. `GET /v1/forms/:id` gains the required `actions`: those this
+  person may run that the table as described leaves runnable, each with
+  its words and its dialog; a routine changed since publication is still
+  offered, and its run refused 409 `schema-changed` or `drift`.
+  `@formancy/data-client` gains `runAction`, its `ActionOutcome` and
+  `UnknownAction`, and `isUnknownAction`; a form reply without `actions`
+  is `unexpected` to it, so a host upgrades its server before its client.
+  A generation request's
+  `actions` is now read and held to the bindings, a format-1 bundle
+  binding one is not served, and a proposal naming one is discovered with
+  the routines in scope, as drift review, a regeneration, a restore and an
+  import are of a version whose snapshot recorded them -- so a server
+  before this refuses every version whose request names an action.
+  `OpenConnection` gains `actionPool`, the bound of its actions' pool, which
+  a connection an embedder's factory opens must report. The audit event
+  of a run is `action`, naming the action once the form binds it and the
+  record by its keyed hash, and never an answer; no other event carries
+  the `action` key. What operators notice:
+  `FORMANCY_DATA_ACTION_DEADLINE_MS`, how long a run may take before the
+  database stops it, 15,000 ms unset -- chosen as mssql's default request
+  timeout, not measured -- and anything but a whole number of milliseconds
+  stops the server at start; above 15,000 ms on SQL Server a save waiting
+  on a run may end as possibly saved. A run that would wait for a
+  connection of the actions' pool is refused 503 at once, with nothing
+  sent, so its deadline is never spent in a queue; each replica counts its
+  own. Behind Cloudflare
+  ([0037](docs/decisions/0037-cloudflare-is-the-edge-not-the-runtime.md)),
+  the runtime door now forwards the route, and so does the live demo's
+  Worker; run `tunnel-config` again, as the guide's section 8 says, or the
+  door does not forward a run, which fails closed. The host page offers no
+  action's control yet, and the studio binds none.
+
 - **A record is saved with the rows of its together children in one
   request** (0155). Why: an order could not be held to at least one line
   and at most a few, nor stored with its lines all or nothing -- a failed

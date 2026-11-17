@@ -62,8 +62,14 @@ export interface ConnectionTest extends ServerIdentity {
 /** Sends a refusal: a stable code, a sentence, and whatever else the caller can act on. */
 export type Refuse = (reply: FastifyReply, status: number, code: string, message: string, extra?: Record<string, unknown>) => FastifyReply
 
-/** Discovers a connection's database as it is now, or sends the refusal and gives `undefined`. */
-export type Discover = (connection: string, reply: FastifyReply) => Promise<MetadataSnapshot | undefined>
+/**
+ * Discovers a connection's database as it is now, within its approved
+ * scope, or sends the refusal and gives `undefined`; with the routines in
+ * it where `routines` asks (0158) -- a proposal that names an action, and
+ * every discovery compared with a published version whose snapshot
+ * recorded them, so review compares like with like (0161).
+ */
+export type Discover = (connection: string, reply: FastifyReply, routines?: boolean) => Promise<MetadataSnapshot | undefined>
 
 function refuse(reply: FastifyReply, status: number, code: string, message: string, extra: Record<string, unknown> = {}) {
   return reply.code(status).send({ code, message, ...extra })
@@ -156,12 +162,17 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     return open
   }
 
-  async function discover(id: string, reply: FastifyReply): Promise<MetadataSnapshot | undefined> {
+  /**
+   * The connection's catalog within its approved scope, with the routines
+   * in it where `routines` asks (0158): a snapshot records them only then,
+   * so every other discovery is the one it was before.
+   */
+  async function discover(id: string, reply: FastifyReply, routines = false): Promise<MetadataSnapshot | undefined> {
     const scope = registry.scope(id)
     const open = await connection(id, reply)
     if (open === undefined || scope === undefined) return undefined
     try {
-      return await open.adapter.discover(scope)
+      return await open.adapter.discover(routines ? { ...scope, routines: true } : scope)
     } catch (error) {
       reply.log.warn({ connection: id, error: (error as Error).message }, 'discovery failed')
       await refuse(reply, 503, 'unavailable', `Connection ${id} could not be read.`)
@@ -205,7 +216,8 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
     const trail = adminTrail(request)
     trail.form = read.generation.formId
     trail.connection = read.generation.connection
-    const snapshot = await discover(read.generation.connection, reply)
+    // A request that names an action is discovered with the routines its actions bind (0161); every other, as it always was.
+    const snapshot = await discover(read.generation.connection, reply, read.generation.actions !== undefined)
     if (snapshot === undefined) return reply
     try {
       // The request as it was read is what a format-2 bundle keeps (0030), so a regeneration asks for the same form.
@@ -270,7 +282,7 @@ export async function adminRoutes(app: FastifyInstance, options: AdminOptions): 
   app.post<{ Params: { id: string } }>('/v1/forms/:id/drift', async (request, reply) => {
     const published = await latest(request.params.id, reply)
     if (published === undefined) return reply
-    const current = await discover(published.bundle.connection, reply)
+    const current = await discover(published.bundle.connection, reply, published.bundle.snapshot.routines !== undefined)
     if (current === undefined) return reply
     return { version: published.version, ...diffSnapshots(published.bundle.snapshot, current, published.bundle.bindings, published.bundle.policy) }
   })

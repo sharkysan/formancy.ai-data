@@ -63,7 +63,8 @@ export async function gate(
   const bundle = checked.bundle
   trail.connection = bundle.connection
 
-  const current = await discover(bundle.connection, reply)
+  // Discovered as the bundle was, with its routines where it recorded them (0161).
+  const current = await discover(bundle.connection, reply, bundle.snapshot.routines !== undefined)
   if (current === undefined) return { ok: false }
 
   let served: Servable

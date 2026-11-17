@@ -131,7 +131,7 @@ function registry(kind: DatabaseKind, snapshot: ReturnType<typeof snapshotOf>): 
   return {
     ids: () => ['erp'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
+    open: async (id) => (id === 'erp' ? { adapter, lookups, records, actions: {} as ActionAdapter, actionPool: 0 } : undefined),
     close: async () => {},
   }
 }

@@ -1062,15 +1062,33 @@ other at the count where the child's foreign key has no index (§11.2).
 
 A routine the deployment keeps in its database, bound to a form as an
 action (0159) and run by an adapter over the open record
-([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). No route sends one yet: what follows is
-`ActionAdapter`, as `plannedAction` in `packages/data-fixtures/src/actions.ts`
-drives it the way the route will.
+([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)),
+through the runtime plane's route
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+
+0. `GET /v1/forms/:id` offers in `actions` those this person may run that
+   the root as described leaves runnable, each with its words and its
+   dialog. A page draws the dialog, then the confirmation, then sends one
+   `POST /v1/forms/:id/actions/:action/run`
+   (`packages/data-server/src/routes/runtime-actions.ts`), as data-client's
+   `runAction` does: the body's shape, the write id, the binding and the
+   policy, all before the connection is opened -- a sending of the write
+   id the server already acted on answered as it was before the binding
+   is asked, whatever was published since; then, once per sending of the
+   write id, a connection of the actions' pool free or 503 with nothing
+   sent, step 1, and the run, step 2 or 3, under
+   `FORMANCY_DATA_ACTION_DEADLINE_MS`. Step 1's description is not under
+   that deadline: on PostgreSQL nothing bounds it, and on SQL Server
+   mssql's default request timeout does.
 
 1. `describe(table, routine)` reads the root and the routine in one
    statement, each with the adapter's definition token: on PostgreSQL the
    routine `to_regprocedure` of its bound signature resolves to, on SQL
    Server the procedure OBJECT_ID names, each normalised by discovery's
-   own functions. `planAction` decides the run over them (0159).
+   own functions. One the catalog no longer resolves is `schema-changed`,
+   409 with nothing sent; `planAction` decides the run over them (0159),
+   and one that resolves to another description than the bound one is
+   `drift`, 409.
 2. `run(request, deadlineMs)` on PostgreSQL
    (`packages/data-postgres/src/actions/run.ts`) is one `sql.begin`:
    `SET LOCAL statement_timeout` to what remains of the deadline; on the
@@ -1109,10 +1127,18 @@ drives it the way the route will.
    prefix (0156), `refused` otherwise -- then the adapter's own statement. Nothing is ever sent
    again: a lost answer is `unknown-outcome`, and a run sent again from the
    same read is `stale`, since the first moved the version.
+5. The route answers 200 with each record's token, a refusal in the
+   server's words -- the deployment's own under the prefix -- or 502 naming
+   the action and each record with the version sent, and the trail holds
+   one `action` event naming the action and the record's keyed hash.
 
 Held by the shared cases in `packages/data-fixtures/src/actions.ts`, which
 each adapter's `actions.integration.test.ts` and
 `actions-lost-answer.integration.test.ts` assert through `covers()`, and
 by `packages/data-core/src/actions/failure.test.ts` for the one mapping of
 a refusal; that a run goes on a client of its own, by
-`packages/data-server/src/drivers.integration.test.ts`.
+`packages/data-server/src/drivers.integration.test.ts`; the route, by
+`packages/data-server/src/routes/runtime-actions.test.ts` and, losing an
+answer on both engines, `e2e-lost-answer.integration.test.ts`; the
+client, by `packages/data-client/src/actions.integration.test.ts` and
+`transport.test.ts`.

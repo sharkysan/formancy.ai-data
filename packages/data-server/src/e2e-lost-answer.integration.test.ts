@@ -4,7 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
 import type { DatabaseKind, FormBindings, FormPolicy, GenerationRequest, MetadataSnapshot } from '@formancy/data-core'
-import { answerBytes, EDGE_VALUES, POSTGRES_IMAGE, SQLSERVER_IMAGE, startPostgresFixture, startSqlServerFixture, startTcpHop } from '@formancy/data-fixtures'
+import {
+  actionToken,
+  answerBytes,
+  EDGE_VALUES,
+  POSTGRES_IMAGE,
+  SQLSERVER_IMAGE,
+  startPostgresFixture,
+  startSqlServerFixture,
+  startTcpHop,
+} from '@formancy/data-fixtures'
 import type { PostgresFixture, SqlServerFixture, TcpHop } from '@formancy/data-fixtures'
 import { createIdentityVerifier } from '@formancy/data-identity'
 import { connectPostgres } from '@formancy/data-postgres'
@@ -64,6 +73,8 @@ let hops: Record<'pg' | 'ms', TcpHop>
 let count: Count
 /** A row of lost.removable inserted by the owner, around the hop: its id. */
 let insertRemovable: (connection: 'pg' | 'ms', code: string) => Promise<string>
+/** An order of the actions schema (0160), of tenant 1 through its customer, inserted by the owner around the hop: its id. */
+let insertActionOrder: (connection: 'pg' | 'ms') => Promise<string>
 let closeOwners: () => Promise<void>
 let root: string
 let registry: ConnectionRegistry
@@ -109,6 +120,11 @@ beforeAll(async () => {
     { ...(connections[0] as ConnectionConfig), id: 'pg-lost', schemas: ['lost'] },
     { ...(connections[1] as ConnectionConfig), id: 'ms-lost', schemas: ['lost'] },
   )
+  // The actions schema every fixture loads (0160), whose close_order an order's action runs (0161).
+  connections.push(
+    { ...(connections[0] as ConnectionConfig), id: 'pg-actions', schemas: ['actions'] },
+    { ...(connections[1] as ConnectionConfig), id: 'ms-actions', schemas: ['actions'] },
+  )
   registry = createConnectionRegistry(connections, DRIVER_FACTORIES, {
     env: { PG_PASSWORD: decodeURIComponent(pgUrl.password), MS_PASSWORD: String(ms.admin.password) },
     readFile: async () => '',
@@ -148,6 +164,24 @@ beforeAll(async () => {
       (await msOwner.request().input('code', code).query<{ id: number }>('insert into lost.removable (code) output inserted.id values (@code)')).recordset[0]
         ?.id,
     )
+  }
+  insertActionOrder = async (connection) => {
+    if (connection === 'pg') {
+      const [customer] = await pgOwner.unsafe<Array<{ id: string }>>(
+        "insert into actions.customer (tenant_id, name) values (1, 'Customer') returning id::text as id",
+      )
+      const [order] = await pgOwner.unsafe<Array<{ id: string }>>(
+        'insert into actions."order" (customer_id, amount) values ($1::bigint, 12.50) returning id::text as id',
+        [customer?.id ?? ''],
+      )
+      return order?.id ?? ''
+    }
+    const customer = await msOwner.request().query<{ id: string }>("insert into actions.customer (tenant_id, name) output inserted.id values (1, N'Customer')")
+    const order = await msOwner
+      .request()
+      .input('customer', String(customer.recordset[0]?.id))
+      .query<{ id: string }>('insert into actions.[order] (customer_id, amount) output inserted.id values (cast(@customer as bigint), 12.50)')
+    return String(order.recordset[0]?.id)
   }
   count = async (connection, statement, text) => {
     if (connection === 'pg') return (await pgOwner.unsafe<Array<{ n: number }>>(statement.pg, [text]))[0]?.n ?? 0
@@ -284,10 +318,43 @@ const ORDERS_WITH_NOTES = {
   pg: 'select count(*)::int as n from sales."order" where notes = $1',
   ms: 'select count(*) as n from sales.[order] where notes = @text',
 }
+/** Orders of the actions schema closed with this note, the run's version moved by one: what a committed run of close leaves. */
+const ACTION_ORDERS_CLOSED = {
+  pg: 'select count(*)::int as n from actions."order" where note = $1 and status = \'closed\' and version = 2',
+  ms: "select count(*) as n from actions.[order] where note = @text and status = N'closed' and version = 2",
+}
 const CUSTOMERS_NAMED = {
   pg: 'select count(*)::int as n from sales.customer where name = $1',
   ms: 'select count(*) as n from sales.customer where name = @text',
 }
+
+/** close_order of the actions schema (0160), as each engine's catalog names it -- `numeric` quoted, as PostgreSQL's quote_ident spells a type name that is a keyword -- bound with one value from each kind of source. */
+const CLOSE_ACTION = {
+  postgres: {
+    name: 'close',
+    routine: { schema: 'actions', name: 'close_order', signature: 'pg_catalog.int8, pg_catalog.text, pg_catalog.text, pg_catalog."numeric", pg_catalog.int4' },
+    scope: 'record',
+    parameters: [
+      { parameter: 'p_order', from: { key: 'id' } },
+      { parameter: 'p_note', from: { input: 'note' } },
+      { parameter: 'p_actor', from: { actor: 'id' } },
+      { parameter: 'p_amount', from: { field: 'amount' } },
+      { parameter: 'p_tenant', from: { attribute: 'tenant' } },
+    ],
+  },
+  sqlserver: {
+    name: 'close',
+    routine: { schema: 'actions', name: 'close_order', signature: '' },
+    scope: 'record',
+    parameters: [
+      { parameter: '@p_order', from: { key: 'id' } },
+      { parameter: '@p_note', from: { input: 'note' } },
+      { parameter: '@p_actor', from: { actor: 'id' } },
+      { parameter: '@p_amount', from: { field: 'amount' } },
+      { parameter: '@p_tenant', from: { attribute: 'tenant' } },
+    ],
+  },
+} as const
 
 describe.each([
   { engine: 'PostgreSQL', connection: 'pg' as const, kind: 'postgres' as DatabaseKind, versionColumn: 'row_version', customerNo: 5101 },
@@ -559,5 +626,86 @@ describe.each([
       { operation: 'save', status: 502, outcome: 'unknown-outcome', rows: 1 },
       kind === 'sqlserver' ? { operation: 'save', status: 409, outcome: 'stale', rows: 1 } : { operation: 'save', status: 200, outcome: 'ok', rows: 1 },
     ])
+  })
+
+  // A run of an action whose answer is lost (0161) is 502, naming the
+  // action and the order with the version sent, and the database was
+  // asked once: the marker -- the note the routine is given, which
+  // PostgreSQL's routine raises as a notice before the COMMIT and SQL
+  // Server's procedure returns as a result set the batch's answer carries
+  // after it (0160) -- crossed the hop once. So PostgreSQL never committed,
+  // and SQL Server did. Either way the same run sent again from the
+  // version sent is safe, as the 502 says: on SQL Server it is stale, the
+  // run having moved the version; on PostgreSQL, once the lost
+  // transaction is rolled back, it runs. The trail names the action and
+  // the order each time, and none of the note. Watched failing on
+  // postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest with
+  // the route sending a run again after its answer was lost: PostgreSQL's
+  // second sending ran it, "expected 200 to be 502", and SQL Server's was
+  // stale, "expected 409 to be 502".
+  test('a run of an action is 502 with the action and the order with its version, sent once', async () => {
+    const formId = `${connection}-action-order`
+    const proposal = await call('/v1/form-proposals', admin, {
+      connection: `${connection}-actions`,
+      formId,
+      root: { schema: 'actions', name: 'order' },
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      versionColumn: 'version',
+      actions: [CLOSE_ACTION[kind]],
+    })
+    expect(proposal.statusCode, proposal.body).toBe(200)
+    const proposed = proposal.json<Proposal>()
+    expect(
+      proposed.bindings.actions?.map((action) => action.name),
+      JSON.stringify(proposal.json().notes),
+    ).toEqual(['close'])
+    // The clerk reads an order and runs close, within their tenant through its customer (0043).
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: Object.fromEntries(proposed.bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+      rowFilters: [],
+      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['customer'],
+      actions: { close: { roles: ['clerk'] } },
+    }
+    const published = await call(`/v1/forms/${formId}/versions`, admin, { expectedBase: null, bundle: asProposed(`${connection}-actions`, proposed, policy) })
+    expect(published.statusCode, published.body).toBe(201)
+
+    const record = actionToken(await insertActionOrder(connection))
+    const note = `lost ${randomUUID().slice(0, 8)}`
+    const body = { records: [{ record, version: '1' }], answers: { note } }
+    const { response, sent } = await sentAndLost(
+      note,
+      // SQL Server answers after its commit: wait until it is visible. PostgreSQL raised the notice before its COMMIT, which never follows.
+      async () => expect(await count(connection, ACTION_ORDERS_CLOSED, note)).toBe(kind === 'sqlserver' ? 1 : 0),
+      () => call(`/v1/forms/${formId}/actions/close/run`, clerk, body),
+    )
+    expect(response.statusCode, response.body).toBe(502)
+    expect(response.json()).toEqual({
+      code: 'unknown-outcome',
+      message: expect.stringContaining('It may have run.'),
+      operation: 'action',
+      action: 'close',
+      records: [{ record, version: '1' }],
+    })
+    expect(sent()).toBe(1)
+
+    // Sent again from the version sent: stale where it committed; where it was rolled back -- once PostgreSQL has seen the connection go -- it runs.
+    await eventually(async () => {
+      const again = await call(`/v1/forms/${formId}/actions/close/run`, clerk, body)
+      expect([again.statusCode, again.json().code ?? 'done']).toEqual(kind === 'sqlserver' ? [409, 'stale'] : [200, 'done'])
+    })
+    expect(await count(connection, ACTION_ORDERS_CLOSED, note)).toBe(1)
+
+    const trail = events.filter(
+      (event): event is RuntimeAuditEvent => event.plane === 'runtime' && event.form === formId && event.record === recordReference(AUDIT_KEY, record),
+    )
+    expect(trail[0]).toMatchObject({ operation: 'action', action: 'close', status: 502, outcome: 'unknown-outcome', rows: null })
+    expect(trail.at(-1)).toMatchObject(
+      kind === 'sqlserver' ? { action: 'close', status: 409, outcome: 'stale' } : { action: 'close', status: 200, outcome: 'ok' },
+    )
+    expect(JSON.stringify(trail)).not.toContain(note)
   })
 })

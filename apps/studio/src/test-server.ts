@@ -363,7 +363,7 @@ export async function startPlane(
         },
       } as unknown as RecordAdapter
       // Nor runs an action (0160).
-      return { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records, actions: {} as ActionAdapter, actionPool: 0 }
     },
     close: async () => {},
   }

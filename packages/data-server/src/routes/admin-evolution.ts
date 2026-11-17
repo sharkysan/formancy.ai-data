@@ -180,7 +180,8 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
         `Version ${String(loaded.version)} was published before 0030 and kept no generation request: propose the form again.`,
       )
     }
-    const current = await discover(bundle.connection, reply)
+    // Discovered as the version was, with its routines where it recorded them (0161).
+    const current = await discover(bundle.connection, reply, bundle.snapshot.routines !== undefined)
     if (current === undefined) return reply
 
     let drift: DriftReport
@@ -238,7 +239,7 @@ export function evolutionRoutes(app: FastifyInstance, { store, discover, refuse 
     const loaded = await loadVersion(store, id, version, reply.log)
     if (!loaded.ok) return refuse(reply, loaded.status, loaded.code, loaded.message)
     trail.connection = loaded.bundle.connection
-    const current = await discover(loaded.bundle.connection, reply)
+    const current = await discover(loaded.bundle.connection, reply, loaded.bundle.snapshot.routines !== undefined)
     if (current === undefined) return reply
 
     let served: Servable

@@ -241,6 +241,43 @@ existed would be documented and inert.
   commit, on both engines, and fails if the write crosses to the database a
   second time.
 
+  `POST /v1/forms/:id/actions/:action/run` runs an action the form binds
+  over the open record ([0161](../../docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)): `{ records: [{ record, version }],
+  answers }`, exactly one record, and the dialog's answers by field key.
+  In this order, each answering alone: a body of another shape 400, before
+  the write id is read; a write id that is not one 400; an action the form
+  does not bind, and a person its policy does not let run it, 403 before
+  the connection is opened and before any statement -- but a sending of
+  a write id the server already acted on, with the same body, is
+  answered as it was before either is asked, whatever was published
+  since; every connection of
+  the actions' pool running one 503 `unavailable`, nothing sent -- the
+  route counts the runs in flight against `OpenConnection.actionPool`, so
+  no run waits in the pool's queue; then the root and the routine
+  described in one statement, 409 `schema-changed` where either no
+  longer resolves, and the plan: 409 `drift` where the
+  database no longer lets the action run, 400 `duplicate-record`, 422
+  `invalid-values` with each answer's error by its dialog field; then one
+  run of the adapter's transaction under `FORMANCY_DATA_ACTION_DEADLINE_MS`,
+  answered 200 `{ records }` with each record's token, 404 `not-found`,
+  409 `stale`, `version-ended` or `schema-changed`, 403
+  `permission-denied`, 422 `declined` in the deployment's words or
+  `refused`, 503 `unavailable` or `action-timeout`, and 502
+  `unknown-outcome` naming the action and each record with the version
+  sent where the answer was lost. It is sent once per write id, each action
+  an operation of its own, and never again. `GET /v1/forms/:id` names in
+  `actions` those this person may run that the table as described leaves
+  runnable, each with its words and its dialog. The audit is one `action`
+  event naming the action, once the form binds it, and the record's keyed
+  hash, and never an answer. `routes/runtime-actions.test.ts` holds what
+  reaches the port; `e2e-lost-answer.integration.test.ts` loses a run's
+  answer on both engines and fails if it crosses to the database twice.
+  A generation request's `actions` is read and held to the bindings by
+  the bundle check, a format-1 bundle binding one is not served, and a
+  proposal naming one is discovered with the routines in scope -- as drift
+  review, a regeneration, a restore and an import are of a version whose
+  snapshot recorded them.
+
   A lookup's statement stops when its request is abandoned or its deadline
   passes ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)). The route passes the adapter a signal that aborts
   when the response or its socket closes before the answer
@@ -730,6 +767,7 @@ one-key settings rotate by restart; a key set rotates as below.
 | `FORMANCY_DATA_CORS_ORIGINS` | The origins a page may call the runtime plane from, comma-separated, each exactly as a browser sends `Origin`: `https://app.example`, or plain HTTP on `localhost`, `127.0.0.1` or `[::1]`. Empty or unset, none. A wildcard, a pattern, `null`, a path or a spelling no browser sends stops the process, and so does a list without the runtime plane. Read at start ([0060](../../docs/decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md)); see *Across origins*, below. |
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | How long a lookup statement may run, in milliseconds counted from when the adapter is asked for it, before the server stops it ([0061](../../docs/decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md)): a whole number from 1 to 2147483647, the longest a Node timer holds. Unset, `DEFAULT_LOOKUP_DEADLINE_MS` from `@formancy/data-core`, the slowest lookup answer `docs/performance.md` measured, which describes that machine and data: a slower or larger deployment raises it. Anything else stops the process with a sentence naming the setting, and `createDataServer` refuses the same as `runtime.lookupDeadlineMs`. On SQL Server mssql's default request timeout of 15 s still cuts any deadline set above it, answered `unavailable`. |
 | `FORMANCY_DATA_SAVE_DEADLINE_MS` | How long a save of a record with its rows (`POST /v1/forms/:id/records/save`) may wait for a lock, in milliseconds, and after which none of its steps starts: past it the save is rolled back and answered `503 unavailable` ([0155](../../docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)). A whole number from 1 to 2147483647; unset, `DEFAULT_SAVE_DEADLINE_MS` from `@formancy/data-core`, measured as `save-limits.ts` says. On PostgreSQL it bounds each statement of the save too; on SQL Server it does not, and a statement slow for another reason than a lock runs to mssql's request timeout of 15 s, which nothing here sets. So where the allowlist has a SQL Server connection, twice it must be below that timeout -- 7,499 at most -- or the process stops with a sentence naming the setting, since a save may run nearly twice the deadline before it is rolled back, and past the timeout it would be `unknown-outcome` instead. Anything else stops the process too. `createDataServer` refuses `runtime.saveDeadlineMs` only where it is not a whole number from 1 to 2147483647: the fit to mssql's timeout is checked by the runnable server (`main.ts`) alone, so an embedder whose registry has a SQL Server connection holds its own deadline to it. It is not a deadline on the whole transaction. |
+| `FORMANCY_DATA_ACTION_DEADLINE_MS` | How long a run of an action (`POST /v1/forms/:id/actions/:action/run`) may take, in milliseconds, before the database stops it ([0161](../../docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)): on PostgreSQL the statement timeout set before each of its statements to what remains of it, past which the run is rolled back and answered `503 action-timeout`; on SQL Server mssql's request timeout for its one batch, with half of it the lock's own bound, past which the run may have committed and is answered `502 unknown-outcome` ([0160](../../docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). The statement that describes the root and the routine before the run is not under it: on PostgreSQL nothing bounds that one, and on SQL Server mssql's default request timeout does. A whole number from 1 to 2147483647; unset, 15000, mssql's default request timeout, chosen and not measured. A run holds its record's lock for up to it, so a save of the record waits as long; on SQL Server, above 15000, a save waiting on a run may end as `unknown-outcome`, its own batch timing out first. Anything else stops the process, and `createDataServer` refuses `runtime.actionDeadlineMs` by the same rule. |
 | `PORT` | The port it listens on, 4390 when unset. |
 
 `src/rate-limit.test.ts` holds what the rate-limit setting accepts and
@@ -737,7 +775,8 @@ refuses, `src/trusted-proxies.test.ts` what the proxy list does,
 `src/cors.test.ts` what the origin list does,
 `src/lookup-deadline.test.ts` what the lookup deadline accepts,
 `src/save-deadline.test.ts` what the save deadline accepts and when it
-must be below mssql's request timeout, and
+must be below mssql's request timeout,
+`src/routes/runtime-actions.test.ts` what the action deadline accepts, and
 `src/publisher-roles.test.ts` what the publisher roles do.
 
 The log is JSON lines on standard output: Fastify's lines for each request,

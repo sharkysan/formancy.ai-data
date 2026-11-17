@@ -28,6 +28,7 @@ export type RuntimeOperation =
   | 'delete'
   | 'supersede'
   | 'save'
+  | 'action'
   | 'lookup-query'
   | 'lookup-resolve'
   | 'view-save'
@@ -98,6 +99,17 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * (0031). Whether, never from where or to where: a state is a value.
    */
   moved: boolean | null
+  /**
+   * `action` only (0161): the name of the action run, which is the
+   * form's configuration and never a value -- and only once the published
+   * form binds an action of that name, so a name only the URL said is
+   * never written. Absent from every other event, and from an action's
+   * refused before its form was read, so every event of another operation
+   * is what it was. Never an answer, an input, a field's value or the
+   * routine's message: a run the deployment declined is `declined`, its
+   * code alone.
+   */
+  action?: string
 }
 
 /**

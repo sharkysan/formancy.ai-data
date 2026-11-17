@@ -475,6 +475,24 @@ the account held no other permission on it, and over-reports a lost
 answer on PostgreSQL and any run past its deadline on SQL Server as "it
 may have run".
 
+**A run is sent once per write id, under one deadline, and never queued**
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). The runtime plane's route answers a sending of a
+write id it already acted on as it was, whatever was published since,
+and otherwise asks the policy before the connection is opened; then,
+once per sending of the write id -- each action an operation of its
+own -- holds a connection of the actions' pool
+for the run from its description to its answer, counted against the bound
+the connection reports, and refuses a run the pool cannot take at once
+503 with nothing sent: a deadline spent in the queue would be spent on
+nothing the run did. `FORMANCY_DATA_ACTION_DEADLINE_MS` is the run's
+deadline, 15 s unset, chosen and not measured. A form offers an action as
+the root described when it is opened leaves it runnable; the routine is
+described by the run. **Held by** `packages/data-server/src/routes/runtime-actions.test.ts`
+and, on both engines, `e2e-lost-answer.integration.test.ts`. **What it
+costs.** A full pool refuses at once however soon a run would answer, each
+replica counts its own runs, and a routine changed since publication is
+offered until its run is refused, 409 `schema-changed` or `drift`.
+
 
 ## 8.7 Audit
 
@@ -493,6 +511,10 @@ throws is logged and does not fail the request. A runtime event carries
 refused, for a `save` the row changes it carried, and `null` for every
 other operation -- a count, never which
 ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md), [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+An `action` event carries `action`, the name of the action run, once the
+published form binds one of that name, and no other event has the key --
+never an answer, an input or the routine's message
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
 And `moved`: whether a create or an update moved its policy's state field,
 never from where or to where
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).

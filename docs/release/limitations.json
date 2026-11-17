@@ -417,7 +417,7 @@
       ]
     },
     "0023": {
-      "reviewed": "sha256:37e53928edae70a9f14e69306b467f3caca9c8d7fdf036cfd624403208abde0a",
+      "reviewed": "sha256:3b9b26d686e6f6be55bbc34d0b9acfe30829ab0abf282a1a187d90e08400c69d",
       "limitations": [
         {
           "area": "operations",
@@ -599,7 +599,7 @@
       ]
     },
     "0029": {
-      "reviewed": "sha256:09ee2e05949f25fa601af960a742bc6cb2daae510e064bcf5442f333e3674749",
+      "reviewed": "sha256:e7c08125a8d1508aec6d3a936d64bd05e4c7801ea205936d9ecf6bf5b9838843",
       "limitations": [
         {
           "area": "host",
@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:45e47565d7de4aa73e29561217957f74b12b61c7a70ce7532b23f54dd593f4cc",
+      "reviewed": "sha256:6936d00cd623baa5a6ee6a7fa7ffd47615d99dfde5cfb850736ff0164d65fcd6",
       "limitations": [
         {
           "area": "writes",
@@ -1040,7 +1040,7 @@
       ]
     },
     "0041": {
-      "reviewed": "sha256:b2404891a7cb4805438ddddcd64a1b98c4ec0b1a5cedc617675baa43baf264fe",
+      "reviewed": "sha256:91e2c4d94bbce96eda598e6fc601c618f9306e40796440e092bf6ff03c59e939",
       "limitations": [
         {
           "area": "forms",
@@ -4648,11 +4648,11 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:d8139f1017ddb5d6d3b7781a0131c92fb3182ca66062efdf328e8ad2a1fef356",
+      "reviewed": "sha256:e22ffb0f2eb2b551a2d409920fbb55b120d1278ad9ecf7441c283bc3555ce71a",
       "limitations": [
         {
           "area": "databases",
-          "says": "Routines are read only when a discovery’s scope asks for them, and nothing in the server asks yet, so no snapshot it takes records one and nothing binds, runs or shows a routine."
+          "says": "Routines are read only when a discovery’s scope asks for them: the server asks for a proposal whose request names an action, and again wherever it compares a version whose snapshot recorded them, and every other snapshot it takes records none."
         },
         {
           "area": "databases",
@@ -4708,11 +4708,11 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:ea8f8c8665333421bd3305e36b45c112e864b7862d8b326551aff485f4d5a562",
+      "reviewed": "sha256:49fcc15d3e7e9736bb5c73fb783b4f637e0d92272f4796dcc45cb37d6722c0c7",
       "limitations": [
         {
           "area": "forms",
-          "says": "Nothing serves or runs an action yet: the server reads no actions in a generation request, so no form it publishes binds one."
+          "says": "An action is published only through a generation request its administrator writes: the studio binds none yet."
         },
         {
           "area": "databases",
@@ -4755,7 +4755,7 @@
         },
         {
           "area": "operations",
-          "says": "Drift review of a form with actions needs a discovery that records routines, and one that does not stops every action; nothing in the server asks for routines yet.",
+          "says": "Drift review of a form with actions needs a discovery that records routines, and one that does not stops every action; the server asks for them where the published version’s snapshot recorded them.",
           "heldBy": "packages/data-core/src/drift/routines.test.ts"
         },
         {
@@ -4769,12 +4769,8 @@
       ]
     },
     "0160": {
-      "reviewed": "sha256:ac60e9f53e0350973a4af420f160dad42ab7ea488c22d766ee009ceb3cb67607",
+      "reviewed": "sha256:9601980e4a4f89e7ee5c7866cf5419749dadd6753bc25d888a4c8b21138be716",
       "limitations": [
-        {
-          "area": "forms",
-          "says": "Nothing in the server runs an action yet: both adapters run one, and no route calls them."
-        },
         {
           "area": "writes",
           "says": "A run holds its record, and the parent it is scoped through, until it commits or rolls back, for up to its deadline: a save of the record or a move of the parent waits for it.",
@@ -4841,6 +4837,67 @@
         {
           "area": "databases",
           "says": "On PostgreSQL a routine with no parameter, replaced by an IMMUTABLE one between a run’s description and its call, is evaluated while the call is planned, before its guard refuses it: it cannot write, and the run is rolled back, but what it raises can reach the person."
+        }
+      ]
+    },
+    "0161": {
+      "reviewed": "sha256:1c2b72e639ef754b2604cbbb52ffbcf9cd3762351f858bf75085dcb34537af60",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "An action is run only by a page an integrator writes, through POST /v1/forms/:id/actions/:action/run or data-client’s runAction: the host page offers no action’s control yet.",
+          "heldBy": "apps/host/src/plane.test.tsx"
+        },
+        {
+          "area": "forms",
+          "says": "A form offers an action by its own table as described when it is opened; a routine that changed since publication is still offered, and its run is refused 409, schema-changed where the bound routine no longer resolves and drift where it resolves to another description.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Each server runs at most as many actions at once on one database as its actions’ pool holds, and refuses the next 503 at once rather than queue it.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "On SQL Server an actions’ pool opens at most ten connections, so a server runs at most ten actions at once on one such database.",
+          "heldBy": "packages/data-server/src/drivers.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "On PostgreSQL an actions’ client opens at most postgres.js’s own ten connections, so a server runs at most ten actions at once on one such database.",
+          "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Each replica counts only its own runs, so a database behind several servers may hold that bound in runs from each."
+        },
+        {
+          "area": "operations",
+          "says": "FORMANCY_DATA_ACTION_DEADLINE_MS is 15 seconds unset, chosen and not measured.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Above 15,000 ms of FORMANCY_DATA_ACTION_DEADLINE_MS, a save on SQL Server waiting on a run may end as possibly saved, which is reasoned and not measured."
+        },
+        {
+          "area": "operations",
+          "says": "A run’s audit event carries an action key no other event has, and names the action only once the form binds one of that name.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A proposal whose request names an action, and drift review, a regeneration, a restore and an import of a version discovered with routines, read the routines in scope as well.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Behind Cloudflare a tunnel forwards a run only once tunnel-config has written its configuration again."
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0161 refuses every version whose generation request names an action, as it refuses every property it does not read."
         }
       ]
     }

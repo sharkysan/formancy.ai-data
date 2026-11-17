@@ -85,8 +85,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *
  * Format 1 is still read, so every version published before 0030 is served
  * -- but not one whose bindings save a lookup's rows with their record or
- * name a touch column (0155): format 1 keeps no generation request, which
- * is where both are declared and compared.
+ * name a touch column (0155), or bind an action (0161): format 1 keeps no
+ * generation request, which is where each is declared and compared.
  *
  * It never throws. A part of another shape than a check reads -- a hand
  * edit's `null` where the bindings' fields belong -- is one more reason the
@@ -153,6 +153,8 @@ function checkedBundle(document: unknown): BundleValidation {
     problems.push(
       'format 1 keeps no generation request, which is where a lookup saved with its record and a touch column are declared (0155): publish format 2',
     )
+  if (format === 1 && Object.hasOwn(bindings, 'actions'))
+    problems.push('format 1 keeps no generation request, which is where an action is named (0161): publish format 2')
 
   // A snapshot no catalog could produce cannot be searched for filter columns.
   if (wellFormed) problems.push(...policyProblems(snapshot, bindings, policy))

@@ -1,5 +1,6 @@
 import { exportFileName, WRITE_ID_HEADER } from '@formancy/data-core'
 import type {
+  ActionRunBody,
   FieldError,
   FormMenu,
   FormRecord,
@@ -13,6 +14,8 @@ import type {
   RecordListQuery,
   SaveBody,
 } from '@formancy/data-core'
+import { actionOutcome } from './actions.js'
+import type { ActionOutcome } from './actions.js'
 import { reconcile } from './reconcile.js'
 import type { Reconciliation } from './reconcile.js'
 import { saveOutcome } from './saves.js'
@@ -414,6 +417,31 @@ export function createDataClient(options: DataClientOptions) {
       } as const
       const answer = await sendWrite(formId, intent, { record, rows: body.rows })
       return 'sent' in answer ? invalidName : saveOutcome(answer, intent)
+    },
+
+    /**
+     * `POST …/actions/:action/run` (0161): the action `name` over the
+     * records it addresses -- exactly one, the open record, at the version
+     * its person read -- with the answers to its dialog by field key. The
+     * answer is each record's token as the database holds its key, never a
+     * version: the run moved it, and the routine may have moved it again,
+     * so a host reads the record again. A refusal is the server's, nothing
+     * done; an `UnknownAction` when nobody can say whether it ran, named by
+     * what the call addressed -- running it again from the versions sent
+     * is refused as changed if it did. Exactly the route's two keys are
+     * sent, with a write id of its own, and nothing is sent again.
+     */
+    runAction: async (formId: string, name: string, run: ActionRunBody): Promise<ActionOutcome> => {
+      const records = run.records.map(({ record, version }) => ({ record, version }))
+      const answer = await exchange({
+        method: 'POST',
+        names: [formId, name],
+        route: ([form, action]) => `/v1/forms/${String(form)}/actions/${String(action)}/run`,
+        body: { records, answers: run.answers },
+        // New for every call, as every write's is (0031).
+        headers: { [WRITE_ID_HEADER]: newWriteId() },
+      })
+      return 'sent' in answer ? invalidName : actionOutcome(answer, { action: name, records })
     },
 
     /**

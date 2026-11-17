@@ -27,7 +27,7 @@ function fakeConnection(onClose: () => void = () => {}): OpenConnection {
     },
     close: async () => onClose(),
   } as DatabaseAdapter
-  return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
+  return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter, actionPool: 0 }
 }
 
 const secrets = { env: { ERP_PASSWORD: 'p@ss' }, readFile: async () => '' }

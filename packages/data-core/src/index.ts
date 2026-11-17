@@ -38,9 +38,9 @@ export { actionMove, actionUnoffered, deleteUnoffered, offeredFor, offers, versi
 export { ambiguousBeside, fitProblem, inputProblem, isParameterSource, routineProblem } from './generate/actions.js'
 export { ACTION_REFRESH } from './actions/wire.js'
 export type { ActionDone, ActionRefresh, ActionRunBody, ActionUnknownOutcome, FormAction } from './actions/wire.js'
-export { ACTION_REFUSED, planAction } from './actions/plan.js'
+export { ACTION_REFUSED, actionChoiceOf, planAction, readRunBody } from './actions/plan.js'
 export { runFailure } from './actions/failure.js'
-export type { DuplicateRecord, PlannedAction } from './actions/plan.js'
+export type { DuplicateRecord, PlannedAction, RunBody } from './actions/plan.js'
 export type {
   ActionAdapter,
   ActionArgument,

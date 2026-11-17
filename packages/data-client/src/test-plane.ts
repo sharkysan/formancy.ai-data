@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EMPTY_PRESENTATION, recordToken } from '@formancy/data-core'
-import type { FieldBinding, FormPolicy } from '@formancy/data-core'
+import type { FieldBinding, FormBindings, FormPolicy } from '@formancy/data-core'
 import { startTcpHop } from '@formancy/data-fixtures'
 import type { TcpHop } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, createIdentityVerifier, DRIVER_FACTORIES } from '@formancy/data-server'
@@ -91,6 +91,38 @@ async function sign(subject: string, claims: Record<string, unknown>): Promise<s
     .sign(createSecretKey(Buffer.from(SECRET, 'utf8')))
 }
 
+/**
+ * close_order of the actions schema (0160) as each engine's catalog names
+ * it -- PostgreSQL by its argument types, SQL Server by its name alone --
+ * bound with one value from each kind of source.
+ */
+const CLOSE_ACTION = {
+  pg: {
+    name: 'close',
+    routine: { schema: 'actions', name: 'close_order', signature: 'pg_catalog.int8, pg_catalog.text, pg_catalog.text, pg_catalog."numeric", pg_catalog.int4' },
+    scope: 'record',
+    parameters: [
+      { parameter: 'p_order', from: { key: 'id' } },
+      { parameter: 'p_note', from: { input: 'note' } },
+      { parameter: 'p_actor', from: { actor: 'id' } },
+      { parameter: 'p_amount', from: { field: 'amount' } },
+      { parameter: 'p_tenant', from: { attribute: 'tenant' } },
+    ],
+  },
+  ms: {
+    name: 'close',
+    routine: { schema: 'actions', name: 'close_order', signature: '' },
+    scope: 'record',
+    parameters: [
+      { parameter: '@p_order', from: { key: 'id' } },
+      { parameter: '@p_note', from: { input: 'note' } },
+      { parameter: '@p_actor', from: { actor: 'id' } },
+      { parameter: '@p_amount', from: { field: 'amount' } },
+      { parameter: '@p_tenant', from: { attribute: 'tenant' } },
+    ],
+  },
+} as const
+
 /** A clerk may do everything the form offers, on the fields it writes, inside their tenant; the e2e journey's policy. */
 function clerkPolicy(fields: readonly FieldBinding[]): FormPolicy {
   return {
@@ -121,9 +153,14 @@ function headersOf(init: RequestInit | undefined): Record<string, string> {
  * and with `saves`, `pg-saved-order` and `ms-saved-order` with
  * `pg-saved-line` and `ms-saved-line`, an order's lines saved with it, one
  * to three of them (0155), the order's touch column its notes on SQL
- * Server.
+ * Server; and with `actions`, `pg-action-order` and `ms-action-order`
+ * over the actions schema every fixture loads (0160), whose `close` a
+ * clerk may run over an order of their tenant, through its customer
+ * (0161).
  */
-export async function startPlane(options: { hops?: boolean; lines?: boolean; removable?: boolean; countries?: boolean; saves?: boolean } = {}): Promise<Plane> {
+export async function startPlane(
+  options: { hops?: boolean; lines?: boolean; removable?: boolean; countries?: boolean; saves?: boolean; actions?: boolean } = {},
+): Promise<Plane> {
   const { pg, ms } = inject('databases')
   const connections: ConnectionConfig[] = [
     { id: 'pg', kind: 'postgres', ...pg, password: 'env:PG_PASSWORD', schemas: ['sales'], tls: { enabled: false } },
@@ -132,6 +169,8 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
   const [pgConnection, msConnection] = connections as [ConnectionConfig, ConnectionConfig]
   // Every key of the parity schema's removable tables is numbered by the database, so a version proves a record (0050).
   connections.push({ ...pgConnection, id: 'pg-parity', schemas: ['parity'] }, { ...msConnection, id: 'ms-parity', schemas: ['parity'] })
+  // The actions schema's routines are asked for by a proposal that names an action (0161).
+  connections.push({ ...pgConnection, id: 'pg-actions', schemas: ['actions'] }, { ...msConnection, id: 'ms-actions', schemas: ['actions'] })
   const hops = options.hops === true ? { pg: await startTcpHop({ ...pg, kind: 'postgres' }), ms: await startTcpHop({ ...ms, kind: 'sqlserver' }) } : undefined
   if (hops !== undefined) {
     // The same databases, reached through the hops by the address an operator would write.
@@ -254,6 +293,35 @@ export async function startPlane(options: { hops?: boolean; lines?: boolean; rem
         bundle: { format: 2, connection, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
       })
     }
+  }
+  // An order of the actions schema with its close (0161): the clerk reads it and runs close, nothing else, within their tenant through the order's customer (0043).
+  for (const { connection } of options.actions === true ? ENGINES : []) {
+    const formId = `${connection}-action-order`
+    const proposal = await admin('/v1/form-proposals', {
+      connection: `${connection}-actions`,
+      root: { schema: 'actions', name: 'order' },
+      formId,
+      title: 'Order',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      versionColumn: 'version',
+      actions: [CLOSE_ACTION[connection]],
+    })
+    const bindings = proposal['bindings'] as FormBindings
+    if ((bindings.actions ?? []).length !== 1) throw new Error(`the generator bound no close on ${connection}: ${JSON.stringify(proposal['notes'])}`)
+    const policy: FormPolicy = {
+      version: 1,
+      operations: { read: ['clerk'], create: [], update: [] },
+      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+      rowFilters: [],
+      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+      through: ['customer'],
+      actions: { close: { roles: ['clerk'] } },
+    }
+    const { form, snapshot, generation } = proposal
+    await admin(`/v1/forms/${formId}/versions`, {
+      expectedBase: null,
+      bundle: { format: 2, connection: `${connection}-actions`, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+    })
   }
   // A customer form whose lookup reads `sales.country`, which no other form here
   // reads and no write here checks: a suite may hold that table locked

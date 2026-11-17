@@ -234,6 +234,37 @@ function isTogether(value: unknown): value is PublishedForm['together'] {
   return value === null || (isRecord(value) && typeof value['field'] === 'string' && isBounds(value))
 }
 
+/** A text a form or an action is worded in: a string, or formancy's message reference `{ $t }`. */
+function isText(value: unknown): boolean {
+  return typeof value === 'string' || (isRecord(value) && Object.keys(value).length === 1 && typeof value['$t'] === 'string')
+}
+
+/**
+ * The actions a person may run over the open record (0161): a list, each
+ * a name, words, the scope `record`, a dialog that is a form or none, and
+ * what else to read again, `list` and `children` each at most once. A
+ * reply without it is from a server older than 0161, whose page would
+ * offer no action.
+ */
+function isActions(value: unknown): value is PublishedForm['actions'] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry['name'] === 'string' &&
+        entry['scope'] === 'record' &&
+        isText(entry['label']) &&
+        (entry['confirm'] === null || isText(entry['confirm'])) &&
+        (entry['done'] === null || isText(entry['done'])) &&
+        (entry['dialog'] === null || (isRecord(entry['dialog']) && isRecord(entry['dialog']['model']))) &&
+        Array.isArray(entry['refresh']) &&
+        entry['refresh'].every((view) => view === 'list' || view === 'children') &&
+        new Set(entry['refresh']).size === entry['refresh'].length,
+    )
+  )
+}
+
 export function isPublishedForm(body: unknown): body is PublishedForm {
   return (
     isRecord(body) &&
@@ -248,7 +279,8 @@ export function isPublishedForm(body: unknown): body is PublishedForm {
     isWritable(body['writable'], body['operations'] as unknown[], body['together']) &&
     isMoves(body['moves']) &&
     isOpens(body['opens']) &&
-    isTogether(body['together'])
+    isTogether(body['together']) &&
+    isActions(body['actions'])
   )
 }
 

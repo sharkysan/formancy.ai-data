@@ -263,7 +263,7 @@ runtime plane only when given a registry and a store.
 | `drift-check.ts`, `drift-check-cli.ts` | The drift check a deploy pipeline runs, which the image ships beside the server: `POST /v1/forms/:id/drift` for each form named, exiting 1 on a failing change and 2 on a form it could not check ([0111](../decisions/0111-a-deploy-pipeline-checks-drift-with-a-command-that-fails-on-a-blocking-change.md)) |
 | `audit.ts` | `auditRequests`, the one set of hooks both planes install: one event per request, and a route without an audit name stops the server (0023, 0033) |
 | `export-limits.ts` | `EXPORT_DEADLINE_MS`, how long a file of records may take, derived from the read timeout of the proxy in front, which `export-limits.test.ts` holds it below in `deploy/web/nginx.conf` ([0079](../decisions/0079-a-person-downloads-the-records-a-list-shows-them-as-one-csv-file-made-whole-or-not-at-all.md)) |
-| `cors.ts`, `trusted-proxies.ts`, `lookup-deadline.ts`, `save-deadline.ts`, `rate-limit.ts` | Each setting's rule, parsed here so it is tested without starting a process; `createDataServer` holds an embedder's origins, proxies and deadlines to the same rules (0060, 0071, 0061, 0155); `save-deadline.ts` also holds the save deadline below mssql's request timeout wherever a SQL Server connection is allowed, which `main.ts` asks of the allowlist |
+| `cors.ts`, `trusted-proxies.ts`, `lookup-deadline.ts`, `save-deadline.ts`, `action-deadline.ts`, `rate-limit.ts` | Each setting's rule, parsed here so it is tested without starting a process; `createDataServer` holds an embedder's origins, proxies and deadlines to the same rules (0060, 0071, 0061, 0155, [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)); `save-deadline.ts` also holds the save deadline below mssql's request timeout wherever a SQL Server connection is allowed, which `main.ts` asks of the allowlist |
 | `paths.ts` | `plainPath`: the server routes only a path with nothing in it to normalise, and refuses every other before any route's work (0037) |
 
 The routes, one plane per file prefix:
@@ -286,6 +286,7 @@ The routes, one plane per file prefix:
 | `routes/runtime-deletes.ts` | runtime | a delete (0050) |
 | `routes/runtime-supersede.ts` | runtime | a change from a date, read and decided as an update is ([0113](../decisions/0113-a-form-over-versions-changes-the-open-one-from-a-date.md)) |
 | `routes/runtime-save.ts`, `routes/save-body.ts`, `routes/save-answers.ts` | runtime | a record with its together children's rows, in one transaction, once per sending of its write id: the body's shape, each child the menu's, every part's policy and a new record's create as the menu offers it before any read, the reads and `planSave`, the membership checks, one call of `RecordAdapter.save`, and its answer or refusal at the part it names (0155) |
+| `routes/runtime-actions.ts` | runtime | an action run over the open record, once per sending of its write id, each action an operation of its own: the body's shape, the write id, a sending already acted on answered as it was, the binding and who may run it before the connection is opened, a connection of the actions' pool free -- the runs in flight counted against `OpenConnection.actionPool`, a full pool 503 with nothing sent -- the root and the routine described, `planAction`, one run under the server's deadline, and its answer in 0160's codes; and `formActions`, what `GET` offers ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)) |
 | `routes/runtime-lookups.ts`, `routes/abandoned.ts` | runtime | a lookup's query and resolve, stopped in the database when the browser leaves or the deadline passes (0061); `lookupScope`, the one place a lookup's filter is decided, which an export asks too |
 | `routes/write-once.ts`, `routes/runtime-errors.ts` | runtime | a write applied once per sending (0031); a refusal as an HTTP answer that names a rule, never a value (0011) |
 
@@ -310,7 +311,11 @@ answer was lost as unknown, never as refused, and read what it addressed
 instead of sending it again (0031). `save` sends a record with its
 together children's rows, its answer read in `saves.ts` by the same
 rules and its refusal with the part it names; `reconcile` reads a lost
-save by its record alone (0155). `lookups.ts` turns a form's lookups into
+save by its record alone (0155). `runAction` runs an action over the open record, its answer read in
+`actions.ts` by the same rules -- `heard`, the one reading a write and a run
+share -- done only on a token for every record, and anything else an
+`UnknownAction` naming the action and the records with their versions
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). `lookups.ts` turns a form's lookups into
 option sources both renderers take, a document naming a source and nothing
 else
 ([formancy.ai 0077](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0077-options-may-come-from-a-named-source.md),

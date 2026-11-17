@@ -9,6 +9,7 @@ import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { DEFAULT_ACTION_DEADLINE_MS } from '../action-deadline.js'
 import { createDataServer } from '../app.js'
 import type { AdminAuditEvent, AuditEvent, AuditSink } from '../audit.js'
 import type { ConfigurationStore, PublishOutcome } from '../config-store.js'
@@ -107,7 +108,7 @@ function registry(): ConnectionRegistry {
     open: async (id) => {
       if (id !== 'erp') return undefined
       if (!reachable) throw new Error(`ECONNREFUSED ${HOST}:1433`)
-      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter }
+      return { adapter, lookups: {} as LookupAdapter, records: {} as RecordAdapter, actions: {} as ActionAdapter, actionPool: 0 }
     },
     close: async () => {},
   }
@@ -221,6 +222,7 @@ describe('what holds the trail in place', () => {
         authenticate,
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
         saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+        actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
       })
       instance.get('/v1/forms/:id/unnamed', async () => ({}))
     })
@@ -258,6 +260,7 @@ describe('what holds the trail in place', () => {
           authenticate,
           lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
           saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+          actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
           audit: { sink: to },
         }),
     },
@@ -309,6 +312,7 @@ describe('what holds the trail in place', () => {
         authenticate,
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
         saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+        actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
         audit: { sink },
       })
     })

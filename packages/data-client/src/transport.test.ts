@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, test } from 'vitest'
 import { CROSS_ORIGIN_REQUEST_HEADERS, WRITE_ID_HEADER } from '@formancy/data-core'
 import { createDataClient } from './client.js'
+import { isUnknownAction } from './actions.js'
 import { isUnknownWrite } from './writes.js'
 import type { UnknownWrite } from './writes.js'
 
@@ -140,6 +141,7 @@ describe('when the data server is not what answers', () => {
       moves: null,
       opens: [],
       together: null,
+      actions: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -462,6 +464,7 @@ describe('across origins (0060)', () => {
       supersede: () => client.supersede('pg-order', CHANGE),
       delete: () => client.delete('pg-order', { record: 'k1:7', version: '00000000000007d1' }),
       save: () => client.save('pg-order', { record: { create: { answers: { notes: 'a' } } }, rows: [] }),
+      runAction: () => client.runAction('pg-order', 'close', { records: [{ record: 'k1:7', version: '00000000000007d1' }], answers: { note: 'a' } }),
       reconcile: () => client.reconcile('pg-order', lost),
       query: () => client.query('pg-order', 'order.customer', { operation: 'read', search: 'a' }),
       resolve: () => client.resolve('pg-order', 'order.customer', { operation: 'read', tokens: ['k1:1'] }),
@@ -767,6 +770,7 @@ describe('a delete (0050)', () => {
       moves: null,
       opens: [],
       together: null,
+      actions: [],
     }
     const DELETING = { cascades: false, clears: false, restricted: true }
     let body: unknown = FORM
@@ -800,7 +804,17 @@ describe('a delete (0050)', () => {
   // copy nobody decided -- as one from a server older than 0107, which
   // sends nothing, would.
   test("a form's copied is null exactly when it offers no create, and field keys when it does", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [], together: null }
+    const FORM = {
+      form: { model: {} },
+      readable: ['id', 'note'],
+      list: null,
+      deleting: null,
+      versions: null,
+      moves: null,
+      opens: [],
+      together: null,
+      actions: [],
+    }
     const writes = (operations: readonly string[]) => ({ create: operations.includes('create') ? ['note'] : null, update: null })
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -846,6 +860,7 @@ describe('a delete (0050)', () => {
       moves: null,
       opens: [],
       together: null,
+      actions: [],
     }
     const writes = (operations: readonly string[]) => ({
       create: operations.includes('create') ? ['valid_from'] : null,
@@ -885,7 +900,17 @@ describe('a delete (0050)', () => {
   // this server sent, and a page that drew by it would withhold or offer an
   // edit nobody decided. Watched failing with `writable` left unchecked.
   test("a form's writable names fields for exactly the writes it offers", async () => {
-    const FORM = { form: { model: {} }, readable: ['id', 'note'], list: null, deleting: null, versions: null, moves: null, opens: [], together: null }
+    const FORM = {
+      form: { model: {} },
+      readable: ['id', 'note'],
+      list: null,
+      deleting: null,
+      versions: null,
+      moves: null,
+      opens: [],
+      together: null,
+      actions: [],
+    }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
@@ -931,6 +956,7 @@ describe('a delete (0050)', () => {
       writable: { create: null, update: [] },
       opens: [],
       together: null,
+      actions: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -984,6 +1010,7 @@ describe('a delete (0050)', () => {
       writable: { create: null, update: null },
       moves: null,
       together: null,
+      actions: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1260,6 +1287,7 @@ describe('a save of a record with its rows (0155)', () => {
       writable: { create: null, update: ['quantity'] },
       moves: null,
       opens: [],
+      actions: [],
     }
     let body: unknown = FORM
     const { base } = await serve((_request, response) => {
@@ -1302,6 +1330,154 @@ describe('a save of a record with its rows (0155)', () => {
     for (const together of [null, { ...flags, saved: { create: true, update: true } }, { ...flags, created: { create: 'yes' } }]) {
       body = menu(together)
       expect(await client.forms(), JSON.stringify(together)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+  })
+})
+
+describe('a run of an action (0161)', () => {
+  const RUN = { records: [{ record: 'k1:7', version: '3' }], answers: { note: 'n' } }
+  const RUN_LOST = 'The answer to this action was lost between this page and the data server. It may have run.'
+  const unknownRun = (status: number, message = RUN_LOST, origin = 'transport') => ({
+    ok: false,
+    status,
+    code: 'unknown-outcome',
+    message,
+    operation: 'action',
+    action: 'close',
+    records: RUN.records,
+    origin,
+  })
+
+  // A run is one POST of exactly its two keys to the action's own route,
+  // with a write id of its own, and is done only on a token for every
+  // record it addressed; a name that is no path segment sends nothing.
+  // Watched failing with the answer read as a write's record: the tokens,
+  // which carry no answers, were an unknown run.
+  test('posts the records and the answers with a write id, and is done on a token for each record', async () => {
+    const seen: Array<{ url: string; id: unknown; body: string }> = []
+    const { base } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push({ url: request.url ?? '', id: request.headers[WRITE_ID_HEADER], body })
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ records: ['k1:7'] }))
+      })
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.runAction('pg-order', 'close', { ...RUN, extra: 'never sent' } as typeof RUN)).toEqual({ ok: true, value: { records: ['k1:7'] } })
+    expect(seen).toEqual([{ url: '/v1/forms/pg-order/actions/close/run', id: expect.stringMatching(/^[0-9a-f]{32}$/), body: JSON.stringify(RUN) }])
+    expect(await client.runAction('pg-order', '..', RUN)).toMatchObject({ ok: false, status: 0, code: 'invalid-name' })
+    expect(seen).toHaveLength(1)
+  })
+
+  // Every answer that is not the data server saying what happened may
+  // have followed a commit: nothing answered, a proxy's page, a JSON 502
+  // of another code, a 500, a 504, a 4xx without a sentence, a 503 of a
+  // code no run is answered with, and a 2xx without a token for every
+  // record -- each an unknown run from the transport, named by what the
+  // call addressed, sent once; the server's own 502 is one from the
+  // database. A host that checks only `ok` fails closed. Watched failing
+  // with every 2xx taken as done: a portal's `{}` ran the action.
+  test('every non-answer is an unknown run, sent once, and the server’s 502 one from the database', async () => {
+    const lost = await serve((request) => {
+      void drained(request).then(() => request.socket.destroy())
+    })
+    expect(await createDataClient({ token: () => 't', base: lost.base }).runAction('pg-order', 'close', RUN)).toEqual(unknownRun(0))
+    expect(lost.asked).toHaveLength(1)
+    const answers: Array<[string, number, (request: IncomingMessage, response: ServerResponse) => void]> = [
+      ['a proxy page', 502, page(502, '<html>Bad Gateway</html>')],
+      ['a gateway timeout', 504, page(504, '<html>Gateway Timeout</html>')],
+      ['another 502', 502, json(502, { code: 'bad-gateway', message: 'upstream closed' })],
+      ['a 500', 500, json(500, { code: 'internal', message: 'boom' })],
+      ['a 4xx without a sentence', 422, json(422, { code: 'refused' })],
+      ['another 503', 503, json(503, { code: 'overloaded', message: 'Try later.' })],
+      ['a portal', 200, json(200, {})],
+      ['no token', 200, json(200, { records: [] })],
+      ['a token too many', 200, json(200, { records: ['k1:7', 'k1:8'] })],
+      ['a token of another type', 200, json(200, { records: [7] })],
+    ]
+    for (const [what, status, answer] of answers) {
+      const { base, asked } = await serve(answer)
+      const outcome = await createDataClient({ token: () => 't', base }).runAction('pg-order', 'close', RUN)
+      expect(outcome, what).toEqual(unknownRun(status))
+      expect(isUnknownAction(outcome), what).toBe(true)
+      expect(asked, what).toHaveLength(1)
+    }
+    const message = 'The connection to the database failed after the action was sent. It may have run.'
+    const { base, asked } = await serve(json(502, { code: 'unknown-outcome', message, operation: 'action', action: 'close', records: RUN.records }))
+    expect(await createDataClient({ token: () => 't', base }).runAction('pg-order', 'close', RUN)).toEqual(unknownRun(502, message, 'database'))
+    expect(asked).toHaveLength(1)
+  })
+
+  // The answers that say nothing was done stay refusals, each the
+  // server's code and sentence: the deployment's own refusal in its words,
+  // a stale version, a policy refusal, the pool full, and PostgreSQL's run
+  // stopped at its deadline in the database, rolled back. Watched failing
+  // with a 503 action-timeout read as any other 503: the run was unknown.
+  test('a refusal is known: 422 declined, 409, 403, 503 unavailable and 503 action-timeout', async () => {
+    const refusals: Array<[number, Record<string, string>]> = [
+      [422, { code: 'declined', message: 'This order cannot be closed now.' }],
+      [409, { code: 'stale', message: 'The record changed since it was read.' }],
+      [403, { code: 'operation-denied', message: 'no role of this actor may run close with this form' }],
+      [503, { code: 'unavailable', message: 'The database could not complete this now. Nothing was done.' }],
+      [503, { code: 'action-timeout', message: 'It took longer than this server allows, and the database stopped it. Nothing was done.' }],
+    ]
+    for (const [status, body] of refusals) {
+      const { base } = await serve(json(status, body))
+      const outcome = await createDataClient({ token: () => 't', base }).runAction('pg-order', 'close', RUN)
+      expect(outcome, body['code']).toEqual({ ok: false, status, code: body['code'], message: body['message'] })
+      expect(isUnknownAction(outcome)).toBe(false)
+    }
+    const write = { ok: false, status: 502, code: 'unknown-outcome', message: 'a write’s', operation: 'update', origin: 'database' }
+    expect(isUnknownAction(write as { ok: boolean })).toBe(false)
+  })
+
+  // A form's actions are a list a page can draw from: each a name, words,
+  // the record scope, a dialog or none, and views to read again, each once.
+  // A reply without them is from a server older than 0161, and one with an
+  // action of another shape is no server's this client knows. Watched
+  // failing with `actions` left unchecked: a reply without it was taken.
+  test("a form's actions are each a name, words, a dialog or none, and views to read again", async () => {
+    const FORM = {
+      form: { model: {} },
+      operations: ['read'],
+      readable: ['id'],
+      list: null,
+      deleting: null,
+      copied: null,
+      versions: null,
+      writable: { create: null, update: null },
+      moves: null,
+      opens: [],
+      together: null,
+    }
+    const CLOSE = {
+      name: 'close',
+      label: 'Close',
+      scope: 'record',
+      confirm: null,
+      done: { $t: 'closed' },
+      dialog: { model: { fields: [] } },
+      refresh: ['list'],
+    }
+    let body: unknown = FORM
+    const { base } = await serve((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(body))
+    })
+    const client = createDataClient({ token: () => 't', base })
+    const malformed = [
+      undefined,
+      null,
+      [{ ...CLOSE, scope: 'selection' }],
+      [{ ...CLOSE, refresh: ['list', 'list'] }],
+      [{ ...CLOSE, label: 7 }],
+      [{ ...CLOSE, dialog: 'none' }],
+    ]
+    for (const actions of malformed) {
+      body = actions === undefined ? FORM : { ...FORM, actions }
+      expect(await client.form('pg-order'), JSON.stringify(actions)).toMatchObject({ ok: false, code: 'unexpected' })
+    }
+    for (const actions of [[], [CLOSE], [{ ...CLOSE, confirm: 'Close it?', dialog: null, refresh: [] }]]) {
+      body = { ...FORM, actions }
+      expect(await client.form('pg-order')).toEqual({ ok: true, value: body })
     }
   })
 })
