@@ -1568,7 +1568,7 @@
       ]
     },
     "0053": {
-      "reviewed": "sha256:4203bd1f063a3b0c337b0be229571a814e9906f0df6e768fb615f9a4b915e0a3",
+      "reviewed": "sha256:c9eca0eb2dc4cc1185808aa3da56f8cd06a644d7a1be542ad2cd1d3888582968",
       "limitations": [
         {
           "area": "host",
@@ -4921,22 +4921,21 @@
       ]
     },
     "0162": {
-      "reviewed": "sha256:d6916a4710f4d2c67763605690ee5b52e6a0dbfef38d34d5080b2cf8a091c65d",
+      "reviewed": "sha256:86e2f2f874c6ef8a8e56e65b24c98df097d7815cc074da05bb827cc2a43160e2",
       "limitations": [
         {
           "area": "host",
-          "says": "The host page offers an action only in the open record's detail: a child row's detail, a Drill down level and a selection of rows offer none.",
-          "heldBy": "apps/host/src/page.test.tsx"
+          "says": "The host page offers an action only in the open record's detail: a child row's detail, a Drill down level and a selection of rows offer none."
         },
         {
           "area": "host",
           "says": "Every run on the host page asks for a confirmation first, even where the administrator wrote none, and an action with a dialog asks it after the dialog: two steps.",
-          "heldBy": "apps/host/src/page.test.tsx"
+          "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
           "area": "host",
           "says": "Where both renderers are shown, an action's dialog is drawn by React alone.",
-          "heldBy": "apps/host/src/page.test.tsx"
+          "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
           "area": "host",
@@ -4944,13 +4943,22 @@
         },
         {
           "area": "host",
-          "says": "After a run the host page reads the record again into its forms, which drops what they held before it, as the confirmation lists; kept editing when the read answers, the forms keep the version from before the run and their next Save is stale.",
+          "says": "After a run the host page reads the record again into its forms, which drops what they held before it without asking again where the confirmation listed them; kept editing when the read asks about a form typed into since, the forms keep the version from before the run and their next Save is stale.",
           "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
           "area": "host",
           "says": "While a save of the record is out, Run it sends nothing; while a run is out, Save in the record’s forms sends nothing.",
           "heldBy": "apps/host/src/in-flight.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Once a run is done and until the record is read again, Save in the record’s forms sends nothing, and says so.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Run it again does not wait for a save of the record out: whichever of the two is sent second is refused as stale."
         },
         {
           "area": "host",

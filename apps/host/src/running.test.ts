@@ -3,6 +3,7 @@ import { createFormEngine } from '@formancy/core'
 import type { FormEngine } from '@formancy/core'
 import type { ActionOutcome, FormAction, UnknownAction } from '@formancy/data-client'
 import type { FormSchema } from '@formancy/spec'
+import type { PaneWork } from './leave.js'
 import { again, answer, answered, ask, checked, checkedText, close, IDLE, runWork, send, words } from './running.js'
 import type { Run, RunTarget } from './running.js'
 
@@ -46,9 +47,10 @@ const LOST: UnknownAction = {
 
 describe('a run of an action over the open record', () => {
   // An action with a dialog asks it first, and one without starts at its
-  // confirmation; Run it sends the version heard as it is pressed, which a
-  // save answered meanwhile may have moved.
-  test('asks its dialog, then confirms, then sends the version heard as Run it is pressed', () => {
+  // confirmation; Run it sends the version it is given -- which version
+  // that is, the newest the detail heard, is action-flow.ts's, and
+  // in-flight.test.tsx holds it through a save answered meanwhile.
+  test('asks its dialog, then confirms, then sends the version it is given', () => {
     const asking = ask(IDLE, TARGET, engine(), [])
     expect(asking.state).toBe('asking')
     expect(ask(IDLE, TARGET, null, []).state).toBe('confirming')
@@ -56,6 +58,42 @@ describe('a run of an action over the open record', () => {
     expect(out).toMatchObject({ state: 'sending', target: { version: '4' }, answers: { note: 'closed' } })
     expect(runWork(out)).toBe('running')
     expect(close(out)).toBe(out)
+  })
+
+  // The action asked again while its dialog asks keeps that dialog, and
+  // what was typed into it, as a new state the keyboard goes to; and a run
+  // out asked again is that run, never a second question that would drop
+  // it (watched failing with a dialog asked again built anew: "expected {
+  // schema: [Function schema], …(27) } to be { schema: [Function schema],
+  // …(27) } // Object.is equality"). Another action asks its own.
+  test('asked again, its dialog keeps what was typed and a run out stays out, each focused again', () => {
+    const dialog = engine()
+    const asking = ask(IDLE, TARGET, dialog, [])
+    const reasked = ask(asking, TARGET, engine(), [])
+    expect(reasked).toMatchObject({ state: 'asking', n: 2 })
+    expect(reasked.state === 'asking' ? reasked.dialog : null).toBe(dialog)
+    const other: RunTarget = { ...TARGET, action: { ...CLOSE, name: 'reopen' }, label: 'Reopen the order' }
+    expect(ask(asking, other, null, [])).toMatchObject({ state: 'confirming', target: { label: 'Reopen the order' } })
+    const out = sending()
+    expect(ask(out, other, null, [])).toMatchObject({ state: 'sending', target: { label: 'Close the order' }, n: out.state === 'idle' ? 0 : out.n + 1 })
+  })
+
+  // The forms the confirmation listed go with the run out: they are what
+  // the person agreed to drop when the record is read again after it, and
+  // the read asks about no other (leave.ts); a run again was confirmed by
+  // nobody, so it carries none (watched failing with the run out carrying
+  // nothing: "expected { state: 'sending', …(5) } to match object { state:
+  // 'sending', …(1) }"). A press of Run it again once the run is out is
+  // nothing: no second run, which action-flow.ts sends only from the check.
+  test('the run out carries what its confirmation listed, a run again none, and Run it again on a run out is nothing', () => {
+    const listed: PaneWork[] = [{ owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:7' }], work: 'changed' }]
+    const confirming = answered(ask(IDLE, TARGET, engine(), listed), { note: 'closed' }, listed)
+    expect(send(confirming, '3')).toMatchObject({ state: 'sending', discards: listed })
+    const unknown = answer(send(confirming, '3'), LOST, 'Done.').next
+    const unchanged = checked(unknown, { ok: true, value: { record: 'k1:7', version: '3', answers: {} } })
+    const out = again(unchanged)
+    expect(out).toMatchObject({ state: 'sending', discards: [] })
+    expect(again(out)).toBe(out)
   })
 
   // A refusal by a dialog field goes back to the dialog with the field's

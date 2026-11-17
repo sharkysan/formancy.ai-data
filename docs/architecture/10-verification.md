@@ -441,7 +441,9 @@ clean and after a failed submit
 the studio at every step of its journey against the real server
 ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)), the
 host page at every state of a load, a save, a stale save, a lost answer, a
-refused selection, a delete, a download and an action
+refused selection, a delete and a download, and of an action its dialog,
+confirmation, done and declined run, though not its run out, a stale run
+or "It may have run", which the jsdom suites alone hold
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
 [0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md),
 [0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md),

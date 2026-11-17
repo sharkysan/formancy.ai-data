@@ -58,7 +58,8 @@ export type Run =
   | { state: 'asking'; target: RunTarget; dialog: FormEngine; n: number }
   /** `discards`: the forms of the record that hold work, which reading it again after the run drops. */
   | { state: 'confirming'; target: RunTarget; dialog: FormEngine | null; answers: Answers; discards: readonly PaneWork[]; n: number }
-  | { state: 'sending'; target: RunTarget; dialog: FormEngine | null; answers: Answers; n: number }
+  /** `discards`: what its confirmation listed, which the person agreed to drop when they ran it -- none for a run again. */
+  | { state: 'sending'; target: RunTarget; dialog: FormEngine | null; answers: Answers; discards: readonly PaneWork[]; n: number }
   /** `reread`: the server's sentence where the record could not be read again after the run. */
   | { state: 'done'; target: RunTarget; said: string; reread: string | null; n: number }
   | { state: 'refused'; target: RunTarget; message: string; stale: boolean; declined: boolean; n: number }
@@ -77,6 +78,8 @@ export const READ_AGAIN = 'The record is read again once it has run, which disca
 export const RUNNING = 'Running…'
 /** A press of Save while the record's run is out: the run moves the version the save would name. */
 export const RUN_HELD = 'An action on this record has not been answered yet; nothing was sent.'
+/** A press of Save once the run is done and before the record is read again: it would name the version from before the run. */
+export const READING_AGAIN = 'The record is being read again after an action ran on it; nothing was sent.'
 /** What a run says once it is done, where the administrator wrote no sentence of their own. */
 export const DONE = 'Done.'
 
@@ -115,10 +118,12 @@ const numbered = (now: Run): number => (now.state === 'idle' ? 0 : now.n) + 1
  * Ask to run `target`'s action: its dialog first where it has one, its
  * confirmation otherwise. A run out, or one that may have run, is asked
  * again instead -- the same region, focused again -- so nothing that holds
- * work is replaced by a second question.
+ * work is replaced by a second question; and so is the same action's
+ * dialog over the same record, which keeps what was typed into it.
  */
 export function ask(now: Run, target: RunTarget, dialog: FormEngine | null, discards: readonly PaneWork[]): Run {
   if (runWork(now) !== null) return { ...now, n: numbered(now) } as Run
+  if (now.state === 'asking' && now.target.action.name === target.action.name && now.target.record === target.record) return { ...now, n: numbered(now) }
   if (dialog !== null) return { state: 'asking', target, dialog, n: numbered(now) }
   return { state: 'confirming', target, dialog: null, answers: {}, discards, n: numbered(now) }
 }
@@ -132,7 +137,7 @@ export function answered(now: Run, answers: Answers, discards: readonly PaneWork
 /** Run it: the confirmation becomes the run out, in the same region, at the version given. */
 export function send(now: Run, version: string): Run {
   if (now.state !== 'confirming') return now
-  return { state: 'sending', target: { ...now.target, version }, dialog: now.dialog, answers: now.answers, n: now.n }
+  return { state: 'sending', target: { ...now.target, version }, dialog: now.dialog, answers: now.answers, discards: now.discards, n: now.n }
 }
 
 /**
@@ -187,7 +192,7 @@ export function checked(now: Run, found: Outcome<FormRecord>): Run {
 export function again(now: Run): Run {
   if (now.state !== 'checked' || now.found.kind !== 'unchanged') return now
   const version = now.unknown.records[0]?.version ?? now.target.version
-  return { state: 'sending', target: { ...now.target, version }, dialog: null, answers: now.answers, n: numbered(now) }
+  return { state: 'sending', target: { ...now.target, version }, dialog: null, answers: now.answers, discards: [], n: numbered(now) }
 }
 
 /** Closed by another request, Keep it, or Close: only what holds no work closes. */

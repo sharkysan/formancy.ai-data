@@ -6,7 +6,11 @@
 - **Verified by:** every jsdom case below was watched failing with its
   rule taken out, the file put back byte for byte, on 2026-11-17, on
   postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest; the
-  browser gate's checks as the last paragraph says.
+  browser gate's checks as the last paragraph says. Held by no test:
+  `refresh: children` listing the sections' grids again, since no form
+  of the actions schema has a child section; and that a child row's
+  detail and a Drill down level offer no action, since no form with an
+  action has either.
   `apps/host/src/plane.test.tsx` -- the whole journey, on both engines and
   through the live demo's path, now closes an order of the actions schema
   through its dialog and its confirmation, and the run's route left the
@@ -23,57 +27,120 @@
   next Tab reaches Keep it, then Run it (watched failing with Run it drawn
   before Keep it: "expected 'Run it' to be 'Keep it'"; and with the
   dialog's Keep it drawn without its words: axe's button-name, and the
-  button unnamed).
+  button unnamed). It also presses Escape in the confirmation, reads
+  done's description, finds Close on a check that found the order
+  unchanged, and finds the keyboard on the region while Run it again is
+  out -- rules watched failing in the suites below.
   `apps/host/src/in-flight.test.tsx`, in both renderers -- while a run is
   out, a second press of Run it and the action asked again from the header
-  send nothing, a press of the order's Save says it sent nothing, and the
-  order closes once (watched failing with Run it sending again while the
-  run was out: "expected { runs: 2, held: 2 } to deeply equal { runs: 1,
-  held: 1 }"; and with the record's forms not held while it was out: the
-  pane said "Saving…", the save sent beside the run); Run it waits for a
-  save of the order out, says why, and then runs over the version that
-  save stored (watched failing with Run it sent while the save was out:
-  "expected 1 to be +0", a run sent).
+  send nothing, the region taking the keyboard again when asked again, a
+  press of the order's Save says it sent nothing, and the order closes
+  once (watched failing with Run it sending again while the run was out:
+  "expected { runs: 2, held: 2 } to deeply equal { runs: 1, held: 1 }";
+  with the record's forms not held while it was out: the pane said
+  "Saving…", the save sent beside the run; and with the region not
+  focused when asked again: "expected 'Close the order' to be 'Close the
+  order: Order k1:1?'"); Run it waits for a save of the order out, says
+  why, and then runs over the version that save stored, the newest the
+  detail heard as Run it is pressed (watched failing with Run it sent
+  while the save was out: "expected 1 to be +0", a run sent); and Escape
+  in the confirmation is Keep it, nothing sent, and nothing while the run
+  is out (watched failing with the confirmation's Escape taken out:
+  "expected 'Close the order: Order k1:5?' to be 'Close the order'"; and
+  with Escape acting while the run was out: "Unable to find an accessible
+  element with the role "region" and name "Close the order: Order
+  k1:5?"").
   `apps/host/src/actions.test.tsx` -- once close ran, the order is read
   again into its panes, which show what the routine stored, and its next
-  Save is stored, in both renderers (watched failing with the reread taken
-  out: the panes still showed the order "open"; and, without the case's
-  wait for them, the pane never said "Saved.", its save refused); a run
-  whose answer was lost before it reached the database checks as not
-  run -- opening another order before the check asks first, naming the
-  run (watched failing with the run not the guard's: "expected null not
-  to be null", no notice) -- and once it commits
-  after all, Run it again names the version it sent and is stale, close
-  kept once (watched failing with Run it again sending the version the
-  order held then: no "Not run", the second run done); a run lost after it
-  committed checks as changed and offers the saved record, never Run it
-  again (watched failing with every check read as unchanged: no "It ran,
-  or the record was changed since you read it.").
+  Save is stored, in both renderers, the region the keyboard lands on
+  described by what the server did (watched failing with the reread taken
+  out: the panes still showed the order "open"; and with the done region
+  described by nothing: "expected '' to be 'The order is closed.'"); close
+  answered while the guard asks about another order loaded meanwhile
+  leaves the keyboard on that question, and its read waits for the
+  person's answer -- kept editing, the panes hold what the routine stored
+  and the next Save is stored, in both renderers (watched failing with
+  the read dropped while the question waited: the panes still showed the
+  order "open"; and with the region taking the keyboard as close
+  answered: "expected 'Close the order: Order k1:3' to be 'Unsaved
+  changes'"); until the order is read again, its Save sends nothing and
+  says so, and a read refused is said, describes the region, and offers
+  the saved record (watched failing with the forms let go as close
+  answered: the pane never said the order was being read again, every
+  status line of it empty); the question that read asks, replaced by
+  another order loaded, lets the forms go, and that order's Save is stored
+  (watched failing with the replaced question letting nothing go:
+  "expected [] to have a length of 1 but got +0", the Save sent nothing);
+  under Both the dialog is React's alone, the confirmation names a form
+  typed into since it asked before anything is sent, focused again and
+  clean under axe, and the read after close asks only about a form typed
+  into while it ran, whose next Save, kept editing, is stale (watched
+  failing with the confirmation not asked again: "expected 'It closes the
+  order, and the database…' to contain 'Order k1:8, React: changes that
+  are n…'"; and with what it listed asked about again: "expected 'Order
+  k1:8, React: changes that are n…' to be 'Order k1:8, Angular: changes
+  that are…'"); an action with no dialog starts at its confirmation, in
+  the page's own sentence, and says "Done.", clean under axe (watched
+  failing with the page's sentence left out: "expected '' to be 'It runs
+  in the database, over this re…'"); a run whose answer was lost before it
+  reached the database checks as not run -- opening another order before
+  the check asks first, naming the run (watched failing with the run not
+  the guard's: "expected null not to be null", no notice) -- and once it
+  commits after all, Run it again names the version it sent and is stale,
+  close kept once, the keyboard on the region while it is out (watched
+  failing with Run it again sending the version the order held then: no
+  "Not run", the second run done; and with the run again leaving the
+  keyboard where Run it again was: "expected 'the page itself' to be
+  'Close the order: Order k1:10?'"); a run lost after it committed checks
+  as changed and offers the saved record, or Close, never Run it again
+  (watched failing with every check read as unchanged: no "It ran, or the
+  record was changed since you read it."; and with no Close there: "Unable
+  to find an accessible element with the role "button" and name "Close"").
   `apps/host/src/running.test.ts`, pure -- the states in their order, the
-  version heard as Run it is pressed, a check by the record's version, Run
-  it again from the version sent and never after a change, and a refusal
-  by a dialog field asking the dialog again with its sentence on the
-  field, which no fixture's routine gives through the server (watched
-  failing with every refusal answered as "Not run": "expected { …(2) } to
-  match object { next: { state: 'asking' }, …(2) }").
+  version Run it is given, a check by the record's version, Run it again
+  from the version sent and never after a change, and a refusal by a
+  dialog field asking the dialog again with its sentence on the field,
+  which no fixture's routine gives through the server (watched failing
+  with every refusal answered as "Not run": "expected { …(2) } to match
+  object { next: { state: 'asking' }, …(2) }"); the action asked again
+  while its dialog asks keeps that dialog (watched failing with a dialog
+  asked again built anew: "expected { schema: [Function schema], …(27) }
+  to be { schema: [Function schema], …(27) } // Object.is equality"); and
+  the run out carries what its confirmation listed, a run again none
+  (watched failing with the run out carrying nothing: "expected { state:
+  'sending', …(5) } to match object { state: 'sending', …(1) }"). That a
+  press of Run it again while its run is out sends nothing is a guard in
+  `action-flow.ts` that no case reaches: the button is gone before a
+  second press can land.
   `apps/host/src/leave.test.ts` -- reading the record again after a run
-  drops the record's own forms alone, and the guard says a run out and one
-  that may have run in sentences of their own (watched failing with the
-  reread dropping every form, as Load does: "expected [ 'master react',
-  'lines react', …(3) ] to deeply equal [ 'master react' ]").
+  drops the record's own forms alone, never its deletion, and asks about
+  none its confirmation listed; and the guard says a run out and one that
+  may have run in sentences of their own (watched failing with the reread
+  dropping every form, as Load does: "expected [ 'master react', 'lines
+  react', …(3) ] to deeply equal [ 'master react' ]"; with the deletion
+  dropped too: "expected [ 'master react', …(2) ] to deeply equal [
+  'master react', 'master angular' ]"; and with nothing agreed spared:
+  "expected [ 'master react', 'master angular' ] to deeply equal [ 'master
+  angular' ]").
+  `apps/host/src/session.test.ts` -- a session held by a deletion and by
+  an action is let go by each apart (watched failing with one hold for
+  both: "expected { kind: 'saved', message: 'Saved.' } to deeply equal {
+  kind: 'held', …(1) }").
   `apps/host/scripts/browser-test.mjs` (`browser/acting.mjs`), in
   Chromium, Firefox and WebKit, CI's legs, at every width down to 320
   pixels -- no rule of host.css selects anything on the dialog's paper;
-  the confirmation takes the keyboard, Keep it is the next Tab, Escape
-  gives the keyboard back to the action's button, the frame stands at 3:1
-  or more against the glass and the two answers one under the other on a
-  phone; Enter on Run it closes the order with the keyboard on what the
-  server did; and "Not run" says the deployment's reason as its own. In
-  Chromium on 2026-11-17, at 320 pixels, with a rule of host.css added
-  over the dialog's labels and Run it drawn before Keep it, the paper's
-  check failed naming `.action-ask .sheet label`, the Tab's with "the
-  focus is on button "Run it"", and the answers' order on a phone too;
-  the rest are measured, not watched failing.
+  Escape there gives the keyboard back to the action's button; the
+  confirmation takes the keyboard, Keep it is the next Tab, the frame
+  stands at 3:1 or more against the glass, the two answers stand one under
+  the other on a phone, and Escape there gives the keyboard back to the
+  action with the order still open; Enter on Run it closes the order with
+  the keyboard on what the server did; and "Not run" says the deployment's
+  reason as its own. In Chromium on 2026-11-17, at 320 pixels, with a rule
+  of host.css added over the dialog's labels and Run it drawn before Keep
+  it, the paper's check failed naming `.action-ask .sheet label`, the
+  Tab's with "the focus is on button "Run it"", and the answers' order on
+  a phone too; the rest are measured, not watched failing. The run out, a
+  stale run and "It may have run" are the jsdom suites', not the gate's.
 
 ## Context
 
@@ -113,10 +180,13 @@ said what the page does after a run and after a lost answer.
      lists them; the next Tab reaches Keep it, never the button that
      runs, and Escape is Keep it. Typed into since it asked, the list is
      said again before anything is sent.
-   - **running**: both answers say so and do nothing; the action asked
-     again from the header is this run asked again.
+   - **running**: both answers say so and do nothing, and so does
+     Escape; the action asked again from the header is this run asked
+     again, its region focused again. The same action asked again while
+     its dialog asks keeps what was typed into it.
    - **done**: the presentation's `done` sentence, or "Done.", in the
-     room's teal for a moment (0146).
+     room's teal for a moment (0146), describing the region the keyboard
+     is taken to, so it is said as it lands.
    - **Not run**: the server's sentence verbatim, a reason the deployment
      worded followed by "This reason is the database's own." (0156), and
      after a stale run, Load the saved record. An answer the server
@@ -125,8 +195,10 @@ said what the page does after a run and after a lost answer.
    - **It may have run**: below.
 
    Each new state takes the keyboard -- once the detail is shown where a
-   layout hid it -- and Keep it and Close give it back to the action's
-   button.
+   layout hid it, and unless the guard is asking the person something
+   meanwhile, which keeps it -- and Keep it and Close give it back to the
+   action's button. Run it again is a new state too, so its run out takes
+   the keyboard where the button was.
 3. **Run it waits for a save of the record out**, says so and sends
    nothing, as Delete it does (0053): the save moves the version the run
    would name. The run names the newest version the detail heard as Run
@@ -134,14 +206,27 @@ said what the page does after a run and after a lost answer.
    of Save sends nothing and says "An action on this record has not been
    answered yet; nothing was sent." A session's hold is now kept by what
    holds it -- a deletion or a run -- so the answer to one never lifts the
-   other's.
+   other's. Run it again does not wait for a save out: it names the
+   version the lost run sent, so whichever of it and the save is sent
+   second is refused as stale, and nothing is written twice.
 4. **After done, the record is read again.** Its row is listed again, and
    the record read again into its own forms through the guard, as the
    request `ran` (`leave.ts`): it drops the record's own forms and nothing
-   of its children or its rows, and what was typed into them while the
-   run was out is asked about first. The run moved the version, and the
-   routine may have changed the values, so a page that kept its read
-   would make the person's next Save stale against a move they caused.
+   of its children, its rows or its deletion. What the confirmation
+   listed, the person agreed to drop when they ran it, so it is not asked
+   about again; a form that holds work only since is asked about first.
+   Until the read has opened, been refused, been kept from or had its
+   question replaced by another request, the record's forms still send
+   nothing on Save, and say "The record is being read again after an
+   action ran on it; nothing was sent." A question
+   the guard asks meanwhile about something else -- another row the
+   person asked for while the run was out -- keeps the keyboard and does
+   not drop the read, which waits for the person's answer and opens
+   unless that answer moved the detail on (`opening.ts`). A read refused
+   is said in the region, which then offers the saved record. The run
+   moved the version, and the routine may have changed the values, so a
+   page that kept its read would make the person's next Save stale
+   against a move they caused.
    `done` carries tokens, not versions, since a routine may move a
    version after the run did (0161); the read gives the right one. An
    action whose `refresh` names `children` lists the grids of the
@@ -189,9 +274,10 @@ stale because of their own run.
   person's -- another row, a layout, a renderer -- as a delete's question
   is closed.
 - **Reading the record again drops what its forms held** before the run,
-  which the confirmation lists. Kept editing when the read answers, the
-  forms keep the version from before the run, and their next Save is
-  stale.
+  which the confirmation lists, without asking again. Kept editing when
+  the read asks about a form typed into since, the forms keep the version
+  from before the run, and their next Save is stale. Until the read
+  answers, a Save sends nothing.
 - **A check is one read of the record**: on PostgreSQL a run orphaned by
   a cut may commit after it, which Run it again then meets as stale --
   the guard, not a second run -- and the person reads "Not run".
@@ -199,7 +285,7 @@ stale because of their own run.
   Drill down level offer none, and no selection of records does (PR 8 of
   the design).
 - **`refresh: list` adds nothing on this page**, which lists the record's
-  row again after every run.
+  row again after every run; `refresh: children` is held by no test.
 - **The detail's header grows a button per action**, wrapping on a phone
   beside Duplicate record and Delete record.
 
@@ -237,11 +323,22 @@ the panes would show values the routine changed as they were.
 answered while a deletion of the record is out would lift the deletion's
 hold, and a save could race the delete.
 
+**Drop the read after a run when the guard is asking, as a read the
+person asked for is dropped.** Lost: a person who then keeps editing
+holds the record at the version from before their own run, and their
+next Save is stale, with nothing on the page saying so.
+
+**Ask about the forms the confirmation listed when the read answers.**
+Lost: the person is asked twice for one decision, and the natural answer
+the second time, Keep editing, leaves their next Save stale.
+
 ## Older records
 
 Extended, not edited away: 0031 (a run whose answer was lost is checked
 by one read of its record, and run again only from the version it sent);
 0047 (the guard counts a run out or unknown as the record's work, and
-reading the record again after a run drops its own forms alone); and
-0161 (the host page offers an action's control, so the route left the
-plane test's exception).
+reading the record again after a run drops its own forms alone); 0053
+(the session's hold for a deletion is kept apart from an action's, so
+the answer to one never lifts the other's); and 0161 (the host page
+offers an action's control, so the route left the plane test's
+exception).

@@ -269,6 +269,32 @@ describe.each(ENGINES)('a pane session on $engine', ({ formId, connection }) => 
     expect((await session.save(submitted(session, { notes: 'held by a deletion, pressed' })))?.kind).toBe('saved')
   })
 
+  // A deletion of the record and an action over it hold its session apart
+  // (0162): each lifts its own hold and leaves the other's, so a run
+  // answered while the record's deletion is out never lets a save race the
+  // delete, nor a deletion answered a save race the run (watched failing
+  // with one hold for both, as before 0162: "expected { kind: 'saved',
+  // message: 'Saved.' } to deeply equal { kind: 'held', …(1) }").
+  test('a session held by a deletion and by an action is let go by each apart', async () => {
+    const session = createSession({ client: client(), formId, definition: await definition(formId), renderer: 'react' })
+    session.open()
+    const answers = { customer: await customer(session, 'Muster'), order_date: EDGES.orderDate, status: 'placed', amount: '3', notes: 'held twice' }
+    expect((await session.save(submitted(session, answers)))?.kind).toBe('created')
+    const deleting = 'A deletion of this record has not been answered yet; nothing was sent.'
+    const running = 'An action on this record has not been answered yet; nothing was sent.'
+    session.hold(deleting)
+    session.hold(running, 'action')
+    session.release('action')
+    const sent = plane.sent.length
+    expect(await session.save(submitted(session, { notes: 'held twice, pressed' }))).toEqual({ kind: 'held', message: deleting })
+    session.hold(running, 'action')
+    session.release('delete')
+    expect(await session.save(submitted(session, { notes: 'held twice, pressed again' }))).toEqual({ kind: 'held', message: running })
+    expect(plane.sent.length).toBe(sent)
+    session.release('action')
+    expect((await session.save(submitted(session, { notes: 'held twice, let go' })))?.kind).toBe('saved')
+  })
+
   // "Load the saved record" on a form that was never saved has nothing to
   // load, and says so rather than sending a read for no record -- which the
   // server would refuse in words about a request the person never made.

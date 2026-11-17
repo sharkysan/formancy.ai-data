@@ -26,14 +26,17 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   runs; Escape is Keep it. While a save of the record is out, Run it says
  *   so and waits; while the run is out, both answers say so and do nothing.
  * - **done**: what the administrator wrote, or "Done.", in the room's teal
- *   for a moment (0146) -- what the server did.
+ *   for a moment (0146) -- what the server did -- which describes the
+ *   region the keyboard is taken to, so it is said as it lands; and where
+ *   the record could not be read again, that, and the saved record.
  * - **Not run**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and the saved record offered after a
  *   stale run.
  * - **It may have run** (0031): the sentence, and a check that reads the
  *   record and says what the read showed in a status line already on the
  *   page; still at the version sent, Run it again; changed, the saved
- *   record. No "Run it again anyway": a run can always be checked.
+ *   record; either, or not found, Close. No "Run it again anyway": a run
+ *   can always be checked.
  */
 
 /** A dialog asks for typed answers, never a lookup: its renderer is handed no option source. */
@@ -172,16 +175,24 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
     </button>
   )
   if (now.state === 'done') {
+    const described = now.reread === null ? `${idBase}-done` : `${idBase}-done ${idBase}-unread`
     return (
-      <div {...region} className="notice" data-kind="done">
+      <div {...region} className="notice" data-kind="done" aria-describedby={described}>
         <RegionHeading level={4} id={headingId}>
           <Words said={heading(now.target)} />
         </RegionHeading>
-        <p className="notice-text">
+        <p id={`${idBase}-done`} className="notice-text">
           <ServerDid said={now.n}>{now.said}</ServerDid>
         </p>
-        {now.reread === null ? null : <p className="notice-text">{`It ran, and the record could not be read again: ${now.reread}`}</p>}
-        <div className="notice-actions">{closes}</div>
+        {now.reread === null ? null : <p id={`${idBase}-unread`} className="notice-text">{`It ran, and the record could not be read again: ${now.reread}`}</p>}
+        <div className="notice-actions">
+          {now.reread === null ? null : (
+            <button type="button" className="button" onClick={flow.load}>
+              Load the saved record
+            </button>
+          )}
+          {closes}
+        </div>
       </div>
     )
   }
@@ -232,7 +243,7 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
             Load the saved record
           </button>
         ) : null}
-        {found?.kind === 'absent' ? closes : null}
+        {unread ? null : closes}
       </div>
     </div>
   )

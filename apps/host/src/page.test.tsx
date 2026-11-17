@@ -40,7 +40,7 @@ import {
 } from './test-host.js'
 import { holdingRequests, holdingWrites, losingWrites } from './test-network.js'
 import { actionForm, CLOSE_DECLINED, CLOSE_WORDS } from './test-actions.js'
-import { askClose, closed, closeRegion, closing, dialogPaper, openActionOrder, openOrderIn, region, runIt } from './test-acting.js'
+import { askClose, closed, closeRegion, closing, dialogPaper, openActionOrder, openOrderIn, region, runIt, runsSent } from './test-acting.js'
 import { checkedText } from './running.js'
 import { done, openRows, rowAnswer, rowCell, rowControl, rowPaper, rowsSay, rowsTab, rowTexts, savedBeside } from './test-rows.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
@@ -383,18 +383,21 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
   })
 
   // An action's states, each held to the floor (0162): its dialog drawn by
-  // React and by Angular; its confirmation, focused and described by the
-  // sentence its presentation wrote, the next Tab on Keep it -- never the
-  // button that runs -- and Escape giving the keyboard back to the action;
-  // with a save of the order out, Run it waiting and described by why; the
-  // run out; done; "Not run" in the deployment's words, as its own, and
-  // stale, offering the saved record; and "It may have run" before and
-  // after its check, then Run it again (watched failing on
+  // React and by Angular, Escape there giving the keyboard back to the
+  // action; its confirmation, focused and described by the sentence its
+  // presentation wrote, the next Tab on Keep it -- never the button that
+  // runs -- and Escape there Keep it, nothing sent; with a save of the
+  // order out, Run it waiting and described by why; the run out; done,
+  // described by what the server did; "Not run" in the deployment's words,
+  // as its own, and stale, offering the saved record; and "It may have
+  // run" before and after its check, with Close, then Run it again, the
+  // keyboard on the region while it is out (watched failing on
   // postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest with
-  // Run it before Keep it: the next Tab was on Run it; and with the run's
-  // status line left without its id while Run it waited: axe's
-  // aria-valid-attr-value, Run it described by an element that is not
-  // there).
+  // Run it before Keep it: "expected 'Run it' to be 'Keep it'"; and with
+  // the dialog's Keep it drawn without its words: axe's button-name, and
+  // the button unnamed). The confirmation's list of forms, an action with
+  // no dialog and no words of its own, and the states of a check that
+  // found the record changed are held to axe in actions.test.tsx.
   test("passes the floor in an action's states, its confirmation's next Tab on Keep it", async () => {
     let hold = false
     const holding = holdingWrites(plane.fetch)
@@ -426,6 +429,12 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     await user.tab()
     expect(focusedName()).toBe('Run it')
     expect(await floor('an action, confirming')).toEqual(CLEAN('an action, confirming'))
+    const kept = plane.sent.length
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
+    expect(screen.queryByRole('region', { name: closing(record, true) })).toBeNull()
+    expect(runsSent(plane, kept)).toBe(0)
+    await askClose(user, record, 'Angular', 'checked on the floor')
 
     hold = true
     await answer(user, 'Angular', 'Amount', '14')
@@ -440,7 +449,7 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(await floor('an action, running')).toEqual(CLEAN('an action, running'))
     holding.answer()
     hold = false
-    await closed(record)
+    expect(computeAccessibleDescription(await closed(record))).toBe(CLOSE_WORDS.done)
     expect(await floor('an action, done')).toEqual(CLEAN('an action, done'))
     await user.click(within(closeRegion(record)).getByRole('button', { name: 'Close' }))
     await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
@@ -472,10 +481,16 @@ describe.each(ENGINES)('the page on $engine', ({ connection, formId, lines }) =>
     expect(await floor('an action, may have run')).toEqual(CLEAN('an action, may have run'))
     await user.click(within(unknown).getByRole('button', { name: 'Check whether it ran' }))
     await within(unknown).findByText(checkedText({ kind: 'unchanged' }), {}, { timeout: 15_000 })
+    expect(within(unknown).getByRole('button', { name: 'Close' })).toBeTruthy()
     expect(await floor('an action, may have run, checked')).toEqual(CLEAN('an action, may have run, checked'))
     // The run held never reaches the database: run again from the version it sent, it is done.
     plane.runs.late.length = 0
+    hold = true
     await user.click(within(unknown).getByRole('button', { name: 'Run it again' }))
+    await waitFor(() => expect(holding.held).toHaveLength(1), { timeout: 15_000 })
+    expect(focusedName()).toBe(closing(refusing, true))
+    holding.answer()
+    hold = false
     await closed(refusing)
   })
 

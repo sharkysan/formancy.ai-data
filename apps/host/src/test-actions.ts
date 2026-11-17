@@ -10,11 +10,13 @@ import type { Engine } from './test-plane.js'
  * order of the actions schema every fixture loads (data-fixtures'
  * fixtures/*.actions.sql, 0160), with close_order bound as `close` -- one
  * value from each kind of source, the note asked in its dialog, as
- * data-client's plane binds it -- and worded by its presentation; the
- * clerk reads the order, changes its note and amount, and runs close,
- * within their tenant through the order's customer (0043). And how a suite
- * writes and reads those orders as the database's owner, beside the page,
- * and loses a run's answer.
+ * data-client's plane binds it -- and worded by its presentation; and
+ * bound again as `stamp`, the note the order's own, so it asks no dialog,
+ * and its presentation gives it a label alone, so the page says its own
+ * confirmation and its own "Done.". The clerk reads the order, changes its
+ * note and amount, and runs both, within their tenant through the order's
+ * customer (0043). And how a suite writes and reads those orders as the
+ * database's owner, beside the page, and loses a run's answer.
  */
 
 /** The action order's form on `engine`. */
@@ -26,6 +28,9 @@ export const CLOSE_WORDS = {
   confirm: 'It closes the order, and the database keeps the note with it.',
   done: 'The order is closed.',
 } as const
+
+/** What stamp's presentation says: its label, and nothing else. */
+export const STAMP_LABEL = 'Close as noted'
 
 /**
  * What close_order says to the person of an order noted `refuse`, after the
@@ -63,6 +68,20 @@ const CLOSE = {
   },
 } as const
 
+/** close_order again, the note the order's own: an action with no dialog. */
+const STAMP = {
+  pg: {
+    ...CLOSE.pg,
+    name: 'stamp',
+    parameters: CLOSE.pg.parameters.map((given) => (given.parameter === 'p_note' ? { parameter: 'p_note', from: { field: 'note' } } : given)),
+  },
+  ms: {
+    ...CLOSE.ms,
+    name: 'stamp',
+    parameters: CLOSE.ms.parameters.map((given) => (given.parameter === '@p_note' ? { parameter: '@p_note', from: { field: 'note' } } : given)),
+  },
+}
+
 /** The fields of an order the clerk changes: every other they read. */
 const WRITTEN = new Set(['note', 'amount'])
 
@@ -80,10 +99,11 @@ export async function publishActions(
       title: 'Order',
       lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
       versionColumn: 'version',
-      actions: [CLOSE[connection]],
+      actions: [CLOSE[connection], STAMP[connection]],
     })
     const bindings = proposal['bindings'] as FormBindings
-    if ((bindings.actions ?? []).length !== 1) throw new Error(`the generator bound no close on ${connection}: ${JSON.stringify(proposal['notes'])}`)
+    if ((bindings.actions ?? []).length !== 2)
+      throw new Error(`the generator did not bind close and stamp on ${connection}: ${JSON.stringify(proposal['notes'])}`)
     const policy: FormPolicy = {
       version: 1,
       operations: { read: ['clerk'], create: [], update: ['clerk'] },
@@ -93,9 +113,15 @@ export async function publishActions(
       rowFilters: [],
       lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
       through: ['customer'],
-      actions: { close: { roles: ['clerk'] } },
+      actions: { close: { roles: ['clerk'] }, stamp: { roles: ['clerk'] } },
     }
-    const presentation: PresentationOverrides = { ...EMPTY_PRESENTATION, actions: [{ action: 'close', ...CLOSE_WORDS }] }
+    const presentation: PresentationOverrides = {
+      ...EMPTY_PRESENTATION,
+      actions: [
+        { action: 'close', ...CLOSE_WORDS },
+        { action: 'stamp', label: STAMP_LABEL },
+      ],
+    }
     const base = proposal['form'] as FormSchema
     const presented = applyPresentation(base, presentation, bindings)
     if (!presented.ok) throw new Error(`close's words do not apply: ${presented.problems.join('; ')}`)

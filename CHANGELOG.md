@@ -35,7 +35,13 @@ the same day (formancy.ai 0232).
   the version the other names. Once it ran, the region says so in teal and
   the record is read again into its forms, with its row and, where the
   action names them, its sections' grids, so the next Save is not stale
-  against the person's own run. A refusal is the server's sentence, the
+  against the person's own run: what the confirmation listed is dropped
+  without asking again, a form typed into while the run was out is asked
+  about first, and until the read answers the record's Save sends nothing
+  and says so; a question the page asks meanwhile about something else
+  keeps the keyboard and does not drop the read, which waits for the
+  answer. A read refused is said, and offers the saved record. A refusal
+  is the server's sentence, the
   database's own reason said as such; a run whose answer was lost says it
   may have run, and Check whether it ran reads the record, offering Run it
   again only where it is still at the version sent -- which, if the first

@@ -21,7 +21,8 @@ import type { Renderer } from './session.js'
  * | Drill down: going up a level                                   | nothing: every level stays mounted       |
  * | Keep my line changes, after a stale save (0155)                | that pane: the record is read again      |
  * | Load the saved record, where its rows are saved with it (0155) | its rows' changes                        |
- * | the record read again after an action over it ran (0162)       | the record's own panes                   |
+ * | the record read again after an action over it ran (0162)       | the record's own forms: those its        |
+ * |                                                                | confirmation listed without asking again |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
  * goes where they go, but for a renderer hidden: it is drawn by none; so is
@@ -90,8 +91,11 @@ export type LeaveRequest =
   | { kind: 'keep-rows'; owner: string; record: string; by: Renderer }
   /** Load the saved record (0155): `record` as stored, and its rows -- `rows`, their owners -- listed again as stored. */
   | { kind: 'reload-rows'; record: string; rows: readonly string[] }
-  /** The open record read again into its own panes once the action `label` names ran over it (0162): the run moved its version. */
-  | { kind: 'ran'; record: string; label: string }
+  /**
+   * The open record read again into its own panes once the action `label` names ran over it (0162): the run moved its version.
+   * `agreed`: the renderers of the record's forms its confirmation listed, whose work the person agreed to drop when they ran it.
+   */
+  | { kind: 'ran'; record: string; label: string; agreed?: readonly Renderer[] }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
   /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`; or into the record a lookup there names, by Open (0141). */
   | { kind: 'drill'; below: number; record: string | null; title: string }
@@ -113,6 +117,8 @@ export interface Discarded {
   spares?: readonly string[]
   renderers: 'all' | readonly Renderer[]
   keeps?: { owner: string; renderer: Renderer }
+  /** Of the record's forms it drops, the renderers of those the person already agreed to drop: not asked about again. */
+  agreed?: readonly Renderer[]
 }
 
 /**
@@ -195,7 +201,8 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'reload-rows':
       return { owners: request.rows, renderers: 'all' }
     case 'ran':
-      return { owners: ['master'], renderers: 'all' }
+      // The forms a renderer draws, never the record's deletion, which a read leaves where it is; nor what its confirmation listed, already agreed to.
+      return { owners: ['master'], renderers: ['react', 'angular'], agreed: request.agreed ?? [] }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }
     case 'drill':
@@ -223,7 +230,8 @@ export function atRisk(request: LeaveRequest, panes: readonly PaneWork[]): PaneW
       pane.work !== null &&
       dropsOwner(pane.owner) &&
       (dropped.renderers === 'all' || (pane.renderer !== null && dropped.renderers.includes(pane.renderer))) &&
-      !(keeps !== undefined && keeps.owner === pane.owner && keeps.renderer === pane.renderer),
+      !(keeps !== undefined && keeps.owner === pane.owner && keeps.renderer === pane.renderer) &&
+      !(pane.renderer !== null && (dropped.agreed?.includes(pane.renderer) ?? false)),
   )
 }
 

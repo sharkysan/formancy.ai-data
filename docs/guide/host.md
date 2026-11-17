@@ -307,7 +307,14 @@ the run is out the record's Save says it sent nothing. Once it ran, it
 says the administrator's sentence or "Done." in teal for a moment, and
 the record is read again, with its row, and the grids of its sections
 where the action names them, so the next Save names the version the run
-moved; what you typed while it was out is asked about first. A refusal
+moved. The forms the confirmation listed are read again without asking
+you a second time; a form you typed into while the run was out is asked
+about first, and until the record is read again its Save sends nothing
+and says so. If the page is asking you about something else as the run
+answers -- another record you asked for meanwhile -- that question keeps
+the keyboard, and the record is read again once you answer it, unless
+your answer moved on. A read that is refused is said, with the saved
+record offered. A refusal
 is said in the server's words, one the database's rules worded for you
 followed by "This reason is the database's own.", and a stale one offers
 the saved record; an answer it refused by a dialog's field goes back to

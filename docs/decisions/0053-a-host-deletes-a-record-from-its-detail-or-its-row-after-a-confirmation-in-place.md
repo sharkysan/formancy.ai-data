@@ -1,6 +1,6 @@
 # 0053 — A host deletes a record from its detail or its row, after a confirmation in place, and says what the server did
 
-- **Status:** accepted; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): its delete states in the host's browser gate run in Chromium, Firefox and Linux WebKit; narrowed by [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md): a together row is removed by a staged Remove with Undo and no confirmation in place, and deleted when its record is saved -- decided, and built with the host page's save
+- **Status:** accepted; extended by [0058](0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md): its delete states in the host's browser gate run in Chromium, Firefox and Linux WebKit; narrowed by [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md): a together row is removed by a staged Remove with Undo and no confirmation in place, and deleted when its record is saved -- decided, and built with the host page's save; extended by [0162](0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md): the session's hold for a deletion is kept apart from an action's, so the answer to one never lifts the other's
 - **Date:** 2026-10-13
 - **Deciders:** Daniel Bacher
 - **Verified by:**

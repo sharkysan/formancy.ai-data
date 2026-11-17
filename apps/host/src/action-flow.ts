@@ -10,7 +10,7 @@ import type { PaneWork } from './leave.js'
 import type { Opening } from './opening.js'
 import type { RendererChoice } from './prefs.js'
 import type { RecordGridHandle } from './record-grid.js'
-import { again, answer, answered, ask, checked, checking, close, DONE, IDLE, RUN_HELD, runWork, send, unread, words } from './running.js'
+import { again, answer, answered, ask, checked, checking, close, DONE, IDLE, READING_AGAIN, RUN_HELD, runWork, send, unread, words } from './running.js'
 import type { Run, RunTarget } from './running.js'
 import type { Renderer, Session, Submitted } from './session.js'
 import type { HeldLevels } from './use-drill.js'
@@ -38,11 +38,16 @@ import type { HeldLevels } from './use-drill.js'
  *   -- the run moved its version, and the routine may have changed its
  *   values, so the panes' version from before would make the next Save
  *   stale against a move the person caused -- and the grids the action
- *   names besides. What that read drops is listed in the confirmation, and
- *   anything typed since is asked about when it answers.
+ *   names besides. The forms its confirmation listed drop without being
+ *   asked about again; one that holds work only since is asked about when
+ *   the read answers. Until the read has opened, been refused, been kept
+ *   from or had its question replaced, a Save of the record sends nothing;
+ *   and a question the guard asks meanwhile about something else does not
+ *   drop it: it waits for the person's answer (opening.ts).
  * - **The keyboard** goes to every state that asks something of the
- *   person, each time it is a new one, and back to the action that asked
- *   on Keep it and Close.
+ *   person, each time it is a new one -- a run out asked again included --
+ *   unless the guard is asking the person something meanwhile, and back to
+ *   the action that asked on Keep it and Close.
  */
 
 export interface ActionFlow {
@@ -74,7 +79,7 @@ export interface ActionFlow {
   again: () => void
   /** Close what the server answered: the keyboard back on the action. */
   close: () => void
-  /** Load the saved record: after a stale run, or a check that found it changed. */
+  /** Load the saved record: after a stale run, a run whose record could not be read again, or a check that found it changed. */
   load: () => void
 }
 
@@ -126,7 +131,8 @@ const back = (flow: FlowState, target: RunTarget): void => flow.buttons.get(targ
 export function useActionFlow(options: ActionFlowOptions): ActionFlow {
   const latest = useRef(options)
   latest.current = options
-  const { registry } = useGuardContext()
+  const guard = useGuardContext()
+  const { registry } = guard
   const [run, setShown] = useState<Run>(IDLE)
   const current = useRef<Run>(IDLE)
   const sent = useRef(0)
@@ -149,7 +155,12 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
   const heard = useHeard(options.sessions)
   const saving = useSaving(options.sessions)
   const entry = useRunEntry(flow)
-  useRunFocus(run, regionRef, () => latest.current.onShow('record'))
+  useRunFocus(
+    run,
+    regionRef,
+    () => latest.current.onShow('record'),
+    () => guard.waiting(),
+  )
   const { definition } = options
   const renderer: Renderer = options.renderer === 'angular' ? 'angular' : 'react'
 
@@ -187,8 +198,10 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
     confirm: () => confirmRun(flow, atStake, heard),
     check: () => checkRun(flow),
     again() {
-      const next = again(current.current)
-      if (next.state === 'sending') dispatch(flow, next)
+      const now = current.current
+      // Only from the check that found it not run: a press once it is out sends nothing, as a press of Run it does.
+      if (now.state !== 'checked') return
+      dispatch(flow, again(now))
     },
     ...regionAnswers(flow),
   }
@@ -212,7 +225,9 @@ function regionAnswers(flow: FlowState): Pick<ActionFlow, 'keep' | 'close' | 'lo
     },
     load() {
       const now = current.current
-      if (!(now.state === 'refused' && now.stale) && !(now.state === 'checked' && now.found.kind === 'changed')) return
+      const offered =
+        (now.state === 'refused' && now.stale) || (now.state === 'done' && now.reread !== null) || (now.state === 'checked' && now.found.kind === 'changed')
+      if (!offered) return
       flow.set(IDLE)
       latest.current.grid.current?.reload()
       latest.current.onLoad(now.target.record)
@@ -257,15 +272,19 @@ function useRunEntry(flow: FlowState): PaneEntry {
 
 /**
  * Each new state that asks something of the person takes the keyboard,
- * once the detail is shown where a layout hid it; the run out keeps it on
- * Run it. Not scrolled sideways: a region scrolled into view horizontally
- * moves the whole page by the scrollbar's gutter (unsaved-notice.tsx).
+ * once the detail is shown where a layout hid it -- but while the guard
+ * asks the person something, which keeps it: they are answering that. The
+ * run out from Run it keeps the confirmation's number, so the keyboard
+ * stays on Run it; a run again, or the action asked again while it is out,
+ * is a new one. Not scrolled sideways: a region scrolled into view
+ * horizontally moves the whole page by the scrollbar's gutter
+ * (unsaved-notice.tsx).
  */
-function useRunFocus(run: Run, regionRef: RefObject<HTMLDivElement | null>, show: () => boolean): void {
+function useRunFocus(run: Run, regionRef: RefObject<HTMLDivElement | null>, show: () => boolean, waiting: () => boolean): void {
   const after = useAfterRender()
   const n = run.state === 'idle' ? 0 : run.n
   useEffect(() => {
-    if (run.state === 'idle' || run.state === 'sending') return
+    if (run.state === 'idle' || waiting()) return
     const focus = (): void => {
       const region = regionRef.current
       region?.focus({ preventScroll: true })
@@ -297,7 +316,7 @@ function confirmRun(flow: FlowState, atStake: (target: RunTarget) => PaneWork[],
 /** The run out: its forms held, sent once, and what the server answered drawn -- unless a discard dropped it meanwhile. */
 function dispatch(flow: FlowState, out: Run): void {
   if (out.state !== 'sending') return
-  const { target, answers } = out
+  const { target, answers, discards } = out
   const { client, entry, sessions } = flow.latest.current
   flow.set(out)
   flow.sent.current += 1
@@ -305,33 +324,54 @@ function dispatch(flow: FlowState, out: Run): void {
   for (const session of sessions) session.hold(RUN_HELD, 'action')
   void client.runAction(entry.id, target.action.name, { records: [{ record: target.record, version: target.version }], answers }).then((outcome) => {
     if (flow.sent.current !== mine) return
-    release(flow)
     const said = words(flow.latest.current.definition.form, target.action.done) ?? DONE
     const { next, done, problems } = answer(flow.current.current, outcome, said)
     if (problems !== undefined && next.state === 'asking') next.dialog.applyServerErrors(problems)
     flow.set(next)
-    if (done) reread(flow, target)
+    if (done) reread(flow, target, discards, mine)
+    else release(flow)
   })
 }
 
 /**
  * After a run: its row listed again, the record read again into its
  * panes, through the guard, and the sections' grids where the action names
- * them; a read refused is said in the region. Nothing of the record when
- * the detail holds another by then.
+ * them; a read refused is said in the region. The record's forms stay held
+ * until the read has opened, been refused, been kept from or had its
+ * question replaced -- a Save before would name the version from before
+ * the run -- and the forms its confirmation listed (`discards`) drop
+ * without asking again. Nothing of the record when the detail holds
+ * another by then.
  */
-function reread(flow: FlowState, target: RunTarget): void {
-  const { opening, grid, drill } = flow.latest.current
+function reread(flow: FlowState, target: RunTarget, discards: readonly PaneWork[], mine: number): void {
+  const { opening, grid, drill, sessions } = flow.latest.current
   grid.current?.reload()
-  if (openRecord(flow) !== target.record) return
-  opening.read({ kind: 'ran', record: target.record, label: target.label }, target.record, false, {
+  // Held for this run alone: a run sent since holds the forms itself.
+  const settled = (): void => {
+    if (flow.sent.current === mine) release(flow)
+  }
+  if (openRecord(flow) !== target.record) {
+    settled()
+    return
+  }
+  for (const session of sessions) session.hold(READING_AGAIN, 'action')
+  const agreed = discards.flatMap((pane) => (pane.renderer === null ? [] : [pane.renderer]))
+  opening.readAgain({ kind: 'ran', record: target.record, label: target.label, agreed }, target.record, {
     opened: () => {
+      settled()
       const [session] = flow.latest.current.sessions
       if (session !== undefined) flow.latest.current.onReread(session)
     },
-    refused: (message) => flow.set(unread(flow.current.current, message)),
+    refused: (message) => {
+      settled()
+      flow.set(unread(flow.current.current, message))
+    },
     // Kept editing: the panes keep what was typed since, at the version before the run, and the region the keyboard.
-    back: () => flow.regionRef.current?.focus({ preventScroll: true }),
+    back: () => {
+      settled()
+      flow.regionRef.current?.focus({ preventScroll: true })
+    },
+    dropped: settled,
   })
   if (target.action.refresh.includes('children')) drill.levels.reloadUnder(target.record)
 }

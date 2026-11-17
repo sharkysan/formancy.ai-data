@@ -1141,7 +1141,12 @@ through the runtime plane's route
    While it is out the record's forms send nothing. Done, the record's row
    is listed again and the record read again into its own forms through
    the guard -- the run moved its version -- and the sections' grids where
-   the action names `children`. A 502 or a lost answer is "It may have
+   the action names `children`. The forms send nothing until that read
+   has opened, been refused or been kept from; what the confirmation
+   listed drops without asking again; and a question the guard asks
+   meanwhile about something else does not drop the read, which waits for
+   the person's answer (`opening.ts`'s `readAgain`, the guard's
+   `afterWaiting`). A 502 or a lost answer is "It may have
    run": one read of the record, and Run it again only at the version the
    run sent, which is stale if the first committed after all.
 

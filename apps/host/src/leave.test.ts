@@ -99,6 +99,38 @@ describe('what each way of leaving a form discards', () => {
     expect(lead({ kind: 'reload-rows', record: 'k1:1', rows: [] })).toEqual(['Loading ', { code: 'k1:1' }, ' as saved, with its rows, closes these forms:'])
   })
 
+  // Reading the record again after an action ran over it (0162) replaces
+  // what its forms hold, and leaves its deletion out where it is: a read
+  // does not touch it, so it is never asked about, and Discard never drops
+  // its track (watched failing with every renderer's, the deletion's
+  // included: "expected [ 'master react', …(2) ] to deeply equal [ 'master
+  // react', 'master angular' ]").
+  test('the record read again after a run drops its own forms, never its deletion', () => {
+    const deleting: PaneWork[] = [
+      { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: null, name: ['Order ', { code: 'k1:1' }], work: 'deleting' },
+      { owner: 'lines', renderer: 'react', name: ['Order line ', { code: 'k1:1,1' }], work: 'changed' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, deleting).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order' })).toEqual(['master react', 'master angular'])
+  })
+
+  // What the action's confirmation listed, the person agreed to drop when
+  // they ran it: the read after it asks about those forms no more, and
+  // about one that holds work only since (watched failing with nothing
+  // agreed spared: "expected [ 'master react', 'master angular' ] to
+  // deeply equal [ 'master angular' ]").
+  test('the record read again after a run asks only about the forms its confirmation did not list', () => {
+    const both: PaneWork[] = [
+      { owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+      { owner: 'master', renderer: 'angular', name: ['Order ', { code: 'k1:1' }], work: 'changed' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, both).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order', agreed: ['react'] })).toEqual(['master angular'])
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order', agreed: ['react', 'angular'] })).toEqual([])
+  })
+
   // The renderer switch hides a renderer's forms everywhere on the page,
   // and a hidden form is not mounted: its work goes with it, so it is asked
   // about, in the record and in every child, and the shown renderer's is not.

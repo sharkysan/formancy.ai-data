@@ -4,7 +4,8 @@ import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { SAVE_OUT } from './deletion.js'
 import { RUN_HELD, RUNNING } from './running.js'
 import { CLOSE_WORDS } from './test-actions.js'
-import { askClose, closed, closeRegion, openActionOrder, runIt, runsSent } from './test-acting.js'
+import { focusedName } from './test-accessible.js'
+import { askClose, closed, closeRegion, closing, openActionOrder, runIt, runsSent } from './test-acting.js'
 import {
   answer,
   chooseCustomer,
@@ -165,13 +166,15 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
 describe.each(ENGINES)('an action run in flight on $engine (0162)', (engine) => {
   // While a run is out, a second press of Run it, and the action asked
   // again from the header, send nothing: the region says it is running,
-  // and the order closes once. A press of the order's Save says it sent
-  // nothing too, since the run moves the version the save would name
-  // (watched failing on postgres:17-alpine and
-  // mcr.microsoft.com/mssql/server:2022-latest with Run it sending again
-  // while the run was out: two runs went, "expected 2 to be 1"; and with
-  // the forms not held while it was out: the save went, held beside the
-  // run).
+  // takes the keyboard again when asked again, and the order closes once.
+  // A press of the order's Save says it sent nothing too, since the run
+  // moves the version the save would name (watched failing on
+  // postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest with
+  // Run it sending again while the run was out: "expected { runs: 2, held:
+  // 2 } to deeply equal { runs: 1, held: 1 }"; with the forms not held
+  // while it was out: the pane said "Saving…", the save sent beside the
+  // run; and with the region not focused when asked again: "expected
+  // 'Close the order' to be 'Close the order: Order k1:1?'").
   test.each(RENDERERS)('in %s, a second press while the run is out sends nothing, and the order closes once', async (renderer) => {
     const record = await plane.db.insertActionOrder(engine.connection)
     const holding = holdingWrites(plane.fetch)
@@ -183,6 +186,7 @@ describe.each(ENGINES)('an action run in flight on $engine (0162)', (engine) => 
     await waitFor(() => expect(within(closeRegion(record, true)).getByRole('status').textContent).toBe(RUNNING))
     await runIt(user, record)
     await user.click(screen.getByRole('button', { name: CLOSE_WORDS.label }))
+    await waitFor(() => expect(focusedName()).toBe(closing(record, true)))
     await save(user, renderer)
     await said(renderer, new RegExp(`^${RUN_HELD}$`))
     expect({ runs: runsSent(plane, from), held: holding.held.length }).toEqual({ runs: 1, held: 1 })
@@ -194,10 +198,10 @@ describe.each(ENGINES)('an action run in flight on $engine (0162)', (engine) => 
 
   // A save of the order out moves the version a run would name: Run it
   // says so, is described by why, and sends nothing; once the save is
-  // answered it runs over the version the save stored, and is done (watched
-  // failing on postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest
-  // with Run it sent while the save was out: the run named the version
-  // before the save, "Not run", stale).
+  // answered it runs over the version the save stored -- the newest the
+  // detail heard as Run it is pressed -- and is done (watched failing on
+  // postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest with
+  // Run it sent while the save was out: "expected 1 to be +0", a run sent).
   test.each(RENDERERS)('in %s, Run it waits for a save of the order out, then runs over the version it stored', async (renderer) => {
     const record = await plane.db.insertActionOrder(engine.connection)
     const holding = holdingWrites(plane.fetch)
@@ -219,6 +223,37 @@ describe.each(ENGINES)('an action run in flight on $engine (0162)', (engine) => 
     holding.answer()
     await closed(record)
     expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'closed', version: 3, amount: '13.50', closes: 1 })
+  })
+
+  // Escape in the confirmation is Keep it: nothing sent, the region gone
+  // and the keyboard back on the action; while the run is out it is
+  // nothing, as both answers are, and the order closes once (watched
+  // failing on postgres:17-alpine and
+  // mcr.microsoft.com/mssql/server:2022-latest with the confirmation's
+  // Escape taken out: "expected 'Close the order: Order k1:5?' to be 'Close
+  // the order'"; and with Escape acting while the run was out: "Unable to
+  // find an accessible element with the role "region" and name "Close the
+  // order: Order k1:5?"").
+  test('Escape in the confirmation is Keep it, and nothing while the run is out', async () => {
+    const record = await plane.db.insertActionOrder(engine.connection)
+    const holding = holdingWrites(plane.fetch)
+    const user = await openActionOrder(holding.fetch, engine, record)
+    await askClose(user, record, 'React', 'kept by Escape')
+    await waitFor(() => expect(focusedName()).toBe(closing(record, true)))
+    const from = plane.sent.length
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(focusedName()).toBe(CLOSE_WORDS.label))
+    expect(screen.queryByRole('region', { name: closing(record, true) })).toBeNull()
+    expect(runsSent(plane, from)).toBe(0)
+    await askClose(user, record, 'React', 'closed past Escape')
+    await runIt(user, record)
+    await writesHeld(holding, 1)
+    await user.keyboard('{Escape}')
+    expect(within(closeRegion(record, true)).getByRole('status').textContent).toBe(RUNNING)
+    holding.answer()
+    await closed(record)
+    expect(runsSent(plane, from)).toBe(1)
+    expect((await plane.db.actionOrder(engine.connection, record)).closes).toBe(1)
   })
 })
 

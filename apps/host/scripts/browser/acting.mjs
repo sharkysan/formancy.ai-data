@@ -1,17 +1,19 @@
 // An action over the open record in the browser (0162), on the action
 // order the plane publishes over the actions schema: its button in the
 // record's header; its dialog, drawn by the renderer shown on its own
-// paper, with no rule of host.css selecting anything on it; the
-// confirmation taking the keyboard, Keep it the next Tab, Escape giving
-// the keyboard back to the action, its frame against the glass at 3:1 or
-// more and its two answers one under the other on a phone, Keep it first;
-// done, from the keyboard, with the keyboard on what the server did and the
+// paper, with no rule of host.css selecting anything on it, and Escape
+// there giving the keyboard back to the action; the confirmation taking
+// the keyboard, Keep it the next Tab, its frame against the glass at 3:1
+// or more and its two answers one under the other on a phone, Keep it
+// first, and Escape there Keep it, the keyboard back on the action; done,
+// from the keyboard, with the keyboard on what the server did and the
 // order closed in the database; and "Not run" in the deployment's words,
 // said as its own -- each measured by the gate's `measured` on the way.
 //
 // PostgreSQL only, as the gate is. What the engines answer, a save or the
-// run out, and a run whose answer was lost are the jsdom suites', on both
-// (page.test.tsx, in-flight.test.tsx, actions.test.tsx).
+// run out, a stale run, and a run whose answer was lost -- "It may have
+// run", before and after its check -- are the jsdom suites', on both
+// (page.test.tsx, in-flight.test.tsx, actions.test.tsx), not measured here.
 
 import { frame, landsOn, stacked } from './deleting.mjs'
 import { focusedOn, WITHIN } from './measure.mjs'
@@ -105,6 +107,15 @@ export function actionJourney(plane, { check }, run) {
                 ? 'one under the other where there is room'
                 : null),
         )
+        await page.keyboard.press('Escape')
+        check("Escape in the confirmation gives the keyboard back to the action's button", await focusedOn(page, action(page)))
+        const kept = await plane.actionOrderOf(at.record)
+        check(
+          'and nothing ran: the confirmation is gone, the order still open in the database',
+          (await region.count()) !== 0 ? 'the confirmation is still drawn' : kept.status === 'open' ? null : JSON.stringify(kept),
+        )
+        // Asked again, for the steps after this one.
+        await confirmation(page, at.record, at.note)
       },
     ],
     [
