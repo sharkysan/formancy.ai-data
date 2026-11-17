@@ -5,7 +5,7 @@ import { WORK } from './leave.js'
 import { checkedText, DONE, READ_AGAIN, READING_AGAIN, RUNS_ON } from './running.js'
 import { audit, focusedName, paragraphs } from './test-accessible.js'
 import { askClose, closed, closeRegion, closing, dialogPaper, openActionOrder, region, runIt, runsSent } from './test-acting.js'
-import { CLOSE_WORDS, STAMP_LABEL } from './test-actions.js'
+import { CLOSE_ALL_LABEL, CLOSE_WORDS, STAMP_LABEL } from './test-actions.js'
 import { answer, load, notice, RENDERERS, said, save, shows, unsavedNotice } from './test-host.js'
 import { holdingRequests, holdingWrites } from './test-network.js'
 import { ENGINES, startPlane } from './test-plane.js'
@@ -274,6 +274,21 @@ describe.each(ENGINES)('an action over the open record on $engine', (engine) => 
     expect(await audit()).toEqual([])
     await shows('React', 'Status', 'closed')
     expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'closed', note: null, version: 2, closes: 1 })
+  })
+
+  // The open record's header offers the actions over the open record
+  // alone: close-all, close_order bound again over a selection, which the
+  // form offers and the clerk may run, is no control of it -- an action
+  // over a selection belongs above the grid, which offers none yet (0165).
+  // Drawn in the header, it would run over the open record alone, a
+  // selection of one nobody chose, under words that say every order chosen.
+  test('the open record’s header offers its actions over the open record, and none over a selection', async () => {
+    const record = await plane.db.insertActionOrder(engine.connection)
+    await openActionOrder(plane.fetch, engine, record)
+    expect(screen.getByRole('button', { name: CLOSE_WORDS.label })).toBeTruthy()
+    expect(screen.getByRole('button', { name: STAMP_LABEL })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: CLOSE_ALL_LABEL })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'close-all' })).toBeNull()
   })
 
   // A run lost before it reached the database checks as not run: the

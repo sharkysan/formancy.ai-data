@@ -13,10 +13,12 @@ import type { Engine } from './test-plane.js'
  * data-client's plane binds it -- and worded by its presentation; and
  * bound again as `stamp`, the note the order's own, so it asks no dialog,
  * and its presentation gives it a label alone, so the page says its own
- * confirmation and its own "Done.". The clerk reads the order, changes its
- * note and amount, and runs both, within their tenant through the order's
- * customer (0043). And how a suite writes and reads those orders as the
- * database's owner, beside the page, and loses a run's answer.
+ * confirmation and its own "Done."; and bound a third time as `close-all`,
+ * over a selection (0165), with a label of its own, which the open
+ * record's header never offers. The clerk reads the order, changes its
+ * note and amount, and may run all three, within their tenant through the
+ * order's customer (0043). And how a suite writes and reads those orders
+ * as the database's owner, beside the page, and loses a run's answer.
  */
 
 /** The action order's form on `engine`. */
@@ -31,6 +33,9 @@ export const CLOSE_WORDS = {
 
 /** What stamp's presentation says: its label, and nothing else. */
 export const STAMP_LABEL = 'Close as noted'
+
+/** What close-all's presentation says: its label, which no control of the open record's header may carry (0165). */
+export const CLOSE_ALL_LABEL = 'Close the chosen orders'
 
 /**
  * What close_order says to the person of an order noted `refuse`, after the
@@ -82,6 +87,12 @@ const STAMP = {
   },
 }
 
+/** close_order over a selection (0165): close's sources, over every record chosen. */
+const CLOSE_ALL = {
+  pg: { ...CLOSE.pg, name: 'close-all', scope: 'selection' },
+  ms: { ...CLOSE.ms, name: 'close-all', scope: 'selection' },
+} as const
+
 /** The fields of an order the clerk changes: every other they read. */
 const WRITTEN = new Set(['note', 'amount'])
 
@@ -99,11 +110,11 @@ export async function publishActions(
       title: 'Order',
       lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
       versionColumn: 'version',
-      actions: [CLOSE[connection], STAMP[connection]],
+      actions: [CLOSE[connection], STAMP[connection], CLOSE_ALL[connection]],
     })
     const bindings = proposal['bindings'] as FormBindings
-    if ((bindings.actions ?? []).length !== 2)
-      throw new Error(`the generator did not bind close and stamp on ${connection}: ${JSON.stringify(proposal['notes'])}`)
+    if ((bindings.actions ?? []).length !== 3)
+      throw new Error(`the generator did not bind close, stamp and close-all on ${connection}: ${JSON.stringify(proposal['notes'])}`)
     const policy: FormPolicy = {
       version: 1,
       operations: { read: ['clerk'], create: [], update: ['clerk'] },
@@ -113,13 +124,14 @@ export async function publishActions(
       rowFilters: [],
       lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
       through: ['customer'],
-      actions: { close: { roles: ['clerk'] }, stamp: { roles: ['clerk'] } },
+      actions: { close: { roles: ['clerk'] }, stamp: { roles: ['clerk'] }, 'close-all': { roles: ['clerk'] } },
     }
     const presentation: PresentationOverrides = {
       ...EMPTY_PRESENTATION,
       actions: [
         { action: 'close', ...CLOSE_WORDS },
         { action: 'stamp', label: STAMP_LABEL },
+        { action: 'close-all', label: CLOSE_ALL_LABEL },
       ],
     }
     const base = proposal['form'] as FormSchema
