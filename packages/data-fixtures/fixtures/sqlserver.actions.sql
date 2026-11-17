@@ -23,7 +23,11 @@
 -- label_ticket takes three varchar parameters in the database's collation:
 -- the label, an answer and the actor's id, each of which SQL Server would
 -- pass as `?` where code page 1252 lacks a character, without an error
--- (0159, Decision 3). Batches are separated by GO.
+-- (0159, Decision 3). tag is SQL Server's alone too: a rowversion form keyed
+-- by text under a case-insensitive collation, so two tokens of a selection,
+-- `alpha` and `ALPHA`, name one row (0165), which touch_tag is run over.
+-- close_order refuses in words for the person an order whose amount is
+-- 66.60, as PostgreSQL's does. Batches are separated by GO.
 
 create schema actions;
 GO
@@ -65,6 +69,11 @@ create table actions.ticket (
   label varchar(50) collate Greek_CI_AS null,
   row_version rowversion not null
 );
+create table actions.tag (
+  code nvarchar(20) collate Latin1_General_CI_AS not null constraint pk_tag primary key,
+  note nvarchar(200) null,
+  row_version rowversion not null
+);
 alter table actions.[order] add obsolete int null;
 create sequence actions.called as bigint start with 1 increment by 1 no cache;
 GO
@@ -73,7 +82,7 @@ begin
   set nocount on;
   declare @called bigint = next value for actions.called;
   insert actions.call (routine, record_id, note, actor, amount, tenant) values (N'close_order', @p_order, @p_note, @p_actor, @p_amount, @p_tenant);
-  if @p_note = N'refuse' throw 50001, N'formancy: refused: This order cannot be closed now.', 1;
+  if @p_note = N'refuse' or @p_amount = 66.60 throw 50001, N'formancy: refused: This order cannot be closed now.', 1;
   if @p_note = N'plain' throw 50002, N'an error not worded for the person', 1;
   if @p_note like N'sleep %'
   begin
@@ -119,10 +128,18 @@ begin
   update actions.ticket set note = @p_remark where id = @p_ticket;
 end
 GO
+create procedure actions.touch_tag @p_code nvarchar(20) as
+begin
+  set nocount on;
+  declare @called bigint = next value for actions.called;
+  insert actions.call (routine, record_id, note) values (N'touch_tag', 0, @p_code);
+end
+GO
 grant select, update on actions.customer to formancy_writer;
 grant select, update on actions.[order] to formancy_writer;
 grant select, update on actions.price to formancy_writer;
 grant select, update on actions.ticket to formancy_writer;
+grant select, update on actions.tag to formancy_writer;
 grant execute on schema::actions to formancy_writer;
 grant view definition on schema::actions to formancy_writer;
 GO

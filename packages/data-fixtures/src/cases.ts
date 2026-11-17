@@ -132,7 +132,7 @@ export const listedCase = (name: ListedCase): string => `check lists: ${name}`
 export const declineCase = (name: DeclineCase): string => `declined: ${name}`
 /** What a save of a record with its rows does on each engine (0155), by the name of its entry in SAVE_PARITY. */
 export const saveCase = (name: SaveCase): string => `saves: ${name}`
-/** What a run of an action over the open record does on each engine (0160), by the name of its entry in ACTION_PARITY. */
+/** What a run of an action over the open record (0160) or a selection (0165) does on each engine, by the name of its entry in ACTION_PARITY. */
 export const actionCase = (name: ActionCase): string => `actions: ${name}`
 
 /**

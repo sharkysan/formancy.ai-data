@@ -46,17 +46,20 @@ export function castOf(typeId: string): string {
 }
 
 /**
- * Lock the record and move its version (0160), as one statement: the
- * record by its key, inside the person's filters and every through -- each
+ * Lock the records and move their versions (0160), as one statement: each
+ * record by its key -- one, or every record of a selection (0165) --
+ * inside the person's filters and every through -- each
  * through's parent locked FOR SHARE, so a move of the parent to another
  * tenant waits for the run, where FOR KEY SHARE would let an UPDATE that
  * leaves the parent's key alone through -- at the version its person read,
  * the open version alone on a form over versions (0113), and only while
  * the root has the definition the run was decided over (0041). The rows
  * are locked FOR NO KEY UPDATE in key order, PostgreSQL's locking after its
- * sort (measured, actions.integration.test.ts), and the version moved by
- * one in the same statement. Only each moved row's key, as canonical text,
- * and its version come back.
+ * sort (measured, actions.integration.test.ts), so two runs over
+ * overlapping selections take their common rows in one order whatever
+ * order each was sent in, and the version moved by one in the same
+ * statement. Only each moved row's key, as canonical text, and its version
+ * come back, in an order PostgreSQL does not promise.
  */
 export function lockStatement(
   request: ActionRequest,

@@ -23,7 +23,10 @@
 -- never called as not. close_order takes one value from each kind of
 -- source and does what its note asks: refuse in words for the person,
 -- refuse otherwise, sleep, raise a notice that crosses the wire with the
--- call's answer, or raise the server's own unknown outcome (40003).
+-- call's answer, or raise the server's own unknown outcome (40003). It
+-- also refuses in words for the person an order whose amount is 66.60,
+-- whatever its note: what one record of a selection refuses while the
+-- others would not, its amount read from the locked row (0165).
 -- broken_order references a column no table has, which PL/pgSQL finds only
 -- when it runs.
 
@@ -68,7 +71,7 @@ create function actions.close_order(p_order bigint, p_note text, p_actor text, p
 begin
   perform pg_catalog.nextval('actions.called');
   insert into actions.call (routine, record_id, note, actor, amount, tenant) values ('close_order', p_order, p_note, p_actor, p_amount, p_tenant);
-  if p_note = 'refuse' then
+  if p_note = 'refuse' or p_amount = 66.60 then
     raise exception 'formancy: refused: This order cannot be closed now.';
   elsif p_note = 'plain' then
     raise exception 'an error not worded for the person';

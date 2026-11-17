@@ -67,3 +67,23 @@ describe('an EXEC that did not resolve to the bound procedure', () => {
     ]).toEqual(['refused', 'refused', 'refused'])
   })
 })
+
+describe('two keys of a selection the database makes one row', () => {
+  // The lock step THROWs its own number with the positions of the records
+  // that name the row (0165), and the run is duplicate-record naming them,
+  // rolled back before any call: read as any other error of the batch, a
+  // person would be told the database refused the run when the selection
+  // named one record twice. The same number with any other message is
+  // somebody else's -- a procedure may THROW any number -- and never names
+  // records. Watched failing on 2026-11-17 with the number read by itself
+  // and no message asked: "expected 'duplicate-record' to be 'refused'".
+  test('is duplicate-record naming their positions, by the number and the message both', () => {
+    const own = batchFailure(
+      [{ step: RUN_STEPS.lock, number: 51736, message: 'formancy: two keys of the selection name one row: 0,2', severity: 16, procedure: null }],
+      request,
+    )
+    expect(own).toMatchObject({ ok: false, code: 'duplicate-record', records: [0, 2] })
+    const theirs = failed(51736, 'actions.close_order')
+    expect(answer(theirs)).toBe('refused')
+  })
+})

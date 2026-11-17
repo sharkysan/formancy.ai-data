@@ -1,4 +1,4 @@
-import { rowFilterTerms, runFailure, throughTerms } from '@formancy/data-core'
+import { LIST_PAGE_SIZE, rowFilterTerms, runFailure, throughTerms, unmovedFailure } from '@formancy/data-core'
 import type { ActionAdapter, ActionFailure, ActionOutcome, ActionRequest, ApiValue, DescribedAction, RecordFailure } from '@formancy/data-core'
 import mssql from 'mssql'
 import type { ConnectionPool } from 'mssql'
@@ -20,8 +20,10 @@ import { runBatch } from './statements.js'
  * built into one batch (statements.ts), sent once with mssql's
  * per-request timeout at the run's deadline and never again, and answered
  * from what the batch selects -- the step CATCH recorded with SQL Server's
- * number, or the moved records' keys. A lock that moved nothing is
- * explained after the batch by the read an update alone would ask.
+ * number, or the moved records' keys with their positions. A lock that
+ * moved fewer records than were sent is explained after the batch, each
+ * record it did not move by the read an update alone would ask, and
+ * answered as `unmovedFailure` reads them, as PostgreSQL's is (0165).
  *
  * Where the engines differ on a deadline, written down here: the lock step
  * waits at most LOCK_TIMEOUT, half the deadline -- chosen, not measured --
@@ -62,7 +64,7 @@ function sendStreamed(
   const sent = new TimedRequest(pool, { requestTimeout: timeoutMs })
   for (const parameter of statement.parameters) sent.input(parameter.name, parameter.type, parameter.value)
   sent.stream = true
-  const results = new BatchResults(keyColumns(request.target.identity))
+  const results = new BatchResults([...keyColumns(request.target.identity), 'o'])
   let error: Error | undefined
   sent.on('recordset', (columns: Record<string, unknown>) => {
     results.recordset(Object.keys(columns))
@@ -101,11 +103,12 @@ function checkRequest(request: ActionRequest, deadlineMs: number): void {
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 2)
     throw new TypeError('A run deadline is a whole number of milliseconds above 1, half of which the lock may wait.')
   if (request.routine.kind !== 'procedure') throw new Error('A run on SQL Server calls a procedure: a function cannot write (0159).')
-  if (request.records.length !== 1) throw new Error('An action over the open record runs over exactly one record.')
+  if (request.records.length < 1 || request.records.length > LIST_PAGE_SIZE)
+    throw new Error(`A run addresses from 1 to ${String(LIST_PAGE_SIZE)} records: the open record, or a selection of one page (0165).`)
   for (const record of request.records) checkKey(request.target, record.key)
 }
 
-/** Each moved record's key, from the canonical text the batch's OUTPUT read. */
+/** Each moved record's key, from the canonical text the batch's OUTPUT read, in the order sent. */
 function keysOf(request: ActionRequest, rows: readonly Row[]): Array<Record<string, ApiValue>> {
   return rows.map((row) =>
     Object.fromEntries(
@@ -143,22 +146,32 @@ export function createSqlServerActions(pool: ConnectionPool): ActionAdapter {
 
     async run(request, deadlineMs): Promise<ActionOutcome> {
       checkRequest(request, deadlineMs)
-      const record = request.records[0] as ActionRequest['records'][number]
       const terms = rowFilterTerms(request.filters)
       const through = throughTerms(request.through)
       const definition = definitionBytes(request.definitions.table)
       const routine = routineDigest(request.definitions.routine)
       const ended = (expected: NonNullable<ReturnType<typeof expectedVersion>>) =>
         request.open === undefined ? undefined : { open: request.open, concurrency: request.target.concurrency, expected }
-      const explained = (expected: ReturnType<typeof expectedVersion>): Promise<RecordFailure> =>
-        whyNothingChanged(
-          pool,
-          existsStatement({ target: request.target, key: record.key }, terms, through, definition, expected === undefined ? undefined : ended(expected)),
-        )
-      const expected = expectedVersion(request.target.concurrency, record.expectedVersion)
+      const expected = request.records.map((record) => expectedVersion(request.target.concurrency, record.expectedVersion))
+      /** Why the record at `position` was not moved, by the read an update alone would ask; one by one, the records `explain` names. */
+      const explained = async (explain: (position: number) => boolean): Promise<ActionFailure> => {
+        const failures: Array<RecordFailure | undefined> = []
+        for (const [position, record] of request.records.entries()) {
+          const version = expected[position]
+          failures.push(
+            explain(position)
+              ? await whyNothingChanged(
+                  pool,
+                  existsStatement({ target: request.target, key: record.key }, terms, through, definition, version === undefined ? undefined : ended(version)),
+                )
+              : undefined,
+          )
+        }
+        return unmovedFailure(failures)
+      }
       // A version no record can hold is never bound: answered as any other mismatch, nothing sent.
-      if (expected === undefined) return runFailure(await explained(undefined))
-      const batch = runBatch(request, terms, through, expected, definition, routine, Math.floor(deadlineMs / 2))
+      if (expected.some((version) => version === undefined)) return explained((position) => expected[position] === undefined)
+      const batch = runBatch(request, terms, through, expected as NonNullable<(typeof expected)[number]>[], definition, routine, Math.floor(deadlineMs / 2))
       let answer: Awaited<ReturnType<typeof sendStreamed>>
       try {
         answer = await sendStreamed(pool, batch, request, deadlineMs)
@@ -169,7 +182,10 @@ export function createSqlServerActions(pool: ConnectionPool): ActionAdapter {
       if (answer === 'unanswered') return UNANSWERED
       if (answer.failed.length > 0) {
         const failure: ActionFailure | 'unmoved' = batchFailure(answer.failed, request)
-        return failure === 'unmoved' ? runFailure(await explained(expected)) : failure
+        if (failure !== 'unmoved') return failure
+        // The positions the lock moved, which the rollback took back and @moved kept.
+        const moved = new Set(answer.moved.map((row) => Number(row['o'])))
+        return explained((position) => !moved.has(position))
       }
       return { ok: true, records: keysOf(request, answer.moved) }
     },

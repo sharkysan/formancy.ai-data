@@ -1,5 +1,5 @@
-import { rowFilterTerms, runFailure, throughTerms } from '@formancy/data-core'
-import type { ActionAdapter, ActionFailure, ActionOutcome, ActionRequest, ApiValue, DescribedAction, RecordValue } from '@formancy/data-core'
+import { LIST_PAGE_SIZE, rowFilterTerms, runFailure, throughTerms, unmovedFailure } from '@formancy/data-core'
+import type { ActionAdapter, ActionFailure, ActionOutcome, ActionRequest, ApiValue, DescribedAction, RecordFailure, RecordValue } from '@formancy/data-core'
 import type { Sql } from 'postgres'
 import { textUnitOf } from '../discovery/columns.js'
 import { describedFrom, parseDefinition } from '../records/definition.js'
@@ -26,17 +26,24 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  *    waits behind DDL as the record's lock waits behind a row, and each
  *    statement is bounded by what the one before left.
  * 3. The lock: each record locked in key order and its version moved, its
- *    throughs' parents held FOR SHARE (statements.ts). Fewer rows than
- *    records and nothing is called: rolled back, and a read after tells
- *    `stale`, `not-found` and `version-ended` apart, as an update's nothing
- *    is (records/explain.ts).
+ *    throughs' parents held FOR SHARE (statements.ts) -- every record of a
+ *    selection in one statement, sorted before it is locked, so two runs
+ *    over overlapping selections wait for each other rather than deadlock
+ *    on them (0165). Fewer rows than records and nothing is called: rolled
+ *    back, and a read after tells `stale`, `not-found` and `version-ended`
+ *    apart for each record the lock did not return, as an update's nothing
+ *    is (records/explain.ts), answered as `unmovedFailure` reads them.
+ *    Which records it returned is told by their keys' canonical values,
+ *    the key's own equality under a deterministic collation.
  * 4. SET LOCAL statement_timeout to what remains, by this process's
  *    monotonic clock; nothing remaining is `action-timeout`, nothing
  *    called. The statements together stay inside the deadline, each set to
  *    what the ones before it left; the round trips between them and the
  *    COMMIT are on top of it.
- * 5. The call, under the routine's guard; fewer calls than records moved
- *    is `schema-changed`, rolled back.
+ * 5. The call, under the routine's guard, once per record moved, in an
+ *    order PostgreSQL does not promise; fewer calls than records moved is
+ *    `schema-changed`, rolled back, and any call's refusal rolls back every
+ *    record.
  *
  * The root cannot change between the two statements: the lock holds its
  * rows and its table lock until COMMIT, and the module writes the root in
@@ -46,10 +53,10 @@ import { callStatement, lockStatement, timeoutStatement } from './statements.js'
  * FATAL, so an unknown outcome, and 15 and 16 lack it.
  */
 
-/** Why a run stopped inside its transaction, thrown there so postgres.js rolls it back: a statement refused, a lock that moved fewer records than were sent, no deadline left for the call, or a call that did not run for every record moved. */
+/** Why a run stopped inside its transaction, thrown there so postgres.js rolls it back: a statement refused, a lock that moved fewer records than were sent -- the rows it did move -- no deadline left for the call, or a call that did not run for every record moved. */
 class Stopped extends Error {
   readonly at: 'lock' | 'call'
-  readonly why: { refused: unknown } | 'unmoved' | 'deadline' | 'uncalled'
+  readonly why: { refused: unknown } | { unmoved: readonly TextRow[] } | 'deadline' | 'uncalled'
 
   constructor(at: Stopped['at'], why: Stopped['why']) {
     super('A run stopped inside its transaction, which rolled back.')
@@ -85,47 +92,74 @@ function checkRequest(request: ActionRequest, deadlineMs: number): void {
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1) throw new TypeError('A run deadline is a whole number of milliseconds above 0.')
   if (request.routine.kind !== 'function') throw new Error('A run on PostgreSQL calls a function: a procedure may COMMIT inside itself (0159).')
   if (request.target.concurrency.kind !== 'version-column') throw new Error('PostgreSQL has no rowversion; a run is guarded by a version column.')
-  if (request.records.length !== 1) throw new Error('An action over the open record runs over exactly one record.')
+  if (request.records.length < 1 || request.records.length > LIST_PAGE_SIZE)
+    throw new Error(`A run addresses from 1 to ${String(LIST_PAGE_SIZE)} records: the open record, or a selection of one page (0165).`)
   for (const record of request.records) checkKey(request.target, record.key)
 }
 
-/** Each moved record's key, from the canonical text the lock returned, as a bound key names it. */
+/** A key's values as one string, canonical: what tells a record the lock returned from one it did not. */
+const spelled = (key: readonly Pick<RecordValue, 'value'>[]): string => JSON.stringify(key.map((part) => part.value))
+
+/**
+ * Each moved record's key, from the canonical text the lock returned, as a
+ * bound key names it, in the order the records were sent: the lock
+ * returns them in an order PostgreSQL does not promise.
+ */
 function keysOf(request: ActionRequest, rows: readonly TextRow[]): { values: Array<Record<string, ApiValue>>; keys: RecordValue[][] } {
-  const values: Array<Record<string, ApiValue>> = []
-  const keys = rows.map((row) => {
+  const moved = rows.map((row) => {
     const value: Record<string, ApiValue> = {}
     const key = request.target.identity.map((column, index) => {
       const decoded = decodeCanonical(column.type, row[index] ?? null)
       value[column.name] = decoded
       return { ...column, value: decoded }
     })
-    values.push(value)
-    return key
+    return { value, key }
   })
-  return { values, keys }
+  const position = new Map(request.records.map((record, index) => [spelled(record.key), index]))
+  const at = (entry: (typeof moved)[number]): number => position.get(spelled(entry.key)) ?? request.records.length
+  const ordered = [...moved].sort((left, right) => at(left) - at(right))
+  return { values: ordered.map((entry) => entry.value), keys: ordered.map((entry) => entry.key) }
+}
+
+/** What locates a record, and the read that explains it, as `whyNothingChanged` takes them. */
+interface Explaining {
+  request: ActionRequest
+  scope: { terms: ReturnType<typeof rowFilterTerms>; through: ReturnType<typeof throughTerms> }
+  definition: Definition
+  path: WritePath
+}
+
+/**
+ * Why each record `explain` names was not moved, one read after another,
+ * as an update's nothing is explained -- `withVersion` as
+ * `whyNothingChanged` takes it -- and the run's answer as `unmovedFailure`
+ * reads them, the same reading SQL Server's adapter asks (0165).
+ */
+async function explained(sql: Sql, on: Explaining, withVersion: boolean, explain: (position: number) => boolean): Promise<ActionFailure> {
+  const failures: Array<RecordFailure | undefined> = []
+  for (const [position, record] of on.request.records.entries()) {
+    const located = {
+      target: on.request.target,
+      key: record.key,
+      expectedVersion: record.expectedVersion,
+      ...(on.request.open === undefined ? {} : { open: on.request.open }),
+    }
+    failures.push(explain(position) ? await whyNothingChanged(sql, located, on.scope, withVersion, on.definition, on.path) : undefined)
+  }
+  return unmovedFailure(failures)
 }
 
 /** What a run that stopped inside its transaction is answered with, once postgres.js rolled it back. */
-async function answered(
-  sql: Sql,
-  stop: Stopped,
-  request: ActionRequest,
-  scope: { terms: ReturnType<typeof rowFilterTerms>; through: ReturnType<typeof throughTerms> },
-  definition: Definition,
-  path: WritePath,
-): Promise<ActionFailure> {
-  const record = request.records[0] as ActionRequest['records'][number]
-  const located = {
-    target: request.target,
-    key: record.key,
-    expectedVersion: record.expectedVersion,
-    ...(request.open === undefined ? {} : { open: request.open }),
-  }
+async function answered(sql: Sql, stop: Stopped, on: Explaining): Promise<ActionFailure> {
+  const { request, definition, path } = on
   if (stop.why === 'deadline') return NO_TIME_LEFT
   if (stop.why === 'uncalled') return UNCALLED
-  if (stop.why === 'unmoved') return runFailure(await whyNothingChanged(sql, located, scope, true, definition, path))
+  if ('unmoved' in stop.why) {
+    const moved = new Set(keysOf(request, stop.why.unmoved).keys.map(spelled))
+    return explained(sql, on, true, (position) => !moved.has(spelled((request.records[position] as ActionRequest['records'][number]).key)))
+  }
   // Under REPEATABLE READ a lost race at the lock is 40001, as an update's is (0006): a race, whatever the version reads now.
-  if (stop.at === 'lock' && sqlState(stop.why.refused) === '40001') return runFailure(await whyNothingChanged(sql, located, scope, false, definition, path))
+  if (stop.at === 'lock' && sqlState(stop.why.refused) === '40001') return explained(sql, on, false, () => true)
   const failure = actionFailure(stop.why.refused, true)
   if (
     stop.at !== 'lock' ||
@@ -179,12 +213,10 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
       const definition = parseDefinition(request.definitions.table)
       const digest = routineDigest(request.definitions.routine)
       const path = pathOf(definition)
-      const record = request.records[0] as ActionRequest['records'][number]
+      const on: Explaining = { request, scope, definition, path }
       // A version that is not a number names no state the record was ever in: answered as any other mismatch, nothing sent.
-      if (!isVersion(record.expectedVersion)) {
-        const located = { target: request.target, key: record.key, expectedVersion: record.expectedVersion }
-        return runFailure(await whyNothingChanged(sql, located, scope, false, definition, path))
-      }
+      if (request.records.some((record) => !isVersion(record.expectedVersion)))
+        return explained(sql, on, false, (position) => !isVersion((request.records[position] as ActionRequest['records'][number]).expectedVersion))
       const lock = lockStatement(request, terms, scope.through, definition, path)
       const start = performance.now()
       const left = (): number => Math.floor(deadlineMs - (performance.now() - start))
@@ -207,7 +239,7 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
           }
           sent = true
           const moved = await send('lock', lock)
-          if (moved.rows.length !== request.records.length) throw new Stopped('lock', 'unmoved')
+          if (moved.rows.length !== request.records.length) throw new Stopped('lock', { unmoved: moved.rows })
           const { values: found, keys } = keysOf(request, moved.rows)
           if (left() < 1) throw new Stopped('call', 'deadline')
           await send('call', timeoutStatement(left()))
@@ -217,7 +249,7 @@ export function createPostgresActions(sql: Sql): ActionAdapter {
         })
         return { ok: true, records: values }
       } catch (error) {
-        if (error instanceof Stopped) return answered(sql, error, request, scope, definition, path)
+        if (error instanceof Stopped) return answered(sql, error, on)
         // The COMMIT refused with the connection still there -- a deferred
         // constraint the routine broke, 40001 under SERIALIZABLE -- rolled
         // back, and that refusal is the answer; a connection lost is

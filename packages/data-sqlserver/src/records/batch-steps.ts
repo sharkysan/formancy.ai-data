@@ -60,9 +60,9 @@ export const NOT_WITHIN_MESSAGE = 'formancy: the record is not one these rows ma
 /** The save passed its deadline before a step (0155): rolled back, before COMMIT was sent. */
 export const PAST_DEADLINE = 51724
 export const PAST_DEADLINE_MESSAGE = 'formancy: the save passed its deadline'
-/** An action's run that moved no record (0160): stale, gone or ended, told apart by a read after. Rolled back, the routine not called. */
+/** An action's run that moved fewer records than it addressed (0160, 0165): stale, gone or ended, told apart by a read after. Rolled back, the routine not called. */
 export const ACTION_UNMOVED = 51731
-export const ACTION_UNMOVED_MESSAGE = 'formancy: the run moved no record'
+export const ACTION_UNMOVED_MESSAGE = 'formancy: the run did not move every record it addressed'
 /** The routine's definition is not the one the run was decided over (0160), just before the EXEC: rolled back, not called. */
 export const ROUTINE_MOVED = 51732
 export const ROUTINE_MOVED_MESSAGE = 'formancy: routine definition moved'
@@ -81,6 +81,15 @@ export const ROUTINE_STATUS_MESSAGE = 'formancy: the procedure returned a status
  */
 export const ROUTINE_DENIED = 51735
 export const ROUTINE_DENIED_MESSAGE = 'formancy: this account may not execute the routine'
+/**
+ * Two keys of a selection the database's equality makes one row (0165),
+ * found once the lock step ran: rolled back, nothing called. Its message
+ * is the prefix and the positions in the request of the records that
+ * name the row, ascending, separated by commas.
+ */
+export const SELECTION_DUPLICATE = 51736
+export const SELECTION_DUPLICATE_PREFIX = 'formancy: two keys of the selection name one row: '
+export const SELECTION_DUPLICATE_MESSAGE = /^formancy: two keys of the selection name one row: ([0-9]+(?:,[0-9]+)*)$/
 /**
  * Every number above, the ones the batches raise for themselves, a save's
  * and a run's among them: errors.ts reads none of them as a deployment's reason for the
@@ -106,6 +115,7 @@ export const OWN_NUMBERS: readonly number[] = [
   ARGUMENT_CHANGED,
   ROUTINE_STATUS,
   ROUTINE_DENIED,
+  SELECTION_DUPLICATE,
 ]
 
 /** One column of what a statement returns: its name in the result, its type in a table variable, and the SQL that computes it. */
