@@ -1,6 +1,6 @@
 # 0161 — The runtime plane runs an action once per write id, under a deadline, and never queues it
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0162](0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md): the host page offers each action in the open record's header and runs it after its dialog and a confirmation in place, so the run's route left the plane test's exception
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** the route, its deadline setting, the run pool's count,

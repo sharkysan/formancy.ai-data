@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, ReactElement, ReactNode, RefObject } from 'react'
+import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-client'
+import { useActionFlow } from './action-flow.js'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
 import { crumbOf, recordName } from './crumbs.js'
@@ -34,7 +35,7 @@ import { RecordTabs, useTabStart } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
-import { Split, useLine } from './split.js'
+import { laneStyle, Split, useLine } from './split.js'
 import { Trail } from './trail.js'
 import { useSaveSet } from './together.js'
 import { useDrill } from './use-drill.js'
@@ -54,10 +55,10 @@ const DISCARDED: Said = ['Discarded the unsaved changes. ']
  * grid keeps its page, sort and search. Mounted again for another form.
  *
  * The record is the page's, in memory: never in the address (layout.ts).
- * Where the server offers delete, the record's header and each row of the
- * grid ask for one, in place, under what asked (0053, delete-flow.ts). Each
- * lookup of the record offers Open under its field, which goes a Drill down
- * level below it, from any layout (0141).
+ * Where the server offers delete, the record's header and each row of the grid ask for
+ * one, in place, under what asked (0053, delete-flow.ts); the header offers each action
+ * the server serves too (0162, action-flow.ts). Each lookup of the record offers Open
+ * under its field, which goes a Drill down level below it, from any layout (0141).
  */
 export function FormView({
   client,
@@ -202,6 +203,8 @@ export function FormView({
     childFormsOf,
     formOf,
   })
+  // The record's actions (0162): a run reads the record again into its panes, and its row and the sections it names.
+  const running = useActionFlow({ client, entry, definition, sessions, opening, renderer, grid, drill, onReread: storedIn, onLoad: load, onShow: reveal })
   const drilling = layout === 'drill'
   const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
 
@@ -384,7 +387,11 @@ export function FormView({
       tabs.created()
       opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined)
     })
-    if (result.kind !== 'saved') return
+    if (result.kind === 'saved') storedIn(session)
+  }
+
+  /** What the crumb calls the record, and what its sections' conditions read, from what `session` holds as stored. */
+  function storedIn(session: Session): void {
     setMasterName(nameOf(session))
     setStored(session.saved().answers)
   }
@@ -392,8 +399,7 @@ export function FormView({
   /** A pane's "Load the saved record": the grid and the crumb say what is stored, as after a save. */
   function loadedSaved(session: Session): void {
     grid.current?.reload()
-    setMasterName(nameOf(session))
-    setStored(session.saved().answers)
+    storedIn(session)
   }
 
   /** The open record's Delete, in the detail's header (0053). While a save of it is out, it waits for the answer, and says so. */
@@ -454,12 +460,7 @@ export function FormView({
   const note = narrow && layout === 'side-by-side'
   const parent = open?.kind === 'record' ? { kind: 'record' as const, token: open.token } : open?.kind === 'new' ? { kind: 'new' as const } : null
   const splitter = useLine(axisOf(layout), shares, lanes)
-  const style = {
-    '--records-share': `${String(shares.width)}fr`,
-    '--record-share': `${String(100 - shares.width)}fr`,
-    // Stacked's records as tall as its line says, inside the window's limits, in the height its limits are read from (0145).
-    '--records-height': splitter?.axis === 'height' ? `${String(splitter.value)}svh` : undefined,
-  } as CSSProperties
+  const style = laneStyle(shares, splitter)
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
   const crumbs: Crumb[] = [
     { level: 0, said: ['Records'] },
@@ -556,6 +557,7 @@ export function FormView({
               <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" />
             ) : null
           }
+          running={running}
           offer={offer}
           body={(panes, heading) => (
             <RecordTabs

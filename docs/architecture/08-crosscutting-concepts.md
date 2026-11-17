@@ -632,7 +632,9 @@ user interface is the rule, and this is what each part of it rests on.
   may delete and what a delete also does
   ([0052](../decisions/0052-the-studio-says-before-publication-who-may-delete-and-what-a-delete-also-does.md)),
   and the host page deletes only after a confirmation in place
-  ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
+  ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)),
+  and runs an action only after one too, Keep it the next Tab in both
+  ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
 - **Accessible name only.** Tests find elements by role and accessible name
   ([formancy.ai 0034](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0034-accessible-name-only.md));
   where the tree cannot answer, a test reads the DOM and its header says

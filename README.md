@@ -164,12 +164,14 @@ release; your application's own pages draw records their own way:
   keeps, run over the open record in one transaction on both engines --
   the record locked under the person's policy at the version they read,
   its version moved, the routine called only as it was published -- once
-  per write id, under a deadline: one call of the runtime plane that
-  `@formancy/data-client` makes, and not yet a control of the host page
-  or a pane of the studio
+  per write id, under a deadline: on the host page, from the open
+  record's header, after its dialog and a confirmation in place, the
+  record read again once it ran; through `@formancy/data-client`, one call
+  of the runtime plane; not yet a pane of the studio
   ([0159](./docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](./docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
-  [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+  [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
+  [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
 - **Deletes, copies and files**: a record deleted one at a time, reaching
   other tables only through the foreign keys its policy names; duplicated
   into a new one; and the records a list shows downloaded as one CSV file
@@ -230,11 +232,12 @@ built from this repository and not published as a package:
   which Keep my line changes and Save then store, line by line, refusing
   a line both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
-- An action is run through the runtime plane alone, over the open record
-  and no selection of records: the host page offers no action's control,
-  and the studio binds none, so an administrator names one in a
-  generation request of their own
-  ([0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+- An action is run over the open record and no selection of records,
+  from the host page's detail of the record and nowhere below it; and the
+  studio binds none, so an administrator names one in a generation
+  request of their own
+  ([0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
+  [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one
   ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
@@ -299,7 +302,8 @@ starting values, a select of the values a check lists, the server's
 stamps of who wrote a record and when, a record saved with its rows
 in one request of the runtime plane, chosen in the studio and sent from
 the host page's own Save, and an action an administrator names run over
-the open record -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
+the open record, from the host page's header too -- each a line of
+[`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased*, and the examples page and the live demo are deployed from
 `main`. [The status page](./docs/guide/status.md) says what 0.3.0 added
 over 0.2.0, and what is not yet measured or read by hand.

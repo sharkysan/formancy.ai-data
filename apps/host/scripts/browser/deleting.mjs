@@ -42,14 +42,14 @@ const row = (page, first) =>
  * once in WebKit, at 320 pixels, on CI on 2026-11-06, the keyboard found on
  * the notice a moment later.
  */
-function landsOn(page, region) {
+export function landsOn(page, region) {
   return until(async () => (await focusedOn(page, region)) === null, 'never').then(
     () => null,
     async () => focusedOn(page, region),
   )
 }
 
-async function frame(region) {
+export async function frame(region) {
   const at = await paintedWhere(region.page(), () =>
     region.evaluate((element) => {
       const style = getComputedStyle(element)
@@ -67,15 +67,15 @@ async function frame(region) {
   return { ratio: contrast(border.rgb, outside) }
 }
 
-/** On a phone the two answers stand one under the other, Keep it first, each the region's width; beside each other elsewhere. */
-async function stacked(region) {
-  return region.evaluate((element) => {
-    const [keep, remove] = ['Keep it', 'Delete it'].map((name) =>
+/** On a phone the two answers stand one under the other, Keep it first, each the region's width; beside each other elsewhere. `second` is the answer that acts: Delete it, or an action's Run it (0162). */
+export async function stacked(region, second = 'Delete it') {
+  return region.evaluate((element, acts) => {
+    const [keep, remove] = ['Keep it', acts].map((name) =>
       [...element.querySelectorAll('button')].find((button) => button.textContent?.trim() === name)?.getBoundingClientRect(),
     )
-    if (keep === undefined || remove === undefined) return { problem: 'the region has no Keep it and Delete it' }
+    if (keep === undefined || remove === undefined) return { problem: `the region has no Keep it and ${acts}` }
     return { under: remove.top >= keep.bottom - 0.5, wide: Math.abs(keep.width - remove.width) < 1, phone: window.matchMedia('(max-width: 40rem)').matches }
-  })
+  }, second)
 }
 
 /** A row's Delete, reached by the arrow keys along its row, and its question under the grid. */

@@ -1,4 +1,6 @@
 import type { ReactElement, ReactNode, RefObject } from 'react'
+import type { ActionFlow } from './action-flow.js'
+import { ActionButtons, ActionRegion } from './action-region.js'
 import { DemoTools } from './demo-tools.js'
 import type { Demo } from './demo-tools.js'
 import type { Said } from './leave.js'
@@ -17,7 +19,8 @@ export type MasterOpen = null | { kind: 'new' } | { kind: 'record'; token: strin
 
 /**
  * The detail (UX-SPEC §5.10, §5.11): the open record's heading, the way back
- * to its row, Duplicate record where the form offers a copy (0107), Delete
+ * to its row, Duplicate record where the form offers a copy (0107), each
+ * action the form offers this person and its region in place (0162), Delete
  * record where it offers delete and its confirmation in place (0053), a
  * status line, and last the demo's controls -- the renderer switch and
  * opening by token -- behind one disclosure (0146); then the record's form
@@ -60,6 +63,7 @@ export function Detail({
   deleteRef,
   onDelete,
   deleteRegion,
+  running,
   offer,
   body,
 }: {
@@ -99,6 +103,8 @@ export function Detail({
   onDelete: () => void
   /** The delete's confirmation, right after the header row that holds Delete record. */
   deleteRegion: ReactNode
+  /** The record's actions (0162): a button each in the header of an open record, and a run's region under it. */
+  running: ActionFlow
   /** Open under each lookup of the record (0141). */
   offer: LookupOffer
   /** What follows the header: the record's panes, drawn given how to show the record's tab, in that tab beside its child sections' (record-tabs.tsx), and the heading that names it. */
@@ -143,6 +149,7 @@ export function Detail({
               Change from a date
             </button>
           ) : null}
+          {open?.kind === 'record' ? <ActionButtons flow={running} /> : null}
           {canDelete && open?.kind === 'record' ? (
             // An outline in --invalid, never a fill: the one control here that cannot be taken back.
             <button
@@ -163,6 +170,7 @@ export function Detail({
           ) : null}
         </div>
         {deleteRegion}
+        <ActionRegion flow={running} idBase="detail-action" />
         <p role="status" className="status quiet-line" data-kind={line.kind}>
           <Words said={line.said} />
         </p>

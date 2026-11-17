@@ -1,5 +1,10 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import { computeAccessibleDescription } from 'dom-accessibility-api'
+import { SAVE_OUT } from './deletion.js'
+import { RUN_HELD, RUNNING } from './running.js'
+import { CLOSE_WORDS } from './test-actions.js'
+import { askClose, closed, closeRegion, openActionOrder, runIt, runsSent } from './test-acting.js'
 import {
   answer,
   chooseCustomer,
@@ -40,13 +45,16 @@ import type { Engine, Plane } from './test-plane.js'
  * rather than dropped (0029, D7).
  *
  * Both renderers, on both engines: the decisions are the session's, and each
- * pane is where one of them could be lost on the way to the person.
+ * pane is where one of them could be lost on the way to the person. And an
+ * action's run over the record (0162), held the same way: a second press
+ * while it is out sends nothing, and Run it waits for a save of the record.
+ * How many runs went is read off the wire, which no role names.
  */
 
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ saves: true })
+  plane = await startPlane({ saves: true, actions: true })
 })
 
 afterAll(async () => {
@@ -151,6 +159,66 @@ describe.each(ENGINES)('a save in flight on $engine', (engine) => {
     expect(stored.ok && stored.value.answers['amount']).toBe('6.0000')
     await shows(renderer, 'Amount', '')
     await shows(renderer, 'Customer', '')
+  })
+})
+
+describe.each(ENGINES)('an action run in flight on $engine (0162)', (engine) => {
+  // While a run is out, a second press of Run it, and the action asked
+  // again from the header, send nothing: the region says it is running,
+  // and the order closes once. A press of the order's Save says it sent
+  // nothing too, since the run moves the version the save would name
+  // (watched failing on postgres:17-alpine and
+  // mcr.microsoft.com/mssql/server:2022-latest with Run it sending again
+  // while the run was out: two runs went, "expected 2 to be 1"; and with
+  // the forms not held while it was out: the save went, held beside the
+  // run).
+  test.each(RENDERERS)('in %s, a second press while the run is out sends nothing, and the order closes once', async (renderer) => {
+    const record = await plane.db.insertActionOrder(engine.connection)
+    const holding = holdingWrites(plane.fetch)
+    const user = await openActionOrder(holding.fetch, engine, record, renderer)
+    await askClose(user, record, renderer, 'closed once')
+    const from = plane.sent.length
+    await runIt(user, record)
+    await writesHeld(holding, 1)
+    await waitFor(() => expect(within(closeRegion(record, true)).getByRole('status').textContent).toBe(RUNNING))
+    await runIt(user, record)
+    await user.click(screen.getByRole('button', { name: CLOSE_WORDS.label }))
+    await save(user, renderer)
+    await said(renderer, new RegExp(`^${RUN_HELD}$`))
+    expect({ runs: runsSent(plane, from), held: holding.held.length }).toEqual({ runs: 1, held: 1 })
+    holding.answer()
+    await closed(record)
+    expect(runsSent(plane, from)).toBe(1)
+    expect((await plane.db.actionOrder(engine.connection, record)).closes).toBe(1)
+  })
+
+  // A save of the order out moves the version a run would name: Run it
+  // says so, is described by why, and sends nothing; once the save is
+  // answered it runs over the version the save stored, and is done (watched
+  // failing on postgres:17-alpine and mcr.microsoft.com/mssql/server:2022-latest
+  // with Run it sent while the save was out: the run named the version
+  // before the save, "Not run", stale).
+  test.each(RENDERERS)('in %s, Run it waits for a save of the order out, then runs over the version it stored', async (renderer) => {
+    const record = await plane.db.insertActionOrder(engine.connection)
+    const holding = holdingWrites(plane.fetch)
+    const user = await openActionOrder(holding.fetch, engine, record, renderer)
+    await answer(user, renderer, 'Amount', '13.5')
+    await save(user, renderer)
+    await writesHeld(holding, 1)
+    const confirming = await askClose(user, record, renderer, 'closed after the save')
+    const run = within(confirming).getByRole('button', { name: 'Run it' })
+    expect({ disabled: run.getAttribute('aria-disabled'), why: computeAccessibleDescription(run) }).toEqual({ disabled: 'true', why: SAVE_OUT })
+    const from = plane.sent.length
+    await runIt(user, record)
+    expect(runsSent(plane, from)).toBe(0)
+    holding.answer()
+    await said(renderer, /^Saved\.$/)
+    await waitFor(() => expect(run.getAttribute('aria-disabled')).toBeNull())
+    await runIt(user, record)
+    await writesHeld(holding, 1)
+    holding.answer()
+    await closed(record)
+    expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'closed', version: 3, amount: '13.50', closes: 1 })
   })
 })
 

@@ -15,12 +15,15 @@
 // the views' found it, and offers the View picker in all of them. And over
 // the parity schema an order and its lines saved with it, one to three of
 // them (0155), as src/test-saves.ts publishes them: a clerk adds and
-// changes lines, and the order's own Save sends them.
+// changes lines, and the order's own Save sends them. And over the actions
+// schema every fixture loads, an order with close_order bound as its
+// action `close`, worded by its presentation, as src/test-actions.ts
+// publishes it (0162): a clerk reads the order and runs close.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { EMPTY_PRESENTATION } from '@formancy/data-core'
+import { applyPresentation, EMPTY_PRESENTATION } from '@formancy/data-core'
 import { insertPaged, POSTGRES_IMAGE, startPostgresFixture } from '@formancy/data-fixtures'
 import { createConnectionRegistry, createDataServer, createFileConfigurationStore, DRIVER_FACTORIES } from '@formancy/data-server'
 import postgres from 'postgres'
@@ -30,6 +33,9 @@ export const LINES = 'pg-order-line'
 export const CUSTOMERS = 'pg-customer'
 export const SAVED_ORDER = 'pg-saved-order'
 export const SAVED_LINES = 'pg-saved-line'
+export const ACTION_ORDER = 'pg-action-order'
+/** What close's presentation says, as src/test-actions.ts's CLOSE_WORDS. */
+export const CLOSE_WORDS = { label: 'Close the order', confirm: 'It closes the order, and the database keeps the note with it.', done: 'The order is closed.' }
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
 
 /**
@@ -71,6 +77,71 @@ function clerkPolicy(bindings, extra = {}) {
   }
 }
 
+/**
+ * The action order (0162): close_order bound as `close`, with a source for
+ * every parameter -- the note asked in its dialog -- and worded by its
+ * presentation, which the server checks as it checks the suites'; a clerk
+ * of tenant 1 reads the order and runs close, through its customer (0043).
+ */
+async function publishActionOrder(call) {
+  const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
+    connection: 'pg-actions',
+    root: { schema: 'actions', name: 'order' },
+    formId: ACTION_ORDER,
+    title: 'Order',
+    lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+    versionColumn: 'version',
+    actions: [
+      {
+        name: 'close',
+        routine: {
+          schema: 'actions',
+          name: 'close_order',
+          signature: 'pg_catalog.int8, pg_catalog.text, pg_catalog.text, pg_catalog."numeric", pg_catalog.int4',
+        },
+        scope: 'record',
+        parameters: [
+          { parameter: 'p_order', from: { key: 'id' } },
+          { parameter: 'p_note', from: { input: 'note' } },
+          { parameter: 'p_actor', from: { actor: 'id' } },
+          { parameter: 'p_amount', from: { field: 'amount' } },
+          { parameter: 'p_tenant', from: { attribute: 'tenant' } },
+        ],
+      },
+    ],
+  })
+  const presentation = { ...EMPTY_PRESENTATION, actions: [{ action: 'close', ...CLOSE_WORDS }] }
+  const presented = applyPresentation(proposal.form, presentation, proposal.bindings)
+  if (!presented.ok) throw new Error(`close's words do not apply: ${presented.problems.join('; ')}`)
+  await call(TOKENS.admin, `/v1/forms/${ACTION_ORDER}/versions`, {
+    expectedBase: null,
+    bundle: {
+      format: 2,
+      connection: 'pg-actions',
+      generation: proposal.generation,
+      base: proposal.form,
+      presentation,
+      form: presented.form,
+      bindings: proposal.bindings,
+      policy: {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: ['clerk'] },
+        fields: Object.fromEntries(
+          proposal.bindings.fields.map((binding) => [
+            binding.field,
+            { read: ['clerk'], write: ['note', 'amount'].includes(binding.field) && binding.writes.update ? ['clerk'] : [] },
+          ]),
+        ),
+        rowFilters: [],
+        lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+        through: ['customer'],
+        actions: { close: { roles: ['clerk'] } },
+      },
+      snapshot: proposal.snapshot,
+    },
+  })
+}
+
 export async function startPlane() {
   const fixture = await startPostgresFixture(POSTGRES_IMAGE)
   await insertPaged({ kind: 'postgres', admin: fixture.admin })
@@ -97,6 +168,17 @@ export async function startPlane() {
         user: decodeURIComponent(url.username),
         password: 'env:PG_PASSWORD',
         schemas: ['parity'],
+        tls: { enabled: false },
+      },
+      {
+        id: 'pg-actions',
+        kind: 'postgres',
+        host: url.hostname,
+        port: Number(url.port),
+        database: url.pathname.slice(1),
+        user: decodeURIComponent(url.username),
+        password: 'env:PG_PASSWORD',
+        schemas: ['actions'],
         tls: { enabled: false },
       },
     ],
@@ -221,6 +303,7 @@ export async function startPlane() {
     policy: (bindings) =>
       clerkPolicy(bindings, { rowFilters: [], lookups: { saved_order: [{ column: 'tenant_id', attribute: 'tenant' }] }, through: ['saved_order'] }),
   })
+  await publishActionOrder(call)
   const source = form.model.fields.find((field) => field.key === 'customer').optionsSource
   const sql = postgres(fixture.admin, { onnotice: () => {} })
   return {
@@ -251,6 +334,14 @@ export async function startPlane() {
       (
         await sql`select count(distinct o.id)::int as orders, count(l.id)::int as lines from parity.saved_order as o left join parity.saved_line as l on l.order_id = o.id where o.note = ${note}`
       )[0],
+    /** An open order of tenant 1's in the actions schema, for a customer of its own, as the owner inserts it: its token. */
+    actionOrder: async () => {
+      const [{ id: customer }] = await sql`insert into actions.customer (tenant_id, name) values (1, 'Gate customer') returning id`
+      const [{ id }] = await sql`insert into actions."order" (customer_id, amount) values (${customer}, 12.50) returning id`
+      return `k1:${String(id)}`
+    },
+    /** An action order's status and note, as the owner reads them. */
+    actionOrderOf: async (record) => (await sql`select status, note from actions."order" where id = ${record.slice('k1:'.length)}`)[0],
     /** How many orders have exactly these notes: what the database holds, asked beside the page. */
     ordersWithNotes: async (notes) => (await sql`select count(*)::int as n from sales."order" where notes = ${notes}`)[0].n,
     deleteCustomer: (no) => sql`delete from sales.customer where tenant_id = 1 and customer_no = ${no}`,

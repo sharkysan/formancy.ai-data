@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ReactElement, RefObject } from 'react'
+import type { CSSProperties, ReactElement, RefObject } from 'react'
 import { clampSplit, lineLimits, stepShare } from './prefs.js'
 import type { Axis, Limits, Shares } from './prefs.js'
 
@@ -88,6 +88,15 @@ function sizeOf(axis: Axis, lanes: HTMLElement): number {
  * grids fit their columns again. A drag the browser cancels ends without
  * being kept.
  */
+/** The lanes' shares as the stylesheet reads them: the records' and the record's widths, and Stacked's records as tall as its line says, inside the window's limits, in the height its limits are read from (0145). */
+export function laneStyle(shares: Shares, line: Line | null): CSSProperties {
+  return {
+    '--records-share': `${String(shares.width)}fr`,
+    '--record-share': `${String(100 - shares.width)}fr`,
+    '--records-height': line?.axis === 'height' ? `${String(line.value)}svh` : undefined,
+  } as CSSProperties
+}
+
 export function Split({
   line,
   controls,

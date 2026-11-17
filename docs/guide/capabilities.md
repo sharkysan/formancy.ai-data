@@ -316,11 +316,15 @@ get*](../../README.md#what-you-get) is the short version, and
   or a lost answer that names the action and the version sent, so the
   same run sent again is refused as changed if it ran. What the routine
   does is the deployment's: field grants, state moves and the policy's
-  cascades do not bind it. The host page offers no action's control yet,
-  and the studio binds none
+  cascades do not bind it. The host page offers each action in the open
+  record's header, asks its dialog and then a confirmation in place, waits
+  for a save of the record out, reads the record again once it ran, and
+  checks a run whose answer was lost by reading the record, running it
+  again only from the version it sent; the studio binds none yet
   ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
-  [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+  [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
+  [0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).

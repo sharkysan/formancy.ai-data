@@ -8,6 +8,7 @@ import type { DeleteTarget } from './deletion.js'
 import { formsAtRisk, useGuardContext } from './guard.js'
 import { levelShown } from './layout.js'
 import type { Layout, View } from './layout.js'
+import { levelOf } from './leave.js'
 import type { LeaveRequest, PaneWork, Said } from './leave.js'
 import { openRefused } from './lookup-opens.js'
 import type { LookupOffer, NamedOpen, OpenChoice } from './lookup-opens.js'
@@ -121,6 +122,8 @@ export interface HeldLevels {
   recordGone(formId: string, token: string): void
   /** A section's handle, by its owner, while it is mounted. */
   register: (owner: string, handle: SectionHandle | null) => void
+  /** Every grid of the open record's sections asks for its page again: an action over it ran, which may have changed its rows (0162). */
+  reloadUnder(token: string): void
 }
 
 export interface Drill {
@@ -431,6 +434,9 @@ export function useDrill({
       if (index !== null && layoutRef.current === 'drill' && shownRef.current >= index + 2) show(index + 1, true, false)
     },
     register,
+    reloadUnder: (token) => {
+      for (const [owner, section] of sections.current) if (levelOf(owner) === 1 && section.parent === token) section.reload()
+    },
   }
 
   function saved(step: DrillStep, token: string, name: string | null): void {

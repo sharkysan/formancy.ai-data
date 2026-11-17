@@ -34,6 +34,7 @@ import {
 } from './test-host.js'
 import type { User } from './test-host.js'
 import { EDGES, ENGINES, startPlane, TOKENS } from './test-plane.js'
+import { askClose, closed, openOrderIn, runIt } from './test-acting.js'
 import { createWithLine } from './test-rows.js'
 import type { Sent } from './test-fetch.js'
 import type { Plane } from './test-plane.js'
@@ -49,7 +50,8 @@ import type { Plane } from './test-plane.js'
  * package rather than listed here: a route the server adds is one the page
  * may send, and one the page sends that the table does not have fails --
  * the delete route included, which the page sends since 0053, from its
- * confirmation in place, and the export, since 0080, from Download CSV.
+ * confirmation in place, the export, since 0080, from Download CSV, and a
+ * run of an action, since 0162, from the action's confirmation.
  *
  * And through both doors the page has: its own origin, as a host serves
  * it, and the live demo's path, behind the demo's Worker (0070), where the
@@ -60,7 +62,7 @@ import type { Plane } from './test-plane.js'
 let plane: Plane
 
 beforeAll(async () => {
-  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true })
+  plane = await startPlane({ children: true, deletes: true, demo: true, versions: true, saves: true, actions: true })
 })
 
 afterAll(async () => {
@@ -145,7 +147,7 @@ const JOURNEYS = [
   { ...ENGINES[0], door: "the demo's path", demo: true },
 ]
 
-describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ formId, lines, price, demo, savedOrder }) => {
+describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ connection, formId, lines, price, demo, savedOrder }) => {
   test('only runtime routes under its base, each carrying the token in the header and nowhere else, never a tenant, and only for forms the menu named', async () => {
     plane.sent.length = 0
     const words = stamp('plane')
@@ -202,6 +204,12 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     await waitFor(() => expect(screen.getByRole('heading', { level: 3, name: 'No record open' })).toBeTruthy(), { timeout: 15_000 })
     // An order created with a line, in one save through the order's own Save (0155).
     await createWithLine(user, savedOrder, stamp('plane-save'))
+    // An order of the actions schema closed through its action (0162): its dialog answered, then Run it.
+    const closing = await plane.db.insertActionOrder(connection)
+    await openOrderIn(user, { connection }, closing, 'Both')
+    await askClose(user, closing, 'React', stamp('plane-run'))
+    await runIt(user, closing)
+    await closed(closing)
     // And on its own origin a price, whose tenant is a column of its own:
     // the demo publishes no form over versions.
     if (door === undefined) await priceJourney(user, price)
@@ -232,18 +240,17 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // by a page that did less (watched failing with 0050's exception for the
     // delete route removed before the page had a control: delete unused;
     // with 0079's for the export removed before Download CSV: export
-    // unused; and with 0155's for the save removed before the page drew a
-    // record's rows as one set: save unused on every door). A save is sent
+    // unused; with 0155's for the save removed before the page drew a
+    // record's rows as one set: save unused on every door; and with 0161's
+    // for a run removed before the page had an action's control: action
+    // unused on every door). A save is sent
     // from an order created with a line through the order's own Save, and
     // carries the token in its header alone, as below. A change from a date is sent from a price on the page's own
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
     // update and in its change from a date). Through the demo's door it is
-    // the one exception: the demo publishes no form over versions. A run of
-    // an action is the other, as delete, export and a save each were until
-    // the page had a control for them: the route arrived before the host
-    // page has an action's control (0161), and goes from this set when it does.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['action'] : ['supersede', 'action'])
+    // the one exception: the demo publishes no form over versions.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

@@ -21,9 +21,11 @@ import type { Renderer } from './session.js'
  * | Drill down: going up a level                                   | nothing: every level stays mounted       |
  * | Keep my line changes, after a stale save (0155)                | that pane: the record is read again      |
  * | Load the saved record, where its rows are saved with it (0155) | its rows' changes                        |
+ * | the record read again after an action over it ran (0162)       | the record's own panes                   |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
- * goes where they go, but for a renderer hidden: it is drawn by none. One
+ * goes where they go, but for a renderer hidden: it is drawn by none; so is
+ * an action's run out, or unknown, over the open record (0162). One
  * asked from a grid's row that is not the record open in the detail is its
  * grid's (`gridOwner`): the records grid's goes only with the grid --
  * another form, Back or Forward, Sign out -- and a child grid's with its
@@ -39,9 +41,10 @@ import type { Renderer } from './session.js'
  * What a pane holds that a discard would lose: answers changed since it was
  * opened or saved, a save out, or a save whose outcome is unknown (0031) --
  * and, of a record or a child row, a deletion out or one that may have been
- * done and is not checked (0053).
+ * done and is not checked (0053); and of the open record, an action's run
+ * out or one that may have run and is not checked (0162).
  */
-export type Work = 'changed' | 'saving' | 'unknown' | 'deleting' | 'delete-unknown'
+export type Work = 'changed' | 'saving' | 'unknown' | 'deleting' | 'delete-unknown' | 'running' | 'run-unknown'
 
 /** Each kind of work, as the notice says it after a pane's name. */
 export const WORK: Readonly<Record<Work, string>> = {
@@ -50,6 +53,8 @@ export const WORK: Readonly<Record<Work, string>> = {
   unknown: 'a save that may have been stored, not yet checked.',
   deleting: 'a deletion the server has not answered yet.',
   'delete-unknown': 'a deletion that may have been done, not yet checked.',
+  running: 'an action the server has not answered yet.',
+  'run-unknown': 'an action that may have run, not yet checked.',
 }
 
 /** How a renderer is written for a person. */
@@ -85,6 +90,8 @@ export type LeaveRequest =
   | { kind: 'keep-rows'; owner: string; record: string; by: Renderer }
   /** Load the saved record (0155): `record` as stored, and its rows -- `rows`, their owners -- listed again as stored. */
   | { kind: 'reload-rows'; record: string; rows: readonly string[] }
+  /** The open record read again into its own panes once the action `label` names ran over it (0162): the run moved its version. */
+  | { kind: 'ran'; record: string; label: string }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
   /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`; or into the record a lookup there names, by Open (0141). */
   | { kind: 'drill'; below: number; record: string | null; title: string }
@@ -187,6 +194,8 @@ export function discards(request: LeaveRequest): Discarded | null {
       return { owners: [request.owner], renderers: [request.by] }
     case 'reload-rows':
       return { owners: request.rows, renderers: 'all' }
+    case 'ran':
+      return { owners: ['master'], renderers: 'all' }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }
     case 'drill':
@@ -241,6 +250,8 @@ export function lead(request: LeaveRequest): Said {
       return ['Reading ', { code: request.record }, ` again in ${RENDERER_NAMES[request.by]}, to keep its rows' changes,${closes}`]
     case 'reload-rows':
       return ['Loading ', { code: request.record }, ` as saved, with its rows,${closes}`]
+    case 'ran':
+      return ['Reading ', { code: request.record }, ` again, since ${request.label} ran on it,${closes}`]
     case 'new':
       return [`Starting a new record${closes}`]
     case 'child-new':

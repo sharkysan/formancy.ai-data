@@ -164,14 +164,17 @@
 }
 
 @media (max-width: 40rem) {
-  /* A delete's two answers, one under the other on a phone: Keep it first,
-     each the width of the region, so neither is pressed for the other. */
-  .delete-actions {
+  /* A delete's two answers, and an action's (0162), one under the other on
+     a phone: Keep it first, each the width of the region, so neither is
+     pressed for the other. */
+  .delete-actions,
+  .run-actions {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .delete-actions .button {
+  .delete-actions .button,
+  .run-actions .button {
     justify-content: center;
   }
 

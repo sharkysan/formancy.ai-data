@@ -1132,6 +1132,18 @@ through the runtime plane's route
    server's words -- the deployment's own under the prefix -- or 502 naming
    the action and each record with the version sent, and the trail holds
    one `action` event naming the action and the record's keyed hash.
+6. On the host page ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)), the open record's header offers each action
+   step 0 served (`apps/host/src/action-region.tsx`); the region under it
+   asks the dialog, drawn by the renderer the person chose, then a
+   confirmation that lists what reading the record again drops, and sends
+   the run once Run it is pressed with no save of the record out, naming
+   the newest version the detail heard (`action-flow.ts`, `running.ts`).
+   While it is out the record's forms send nothing. Done, the record's row
+   is listed again and the record read again into its own forms through
+   the guard -- the run moved its version -- and the sections' grids where
+   the action names `children`. A 502 or a lost answer is "It may have
+   run": one read of the record, and Run it again only at the version the
+   run sent, which is stale if the first committed after all.
 
 Held by the shared cases in `packages/data-fixtures/src/actions.ts`, which
 each adapter's `actions.integration.test.ts` and
@@ -1142,4 +1154,6 @@ a refusal; that a run goes on a client of its own, by
 `packages/data-server/src/routes/runtime-actions.test.ts` and, losing an
 answer on both engines, `e2e-lost-answer.integration.test.ts`; the
 client, by `packages/data-client/src/actions.integration.test.ts` and
-`transport.test.ts`.
+`transport.test.ts`; the host page, by `apps/host/src/page.test.tsx`,
+`in-flight.test.tsx`, `actions.test.tsx` and `plane.test.tsx` on both
+engines, and its browser gate.

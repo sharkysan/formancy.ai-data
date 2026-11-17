@@ -677,7 +677,7 @@
       ]
     },
     "0031": {
-      "reviewed": "sha256:6936d00cd623baa5a6ee6a7fa7ffd47615d99dfde5cfb850736ff0164d65fcd6",
+      "reviewed": "sha256:0282330ac1c6bf121a5037ef26a02899e4120e9c91f605b7ed1380652cc001bf",
       "limitations": [
         {
           "area": "writes",
@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:900ab46578cc6f8e72bf225c73126df0c310ceae9c8d7233f458f083c8f2870c",
+      "reviewed": "sha256:f8482e74b3d7c24d2579c2c4f1d6fa9942c4e11dcb7b83cf8ac9ac8fc8a8b8ed",
       "limitations": [
         {
           "area": "host",
@@ -4861,12 +4861,11 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:1c2b72e639ef754b2604cbbb52ffbcf9cd3762351f858bf75085dcb34537af60",
+      "reviewed": "sha256:8507beadca75aff37a8199b711e2bdc37aa6422e2e1f175a60a3f74260dc819c",
       "limitations": [
         {
           "area": "forms",
-          "says": "An action is run only by a page an integrator writes, through POST /v1/forms/:id/actions/:action/run or data-client’s runAction: the host page offers no action’s control yet.",
-          "heldBy": "apps/host/src/plane.test.tsx"
+          "says": "An action is published only by a client that writes its generation request itself: the studio binds none yet."
         },
         {
           "area": "forms",
@@ -4918,6 +4917,45 @@
         {
           "area": "operations",
           "says": "A server older than 0161 refuses every version whose generation request names an action, as it refuses every property it does not read."
+        }
+      ]
+    },
+    "0162": {
+      "reviewed": "sha256:d6916a4710f4d2c67763605690ee5b52e6a0dbfef38d34d5080b2cf8a091c65d",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "The host page offers an action only in the open record's detail: a child row's detail, a Drill down level and a selection of rows offer none.",
+          "heldBy": "apps/host/src/page.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Every run on the host page asks for a confirmation first, even where the administrator wrote none, and an action with a dialog asks it after the dialog: two steps.",
+          "heldBy": "apps/host/src/page.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "Where both renderers are shown, an action's dialog is drawn by React alone.",
+          "heldBy": "apps/host/src/page.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A dialog's answers are dropped without asking by any other request on the page, as a delete's question is closed."
+        },
+        {
+          "area": "host",
+          "says": "After a run the host page reads the record again into its forms, which drops what they held before it, as the confirmation lists; kept editing when the read answers, the forms keep the version from before the run and their next Save is stale.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "While a save of the record is out, Run it sends nothing; while a run is out, Save in the record’s forms sends nothing.",
+          "heldBy": "apps/host/src/in-flight.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A run whose answer was lost is checked by one read of the record and run again only from the version it sent, so on PostgreSQL a run orphaned by a cut that commits after the check makes Run it again refused as stale.",
+          "heldBy": "apps/host/src/actions.test.tsx"
         }
       ]
     }

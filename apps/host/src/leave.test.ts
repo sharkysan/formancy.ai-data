@@ -89,6 +89,8 @@ describe('what each way of leaving a form discards', () => {
     expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual(['master react'])
     expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'angular' })).toEqual([])
     expect(of({ kind: 'reload-rows', record: 'k1:1', rows: ['saved_line~saved_order'] })).toEqual(['saved_line~saved_order null'])
+    // The record read again after an action over it ran (0162): its own panes, and nothing of its children or its rows.
+    expect(of({ kind: 'ran', record: 'k1:1', label: 'Close the order' })).toEqual(['master react'])
     expect(lead({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual([
       'Reading ',
       { code: 'k1:1' },
@@ -290,6 +292,8 @@ describe('what the notice says', () => {
       unknown: 'a save that may have been stored, not yet checked.',
       deleting: 'a deletion the server has not answered yet.',
       'delete-unknown': 'a deletion that may have been done, not yet checked.',
+      running: 'an action the server has not answered yet.',
+      'run-unknown': 'an action that may have run, not yet checked.',
     })
   })
 })
