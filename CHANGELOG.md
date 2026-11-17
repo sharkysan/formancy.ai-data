@@ -1698,6 +1698,22 @@ the same day (formancy.ai 0232).
 
 ### Fixed
 
+- **A bigint field whose column's default is past int starts at it on SQL
+  Server too** (0149). Why: T-SQL types an integer past int as numeric,
+  and SQL Server writes such a default back with a point after its
+  digits, `((9007199254740993.))`, as `check-lists.ts` had measured it
+  doing in a check; the generator read only `((9007199254740993))`, a
+  spelling SQL Server does not write, which its test held. One DDL
+  started the field at its default on PostgreSQL and empty on SQL Server,
+  where the database filled it at the create. A point after an integer's
+  digits is now read as those digits, and only there: `((9.5.))` is still
+  no constant. `DEFAULT_PARITY` gains `huge`, a bigint defaulting to
+  9007199254740993 on both engines, so each suite holds its spelling, its
+  starting answer and what is stored on every image it runs. What you
+  notice: such a field starts at its default on a new record; a session,
+  a draft or an import holding a base generated over one before is
+  refused at publish until it is generated again (0030).
+
 - **Done gives the keyboard back to the row even when pressed before the
   grid drew the row's first keystroke** (0155). Why: a row's first
   keystroke and its Done each ask the tab's grid for its rows again, and
