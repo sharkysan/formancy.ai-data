@@ -443,6 +443,7 @@ an adapter or `data-core` reads the environment.
 | `FORMANCY_DATA_CORS_ORIGINS` | the origins a page may call the runtime plane from | [0060](../decisions/0060-the-runtime-plane-answers-the-origins-an-operator-lists-and-the-administrators-plane-none.md) | `cors.test.ts`, `cross-origin.test.ts`; the `container` job |
 | `FORMANCY_DATA_LOOKUP_DEADLINE_MS` | how long a lookup statement may run | [0061](../decisions/0061-a-lookup-statement-stops-when-its-request-is-abandoned-or-its-deadline-passes.md), [0063](../decisions/0063-the-default-lookup-deadline-is-outside-the-measured-product.md) | `lookup-deadline.test.ts`; the `container` job |
 | `FORMANCY_DATA_SAVE_DEADLINE_MS` | how long a save of a record with its rows may wait for a lock, after which none of its steps starts; held below half of mssql's request timeout where a SQL Server connection is allowed | [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | `save-deadline.test.ts`; the `container` job |
+| `FORMANCY_DATA_ACTION_DEADLINE_MS` | how long a run of an action may take before the database stops it; 15 s unset, chosen and not measured | [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md) | `routes/runtime-actions.test.ts`; `scripts/server-start.test.mjs` |
 
 The files named are under `packages/data-server/src/`. Each setting's
 default and spelling, `PORT`'s included, is in

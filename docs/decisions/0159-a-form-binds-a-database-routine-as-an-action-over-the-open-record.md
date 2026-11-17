@@ -1,6 +1,6 @@
 # 0159 — A form binds a database routine as an action over the open record
 
-- **Status:** accepted; extended by [0160](0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md): both adapters run what it plans, and on SQL Server every argument of a parameter that counts code-page bytes is checked to read back as given
+- **Status:** accepted; extended by [0160](0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md): both adapters run what it plans, and on SQL Server every argument of a parameter that counts code-page bytes is checked to read back as given; amended by [0161](0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md): the server reads a request's actions, holds every bound one to the request and serves them, which Decision 12 said it did not
 - **Date:** 2026-11-16
 - **Deciders:** Daniel Bacher
 - **Verified by:** what data-core decides of an action, the part of this

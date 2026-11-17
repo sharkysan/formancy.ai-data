@@ -81,7 +81,11 @@ One path runs through the packages, and most changes touch one step of it.
    in the store's `.people`, one file per person and form (0126).
    A record and the rows of its together children are saved in one request
    (`routes/runtime-save.ts`), planned by `records/save.ts` and run by each
-   adapter's `records/save.ts` as one transaction (0155).
+   adapter's `records/save.ts` as one transaction (0155). An action is run
+   over the open record (`routes/runtime-actions.ts`), planned by
+   `actions/plan.ts` and run by each adapter's `actions/` as one
+   transaction, once per write id, never queued on the actions' pool
+   (0159, 0160, 0161).
 6. **Review drift.** `diffSnapshots` (`drift/`) classifies a fresh snapshot
    against what a published form's bindings and lookups rest on (0010).
 

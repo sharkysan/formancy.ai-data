@@ -1,6 +1,6 @@
 # 0160 — An action runs in one transaction that locks the record, moves its version and calls the routine, guarded and never retried
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0161](0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md): the runtime plane runs it, under `FORMANCY_DATA_ACTION_DEADLINE_MS`, never queued on the actions' pool
 - **Date:** 2026-11-16
 - **Deciders:** Daniel Bacher
 - **Verified by:** the adapters' run, the part of this decision built so
