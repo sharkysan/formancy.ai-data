@@ -27,7 +27,11 @@
 -- by text under a case-insensitive collation, so two tokens of a selection,
 -- `alpha` and `ALPHA`, name one row (0165), which touch_tag is run over.
 -- close_order refuses in words for the person an order whose amount is
--- 66.60, as PostgreSQL's does. Batches are separated by GO.
+-- 66.60, and raises the amount of its customer's other orders noted
+-- 'raise others', as PostgreSQL's does; noted 'drop others' it deletes
+-- them, which it may by ownership chaining, the writer holding no DELETE:
+-- a call that removes a later record of its selection (0165). Batches are
+-- separated by GO.
 
 create schema actions;
 GO
@@ -92,6 +96,10 @@ begin
   if @p_note like N'lost %' select @p_note as [echo];
   if @p_note like N'rows %'
     select top (convert(int, substring(@p_note, 6, 20))) replicate(N'x', 500) as [filler] from sys.all_objects as a cross join sys.all_objects as b;
+  if @p_note = N'raise others'
+    update actions.[order] set amount = amount + 1 where customer_id = (select customer_id from actions.[order] where id = @p_order) and id <> @p_order;
+  if @p_note = N'drop others'
+    delete actions.[order] where customer_id = (select customer_id from actions.[order] where id = @p_order) and id <> @p_order;
   if @p_note = N'status' return 7;
   if @p_note = N'commit' commit transaction;
   if @p_note = N'rollback'

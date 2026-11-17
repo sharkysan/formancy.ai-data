@@ -87,3 +87,34 @@ describe('two keys of a selection the database makes one row', () => {
     expect(answer(theirs)).toBe('refused')
   })
 })
+
+describe('a record the run locked and then did not find', () => {
+  // Every record's arguments are read once the lock step ran, before any
+  // call (0165); a row its key no longer finds -- which only a trigger of
+  // the lock can have removed or moved -- refuses the run, rolled back,
+  // nothing called, and says so by the adapter's own number and message.
+  // Read as anybody's error, a log would say the database refused the run
+  // with a number nobody can look up. The same number with any other
+  // message is somebody else's.
+  test('is refused, saying the record was not found to read its arguments from', () => {
+    const own = batchFailure(
+      [
+        {
+          step: RUN_STEPS.arguments,
+          number: 51737,
+          message: 'formancy: a record the run locked was not found to read its arguments from',
+          severity: 16,
+          procedure: null,
+        },
+      ],
+      request,
+    )
+    expect(own).toEqual({
+      ok: false,
+      code: 'refused',
+      message:
+        'A record the run locked was not found by its key to read its arguments from: a trigger of the lock removed it or moved its key. Nothing was called, and the run was rolled back.',
+    })
+    expect(answer(failed(51737, 'actions.close_order'))).toBe('refused')
+  })
+})

@@ -91,6 +91,21 @@ async function calls(ids: readonly number[]): Promise<string[]> {
   return rows.map((row) => row.call)
 }
 
+/** Every call close_order recorded for any of `ids`, as `id:amount`, the amount it was given, by id. */
+async function given(ids: readonly number[]): Promise<string[]> {
+  const rows = await owner<{ call: string }[]>`
+    select concat_ws(':', record_id::text, amount::text) as call from actions.call
+    where routine = 'close_order' and record_id = any(${ids.map(String)}::bigint[]) order by record_id, id`
+  return rows.map((row) => row.call)
+}
+
+/** Each order's amount as stored, as text, in the order of `ids`. */
+async function amounts(ids: readonly number[]): Promise<string[]> {
+  const rows = await owner<{ id: string; amount: string }[]>`
+    select id::text as id, amount::text as amount from actions."order" where id = any(${ids.map(String)}::bigint[])`
+  return ids.map((id) => rows.find((row) => Number(row.id) === id)?.amount ?? 'gone')
+}
+
 /** How many calls of the actions schema's routines have begun, as the sequence each draws from as it begins counts them. */
 async function begun(): Promise<number> {
   const [row] = await owner<{ n: string }[]>`select (case when is_called then last_value else 0 end)::text as n from actions.called`
@@ -276,4 +291,26 @@ describe('a run over a selection', () => {
     expect(refused.begun).toBe(0)
     expect(await stored([last])).toEqual([{ status: 'open', version: 1 }])
   })
+
+  // Each call raises the amount of the selection's other order: each is
+  // given the amount its own order held once locked, whichever ran first,
+  // never what the other call wrote to it -- the call statement reads
+  // every argument from its snapshot, taken before any call, which a
+  // VOLATILE routine's later writes are not in -- and both raises are
+  // kept. A call given what an earlier call wrote would see a selection's
+  // values change under it as its calls ran, and the engines would pass
+  // different values for one run.
+  test(
+    'gives each call what its record held once locked, whatever another call wrote to it',
+    covers('postgres', actionCase('selection-as-locked')),
+    async () => {
+      const [a, b] = (await orders(2)) as [number, number]
+      const request = await planned([a, b], 'raise others')
+      const { outcome, begun: called } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe(expected('selection-as-locked'))
+      expect(called).toBe(2)
+      expect(await given([a, b])).toEqual([`${String(a)}:12.50`, `${String(b)}:12.50`])
+      expect(await amounts([a, b])).toEqual(['13.50', '13.50'])
+    },
+  )
 })

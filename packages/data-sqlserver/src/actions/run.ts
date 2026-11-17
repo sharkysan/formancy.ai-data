@@ -25,12 +25,14 @@ import { runBatch } from './statements.js'
  * record it did not move by the read an update alone would ask, and
  * answered as `unmovedFailure` reads them, as PostgreSQL's is (0165).
  *
- * Where the engines differ on a deadline, written down here: the lock step
- * waits at most LOCK_TIMEOUT, half the deadline -- chosen, not measured --
- * and a wait past it is 1222, a known rollback, `unavailable`. Past the
- * deadline mssql sends an attention and the client's ETIMEOUT may follow a
- * COMMIT (0031 P3): `unknown-outcome`, which is what any run past its
- * deadline reads here. The attention is in-band and stops only this batch
+ * Where the engines differ on a deadline, written down here: each UPDATE of
+ * the lock step waits at most LOCK_TIMEOUT, half the deadline -- chosen,
+ * not measured -- and a wait past it is 1222, a known rollback,
+ * `unavailable`; a selection's lock step as a whole, one UPDATE per record
+ * (0165), is bounded by the deadline alone. Past the deadline mssql sends
+ * an attention and the client's ETIMEOUT may follow a COMMIT (0031 P3):
+ * `unknown-outcome`, which is what any run past its deadline reads here, a
+ * selection's still in its lock step, nothing called, included. The attention is in-band and stops only this batch
  * (0061); no cancel is sent of the adapter's own.
  *
  * The batch's result sets are streamed, and every row of one that is not

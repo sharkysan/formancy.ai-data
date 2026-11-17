@@ -100,6 +100,12 @@ export type ActionExpectation = ActionAnswer | Readonly<Record<DatabaseKind, Act
  *   amount 66.60: `declined` in its words, and nothing kept of any.
  * - `selection-page`: a selection of exactly a page, `LIST_PAGE_SIZE`
  *   orders, commits; one more is refused before any statement.
+ * - `selection-as-locked`: each call raises the amount of the selection's
+ *   other order, noted 'raise others': done, and each call was given the
+ *   amount its own order held once locked, never what the other call
+ *   wrote to it -- PostgreSQL reads every argument in one statement under
+ *   one snapshot, and SQL Server's batch reads every record's before its
+ *   first EXEC.
  */
 export const ACTION_PARITY = {
   done: 'done',
@@ -121,6 +127,7 @@ export const ACTION_PARITY = {
   'selection-stale': 'stale',
   'selection-declined': 'declined',
   'selection-page': 'done',
+  'selection-as-locked': 'done',
 } as const satisfies Readonly<Record<string, ActionExpectation>>
 
 export type ActionCase = keyof typeof ACTION_PARITY

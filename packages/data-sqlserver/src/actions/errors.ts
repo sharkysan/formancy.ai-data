@@ -5,6 +5,8 @@ import {
   ACTION_UNMOVED_MESSAGE,
   ARGUMENT_CHANGED,
   ARGUMENT_CHANGED_MESSAGE,
+  ARGUMENTS_UNREAD,
+  ARGUMENTS_UNREAD_MESSAGE,
   DEFINITION_MOVED,
   DEFINITION_MOVED_MESSAGE,
   ROUTINE_DENIED,
@@ -25,7 +27,8 @@ import { RUN_STEPS } from './statements.js'
  *
  * - The run's own errors first, by number AND exact message, since a user
  *   error number is anybody's: a record not moved, two keys of a selection
- *   the database makes one row (0165), the routine's definition moved, an
+ *   the database makes one row (0165), a record locked and then not found
+ *   to read its arguments from (0165), the routine's definition moved, an
  *   argument changed on its way, a status other than 0. Then the
  *   write batch's, which a run's lock step carries and records/errors.ts
  *   answers: a moved root, a transaction a trigger or a procedure ended.
@@ -102,6 +105,13 @@ export function batchFailure(failed: readonly Failed[], request: ActionRequest):
       code: 'duplicate-record',
       message: 'Two keys of the selection name one row under the key’s collation; nothing was called, and the run was rolled back.',
       records: twice.split(',').map(Number),
+    }
+  if (own(ARGUMENTS_UNREAD, ARGUMENTS_UNREAD_MESSAGE))
+    return {
+      ok: false,
+      code: 'refused',
+      message:
+        'A record the run locked was not found by its key to read its arguments from: a trigger of the lock removed it or moved its key. Nothing was called, and the run was rolled back.',
     }
   if (own(ROUTINE_MOVED, ROUTINE_MOVED_MESSAGE))
     return {

@@ -36,9 +36,9 @@ function request(type: NormalizedType, keys: readonly string[]): ActionRequest {
   } as unknown as ActionRequest
 }
 
-/** The positions the batch's UPDATEs OUTPUT, in the order the batch runs them. */
-function updated(planned: ActionRequest): number[] {
-  const batch = runBatch(
+/** The batch of `planned`, every record at version 1. */
+function batchOf(planned: ActionRequest): string {
+  return runBatch(
     planned,
     [],
     [],
@@ -46,8 +46,12 @@ function updated(planned: ActionRequest): number[] {
     Buffer.alloc(32),
     Buffer.alloc(32),
     1000,
-  )
-  return [...batch.sql.matchAll(/^update \[r\] set .* output ([0-9]+), /gm)].map((match) => Number(match[1]))
+  ).sql
+}
+
+/** The positions the batch's UPDATEs OUTPUT, in the order the batch runs them. */
+function updated(planned: ActionRequest): number[] {
+  return [...batchOf(planned).matchAll(/^update \[r\] set .* output ([0-9]+), /gm)].map((match) => Number(match[1]))
 }
 
 describe('the order a run locks its records in', () => {
@@ -72,5 +76,33 @@ describe('the order a run locks its records in', () => {
     expect(updated(request(INT64, ['10', '2', '9']))).toEqual([1, 2, 0])
     expect(updated(request(INT64, ['9', '2', '10']))).toEqual([1, 0, 2])
     expect(updated(request(INT64, ['7']))).toEqual([0])
+  })
+})
+
+describe('what each call of a selection is given', () => {
+  /** Each statement of the batch that reads a record's row, sets a call's variables from it, or calls, in the order the batch runs them. */
+  function steps(planned: ActionRequest): string[] {
+    return batchOf(planned)
+      .split('\n')
+      .flatMap((line) => {
+        const read = /^insert @given \(.*\) select ([0-9]+), .* from \[actions\]\.\[order\] as \[r\] where /.exec(line)
+        if (read !== null) return [`read ${String(read[1])}`, ...(/if @@rowcount <> 1 throw /.test(line) ? ['found'] : [])]
+        const given = /^select @a0 = \[a0\] from @given where \[o\] = ([0-9]+);$/.exec(line)
+        if (given !== null) return [`given ${String(given[1])}`]
+        return /^exec @status = /.test(line) ? ['exec'] : []
+      })
+  }
+
+  // Every record's arguments are read from its locked row before the first
+  // EXEC, each read found exactly one row, and each EXEC is given its own
+  // record's: what PostgreSQL's one call statement passes, read under one
+  // snapshot. Read just before each EXEC, a record whose row an earlier
+  // call deleted would leave the variables holding the previous record's
+  // key, and the procedure would run twice over one row, answered done;
+  // and a column an earlier call changed would reach the later call as it
+  // wrote it, where PostgreSQL passes it as locked (0165).
+  test('reads every record’s arguments before the first call, and gives each call its own', () => {
+    expect(steps(request(INT64, ['9', '2']))).toEqual(['read 0', 'found', 'read 1', 'found', 'given 0', 'exec', 'given 1', 'exec'])
+    expect(steps(request(INT64, ['7']))).toEqual(['read 0', 'found', 'given 0', 'exec'])
   })
 })

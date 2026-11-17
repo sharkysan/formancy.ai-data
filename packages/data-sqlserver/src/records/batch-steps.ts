@@ -91,6 +91,13 @@ export const SELECTION_DUPLICATE = 51736
 export const SELECTION_DUPLICATE_PREFIX = 'formancy: two keys of the selection name one row: '
 export const SELECTION_DUPLICATE_MESSAGE = /^formancy: two keys of the selection name one row: ([0-9]+(?:,[0-9]+)*)$/
 /**
+ * A record the lock step moved was not found by its key when its arguments
+ * were read, before any call (0165): a trigger of the lock removed it or
+ * moved its key. Rolled back, nothing called.
+ */
+export const ARGUMENTS_UNREAD = 51737
+export const ARGUMENTS_UNREAD_MESSAGE = 'formancy: a record the run locked was not found to read its arguments from'
+/**
  * Every number above, the ones the batches raise for themselves, a save's
  * and a run's among them: errors.ts reads none of them as a deployment's reason for the
  * person, whatever its message (0156). batch-steps.test.ts fails when a
@@ -116,6 +123,7 @@ export const OWN_NUMBERS: readonly number[] = [
   ROUTINE_STATUS,
   ROUTINE_DENIED,
   SELECTION_DUPLICATE,
+  ARGUMENTS_UNREAD,
 ]
 
 /** One column of what a statement returns: its name in the result, its type in a table variable, and the SQL that computes it. */

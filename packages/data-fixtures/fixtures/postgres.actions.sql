@@ -26,7 +26,10 @@
 -- call's answer, or raise the server's own unknown outcome (40003). It
 -- also refuses in words for the person an order whose amount is 66.60,
 -- whatever its note: what one record of a selection refuses while the
--- others would not, its amount read from the locked row (0165).
+-- others would not, its amount read from the locked row (0165). Noted
+-- 'raise others', it raises the amount of its customer's other orders by
+-- one: what one call of a selection writes to a column another record of
+-- it passes (0165).
 -- broken_order references a column no table has, which PL/pgSQL finds only
 -- when it runs.
 
@@ -81,6 +84,8 @@ begin
     raise notice '%', p_note;
   elsif p_note = 'unknown' then
     raise exception 'completion unknown' using errcode = '40003';
+  elsif p_note = 'raise others' then
+    update actions."order" set amount = amount + 1 where customer_id = (select customer_id from actions."order" where id = p_order) and id <> p_order;
   end if;
   update actions."order" set status = 'closed', note = p_note where id = p_order;
 end

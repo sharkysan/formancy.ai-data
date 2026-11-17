@@ -5,6 +5,8 @@ import {
   ACTION_UNMOVED,
   ACTION_UNMOVED_MESSAGE,
   ARGUMENT_CHANGED,
+  ARGUMENTS_UNREAD,
+  ARGUMENTS_UNREAD_MESSAGE,
   DEFINITION_MOVED,
   DEFINITION_MOVED_MESSAGE,
   definitionGuard,
@@ -38,10 +40,11 @@ import { routineFactsOf, routineName } from './definition.js'
 /*
  * An action's run on SQL Server as ONE batch (0160), as every write is, with
  * `xact_abort`, TRY/CATCH and 0031's transaction check: the lock that moves
- * each record's version, the routine's guard, the arguments read and
- * checked, the EXEC, and the COMMIT, each numbered in `@step`. A selection
- * (0165) is the same batch with one UPDATE per record, in key order, and
- * then a guard, the arguments and an EXEC per record. Every identifier is
+ * each record's version, the arguments read and checked, the routine's
+ * guard, the EXEC, and the COMMIT, each numbered in `@step`. A selection
+ * (0165) is the same batch with one UPDATE per record, in key order, every
+ * record's arguments read before the first call, and then a guard and an
+ * EXEC per record. Every identifier is
  * approved metadata and quoted here, but a parameter's name, which an EXEC
  * takes unquoted and which is held to a regular identifier instead; every
  * value is bound, but the lock timeout, which SET LOCK_TIMEOUT takes no
@@ -100,53 +103,93 @@ function countsCodePage(type: NormalizedType): type is Extract<NormalizedType, {
   return type.kind === 'text' && type.lengthUnit === 'code-page-bytes'
 }
 
-/** What one call is given: each argument assigned from the record it runs over -- `keyed`, that record's key as the batch binds it -- and checked. */
-type ArgumentsFor = (keyed: readonly string[]) => string[]
+/**
+ * What a run's calls are given (0160, 0165): every record's arguments read
+ * once, after the lock step and before the first EXEC, and each call's
+ * variables set from its own record's just before it.
+ */
+interface Arguments {
+  /** Each argument's variable, of its parameter's type, and @given, a row per record of its column arguments as read. */
+  declared: string[]
+  /** The read, once: every value bound and set, every record's row read into @given by its key -- exactly one row, or the run is refused -- and every code-page argument checked. */
+  read: (addressed: readonly Addressed[]) => string[]
+  /** Just before the call over the record at `position`: its column arguments' variables set from @given. */
+  given: (position: number) => string[]
+}
 
 /**
  * Each argument into a variable of its parameter's exact type, in the
- * routine's order: a column of the locked row read into it in one SELECT,
- * by the record's key -- its value never leaves the database -- and a
- * value bound once and set before each call. A parameter that counts
- * code-page bytes is checked to read back as it was given, as nvarchar,
- * and the run refused, nothing called, where it does not: SQL Server
- * writes a character its code page lacks as `?`, or its best fit, without
- * an error, whether the text is an answer, a context value or a column
- * under a collation of another code page (0159). A char's padding is no
- * change.
+ * routine's order: a column of the locked row, read for every record into
+ * @given by the record's key -- its value never leaves the database -- in
+ * a column of that type, and set from there before the record's call; and
+ * a value bound once and set once. Every record's row is read before the
+ * first call, so each call is given what its row held once locked, never
+ * what an earlier call wrote to it -- what PostgreSQL's one call statement
+ * passes, read under one snapshot -- and a row not found, which only a
+ * trigger of the lock can have removed, refuses the run rather than leave
+ * a variable at the record before's value: a SELECT that finds no row
+ * assigns nothing. A parameter that counts code-page bytes is checked to
+ * read back as it was given, as nvarchar, and the run refused, nothing
+ * called, where it does not: SQL Server writes a character its code page
+ * lacks as `?`, or its best fit, without an error, whether the text is an
+ * answer, a context value or a column under a collation of another code
+ * page (0159). A char's padding is no change. @given's columns take the
+ * database's collation, as a variable does.
  */
-function argumentsOf(parameters: Parameters, request: ActionRequest): { declared: string[]; assigned: ArgumentsFor } {
+function argumentsOf(parameters: Parameters, request: ActionRequest): Arguments {
   const declared: string[] = []
+  const columns = ['[o] int not null primary key']
+  const names = ['[o]']
   const read: string[] = []
+  const assign: string[] = []
   const set: string[] = []
   const checks: string[] = []
   request.routine.arguments.forEach((argument: ActionArgument, index) => {
     if (!PARAMETER.test(argument.parameter)) throw new Error(`${argument.parameter} is not a parameter name an EXEC takes; no generator binds one.`)
     const variable = `@a${String(index)}`
-    const given = `@s${String(index)}`
-    declared.push(`declare ${variable} ${declaredType(argument.typeId)}, ${given} nvarchar(max);`)
+    const type = declaredType(argument.typeId)
+    declared.push(`declare ${variable} ${type};`)
+    const trim = (text: string) => (argument.type.kind === 'text' && argument.type.fixedLength ? `rtrim(${text})` : text)
+    const changed = `throw ${String(ARGUMENT_CHANGED)}, N'formancy: an argument did not reach its parameter as given: ${String(index)}', 1;`
     if (argument.from.kind === 'column') {
       const source = `${ROW}.${quoteName(argument.from.column)}`
-      read.push(`${variable} = ${source}`, `${given} = convert(nvarchar(max), ${source})`)
-    } else {
-      const bound = bindValue(parameters, argument.type, argument.from.value)
-      set.push(`set ${variable} = ${bound};`)
-      if (countsCodePage(argument.type)) set.push(`set ${given} = convert(nvarchar(max), ${bound});`)
+      const held = `[a${String(index)}]`
+      columns.push(`${held} ${type} null`)
+      names.push(held)
+      read.push(source)
+      assign.push(`${variable} = ${held}`)
+      if (countsCodePage(argument.type)) {
+        const text = `[s${String(index)}]`
+        columns.push(`${text} nvarchar(max) null`)
+        names.push(text)
+        read.push(`convert(nvarchar(max), ${source})`)
+        checks.push(`if exists (select 1 from @given where not (${exactText(trim(`convert(nvarchar(max), ${held})`), trim(text))})) ${changed}`)
+      }
+      return
     }
+    const bound = bindValue(parameters, argument.type, argument.from.value)
+    set.push(`set ${variable} = ${bound};`)
     if (countsCodePage(argument.type)) {
-      const trim = (text: string) => (argument.type.kind === 'text' && argument.type.fixedLength ? `rtrim(${text})` : text)
-      checks.push(
-        `if not (${exactText(trim(`convert(nvarchar(max), ${variable})`), trim(given))}) ` +
-          `throw ${String(ARGUMENT_CHANGED)}, N'formancy: an argument did not reach its parameter as given: ${String(index)}', 1;`,
-      )
+      const given = `@s${String(index)}`
+      declared.push(`declare ${given} nvarchar(max);`)
+      set.push(`set ${given} = convert(nvarchar(max), ${bound});`)
+      checks.push(`if not (${exactText(trim(`convert(nvarchar(max), ${variable})`), trim(given))}) ${changed}`)
     }
   })
-  const assigned: ArgumentsFor = (keyed) => [
-    ...(read.length === 0 ? [] : [`select ${read.join(', ')} from ${quoteTable(request.target.table)} as ${ROW} where ${keyed.join(' and ')};`]),
-    ...set,
-    ...checks,
-  ]
-  return { declared, assigned }
+  declared.push(`declare @given table (${columns.join(', ')});`)
+  return {
+    declared,
+    read: (addressed) => [
+      ...set,
+      ...addressed.map(
+        ({ position, keyed }) =>
+          `insert @given (${names.join(', ')}) select ${[String(position), ...read].join(', ')} from ${quoteTable(request.target.table)} as ${ROW} where ${keyed.join(' and ')}; ` +
+          `if @@rowcount <> 1 throw ${String(ARGUMENTS_UNREAD)}, N'${ARGUMENTS_UNREAD_MESSAGE}', 1;`,
+      ),
+      ...checks,
+    ],
+    given: (position) => (assign.length === 0 ? [] : [`select ${assign.join(', ')} from @given where [o] = ${String(position)};`]),
+  }
 }
 
 /**
@@ -336,21 +379,24 @@ function catchBlock(table: string, root: string): string[] {
  *    trigger, one row per record; two keys of a selection the database
  *    makes one row; and every record moved. None is the adapter's own
  *    error, THROWn, and explained by a read after.
- * 2. For each record, in the order sent: the routine's guard
+ * 2. Every record's arguments, read from its locked row by its key before
+ *    any call (`argumentsOf`), each found exactly once, and checked.
+ * 3. For each record, in the order sent: the routine's guard
  *    (`guardStep`), OBJECT_ID and the definition's digest compared with
  *    the bundle's, then EXECUTE, just before its EXEC -- unlike the root's,
  *    not inside the statement it guards, and nothing closes the window
- *    between the two: the cost, which 0160 names; each argument read into
- *    a variable of its parameter's type, checked; and the EXEC, its status
- *    kept, then the transaction still the one the batch began -- a
- *    procedure that ended it may have committed (0031 P8) -- and a status
- *    other than 0 THROWn, so the batch rolls back, every record with it.
- * 3. The COMMIT, and CATCH (`catchBlock`).
+ *    between the two: the cost, which 0160 names; its arguments set from
+ *    what step 2 read; and the EXEC, its status kept, then the transaction
+ *    still the one the batch began -- a procedure that ended it may have
+ *    committed (0031 P8), every record's version and the calls so far with
+ *    it -- and a status other than 0 THROWn, so the batch rolls back,
+ *    every record with it.
+ * 4. The COMMIT, and CATCH (`catchBlock`).
  *
  * `expected` is each record's version, in the request's order. The
  * filters and every through are bound once and named by every record's
  * statements, and each record's key once, named by its UPDATE, its
- * duplicate check and its arguments' SELECT.
+ * duplicate check and its arguments' read.
  */
 export function runBatch(
   request: ActionRequest,
@@ -383,10 +429,10 @@ export function runBatch(
   const bound = parameters.add(mssql.VarBinary(32), routine)
   const args = argumentsOf(parameters, request)
   const exec = request.routine.arguments.map((argument, index) => `${argument.parameter} = @a${String(index)}`)
-  const calls = addressed.flatMap(({ keyed }) => [
+  const calls = addressed.flatMap(({ position }) => [
     ...guardStep(name, bound),
     `set @step = ${String(RUN_STEPS.arguments)};`,
-    ...args.assigned(keyed),
+    ...args.given(position),
     `set @step = ${String(RUN_STEPS.call)};`,
     `exec @status = ${quoteTable({ schema: request.routine.ref.schema, name: request.routine.ref.name })}${exec.length === 0 ? '' : ` ${exec.join(', ')}`};`,
     SAME_TRANSACTION,
@@ -402,6 +448,8 @@ export function runBatch(
     ...args.declared,
     'begin try',
     ...lockStep(request, addressed, { table, root, keys }, lockTimeoutMs),
+    `set @step = ${String(RUN_STEPS.arguments)};`,
+    ...args.read(addressed),
     ...calls,
     `set @step = ${String(RUN_STEPS.commit)};`,
     'commit transaction;',

@@ -109,6 +109,25 @@ async function calls(ids: readonly number[]): Promise<string[]> {
   return rows.map((row) => row.call)
 }
 
+/** Every call close_order recorded for any of `ids`, as `id:amount`, the amount it was given, by id. */
+async function given(ids: readonly number[]): Promise<string[]> {
+  const rows = await query<{ call: string }>(
+    `select concat_ws(N':', convert(nvarchar(20), record_id), convert(nvarchar(20), amount)) as [call] from actions.call
+     where routine = N'close_order' and N',' + @ids + N',' like N'%,' + convert(nvarchar(20), record_id) + N',%' order by record_id, id`,
+    { ids: ids.join(',') },
+  )
+  return rows.map((row) => row.call)
+}
+
+/** Each order's amount as stored, as text, in the order of `ids`. */
+async function amounts(ids: readonly number[]): Promise<string[]> {
+  const rows = await query<{ id: string; amount: string }>(
+    `select convert(nvarchar(20), id) as id, convert(nvarchar(20), amount) as amount from actions.[order] where N',' + @ids + N',' like N'%,' + convert(nvarchar(20), id) + N',%'`,
+    { ids: ids.join(',') },
+  )
+  return ids.map((id) => rows.find((row) => Number(row.id) === id)?.amount ?? 'gone')
+}
+
 /** How many calls of the actions schema's procedures have begun, as the sequence each draws from as it begins counts them. */
 async function begun(): Promise<number> {
   const [row] = await query<{ n: string }>(
@@ -280,6 +299,26 @@ describe('a run over a selection', () => {
     expect(refused.begun).toBe(0)
     expect(await stored([last])).toEqual([{ status: 'open', version: 1 }])
   })
+
+  // Each call raises the amount of the selection's other order: each is
+  // given the amount its own order held once locked, never what the call
+  // before it wrote -- the batch reads every record's arguments before its
+  // first EXEC -- and both raises are kept. Read just before each EXEC,
+  // the second order's call would be given 13.50, what the first wrote,
+  // where PostgreSQL's one call statement passes 12.50 (0165).
+  test(
+    'gives each call what its record held once locked, whatever another call wrote to it',
+    covers('sqlserver', actionCase('selection-as-locked')),
+    async () => {
+      const [a, b] = (await orders(2)) as [number, number]
+      const request = await planned([a, b], 'raise others')
+      const { outcome, begun: called } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe(expected('selection-as-locked'))
+      expect(called).toBe(2)
+      expect(await given([a, b])).toEqual([`${String(a)}:12.50`, `${String(b)}:12.50`])
+      expect(await amounts([a, b])).toEqual(['13.50', '13.50'])
+    },
+  )
 })
 
 describe('a run over a selection on SQL Server alone', () => {
@@ -323,6 +362,53 @@ describe('a run over a selection on SQL Server alone', () => {
     expect(!outcome.ok && outcome.records).toEqual([0, 1])
     expect(called).toBe(0)
     expect(await tagVersion('alpha')).toBe(version)
+  })
+
+  // The first order's call deletes the second, its customer's other
+  // order, before the second's call: the second is still called once, with
+  // its own key, as its row held it once locked, and the first is never
+  // called again. A SELECT into a variable that finds no row assigns
+  // nothing, so read just before each EXEC the second call would be given
+  // the first order's key and amount: the procedure run twice over one
+  // row, and the run answered done for both. SQL Server's alone: only its
+  // batch reads a record's arguments in a statement of their own, and
+  // PostgreSQL's one call statement reads every one under one snapshot.
+  test('calls each record once with its own key, though an earlier call deleted its row', async () => {
+    const [a, b] = (await orders(2)) as [number, number]
+    const request = await planned([a, b], 'drop others')
+    const { outcome, begun: called } = await counted(() => actions.run(request, DEADLINE))
+    expect(outcome).toEqual({ ok: true, records: [{ id: String(a) }, { id: String(b) }] })
+    expect(called).toBe(2)
+    expect(await calls([a, b])).toEqual([`${String(a)}:drop others`, `${String(b)}:drop others`])
+    expect(await stored([a, b])).toEqual([
+      { status: 'closed', version: 2 },
+      { status: 'gone', version: 0 },
+    ])
+  })
+
+  // A record the lock step moved and its key then finds no row -- a
+  // trigger of the touch deletes the tag -- refuses the run before any
+  // call, rolled back, the tag back at the version it was read at: its
+  // arguments are read once the lock step ran, and a read that finds no
+  // row is refused rather than leave the procedure's variables unset. Read
+  // as it was before 0165, the procedure would be called with a NULL key
+  // and the run answered done.
+  test('is refused, nothing called, when a trigger of the lock removed a record', async () => {
+    await owner
+      .request()
+      .batch(
+        "create trigger actions.tag_gone on actions.tag after update as begin set nocount on; delete actions.tag where code = N'gone' and code in (select code from inserted); end",
+      )
+    try {
+      const version = await tag('gone')
+      const request = await plannedSelection(actions, tagged, 'touch', { records: [{ record: tagToken('gone'), version }] })
+      const { outcome, begun: called } = await counted(() => actions.run(request, DEADLINE))
+      expect(actionAnswer(outcome)).toBe('refused')
+      expect(called).toBe(0)
+      expect(await tagVersion('gone')).toBe(version)
+    } finally {
+      await owner.request().batch('drop trigger actions.tag_gone')
+    }
   })
 
   // One spelling of a tag alone is one record, whatever case it is sent
