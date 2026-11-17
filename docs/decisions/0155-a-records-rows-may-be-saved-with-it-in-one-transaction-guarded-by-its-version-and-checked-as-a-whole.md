@@ -290,7 +290,10 @@
   the rail), the mark following the first keystroke (with the set told of
   typing only at Done: no mark until then), Enter on a line putting the
   keyboard on the rail's heading, Done back on its row, Add in its first
-  field and Go to Save on the order's Save, and a clerk's line saying they
+  field and Go to Save on the order's Save, Done back on a new line's row
+  when pressed before the grid drew the line's first keystroke (with the
+  grid telling the tab of a page AG Grid had set aside as drawn: the
+  keyboard on the tab's heading), and a clerk's line saying they
   may not remove saved rows while their new line has its Remove (with the
   line saying "You may not remove them here": the page contradicted its
   own button); Add absent at three lines, Remove at one -- a remover's --

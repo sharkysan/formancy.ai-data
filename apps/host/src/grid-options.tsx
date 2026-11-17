@@ -156,6 +156,23 @@ export function select(grid: GridApi<GridRow>, open: string | null): IRowNode<Gr
   return changed
 }
 
+/**
+ * Whether AG Grid took a block's rows, answered from `start`: each is the
+ * grid's row at its index. A block the cache was purged of after AG Grid
+ * made it is asked for all the same, a task after it was made, and the
+ * block made in its place waits until it has answered, one ask at a time;
+ * AG Grid then sets its rows aside (`InfiniteBlock`, `RowNodeBlockLoader`,
+ * ag-grid-community 36.2.0). Two reloads before that task -- a together
+ * row's keystroke and its Done (0155) -- made one. Such a block says
+ * nothing and tells no section it was drawn (`onListed`, record-grid.tsx):
+ * the block made in its place does. A grid not ready, or gone, holds
+ * nothing to read: the block is taken.
+ */
+export function took(grid: GridApi<GridRow> | null, start: number, rows: readonly GridRow[]): boolean {
+  if (grid === null || grid.isDestroyed()) return true
+  return rows.every((row, index) => grid.getRowNode(row.id)?.rowIndex === start + index)
+}
+
 /** The sort the grid's headers show, in its order: what a header press leaves, or what was applied to them. */
 export function headerSort(grid: GridApi<GridRow>): ListSortTerm[] {
   return grid

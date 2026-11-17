@@ -1567,6 +1567,18 @@ the same day (formancy.ai 0232).
 
 ### Fixed
 
+- **Done gives the keyboard back to the row even when pressed before the
+  grid drew the row's first keystroke** (0155). Why: a row's first
+  keystroke and its Done each ask the tab's grid for its rows again, and
+  AG Grid asks for a page a task after it makes it, one ask at a time; two
+  asks inside that task left a page AG Grid had given up asked for and
+  answered first, and the grid told the tab it was drawn, so Done's focus
+  found no row and went to the tab's heading. The browser gate's new
+  order with its line failed so once on CI, typing straight on into Done.
+  A page AG Grid sets aside now says nothing, and the one asked in its
+  place puts the keyboard there. What you notice: the keyboard on the row
+  after Done, however quickly it was pressed.
+
 - **A PostgreSQL trigger function's own SQL error is a refusal, not a
   server error** (0156). Why: an error in class 42 with no code of its own
   -- an ambiguous column in a trigger function, 42702 -- was taken to be

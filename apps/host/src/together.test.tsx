@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { focusedName } from './test-accessible.js'
 import {
   chooseForm,
@@ -35,10 +36,10 @@ import type { Plane } from './test-plane.js'
  *
  * Found by role and accessible name. What the accessibility tree cannot
  * answer is read off the DOM: which grid row holds the keyboard
- * (`focusedRow`), by the focused element's nearest `role="row"`, since
- * AG Grid focuses a cell of the row, or hands the keyboard to a button in
- * it, and the tree gives the row itself no state that says the keyboard is
- * in it.
+ * (`focusedRow`, `focusedRowTexts`), by the focused element's nearest
+ * `role="row"`, since AG Grid focuses a cell of the row, or hands the
+ * keyboard to a button in it, and the tree gives the row itself no state
+ * that says the keyboard is in it.
  */
 
 let plane: Plane
@@ -61,6 +62,10 @@ const ARRIVES = { timeout: 15_000 }
 
 /** The first cell of the grid row the keyboard is in: AG Grid's focused cell, or the button it handed the keyboard to. Read off the DOM: see the header. */
 const focusedRow = (): string | undefined => document.activeElement?.closest('[role="row"]')?.querySelector('[role="gridcell"]')?.textContent ?? undefined
+
+/** Every cell's text of the grid row the keyboard is in, as `rowTexts` gives a row's: a new line's first, its key, is empty. Read off the DOM: see the header. */
+const focusedRowTexts = (): string[] =>
+  [...(document.activeElement?.closest('[role="row"]')?.querySelectorAll('[role="gridcell"]') ?? [])].map((cell) => cell.textContent ?? '')
 
 /** The focused element, once it is a renderer's summary of a form's problems, found by its heading. */
 async function focusedSummary(): Promise<HTMLElement> {
@@ -242,6 +247,30 @@ describe.each(ENGINES)('an order’s lines saved with it on $engine', (engine) =
     const token = /(k1:\d+)/.exec(created)?.[1] ?? ''
     expect(await plane.db.savedLines(engine.connection, token)).toEqual([{ no: 1, quantity: 2 }])
     expect(await plane.db.countSavedOrders(engine.connection, note)).toBe(1)
+  })
+
+  // Done pressed before the grid has drawn the line's first keystroke --
+  // the number, Tab, the quantity, Tab past the note and Enter on Done, no
+  // timer between the keys, as a browser busy drawing the keystroke runs
+  // the keys it was sent before the grid's own task -- still gives the
+  // keyboard back to the new line's row (watched failing with the keyboard
+  // on the tab's heading, as the browser gate's lost save failed once on
+  // CI: the keystroke's page and Done's were both made before AG Grid asked
+  // for the first, whose rows it then set aside, and the grid told the tab
+  // that page was drawn, so Done's focus found no row and was spent).
+  test('Done pressed before the grid drew the new line’s first keystroke gives the keyboard back to its row', async () => {
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, engine.savedOrder)
+    await newRecord(user)
+    const paper = await waitFor(() => screen.getByRole('form', { name: 'Order, React' }), ARRIVES)
+    await user.type(await waitFor(() => within(paper).getByLabelText(/^Note\b/), ARRIVES), stamp('quick'))
+    await showChild(user, 'Order line')
+    await user.click(within(rowsTab()).getByRole('button', { name: 'Add Order line' }))
+    await waitFor(() => expect(focusedName()).toMatch(/^Line no\b/), ARRIVES)
+    await userEvent.setup({ delay: null }).keyboard('1{Tab}2{Tab}{Tab}{Enter}')
+    await waitFor(() => expect(within(rowsTab()).queryByRole('form', { name: 'New Order line 1, React' })).toBeNull(), ARRIVES)
+    await waitFor(() => expect(focusedRowTexts().slice(1, 5)).toEqual(['1', '2', '', 'New']), ARRIVES)
   })
 
   // A line whose own form refuses its answers sends nothing at the order's

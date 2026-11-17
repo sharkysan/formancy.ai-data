@@ -218,7 +218,10 @@ export interface GridSource extends IDatasource {
  * the same filter, in the request's body, so its values are in no URL
  * (0104), and the same sort, the section's (0105). One request at a time,
  * the grid's own `maxConcurrentDatasourceRequests`; a block AG Grid no
- * longer wants is answered as failed and says nothing.
+ * longer wants is answered as failed and says nothing. A block it gave up
+ * before asking for it -- the cache purged in between -- is asked for all
+ * the same, with no newer ask to fail it, and answered: AG Grid sets its
+ * rows aside, and the grid says nothing of it (record-grid.tsx).
  *
  * A block is asked for after the row the block before it ended with (0108):
  * each answered block's `next` is kept by the row the block after it
