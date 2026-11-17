@@ -1,5 +1,5 @@
 import type { FormRecord, RecordDeleted } from '@formancy/data-core'
-import type { Outcome } from './client.js'
+import type { Outcome, Refusal } from './client.js'
 import { isFormRecord, isNullableString, isRecord, isRecordDeleted, refusalOf } from './shapes.js'
 
 /*
@@ -106,22 +106,38 @@ export function writeOutcome(
   intent: WriteIntent,
   stored?: (body: unknown) => boolean,
 ): WriteOutcome | DeleteOutcome | Outcome<unknown> | UnknownWrite {
-  if (!answer.answered) return lost(intent, 0)
+  const done = stored ?? (intent.operation === 'delete' ? isRecordDeleted : isFormRecord)
+  return heard(answer, done, (status, said) => {
+    if (said === undefined) return lost(intent, status)
+    const record = isNullableString(said.body['record']) ? said.body['record'] : intent.record
+    const version = isNullableString(said.body['version']) ? said.body['version'] : intent.version
+    return { ok: false, status, code: 'unknown-outcome', message: said.message, operation: intent.operation, record, version, origin: 'database' }
+  })
+}
+
+/**
+ * `writeOutcome`'s rules, in its order, for the answer to anything that
+ * may have written -- a write, or a run of an action (0161) -- whatever
+ * its unknown outcome says: one reading of 0031, so a write and a run
+ * cannot tell one answer apart two ways. `done` is the 2xx that counts;
+ * `unknown` makes the outcome nobody here can know, from the transport
+ * (`said` undefined) or from the data server's 502 with its sentence;
+ * `passing` the codes of a 503 that is the server saying nothing was done.
+ */
+export function heard<T, U>(
+  answer: WriteAnswer,
+  done: (body: unknown) => boolean,
+  unknown: (status: number, said?: { message: string; body: Record<string, unknown> }) => U,
+  passing: readonly string[] = ['unavailable'],
+): { ok: true; value: T } | Refusal | U {
+  if (!answer.answered) return unknown(0)
   const { status, body } = answer
-  if (!isRecord(body)) return lost(intent, status)
-  if (status >= 200 && status <= 299) {
-    if (stored !== undefined) return stored(body) ? { ok: true, value: body } : lost(intent, status)
-    if (intent.operation === 'delete') return isRecordDeleted(body) ? { ok: true, value: body } : lost(intent, status)
-    return isFormRecord(body) ? { ok: true, value: body } : lost(intent, status)
-  }
+  if (!isRecord(body)) return unknown(status)
+  if (status >= 200 && status <= 299) return done(body) ? { ok: true, value: body as T } : unknown(status)
   const message = body['message']
-  if (typeof message !== 'string') return lost(intent, status)
-  if (status === 502 && body['code'] === 'unknown-outcome') {
-    const record = isNullableString(body['record']) ? body['record'] : intent.record
-    const version = isNullableString(body['version']) ? body['version'] : intent.version
-    return { ok: false, status, code: 'unknown-outcome', message, operation: intent.operation, record, version, origin: 'database' }
-  }
+  if (typeof message !== 'string') return unknown(status)
+  if (status === 502 && body['code'] === 'unknown-outcome') return unknown(status, { message, body })
   if (status >= 400 && status <= 499) return refusalOf(status, body)
-  if (status === 503 && body['code'] === 'unavailable') return refusalOf(status, body)
-  return lost(intent, status)
+  if (status === 503 && typeof body['code'] === 'string' && passing.includes(body['code'])) return refusalOf(status, body)
+  return unknown(status)
 }

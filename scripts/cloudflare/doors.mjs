@@ -48,7 +48,7 @@ export const EXAMPLE = {
  * stops the generator, so a new kind of name is a decision rather than a
  * guess.
  */
-const SAMPLES = { forms: 'order', connections: 'erp', lookups: 'customer', versions: '1', drafts: '1' }
+const SAMPLES = { forms: 'order', connections: 'erp', lookups: 'customer', versions: '1', drafts: '1', actions: 'close' }
 
 const LINE = /^((?:│ {3}| {4})*)(?:├── |└── )(\/\S*) \(([A-Z]+(?:, [A-Z]+)*)\)$/
 

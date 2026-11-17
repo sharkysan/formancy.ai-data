@@ -151,7 +151,7 @@ function registry(): ConnectionRegistry {
     scope: () => ({ schemas: ['sales'] }),
     open: async () => {
       if (opening > 0) await new Promise((resolve) => setTimeout(resolve, opening))
-      return { adapter, lookups, records, actions: {} as ActionAdapter }
+      return { adapter, lookups, records, actions: {} as ActionAdapter, actionPool: 0 }
     },
     close: async () => {},
   }

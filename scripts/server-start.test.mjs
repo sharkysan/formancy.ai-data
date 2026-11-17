@@ -182,3 +182,22 @@ describe('the built server, with a save deadline (0155)', () => {
     STARTS,
   )
 })
+
+describe('the built server, with an action deadline (0161)', () => {
+  // main.ts reads the run's deadline before anything opens, as every
+  // deadline: one a run's statement timeout could not hold stops the server
+  // before it listens, naming the setting and quoting what was written,
+  // and a whole number of milliseconds starts it. Watched failing with
+  // main.ts reading no action deadline: the server listened at "15s".
+  test(
+    'stops at start on an action deadline that is not a whole number of milliseconds, and starts on one that is',
+    async () => {
+      const junk = await start({ FORMANCY_DATA_ACTION_DEADLINE_MS: '15s' })
+      expect([junk.listening, junk.code]).toEqual([false, 1])
+      expect(junk.stderr.trim()).toBe('FORMANCY_DATA_ACTION_DEADLINE_MS is a whole number of milliseconds from 1 to 2147483647; it is "15s".')
+      const taken = await start({ FORMANCY_DATA_ACTION_DEADLINE_MS: '20000' })
+      expect(taken.listening, taken.stderr).toBe(true)
+    },
+    STARTS,
+  )
+})

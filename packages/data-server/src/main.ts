@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { resolveSecret } from '@formancy/data-identity'
+import { actionDeadlineSetting } from './action-deadline.js'
 import { createDataServer } from './app.js'
 import type { DataServerOptions } from './app.js'
 import { createFileConfigurationStore } from './config-store.js'
@@ -44,6 +45,9 @@ import { trustedProxiesSetting } from './trusted-proxies.js'
  *                                                  after which none of its steps starts, 1 to 2147483647 ms, and
  *                                                  with a SQL Server connection allowed, twice it below mssql's
  *                                                  15 s request timeout; default DEFAULT_SAVE_DEADLINE_MS (0155)
+ *   FORMANCY_DATA_ACTION_DEADLINE_MS               how long a run of an action may take before the database stops
+ *                                                  it, 1 to 2147483647 ms; default DEFAULT_ACTION_DEADLINE_MS, 15 s
+ *                                                  (0161)
  *   PORT                                           default 4390
  */
 function required(name: string): string {
@@ -103,6 +107,15 @@ if (!deadline.ok) {
 const saveDeadline = saveDeadlineSetting(process.env['FORMANCY_DATA_SAVE_DEADLINE_MS'])
 if (!saveDeadline.ok) {
   console.error(saveDeadline.problem)
+  process.exit(1)
+}
+
+// Read before anything opens, as the lookup deadline is: a deadline of 0,
+// junk, or one longer than a timer holds stops the process here
+// (action-deadline.ts, 0161).
+const actionDeadline = actionDeadlineSetting(process.env['FORMANCY_DATA_ACTION_DEADLINE_MS'])
+if (!actionDeadline.ok) {
+  console.error(actionDeadline.problem)
   process.exit(1)
 }
 
@@ -238,6 +251,7 @@ if (storeDirectory !== undefined && connectionsFile !== undefined) {
     origins: origins.origins,
     lookupDeadlineMs: deadline.ms,
     saveDeadlineMs: saveDeadline.ms,
+    actionDeadlineMs: actionDeadline.ms,
     log: () => app.log,
   })
 }

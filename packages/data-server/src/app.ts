@@ -3,6 +3,7 @@ import { DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS } from '@formancy/
 import type { HostIdentity, IdentityVerifier } from '@formancy/data-identity'
 import Fastify, { LogController } from 'fastify'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { actionDeadlineProblem, DEFAULT_ACTION_DEADLINE_MS } from './action-deadline.js'
 import { CONFIGURATION_ID_MAX_LENGTH } from './config-store.js'
 import type { ConfigurationStore } from './config-store.js'
 import type { ConnectionRegistry } from './connections.js'
@@ -107,6 +108,16 @@ export interface DataServerOptions {
    * request timeout (`saveDeadlineFit`). That fit is the runnable server's
    * check alone: here only the whole number is, so an embedder whose
    * registry has a SQL Server connection holds its deadline to it.
+   *
+   * `actionDeadlineMs`: how long a run of an action may take before the
+   * database stops it -- PostgreSQL's statement timeout before each of its
+   * statements, to what remains of it, and SQL Server's request timeout for
+   * its one batch, half of it the lock's own bound (0160) -- answered
+   * `503 action-timeout` on PostgreSQL, rolled back, and `502
+   * unknown-outcome` on SQL Server, where it may have committed (0161). A
+   * whole number from 1 to 2147483647, or the server is not built. Default
+   * `DEFAULT_ACTION_DEADLINE_MS`, 15 s, chosen and not measured; the
+   * runnable server reads `FORMANCY_DATA_ACTION_DEADLINE_MS` for it.
    */
   runtime?: {
     registry: ConnectionRegistry
@@ -115,6 +126,7 @@ export interface DataServerOptions {
     origins?: readonly string[]
     lookupDeadlineMs?: number
     saveDeadlineMs?: number
+    actionDeadlineMs?: number
   }
 }
 
@@ -197,6 +209,10 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   const saveDeadlineMs = options.runtime?.saveDeadlineMs ?? DEFAULT_SAVE_DEADLINE_MS
   const saveRefused = saveDeadlineProblem('runtime.saveDeadlineMs', saveDeadlineMs)
   if (saveRefused !== undefined) throw new Error(saveRefused)
+  // A run's by its variable's rule (action-deadline.ts): a fraction or NaN would reach every run's statement timeout, 0 would refuse every run.
+  const actionDeadlineMs = options.runtime?.actionDeadlineMs ?? DEFAULT_ACTION_DEADLINE_MS
+  const actionRefused = actionDeadlineProblem('runtime.actionDeadlineMs', actionDeadlineMs)
+  if (actionRefused !== undefined) throw new Error(actionRefused)
   // The proxies by the setting's rule (trusted-proxies.ts, 0071): a list
   // that would believe every client about itself stops the server here. A
   // copy is checked and handed to Fastify, as the origins are.
@@ -301,8 +317,8 @@ export async function createDataServer(options: DataServerOptions): Promise<Fast
   }
 
   if (options.runtime !== undefined) {
-    const { origins: _offered, lookupDeadlineMs: _checked, saveDeadlineMs: _saveChecked, ...runtime } = options.runtime
-    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs, saveDeadlineMs })
+    const { origins: _offered, lookupDeadlineMs: _checked, saveDeadlineMs: _saveChecked, actionDeadlineMs: _actionChecked, ...runtime } = options.runtime
+    await app.register(runtimeRoutes, { ...runtime, authenticate, lookupDeadlineMs, saveDeadlineMs, actionDeadlineMs })
   }
 
   return app

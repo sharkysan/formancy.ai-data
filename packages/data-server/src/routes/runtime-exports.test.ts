@@ -304,7 +304,7 @@ function registry(): ConnectionRegistry {
   return {
     ids: () => ['erp', 'crm'],
     scope: () => ({ schemas: ['sales'] }),
-    open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records, actions: {} as ActionAdapter } : undefined),
+    open: async (id) => (id === 'erp' || id === 'crm' ? { adapter, lookups, records, actions: {} as ActionAdapter, actionPool: 0 } : undefined),
     close: async () => {},
   }
 }

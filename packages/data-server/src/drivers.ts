@@ -30,8 +30,8 @@ export const SQLSERVER_ACTIONS_APPLICATION = 'formancy-data actions'
  * 12.7.4: `max: 10`) and set here explicitly, because no public property of
  * a pool reports its bound -- `size` is how many it holds now -- where
  * postgres.js reports its own as `options.max` (measured,
- * actions.integration.test.ts in each adapter). The route will count a run
- * against it.
+ * actions.integration.test.ts in each adapter). The runtime plane counts
+ * the runs in flight against it (0161).
  */
 export const SQLSERVER_ACTION_POOL = 10
 
@@ -83,7 +83,14 @@ const openPostgres: ConnectionFactory = async (config, secret) => {
     await Promise.all([sql.end({ timeout: 1 }), lookupSql.end({ timeout: 1 }), actionSql.end({ timeout: 1 })])
     throw error
   }
-  return { adapter, lookups: createPostgresLookups(lookupSql), records: createPostgresRecords(sql), actions: createPostgresActions(actionSql) }
+  return {
+    adapter,
+    lookups: createPostgresLookups(lookupSql),
+    records: createPostgresRecords(sql),
+    actions: createPostgresActions(actionSql),
+    // postgres.js's own bound, which it reports (0160): the runs the runtime plane lets be in flight on it (0161).
+    actionPool: actionSql.options.max,
+  }
 }
 
 /** The adapter's login for each allowlist login, kept so that a connection opened again is given the same object. */
@@ -136,7 +143,13 @@ const openSqlServer: ConnectionFactory = async (config, secret) => {
       await Promise.all([records.close(), actionPool.close()])
     },
   }
-  return { adapter, lookups: createSqlServerLookups(pool), records: createSqlServerRecords(pool), actions: createSqlServerActions(actionPool) }
+  return {
+    adapter,
+    lookups: createSqlServerLookups(pool),
+    records: createSqlServerRecords(pool),
+    actions: createSqlServerActions(actionPool),
+    actionPool: SQLSERVER_ACTION_POOL,
+  }
 }
 
 /**

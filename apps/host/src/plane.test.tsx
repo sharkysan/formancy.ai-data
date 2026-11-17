@@ -239,8 +239,11 @@ describe.each(JOURNEYS)('what the page sends on $engine, through $door', ({ form
     // origin, the tenant a column the page sends in no body since 0117
     // (watched failing with every answer sent: the tenant in the price's
     // update and in its change from a date). Through the demo's door it is
-    // the one exception: the demo publishes no form over versions.
-    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? [] : ['supersede'])
+    // the one exception: the demo publishes no form over versions. A run of
+    // an action is the other, as delete, export and a save each were until
+    // the page had a control for them: the route arrived before the host
+    // page has an action's control (0161), and goes from this set when it does.
+    const UNSENT: ReadonlySet<string> = new Set(door === undefined ? ['action'] : ['supersede', 'action'])
     expect(
       ROUTES.filter(({ matches, operation }) => !UNSENT.has(operation) && !sent.some((request) => matches.test(line(request)))).map(
         ({ operation }) => operation,

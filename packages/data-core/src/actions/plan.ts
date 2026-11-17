@@ -15,7 +15,7 @@ import { filtersFor, throughFor } from '../records/scope.js'
 import { decodeRecordKey } from '../records/token.js'
 import type { DescribedTable, RecordConcurrency } from '../records/types.js'
 import { describeRoutine } from '../routines.js'
-import type { ActionArgument, ActionBinding, ActionRecord, ActionRequest, BoundSource, DescribedRoutine, ParameterSource } from './types.js'
+import type { ActionArgument, ActionBinding, ActionChoice, ActionRecord, ActionRequest, BoundSource, DescribedRoutine, ParameterSource } from './types.js'
 
 /*
  * Where a run's request from a browser becomes a request to an adapter
@@ -53,7 +53,7 @@ export interface DuplicateRecord {
 export type PlannedAction = { ok: true; request: ActionRequest } | InvalidValues | PlanRefusal | DuplicateRecord
 
 /** A run's body, read: the records it addresses and the answers by field key, own properties only. */
-interface RunBody {
+export interface RunBody {
   records: Array<{ record: string; version: string }>
   answers: ReadonlyMap<string, unknown>
 }
@@ -62,7 +62,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function readBody(body: unknown): { ok: true; body: RunBody } | PlanRefusal {
+/**
+ * A run's body by its shape alone, or `invalid-request`: the planner's own
+ * reading, which the route asks first too (0161), so the two cannot read
+ * one body two ways -- the route before it reads a write id or asks the
+ * store, the planner again over what it plans.
+ */
+export function readRunBody(body: unknown): { ok: true; body: RunBody } | PlanRefusal {
   const shape = 'A run is { records: [{ record, version }], answers: { field: value } }.'
   if (!isRecord(body) || !Array.isArray(body['records']) || !isRecord(body['answers'])) return refuse('invalid-request', shape)
   const records: RunBody['records'] = []
@@ -90,6 +96,21 @@ function sourceOf(from: BoundSource): ParameterSource {
 }
 
 /**
+ * The request's choice a stored binding was bound from, as the request
+ * spells it: its name, routine and scope, and each parameter's source, in
+ * the routine's order. What the planner binds again, and what the bundle
+ * check compares with the stored request (0161).
+ */
+export function actionChoiceOf(action: ActionBinding): ActionChoice {
+  return {
+    name: action.name,
+    routine: { ...action.routine },
+    scope: action.scope,
+    parameters: action.parameters.map((parameter) => ({ parameter: parameter.parameter, from: sourceOf(parameter.from) })),
+  }
+}
+
+/**
  * Why the stored binding is not what the generator binds from the
  * bindings' own snapshot, or `null` (0159): a hand edit -- another
  * routine's types, a source the policy never saw, a move the token does
@@ -97,12 +118,7 @@ function sourceOf(from: BoundSource): ParameterSource {
  * reads none of it, and publish compares it with the generator (0030).
  */
 function bindingProblem(snapshot: MetadataSnapshot, prepared: Prepared, bindings: FormBindings, action: ActionBinding): string | null {
-  const choice = {
-    name: action.name,
-    routine: action.routine,
-    scope: action.scope,
-    parameters: action.parameters.map((parameter) => ({ parameter: parameter.parameter, from: sourceOf(parameter.from) })),
-  }
+  const choice = actionChoiceOf(action)
   const bound = bindAction(snapshot, prepared.root, { identity: bindings.identity, concurrency: bindings.concurrency, fields: bindings.fields }, choice)
   if (typeof bound === 'string') return bound
   const { dialog: _dialog, ...stored } = action
@@ -248,7 +264,7 @@ export function planAction(
   const problem = bindingProblem(snapshot, prepared, bindings, action)
   if (problem !== null) return refuse('invalid-bindings', `The bindings bind action ${name}, and their snapshot says: ${problem}.`)
   if (!prepared.addressable) return unaddressable(prepared)
-  const read = readBody(body)
+  const read = readRunBody(body)
   if (!read.ok) return read
   const allowed = authorizeAction(policy, context, bindings, name)
   if (!allowed.ok) return allowed

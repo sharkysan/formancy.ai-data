@@ -1,5 +1,5 @@
-import { boundsProblem, isStampChoice } from '@formancy/data-core'
-import type { GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
+import { boundsProblem, isParameterSource, isStampChoice } from '@formancy/data-core'
+import type { ActionChoice, GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
 import { CONFIGURATION_ID as FORM_ID } from './config-store.js'
 
 export type GenerationReading = { ok: true; generation: GenerationRequest } | { ok: false; problems: string[] }
@@ -45,6 +45,34 @@ function togetherOf(value: unknown): { together: LookupChoice['together'] } | { 
   return { together: { min, max } }
 }
 
+/**
+ * The actions a request names (0159, 0161): absent, or a list of choices,
+ * each exactly `{ name, routine: { schema, name, signature }, scope,
+ * parameters: [{ parameter, from }] }`, every source one of the five
+ * (`isParameterSource`), and the scope `record`, the one this release
+ * runs; `null` for anything else. Read by shape and copied, so a hand edit
+ * carries nothing else; what a choice means -- a name a URL carries, one of
+ * each, a routine the snapshot holds -- is the generator's to refuse.
+ */
+function actionsOf(value: unknown): ActionChoice[] | undefined | null {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) return null
+  const choices: ActionChoice[] = []
+  for (const entry of value) {
+    if (!isRecord(entry) || !isRecord(entry['routine']) || !Array.isArray(entry['parameters'])) return null
+    const { name, scope, routine, parameters } = entry
+    if (typeof name !== 'string' || scope !== 'record') return null
+    if (typeof routine['schema'] !== 'string' || typeof routine['name'] !== 'string' || typeof routine['signature'] !== 'string') return null
+    const mapped: ActionChoice['parameters'] = []
+    for (const parameter of parameters as unknown[]) {
+      if (!isRecord(parameter) || typeof parameter['parameter'] !== 'string' || !isParameterSource(parameter['from'])) return null
+      mapped.push({ parameter: parameter['parameter'], from: { ...parameter['from'] } })
+    }
+    choices.push({ name, routine: { schema: routine['schema'], name: routine['name'], signature: routine['signature'] }, scope, parameters: mapped })
+  }
+  return choices
+}
+
 /** The lookup choices, or the problem with them: a list of `{ foreignKey, display, section?, together? }`. */
 function lookupChoices(value: unknown): LookupChoice[] | string {
   const shape = 'lookups must be a list of { foreignKey, display: [columns], section?: { when: { column, value } | null }, together?: { min, max } }'
@@ -78,12 +106,13 @@ function lookupChoices(value: unknown): LookupChoice[] | string {
  * present only when it is a string, a lookup's `section` only when it
  * marks one (0109), `validity` only when it names a chain (0113),
  * `stamps` only when it is given (0153), as given, and a lookup's
- * `together` and `touchColumn` only when they are given (0155). Other
- * properties are not carried, so a stored request that is not equal to its
- * own reading holds something this reading would not have produced -- and
- * a server older than 0153 refuses a stored request that stamps, and one
- * older than 0155 one that saves rows with their record, as it refuses
- * every property it does not read.
+ * `together` and `touchColumn` only when they are given (0155), and
+ * `actions` only when it is given (0161). Other properties are not
+ * carried, so a stored request that is not equal to its own reading holds
+ * something this reading would not have produced -- and a server older
+ * than 0153 refuses a stored request that stamps, one older than 0155 one
+ * that saves rows with their record, and one older than 0161 one that
+ * names an action, as it refuses every property it does not read.
  */
 export function readGeneration(value: unknown): GenerationReading {
   if (!isRecord(value)) return { ok: false, problems: ['a generation request is an object'] }
@@ -107,7 +136,10 @@ export function readGeneration(value: unknown): GenerationReading {
     problems.push(
       "stamps must be a list of { column, value: { kind: 'actor' } | { kind: 'attribute', attribute } | { kind: 'time' }, on: 'create' | 'update' | 'both' }",
     )
-  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null || stamped === null)
+  const actions = actionsOf(value['actions'])
+  if (actions === null)
+    problems.push("actions must be a list of { name, routine: { schema, name, signature }, scope: 'record', parameters: [{ parameter, from }] }")
+  if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null || stamped === null || actions === null)
     return { ok: false, problems }
   return {
     ok: true,
@@ -122,6 +154,7 @@ export function readGeneration(value: unknown): GenerationReading {
       ...(typeof touchColumn === 'string' ? { touchColumn } : {}),
       ...(chain === undefined ? {} : { validity: chain }),
       ...(stamped === undefined ? {} : { stamps: stamped }),
+      ...(actions === undefined ? {} : { actions }),
     },
   }
 }

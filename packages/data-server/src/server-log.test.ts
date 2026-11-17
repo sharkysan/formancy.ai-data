@@ -5,6 +5,7 @@ import { DEFAULT_LOOKUP_DEADLINE_MS, DEFAULT_SAVE_DEADLINE_MS } from '@formancy/
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { DEFAULT_ACTION_DEADLINE_MS } from './action-deadline.js'
 import { createDataServer } from './app.js'
 import type { ConfigurationStore } from './config-store.js'
 import { createFileConfigurationStore } from './config-store.js'
@@ -65,6 +66,7 @@ async function runnable(
     origins,
     lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
     saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+    actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
     // `app` is initialised below, before any request reaches the plane's log.
     log: () => app.log,
   })
@@ -169,6 +171,7 @@ describe("the runnable server's log", () => {
         origins: [],
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
         saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+        actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
         log: () => server.log,
       }).admin,
     ).toBeUndefined()
@@ -222,6 +225,7 @@ describe("the runnable server's log", () => {
         origins: [],
         lookupDeadlineMs: DEFAULT_LOOKUP_DEADLINE_MS,
         saveDeadlineMs: DEFAULT_SAVE_DEADLINE_MS,
+        actionDeadlineMs: DEFAULT_ACTION_DEADLINE_MS,
         log: () => plain.log,
       }).admin,
     ).toBeUndefined()

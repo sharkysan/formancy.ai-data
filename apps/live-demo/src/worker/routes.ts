@@ -27,6 +27,7 @@ const SESSION_METHODS = ['GET', 'POST'] as const
 export const RUNTIME_ROUTES: readonly { method: 'GET' | 'POST'; path: string }[] = [
   { method: 'GET', path: '/v1/forms' },
   { method: 'GET', path: '/v1/forms/:id' },
+  { method: 'POST', path: '/v1/forms/:id/actions/:action/run' },
   { method: 'POST', path: '/v1/forms/:id/lookups/:source/query' },
   { method: 'POST', path: '/v1/forms/:id/lookups/:source/resolve' },
   { method: 'POST', path: '/v1/forms/:id/records/create' },

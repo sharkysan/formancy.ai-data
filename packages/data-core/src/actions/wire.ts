@@ -3,9 +3,10 @@ import type { RuntimeRefusal } from '../runtime.js'
 
 /*
  * The runtime plane's shapes for an action (0159), declared once so that
- * the server that will send them and the client that will read them
- * compile against the same shape, as `runtime.ts`'s are (0029). Nothing
- * serves or sends one yet: the route is a later record's.
+ * the server that sends them and the client that reads them
+ * compile against the same shape, as `runtime.ts`'s are (0029): the data
+ * server's `POST /v1/forms/:id/actions/:action/run` sends them and
+ * data-client's `runAction` reads them (0161).
  */
 
 /**

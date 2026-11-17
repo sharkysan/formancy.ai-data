@@ -1,4 +1,5 @@
 import type { FormSchema } from '@formancy/spec'
+import type { FormAction } from './actions/wire.js'
 import type { ApiValue } from './codecs/codec.js'
 import { DEFAULT_MAX_PAGE_SIZE } from './lookup/config.js'
 import type { LookupRow } from './lookup/types.js'
@@ -214,7 +215,12 @@ export interface Deleting {
  * so `operations` holds neither; `null` for every other form. `operations`
  * holds no `create` either where a together child requires rows of this
  * form's records and this person could not make the save that creates one
- * with them, as the menu says it (0155).
+ * with them, as the menu says it (0155). `actions` is the actions this
+ * person may run over the open record, in the bindings' order, each worded
+ * as `presentedActions` words it: those the policy lets them run
+ * (`runnableActions`), less those the root as described now stops
+ * (`DriftVerdict.actions`, 0041). A routine is not described here: its run
+ * describes it, and refuses one that changed. `[]` where none (0161).
  */
 export interface PublishedForm {
   form: FormSchema
@@ -228,6 +234,7 @@ export interface PublishedForm {
   moves: StateMoves | null
   opens: LookupOpen[]
   together: { field: string; min: number; max: number } | null
+  actions: FormAction[]
 }
 
 /**
