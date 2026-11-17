@@ -306,6 +306,22 @@ describe('a run over a selection', () => {
       { code: 'duplicate-record', message: DUPLICATE_RECORD, records: [records[0]?.record, records[1]?.record] },
     ])
   })
+
+  // The open record's action is answered in the one shape too: a 409 or a
+  // 404 about its record carries `records`, its one token, so a client
+  // reads every refusal about records one way whichever action it ran
+  // (`ActionRecordsRefusal`). Without it a client holding the shape would
+  // find no record named, and a page that reads `records` to know what to
+  // read again would read nothing for the open record's action.
+  test('of the open record’s action, refused about its record, names it too', async () => {
+    const [one] = page(1) as [{ record: string; version: string }]
+    outcome = async () => ({ ok: false, code: 'stale', message: 'm', records: [0] })
+    const stale = await run([one], 'ship')
+    expect([stale.statusCode, stale.json()]).toEqual([409, { code: 'stale', message: expect.stringContaining('Nothing was done.'), records: [one.record] }])
+    outcome = async () => ({ ok: false, code: 'not-found', message: 'm', records: [0] })
+    const gone = await run([one], 'ship')
+    expect([gone.statusCode, gone.json()]).toEqual([404, { code: 'not-found', message: 'No such record. Nothing was done.', records: [one.record] }])
+  })
 })
 
 describe('what a run over a selection leaves behind', () => {
