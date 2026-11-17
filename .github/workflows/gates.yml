@@ -127,13 +127,19 @@ jobs:
   # packages with a `test:coverage` script disagree, so a new package cannot
   # go untested in CI by being left off it.
   #
+  # A suite that alone outgrows every other job runs in shards, each a job of
+  # its own on its own runner, starting its own databases: the host's, in two
+  # (0164). vitest's `--shard` divides it by file, the same way on every
+  # runner, and the report holds the shards together to every file of the
+  # suite, each run in exactly one, and to every shard having left results.
+  #
   # The suites run the adapters against real PostgreSQL and real SQL Server,
   # through testcontainers on the runner's Docker. There is no mocked driver in
   # this repository and there is not going to be one (0003): database
   # semantics are the product, and a suite that passed without a database
   # would be proving the mock.
   test:
-    name: test (${{ matrix.package }})
+    name: test (${{ matrix.package }}${{ matrix.shard && format(', {0}', matrix.shard) || '' }})
     runs-on: ubuntu-latest
     # The suites start a real SQL Server, and its image is close to a gigabyte
     # and a half; the pull is not cached between runs. The host's suite is
@@ -145,12 +151,29 @@ jobs:
     # running when 40 cancelled it, in run 44029572857. 60 is room again and
     # still a limit a hung suite reaches; the host's suite in two jobs is the
     # fix that shortens the run rather than waiting longer for it.
+    #
+    # So it runs in two shards (0164). Predicted, not measured, from run
+    # 44027383496's per-file times, which came before 0162 added its files:
+    # shard 1/2's 46 files took 3626 s of file time and 2/2's 45 took 3101 s,
+    # run 2.92 at a time, which puts their spans near 1241 s and 1062 s, and
+    # their tasks about 28 s longer, near 21 and 18 minutes. The first run of
+    # the shards measures them; the limit stays 60 until it has.
     timeout-minutes: 60
     strategy:
       # Every suite reports, rather than the first failure cancelling the rest.
       fail-fast: false
       matrix:
-        package: ['@formancy/data-core', '@formancy/data-identity', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-host', '@formancy/data-live-demo']
+        package: ['@formancy/data-core', '@formancy/data-identity', '@formancy/data-fixtures', '@formancy/data-postgres', '@formancy/data-sqlserver', '@formancy/data-server', '@formancy/data-client', '@formancy/data-performance', '@formancy/data-examples', '@formancy/data-studio', '@formancy/data-live-demo']
+        # A suite in shards: an entry per shard, `<index>/<count>` as vitest's
+        # --shard takes it, of a package the list above leaves out. Listed
+        # there too, GitHub would add each entry to that package's one leg,
+        # the second's shard replacing the first's, and run one shard alone;
+        # scripts/release-report/workflows.mjs refuses that, and
+        # scripts/ci-test-jobs.test.mjs holds a package's shards to 1/N up to
+        # N/N, each once (0164).
+        include:
+          - { package: '@formancy/data-host', shard: '1/2' }
+          - { package: '@formancy/data-host', shard: '2/2' }
     steps:
       - uses: actions/checkout@v4
 
@@ -171,23 +194,39 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Which files a shard runs is vitest's choice: it sorts every file the
+      # suite resolves by a hash of its path and runs its own share. A shard's
+      # leg writes that whole list first, which globs as a run does and runs
+      # nothing -- no database starts -- so that the report can hold the
+      # shards to running each file of it once (0164).
+      - name: The files the shards share out
+        if: matrix.shard
+        run: pnpm --filter "$PACKAGE" exec vitest list --filesOnly --json=test-results/files.json
+        env:
+          PACKAGE: ${{ matrix.package }}
+
       # turbo builds what the package depends on first (`^build`), then runs
       # its suite and nothing else's. `--force` makes "this job did not replay
       # a cached result" a property of the command rather than an accident of
       # a fresh runner; `--summarize` writes the task's own start and end,
-      # which the report shows as its wall time. The package reaches the
-      # command through the environment, never through `${{ }}` in the script.
-      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize
+      # which the report shows as its wall time. A shard reaches vitest as
+      # `--shard` after turbo's `--`, which turbo hands the task it was asked
+      # to run and not the builds before it (turbo 2.11.2, watched on
+      # 2026-11-17); a package run whole is handed nothing. The package and
+      # the shard reach the command through the environment, never through
+      # `${{ }}` in the script.
+      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize ${SHARD:+-- --shard="$SHARD"}
         env:
           PACKAGE: ${{ matrix.package }}
+          SHARD: ${{ matrix.shard }}
       # Skipped, visibly, while the repository has no CODECOV_TOKEN -- a new
       # repository should not be red for a reason unrelated to its code -- and
       # in every release, which passes no secret. Once the secret exists the
       # upload runs and a failed upload fails the job, as upstream: a report
       # that silently did not arrive is a number nobody can read. Each job
-      # uploads its own package's report; Codecov merges them by commit. A
-      # secret cannot be tested in `if:` directly, so it goes through the
-      # environment.
+      # uploads its own package's report, a shard's counting the lines its own
+      # files reached; Codecov merges them by commit. A secret cannot be
+      # tested in `if:` directly, so it goes through the environment.
       - name: Upload coverage to Codecov
         if: env.CODECOV_TOKEN != ''
         env:
@@ -201,9 +240,10 @@ jobs:
       - name: Keep what this job found, for the report
         id: collect
         if: ${{ !cancelled() }}
-        run: node scripts/release-report/collect.mjs --job test --package "$PACKAGE"
+        run: node scripts/release-report/collect.mjs --job test --package "$PACKAGE" --shard "$SHARD"
         env:
           PACKAGE: ${{ matrix.package }}
+          SHARD: ${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
@@ -219,10 +259,11 @@ jobs:
   # there. Passing on the default says nothing of 16 or 2019: database
   # semantics are the product (0003), and they move between versions.
   #
-  # The `test` job's command, told its image through FORMANCY_IMAGES, which
-  # turbo hashes for the suites (turbo.json), so no leg replays a cached run
-  # of another image; the image reaches the report from the servers' own
-  # records, never from this name. One leg per pair, so a red leg names its
+  # The `test` job's command, given no shard, so each leg runs its suite
+  # whole, and told its image through FORMANCY_IMAGES, which turbo hashes
+  # for the suites (turbo.json), so no leg replays a cached run of another
+  # image; the image reaches the report from the servers' own records,
+  # never from this name. One leg per pair, so a red leg names its
   # package and its image. The server, client, host, studio and performance
   # suites stay on the defaults: they test the server, not the database's
   # semantics. A PostgreSQL leg of data-fixtures starts the default SQL Server
@@ -271,7 +312,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize
+      - run: pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize ${SHARD:+-- --shard="$SHARD"}
         env:
           PACKAGE: ${{ matrix.package }}
           FORMANCY_IMAGES: ${{ matrix.image }}

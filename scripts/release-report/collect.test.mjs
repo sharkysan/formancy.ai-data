@@ -129,6 +129,20 @@ describe('a job’s key', () => {
     )
     expect(() => keyFor({ job: 'test-images', pkg: '@formancy/nothing', variant: 'postgres:16-alpine' }, covered)).toThrow(/no workspace package/)
   })
+
+  // A suite in shards leaves a results file per shard (0164): keyed by the
+  // package alone, the shards would share one artefact and the last upload
+  // would replace the others. A shard vitest would refuse, or one of one,
+  // which is the suite whole under another name, is refused here first.
+  test('names the shard of a suite the test job runs in shards', () => {
+    const covered = [{ path: 'apps/host', id: 'app-host', name: '@formancy/data-host' }]
+    expect(keyFor({ job: 'test', pkg: '@formancy/data-host', shard: '1/2' }, covered)).toBe('test-app-host-1of2')
+    expect(keyFor({ job: 'test', pkg: '@formancy/data-host', shard: '2/2' }, covered)).toBe('test-app-host-2of2')
+    for (const shard of ['0/2', '3/2', '1/1', '1-2', '1/2/3', '']) {
+      expect(() => keyFor({ job: 'test', pkg: '@formancy/data-host', shard }, covered), shard).toThrow(/is not <index>\/<count>/)
+    }
+    expect(() => keyFor({ job: 'verify', shard: '1/2' }, covered)).toThrow(/no --package names one/)
+  })
 })
 
 describe('a test job’s results', () => {
@@ -185,6 +199,35 @@ describe('a test job’s results', () => {
     })
     expect(result.suites.map((suite) => suite.package)).toEqual(['@formancy/data-host'])
     expect(result.servers.map((server) => [server.image, server.caller])).toEqual([['postgres:16-alpine', 'apps/host/src/test-databases.ts']])
+  })
+
+  // A shard's results are its half of the suite, under its own key, with
+  // every file the suite resolves (0164): without that list, a file no
+  // shard ran is a file the report never heard of.
+  test('keep a shard’s suite under its key, with every file its suite shares out', () => {
+    const root = workspace()
+    put(root, 'apps/host/test-results/files.json', [{ file: join(root, 'apps/host/src/stale.test.tsx') }, { file: join(root, 'apps/host/src/page.test.tsx') }])
+    const result = collect({ root, job: 'test', pkg: '@formancy/data-host', shard: '2/2', ...machine })
+    expect(result).toMatchObject({
+      key: 'test-app-host-2of2',
+      package: '@formancy/data-host',
+      shard: { index: 2, count: 2, suiteFiles: ['apps/host/src/page.test.tsx', 'apps/host/src/stale.test.tsx'] },
+      missing: [],
+    })
+    expect(result.suites.map((suite) => suite.files.map((file) => file.file))).toEqual([['apps/host/src/page.test.tsx']])
+    expect(collect({ root, job: 'test', pkg: '@formancy/data-host', ...machine })).not.toHaveProperty('shard')
+  })
+
+  // A shard's leg that listed nothing leaves the report nothing to hold its
+  // shards' files to, which must not read as every file having run.
+  test('list a shard whose leg wrote no list of its suite’s files, and refuse a shard outside the test job', () => {
+    const root = workspace()
+    const result = collect({ root, job: 'test', pkg: '@formancy/data-host', shard: '1/2', ...machine })
+    expect(result.shard).toEqual({ index: 1, count: 2, suiteFiles: null })
+    expect(result.missing).toEqual(["apps/host/test-results/files.json, every file the suite's shards share out"])
+    expect(() => collect({ root, job: 'test-images', pkg: '@formancy/data-host', variant: 'postgres:17-alpine', shard: '1/2', ...machine })).toThrow(
+      /--shard divides a package's suite in the test job, not --job test-images/,
+    )
   })
 
   // A leg whose suite never started its image -- FORMANCY_IMAGES dropped on

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { buildReport } from './report.mjs'
-import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, heldChecks, job, server, withFirefox, withWebKit } from './synthetic-run.mjs'
+import { CASES, ciJob, copy, DIST, greenCiRun, greenRun, heldChecks, job, server, withFirefox, withShards, withWebKit } from './synthetic-run.mjs'
 
 /**
  * What fails a run (0035), for what the report shows of versions, results,
@@ -83,6 +83,106 @@ describe('a package’s suite', () => {
   test('whose job missed a file fails the run', () => {
     expect(withDefect((inputs) => job(inputs, 'test-data-core').missing.push('packages/data-core/test-results/vitest.json'))).toEqual([
       'test-data-core: expected and not found: packages/data-core/test-results/vitest.json',
+    ])
+  })
+})
+
+describe('a package’s suite in shards', () => {
+  // The host's suite runs in two jobs (0164); the report reads them as one
+  // suite, every file and test once, which fails nothing a whole run would
+  // not.
+  const sharded = (change = () => {}) => {
+    const inputs = withShards(copy(greenRun()))
+    change(inputs)
+    return inputs
+  }
+
+  // Two shards that ran side by side are one suite: counted once, timed by
+  // the longer, and with no coverage, since each shard's counts only the
+  // lines its own files reached.
+  test('are one row, and a green run of them has no problems', () => {
+    const report = buildReport(sharded())
+    expect(report.problems).toEqual([])
+    expect(report.results.packages.find((row) => row.package === '@formancy/data-host')).toMatchObject({
+      files: 2,
+      tests: 2,
+      passed: 2,
+      wallMs: 14_000,
+      coverage: null,
+      shards: { legs: ['1/2', '2/2'], mixed: false, absent: [], unrun: [], twice: [] },
+    })
+  })
+
+  // A shard whose job left nothing is half a suite nobody ran, with the
+  // other half green beside it.
+  test('with one shard’s results missing fails the run, naming the shard and the files nobody ran', () => {
+    expect(problemsOf(sharded((inputs) => (inputs.results = inputs.results.filter((result) => result.key !== 'test-app-host-2of2'))))).toEqual([
+      '@formancy/data-host: shard 2/2 left no results, so the files vitest gave it ran nowhere',
+      '@formancy/data-host: 1 file(s) of its suite ran in no shard: apps/host/src/stale.test.tsx',
+    ])
+  })
+
+  // In CI the artefact the workflow expects is missing too, and says which.
+  test('with one shard’s artefact missing in CI fails the run, naming the artefact', () => {
+    const inputs = copy(greenCiRun())
+    const { results } = withShards({ results: [ciJob(inputs, 'test-app-host')] })
+    const shard = results.find((result) => result.key === 'test-app-host-1of2')
+    inputs.artefacts = [
+      ...inputs.artefacts.filter((artefact) => artefact.name !== 'release-results-test-app-host'),
+      { name: `release-results-${shard.key}`, files: [{ file: `${shard.key}.json`, result: shard }] },
+    ]
+    inputs.expected = [...inputs.expected.filter((entry) => entry.key !== 'test-app-host'), ...results.map(({ key }) => ({ key, job: 'test' }))]
+    expect(problemsOf(inputs)).toEqual([
+      'test-app-host-2of2: its job left no artefact release-results-test-app-host-2of2',
+      '@formancy/data-host: shard 2/2 left no results, so the files vitest gave it ran nowhere',
+      '@formancy/data-host: 1 file(s) of its suite ran in no shard: apps/host/src/stale.test.tsx',
+    ])
+  })
+
+  // A file vitest resolves that no shard ran: a list the shards divided
+  // differently -- two counts, or two trees -- with every leg green.
+  test('with a file of the suite that no shard ran fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          for (const result of inputs.results.filter((entry) => entry.shard !== undefined)) result.shard.suiteFiles.push('apps/host/src/drill.test.tsx')
+        }),
+      ),
+    ).toEqual(['@formancy/data-host: 1 file(s) of its suite ran in no shard: apps/host/src/drill.test.tsx'])
+  })
+
+  // A shard whose --shard never reached vitest runs every file, and the
+  // other shard's files run twice.
+  test('with a file in two shards fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          const [first] = job(inputs, 'test-app-host-1of2').suites[0].files
+          job(inputs, 'test-app-host-2of2').suites[0].files.push(structuredClone(first))
+        }),
+      ),
+    ).toEqual(['@formancy/data-host: 1 file(s) ran in more than one shard: apps/host/src/page.test.tsx in 1/2 and 2/2'])
+  })
+
+  // Shards of two counts divide the files two ways; a leg of the whole suite
+  // beside its shards runs every file twice.
+  test('run as anything but 1/N to N/N, each once, fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          job(inputs, 'test-app-host-2of2').shard = { ...job(inputs, 'test-app-host-2of2').shard, index: 2, count: 3 }
+        }),
+      ),
+    ).toEqual(['@formancy/data-host: its legs ran it as 1/2, 2/3, where a suite in shards runs as 1/N to N/N, each once'])
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          inputs.results.push({ ...structuredClone(job(inputs, 'test-app-host-1of2')), key: 'test-app-host', shard: undefined })
+        }),
+      ),
+    ).toEqual([
+      '@formancy/data-host: its legs ran it as 1/2, 2/2, whole, where a suite in shards runs as 1/N to N/N, each once',
+      '@formancy/data-host: 1 file(s) ran in more than one shard: apps/host/src/page.test.tsx in 1/2 and whole',
     ])
   })
 })

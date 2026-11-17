@@ -262,7 +262,7 @@ of them in different SQL dialects, by somebody who knows both.
 | Job | Runs | What it proves |
 |---|---|---|
 | `verify` | `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`, `pnpm test:repo` | The tree builds and type-checks, the vitest, Vite and tsdown configs with it through `tsconfig.tools.json`; every TypeScript and JavaScript file git does not ignore holds to the shared lint rules -- `@eslint/js`'s recommended set and typescript-eslint's type-aware one, every rule at error, a disable comment only with its reason -- and is as Prettier writes it, which the check reads and never writes; each was watched failing on 30 October 2026, on a floating promise and a double-quoted string planted in `packages/data-core/src/records/heading.ts`, the file put back byte for byte ([0116](../decisions/0116-every-typescript-and-javascript-file-is-linted-and-formatted-by-the-rules-the-four-repositories-share.md)); each published package passes `publint` and `attw`; every tarball declares the source-available licence and carries `LICENSE.md` and `NOTICE` ([0001](../decisions/0001-a-paid-module-in-its-own-repository.md)); the repository's own guards (§10.4) |
-| `test`, one per package | `turbo run test:coverage --force --summarize` | Each package's suite, its databases included, on a runner of its own; `--force` so a cached result is never reported as this run's |
+| `test`, one per package, or one per shard of a suite in shards | `turbo run test:coverage --force --summarize`, a shard's after `vitest list --filesOnly` and with `-- --shard=<index>/<count>` | Each package's suite, its databases included, on a runner of its own, the host's in two shards, each on its own ([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md)); `--force` so a cached result is never reported as this run's |
 | `test-images`, one per image of the matrix but the defaults | the `test` job's command, `FORMANCY_IMAGES` set to the leg's image | data-fixtures and that engine's adapter suite on that image (0067); no coverage is uploaded |
 | `browser`, one per browser | `pnpm test:browser` | §10.5 |
 | `pictures` | `pnpm test:pictures` | §10.6 |
@@ -278,7 +278,11 @@ runner timed out a test that takes seconds alone.
 `scripts/ci-test-jobs.test.mjs` fails when the matrix and the workspace's
 packages with a suite disagree, so a new package cannot go untested in CI by
 being left off it, and when the `test-images` legs and `MATRIX_IMAGES`
-disagree.
+disagree. The host's suite, which alone ran sixteen minutes past every
+other job, runs in two shards, which vitest divides by a hash of each
+file's path: `scripts/ci-test-jobs.test.mjs` fails when a package's shards
+are other than 1/N to N/N, each once, and the report when a shard left no
+results, or a file of the suite ran in no shard or in two (0164).
 
 Outside the gates: `.github/workflows/cla.yml` fails a pull request naming
 any commit author with no signature in `.github/cla/signatories.json`;
@@ -671,7 +675,9 @@ release publishes; the release gates; and the known limitations
 ([0035](../decisions/0035-a-release-report-is-derived-from-the-run-that-gated-it.md)).
 It is a build output of the run, never a committed document, and it fails
 the run on anything in its problems: a job that ended other than success, a
-test skipped or failed -- skipped is not passed -- a shared case on one
+test skipped or failed -- skipped is not passed -- a shard of a suite that
+left no results, or a file of it that no shard ran or two did, a shared
+case on one
 engine only or missing on an image of the matrix, an image of the matrix
 that answered no test, a browser gate missing in a browser, two builds of
 one package that differ. `docs/release/README.md` lists every rule, and

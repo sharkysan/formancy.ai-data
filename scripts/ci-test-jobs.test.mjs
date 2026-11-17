@@ -3,14 +3,16 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { beforeAll, describe, expect, test } from 'vitest'
 import { coveredPackages } from './codecov-config.mjs'
+import { parseShard } from './release-report/collect.mjs'
 import { imageMatrix, readWorkflow, testMatrix } from './release-report/workflows.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /**
- * The `test` job's matrix as `.github/workflows/gates.yml` lists it, which
+ * The `test` job's legs as `.github/workflows/gates.yml` lists them, which
  * ci.yml and release.yml both run (0035), read with `yaml` as the report reads
- * it: the list the report expects a results artefact per package from.
+ * them: the legs the report expects a results artefact from, `{ package,
+ * shard }` each, `shard` null for a suite run whole (0164).
  */
 const matrix = () => testMatrix(readWorkflow(root))
 
@@ -30,20 +32,39 @@ beforeAll(async () => {
 }, 60_000)
 
 describe('the CI test jobs', () => {
-  // Each package's suite runs in a job of its own, on its own runner. All nine
-  // at once on one four-CPU runner, beside their databases, took a studio test
-  // that runs in 2 s locally past its 60 s limit on main (run 37940021594). A
-  // package left out of the matrix would then never be tested in CI at all,
-  // and nothing would be red.
+  // Each package's suite runs in a job of its own, or in a job per shard of it
+  // (0164), on its own runner. All nine at once on one four-CPU runner,
+  // beside their databases, took a studio test that runs in 2 s locally past
+  // its 60 s limit on main (run 37940021594). A package left out of the
+  // matrix would then never be tested in CI at all, and nothing would be red.
   test('run every package that has a suite, and nothing else', () => {
-    expect([...matrix()].sort()).toEqual([...packagesWithSuites()].sort())
+    expect([...new Set(matrix().map((leg) => leg.package))].sort()).toEqual([...packagesWithSuites()].sort())
   })
 
-  // Listed twice is two runners doing one job; harmless, but a sign the list
-  // was edited by hand past the point of reading it.
-  test('run each package once', () => {
-    const names = matrix()
-    expect(names.length).toBe(new Set(names).size)
+  // Listed twice is two runners doing one job. A suite in shards (0164) is
+  // run whole by none of its legs and in full by all of them together: a
+  // shard missing is files nobody ran, with every leg green; one twice, or a
+  // leg of the whole suite beside its shards, is files run twice; and shards
+  // of two counts divide the files two ways, so that one file can fall in
+  // neither. vitest refuses a shard past its count, and parseShard() one of
+  // one, so a typo is red here before any runner starts.
+  test('run each package once: whole, or in shards 1/N to N/N, each once', () => {
+    const legs = matrix()
+    const sharded = []
+    for (const name of new Set(legs.map((leg) => leg.package))) {
+      const shards = legs.filter((leg) => leg.package === name).map((leg) => leg.shard)
+      if (shards.length === 1 && shards[0] === null) continue
+      expect(shards, `${name} runs whole beside its shards, or twice`).not.toContain(null)
+      const parsed = shards.map(parseShard)
+      const [{ count }] = parsed
+      expect(parsed.map((shard) => `${String(shard.index)}/${String(shard.count)}`).sort(), name).toEqual(
+        Array.from({ length: count }, (_, at) => `${String(at + 1)}/${String(count)}`).sort(),
+      )
+      sharded.push(name)
+    }
+    // The guard on the guard: with no suite in shards, the loop above holds
+    // nothing, and a shard left out of the include list would pass it.
+    expect(sharded).toEqual(['@formancy/data-host'])
   })
 
   // A guard on the guard: a walk that found no suites would compare an empty

@@ -17,7 +17,7 @@ export const engineName = (engine) => ENGINE[engine] ?? engine
 
 const list = (items, most = 5) => (items.length <= most ? items.join('; ') : `${items.slice(0, most).join('; ')}; and ${String(items.length - most)} more`)
 
-/** Each package's suite in each leg: present, ran something, every test passed, every file passed, vitest said success. */
+/** Each package's suite in each leg: present, ran something, every test passed, every file passed, vitest said success, and its shards whole. */
 function suiteProblems(row) {
   const name = row.package === null ? 'the repository guards' : row.image == null ? row.package : `${row.package} on ${row.image}`
   if (!row.present) return [`${name}: no results from its suite`]
@@ -40,6 +40,25 @@ function suiteProblems(row) {
   }
   if (!row.success) problems.push(`${name}: vitest reported the run unsuccessful`)
   if (row.numFailedTestSuites > 0) problems.push(`${name}: vitest counted ${String(row.numFailedTestSuites)} failed suite(s)`)
+  return [...problems, ...shardProblems(name, row.shards)]
+}
+
+/**
+ * A suite run in shards (0164): its legs 1/N to N/N, each once; and every
+ * file its legs listed run in exactly one of them. A shard that left nothing
+ * is files nobody ran, with every other leg green; a file in two shards is
+ * a leg that ran more than its share, or a shard that never reached vitest.
+ */
+function shardProblems(name, shards) {
+  if (shards == null) return []
+  const problems = []
+  if (shards.mixed) problems.push(`${name}: its legs ran it as ${shards.legs.join(', ')}, where a suite in shards runs as 1/N to N/N, each once`)
+  for (const leg of shards.absent) problems.push(`${name}: shard ${leg} left no results, so the files vitest gave it ran nowhere`)
+  if (shards.unrun.length > 0) problems.push(`${name}: ${String(shards.unrun.length)} file(s) of its suite ran in no shard: ${list(shards.unrun)}`)
+  if (shards.twice.length > 0)
+    problems.push(
+      `${name}: ${String(shards.twice.length)} file(s) ran in more than one shard: ${list(shards.twice.map((entry) => `${entry.file} in ${entry.by.join(' and ')}`))}`,
+    )
   return problems
 }
 

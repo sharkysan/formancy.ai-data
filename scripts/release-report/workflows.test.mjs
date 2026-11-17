@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 import { namedPackages } from './collect.mjs'
 import { BUILT_INPUTS, workspace } from './tested-on.mjs'
-import { collectStep, expectedKeys, gateJobs, imageMatrix, readWorkflow } from './workflows.mjs'
+import { collectStep, expectedKeys, gateJobs, imageMatrix, readWorkflow, testMatrix } from './workflows.mjs'
 
 /**
  * The shape of the three workflows a release depends on (0035), parsed with
@@ -339,11 +339,19 @@ describe('gates.yml', () => {
     )
     expect(keys).not.toContain('browser')
     const of = (job) => expected.filter((entry) => entry.job === job).map((entry) => entry.key)
+    // A package run whole leaves one key; one in shards a key per shard and
+    // none of its own, which no job would leave (0164).
+    const shards = (name) =>
+      testMatrix(gates)
+        .filter((leg) => leg.package === name && leg.shard !== null)
+        .map((leg) => leg.shard.replace('/', 'of'))
     expect(of('test').sort()).toEqual(
       namedPackages()
-        .map((entry) => `test-${entry.id}`)
+        .flatMap((entry) => (shards(entry.name).length === 0 ? [`test-${entry.id}`] : shards(entry.name).map((shard) => `test-${entry.id}-${shard}`)))
         .sort(),
     )
+    expect(of('test')).toEqual(expect.arrayContaining(['test-app-host-1of2', 'test-app-host-2of2']))
+    expect(of('test')).not.toContain('test-app-host')
     // Each leg's key names its package and its image, so the report expects
     // every pair the job lists and no two legs share one.
     expect(of('test-images')).toEqual(
@@ -380,11 +388,71 @@ describe('gates.yml', () => {
     expect(() => expectedKeys(leg({ include: [{ package: '@formancy/data-postgres' }] }), named)).toThrow(/include entry 1 gives no image/)
   })
 
+  // A job keyed by a package and a shard runs its list whole and each
+  // include entry as a shard (0164). GitHub adds an include entry to the
+  // listed leg it matches, and the next entry's shard replaces the first's
+  // there: a sharded package also on the list would run one shard alone,
+  // with the report expecting the other. A key crossed beside the list
+  // would run every package once per value, under one key.
+  test('reads a job keyed by a package and a shard as its list whole and its include entries, and refuses a shard of a listed package', () => {
+    const job = (matrix, run = '--package "$PACKAGE" --shard "$SHARD"') => ({
+      jobs: {
+        test: {
+          strategy: { matrix },
+          steps: [
+            {
+              id: 'collect',
+              run: `node scripts/release-report/collect.mjs --job test ${run}`,
+              env: { PACKAGE: '${{ matrix.package }}', SHARD: '${{ matrix.shard }}', IMAGE: '${{ matrix.image }}' },
+            },
+          ],
+        },
+      },
+    })
+    const named = namedPackages()
+    const host = (shard) => ({ package: '@formancy/data-host', shard })
+    expect(expectedKeys(job({ package: ['@formancy/data-core'], include: [host('1/2'), host('2/2')] }), named)).toEqual([
+      { key: 'test-data-core', job: 'test' },
+      { key: 'test-app-host-1of2', job: 'test' },
+      { key: 'test-app-host-2of2', job: 'test' },
+    ])
+    expect(() => expectedKeys(job({ package: ['@formancy/data-host'], include: [host('1/2'), host('2/2')] }), named)).toThrow(
+      /include entry 1 gives @formancy\/data-host a shard, and its package list names it too/,
+    )
+    expect(() => expectedKeys(job({ package: ['@formancy/data-core'], include: [{ package: '@formancy/data-host' }] }), named)).toThrow(
+      /include entry 1 gives no shard/,
+    )
+    expect(() => expectedKeys(job({ package: ['@formancy/data-core'], node: ['22', '24'], include: [] }), named)).toThrow(/lists node beside package/)
+    expect(() => expectedKeys(job({ package: ['@formancy/data-core'], include: [host('3/2')] }), named)).toThrow(/--shard 3\/2 is not <index>\/<count>/)
+    expect(() => expectedKeys(job({ package: ['@formancy/data-core'], include: [host('1/1')] }), named)).toThrow(/--shard 1\/1 is not <index>\/<count>/)
+    expect(() => expectedKeys(job({ include: [host('1/2')] }, '--package "$PACKAGE" --variant "$IMAGE" --shard "$SHARD"'), named)).toThrow(
+      /needs --package and no --variant/,
+    )
+  })
+
+  // A shard runs what vitest chooses from the files its suite resolves; the
+  // report holds the shards to that list, which the leg writes before its
+  // run, through the same config and with nothing started (0164). Without
+  // it, a file no shard ran is a file the report never heard of.
+  test('lists the files a sharded suite shares out in each shard’s leg, before it runs, and in no other', () => {
+    const steps = gates.jobs.test.steps
+    const list = steps.findIndex((step) => String(step.run).includes('vitest list'))
+    const run = steps.findIndex((step) => String(step.run).includes('turbo run test:coverage'))
+    expect(steps[list]).toMatchObject({
+      if: 'matrix.shard',
+      run: 'pnpm --filter "$PACKAGE" exec vitest list --filesOnly --json=test-results/files.json',
+      env: { PACKAGE: '${{ matrix.package }}' },
+    })
+    expect(list).toBeGreaterThan(steps.findIndex((step) => step.run === 'pnpm install --frozen-lockfile'))
+    expect(list).toBeLessThan(run)
+    expect(collectStep(gates.jobs.test).run).toBe('node scripts/release-report/collect.mjs --job test --package "$PACKAGE" --shard "$SHARD"')
+  })
+
   // The image legs are the test job's command on another image (0067): a
   // leg without --force could replay the default's cached run under its
-  // image's name, and one without FORMANCY_IMAGES runs the default. Coverage
-  // is the default leg's to upload: an image leg covers the same lines, and
-  // Codecov merges by commit.
+  // image's name, and one without FORMANCY_IMAGES runs the default. Given no
+  // SHARD, it runs its suite whole (0164). Coverage is the default leg's to
+  // upload: an image leg covers the same lines, and Codecov merges by commit.
   test('runs each image leg as the test job runs its package, on the leg’s image, uploading no coverage', () => {
     const job = gates.jobs['test-images']
     const run = job.steps.find((step) => String(step.run).includes('turbo run test:coverage'))
@@ -465,11 +533,14 @@ describe('gates.yml', () => {
   })
 
   // Without --force a suite's results could be a cached replay of another
-  // commit's; without --summarize the report has no wall time for it.
-  test('runs each package fresh, with its own timing, the package from the environment', () => {
+  // commit's; without --summarize the report has no wall time for it. A
+  // shard's leg without --shard would run the whole suite under the shard's
+  // name, and the report would find every file in both (0164); one with it
+  // before turbo's `--` would be turbo's to refuse.
+  test('runs each package fresh, with its own timing, the package and its shard from the environment', () => {
     const run = gates.jobs.test.steps.find((step) => String(step.run).includes('turbo run test:coverage'))
-    expect(run.run).toBe('pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize')
-    expect(run.env).toEqual({ PACKAGE: '${{ matrix.package }}' })
+    expect(run.run).toBe('pnpm exec turbo run test:coverage --filter="$PACKAGE" --force --summarize ${SHARD:+-- --shard="$SHARD"}')
+    expect(run.env).toEqual({ PACKAGE: '${{ matrix.package }}', SHARD: '${{ matrix.shard }}' })
   })
 
   // An expression inside a script is text a matrix value or a tag name can

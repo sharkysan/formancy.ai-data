@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { derivedLimitations } from './derived-limitations.mjs'
 import { renderContent, renderReport, renderSummary } from './render.mjs'
 import { buildReport } from './report.mjs'
-import { copy, greenCiRun, greenRun, job, server, withFirefox, withWebKit } from './synthetic-run.mjs'
+import { copy, greenCiRun, greenRun, job, server, withFirefox, withShards, withWebKit } from './synthetic-run.mjs'
 
 /**
  * The report's derived limitations and its Markdown (0035), over a run made
@@ -183,6 +183,22 @@ describe('the Markdown', () => {
     )
     const row = markdown.split('\n').find((line) => line.startsWith('| @formancy/data-core |'))
     expect(row).toMatch(/\| not measured \| [\d.]+ s \| {2}\| not measured \|$/)
+  })
+
+  // A suite in shards is one row that says so (0164): its wall time is the
+  // longer shard's, and no coverage is shown for it, since one shard's total
+  // would read as the suite's and two totals do not add up to a union.
+  test('prints a suite run in shards as one row that names them, with no coverage', () => {
+    const markdown = renderContent(
+      report((inputs) => {
+        withShards(inputs)
+        job(inputs, 'test-app-host-2of2').suites[0].task.endTime += 1000
+      }),
+    )
+    const row = markdown.split('\n').find((line) => line.startsWith('| @formancy/data-host'))
+    expect(row).toBe(
+      '| @formancy/data-host, in shards 1/2, 2/2 | no | 2 | 2 | 2 | 0 | 0 | 0 | 15.0 s | 1.0 s | postgres, sqlserver | not merged across its shards |',
+    )
   })
 
   // Every register line names the record that states it, and a held line
