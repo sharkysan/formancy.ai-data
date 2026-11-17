@@ -257,6 +257,18 @@ function boundSource(root: ObjectMeta, ground: ActionGround, parameter: RoutineP
   return 'attribute' in from ? { kind: 'attribute', attribute: from.attribute } : { kind: 'actor' }
 }
 
+/**
+ * Why `from` cannot give `parameter` its value on this form, or `null`: the
+ * rule `bindAction` holds each mapped parameter to, asked of one parameter
+ * and one source. The studio asks it of every source it could offer a
+ * parameter, so it offers exactly those the generator binds and never
+ * decides one itself (0163).
+ */
+export function sourceProblem(root: ObjectMeta, ground: ActionGround, parameter: RoutineParameter, from: ParameterSource): string | null {
+  const bound = boundSource(root, ground, parameter, from)
+  return typeof bound === 'string' ? bound : null
+}
+
 /** Every parameter mapped exactly once, and each mapped to a source the form can give it -- or the first reason not. */
 function parametersFor(root: ObjectMeta, ground: ActionGround, routine: RoutineMeta, choice: ActionChoice): ActionParameter[] | string {
   const given = new Map<string, ParameterSource>()

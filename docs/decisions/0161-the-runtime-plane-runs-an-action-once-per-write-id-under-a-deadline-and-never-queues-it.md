@@ -1,6 +1,6 @@
 # 0161 — The runtime plane runs an action once per write id, under a deadline, and never queues it
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0163](0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md): the studio publishes an action, which this record's costs said only a client writing its own generation request could
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** the route, its deadline setting, the run pool's count,

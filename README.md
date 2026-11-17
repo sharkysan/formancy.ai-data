@@ -164,12 +164,15 @@ release; your application's own pages draw records their own way:
   keeps, run over the open record in one transaction on both engines --
   the record locked under the person's policy at the version they read,
   its version moved, the routine called only as it was published -- once
-  per write id, under a deadline: one call of the runtime plane that
-  `@formancy/data-client` makes, and not yet a control of the host page
-  or a pane of the studio
+  per write id, under a deadline: bound in the studio, each parameter
+  given only what the generator binds and the grant made after a note of
+  what the routine does that nothing here binds, and one call of the
+  runtime plane that `@formancy/data-client` makes, not yet a control of
+  the host page
   ([0159](./docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](./docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
-  [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+  [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
+  [0163](./docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
 - **Deletes, copies and files**: a record deleted one at a time, reaching
   other tables only through the foreign keys its policy names; duplicated
   into a new one; and the records a list shows downloaded as one CSV file
@@ -231,9 +234,7 @@ built from this repository and not published as a package:
   a line both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - An action is run through the runtime plane alone, over the open record
-  and no selection of records: the host page offers no action's control,
-  and the studio binds none, so an administrator names one in a
-  generation request of their own
+  and no selection of records: the host page offers no action's control
   ([0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one
@@ -298,8 +299,8 @@ record's child forms in tabs, state moves, versions changed from a date,
 starting values, a select of the values a check lists, the server's
 stamps of who wrote a record and when, a record saved with its rows
 in one request of the runtime plane, chosen in the studio and sent from
-the host page's own Save, and an action an administrator names run over
-the open record -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
+the host page's own Save, and an action an administrator binds in the
+studio, run over the open record -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased*, and the examples page and the live demo are deployed from
 `main`. [The status page](./docs/guide/status.md) says what 0.3.0 added
 over 0.2.0, and what is not yet measured or read by hand.

@@ -18,6 +18,11 @@ type Tested = Outcome<ConnectionTest> | 'testing'
  * words -- those name hosts and ports, and the server keeps them in its log.
  * An answer from a server this release was not tested on says so, in the
  * server's sentence, and is an answer like any other (0068).
+ *
+ * Include routines, off unless ticked, discovers the functions and
+ * procedures of the approved schemas too (0158, 0163), which the Choose
+ * step offers as actions: a snapshot records them only when asked, so
+ * every discovery without it is the one it always was.
  */
 export function ConnectStep({
   client,
@@ -38,6 +43,7 @@ export function ConnectStep({
   const [tested, setTested] = useState<Record<string, Tested>>({})
   const [discovering, setDiscovering] = useState<string | null>(null)
   const [refused, setRefused] = useState<{ connection: string; message: string } | null>(null)
+  const [routines, setRoutines] = useState(false)
 
   // A press while the last one is on its way does nothing. The buttons are
   // not disabled for it: a disabled button drops the keyboard's focus.
@@ -53,7 +59,7 @@ export function ConnectStep({
     setDiscovering(connection)
     setRefused(null)
     onDiscovering()
-    const outcome = await client.metadata(connection)
+    const outcome = await client.metadata(connection, routines)
     setDiscovering(null)
     if (outcome.ok) onDiscovered(connection, outcome.value)
     else setRefused({ connection, message: outcome.message })
@@ -64,6 +70,20 @@ export function ConnectStep({
       <p className="lede">
         The databases this deployment allows forms to bind to, as the server&rsquo;s connections file names them. Test one to see what answers; discover it to
         see what it can see, and what it cannot.
+      </p>
+      <div className="check">
+        <input
+          type="checkbox"
+          id="include-routines"
+          checked={routines}
+          aria-describedby="include-routines-about"
+          onChange={(event) => setRoutines(event.target.checked)}
+        />
+        <label htmlFor="include-routines">Include routines</label>
+      </div>
+      <p id="include-routines-about" className="hint">
+        Discover the functions and procedures of the approved schemas too, which the Choose step offers to run as actions over the open record. A form that
+        binds one is published with them in its snapshot, which a server of an earlier release refuses to serve.
       </p>
       {connections.length === 0 ? (
         <p className="none">The server allows no connection: its connections file lists none.</p>

@@ -235,3 +235,22 @@ export function withTransitions(policy: FormPolicy, rule: TransitionRule | null)
   const { transitions: _, ...rest } = policy
   return rule === null ? rest : { ...rest, transitions: { field: rule.field, moves: rule.moves.map((move) => ({ ...move, roles: [...move.roles] })) } }
 }
+
+/**
+ * The policy with `name` run by `roles` (0159): the action's entry left
+ * out when it names nobody, and `actions` left out when no action is
+ * anybody's -- absent is nobody's, and a policy that grants no action stays
+ * one a server older than 0159 still reads.
+ */
+export function withActionRoles(policy: FormPolicy, name: string, roles: readonly string[]): FormPolicy {
+  const { actions: _, ...rest } = policy
+  const actions = Object.fromEntries(Object.entries(policy.actions ?? {}).filter(([action]) => action !== name))
+  if (roles.length > 0) actions[name] = { roles: [...roles] }
+  return Object.keys(actions).length === 0 ? rest : { ...rest, actions }
+}
+
+/** Action grants for names the form does not bind: left from an earlier generation, and refused until removed (`validatePolicy`). */
+export function orphanActions(policy: FormPolicy, bindings: FormBindings): string[] {
+  const bound = new Set((bindings.actions ?? []).map((action) => action.name))
+  return Object.keys(policy.actions ?? {}).filter((name) => !bound.has(name))
+}

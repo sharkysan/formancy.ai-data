@@ -1,7 +1,8 @@
-import { actionChoiceOf, applyPresentation, findObject, generateForm, presentationShapeProblems } from '@formancy/data-core'
+import { actionChoiceOf, applyPresentation, findObject, generateForm, presentationShapeProblems, presentedActions } from '@formancy/data-core'
 import type { ActionChoice, FormBindings, GenerationRequest, MetadataSnapshot, ObjectRef, PresentationOverrides, StampChoice } from '@formancy/data-core'
 import type { FormSchema } from '@formancy/spec'
 import { canonicalize } from '@formancy/spec'
+import { validateSchema } from '@formancy/spec/validate'
 import type { BundleV2 } from './bundle.js'
 import { readGeneration } from './generation.js'
 import { servedSchema } from './served-schema.js'
@@ -51,12 +52,32 @@ export function format2Problems(document: Record<string, unknown>, form: FormSch
   const shape = presentationShapeProblems(document['presentation'])
   if (shape.length > 0) return [...problems, ...shape.map((problem) => `presentation: ${problem}`)]
   if (!base.valid) return problems
-  const applied = applyPresentation(base.schema, document['presentation'] as PresentationOverrides, bindings)
-  if (!applied.ok) problems.push(...applied.problems.map((problem) => `presentation: ${problem}`))
-  else if (canonicalize(applied.form) !== canonicalize(form)) {
+  const presentation = document['presentation'] as PresentationOverrides
+  const applied = applyPresentation(base.schema, presentation, bindings)
+  if (!applied.ok) return [...problems, ...applied.problems.map((problem) => `presentation: ${problem}`)]
+  if (canonicalize(applied.form) !== canonicalize(form)) {
     problems.push('form: is not the base with its presentation applied; the form, the base or the presentation was edited')
   }
-  return problems
+  return [...problems, ...dialogProblems(bindings, presentation)]
+}
+
+/**
+ * Each action's dialog as a page is served it, the presentation's words
+ * applied (`presentedActions`, 0159), against formancy's own validator
+ * (0163): a word it refuses -- help text past the length it holds -- makes
+ * a dialog no renderer draws, refused here for every client, as a form it
+ * refuses is, in the sentence the studio says before it sends one. Asked
+ * of words `applyPresentation` fitted to the bindings. The first error of
+ * each, which names what to change: the rest are the alternatives the
+ * schema tried after it.
+ */
+function dialogProblems(bindings: FormBindings, presentation: PresentationOverrides): string[] {
+  return presentedActions(bindings, presentation.actions).flatMap((action) => {
+    if (action.dialog === null) return []
+    const checked = validateSchema(action.dialog)
+    const [first] = checked.valid ? [] : checked.errors
+    return first === undefined ? [] : [`presentation: the dialog of ${action.name}, at ${first.path}: ${first.message}`]
+  })
 }
 
 /**

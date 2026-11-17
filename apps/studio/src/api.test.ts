@@ -115,6 +115,23 @@ describe('the administrator plane, through the studio client', () => {
     expect(plane.requests).toEqual([{ method: 'GET', path: '/v1/connections/a%2Fb/metadata' }])
   })
 
+  // Asked for the routines (0163), a discovery says so in the one query
+  // the server reads, and the snapshot that comes back records them; not
+  // asked, the request is the one it always was, and the snapshot records
+  // none (0158). Watched failing with the flag not sent: the snapshot
+  // recorded no routine, and the Choose step would offer none.
+  test('discovers a connection with its routines when asked, and without them otherwise', async () => {
+    const asked = await admin.metadata('fixture', true)
+    const plain = await admin.metadata('fixture')
+    expect(plane.requests).toEqual([
+      { method: 'GET', path: '/v1/connections/fixture/metadata', query: '?routines=true' },
+      { method: 'GET', path: '/v1/connections/fixture/metadata' },
+    ])
+    if (!asked.ok || !plain.ok) throw new Error('a discovery was refused')
+    expect(asked.value.routines?.map((routine) => routine.ref.name)).toEqual(['ship_order'])
+    expect(plain.value.routines).toBeUndefined()
+  })
+
   // The four routes of 0030 -- versions, one version, a regeneration and a
   // restore -- each read in the shape the server sends. A renamed field would
   // blank the Drift step's version list or its regeneration; here it is a

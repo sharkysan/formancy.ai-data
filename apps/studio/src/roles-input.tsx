@@ -14,11 +14,14 @@ export function RolesInput({
   label,
   roles,
   onRoles,
+  describedBy,
 }: {
   id: string
   label: ReactElement | string
   roles: readonly string[]
   onRoles: (roles: string[]) => void
+  /** The id of what is read with the box: a note it is granted after. */
+  describedBy?: string
 }): ReactElement {
   const [draft, setDraft] = useState(formatRoles(roles))
   useEffect(() => {
@@ -34,6 +37,7 @@ export function RolesInput({
         value={draft}
         spellCheck={false}
         autoComplete="off"
+        aria-describedby={describedBy}
         onChange={(event) => {
           setDraft(event.target.value)
           onRoles(parseRoles(event.target.value))

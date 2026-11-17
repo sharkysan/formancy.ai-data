@@ -156,6 +156,40 @@ step's check names a policy that narrows the rows by anything but their
 record, and the Publish step waits on a max past one batch
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
+An action runs a function or procedure your database keeps over the open
+record. Tick Include routines on the Connect step before Discover, and
+the pane of what the connection can see lists its routines under its
+tables; without it no routine is read, and the Choose step offers no
+action and says so. There, an Actions group lists every routine, none
+ticked: one no run could call -- one this account may not execute, a
+PostgreSQL function that returns a value, a SQL Server function -- is
+listed disabled with the generator's reason, and a form that offers no
+action at all, with no confirmed version or, on a rowversion, no touch
+column, says so above them. "Offer `sales.ship_order(…)` as an action"
+names it after its routine, which you may type over, and gives each
+parameter a select starting at Nothing yet and offering only what the
+generator binds for its type: the record's key, a column of it, an answer
+in the action's dialog, a trusted attribute -- named, starting at
+`tenant` -- or the signed-in person's id. Until each has one, the
+generator's note under it says which is missing. An action chosen stays
+listed, ticked, when its routine is no longer in the snapshot or the
+connection was discovered again without Include routines, since what you
+generate still names it: untick it there to leave it out. On the Policy step,
+"Roles that may run ship-order" is the grant, which needs read and not
+update, and above it a note says what the routine does that nothing here
+binds: it calls the routine after moving the record's version, field
+grants, state moves and cascades do not bind it, a routine writing other
+rows over a version column must increment theirs, on SQL Server a RETURN
+status other than 0 refuses the run, and a routine reaching past this
+connection's grants may. On the Presentation step, under Actions, each
+action's label, the sentence a page asks before it runs and the one it
+says after, what is read again, and each dialog question's label and help
+text -- words alone, which the Publish step waits on where the server or
+formancy's validator would refuse them. The Drift step says "Run
+ship-order: still allowed" or blocked, and a regeneration taken up keeps
+the actions and their words
+([0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
+
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with
 the column's default, “draft”." -- and takes another: a box for text and

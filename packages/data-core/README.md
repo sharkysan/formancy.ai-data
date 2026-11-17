@@ -86,12 +86,16 @@ browser.
   `GenerationRequest.actions` names each, a routine and a source for every
   parameter; `generateForm` binds each into `FormBindings.actions`, with
   its dialog, or says in a `blocked` note which rule refused it, and
-  `bindAction` and `fitProblem` are those rules. `FormPolicy.actions` names
+  `bindAction` and `fitProblem` are those rules; `sourceProblem` is the
+  rule for one parameter and one source, which a client asks of each
+  source it could offer so it offers only those the generator binds, and
+  `fieldKeyFor` the key rule an input's name is held to
+  ([0163](../../docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)). `FormPolicy.actions` names
   who may run each, which `authorizeAction` and `runnableActions` answer;
   `planAction` plans a run; `PresentationOverrides.actions` holds its
   words; drift review reads the routines a form's actions bind, and
-  `DriftVerdict.actions` is those still runnable. Nothing serves or runs
-  an action yet.
+  `DriftVerdict.actions` is those still runnable. Both adapters run one,
+  and data-server's runtime plane serves and runs it (0160, 0161).
 
 ```ts
 import { generateForm } from '@formancy/data-core'

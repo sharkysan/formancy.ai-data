@@ -29,6 +29,7 @@ import { actionDeadlineSetting, DEFAULT_ACTION_DEADLINE_MS } from '../action-dea
 import { createDataServer } from '../app.js'
 import type { AuditSink, RuntimeAuditEvent } from '../audit.js'
 import { recordReference } from '../audit.js'
+import { validateBundle } from '../bundle.js'
 import type { BundleV2 } from '../bundle.js'
 import { createFileConfigurationStore } from '../config-store.js'
 import type { ConfigurationStore } from '../config-store.js'
@@ -612,6 +613,25 @@ describe('a form published with actions', () => {
     ])
   })
 
+  // A page is served an action's dialog with the presentation's words
+  // applied, and a word formancy's validator refuses -- help text past the
+  // 300 characters it holds -- makes a dialog no renderer draws: refused
+  // by the bundle check, on publish and on every read, for every client,
+  // as a form formancy refuses is, and in the sentence the studio says
+  // before it sends one (0163). Watched failing with the dialogs left
+  // unvalidated: "expected [] to deeply equal [ StringMatching{…} ]".
+  test('is served only where every dialog its words make is one formancy’s validator accepts', async () => {
+    const good = bundle()
+    const words = [{ action: 'close', inputs: [{ input: 'note', description: 'x'.repeat(301) }] }]
+    const worded = { ...good, presentation: { ...good.presentation, actions: words } }
+    expect(validateBundle({ ...worded, presentation: { ...good.presentation, actions: [{ action: 'close', label: 'Close it' }] } }).ok).toBe(true)
+    const checked = validateBundle(worded)
+    expect(checked.ok ? [] : checked.problems).toEqual([expect.stringMatching(/^presentation: the dialog of close, at \/model\/fields\/0\/description: /)])
+    await store.publish('worded', null, worded)
+    const response = await app.inject({ method: 'GET', url: '/v1/forms/worded', headers: as('clerk') })
+    expect([response.statusCode, response.json().code]).toEqual([500, 'corrupt-bundle'])
+  })
+
   // A request may name an action's parameters in any order, and the
   // generator binds them in the routine's: the bundle check compares the
   // two as sets, so a version whose request listed them otherwise is
@@ -684,6 +704,55 @@ describe('a form published with actions', () => {
       const imported = await post('/v1/forms/order/imports', { expectedBase: 2, bundle: bundle() })
       expect(imported.statusCode, imported.body).toBe(201)
       expect(scopes).toEqual(Array.from({ length: 4 }, () => ({ schemas: ['sales'], routines: true })))
+    } finally {
+      await admin.close()
+    }
+  })
+})
+
+describe('GET /v1/connections/:id/metadata?routines=true', () => {
+  // The studio's "Include routines" (0163): a connection's discovery asks
+  // for the routines in scope with `routines=true`, and otherwise is the
+  // one it always was, so a page that never asks reads the snapshot it
+  // read before; any other value is refused before anything is
+  // discovered, rather than read as either. The administrator's trail
+  // names it as every discovery. Watched failing with the query ignored:
+  // the scope asked for no routine, so the Choose step had none to offer;
+  // and with any value read as a yes: `routines=false` discovered them.
+  test('discovers with the routines in scope when the studio asks, and only then', async () => {
+    const trail: Array<Record<string, unknown>> = []
+    const admin = await createDataServer({
+      verifyIdentity,
+      admin: {
+        registry: registry(),
+        store,
+        adminRoles: ['data-admin'],
+        audit: {
+          sink: (event) => {
+            trail.push({ ...event })
+          },
+        },
+      },
+    })
+    try {
+      const read = (query: string) => admin.inject({ method: 'GET', url: `/v1/connections/erp/metadata${query}`, headers: as('admin') })
+      const asked = await read('?routines=true')
+      expect(asked.statusCode, asked.body).toBe(200)
+      expect(asked.json<{ routines?: unknown[] }>().routines).toHaveLength(2)
+      expect((await read('')).statusCode).toBe(200)
+      expect(scopes).toEqual([{ schemas: ['sales'], routines: true }, { schemas: ['sales'] }])
+      for (const query of ['?routines=false', '?routines=1', '?routines=']) {
+        const refused = await read(query)
+        expect([refused.statusCode, refused.json<{ code: string }>().code], query).toEqual([400, 'invalid-request'])
+      }
+      expect(scopes).toHaveLength(2)
+      expect(trail.map((event) => [event['operation'], event['status']])).toEqual([
+        ['discovery', 200],
+        ['discovery', 200],
+        ['discovery', 400],
+        ['discovery', 400],
+        ['discovery', 400],
+      ])
     } finally {
       await admin.close()
     }
