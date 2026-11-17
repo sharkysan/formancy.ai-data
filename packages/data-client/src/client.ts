@@ -421,15 +421,18 @@ export function createDataClient(options: DataClientOptions) {
 
     /**
      * `POST …/actions/:action/run` (0161): the action `name` over the
-     * records it addresses -- exactly one, the open record, at the version
-     * its person read -- with the answers to its dialog by field key. The
-     * answer is each record's token as the database holds its key, never a
-     * version: the run moved it, and the routine may have moved it again,
-     * so a host reads the record again. A refusal is the server's, nothing
-     * done; an `UnknownAction` when nobody can say whether it ran, named by
-     * what the call addressed -- running it again from the versions sent
-     * is refused as changed if it did. Exactly the route's two keys are
-     * sent, with a write id of its own, and nothing is sent again.
+     * records it addresses, each at the version its person read --
+     * exactly one, the open record, for a `record` action; one to a page of
+     * them, `LIST_PAGE_SIZE`, for a `selection` (0165) -- with the answers
+     * to its dialog by field key. The answer is each record's token as the
+     * database holds its key, never a version: the run moved it, and the
+     * routine may have moved it again, so a host reads the records again.
+     * A refusal is the server's, nothing done, and names which of the
+     * records it is about where the server did (`ActionRefusal`); an
+     * `UnknownAction` when nobody can say whether it ran, named by what the
+     * call addressed -- running it again from the versions sent is refused
+     * as changed if it did. Exactly the route's two keys are sent, with a
+     * write id of its own, and nothing is sent again.
      */
     runAction: async (formId: string, name: string, run: ActionRunBody): Promise<ActionOutcome> => {
       const records = run.records.map(({ record, version }) => ({ record, version }))

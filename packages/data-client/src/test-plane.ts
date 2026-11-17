@@ -294,34 +294,39 @@ export async function startPlane(
       })
     }
   }
-  // An order of the actions schema with its close (0161): the clerk reads it and runs close, nothing else, within their tenant through the order's customer (0043).
+  // An order of the actions schema with its close (0161), and `-action-orders` with close-all, close over a selection (0165): the clerk reads them and runs it, nothing else, within their tenant through the order's customer (0043).
   for (const { connection } of options.actions === true ? ENGINES : []) {
-    const formId = `${connection}-action-order`
-    const proposal = await admin('/v1/form-proposals', {
-      connection: `${connection}-actions`,
-      root: { schema: 'actions', name: 'order' },
-      formId,
-      title: 'Order',
-      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
-      versionColumn: 'version',
-      actions: [CLOSE_ACTION[connection]],
-    })
-    const bindings = proposal['bindings'] as FormBindings
-    if ((bindings.actions ?? []).length !== 1) throw new Error(`the generator bound no close on ${connection}: ${JSON.stringify(proposal['notes'])}`)
-    const policy: FormPolicy = {
-      version: 1,
-      operations: { read: ['clerk'], create: [], update: [] },
-      fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
-      rowFilters: [],
-      lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
-      through: ['customer'],
-      actions: { close: { roles: ['clerk'] } },
+    const forms = [
+      { formId: `${connection}-action-order`, action: CLOSE_ACTION[connection] },
+      { formId: `${connection}-action-orders`, action: { ...CLOSE_ACTION[connection], name: 'close-all', scope: 'selection' } },
+    ] as const
+    for (const { formId, action } of forms) {
+      const proposal = await admin('/v1/form-proposals', {
+        connection: `${connection}-actions`,
+        root: { schema: 'actions', name: 'order' },
+        formId,
+        title: 'Order',
+        lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+        versionColumn: 'version',
+        actions: [action],
+      })
+      const bindings = proposal['bindings'] as FormBindings
+      if ((bindings.actions ?? []).length !== 1) throw new Error(`the generator bound no ${action.name} on ${connection}: ${JSON.stringify(proposal['notes'])}`)
+      const policy: FormPolicy = {
+        version: 1,
+        operations: { read: ['clerk'], create: [], update: [] },
+        fields: Object.fromEntries(bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: [] }])),
+        rowFilters: [],
+        lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
+        through: ['customer'],
+        actions: { [action.name]: { roles: ['clerk'] } },
+      }
+      const { form, snapshot, generation } = proposal
+      await admin(`/v1/forms/${formId}/versions`, {
+        expectedBase: null,
+        bundle: { format: 2, connection: `${connection}-actions`, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
+      })
     }
-    const { form, snapshot, generation } = proposal
-    await admin(`/v1/forms/${formId}/versions`, {
-      expectedBase: null,
-      bundle: { format: 2, connection: `${connection}-actions`, generation, base: form, presentation: EMPTY_PRESENTATION, form, bindings, policy, snapshot },
-    })
   }
   // A customer form whose lookup reads `sales.country`, which no other form here
   // reads and no write here checks: a suite may hold that table locked

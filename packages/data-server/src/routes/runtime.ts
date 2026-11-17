@@ -41,7 +41,7 @@ import type { PublishedBundle } from '../bundle.js'
 import type { ConfigurationStore } from '../config-store.js'
 import type { ConnectionRegistry, OpenConnection } from '../connections.js'
 import type { AuditSink, RuntimeAuditEvent, RuntimeOperation } from '../audit.js'
-import { auditedForm, auditRequests, recordReference } from '../audit.js'
+import { auditedForm, auditRequests, recordReference, selectionReferences } from '../audit.js'
 import { loadPublished } from '../published.js'
 import { formActions, registerActionRoute } from './runtime-actions.js'
 import { registerDeleteRoute } from './runtime-deletes.js'
@@ -85,9 +85,19 @@ declare module 'fastify' {
      * into its file so far (0079), or the row changes a save carried
      * (0155). `moved`: whether a planned create or update -- or a save's
      * record -- moves its policy's state field (0112). `action`: the name
-     * of the action run, once the form binds it (0161).
+     * of the action run, once the form binds it (0161). `records`: every
+     * record a run over a selection addressed, once the form binds it
+     * (0165), whose count is then `rows`.
      */
-    auditTrail?: { formVersion: number | null; record?: string; repeated?: boolean; rows?: number; moved?: boolean | null; action?: string }
+    auditTrail?: {
+      formVersion: number | null
+      record?: string
+      repeated?: boolean
+      rows?: number
+      moved?: boolean | null
+      action?: string
+      records?: string[]
+    }
   }
 }
 
@@ -160,9 +170,10 @@ export async function runtimeRoutes(app: FastifyInstance, options: RuntimeOption
         status: base.status,
         outcome: trail.repeated === true ? 'repeated' : base.outcome,
         record: recordReference(key, trail.record),
-        rows: base.operation === 'export' || base.operation === 'save' ? (trail.rows ?? 0) : null,
+        rows: base.operation === 'export' || base.operation === 'save' || trail.records !== undefined ? (trail.rows ?? 0) : null,
         moved: trail.repeated === true ? null : (trail.moved ?? null),
         ...(trail.action === undefined ? {} : { action: trail.action }),
+        ...(trail.records === undefined ? {} : { records: selectionReferences(key, trail.records) }),
       }
     },
   })

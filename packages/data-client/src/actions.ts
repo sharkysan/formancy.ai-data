@@ -5,13 +5,15 @@ import { heard } from './writes.js'
 import type { WriteAnswer } from './writes.js'
 
 /*
- * A run of an action over the open record (0161), as the client reads its
- * answer: by the rules every write's answer is read by (`heard`, 0031) --
- * known only when the data server says what happened, unknown otherwise,
- * never sent again -- with a run's own two. Done is the tokens of every
- * record it addressed; and PostgreSQL's run past its deadline, which the
- * database stopped and rolled back, is the server saying nothing was done,
- * as a 503 `unavailable` is (0160). Kept out of `client.ts`, which only
+ * A run of an action over the open record (0161), or over a selection of
+ * a page's records (0165), as the client reads its answer: by the rules
+ * every write's answer is read by (`heard`, 0031) -- known only when the
+ * data server says what happened, unknown otherwise, never sent again --
+ * with a run's own three. Done is the tokens of every record it
+ * addressed; PostgreSQL's run past its deadline, which the database
+ * stopped and rolled back, is the server saying nothing was done, as a 503
+ * `unavailable` is (0160); and a refusal about some of the records names
+ * them, each one the call addressed. Kept out of `client.ts`, which only
  * sends it.
  */
 
@@ -44,8 +46,17 @@ export interface UnknownAction {
   origin: 'database' | 'transport'
 }
 
+/**
+ * A run the server refused, nothing done (0165): its refusal, and where
+ * the server named which records it is about -- `not-found`, `stale`,
+ * `version-ended`, `duplicate-record` -- those records, each a token the
+ * call addressed. A name the call did not address is no answer to it,
+ * and is dropped: a page reads again only records it holds.
+ */
+export type ActionRefusal = Refusal & { records?: string[] }
+
 /** What `runAction` resolves to: the records it addressed, by their tokens as the database holds them; a refusal; or a run nobody here can say happened. */
-export type ActionOutcome = { ok: true; value: ActionDone } | Refusal | UnknownAction
+export type ActionOutcome = { ok: true; value: ActionDone } | ActionRefusal | UnknownAction
 
 const RUN_LOST_ON_THE_WAY = 'The answer to this action was lost between this page and the data server. It may have run.'
 
@@ -73,7 +84,7 @@ function doneFor(intent: ActionIntent): (body: unknown) => boolean {
  * own arguments, which the transport cannot lose.
  */
 export function actionOutcome(answer: WriteAnswer, intent: ActionIntent): ActionOutcome {
-  return heard<ActionDone, UnknownAction>(
+  const outcome = heard<ActionDone, UnknownAction>(
     answer,
     doneFor(intent),
     (status, said) => ({
@@ -88,4 +99,9 @@ export function actionOutcome(answer: WriteAnswer, intent: ActionIntent): Action
     }),
     ['unavailable', 'action-timeout'],
   )
+  if (outcome.ok || isUnknownAction(outcome) || !answer.answered || !isRecord(answer.body)) return outcome
+  const named = answer.body['records']
+  if (!Array.isArray(named)) return outcome
+  const addressed = new Set(intent.records.map(({ record }) => record))
+  return { ...outcome, records: named.filter((record): record is string => typeof record === 'string' && addressed.has(record)) }
 }

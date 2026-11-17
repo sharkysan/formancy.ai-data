@@ -1430,11 +1430,65 @@ describe('a run of an action (0161)', () => {
     expect(isUnknownAction(write as { ok: boolean })).toBe(false)
   })
 
+  // A run over a selection (0165) is one POST of every record chosen, in
+  // the order chosen, and done only on a token for each of them: one short
+  // is no answer the server gives to a run that committed. Watched failing
+  // on 2026-11-17 with any token taken as done: "expected false to be
+  // true", the selection short of a token done.
+  test('posts every record of a selection, and is done on a token for each', async () => {
+    const records = [
+      { record: 'k1:9', version: '1' },
+      { record: 'k1:7', version: '3' },
+    ]
+    const seen: string[] = []
+    let answer: unknown = { records: ['k1:9', 'k1:7'] }
+    const { base } = await serve((request, response) => {
+      void drained(request).then((body) => {
+        seen.push(body)
+        response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer))
+      })
+    })
+    const client = createDataClient({ token: () => 't', base })
+    expect(await client.runAction('pg-order', 'close-all', { records, answers: {} })).toEqual({ ok: true, value: { records: ['k1:9', 'k1:7'] } })
+    expect(seen).toEqual([JSON.stringify({ records, answers: {} })])
+    answer = { records: ['k1:9'] }
+    expect(isUnknownAction(await client.runAction('pg-order', 'close-all', { records, answers: {} }))).toBe(true)
+  })
+
+  // A refusal about some of a selection's records names them (0165), so a
+  // page reads those again: each a token the call addressed, in the
+  // server's order. A name the call never sent is no answer to it, and is
+  // dropped; a refusal naming none has no `records`. Watched failing on
+  // 2026-11-17 with the body's `records` left unread: "expected { ok:
+  // false, status: 409, …(2) } to deeply equal { ok: false, status: 409,
+  // …(3) }".
+  test('a refusal about some records names those the call addressed', async () => {
+    const records = [
+      { record: 'k1:9', version: '1' },
+      { record: 'k1:7', version: '3' },
+    ]
+    const stale = { code: 'stale', message: 'The record changed since it was read.', records: ['k1:7', 'k1:8', 7] }
+    const named = await serve(json(409, stale))
+    expect(await createDataClient({ token: () => 't', base: named.base }).runAction('pg-order', 'close-all', { records, answers: {} })).toEqual({
+      ok: false,
+      status: 409,
+      code: 'stale',
+      message: stale.message,
+      records: ['k1:7'],
+    })
+    const plain = await serve(json(422, { code: 'refused', message: 'The database refused this action, and nothing was done.' }))
+    const refused = await createDataClient({ token: () => 't', base: plain.base }).runAction('pg-order', 'close-all', { records, answers: {} })
+    expect(refused.ok === false && 'records' in refused).toBe(false)
+  })
+
   // A form's actions are a list a page can draw from: each a name, words,
-  // the record scope, a dialog or none, and views to read again, each once.
-  // A reply without them is from a server older than 0161, and one with an
-  // action of another shape is no server's this client knows. Watched
-  // failing with `actions` left unchecked: a reply without it was taken.
+  // the record or the selection scope (0165), a dialog or none, and views
+  // to read again, each once. A reply without them is from a server older
+  // than 0161, and one with an action of another shape is no server's this
+  // client knows. Watched failing with `actions` left unchecked: a reply
+  // without it was taken; and on 2026-11-17 with the record scope alone
+  // read: "expected { ok: false, status: 200, …(2) } to deeply equal { ok:
+  // true, value: { …(12) } }", a form with a selection action refused.
   test("a form's actions are each a name, words, a dialog or none, and views to read again", async () => {
     const FORM = {
       form: { model: {} },
@@ -1466,7 +1520,7 @@ describe('a run of an action (0161)', () => {
     const malformed = [
       undefined,
       null,
-      [{ ...CLOSE, scope: 'selection' }],
+      [{ ...CLOSE, scope: 'page' }],
       [{ ...CLOSE, refresh: ['list', 'list'] }],
       [{ ...CLOSE, label: 7 }],
       [{ ...CLOSE, dialog: 'none' }],
@@ -1475,7 +1529,12 @@ describe('a run of an action (0161)', () => {
       body = actions === undefined ? FORM : { ...FORM, actions }
       expect(await client.form('pg-order'), JSON.stringify(actions)).toMatchObject({ ok: false, code: 'unexpected' })
     }
-    for (const actions of [[], [CLOSE], [{ ...CLOSE, confirm: 'Close it?', dialog: null, refresh: [] }]]) {
+    for (const actions of [
+      [],
+      [CLOSE],
+      [{ ...CLOSE, confirm: 'Close it?', dialog: null, refresh: [] }],
+      [{ ...CLOSE, name: 'close-all', scope: 'selection' }],
+    ]) {
       body = { ...FORM, actions }
       expect(await client.form('pg-order')).toEqual({ ok: true, value: body })
     }

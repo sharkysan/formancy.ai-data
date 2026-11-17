@@ -240,11 +240,11 @@ function isText(value: unknown): boolean {
 }
 
 /**
- * The actions a person may run over the open record (0161): a list, each
- * a name, words, the scope `record`, a dialog that is a form or none, and
- * what else to read again, `list` and `children` each at most once. A
- * reply without it is from a server older than 0161, whose page would
- * offer no action.
+ * The actions a person may run (0161): a list, each a name, words, the
+ * scope `record` -- the open record -- or `selection` -- records chosen of
+ * a page (0165) -- a dialog that is a form or none, and what else to read
+ * again, `list` and `children` each at most once. A reply without it is
+ * from a server older than 0161, whose page would offer no action.
  */
 function isActions(value: unknown): value is PublishedForm['actions'] {
   return (
@@ -253,7 +253,7 @@ function isActions(value: unknown): value is PublishedForm['actions'] {
       (entry) =>
         isRecord(entry) &&
         typeof entry['name'] === 'string' &&
-        entry['scope'] === 'record' &&
+        (entry['scope'] === 'record' || entry['scope'] === 'selection') &&
         isText(entry['label']) &&
         (entry['confirm'] === null || isText(entry['confirm'])) &&
         (entry['done'] === null || isText(entry['done'])) &&

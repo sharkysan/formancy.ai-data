@@ -1,5 +1,5 @@
-import { boundsProblem, isParameterSource, isStampChoice } from '@formancy/data-core'
-import type { ActionChoice, GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
+import { ACTION_SCOPES, boundsProblem, isParameterSource, isStampChoice } from '@formancy/data-core'
+import type { ActionChoice, ActionScope, GenerationRequest, LookupChoice, StampChoice } from '@formancy/data-core'
 import { CONFIGURATION_ID as FORM_ID } from './config-store.js'
 
 export type GenerationReading = { ok: true; generation: GenerationRequest } | { ok: false; problems: string[] }
@@ -49,10 +49,12 @@ function togetherOf(value: unknown): { together: LookupChoice['together'] } | { 
  * The actions a request names (0159, 0161): absent, or a list of choices,
  * each exactly `{ name, routine: { schema, name, signature }, scope,
  * parameters: [{ parameter, from }] }`, every source one of the five
- * (`isParameterSource`), and the scope `record`, the one this release
- * runs; `null` for anything else. Read by shape and copied, so a hand edit
+ * (`isParameterSource`), and the scope `record` or `selection` (0165);
+ * `null` for anything else. Read by shape and copied, so a hand edit
  * carries nothing else; what a choice means -- a name a URL carries, one of
- * each, a routine the snapshot holds -- is the generator's to refuse.
+ * each, a routine the snapshot holds -- is the generator's to refuse. A
+ * server older than 0165 refuses a stored request naming a selection, as
+ * it refuses every scope it does not run.
  */
 function actionsOf(value: unknown): ActionChoice[] | undefined | null {
   if (value === undefined) return undefined
@@ -61,14 +63,19 @@ function actionsOf(value: unknown): ActionChoice[] | undefined | null {
   for (const entry of value) {
     if (!isRecord(entry) || !isRecord(entry['routine']) || !Array.isArray(entry['parameters'])) return null
     const { name, scope, routine, parameters } = entry
-    if (typeof name !== 'string' || scope !== 'record') return null
+    if (typeof name !== 'string' || !(ACTION_SCOPES as readonly unknown[]).includes(scope)) return null
     if (typeof routine['schema'] !== 'string' || typeof routine['name'] !== 'string' || typeof routine['signature'] !== 'string') return null
     const mapped: ActionChoice['parameters'] = []
     for (const parameter of parameters as unknown[]) {
       if (!isRecord(parameter) || typeof parameter['parameter'] !== 'string' || !isParameterSource(parameter['from'])) return null
       mapped.push({ parameter: parameter['parameter'], from: { ...parameter['from'] } })
     }
-    choices.push({ name, routine: { schema: routine['schema'], name: routine['name'], signature: routine['signature'] }, scope, parameters: mapped })
+    choices.push({
+      name,
+      routine: { schema: routine['schema'], name: routine['name'], signature: routine['signature'] },
+      scope: scope as ActionScope,
+      parameters: mapped,
+    })
   }
   return choices
 }
@@ -138,7 +145,7 @@ export function readGeneration(value: unknown): GenerationReading {
     )
   const actions = actionsOf(value['actions'])
   if (actions === null)
-    problems.push("actions must be a list of { name, routine: { schema, name, signature }, scope: 'record', parameters: [{ parameter, from }] }")
+    problems.push("actions must be a list of { name, routine: { schema, name, signature }, scope: 'record' | 'selection', parameters: [{ parameter, from }] }")
   if (problems.length > 0 || lookups === undefined || pinnedColumns === undefined || !isRecord(root) || chain === null || stamped === null || actions === null)
     return { ok: false, problems }
   return {

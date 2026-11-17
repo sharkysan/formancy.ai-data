@@ -14,9 +14,10 @@ import type { Plane } from './test-plane.js'
  * actions' own pool (0160): the form offers the action with its dialog,
  * a run commits and moves the version, the same run from the same read is
  * stale, the deployment's refusal reaches the person in its words, and
- * another tenant's record is not found. What one transaction stores, and
- * what a version that moved refuses, are database answers, so they are
- * asked of the databases.
+ * another tenant's record is not found. And over a selection (0165): every
+ * order chosen commits in one run, and a refusal names the records it is
+ * about. What one transaction stores, and what a version that moved
+ * refuses, are database answers, so they are asked of the databases.
  */
 
 let plane: Plane
@@ -126,5 +127,49 @@ describe.each(ENGINES)('an action run over the open record on $engine', ({ conne
     const minted = await client.runAction(form, 'close', { records: [{ record: theirs, version: '1' }], answers: { note: 'not mine' } })
     expect(refused(minted)).toBe('404 not-found')
     expect(await stored(connection, theirs)).toEqual({ status: 'open', version: 1, note: null, actor: null })
+  })
+})
+
+describe.each(ENGINES)('an action run over a selection on $engine', ({ connection }) => {
+  const form = `${connection}-action-orders`
+
+  // The form offers close-all as a selection, and one run over two orders
+  // commits both, each version moved and each closed by its own call; the
+  // same run again is stale naming both, by the tokens sent, and keeps
+  // nothing more. A client that sent the first record alone, or read the
+  // refusal without its records, would leave a page reloading nothing.
+  // Written on 2026-11-17 without a database: CI is its first run.
+  test('commits every order chosen, and the same run again is stale naming both', async () => {
+    const client = plane.client()
+    const definition = await client.form(form)
+    if (!definition.ok) throw new Error(JSON.stringify(definition))
+    expect(definition.value.actions.map((action) => [action.name, action.scope])).toEqual([['close-all', 'selection']])
+    const records = [await order(connection, 1), await order(connection, 1)]
+    const run = { records: records.map((record) => ({ record, version: '1' })), answers: { note: 'closed together' } }
+    expect(await client.runAction(form, 'close-all', run)).toEqual({ ok: true, value: { records } })
+    for (const record of records) expect(await stored(connection, record)).toEqual({ status: 'closed', version: 2, note: 'closed together', actor: 'clerk-1' })
+    const again = await client.runAction(form, 'close-all', run)
+    expect(again.ok === false && !isUnknownAction(again) ? [again.status, again.code, again.records] : again).toEqual([409, 'stale', records])
+  })
+
+  // Another tenant's order chosen beside the clerk's own: the run is
+  // not-found naming that order alone, and the clerk's order is rolled back
+  // with it, its version where it was -- all or nothing, and no word of the
+  // other tenant's order but its token, which the clerk sent. Written on
+  // 2026-11-17 without a database: CI is its first run.
+  test('naming another tenant’s order is not-found naming it, and keeps nothing of the rest', async () => {
+    const client = plane.client()
+    const mine = await order(connection, 1)
+    const theirs = await order(connection, 2)
+    const run = {
+      records: [
+        { record: mine, version: '1' },
+        { record: theirs, version: '1' },
+      ],
+      answers: { note: 'not all mine' },
+    }
+    const refused = await client.runAction(form, 'close-all', run)
+    expect(refused.ok === false && !isUnknownAction(refused) ? [refused.status, refused.code, refused.records] : refused).toEqual([404, 'not-found', [theirs]])
+    expect(await stored(connection, mine)).toEqual({ status: 'open', version: 1, note: null, actor: null })
   })
 })
