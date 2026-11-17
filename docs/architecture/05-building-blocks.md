@@ -494,7 +494,9 @@ save's answer does — framework-neutral, so both renderers show one decision
 write in no operation ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)), and draws a saved record for its update and a new one for its create ([0122](../decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)), its state field through `src/moves.ts` as the moves its person may make from where the record is ([0127](../decisions/0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md)). A new record -- `open()` over no answers, and `start(prefill)` for a child's new row, through `@formancy/core`'s `withDefaults` -- starts at the defaults the form is served with, which `GET /v1/forms/:id` keeps only where this person's create takes them (data-core's `policy/starting.ts`); a record read, a copy and a form discarded back to open with their answers and start at none, and a saved record's state choice carries no default, which its choice need not offer ([0149](../decisions/0149-a-new-record-starts-with-its-columns-constant-default.md)). `src/forms-nav.tsx` draws the menu (0045) -- Find a form (`src/find-form.tsx`), the forms under their groups (`src/form-groups.tsx`) and the forms linked to the open one (`src/linked-forms.tsx`, which keeps the keyboard when the link it was on is drawn no more), each link a `src/form-link.tsx`, which `src/form-list.ts` orders, matches and links ([0144](../decisions/0144-the-host-lists-its-forms-by-group.md)); `src/record-grid.tsx`,
 `src/grid-datasource.ts` and `src/grid-options.tsx` put a page of records
 at a time in AG Grid Community (0044), its sort the section's, held beside
-its filter, which its headers show and a press on one tells back;
+its filter, which its headers show and a press on one tells back
+(`src/use-grid-sort.ts`), and `src/use-grid-line.ts` says each page asked
+for, answered or refused on the grid's line and keeps the pager's place;
 `src/use-held-rows.ts` asks for a page and a new list's first page before
 AG Grid is shown them, so the rows on screen stay while they are asked,
 and `src/server-did.tsx` draws what the server answered on a line in the
@@ -529,6 +531,9 @@ boxes say a lookup's condition
 ([0135](../decisions/0135-a-lookup-field-filters-by-the-record-it-refers-to.md)),
 `src/cell-example.tsx` a cell's value kept as its column's condition
 ([0133](../decisions/0133-a-cell-filters-by-its-value.md)),
+and `src/use-header-filters.ts` a grid's side of the boxes and the cells
+-- which columns have a box, a cell's value kept and the keyboard back on
+its row, and the records a page shows heard of --
 with `src/filter-terms.ts` what they offer and say
 ([0104](../decisions/0104-a-list-and-a-browse-are-filtered-by-conditions-on-their-columns.md)),
 over the fields offered ([0123](../decisions/0123-an-administrator-chooses-the-fields-a-forms-filter-panel-offers.md));
@@ -555,7 +560,8 @@ what each is named and where a key moves the selection, and
 `src/tab-list.tsx` WAI-ARIA's tabs over them, each panel drawn the first
 time its tab is shown and kept after, all of them forgotten for another
 record, and `src/use-grid-sizing.ts` a grid's columns sized only where it
-is drawn, owed while it is hidden, as `src/grid-sizing.ts` decides
+is drawn, owed while it is hidden, as `src/grid-sizing.ts` decides, and
+its well as tall as its page
 ([0142](../decisions/0142-a-records-child-forms-are-tabs-beside-it.md));
 `src/together.tsx` draws a child whose rows are saved with the record --
 its rows in a grid of the page's own set, each change in words, Add and

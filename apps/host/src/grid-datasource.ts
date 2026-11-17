@@ -240,7 +240,7 @@ export interface GridSource extends IDatasource {
  *
  * A block AG Grid asks for under another order than this list's asks the
  * server nothing: the grid's headers have not caught up with the section's
- * sort yet (record-grid.tsx), or a press on one has not reached the section,
+ * sort yet (use-grid-sort.ts), or a press on one has not reached the section,
  * whose new list then asks. The block asked for once they agree is the one
  * that is sent, so a view picked -- a new filter and a new sort at once --
  * is one first page, never one in the old order first. Until then it is

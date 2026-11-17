@@ -92,7 +92,7 @@ describe('exampleTerm', () => {
 const column = (key: string, label: string): ArrangedColumn => ({ key, label, sortable: false, source: null, shown: true })
 const ROWS = [row({ id: 7, status: 'placed', amount: '12.50' }), { ...row({ id: 8, status: 'shipped', amount: '3.00' }), id: 'k1:2', record: 'k1:2' }]
 
-/** A grid of two rows under a section's filter, every filter it is sent kept in `sent`, wired as record-grid wires it. */
+/** A grid of two rows under a section's filter, every filter it is sent kept in `sent`, wired as use-header-filters.ts wires it. */
 function Grid({ sent }: { sent: ListFilterTerm[][] }): ReactElement {
   const [filter, setFilter] = useState<ListFilterTerm[]>([])
   const headers: HeaderFilters = {

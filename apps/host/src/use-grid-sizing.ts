@@ -3,8 +3,9 @@ import type { RefObject } from 'react'
 import type { GridApi } from 'ag-grid-community'
 import type { ArrangedColumn } from './columns.js'
 import type { GridRow } from './grid-datasource.js'
-import { hiddenWell, sizedToContent, sizing } from './grid-sizing.js'
+import { hiddenWell, sizedToContent, sizing, wellHeight } from './grid-sizing.js'
 import type { SizeState, SizeWant } from './grid-sizing.js'
+import { ROW_HEIGHT } from './grid-theme.js'
 import { CONTENT_WIDTH } from './widths.js'
 import type { ColumnWidth } from './widths.js'
 
@@ -19,8 +20,12 @@ import type { ColumnWidth } from './widths.js'
  * by Fit or Reset columns (0151), to the rows on the page -- or, shown
  * while nothing was listed, to the next rows that come (`sizeWaiting`).
  * Where the well is hidden the size is owed, and made when the well is
- * drawn again, which its size changing from nothing says. After each, `fit`
- * fits the well to its page.
+ * drawn again, which its size changing from nothing says.
+ *
+ * And the grid's well as tall as its page, never past its cap (`fit`):
+ * after each size, after each page the grid lists or is refused, each time
+ * AG Grid says the grid's size changed, and each time the header's height
+ * does.
  *
  * A column whose width the person set is never sized, whatever asks
  * (`sizedToContent`): its width is the person's until Fit or Reset columns
@@ -30,26 +35,45 @@ export function useGridSizing({
   api,
   well,
   shown,
-  fit,
   refit,
   arranged,
   widths,
+  boxedKeys,
 }: {
   api: RefObject<GridApi<GridRow> | null>
   well: RefObject<HTMLDivElement | null>
   shown: { current: SizeState }
-  fit: () => void
   refit: number
   /** The grid's columns as the section arranged them (0106). */
   arranged: readonly ArrangedColumn[]
   /** The widths the person set (0151). */
   widths: readonly ColumnWidth[]
-}): { sizeOnce: () => void; sizeWaiting: (rows: number) => void; sizeColumns: (columns: readonly string[]) => void } {
+  /** The keys of the columns with a box under their header (0132), as one string: a change of them changes the header's height. */
+  boxedKeys: string
+}): { fit: () => void; sizeOnce: () => void; sizeWaiting: (rows: number) => void; sizeColumns: (columns: readonly string[]) => void } {
   /** The widths set, read when a size is made: a task after it is asked for. */
   const kept = useRef(widths)
   kept.current = widths
   /** Columns shown, or given back to their content, while nothing was listed: sized to the next page that has rows. */
   const unsized = useRef(new Set<string>())
+
+  /**
+   * The well as tall as its page, never past its cap. A DOM read: the
+   * header's height is laid out by AG Grid, and is its every row -- the
+   * columns' and, where the line may name a column, the boxes' (0132),
+   * which counted as the first alone left the last row under the scrollbar.
+   */
+  const fit = useCallback(() => {
+    const container = well.current
+    if (container === null) return
+    const header = container.querySelector('.ag-header')?.getBoundingClientRect().height || 40
+    const height = wellHeight(header, shown.current.loaded ? shown.current.rows : 0, Number.parseFloat(getComputedStyle(container).maxHeight))
+    container.style.height = `${String(height)}px`
+    // Never shorter than its header and one whole row: a panel short of
+    // room shrinks the well to its least (records.css), which was a row
+    // under one header row, and less than one under the boxes' row (0132).
+    container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
+  }, [well, shown])
 
   /** `columns` sized to their content, but those whose width the person set: never past CONTENT_WIDTH, never below their floor. */
   const toContent = useCallback((grid: GridApi<GridRow>, columns: readonly string[]) => {
@@ -159,5 +183,16 @@ export function useGridSizing({
     sizeColumns(added)
   }, [arranged, widths, sizeColumns])
 
-  return { sizeOnce, sizeWaiting, sizeColumns }
+  // The header's height changes after the well is fitted -- its row of
+  // boxes laid out (0132), a label wrapping -- and a well fitted to the
+  // header as it was leaves less than a row under it: fitted again each time.
+  useEffect(() => {
+    const header = well.current?.querySelector('.ag-header')
+    if (header === null || header === undefined || typeof ResizeObserver !== 'function') return undefined
+    const observer = new ResizeObserver(() => fit())
+    observer.observe(header)
+    return () => observer.disconnect()
+  }, [well, fit, boxedKeys])
+
+  return { fit, sizeOnce, sizeWaiting, sizeColumns }
 }

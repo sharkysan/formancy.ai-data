@@ -1,28 +1,24 @@
-import { forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { GridApi } from 'ag-grid-community'
 import type { ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
-import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
-import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STANDING_HELP, STARTED_AGAIN } from './grid-datasource.js'
+import { answered, createDatasource } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow, GridSource, ListClient } from './grid-datasource.js'
-import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, liveDelete, select, took } from './grid-options.js'
+import { columnDefsOf, drawWidths, gridOptionsFor, liveDelete, select, took } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
-import { ROW_HEIGHT } from './grid-theme.js'
-import { filterByExample } from './cell-example.js'
-import { HeaderFilterContext } from './header-filter.js'
-import { pageRecords } from './known-records.js'
+import type { SizeState } from './grid-sizing.js'
 import type { Said } from './leave.js'
 import { Pager } from './pager.js'
-import type { Status } from './pager.js'
-import { wellHeight } from './grid-sizing.js'
+import { useGridLine } from './use-grid-line.js'
 import { useGridSizing } from './use-grid-sizing.js'
+import { useGridSort } from './use-grid-sort.js'
+import { useHeaderFilters } from './use-header-filters.js'
 import { useHeaderFloors } from './use-header-floors.js'
 import { useHeldRows } from './use-held-rows.js'
 import type { HeldRows } from './use-held-rows.js'
-import { sameSort } from './views.js'
 import type { ColumnWidth, Measured, WidthChange } from './widths.js'
 
 export type { OpenHow, RowDelete } from './grid-options.js'
@@ -32,14 +28,19 @@ export { DELETE_COLUMN } from './grid-options.js'
  * One record grid: AG Grid Community over the infinite row model, a page of
  * `LIST_PAGE_SIZE` rows at a time from `records/list` (0044, 0047), with the
  * pager and the status line that speak for it. The master grid and every
- * child grid are this one component; how AG Grid is configured is
- * grid-options.tsx's, and what is asked and said grid-datasource.ts's.
+ * child grid are this one component, which puts its parts together: how
+ * AG Grid is configured is grid-options.tsx's, what is asked and said
+ * grid-datasource.ts's, what the line says and where the pager is
+ * use-grid-line.ts's, the sort on the headers use-grid-sort.ts's, the boxes
+ * under them and `=` on a cell use-header-filters.ts's, and the columns'
+ * widths and the well's height use-grid-sizing.ts's.
  *
- * What it holds: the page's numbers, what the line says, and the open
- * record's row selected in the grid after every page -- so `aria-selected`
- * and the bar say what the detail shows -- and the well as tall as its page,
- * its columns sized to the first page and again each time the separator is
- * let go, only where the grid is drawn (use-grid-sizing.ts, 0142).
+ * What it holds itself: whether its page has answered and how many rows it
+ * drew, and the open record's row selected in the grid after every page --
+ * so `aria-selected` and the bar say what the detail shows. The well is as
+ * tall as its page, and its columns are sized to the first page and again
+ * each time the separator is let go, only where the grid is drawn
+ * (use-grid-sizing.ts, 0142).
  *
  * The rows on screen stay while the next are asked for (0146): a page
  * turned to and a new list's first page are asked for before AG Grid is
@@ -47,26 +48,12 @@ export { DELETE_COLUMN } from './grid-options.js'
  * which the room's stylesheet dims, while the line says what is asked; the
  * grid hears only the list shown and the list asked for. While a refused
  * new list stands, Previous rows and Next rows wait, and a reload asks for
- * that list. What the server answered is said in the room's teal for a
- * moment, a page's own sentence not (pager.tsx).
- *
- * A record gone from it (0053) -- deleted, or not found by a delete and
- * closed -- is said once, before the sentence of the page asked for again;
- * a page left empty that is not the first says nothing, and AG Grid shows
- * the page before it.
+ * that list. A page left empty that is not the first -- its last record
+ * gone (0053) -- says nothing, and AG Grid shows the page before it.
  *
  * What it lists is its section's: the search submitted, the parent, the
  * filter its section applied (grid-filter.tsx, 0104), whose fields its line
- * names, and the sort. A filter the server refuses is said in the server's
- * sentence with what to do instead of Ask again, which would be refused the
- * same.
- *
- * The sort is the section's too (0105), so a view picked can set it with
- * the filter: the headers are made to show it whenever they show another,
- * and a header the person sorts by is told to the section, which then
- * holds that sort. Its datasource asks for a block only once the headers
- * show the section's sort (grid-datasource.ts), so a new filter and a new
- * sort together are one first page.
+ * names, and the sort (0105), which its headers show (use-grid-sort.ts).
  *
  * The columns are the section's too (0106): in its order, and those it hid
  * kept in the grid, hidden, with their sort. A change of them is drawn by
@@ -190,38 +177,14 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   } = props
   const api = useRef<GridApi<GridRow> | null>(null)
   const well = useRef<HTMLDivElement>(null)
-  const retryButton = useRef<HTMLButtonElement>(null)
   // What the grid's callbacks read when they run: its options are made once.
   const latest = useRef(props)
   latest.current = props
-  const [status, setStatus] = useState<Status>({
-    kind: 'loading',
-    text: [quiet ? '' : loading(0, LIST_PAGE_SIZE, props.noun)],
-    help: null,
-    clear: false,
-    retry: false,
-    said: null,
-  })
-  /** How many times the line has said what the server answered: each time, its words are drawn in teal anew. */
-  const answers = useRef(0)
-  /** The line as it is, and as it was when a page was asked first: said again where AG Grid is not moved to that page. */
-  const statusNow = useRef(status)
-  statusNow.current = status
-  const beforeAsk = useRef<Status | null>(null)
   /** The rows held while the next are asked for, read when a hook runs: made below, from the datasource these hooks are given to. */
   const heldNow = useRef<HeldRows | null>(null)
   /** What `from` says is the page's: the list shown, or the list asked for (use-held-rows.ts). */
   const ours = (from: GridSource): boolean => heldNow.current?.live(from) ?? true
-  const [pager, setPager] = useState({ page: 0, hasMore: false })
-  const shown = useRef({ rows: 0, loaded: false, sized: false, owed: false, quiet, retrying: false })
-  /** What a record gone from the grid says before the next page's sentence, once. */
-  const removedLine = useRef<Said | null>(null)
-  /** The sentence of a page, after the removal said first if there is one -- which it then is not again. */
-  const first = (said: Said): Said => {
-    const before = removedLine.current
-    removedLine.current = null
-    return before === null ? said : [...before, ' ', ...said]
-  }
+  const shown = useRef<SizeState>({ rows: 0, loaded: false, sized: false, owed: false })
   const arranged = useMemo(() => arrange(columns, choices), [columns, choices])
   /** The first column shown: where the open row's bar is, and the keyboard goes into a row. Read when needed, so a column moved or hidden asks nothing again. */
   const firstShown = useRef('')
@@ -236,68 +199,23 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     if (changed.length > 0 && first !== '') grid.refreshCells({ rowNodes: changed, columns: [first], force: true })
   }, [])
 
-  /**
-   * The well as tall as its page, never past its cap. A DOM read: the
-   * header's height is laid out by AG Grid, and is its every row -- the
-   * columns' and, where the line may name a column, the boxes' (0132),
-   * which counted as the first alone left the last row under the scrollbar.
-   */
-  const fit = useCallback(() => {
-    const container = well.current
-    if (container === null) return
-    const header = container.querySelector('.ag-header')?.getBoundingClientRect().height || 40
-    const height = wellHeight(header, shown.current.loaded ? shown.current.rows : 0, Number.parseFloat(getComputedStyle(container).maxHeight))
-    container.style.height = `${String(height)}px`
-    // Never shorter than its header and one whole row: a panel short of
-    // room shrinks the well to its least (records.css), which was a row
-    // under one header row, and less than one under the boxes' row (0132).
-    container.style.minHeight = `${String(Math.ceil(header + ROW_HEIGHT + 18))}px`
-  }, [])
-
-  const { sizeOnce, sizeWaiting, sizeColumns } = useGridSizing({ api, well, shown, fit, refit, arranged, widths })
-
-  /**
-   * The section's sort on the headers, where they show another: they follow
-   * it, and lead it only by a press. Every field a view or a kept sort
-   * sorts by is a column here, shown or hidden (0106): a view is offered,
-   * and a kept sort restored, only with fields in `list.sortable`, whose
-   * fields `columnsOf` draws, leaving out only a child's parent field, a
-   * lookup, which no list sorts by.
-   */
-  const showSort = useCallback(() => {
-    const grid = api.current
-    if (grid === null || grid.isDestroyed()) return
-    const wanted = latest.current.sort
-    if (sameSort(headerSort(grid), wanted)) return
-    grid.applyColumnState({
-      state: wanted.map((term, index) => ({ colId: term.field, sort: term.direction, sortIndex: index })),
-      defaultState: { sort: null, sortIndex: null },
-    })
-  }, [])
-  /**
-   * The last sort the headers told the section of. AG Grid tells a press a
-   * task late, so when the section holds what a press told it, the headers
-   * may already show a later press on its way: showing the told one again
-   * would undo it, as two quick Enters on a header did (export.test.tsx).
-   */
-  const told = useRef<readonly ListSortTerm[] | null>(null)
+  const { boxedKeys, headers } = useHeaderFilters(api)
+  const { fit, sizeOnce, sizeWaiting, sizeColumns } = useGridSizing({ api, well, shown, refit, arranged, widths, boxedKeys })
+  const { showSort, sorted } = useGridSort(api, sort, (told) => props.onSort(told))
+  const { status, pager, asking, retryRef, line } = useGridLine({ quiet, parent: parent?.record, noun: props.noun })
 
   const hooks = useMemo<DatasourceHooks>(
     () => ({
       loading: (start, end, ahead, from) => {
         if (!ours(from)) return
-        // Asked first, the rows on screen stay, and so does the page they are on; asked by AG Grid, a refusal before is not Ask again's.
-        if (ahead) beforeAsk.current = statusNow.current
-        else {
+        // Asked by AG Grid, a refusal before is not Ask again's.
+        if (!ahead) {
           shown.current.loaded = false
           heldNow.current?.heard()
         }
         latest.current.onFiltered?.(false)
         api.current?.setGridAriaProperty('busy', 'true')
-        const words = shown.current.quiet ? '' : loading(start, end - start, latest.current.noun)
-        shown.current.quiet = false
-        setStatus((before) => ({ kind: 'loading', text: [words], help: null, clear: false, retry: before.retry && shown.current.retrying, said: null }))
-        if (!ahead) setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
+        line.loading(start, end, ahead)
       },
       answered: (start, rows, hasMore, asked, from) => {
         if (!ours(from) || !took(api.current, start, rows)) return
@@ -308,8 +226,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // says what the grid shows (P7, measured in delete-rows.test.tsx,
         // 0053).
         if (rows.length === 0 && start > 0) return
-        const fromRetry = shown.current.retrying && document.activeElement === retryButton.current
-        shown.current = { ...shown.current, rows: rows.length, loaded: true, retrying: false }
+        shown.current = { ...shown.current, rows: rows.length, loaded: true }
         api.current?.setGridAriaProperty('busy', null)
         const { noun, canCreate, columns: shownColumns } = latest.current
         // The fields the block's own filter is on, by the labels the grid's headers carry.
@@ -324,12 +241,10 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           canCreate,
           ...(noun === undefined ? {} : { noun }),
         })
-        answers.current += 1
-        setStatus({ kind: 'answer', text: first([said.text]), help: said.help, clear: said.clear, retry: false, said: answers.current })
+        const fromRetry = line.answered(start, said, hasMore)
         // The records the page shows, by the labels the line, the chips and the boxes then say a lookup's condition by (0135).
-        for (const [field, named] of pageRecords(shownColumns, rows)) headersNow.current?.heard?.(field, named)
+        headers.heard(shownColumns, rows)
         latest.current.onFiltered?.(start === 0 && rows.length === 0 && asked.length > 0)
-        setPager({ page: Math.floor(start / LIST_PAGE_SIZE), hasMore })
         applySelection()
         fit()
         sizeOnce()
@@ -338,52 +253,30 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         sizeWaiting(rows.length)
         // Ask again stays where it was pressed until the answer; then the rows that came.
         if (fromRetry && rows.length > 0 && firstShown.current !== '') api.current?.setFocusedCell(start, firstShown.current)
-        // After `=`, the keyboard back on the row it was pressed on, or the first, in its column (0133).
-        const example = exampleAt.current
-        if (example !== null && start === 0) {
-          exampleAt.current = null
-          const grid = api.current
-          const node = example.record === null ? undefined : grid?.getRowNode(example.record)
-          const at = node?.rowIndex ?? (rows.length > 0 ? 0 : null)
-          if (grid !== null && !grid.isDestroyed() && at !== null) {
-            grid.ensureIndexVisible(at)
-            grid.setFocusedCell(at, example.colId)
-          }
-        }
+        // After `=`, the keyboard back where it was pressed (0133).
+        headers.listed(start, rows)
       },
       refused: (message, code, ahead, from) => {
         if (!ours(from)) return
         // Asked first, the rows on screen are still there, and the pager still theirs.
-        shown.current = ahead ? { ...shown.current, retrying: false } : { ...shown.current, rows: 0, loaded: true, retrying: false }
+        if (!ahead) shown.current = { ...shown.current, rows: 0, loaded: true }
         api.current?.setGridAriaProperty('busy', null)
-        // A filter the server cannot apply is refused again however often it is asked: its recovery is the condition.
-        const filterRefused = code === 'not-filterable'
         // A new list refused stands, over the last list's rows: the pager waits for it.
         const stands = ahead && heldNow.current !== null && heldNow.current.source !== from
         latest.current.onFiltered?.(false)
-        setStatus({
-          kind: 'refused',
-          text: first([message]),
-          help: filterRefused ? REFUSED_FILTER_HELP : stands ? STANDING_HELP : null,
-          clear: false,
-          retry: !filterRefused,
-          said: null,
-        })
-        if (ahead) return
-        setPager((before) => ({ ...before, hasMore: false }))
-        fit()
+        line.refused(message, code, ahead, stands)
+        if (!ahead) fit()
       },
       restart: (from) => {
         if (!ours(from)) return
         // The row the asked page comes after is gone (0108): the first page
         // is where the list starts again, and its line says why first. A
         // task later, so AG Grid is out of the block it is failing.
-        shown.current = { ...shown.current, retrying: false }
-        removedLine.current = [STARTED_AGAIN]
+        line.restart()
         setTimeout(() => heldNow.current?.restart(), 0)
       },
     }),
-    [applySelection, fit, sizeOnce, sizeWaiting],
+    [applySelection, fit, sizeOnce, sizeWaiting, line, headers],
   )
 
   // A new search, another parent, another filter or another sort is a new
@@ -395,19 +288,12 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [client, formId, columns, search, parent?.field, parent?.record, filter, sort, hooks],
   )
   useEffect(() => () => datasource.abort(), [datasource])
-  useEffect(() => {
-    if (sort !== told.current) showSort()
-  }, [sort, showSort])
-  useEffect(() => {
-    // The parent changed: its line has spoken, and this one waits for the answer.
-    if (quiet) shown.current.quiet = true
-  }, [quiet, parent?.record])
   useEffect(() => applySelection(), [openToken, applySelection])
-  // After the parent's line is quieted above: a new list's first page is asked here, and its line is the quiet one.
+  // After the parent's line is quieted (use-grid-line.ts): a new list's first page is asked here, and its line is the quiet one.
   // A page AG Grid was not moved to: the wait is over, and the line says what it said before the ask.
   const held = useHeldRows(api, datasource, () => {
     api.current?.setGridAriaProperty('busy', null)
-    if (beforeAsk.current !== null) setStatus(beforeAsk.current)
+    line.stuck()
   })
   heldNow.current = held
 
@@ -439,11 +325,11 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // A list on its way, or a refused one standing, is the one to list again: the rows shown are the last list's.
         if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
       },
-      say(line) {
-        setStatus({ kind: 'answer', text: line, help: null, clear: false, retry: false, said: null })
+      say(said) {
+        line.say(said)
       },
-      removed(line) {
-        removedLine.current = line
+      removed(said) {
+        line.removed(said)
         if (heldNow.current?.reload() !== true) api.current?.purgeInfiniteCache()
       },
       widthOf(field) {
@@ -464,26 +350,13 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         if (never.length > 0) sizeColumns(never)
       },
     }),
-    [sizeColumns],
+    [sizeColumns, line],
   )
 
   // A row's Delete reads the page's handler when pressed: the column is made once per noun -- and per header and words (0155).
   const removeNoun = props.remove?.noun
   const removeWorded = props.remove?.said !== undefined
   const removeHeading = props.remove?.heading
-  // A box under each header the section's filter line may name (0132), the keys as one string so the columns are made again only when they change.
-  const headerFilters = useContext(HeaderFilterContext)
-  const headersNow = useRef(headerFilters)
-  headersNow.current = headerFilters
-  /** Where `=` kept a cell's value (0133): the keyboard goes back to that row and column once the list it asked for answers. */
-  const exampleAt = useRef<{ record: string | null; colId: string } | null>(null)
-  // The grid described by the filter line's hint, which says `=`, where there is a line to say it.
-  const describedBy = headerFilters !== null && headerFilters.fields.length > 0 ? (headerFilters.hint ?? null) : null
-  useEffect(() => {
-    const grid = api.current
-    if (grid !== null && !grid.isDestroyed()) grid.setGridAriaProperty('describedby', describedBy)
-  }, [describedBy])
-  const boxedKeys = (headerFilters?.fields ?? []).map((field) => field.field).join('\n')
   // Each header's floor, measured again where the page's fonts loading changed one (0151).
   const floors = useHeaderFloors(columns)
   const columnDefs = useMemo(
@@ -499,17 +372,6 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
     [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors],
   )
 
-  // The header's height changes after the well is fitted -- its row of
-  // boxes laid out (0132), a label wrapping -- and a well fitted to the
-  // header as it was leaves less than a row under it: fitted again each time.
-  useEffect(() => {
-    const header = well.current?.querySelector('.ag-header')
-    if (header === null || header === undefined || typeof ResizeObserver !== 'function') return undefined
-    const observer = new ResizeObserver(() => fit())
-    observer.observe(header)
-    return () => observer.disconnect()
-  }, [fit, boxedKeys])
-
   const options = useMemo(
     () =>
       gridOptionsFor({
@@ -520,47 +382,28 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           ready: (ready) => {
             api.current = ready
             if (!shown.current.loaded) ready.setGridAriaProperty('busy', 'true')
-            const headers = headersNow.current
-            if (headers !== null && headers.fields.length > 0 && headers.hint !== undefined) ready.setGridAriaProperty('describedby', headers.hint)
+            headers.ready(ready)
             // The sort the section opens on: a default view's (0105).
             showSort()
           },
-          sorted: () => {
-            const grid = api.current
-            if (grid === null || grid.isDestroyed()) return
-            const now = headerSort(grid)
-            // Only a sort the section does not hold yet: the one it holds was put on the headers by showSort.
-            if (sameSort(now, latest.current.sort)) return
-            told.current = now
-            latest.current.onSort(now)
-          },
+          sorted,
           widthsSet: (changes) => latest.current.onWidths(changes),
           resized: fit,
           asked: (row, how, rowIndex, colId) => {
             if (row === undefined) return
-            if (row.record === null) setStatus({ kind: 'refused', text: [CANNOT_OPEN], help: null, clear: false, retry: false, said: null })
+            if (row.record === null) line.cannotOpen()
             else latest.current.onOpen(row.record, how, { rowIndex: rowIndex ?? 0, colId })
           },
           drilling: () => latest.current.drilling === true,
           example: (row, colId) => {
-            if (filterByExample(headersNow.current, row, colId)) {
-              exampleAt.current = { record: row?.record ?? null, colId }
-              return
-            }
+            if (headers.example(row, colId)) return
             const label = latest.current.columns.find((column) => column.key === colId)?.label ?? colId
-            setStatus({
-              kind: 'answer',
-              text: [`= keeps no value of ${label}: the filter cannot say one.`],
-              help: null,
-              clear: false,
-              retry: false,
-              said: null,
-            })
+            line.say([`= keeps no value of ${label}: the filter cannot say one.`])
           },
         },
       }),
     // The options are the grid's for its life; what changes is read through `latest` and `firstShown`.
-    [labelledBy, fit, showSort],
+    [labelledBy, fit, showSort, sorted, line, headers],
   )
 
   return (
@@ -573,13 +416,11 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           first={pager.page === 0}
           last={!pager.hasMore}
           waits={held.standing}
-          asking={shown.current.retrying}
-          retryRef={retryButton}
+          asking={asking}
+          retryRef={retryRef}
           onClear={onClearSearch}
           onRetry={() => {
-            if (shown.current.retrying) return
-            shown.current.retrying = true
-            setStatus((before) => ({ ...before, retry: true }))
+            if (!line.askAgain()) return
             if (!held.again()) api.current?.purgeInfiniteCache()
           }}
           onPrevious={() => {
