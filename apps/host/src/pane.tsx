@@ -4,6 +4,8 @@ import type { FormEngine } from '@formancy/core'
 import type { FormRecord } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
+import { useGuardContext } from './guard.js'
+import type { LeaveRequest } from './leave.js'
 import type { LookupOffer } from './lookup-opens.js'
 import { ReactForm } from './react-form.js'
 import { ServerDid } from './server-did.js'
@@ -26,6 +28,10 @@ export const DISCARDED = 'Loaded the saved record. Your changes were discarded.'
 
 /** What the saved line says once Keep my line changes has read the record again (0155). */
 export const KEPT = 'Read the record again at its new version. The changes to its rows are kept, each at the version it was read at: press Save to store them.'
+
+/** What it says once Keep my line changes has read the record again over what was typed into it, which the person said to discard (0155). */
+export const KEPT_DISCARDED =
+  'Read the record again at its new version, and discarded what you typed into it. The changes to its rows are kept, each at the version it was read at: press Save to store them.'
 
 /** What the saved line's colour repeats: the server's answer, a save still out, or a refusal (UX-SPEC §5.11). */
 type Kind = 'answer' | 'pending' | 'refused'
@@ -69,7 +75,13 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  * saved record: the record read again at its new version, every row's
  * change kept at the version it was read at, the keyboard on the pane's
  * heading. A refusal about a row is said on the line alone: the rows' tab
- * takes the keyboard to it.
+ * takes the keyboard to it. Both ask the guard first, as anything that
+ * drops work does (0047): Keep my line changes reads the record again over
+ * whatever was typed into this pane since it was saved -- while the save
+ * was out, or since the notice -- and Load the saved record, there or in
+ * the unknown notice, drops every change its rows hold, which sit in
+ * another tab and are easily forgotten. Kept editing, nothing moves, and
+ * the keyboard is back on the button.
  *
  * Where the record's tabs hide the pane (0142), a refused save's notice,
  * or the renderer's summary of a refused answer, which take the keyboard,
@@ -78,6 +90,7 @@ type Notice = { kind: 'stale' | 'refused' | 'declined' | 'unknown'; message: str
  */
 export function Pane({
   session,
+  owner,
   title,
   level = 4,
   idBase,
@@ -88,6 +101,8 @@ export function Pane({
   onShow,
 }: {
   session: Session
+  /** The guard's name for the pane's record (0047): `master`, a child section's key, or a Drill down level's -- what Keep my line changes asks about. */
+  owner: string
   title: string
   /** The heading's level: under the detail's h3, or a child row's h5 (0047). */
   level?: 4 | 6
@@ -137,6 +152,36 @@ export function Pane({
     onLoaded?.()
   }, [session, say, onLoaded])
 
+  const guard = useGuardContext()
+  /**
+   * `run` once the guard lets `request` through (0047) -- at once where it
+   * is null or drops no work -- with whether work was dropped for it; its
+   * sentence, or null where it ran clean or the person kept editing, which
+   * gives the keyboard back to the button that asked.
+   */
+  const asked = (request: LeaveRequest | null, run: (discarded: boolean) => Promise<string | null>): Promise<string | null> =>
+    new Promise((resolve) => {
+      if (request === null) {
+        void run(false).then(resolve)
+        return
+      }
+      const at = document.activeElement
+      guard.ask(
+        request,
+        (discarded) => void run(discarded).then(resolve),
+        () => {
+          if (at instanceof HTMLElement && at.isConnected) at.focus()
+          resolve(null)
+        },
+      )
+    })
+  /** Load the saved record where the record's rows are saved with it (0155): their changes go too, so the guard names them first. */
+  const reloadRows = (): LeaveRequest | null => {
+    const rows = session.rowOwners()
+    const record = session.state().record
+    return rows.length === 0 || record === undefined ? null : { kind: 'reload-rows', record, rows }
+  }
+
   return (
     <section className="pane" aria-labelledby={namedBy === undefined ? headingId : `${namedBy} ${headingId}`}>
       <div className="pane-top">
@@ -159,23 +204,33 @@ export function Pane({
         say={say}
         offer={steady}
         onAnswer={onAnswer}
-        onReload={async () => {
-          const problem = await session.reload()
-          if (problem === null) loaded()
-          return problem
-        }}
-        onLoad={(record) => {
-          session.loadStored(record)
-          loaded()
-        }}
-        onKeep={async () => {
-          const problem = await session.keepRows()
-          if (problem === null) {
-            setReloaded(session.opened().generation)
-            say(KEPT)
-          }
-          return problem
-        }}
+        onReload={() =>
+          asked(reloadRows(), async () => {
+            const problem = await session.reload()
+            if (problem === null) loaded()
+            return problem
+          })
+        }
+        onLoad={(record) =>
+          void asked(reloadRows(), async () => {
+            session.loadStored(record)
+            loaded()
+            return null
+          })
+        }
+        onKeep={() =>
+          asked({ kind: 'keep-rows', owner, record: session.state().record ?? '', by: session.renderer }, async (discarded) => {
+            const problem = await session.keepRows()
+            if (problem === null) {
+              setReloaded(session.opened().generation)
+              say(discarded ? KEPT_DISCARDED : KEPT)
+            } else if (discarded) {
+              // The notice went with the form discarded: the line says it.
+              say(problem, 'refused')
+            }
+            return problem
+          })
+        }
         onShow={onShow}
       />
     </section>

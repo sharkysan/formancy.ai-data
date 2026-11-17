@@ -80,7 +80,12 @@ import { disableFields } from './widgets.js'
  * the tab says where it is; a stale record whose own answers did not
  * change offers to keep the rows' changes (`keep`). A lost save is
  * unknown as an update's or a create's is, held as a create is where it
- * created the record.
+ * created the record. The rows are one set for every pane of the record,
+ * so a press in one pane while another's save of them is out says busy,
+ * and after another's lost save that created the record says held, until
+ * that pane checks it or is told to enter it again: a second press of the
+ * other renderer's Save would otherwise send the same rows with a second
+ * record.
  */
 
 export type Renderer = 'react' | 'angular'
@@ -489,6 +494,8 @@ export function createSession({ client, formId, definition, renderer, namespace,
       rows?.reload(read.value.record)
       return null
     },
+    /** The guard's owners of the rows saved with the record (0155): what Load the saved record drops with it. */
+    rowOwners: (): string[] => rows?.owners(state.record) ?? [],
     /** `record` as stored opened over the draft -- an unknown save's check found it -- and its rows listed again with it (0155). */
     loadStored(record: FormRecord): void {
       open(record)
@@ -522,14 +529,26 @@ export function createSession({ client, formId, definition, renderer, namespace,
       if (deleting !== undefined) return { kind: 'held', message: deleting }
       // The rows go with it where they hold a change (0155): each changed row's form submitted first, and none refusing.
       const carried = state.follows === undefined && rows?.carries(state.record) === true
+      // Held by another pane's save of the same rows: the set is the record's, whichever renderer sent it.
+      const held = carried ? (rows?.held(state.record) ?? null) : null
+      if (held === 'busy') return { kind: 'busy', message: BUSY }
+      if (held === 'held') return { kind: 'held', message: HELD }
       const taken = carried ? (rows?.take(state.record) ?? null) : null
       if (carried && taken === null) return { kind: 'rows', message: ROW_REFUSED }
-      const promise: Promise<SaveResult | null> = send(engine, generation, submitted.data, taken).finally(() => {
-        // Only its own: a later form's save may hold the guard by now.
-        if (saving?.promise === promise) saving = undefined
-        notify()
-      })
+      const promise: Promise<SaveResult | null> = send(engine, generation, submitted.data, taken)
+        .then((result) => {
+          // A record created: the rows held for a new one are its own now, whether or not this save carried them (0155).
+          if (result.kind === 'created' && state.record !== undefined) rows?.created(state.record)
+          return result
+        })
+        .finally(() => {
+          // Only its own: a later form's save may hold the guard by now.
+          if (saving?.promise === promise) saving = undefined
+          notify()
+        })
       saving = { promise, generation }
+      // What holds this save's rows for every other pane: it out, then its loss where it created the record, until checked.
+      if (taken !== null) rows?.holding(state.record, () => (saving?.promise === promise ? 'busy' : lostHere()?.held === true ? 'held' : null))
       notify()
       return promise
     },

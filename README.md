@@ -218,7 +218,8 @@ built from this repository and not published as a package:
 - A record's rows saved with it are chosen in a generation request of an
   administrator's own: the studio does not yet offer the choice; and two
   people saving lines of one order at once makes the second stale, which
-  one press of Keep my line changes turns into a save
+  Keep my line changes and Save then store, line by line, refusing a line
+  both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one

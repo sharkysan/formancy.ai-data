@@ -7,6 +7,13 @@
 // own, or not, as 0058's table says of a lost POST on the connection it
 // took: one order is stored either way, and the page says what is true --
 // the order created, or that it may have been saved, the keyboard on that.
+//
+// Found by role and accessible name. What the accessibility tree cannot
+// answer is read off the DOM: which grid row holds the keyboard after Done
+// -- the focused element's nearest role=row, and the cells of the rows
+// that share its aria-rowindex, since AG Grid draws one row in each of its
+// pinned containers, and the tree gives no row a state that says the
+// keyboard is in it.
 
 import { lostCreate } from '../../../../scripts/browser-gate.mjs'
 import { FORM, SAVED_ORDER } from './plane.mjs'
@@ -45,20 +52,29 @@ async function addLine(page, check, no, quantity, state) {
     .fill(quantity)
 }
 
-/** Done from the keyboard, and Go to Save from it: the keyboard back on the line's row, then on the order's Save. */
-async function doneAndGo(page, check, state) {
+/**
+ * Whether the keyboard is in the new line's own row of the lines' tab: its
+ * number `no` and its New mark among the cells of the row the keyboard is
+ * in. Read off the DOM: see the header.
+ */
+async function onNewLine(page, no) {
+  return lines(page).evaluate((region, number) => {
+    const row = document.activeElement?.closest('[role="row"]')
+    const index = row?.getAttribute('aria-rowindex')
+    if (row === null || row === undefined || index === null || index === undefined || !region.contains(row)) return false
+    const cells = [...region.querySelectorAll(`[role="row"][aria-rowindex="${index}"] [role="gridcell"]`)].map((cell) => (cell.textContent ?? '').trim())
+    return cells.includes(number) && cells.includes('New')
+  }, no)
+}
+
+/** Done from the keyboard, and Go to Save from it: the keyboard back on the new line's row, numbered `no`, then on the order's Save. */
+async function doneAndGo(page, check, no, state) {
   const done = railPaper(page, 'New Order line 1', 'React').getByRole('button', { name: 'Done', exact: true })
   await done.focus()
   await page.keyboard.press('Enter')
   await railPaper(page, 'New Order line 1', 'React').waitFor({ state: 'detached', ...WITHIN })
-  await until(
-    async () =>
-      page.evaluate(
-        () => document.activeElement?.closest('[role="grid"]')?.getAttribute('aria-label') !== null && document.activeElement?.closest('[role="row"]') !== null,
-      ),
-    'never',
-  ).catch(() => null)
-  const onRow = await page.evaluate(() => document.activeElement?.closest('[role="row"]') !== null && document.activeElement?.closest('.child') !== null)
+  await until(async () => onNewLine(page, no), 'never').catch(() => null)
+  const onRow = await onNewLine(page, no)
   check(`${state}: Done gives the keyboard back to the line's row`, onRow ? null : `the focus is on ${await describeFocus(page)}`)
   const go = lines(page).getByRole('button', { name: 'Go to Save', exact: true })
   await go.focus()
@@ -99,7 +115,7 @@ export function togetherJourney(plane, hop, { check, measure, asked }, run) {
         await page.getByRole('heading', { level: 3, name: `Order ${at.record}`, exact: true }).waitFor(WITHIN)
         await page.getByRole('tab', { name: 'Order line', exact: true }).click()
         await until(
-          async () => (await lineOf(page)) === '2 Order line rows; each Order holds 1 to 3. You may not remove them here.',
+          async () => (await lineOf(page)) === '2 Order line rows; each Order holds 1 to 3. You may not remove saved rows here.',
           'the lines of the saved order were never listed',
         )
       },
@@ -124,7 +140,7 @@ export function togetherJourney(plane, hop, { check, measure, asked }, run) {
     [
       'Saved with its line (React)',
       async (page) => {
-        await doneAndGo(page, check, 'a line added')
+        await doneAndGo(page, check, '3', 'a line added')
         await page.keyboard.press('Enter')
         await pane(page, 'React').getByRole('status').filter({ hasText: 'Saved the Order: 1 Order line row added.' }).waitFor(WITHIN)
         const held = await plane.savedWithNote(at.note)
@@ -145,7 +161,7 @@ export function togetherJourney(plane, hop, { check, measure, asked }, run) {
           .fill(note)
         await page.getByRole('tab', { name: 'Order line', exact: true }).click()
         await addLine(page, check, '1', '2', 'a lost save')
-        await doneAndGo(page, check, 'a lost save')
+        await doneAndGo(page, check, '1', 'a lost save')
         const marker = Buffer.from(note, 'utf8')
         const sent = hop.sentOn(marker)
         const lost = hop.swallowAnswersFrom(marker)

@@ -3426,11 +3426,11 @@
       "none": "How this repository's TypeScript and JavaScript are linted, formatted and merged across the format, which a contributor meets in every pull request -- a finding to fix, a file to format, a branch begun before the format merged through scripts/prettier-merge.mjs, a commit blame skips; the gate runs in CI, and the tools are root devDependencies no package declares. What reaches a user or an integrator is the CHANGELOG's -- the defects the linter found, fixed, and fieldHeading, which data-core now exports and data-client re-exports -- and none of it is a cost."
     },
     "0117": {
-      "reviewed": "sha256:da0547788159c4c2d91b344da53d03cae7fdc63b5db299c22e6ca21ff46f66b0",
+      "reviewed": "sha256:803d2886b1838d94f69499d8b16c3a2d1569a9bed8979572bb0876ad62727f22",
       "limitations": [
         {
           "area": "server",
-          "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer, as unexpected, so a host upgrades its server before its client.",
+          "says": "@formancy/data-client reads a form without writable, or with a write named that the form does not offer -- but a together child's create, which a save of its record makes (0155) -- as unexpected, so a host upgrades its server before its client.",
           "heldBy": "packages/data-client/src/transport.test.ts"
         },
         {
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:87aa943fe52e5654104cea8636756bfefa2975c2a42c076ad551540e2b784d60",
+      "reviewed": "sha256:28305d6d6bd3a8c00994741b9cce72558c77b47367df5aa83492ec77ed50c4df",
       "limitations": [
         {
           "area": "forms",
@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:c38bb3b4d35e4588a54f3c1db5f34e76c24978d272cb73f8b03fe9107a59e8dc",
+      "reviewed": "sha256:dbe3b5733dbdc8a3a70c888affabfd6c7b633550b8b29260e6aed62777b6435e",
       "limitations": [
         {
           "area": "writes",
@@ -4489,8 +4489,17 @@
         },
         {
           "area": "host",
-          "says": "After a stale save of a record with its rows, Load the saved record drops every row's change with the record's, asking nothing more.",
+          "says": "After a stale save of a record with its rows, Keep my line changes keeps none of what was typed into the record itself: where its form holds typing the page asks first, and Discard and continue drops it, nothing merged; and Load the saved record asks first, naming the rows' changes it drops with the record's.",
           "heldBy": "apps/host/src/stale-set.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A row whose change is in a save of its record still out cannot be removed, nor put back, until that save is answered.",
+          "heldBy": "apps/host/src/in-flight.test.tsx"
+        },
+        {
+          "area": "testing",
+          "says": "No host test reaches a refusal of a save that names a field of a row, which the page puts on that row's field: neither engine names the column of a check or a unique key. Nor does one open a together child's tab in Stacked or Separate views, or on a Drill down level below the record."
         },
         {
           "area": "forms",

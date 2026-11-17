@@ -69,9 +69,13 @@ export function pendingName(heading: Said, child: ChildRows): Said {
  * The tab's line: how many rows, the bound, why a control is not there,
  * the changes held and where they are saved. "3 Order line rows; each
  * Order holds 1 to 3, so none can be added. 1 changed. Saved with the
- * Order."
+ * Order." Why a Remove is not there is said by the rule that draws it
+ * (together.tsx): a new row is taken off the page by whoever may add one,
+ * a saved one deleted by whoever may delete, Undo remove is absent at the
+ * maximum, and a row in the save still out is removed once it is answered
+ * (`sending`).
  */
-export function tabLine(child: ChildRows, parentNoun: string): string {
+export function tabLine(child: ChildRows, parentNoun: string, sending: (row: HeldRow) => boolean = () => false): string {
   const title = child.form.menu.title
   if (child.listing.kind === 'asking') return `Loading ${title} rows.`
   if (child.listing.kind === 'refused') return child.listing.message
@@ -82,16 +86,29 @@ export function tabLine(child: ChildRows, parentNoun: string): string {
   if (may.over) {
     return `${rowsOf(counts.held, title)}: more than each ${parentNoun} holds through this form, at most ${String(max)}, so they are read only here.`
   }
-  // A new row is taken off the page by whoever may add one; a stored one is deleted by whoever may delete.
-  const removes = child.parent === 'new' ? may.create : may.delete
-  const cannot = [...(may.create && counts.held >= max ? ['added'] : []), ...(removes && counts.held <= min && counts.held > 0 ? ['removed'] : [])]
+  // A new row is taken off the page by whoever may add one; a saved one is deleted by whoever may delete -- a new record has none.
+  const removesSaved = child.parent === 'new' || may.delete
+  const removes = (row: HeldRow): boolean => (row.ref !== null ? may.create : may.delete)
+  const cannot = [
+    ...(may.create && counts.held >= max ? ['added'] : []),
+    ...((child.parent === 'new' ? may.create : may.delete) && counts.held <= min && counts.held > 0 ? ['removed'] : []),
+    ...(may.delete && counts.held >= max && child.rows.some((row) => row.removed) ? ['restored'] : []),
+  ]
   const why = cannot.length === 0 ? '' : `, so none can be ${cannot.join(' or ')}`
-  const not = [...(may.create ? [] : ['add']), ...(removes ? [] : ['remove'])]
   const denied =
-    !may.create && !may.update && !may.delete ? ' You may only read them here.' : not.length > 0 ? ` You may not ${not.join(' or ')} them here.` : ''
+    !may.create && !may.update && !may.delete
+      ? ' You may only read them here.'
+      : !may.create && !removesSaved
+        ? ' You may not add or remove them here.'
+        : !may.create
+          ? ' You may not add them here.'
+          : !removesSaved
+            ? ' You may not remove saved rows here.'
+            : ''
+  const out = child.rows.some((row) => sending(row) && removes(row)) ? ' The rows in the save still out can be removed once it is answered.' : ''
   const changes = changesSaid(title, counts)
   return [
-    `${rowsOf(counts.held, title)}; each ${parentNoun} holds ${bound}${why}.${denied}`,
+    `${rowsOf(counts.held, title)}; each ${parentNoun} holds ${bound}${why}.${denied}${out}`,
     ...(changes === null ? [] : [`${changes[0]?.toUpperCase() ?? ''}${changes.slice(1)}. Saved with the ${parentNoun}.`]),
     ...(child.note === null ? [] : [child.note]),
   ].join(' ')

@@ -12,13 +12,15 @@ import type { Renderer } from './session.js'
  * | another form; Back or Forward; Sign out                        | those, and the records grid's deletion   |
  * | another child row; New <child>                                 | that child's panes                       |
  * | a record created in one of the record's panes                  | the record's other panes and every       |
- * |                                                                | child's                                  |
+ * |                                                                | child's but its rows saved with it       |
  * | a child row created in one of a child's panes                  | that child's other panes                 |
  * | a renderer hidden by the renderer switch                       | that renderer's panes, everywhere        |
  * | a layout or view change; paging; search; sort                  | nothing: every view stays mounted        |
  * | Drill down: going down from level n; a delete there            | every level below n (0090)               |
  * | Open under a lookup of level n's record                        | every level below n (0141)               |
  * | Drill down: going up a level                                   | nothing: every level stays mounted       |
+ * | Keep my line changes, after a stale save (0155)                | that pane: the record is read again      |
+ * | Load the saved record, where its rows are saved with it (0155) | its rows' changes                        |
  *
  * A deletion out, or unknown (0053), is listed with its owner's panes and
  * goes where they go, but for a renderer hidden: it is drawn by none. One
@@ -70,8 +72,19 @@ export type LeaveRequest =
   | { kind: 'sign-out' }
   | { kind: 'child-row'; owner: string; record: string }
   | { kind: 'child-new'; owner: string; title: string }
-  /** The detail following a record one of its panes created: `owner`'s pane in `by` holds it already. */
-  | { kind: 'created'; owner: string; record: string; by: Renderer }
+  /**
+   * The detail following a record one of its panes created: `owner`'s pane in `by` holds it already, and `rows` names the
+   * owners of the rows saved with it (0155), which the save that created it carried or which are its own since: none of them
+   * is another pane's work.
+   */
+  | { kind: 'created'; owner: string; record: string; by: Renderer; rows?: readonly string[] }
+  /**
+   * Keep my line changes (0155): `owner`'s pane in `by` reads `record` again at its new version, over whatever was typed into
+   * it, and keeps its rows' changes.
+   */
+  | { kind: 'keep-rows'; owner: string; record: string; by: Renderer }
+  /** Load the saved record (0155): `record` as stored, and its rows -- `rows`, their owners -- listed again as stored. */
+  | { kind: 'reload-rows'; record: string; rows: readonly string[] }
   | { kind: 'renderer'; hides: readonly Renderer[]; shows: string }
   /** Drill down: going down from level `below` into a row, or a new one when `record` is null, whose form is `title`; or into the record a lookup there names, by Open (0141). */
   | { kind: 'drill'; below: number; record: string | null; title: string }
@@ -165,10 +178,15 @@ export function discards(request: LeaveRequest): Discarded | null {
     case 'created': {
       // The record's own: its children are the record's, and go with it.
       const keeps = { owner: request.owner, renderer: request.by }
+      // Its rows saved with it are the created record's own (0155), whichever pane typed them.
       return request.owner === 'master'
-        ? { owners: 'all', spares: RECORDS_GRID, renderers: 'all', keeps }
+        ? { owners: 'all', spares: [...RECORDS_GRID, ...(request.rows ?? [])], renderers: 'all', keeps }
         : { owners: [request.owner], renderers: 'all', keeps }
     }
+    case 'keep-rows':
+      return { owners: [request.owner], renderers: [request.by] }
+    case 'reload-rows':
+      return { owners: request.rows, renderers: 'all' }
     case 'renderer':
       return { owners: 'all', renderers: request.hides }
     case 'drill':
@@ -219,6 +237,10 @@ export function lead(request: LeaveRequest): Said {
       return ['Starting the next version of ', { code: request.record }, closes]
     case 'created':
       return ['Opening ', { code: request.record }, `, just created in ${RENDERER_NAMES[request.by]},${closes}`]
+    case 'keep-rows':
+      return ['Reading ', { code: request.record }, ` again in ${RENDERER_NAMES[request.by]}, to keep its rows' changes,${closes}`]
+    case 'reload-rows':
+      return ['Loading ', { code: request.record }, ` as saved, with its rows,${closes}`]
     case 'new':
       return [`Starting a new record${closes}`]
     case 'child-new':

@@ -80,7 +80,8 @@ export async function openRows(
   await load(user, record)
   await loaded(record)
   await showChild(user, 'Order line')
-  await rowsSay(/^\d+ Order line rows?; /)
+  // A semicolon after the count, or a colon where the order holds more than the form allows.
+  await rowsSay(/^\d+ Order line rows?[;:] /)
   await rowsDrawn()
   return user
 }

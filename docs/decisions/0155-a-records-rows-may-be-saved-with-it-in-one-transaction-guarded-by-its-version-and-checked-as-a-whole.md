@@ -281,54 +281,107 @@
   no form).
   The host page, on postgres:17-alpine and
   mcr.microsoft.com/mssql/server:2022-latest, each mutation watched on
-  PostgreSQL: `apps/host/src/together.test.tsx` -- a line changed and one
-  added held on the page, said New and Changed in their column, and saved
-  by the order's own Save in either renderer (with the session never
-  carrying the rows: "Saved." and the lines as they were), the line's form
-  without the field naming the order (with it left in: a Saved order
-  control on the rail), Enter on a line putting the keyboard on the rail's
-  heading, Done back on its row, Add in its first field and Go to Save on
-  the order's Save; Add absent at three lines, Remove at one -- a remover's
-  -- and to a clerk the policy grants no delete, the line saying why (with
-  Remove drawn at the bound: a Remove on the last line; and with the
-  menu's flags ignored: the clerk's line said nothing of removing), Remove
-  marking a line To be deleted and becoming Undo remove with the keyboard
-  on it; and a new order's Save, pressed before its lines' tab was ever
-  shown, refused at that tab with the keyboard on its heading and the
-  bound in the page's words, then created with its line (with the tab
-  drawn only once shown: the order's pane took the refusal; and with the
-  bound in the server's words: the line named the line form's id).
+  PostgreSQL, and those that came with the host page's review on both:
+  `apps/host/src/together.test.tsx` -- a line changed and one added held
+  on the page, said New and Changed in their column, and saved by
+  the order's own Save in either renderer (with the session never carrying
+  the rows: "Saved." and the lines as they were), the line's form without
+  the field naming the order (with it left in: a Saved order control on
+  the rail), the mark following the first keystroke (with the set told of
+  typing only at Done: no mark until then), Enter on a line putting the
+  keyboard on the rail's heading, Done back on its row, Add in its first
+  field and Go to Save on the order's Save, and a clerk's line saying they
+  may not remove saved rows while their new line has its Remove (with the
+  line saying "You may not remove them here": the page contradicted its
+  own button); Add absent at three lines, Remove at one -- a remover's --
+  and Undo remove at three, the line saying why (with Remove drawn at the
+  bound: a Remove on the last line; with the menu's flags ignored: the
+  clerk's line said nothing of removing; and with Undo remove drawn at the
+  bound: four lines held under a bound of three), Remove marking a line To
+  be deleted and becoming Undo remove with the keyboard on it; a new
+  order's Save, pressed before its lines' tab was ever shown, refused at
+  that tab with the keyboard on its heading and the bound in the page's
+  words, then created with its line (with the tab drawn only once shown:
+  the order's pane took the refusal; and with the bound in the server's
+  words: the line named the line form's id); a line its own form refuses
+  opened with its summary taking the keyboard and nothing sent (with
+  `take` handing it on: the save went out and the server refused it); a
+  line the database's check refuses refusing the save at that line, opened
+  on its tab, the keyboard on the tab's heading and the server's words on
+  its line (with a refusal about a row that names no field said on the
+  order's pane alone: the keyboard went to its Not saved notice); an order
+  holding four lines under a bound of three shown read only (with `mayOf`
+  ignoring the count: the line said only that none could be added); the
+  line form opened on its own saying its lines are added and removed with
+  their Order, with no New record and no Delete (with `savedWith`
+  answering null: no such sentence); and in Drill down a line opened on
+  the tab's rail and saved by the order's Save (with the together tab drawn
+  as a child section while drilling: a child section's grid).
   `stale-set.test.tsx` -- the second of two saves of different lines of
   one order stale at the order, Keep my line changes keeping its line,
   and Save storing it beside the other (with Keep listing the lines
-  afresh: the page's line was gone); a line both changed said Changed by
-  someone else and refused at that line, nothing stored, until Load this
-  line takes it as stored (with the moved line taken at the version it was
-  listed at: marked Changed alone, and, its mark kept, saved over the
-  other person's change with nothing said); and Load the saved record
-  dropping the lines' changes with the order's (with the session loading
-  the record alone: the lines as they were drafted). `plane.test.tsx` --
-  the save sent from the page through every door, the token in its header
-  alone (with 0155's exception removed before the page drew a record's
-  rows as one set: save unused on every door). `page.test.tsx` -- axe and
-  a name on every control in every state of the lines' tab (with Add drawn
-  without a name). `in-flight.test.tsx` -- a second press while the save
-  is out sending nothing, a line typed into meanwhile keeping its newer
-  answer and its mark, every answer heard (with the newer typing dropped
-  for the stored row: the line said nothing of it). `leaving.test.tsx` --
-  New record asking first and naming the order with what its lines hold
-  (with the lines' changes not the guard's: nothing asked).
+  afresh: the page's line was gone); Keep asking first where the order was
+  typed into after the stale answer, Keep editing keeping the typing and
+  Discard and continue saying it was dropped (with Keep reading the order
+  again unasked: the page asked nothing); a line both changed said Changed
+  by someone else and refused at that line, nothing stored, until Load
+  this line takes it as stored (with the moved line taken at the version
+  it was listed at: marked Changed alone, and, its mark kept, saved over
+  the other person's change with nothing said); a line deleted beside the
+  page found gone by the save, marked so, and taken off the page by Load
+  this line, said on the tab's line with the keyboard on its heading (with
+  a line not found left unmarked: no Load this line; and with Load this
+  line saying it loaded the line: the keyboard on the page itself); and
+  Load the saved record asking first, naming the lines' changes, and then
+  dropping them with the order's (with the session loading the record
+  alone: the lines as they were drafted; and with the rows dropped unasked:
+  no question). `plane.test.tsx` -- the save sent from the page through
+  every door, the token in its header alone (with 0155's exception
+  removed before the page drew a record's rows as one set: save unused on
+  every door). `page.test.tsx` -- axe and a name on every control in the
+  states of the lines' tab its case lists, a new line on the rail, one
+  its form refused and an order read only over its bound among them (with
+  Add drawn without a name). `in-flight.test.tsx` -- a second press while
+  the save is out sending nothing, a line typed into meanwhile keeping its
+  newer answer and its mark, every answer heard (with the newer typing
+  dropped for the stored row: the line said nothing of it); and a new
+  order's line typed into while the save creating both is out keeping the
+  keyboard and its tab, the order opened without asking about its own
+  line, no Remove while the line is out, and the next Save storing the
+  typing (with the line's forms keyed by its grid key: the keyboard on the
+  page itself; with the record's tabs started again for the created order:
+  the order's tab shown; with the created order's rows another pane's
+  work: the page asked, and the order was not opened; and with Remove
+  drawn while its line was out: each new line's Remove). `leaving.test.tsx`
+  -- New record asking first and naming the order with what its lines
+  hold (with the lines' changes not the guard's: nothing asked).
   `unknown-child.test.tsx` -- a save whose answer was lost after it
   committed, sent once, checked by the order, and Load the saved record
-  listing the lines as stored (with the order loaded alone: the line still
-  marked Changed). The host's browser gate,
-  `apps/host/scripts/browser/together.mjs`, in Chromium on this machine and
-  in Firefox and WebKit in CI -- the lines' tab clean at every width down to
-  320 pixels; Add, typing, Done, Go to Save and Save from the keyboard; no
-  rule of host.css on a line's paper; and a new order saved with its line
-  whose answer the hop drops stored once with its line, the page saying it
-  may have been saved, or, where the browser sent it again, that it was
-  created.
+  asking about the line's change and listing the lines as stored (with the
+  order loaded alone: the line still marked Changed); saved again at the
+  version it sent, stale by its own doing and still unknown (with that
+  sentence for a lost update alone: a stale notice took the unknown one's
+  place); and a new order created with its line, its answer lost, holding
+  a second press in either renderer until it is checked, one order stored
+  (with a lost save that created the record not held, and with the hold
+  the pane's alone: a second order created with the line). `save-set.test.ts`
+  -- a row added, while the create was out, to a child the save took
+  nothing of, the created record's (with only the children the save
+  carried moved: its owners named the lines alone). `leave.test.ts` -- a
+  created record's rows spared by the guard's question, Keep my line
+  changes asking about its pane alone and Load the saved record about the
+  rows (with the rows not spared: the created order's own line asked
+  about). The host's browser gate, `apps/host/scripts/browser/together.mjs`
+  -- the lines' tab clean at every width down to 320 pixels; Add, typing,
+  Done, Go to Save and Save from the keyboard, Done giving the keyboard
+  back to the new line's own row; no rule of host.css on a line's paper;
+  and a new order saved with its line whose answer the hop drops stored
+  once with its line, the page saying it may have been saved, or, where
+  the browser sent it again, that it was created -- in Chromium on this
+  machine, its keyboard checks watched failing there (with Add's move to
+  the rail's first field removed, and with Done's and Go to Save's: each
+  check found the keyboard on the page itself); in Firefox and WebKit in
+  CI alone, where none of its checks was watched failing.
 
 ## Context
 
@@ -557,38 +610,63 @@ column of its own; the tab's line, a polite live region, says how many
 rows there are, the bound, why a control is not there and what is held,
 with Go to Save beside it, which shows the record's tab and puts the
 keyboard on its Save and sends nothing. Add starts a new row, its `ref`
-minted from a counter that never goes back, on a rail with the keyboard in
-its first field; a row opens there by a click, Space or Enter in every
-layout, Drill down included, in the child's own document with the field
-naming the record left out, and Done runs the engine's submit and closes
-the rail where it accepts, sending nothing. Remove marks a row to be
-deleted and becomes Undo remove with the keyboard left on it, asking
-nothing. Add is absent at `max` and Remove at `min` -- a new row's too,
-as a repeater's are (formancy.ai 0184) -- and each is drawn only where the
-menu's `TogetherChild` lets this person; a record holding more than `max`
-shows them read only. A row's draft is its forms, one engine per
+minted from a counter that never goes back, and named by it, on a rail
+with the keyboard in its first field; a row opens there by a click, Space
+or Enter in every layout -- in Drill down on the record's own level, not a
+level below -- in the child's own document with the field naming the
+record left out, and Done runs the engine's submit and closes the rail
+where it accepts, sending nothing. Remove marks a row to be deleted and
+becomes Undo remove with the keyboard left on it, asking nothing. Add is
+absent at `max` and Remove at `min` -- a new row's too, as a repeater's
+are (formancy.ai 0184) -- and Undo remove at `max`, which it would pass;
+each is drawn only where the menu's `TogetherChild` lets this person, and
+the line says why one is not, in the words of the rule that draws it: a
+clerk who may add rows and not delete them may take off a row they added,
+and not a saved one. A record holding more than `max` shows them read
+only. A row's draft is its forms, one engine per
 renderer, each answer typed into one copied into the other. The record's
 Save (`session.ts`, through `with-rows.ts`) carries its rows wherever
 they hold a change, or a child requires rows of a new record: each new or
 changed row's forms submitted first, a row refusing opened with its
 summary taking the keyboard and nothing sent; then one `client.save`
 with the record's answers where they changed and none where they did not.
-Its answer goes where it is about: stored, each row takes its stored self,
-or, typed into while the save was out, keeps its newer answers and its
-mark with the stored version, and the record's line says what was saved;
-a refusal about a row onto that row's forms, a bound onto the tab in the
-page's words, each with the keyboard there; stale at the record from a
-save of rows alone, the notice offers Keep my line changes, which reads
-the record again and lists the rows again, every change kept at the
-version it was read at and a row moved or gone since marked changed by
-someone else, so the next save is guarded row by row and Load this line
-takes one row as stored; lost, the record's notice checks by the record
-alone, and Load the saved record lists the rows again. The guard counts
-the rows' changes as the record's work and names them with it. A
-together child opened on its own says its rows are added and removed
-with their record. `GET /v1/forms/:id` serves a together child's
-`writable.create` -- what a row's create in a save takes from this
-person -- where they may make it, though `operations` holds no create, and
+While it is out every row stays editable, and the row's forms are keyed
+by a slot it keeps when its key becomes its token, so the field being
+typed into keeps the keyboard; but a row whose change is in that save has
+no Remove until it is answered, since a new row taken off the page
+meanwhile would be stored and shown nowhere. The rows are one set for
+every pane of the record, so a press in the other renderer's pane while
+the save is out says busy, and after a lost save that created the record
+is held until that pane checks it. Its answer goes where it is about:
+stored, each row takes its stored self, or, typed into while the save was
+out, keeps its newer answers and its mark with the stored version, and the
+record's line says what was saved; a record created takes every row held
+for it, one added while the save was out too, and opening it asks nothing
+about them, nor starts its tabs again; a refusal about a row opens that
+row, the server's words on its fields where it names one and on the tab's
+line where it does not -- neither engine names the column of a check or a
+unique key -- a row stale marked moved and one not found gone, and a
+bound onto the tab in the page's words, each with the keyboard there;
+stale at the record from a save of rows alone, the notice offers Keep my
+line changes, which reads the record again and lists the rows again,
+every change kept at the version it was read at and a row moved or gone
+since marked changed by someone else, so the next save is guarded row by
+row and Load this line takes one row as stored, or, gone, off the page,
+the tab's line saying so; lost, the record's notice checks by the record
+alone, and Load the saved record lists the rows again. Keep my line
+changes asks the guard first where the record's own form holds typing,
+which it reads the record again over -- nothing merges, as for a record
+alone (0029) -- and Load the saved record, in the stale notice or the
+unknown one, asks first where the rows hold changes, naming them. The
+guard counts the rows' changes as the record's work and names them with
+it. A together child opened on its own says its rows are added and
+removed with their record, named by the form it opens in (0140), and that
+a change made there is saved by itself. `GET /v1/forms/:id` serves a
+together child's `writable.create` -- what a row's create in a save takes
+from this person -- where they may make it, though `operations` holds no
+create, and with it its starting defaults (0149), narrowing
+[0117](0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md),
+whose `writable` named a write `operations` does not hold as `null`;
 `@formancy/data-client` reads it there and nowhere else, so a page draws a
 new row with the fields its create takes.
 
@@ -762,8 +840,21 @@ What it costs, and what it does not do:
 - **A row's two renderers are two engines kept equal.** Each answer typed
   into one is copied into the other; a field a rule computes is each
   form's own.
-- **Load the saved record after a stale save drops every row's change**
-  with the record's, asking nothing more, as it drops the record's own.
+- **Keep my line changes keeps none of the record's own typing.** It
+  reads the record again at its new version; where its form holds typing
+  -- typed while the save was out, or after the stale notice -- the guard
+  asks first, and Discard and continue drops it: nothing merges, as for a
+  stale record alone (0029). Load the saved record asks first too, naming
+  the rows' changes it drops with the record's.
+- **A row in the save still out cannot be removed** until that save is
+  answered, nor put back: a new row taken off the page meanwhile would be
+  stored all the same, and shown nowhere.
+- **What no host test reaches.** A refusal naming a field of a row is put
+  on that row's field (`applyServerErrors`) by code no test reaches:
+  neither engine names the column of a check or a unique key, and a row's
+  own form refuses a missing answer before anything is sent. The lines'
+  tab in Stacked and Separate views, and on a Drill down level below the
+  record, is the same `RecordTabs` drawing, which no test opens there.
 - **Remove is absent at `min` for a new row too**, as a repeater's is: a
   new record at its fewest rows adds one before it drops one.
 - **Built in part.** The plan, both adapters' save, the generator's and

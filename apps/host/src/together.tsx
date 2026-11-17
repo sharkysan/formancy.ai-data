@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { DataClient } from '@formancy/data-client'
+import type { ChildForm } from './children.js'
 import { useAfterRender } from './after-render.js'
 import { AngularForm } from './angular-mount.js'
 import type { ParentOpen } from './children.js'
@@ -15,7 +16,7 @@ import { ReactForm } from './react-form.js'
 import { DELETE_COLUMN, RecordGrid } from './record-grid.js'
 import type { OpenHow, RecordGridHandle } from './record-grid.js'
 import { countsOf, mayOf, pendingName, tabLine } from './rows-said.js'
-import { CHANGE_COLUMN } from './save-set.js'
+import { CHANGE_COLUMN, createSaveSet, isTogether } from './save-set.js'
 import type { HeldRow, SaveSet, TogetherForm } from './save-set.js'
 import type { Session } from './session.js'
 import { Words } from './words.js'
@@ -25,6 +26,18 @@ const NAMES = { react: 'React', angular: 'Angular' } as const
 
 /** A together tab's grid lists in no order but the set's, and by no filter: these never change. */
 const NONE: readonly never[] = []
+
+/**
+ * The rows of a record's together children, held for its Save (0155): one
+ * set for every pane of the record and every tab of its rows, made once
+ * for the form, its children read when it asks, since they may answer after
+ * the record is drawn.
+ */
+export function useSaveSet(client: DataClient, formId: string, parentNoun: string, childForms: readonly ChildForm[]): SaveSet {
+  const childrenNow = useRef(childForms)
+  childrenNow.current = childForms
+  return useMemo(() => createSaveSet({ client, formId, parentNoun, forms: () => childrenNow.current.filter(isTogether) }), [client, formId, parentNoun])
+}
 
 /** What the rail's line says of a row whose version moved, or which is gone, since its change was read. */
 export const MOVED = 'Changed by someone else since it was read: Save refuses this row unless you load it as stored.'
@@ -70,8 +83,16 @@ function focusFirstField(rail: HTMLElement | null): void {
  *
  * Nothing here sends a row: the record's own Save does (session.ts,
  * save-set.ts). Add is absent at the maximum and Remove at the minimum, as
- * formancy.ai 0184 draws a repeater's, and each is drawn only where the
- * menu's flags let this person (0155); the line says why one is not.
+ * formancy.ai 0184 draws a repeater's -- and Undo remove at the maximum,
+ * which would add one past it -- and each is drawn only where the menu's
+ * flags let this person (0155); the line says why one is not. A row whose
+ * change is in the save still out has neither Remove nor Undo remove until
+ * it is answered. A row's forms are keyed by the row's slot, which a new
+ * row keeps when its save stores it and its key becomes its token, so the
+ * field being typed into while it was out keeps the keyboard; and a new
+ * row is named by the number its ref was minted with, which no other row
+ * of the record's child is given, so its name does not move when another
+ * is removed.
  *
  * Its rows are the save set's, which outlives the tab: a tab drawn again
  * for the same record finds them as they were, and the guard counts them
@@ -132,7 +153,9 @@ export function TogetherSection({
   const counts = countsOf(rows)
   const { min, max } = child.together
   const adds = may.create && counts.held < max
-  const removes = (row: HeldRow): boolean => (row.ref !== null ? may.create : may.delete) && (row.removed || counts.held > min)
+  // Undo remove is an Add of the row: absent at the maximum, as Add is.
+  const removes = (row: HeldRow): boolean =>
+    !saveSet.sending(row) && (row.ref !== null ? may.create : may.delete) && (row.removed ? counts.held < max : counts.held > min)
 
   useEffect(() => {
     if (rows.listing.kind === 'idle') void saveSet.list(rows)
@@ -192,12 +215,8 @@ export function TogetherSection({
   )
 
   const open = rows.open === null ? undefined : rows.rows.find((row) => row.key === rows.open)
-  /** A row by its key, for its name. */
-  const nameOf = (row: HeldRow): Said => {
-    if (row.ref === null) return [`${title} `, { code: row.key }]
-    const n = rows.rows.filter((each) => each.ref !== null).indexOf(row) + 1
-    return [`New ${title} ${String(n)}`]
-  }
+  /** A row by its key, for its name; a new one by its ref's number, never another row's. */
+  const nameOf = (row: HeldRow): Said => (row.ref === null ? [`${title} `, { code: row.key }] : [`New ${title} ${row.ref.slice(1)}`])
   const named = (row: HeldRow): string =>
     nameOf(row)
       .map((part) => (typeof part === 'string' ? part : part.code))
@@ -228,8 +247,7 @@ export function TogetherSection({
     const row = rows.rows.find((each) => each.key === gridRow.record)
     if (row === undefined) return
     const { key } = row
-    const gone = row.ref !== null
-    saveSet.remove(rows, key, !row.removed)
+    const gone = saveSet.remove(rows, key, !row.removed)
     onListed.current = () => {
       // A new row is taken off the page; a stored one keeps its place, its button now the other way.
       if (gone) (addButton.current ?? sectionHeading.current)?.focus()
@@ -238,8 +256,15 @@ export function TogetherSection({
   }
 
   async function loadLine(row: HeldRow): Promise<void> {
-    const problem = await saveSet.loadLine(rows, row.key)
-    setRailLine(problem === null ? [`Loaded `, ...nameOf(row), ' as stored. Your changes to it were discarded.'] : [problem])
+    const name = nameOf(row)
+    const loaded = await saveSet.loadLine(rows, row.key)
+    if (loaded.kind === 'gone') {
+      // Off the page with its rail: the tab's line says so, and the keyboard goes to the tab's heading, not the page.
+      setRailLine([])
+      after(() => sectionHeading.current?.focus())
+      return
+    }
+    setRailLine(loaded.kind === 'loaded' ? [`Loaded `, ...name, ' as stored. Your changes to it were discarded.'] : [loaded.message])
     after(() => railHeading.current?.focus())
   }
 
@@ -287,7 +312,7 @@ export function TogetherSection({
           <div className="pager">
             <div className="status-cell">
               <p role="status" className="status" data-kind={rows.listing.kind === 'refused' ? 'refused' : 'answer'}>
-                {tabLine(rows, parentNoun)}
+                {tabLine(rows, parentNoun, saveSet.sending)}
               </p>
             </div>
             {may.create || may.update || may.delete ? (
@@ -332,7 +357,7 @@ export function TogetherSection({
               .filter((session) => renderersOf(renderer).includes(session.renderer))
               .map((session) => (
                 <RowPane
-                  key={`${open.key} ${session.renderer}`}
+                  key={`${String(open.slot)} ${session.renderer}`}
                   session={session}
                   title={named(open)}
                   idBase={`${owner}~${String(open.slot)}`}

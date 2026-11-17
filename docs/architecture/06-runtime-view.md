@@ -1018,15 +1018,24 @@ the other, and nothing is sent until the record's Save:
    where they did not, so the server touches it, and each child's creates
    by a ref the page mints, updates and deletes by token and the version
    each row was read at.
+   While it is out the rows are held for every pane of the record: a
+   press in the other renderer's says busy, and after a lost save that
+   created the record held, until it is checked; a row in that save has
+   no Remove until it is answered.
 3. The answer goes where it is about: stored, each row takes its stored
    self -- one typed into meanwhile keeps its newer answers and its mark,
-   the stored version applied -- and the record's line says what was
-   saved; a refusal about a row onto that row, a bound onto the tab, each
-   with the keyboard there; stale at the record, from a save of rows
-   alone, Keep my line changes reads the record again and lists the rows
+   the stored version applied, and the keyboard, its forms keyed by a slot
+   that outlives its key -- and the record's line says what was saved; a
+   record created takes every row held for it, and opening it asks nothing
+   about them; a refusal about a row opens that row, a stale one marked
+   moved and one not found gone, and a bound goes onto the tab, each with
+   the keyboard there; stale at the record, from a save of rows alone,
+   Keep my line changes -- asking first where the record's own form holds
+   typing, which it drops -- reads the record again and lists the rows
    again, each change kept at its version, so the next save is guarded row
    by row; lost, the record's notice checks by the record alone, and Load
-   the saved record lists its rows again.
+   the saved record, asking first where the rows hold changes, lists them
+   again.
 
 Held by the shared cases in `packages/data-fixtures/src/saves.ts`, which
 each adapter's `save.integration.test.ts` and
@@ -1038,9 +1047,10 @@ fake ports and `packages/data-server/src/e2e-lost-answer.integration.test.ts`
 on both engines; for the client, by
 `packages/data-client/src/saves.integration.test.ts` on both engines; and
 for the host page, by `apps/host/src/together.test.tsx`,
-`stale-set.test.tsx` and the save cases of `plane.test.tsx`,
-`page.test.tsx`, `in-flight.test.tsx`, `leaving.test.tsx` and
-`unknown-child.test.tsx` on both engines, and
+`stale-set.test.tsx`, `save-set.test.ts` and the save cases of
+`plane.test.tsx`, `page.test.tsx`, `in-flight.test.tsx`,
+`leaving.test.tsx`, `unknown-child.test.tsx` and `leave.test.ts` on both
+engines, and
 `apps/host/scripts/browser/together.mjs` in the browser gate. What
 it costs: two people saving different lines of one order at once are one
 saved and one `stale`; on SQL Server a trigger that ends the transaction

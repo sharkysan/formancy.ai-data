@@ -194,6 +194,7 @@ export function Detail({
                 <Pane
                   key={session.renderer}
                   session={session}
+                  owner="master"
                   title={formTitle}
                   idBase={formId}
                   onAnswer={(result) => onAnswer(result, session)}

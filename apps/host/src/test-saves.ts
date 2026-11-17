@@ -68,6 +68,8 @@ export interface SavedDb {
   savedLines(connection: Engine['connection'], record: string): Promise<Array<{ no: number; quantity: number }>>
   /** How many parity orders are noted `note`, asked of the owner. */
   countSavedOrders(connection: Engine['connection'], note: string): Promise<number>
+  /** The order's line numbered `no` deleted by the owner, as another application would: its trigger moves the order's version. */
+  deleteSavedLine(connection: Engine['connection'], record: string, no: number): Promise<void>
 }
 
 export function savedDb(pgAdmin: postgres.Sql, msAdmin: mssql.ConnectionPool): SavedDb {
@@ -109,6 +111,16 @@ export function savedDb(pgAdmin: postgres.Sql, msAdmin: mssql.ConnectionPool): S
         .input('id', mssql.Int, id)
         .query<{ no: number; quantity: number }>('select line_no as no, quantity from parity.saved_line where order_id = @id order by line_no')
       return result.recordset.map((row) => ({ no: row.no, quantity: row.quantity }))
+    },
+    deleteSavedLine: async (connection, record, no) => {
+      const id = Number(record.slice('k1:'.length))
+      if (connection === 'pg') await pgAdmin`delete from parity.saved_line where order_id = ${id} and line_no = ${no}`
+      else
+        await msAdmin
+          .request()
+          .input('id', mssql.Int, id)
+          .input('no', mssql.Int, no)
+          .query('delete from parity.saved_line where order_id = @id and line_no = @no')
     },
     countSavedOrders: async (connection, note) => {
       if (connection === 'pg') return (await pgAdmin<Array<{ n: number }>>`select count(*)::int as n from parity.saved_order where note = ${note}`)[0]?.n ?? 0

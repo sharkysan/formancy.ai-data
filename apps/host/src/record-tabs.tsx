@@ -18,6 +18,29 @@ import type { Drill } from './use-drill.js'
 import { Words } from './words.js'
 
 /**
+ * What a record's tabs are for (0142), as `RecordTabs`' `record`: another
+ * record starts them again on its own tab, but the record a new one's save
+ * created is that one, stored, and its rows' tab may be where the person is
+ * typing while the save was out (0155). `created()`, called as that record
+ * is opened, says the next one is it.
+ */
+export function useTabStart(open: { kind: string } | null): { start: unknown; created: () => void } {
+  const createdHere = useRef(false)
+  const held = useRef<{ open: { kind: string } | null; start: unknown }>({ open, start: open })
+  if (held.current.open !== open) {
+    const same = createdHere.current && held.current.open?.kind === 'new'
+    held.current = { open, start: same ? held.current.start : open }
+    createdHere.current = false
+  }
+  return {
+    start: held.current.start,
+    created: () => {
+      createdHere.current = true
+    },
+  }
+}
+
+/**
  * A record and its child forms, in tabs beside it (0142): the record's own
  * tab, named as its heading names it, holds its panes and the sections of
  * it (0109), each shown while the record as stored holds its condition's

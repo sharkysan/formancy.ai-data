@@ -217,7 +217,9 @@ describe.each(ENGINES)('leaving a draft on $engine', (engine) => {
 describe.each(ENGINES)('leaving an order’s lines on $engine (0155)', (engine) => {
   // A line changed and one added are the order's work, though no form of
   // the order's own changed: New record asks first and names them with the
-  // order, Keep editing keeps them, and Discard drops them with it.
+  // order, Keep editing keeps them, and Discard drops them with it
+  // (watched failing with the lines' changes not the guard's: nothing
+  // asked).
   test('the guard names the order with the changes its lines hold', async () => {
     const record = await plane.db.insertSavedOrder(engine.connection, stamp('leaving'), 1)
     const user = await openRows(plane, engine, record)

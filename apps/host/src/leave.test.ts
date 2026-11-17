@@ -60,6 +60,43 @@ describe('what each way of leaving a form discards', () => {
     expect(owners({ kind: 'created', owner: 'lines', record: 'k1:1,3', by: 'react' })).toEqual(['lines angular'])
   })
 
+  // A record's rows saved with it (0155) are its work, drawn by no
+  // renderer. A record created in a pane asks nothing about them -- its
+  // save carried them, or they are the created record's since (watched
+  // failing with them not spared: the created order's own line was asked
+  // about, and Discard would have dropped it). Keep my line changes reads
+  // the one pane again over what was typed into it, and asks about that
+  // pane alone, never the rows it keeps; Load the saved record asks about
+  // the rows it lists again, and not the pane it opens, whose notice says
+  // the draft goes.
+  test("a record's rows saved with it: spared by its create, kept by Keep my line changes, dropped by Load the saved record", () => {
+    const rows: PaneWork[] = [
+      ...PANES,
+      { owner: 'saved_line~saved_order', renderer: null, name: ['Order ', { code: 'k1:1' }, ' with 1 Order line row added'], work: 'changed' },
+    ]
+    const of = (request: LeaveRequest): string[] => atRisk(request, rows).map((pane) => `${pane.owner} ${String(pane.renderer)}`)
+    expect(of({ kind: 'created', owner: 'master', record: 'k1:5', by: 'react' })).toEqual([
+      'lines react',
+      'lines angular',
+      'staff react',
+      'saved_line~saved_order null',
+    ])
+    expect(of({ kind: 'created', owner: 'master', record: 'k1:5', by: 'react', rows: ['saved_line~saved_order'] })).toEqual([
+      'lines react',
+      'lines angular',
+      'staff react',
+    ])
+    expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual(['master react'])
+    expect(of({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'angular' })).toEqual([])
+    expect(of({ kind: 'reload-rows', record: 'k1:1', rows: ['saved_line~saved_order'] })).toEqual(['saved_line~saved_order null'])
+    expect(lead({ kind: 'keep-rows', owner: 'master', record: 'k1:1', by: 'react' })).toEqual([
+      'Reading ',
+      { code: 'k1:1' },
+      " again in React, to keep its rows' changes, closes these forms:",
+    ])
+    expect(lead({ kind: 'reload-rows', record: 'k1:1', rows: [] })).toEqual(['Loading ', { code: 'k1:1' }, ' as saved, with its rows, closes these forms:'])
+  })
+
   // The renderer switch hides a renderer's forms everywhere on the page,
   // and a hidden form is not mounted: its work goes with it, so it is asked
   // about, in the record and in every child, and the shown renderer's is not.

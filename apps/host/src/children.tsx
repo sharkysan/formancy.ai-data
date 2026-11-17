@@ -493,6 +493,7 @@ export function ChildSection({
                 <Pane
                   key={session.renderer}
                   session={session}
+                  owner={owner}
                   title={open.kind === 'record' ? `${title} ${open.token}` : `New ${title}`}
                   level={6}
                   idBase={owner}

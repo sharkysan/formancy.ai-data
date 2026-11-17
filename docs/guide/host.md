@@ -75,24 +75,33 @@ the fewest and the most the record holds, why Add or Remove is not there,
 and what is held, with Go to Save beside it, which shows the record's tab
 and puts the keyboard on its Save and sends nothing. Add starts a new row
 on a rail below the grid with the keyboard in its first field; a row opens
-there by a click, Space or Enter, in every layout, Drill down included, in
-its own form without the field naming the record, which the save fills
-in; Done closes it, sends nothing, and gives the keyboard back to its row.
-Remove marks a row to be deleted and becomes Undo remove, the keyboard
-left on it; nothing asks first, because nothing is deleted until Save.
-There is no Add at the most rows the record may hold and no Remove at the
-fewest, and neither where the server says you may not, which the line
-says. A row whose form refuses its answers is opened with its problems and
-nothing is sent; a refusal about a row goes onto that row, and one about
-the rows' count onto the tab, the keyboard there. Every save moves the
-record's version, so saving lines of an order someone else saved since is
-stale even where the two of you changed different lines: where you
-changed only lines, Keep my line changes reads the order again and keeps
-each change at the version it was read at, and Save stores them -- but a
-line the other person changed too, said Changed by someone else, is
-refused at that line until Load this line takes it as stored. Such a
-form opened on its own says its rows are added and removed with their
-record, and offers no New and no Delete.
+there by a click, Space or Enter -- in Drill down too, on the record's own
+level rather than a level below -- in its own form without the field
+naming the record, which the save fills in; Done closes it, sends nothing,
+and gives the keyboard back to its row. Remove marks a row to be deleted
+and becomes Undo remove, the keyboard left on it; nothing asks first,
+because nothing is deleted until Save. There is no Add at the most rows
+the record may hold, no Remove at the fewest and no Undo remove at the
+most, and none of them where the server says you may not -- you may take
+off a row you added and not yet saved where you may not delete a saved
+one -- which the line says. A row whose form refuses its answers is
+opened with its problems and nothing is sent; a refusal about a row opens
+that row with the server's words, and one about the rows' count is said
+on the tab, the keyboard there. While the save is out you can go on
+typing in any row, but a row in that save has no Remove until it is
+answered, and the other renderer's Save sends nothing. Every save moves
+the record's version, so saving lines of an order someone else saved
+since is stale even where the two of you changed different lines: where
+you changed only lines, Keep my line changes reads the order again and
+keeps each change at the version it was read at -- asking first if you
+typed into the order itself since, which it drops -- and Save stores them;
+but a line the other person changed too, said Changed by someone else, is
+refused at that line until Load this line takes it as stored, or takes it
+off the page where it was deleted. Load the saved record asks first where
+the rows hold changes. Such a form opened on its own says its rows are
+added and removed with their record, and that a change made there is
+saved by itself, and offers no New and no Delete.
+
 A form that is its own child -- an employee and their manager -- shows its
 records as a grid or as a tree: the records with no parent, and under each
 record, once it is expanded, those naming it

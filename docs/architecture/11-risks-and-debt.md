@@ -829,11 +829,16 @@ record's rows as the record opens rather than when first shown -- one
 list more for every record of such a form a person opens, the price of a
 Save that can show the tab it refuses at; a row's form in each renderer
 is its own engine, each answer typed into one copied into the other, and
-a field a rule computes is each form's own; Load the saved record after
-a stale save of rows drops every row's draft with the record's, asking
-nothing more; and Remove is absent at the fewest rows for a new row too,
-as a repeater's is, so a new record at its fewest adds a row before it
-drops one. A record whose rows are required is
+a field a rule computes is each form's own; Keep my line changes keeps
+none of the record's own typing -- the guard asks first, and nothing
+merges -- and Load the saved record after a stale save of rows drops
+every row's draft with the record's once the guard has asked; a row in
+the save still out cannot be removed until it is answered; and Remove is
+absent at the fewest rows for a new row too, as a repeater's is, so a new
+record at its fewest adds a row before it drops one. Untested there: a
+refusal naming a row's field put on that field, which neither engine
+answers for a check or a unique key, and the tab in Stacked and Separate
+views and on a Drill down level below the record. A record whose rows are required is
 never created alone, so every plain create of every form, and every
 save, reads every published form from the store first, and is refused
 503 when the store cannot list them -- about 2 ms a published form,

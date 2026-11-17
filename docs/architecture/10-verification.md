@@ -448,8 +448,8 @@ things are drawn, which jsdom draws nowhere, so the host's
 [0151](../decisions/0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md)).
 It fails when an order's lines saved with it are not measured clean in
 their tab at every width; when Add from the keyboard does not put it in
-the new line's first field, Done does not give it back to the line's
-row, or Go to Save does not put it on the order's Save; when a rule of
+the new line's first field, Done does not give it back to the new line's
+own row, or Go to Save does not put it on the order's Save; when a rule of
 host.css selects anything on a line's paper in either renderer; and when
 a new order saved with its line whose answer the hop drops after the
 server stored it is not stored once with its one line, or the page does

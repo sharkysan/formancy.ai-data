@@ -435,7 +435,9 @@ sends them with it, `apps/host/src/together.test.tsx` and
 `stale-set.test.tsx` on both engines -- the second of two saves of one
 order's lines stale at the order, Keep my line changes keeping each
 line's change at the version it was read at, and a line both changed
-refused at that line.
+refused at that line; and `unknown-child.test.tsx`, where a lost save
+that created the record holds a press in either renderer's pane, since
+the rows are one set for both.
 
 **What it costs.** What 0155 records: the second of two
 people saving different lines of one order at once is `stale`, the

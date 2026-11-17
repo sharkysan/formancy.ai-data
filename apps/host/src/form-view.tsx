@@ -30,13 +30,13 @@ import type { Axis, RendererChoice, Shares } from './prefs.js'
 import { DELETE_COLUMN } from './record-grid.js'
 import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
-import { RecordTabs } from './record-tabs.js'
+import { RecordTabs, useTabStart } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
-import { createSaveSet, isTogether } from './save-set.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { Split, useLine } from './split.js'
 import { Trail } from './trail.js'
+import { useSaveSet } from './together.js'
 import { useDrill } from './use-drill.js'
 import type { FormOf } from './use-drill.js'
 
@@ -126,6 +126,7 @@ export function FormView({
   const [open, setOpen] = useState<MasterOpen>(null)
   const openRef = useRef<MasterOpen>(null)
   openRef.current = open
+  const tabs = useTabStart(open)
   const [line, setLine] = useState<{ said: Said; kind: 'answer' | 'refused' }>({ said: [], kind: 'answer' })
   const [search, setSearch] = useState('')
   const demo = useDemo()
@@ -147,13 +148,8 @@ export function FormView({
   /** Where a version may be changed from a date (0113): the fields it starts and ends at, and the chain's key; else null. */
   const versions = definition.versions
   const columns = useMemo(() => columnsOf(definition, null), [definition])
-  // The rows of the record's together children, held for its Save, which every pane's save carries (0155); its children read when asked.
-  const childrenNow = useRef(childForms)
-  childrenNow.current = childForms
-  const saveSet = useMemo(
-    () => createSaveSet({ client, formId, parentNoun: entry.title, forms: () => childrenNow.current.filter(isTogether) }),
-    [client, formId, entry.title],
-  )
+  // The rows of the record's together children, held for its Save, which every pane's save carries (0155).
+  const saveSet = useSaveSet(client, formId, entry.title, childForms)
   const sessions = useMemo(
     () => (['react', 'angular'] as const).map((which) => createSession({ client, formId, definition, renderer: which, rows: saveSet.rows })),
     [client, formId, definition, saveSet],
@@ -384,7 +380,10 @@ export function FormView({
   /** A save the server answered in the record's panes: the grid shows what is stored, and a created record is the detail's (opening.ts). */
   function answered(result: SaveResult, session: Session): void {
     grid.current?.reload()
-    opening.answered(result, session, (now) => opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined))
+    opening.answered(result, session, (now) => {
+      tabs.created()
+      opened(now.token, now.discarded ? [...DISCARDED, 'Opened ', { code: now.token }, '.'] : undefined)
+    })
     if (result.kind !== 'saved') return
     setMasterName(nameOf(session))
     setStored(session.saved().answers)
@@ -562,7 +561,7 @@ export function FormView({
             <RecordTabs
               client={client}
               childForms={childForms}
-              record={open}
+              record={tabs.start}
               heading={heading}
               headingId="detail-heading"
               idBase="detail"

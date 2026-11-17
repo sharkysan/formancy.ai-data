@@ -8,13 +8,20 @@ import { Segmented } from './segmented.js'
 
 const LAYOUT_LABELS: Readonly<Record<Layout, string>> = { 'side-by-side': 'Side by side', stacked: 'Stacked', separate: 'Separate views', drill: 'Drill down' }
 
-/** What a form whose rows are saved with their record says of it (0155), by its lookup's label; null for any other form. */
+/**
+ * What a form whose rows are saved with their record says of it (0155):
+ * they are added and removed only in a save of their record, named by the
+ * form it opens in (0140) -- or, where this person may open it in none, by
+ * its lookup's label -- and a change made here is saved one row at a time,
+ * as this form still updates a row by itself. Null for any other form.
+ */
 export function savedWith(definition: PublishedForm, title: string): string | null {
   const together = definition.together
   if (together === null) return null
   const field = definition.form.model.fields.find((each) => each.key === together.field)
-  const label = field === undefined ? together.field : fieldHeading(field)
-  return `${title} rows are added and removed with their ${label}, in its own save: open it to change them.`
+  const opens = definition.opens.find((each) => each.field === together.field)?.forms[0]?.title
+  const record = opens ?? (field === undefined ? together.field : fieldHeading(field))
+  return `${title} rows are added and removed with their ${record}, in its own save; a change to one made here is saved by itself.`
 }
 
 /**

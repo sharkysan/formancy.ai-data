@@ -17,7 +17,7 @@ import { boundSaid, changesSaid, countsOf, markOf, mayOf } from './rows-said.js'
 import { createSession, NEWER } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { withoutField } from './widgets.js'
-import type { WithRows } from './with-rows.js'
+import type { RowsHeld, WithRows } from './with-rows.js'
 
 /*
  * The rows of a record's together children (0155), as the page holds them
@@ -40,10 +40,17 @@ import type { WithRows } from './with-rows.js'
  *   stored version where something was, which keeps its mark; a refusal
  *   about a row goes onto its forms and opens it, one about a child as a
  *   whole onto its tab's line.
+ * - **In flight.** Every row stays editable, but a row whose change is in
+ *   the save still out is removed, or put back, once it is answered
+ *   (`sending`): a new row taken off the page meanwhile would be stored all
+ *   the same, and shown nowhere. The set is the record's, every pane's, so
+ *   one pane's save of it out, or lost where it created the record, holds a
+ *   press in any pane (`held`), and a record it created takes every row
+ *   held for it -- one added while it was out too.
  * - **Stale.** Keep my line changes lists the rows again and keeps every
  *   change at the version it was read at, marking a row moved or gone
  *   since; the next save is guarded row by row, and Load this line takes
- *   one row as stored.
+ *   one row as stored -- or, gone, takes it off the page and says so.
  *
  * What a change is said as -- in the grid, on the tab's line, in the guard
  * and after a save -- is derived here from the rows, never typed per state.
@@ -84,6 +91,9 @@ export interface HeldRow {
 /** Where a child's rows are on the page: not asked yet, being listed, held, or refused in the server's words. */
 export type Listing = { kind: 'idle' } | { kind: 'asking' } | { kind: 'listed' } | { kind: 'refused'; message: string }
 
+/** What Load this line came to: the row as stored, the row gone -- deleted since -- and off the page, or the server's sentence. */
+export type LineLoaded = { kind: 'loaded' } | { kind: 'gone' } | { kind: 'refused'; message: string }
+
 /** Where the tab is to put the keyboard next, asked once each time `n` moves: its heading, or a row's forms. */
 export interface FocusAsk {
   n: number
@@ -102,6 +112,8 @@ export interface ChildRows {
   rows: HeldRow[]
   /** The row on the rail, by its key. */
   open: string | null
+  /** The last ref minted for a new row of these: never taken back, so no two rows of the record's child share one, nor a name. */
+  minted: number
   /** What the tab's line adds after a refusal about the child as a whole, or a row. */
   note: string | null
   focus: FocusAsk | null
@@ -163,11 +175,13 @@ export interface SaveSetOptions {
 export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOptions) {
   const children = new Map<string, ChildRows>()
   const listeners = new Set<() => void>()
-  /** The last ref minted: never taken back, so no two rows of a record's page share one. */
-  let minted = 0
   /** The last row's slot: each row held gets its own. */
   let slots = 0
   let changes = 0
+  /** The rows whose change is in a save still out: removed, or put back, once it is answered. */
+  const out = new Set<HeldRow>()
+  /** What holds each record's rows, by the record's token or `new`: the pane whose save of them was sent last. */
+  const holders = new Map<string, () => RowsHeld>()
   const notify = (): void => {
     changes += 1
     for (const listener of listeners) listener()
@@ -201,6 +215,15 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       else session.open({ ...row.stored, answers: withoutParent(row.stored.answers, child.form.child.field) as FormRecord['answers'] })
     }
     mirror(sessions)
+    // The row's mark and the tab's line follow its first keystroke, and its last one back to what it was: not every keystroke.
+    const [first] = sessions as [Session]
+    let was = first.changed()
+    first.opened().engine.subscribe(() => {
+      const now = first.changed()
+      if (now === was || row.drafts !== sessions) return
+      was = now
+      notify()
+    })
     row.drafts = sessions
     return sessions
   }
@@ -282,15 +305,15 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
         held.form = form
         return held
       }
-      const made: ChildRows = { key, form, owner, parent, listing: { kind: 'idle' }, rows: [], open: null, note: null, focus: null }
+      const made: ChildRows = { key, form, owner, parent, listing: { kind: 'idle' }, rows: [], open: null, minted: 0, note: null, focus: null }
       children.set(key, made)
       return made
     },
     list: (child: ChildRows): Promise<void> => list(child),
     /** A new row, last, open on the rail. */
     add(child: ChildRows): HeldRow {
-      minted += 1
-      const ref = `r${String(minted)}`
+      child.minted += 1
+      const ref = `r${String(child.minted)}`
       const row: HeldRow = { key: `${NEW}${ref}`, slot: (slots += 1), ref, stored: null, version: null, drafts: null, removed: false, moved: null }
       child.rows.push(row)
       drafted(child, row)
@@ -305,31 +328,43 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       child.open = key
       notify()
     },
-    /** Remove, and Undo remove: a stored row marked to be deleted, or no longer; a new row taken off the page. */
-    remove(child: ChildRows, key: string, removed: boolean): void {
+    /**
+     * Remove, and Undo remove: a stored row marked to be deleted, or no
+     * longer; a new row taken off the page, which this answers true for.
+     * Nothing for a row whose change is in the save still out (`sending`).
+     */
+    remove(child: ChildRows, key: string, removed: boolean): boolean {
       const row = rowIn(child, key)
-      if (row === undefined) return
-      if (row.ref !== null) {
+      if (row === undefined || out.has(row)) return false
+      const taken = row.ref !== null
+      if (taken) {
         child.rows = child.rows.filter((each) => each !== row)
         if (child.open === key) child.open = null
       } else row.removed = removed
       notify()
+      return taken
     },
-    /** Load this line: the row as stored now, its draft dropped -- or off the page, where it is gone. */
-    async loadLine(child: ChildRows, key: string): Promise<string | null> {
+    /** Whether a row's change is in the save still out: it is removed, or put back, once that is answered. */
+    sending: (row: HeldRow): boolean => out.has(row),
+    /**
+     * Load this line: the row as stored now, its draft dropped -- or, gone
+     * since, off the page, which the tab's line says.
+     */
+    async loadLine(child: ChildRows, key: string): Promise<LineLoaded> {
       const row = rowIn(child, key)
-      if (row === undefined) return null
+      if (row === undefined) return { kind: 'loaded' }
       const read = await client.read(child.form.child.form, key)
-      if (!read.ok && !(read.status === 404 && read.code === 'not-found')) return read.message
+      if (!read.ok && !(read.status === 404 && read.code === 'not-found')) return { kind: 'refused', message: read.message }
       // What the tab said of it -- refused, changed by someone else -- is said no longer.
       child.note = null
       if (read.ok) Object.assign(row, { stored: read.value, version: read.value.version, drafts: null, removed: false, moved: null })
       else {
         child.rows = child.rows.filter((each) => each !== row)
         child.open = null
+        child.note = `${child.form.menu.title} ${key} was deleted by someone else: your change to it was discarded.`
       }
       notify()
-      return null
+      return read.ok ? { kind: 'loaded' } : { kind: 'gone' }
     },
     /** The rows as the grid shows them: each as typed, with its change in words. */
     gridRows(child: ChildRows): FormRecord[] {
@@ -361,6 +396,17 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       if (under(record).some((child) => set.pending(child))) return true
       // A new record a together child requires rows of goes as one save, its bound said by the server where none were added.
       return record === undefined && forms().some((form) => form.child.together.min >= 1 && form.child.together.created.create)
+    },
+    held: (record) => holders.get(record ?? 'new')?.() ?? null,
+    holding(record, holds) {
+      holders.set(record ?? 'new', holds)
+    },
+    owners: (record) => under(record).map((child) => child.owner),
+    created(record) {
+      // Every row held for a new record is the created one's, whether or not its save carried them: a row added while it was out,
+      // or a child it took none of, is saved with it next.
+      for (const child of under(undefined)) child.parent = record
+      notify()
     },
     take(record) {
       const taken: TakenRows = { body: [], sent: [] }
@@ -407,7 +453,20 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       notify()
       return refused === null ? taken : null
     },
-    send: (record: SaveRecordChange, taken: TakenRows) => client.save(formId, { record, rows: taken.body }),
+    async send(record: SaveRecordChange, taken: TakenRows): Promise<SaveOutcome> {
+      const sent = taken.sent.flatMap(({ child: key, changes: each }) => {
+        const child = children.get(key)
+        return child === undefined ? [] : each.flatMap((change) => rowIn(child, change.row) ?? [])
+      })
+      for (const row of sent) out.add(row)
+      notify()
+      try {
+        return await client.save(formId, { record, rows: taken.body })
+      } finally {
+        for (const row of sent) out.delete(row)
+        notify()
+      }
+    },
     settle(outcome: SaveOutcome, taken: TakenRows, result: SaveResult): SaveResult {
       if (outcome.ok) return stored(outcome.value, taken, result)
       if (isUnknownWrite(outcome)) return result
@@ -467,6 +526,7 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       const words = changesSaid(child.form.menu.title, counts, 'deleted')
       if (words !== null) said.push(words)
     }
+
     const tail = newer ? ` ${NEWER}` : ''
     const rows = said.length === 0 ? '' : listed(said)
     notify()
@@ -479,11 +539,12 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
 
   /**
    * A save's refusal about the rows, put where it is about: a row's field
-   * errors onto its forms, a stale row marked moved, anything else about a
-   * child onto its tab's line; and the first of them opened, its tab taking
-   * the keyboard -- unless the record has field errors of its own, which its
-   * pane's summary takes the keyboard for. The words the record's pane says
-   * for it, or null where the refusal is the record's.
+   * errors onto its forms, a stale row marked moved and one not found gone,
+   * anything else about a child onto its tab's line; and the first of them
+   * opened, its tab taking the keyboard -- unless the record has field
+   * errors of its own, which its pane's summary takes the keyboard for. The
+   * words the record's pane says for it, or null where the refusal is the
+   * record's.
    */
   function refused(outcome: SaveRefused): string | null {
     const isRecord = (part: SavePart): boolean => 'record' in part && part.record === true
@@ -509,7 +570,10 @@ export function createSaveSet({ client, formId, parentNoun, forms }: SaveSetOpti
       const row = rowAt(child, part)
       const known = Object.keys(fields).length > 0
       if (row !== undefined && known) for (const session of drafted(child, row)) session.opened().engine.applyServerErrors(fields)
-      if (row !== undefined && outcome.code === 'stale') row.moved = 'moved'
+      // Stale, it moved since it was read; not found, it is gone -- a row the page listed under its record is under no other:
+      // either way, changed by someone else, which Load this line takes as stored, or off the page.
+      if (row !== undefined && row.ref === null && (outcome.code === 'stale' || outcome.code === 'not-found'))
+        row.moved = outcome.code === 'stale' ? 'moved' : 'gone'
       if (row === undefined || !known) child.note = outcome.message
       placed.push({ child, row, fields: known })
     }
