@@ -8,7 +8,7 @@ import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
 import { answered, CANNOT_OPEN, createDatasource, loading, REFUSED_FILTER_HELP, STANDING_HELP, STARTED_AGAIN } from './grid-datasource.js'
 import type { DatasourceHooks, GridColumn, GridRow, GridSource, ListClient } from './grid-datasource.js'
-import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, liveDelete, select } from './grid-options.js'
+import { columnDefsOf, drawWidths, gridOptionsFor, headerSort, liveDelete, select, took } from './grid-options.js'
 import type { OpenHow, RowDelete } from './grid-options.js'
 import { ROW_HEIGHT } from './grid-theme.js'
 import { filterByExample } from './cell-example.js'
@@ -300,7 +300,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         if (!ahead) setPager((before) => ({ ...before, page: Math.floor(start / LIST_PAGE_SIZE) }))
       },
       answered: (start, rows, hasMore, asked, from) => {
-        if (!ours(from)) return
+        if (!ours(from) || !took(api.current, start, rows)) return
         heldNow.current?.heard()
         // A page left empty that is not the first -- its last row deleted --
         // says nothing: with fewer rows than the page starts at, AG Grid's
