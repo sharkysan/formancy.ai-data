@@ -66,6 +66,17 @@ textarea:where(:not(.sheet *)) {
   font-size: 0.9375rem;
 }
 
+/* A select draws its shown option on one line and cuts it off at its box.
+   Inside a grid's minmax(0, 1fr) track, the narrow studio's one column,
+   WebKit counts the text past the box as the page's scrollable overflow:
+   the Choose step's touch column, showing its None, scrolled a 320px
+   window 91px sideways (0155). Chromium and Firefox count none of it.
+   Paint containment keeps that overflow inside the box, where it was
+   already cut off; the select, focused or not, is drawn as before. */
+select:where(:not(.sheet *)) {
+  contain: paint;
+}
+
 input:not([type='checkbox']):where(:not(.sheet *)):focus-visible,
 select:where(:not(.sheet *)):focus-visible,
 textarea:where(:not(.sheet *)):focus-visible {
