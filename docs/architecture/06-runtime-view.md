@@ -1172,3 +1172,61 @@ client, by `packages/data-client/src/actions.integration.test.ts` and
 `transport.test.ts`; the host page, by `apps/host/src/page.test.tsx`,
 `in-flight.test.tsx`, `actions.test.tsx` and `plane.test.tsx` on both
 engines, and its browser gate.
+
+## 6.16 Running an action over a selection
+
+An action whose `scope` is `selection`, bound by the generator's rules for
+the open record's, run over one to `LIST_PAGE_SIZE` records of the page a
+list shows, in one transaction, all or nothing
+([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+The steps are 6.15's, with these differences:
+
+0. `readRunBody` refuses a body of no record or more than a page, 400
+   before the write id is read, so no statement is sent; the planner holds
+   the records to the binding's scope -- one for the open record's -- and
+   refuses two tokens of one key 400 `duplicate-record`, naming both.
+1. On PostgreSQL the lock is 0160's one statement over every record, each
+   under the person's filters and throughs at the version read, sorted by
+   key before it is locked `for no key update`; the call statement calls
+   the routine once for each row moved, in an order PostgreSQL does not
+   promise. The rows the lock returned are told from the records sent by
+   their keys' canonical values.
+2. On SQL Server the batch runs one UPDATE per record `WITH (UPDLOCK,
+   HOLDLOCK)` in the adapter's key order (`lockOrder`, a whole number by
+   its value, any other key by its canonical text), each OUTPUT with its
+   position; then the checks a write's step carries, two keys the
+   database's equality makes one row -- found among the rows this
+   transaction moved, read `WITH (NOLOCK)`, and THROWn as 51736 with
+   their positions, before any call -- and every record moved; then, for
+   each record in the order sent, the routine's guard, its arguments read
+   from its own row, and its EXEC.
+3. Fewer records locked than sent is rolled back with nothing called, and
+   each record not locked is explained by the read an update alone asks,
+   one read each, and answered by data-core's `unmovedFailure`, which both
+   adapters ask: a refusal about the run first, then `not-found`,
+   `version-ended` and `stale`, naming every record with that code. A
+   call refused undoes every record.
+4. The route answers 200 with every token in the order sent; a refusal
+   about records carries `records`, the tokens sent at the positions
+   named (`ActionRecordsRefusal`); a lost answer names every record with
+   its version. The trail's `action` event names every record by its
+   keyed hash in `records`, their count in `rows`, and no `record`.
+5. data-client's `runAction` sends every record and reads the records a
+   refusal names, each one it addressed. The host page offers a selection
+   nowhere yet: its open record's header offers the actions over the open
+   record alone (`apps/host/src/action-flow.ts`).
+
+Held by the shared cases `selection-done`, `selection-crossed`,
+`selection-stale`, `selection-declined` and `selection-page` in
+`packages/data-fixtures/src/actions.ts`, which each adapter's
+`actions-selection.integration.test.ts` asserts through `covers()`, with
+SQL Server's collation duplicate beside them; by
+`packages/data-core/src/actions/plan.test.ts` and `failure.test.ts`;
+by `packages/data-sqlserver/src/actions/statements.test.ts` for the order
+the batch locks in; by `packages/data-server/src/routes/runtime-actions-selection.test.ts`
+for the route and the trail; and by `packages/data-client/src/transport.test.ts`.
+The container suites were written without a database, and CI is their
+first run. What it costs: every record is held until the last call
+returns, the routine is called once per record and never for the set, a
+selection is one page at most, and on SQL Server two spellings a
+case-insensitive collation equates sort apart in the lock order (§11).

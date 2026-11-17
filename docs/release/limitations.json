@@ -4728,7 +4728,7 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:2a4900d8b599ebfa8eab8c170a5988af9082e2324022959d2e05a36810ecadff",
+      "reviewed": "sha256:63d9b0c3d88af569976abc220eaa55c1b044841d54bb2ad51d7bf6747c41f412",
       "limitations": [
         {
           "area": "databases",
@@ -4785,7 +4785,7 @@
       ]
     },
     "0160": {
-      "reviewed": "sha256:9601980e4a4f89e7ee5c7866cf5419749dadd6753bc25d888a4c8b21138be716",
+      "reviewed": "sha256:66046da519842150ab7d1f90739ef8264d5842eaad033fcb1f066e4334f2f81f",
       "limitations": [
         {
           "area": "writes",
@@ -4857,7 +4857,7 @@
       ]
     },
     "0161": {
-      "reviewed": "sha256:b6de00ea484f7933b1a75ede22d365c3615697c3f6337724a32e8bb9eb465591",
+      "reviewed": "sha256:afc5d7fb5b39aa5fe9b4e980238cf077ded09d776272317553c8aef42130774d",
       "limitations": [
         {
           "area": "forms",
@@ -4995,6 +4995,59 @@
     "0164": {
       "reviewed": "sha256:fb5d7dbbfc4d74f79c3ea37bdebb42025cc2f037dec48099efbff39c0eecd83b",
       "none": "How CI runs the host page's suite, an app that is never published, in two jobs, and how the release report reads them: a contributor meets two check names where there was one and the runner time of a second set of databases. A release's report shows no coverage figure for that suite and says so in its row; nothing a user, integrator or operator installs or runs changes."
+    },
+    "0165": {
+      "reviewed": "sha256:f3ec3763a04db6d55d0327f9ebe0a5f78d6a3d7aa671870fb61cb27f868992bb",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A run over a selection holds every record of it locked until the last routine call returns, so a save of any of them waits for the whole run, up to its deadline, and one slow call holds them all."
+        },
+        {
+          "area": "forms",
+          "says": "An action over a selection calls its routine once per record, never once for the set, and runs over at most one page of records, LIST_PAGE_SIZE, 50.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions-selection.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A selection is all or nothing: one record refused, by the routine or by a change since it was read, rolls back every record of it, and the refusal names the records it is about.",
+          "heldBy": "packages/data-postgres/src/actions-selection.integration.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a selection's records are locked in the adapter's key order, a whole number by its value and any other key by its canonical text, so two runs that each name one row by another spelling a case-insensitive collation equates can deadlock, answered unavailable and rolled back.",
+          "heldBy": "packages/data-sqlserver/src/actions/statements.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a selection's procedure is called in the order the records were sent, so one refused leaves the later ones uncalled; on PostgreSQL the order of the calls is not promised."
+        },
+        {
+          "area": "databases",
+          "says": "On PostgreSQL two spellings of a key that a nondeterministic collation makes one row are refused rather than answered duplicate-record, which is reasoned and not tested."
+        },
+        {
+          "area": "operations",
+          "says": "A refused selection is explained by one read per record it did not lock, up to a page of statements after the rollback."
+        },
+        {
+          "area": "operations",
+          "says": "A run's 404, 409 and 400 about records carry the records they name, the open record's too, and an audit event of a run over a selection carries a records key no other event has.",
+          "heldBy": "packages/data-server/src/routes/runtime-actions-selection.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "The studio binds an action over the open record alone, so only a client writing its own generation request publishes an action over a selection."
+        },
+        {
+          "area": "host",
+          "says": "The host page offers an action over a selection nowhere: its open record's header offers the actions over the open record alone, and a selection is run through the runtime plane or @formancy/data-client."
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0165 refuses every version whose generation request names an action over a selection, as it refuses every scope it does not run."
+        }
+      ]
     }
   }
 }

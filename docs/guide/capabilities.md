@@ -331,6 +331,27 @@ get*](../../README.md#what-you-get) is the short version, and
   [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
   [0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
   [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
+- **An action runs over a selection of up to a page of records**, on
+  `main` since 0.3.0: an action whose `scope` is `selection` in the
+  generation request, bound by the generator's rules for the open
+  record's, is run by `POST /v1/forms/:id/actions/:action/run` over one to
+  `LIST_PAGE_SIZE` records -- more, or none, refused 400 before any
+  statement, two tokens of one key 400 `duplicate-record` -- in one
+  transaction on both engines: every record locked in key order under the
+  person's filters at the version they read, so two runs over
+  overlapping selections wait rather than deadlock, each version moved,
+  and the routine called once for each, all kept or none. One record
+  changed, gone or ended is `stale`, `not-found` or `version-ended`
+  naming the records it is about in `records`, by their tokens, and a
+  routine's refusal of one record undoes them all; on SQL Server two keys
+  a case-insensitive collation makes one row are `duplicate-record`,
+  rolled back before any call. Done is every token in the order sent,
+  and the trail names every record by its keyed hash and their count.
+  `@formancy/data-client`'s `runAction` sends it and reads the records a
+  refusal names. Every record is held until the last call returns, and
+  the routine is never called once for the set. The studio binds the
+  open record's scope alone and the host page offers no selection yet
+  ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).

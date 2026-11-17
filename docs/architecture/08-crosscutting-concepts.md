@@ -475,6 +475,27 @@ the account held no other permission on it, and over-reports a lost
 answer on PostgreSQL and any run past its deadline on SQL Server as "it
 may have run".
 
+**A selection's run is one transaction, its records locked in key order, all or nothing**
+([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+An action over a selection runs over one to `LIST_PAGE_SIZE` records of
+the page a list shows, each under the person's filters and throughs at
+the version they read: PostgreSQL's one lock statement sorts them by key
+before it locks them, and SQL Server's batch runs one UPDATE per record in
+the adapter's key order, so two runs over overlapping selections wait for
+each other rather than deadlock on the records they share. The routine is
+called once per record, and any record's refusal -- a change since it was
+read, the routine's own -- rolls back every record; a refusal about
+records names them, by data-core's one reading of what each record not
+locked was (`unmovedFailure`). On SQL Server two keys a case-insensitive
+collation makes one row are `duplicate-record`, found among the rows the
+batch moved before any call. **Held by** the shared `selection-*` cases of
+`ACTION_PARITY`, which each adapter's `actions-selection.integration.test.ts`
+asserts through `covers()`, first run in CI, and
+`packages/data-sqlserver/src/actions/statements.test.ts`. **What it
+costs.** Every record is held until the last call returns; there is no
+set-level call; a selection is one page at most; and SQL Server's key
+order is the adapter's own, not the index's.
+
 **A run is sent once per write id, under one deadline, and never queued**
 ([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)). The runtime plane's route answers a sending of a
 write id it already acted on as it was, whatever was published since,
@@ -514,7 +535,11 @@ other operation -- a count, never which
 An `action` event carries `action`, the name of the action run, once the
 published form binds one of that name, and no other event has the key --
 never an answer, an input or the routine's message
-([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)).
+([0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md));
+over a selection it carries `records`, every record's keyed hash in the
+order sent, `null` without an audit key, and `rows` their count, its
+`record` `null`
+([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
 And `moved`: whether a create or an update moved its policy's state field,
 never from where or to where
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md)).

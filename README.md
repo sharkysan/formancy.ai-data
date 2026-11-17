@@ -164,7 +164,10 @@ release; your application's own pages draw records their own way:
   keeps, run over the open record in one transaction on both engines --
   the record locked under the person's policy at the version they read,
   its version moved, the routine called only as it was published -- once
-  per write id, under a deadline: bound in the studio, each parameter
+  per write id, under a deadline; or over a selection of up to a page of
+  records, all locked in key order in one transaction and all kept or
+  none, through the runtime plane and `@formancy/data-client` alone so
+  far: bound in the studio, each parameter
   given only what the generator binds and the grant made after a note of
   what the routine does that nothing here binds; run on the host page
   from the open record's header, after its dialog and a confirmation in
@@ -174,7 +177,8 @@ release; your application's own pages draw records their own way:
   [0160](./docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
   [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
   [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
-  [0163](./docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
+  [0163](./docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md),
+  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
 - **Deletes, copies and files**: a record deleted one at a time, reaching
   other tables only through the foreign keys its policy names; duplicated
   into a new one; and the records a list shows downloaded as one CSV file
@@ -235,10 +239,14 @@ built from this repository and not published as a package:
   which Keep my line changes and Save then store, line by line, refusing
   a line both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
-- An action is run over the open record and no selection of records,
-  from the host page's detail of the record and nowhere below it
+- The host page runs an action over the open record alone, from its
+  detail and nowhere below it, and the studio binds that scope alone: an
+  action over a selection of records is published by a client writing
+  its own generation request and run through `@formancy/data-client`,
+  until the host page chooses the rows
   ([0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
-  [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+  [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
+  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one
   ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).

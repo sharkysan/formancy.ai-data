@@ -291,10 +291,12 @@ done, is checked by reading the record, and is repeated only after asking
 again
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
 
-Each action the server offers you on the form -- a routine the database
-keeps, which an administrator bound to it -- is a button in the open
-record's header, named by its label, and only there: a child row and a
-Drill down level offer none. Pressed, it asks in place under the header,
+Each action the server offers you on the form over the open record -- a
+routine the database keeps, which an administrator bound to it -- is a
+button in the open record's header, named by its label, and only there:
+a child row and a Drill down level offer none, and an action over a
+selection of records is offered nowhere on this page yet
+([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)). Pressed, it asks in place under the header,
 with no overlay: first its dialog, where it has one, drawn by the
 renderer you chose -- React where both are shown -- on its own paper,
 with Continue; then a confirmation, which names the action and the

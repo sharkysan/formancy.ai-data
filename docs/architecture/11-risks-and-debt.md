@@ -73,6 +73,23 @@ account's own grants; the module holds only what it hands the routine and
 which row it runs over
 ([0159](../decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
 
+**A run over a selection, accepted rather than fixed**
+([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+Every record of a selection is held until the last routine call returns,
+so one slow call holds a page of records and a save of any of them waits;
+the routine is called once per record and never for the set; and a
+selection is one page. On SQL Server the lock order is the adapter's --
+a whole number by its value, any other key by its canonical text -- and
+not the index's, so two runs that each name one row by another spelling
+a case-insensitive collation equates can deadlock, `unavailable`, rolled
+back; the procedure is called in the order sent, so one refused leaves
+the later ones uncalled, where PostgreSQL promises no order. On
+PostgreSQL two spellings a nondeterministic collation makes one key are
+`refused` and not `duplicate-record`, reasoned and not tested. A refused
+selection is explained by one read per record it did not lock. The
+container suites that hold it were written without a database, and their
+first run is CI's.
+
 **An action's run, accepted rather than fixed** ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)). On
 PostgreSQL a run locks a through's parent `FOR SHARE`, which asks UPDATE on
 the parent's table, and the generator does not yet refuse an action whose

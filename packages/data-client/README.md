@@ -180,17 +180,21 @@ through and its bounds, or `null`, and a menu's child carries `together`
 where it is saved with its record; a form reply without `together` is
 `unexpected`.
 
-`runAction` runs an action a form offers in `actions` over the open
-record: `records`, exactly one `{ record, version }` at the version its
-person read, and `answers`, the action's dialog by field key, its two
-keys alone, with a write id of its own. It resolves to an `ActionOutcome`:
+`runAction` runs an action a form offers in `actions` over the records
+its `scope` names: `records`, each `{ record, version }` at the version
+its person read -- exactly one, the open record, for `record`; one to
+`LIST_PAGE_SIZE` of a page, all or nothing, for `selection`
+([0165](../../docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)) -- and `answers`, the action's dialog
+by field key, its two keys alone, with a write id of its own. It resolves to an `ActionOutcome`:
 done only on a token for every record it addressed -- never a version,
 since the run moved it and the routine may have moved it again, so a page
 reads the record again; a refusal, the server's code and sentence --
 `declined` in the deployment's own words, `stale` from a read the run
 or anybody moved, `unavailable` when the server's actions' pool is busy,
 `action-timeout` when PostgreSQL stopped it at its deadline, nothing done
-by any; or an `UnknownAction` -- `ok: false`, `operation: 'action'`, the
+by any -- and, where the server named which records it is about,
+`records`, each a token the call addressed (`ActionRefusal`); or an
+`UnknownAction` -- `ok: false`, `operation: 'action'`, the
 action and each record with the version sent, from the call's own
 arguments -- whenever what answered was not the data server saying what
 happened. Running it again from those versions is refused `stale` if the
