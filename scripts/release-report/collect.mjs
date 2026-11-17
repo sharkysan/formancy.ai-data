@@ -1,6 +1,7 @@
 // What one job of a run found, in one file the release report reads (0035).
 //
-//   node scripts/release-report/collect.mjs --job test --package @formancy/data-host
+//   node scripts/release-report/collect.mjs --job test --package @formancy/data-core
+//   node scripts/release-report/collect.mjs --job test --package @formancy/data-host --shard 1/2
 //   node scripts/release-report/collect.mjs --job test-images --package @formancy/data-postgres --variant postgres:16-alpine
 //   node scripts/release-report/collect.mjs --job browser --variant chromium
 //   node scripts/release-report/collect.mjs --job getting-started --variant 2.20.3
@@ -11,7 +12,8 @@
 // step's outputs, so the artefact's name and the file's key have one source.
 // The key is the job, `<job>-<id>` for a job given a package's suite with
 // `--package` -- `test-<id>`, and `test-images-<id>` for a leg of the image
-// matrix (0067) -- with the id codecov-config.mjs gives it, and either with
+// matrix (0067) -- with the id codecov-config.mjs gives it, `-<i>of<n>` for a
+// shard of a suite the test job runs in shards (0164), and either with
 // `--variant` appended for a job a matrix runs more than once: an image leg's
 // image, which the leg's suite must have started.
 //
@@ -19,7 +21,8 @@
 // in the container and getting-started jobs, which install nothing.
 //
 // What it reads, each where its writer puts it: a suite's
-// `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo's
+// `test-results/vitest.json` and `coverage/coverage-summary.json`, a shard's
+// `test-results/files.json` of every file its suite resolves, turbo's
 // `.turbo/runs/*.json` for the task's own start and end, every
 // `test-results/servers/*.json` record of a server a suite or a gate started
 // (data-fixtures, or the getting-started journey), a browser gate's
@@ -58,13 +61,30 @@ const time = (value) => (typeof value === 'number' ? value : Date.parse(value))
 /** A matrix value safe in an artefact's name. */
 const safe = (value) => String(value).replaceAll(/[^A-Za-z0-9.]+/g, '-')
 
+/**
+ * A shard of a package's suite, `<index>/<count>` as vitest's `--shard`
+ * takes it (0164), as `{ index, count }`. One shard of one is the suite
+ * whole, which a leg runs without one.
+ */
+export function parseShard(value) {
+  const [, index, count] = /^([1-9]\d*)\/([1-9]\d*)$/.exec(String(value)) ?? []
+  if (index === undefined || Number(index) > Number(count) || Number(count) < 2)
+    throw new Error(`--shard ${String(value)} is not <index>/<count>, an index from 1 to a count of at least 2`)
+  return { index: Number(index), count: Number(count) }
+}
+
 /** The key of a job's results: the artefact is `release-results-<key>`. */
-export function keyFor({ job, pkg, variant }, covered) {
+export function keyFor({ job, pkg, variant, shard }, covered) {
   let key = job
   if (job === 'test' || pkg !== undefined) {
     const entry = covered.find((candidate) => candidate.name === pkg)
     if (entry === undefined) throw new Error(`--package ${String(pkg)} is no workspace package with a test:coverage script`)
     key = `${job}-${entry.id}`
+  }
+  if (shard !== undefined) {
+    if (pkg === undefined) throw new Error(`--shard ${String(shard)} divides a package's suite, and no --package names one`)
+    const { index, count } = parseShard(shard)
+    key = `${key}-${String(index)}of${String(count)}`
   }
   return variant === undefined ? key : `${key}-${safe(variant)}`
 }
@@ -166,6 +186,24 @@ export function normaliseSuite(json, root) {
   }
 }
 
+/**
+ * Every test file a sharded suite resolves, which its shards share out
+ * (0164), repository-relative and sorted: `vitest list --filesOnly
+ * --json=test-results/files.json` in the package, which globs as a run does
+ * and runs nothing. null, listed as missing, when the leg wrote none: the
+ * report then has nothing to hold the shards' files to.
+ */
+function suiteFilesOf(root, path, missing) {
+  const shown = slash(join(path, 'test-results', 'files.json'))
+  if (!existsSync(join(root, shown))) {
+    missing.push(`${shown}, every file the suite's shards share out`)
+    return null
+  }
+  return readJson(join(root, shown))
+    .map((entry) => slash(relative(root, entry.file)))
+    .sort()
+}
+
 /** The newest turbo run summary's entry for `taskId`: its own start and end, and whether turbo replayed it. */
 function turboTask(root, taskId) {
   const folder = join(root, '.turbo', 'runs')
@@ -226,6 +264,7 @@ export function collect({
   job,
   pkg,
   variant,
+  shard,
   image,
   local = false,
   since,
@@ -239,8 +278,10 @@ export function collect({
     if (variant === undefined) throw new Error(`--job browser needs --variant <browser>, the browser its leg ran: one of ${browsers.join(', ')}`)
     if (!browsers.includes(variant)) throw new Error(`--job browser --variant ${variant}: ${variant} is no browser the gates run in (${browsers.join(', ')})`)
   }
+  if (shard !== undefined && (local || job !== 'test'))
+    throw new Error(`--shard divides a package's suite in the test job, not ${local ? 'a local run' : `--job ${String(job)}`}`)
   const packages = namedPackages(root)
-  const key = local ? 'local' : keyFor({ job, pkg, variant }, packages)
+  const key = local ? 'local' : keyFor({ job, pkg, variant, shard }, packages)
   const missing = []
   const after = local ? time(since) : Number.NEGATIVE_INFINITY
   if (local && Number.isNaN(after))
@@ -301,13 +342,16 @@ export function collect({
   }
 
   let container = null
+  let sharded = null
   if (local) {
     for (const entry of packages) suiteOf(entry.path, entry.name)
     suiteOf('.', null)
     for (const app of browserApps(root)) for (const browser of browsers) gateOf(app.path, browser)
     installOf()
   } else if (job === 'test') {
-    suiteOf(packages.find((entry) => entry.name === pkg).path, pkg)
+    const { path } = packages.find((entry) => entry.name === pkg)
+    suiteOf(path, pkg)
+    if (shard !== undefined) sharded = { ...parseShard(shard), suiteFiles: suiteFilesOf(root, path, missing) }
   } else if (job === 'test-images') {
     if (variant === undefined) throw new Error('--job test-images needs --variant <image>, the image its leg runs on')
     suiteOf(packages.find((entry) => entry.name === pkg).path, pkg)
@@ -363,6 +407,7 @@ export function collect({
     key,
     ...(pkg === undefined ? {} : { package: pkg }),
     ...(variant === undefined ? {} : { variant }),
+    ...(sharded === null ? {} : { shard: sharded }),
     runner: runner(env, docker),
     commit: env.GITHUB_SHA ?? git(['rev-parse', 'HEAD']).trim(),
     run: { id: env.GITHUB_RUN_ID ?? null, attempt: env.GITHUB_RUN_ATTEMPT ?? null },
@@ -400,11 +445,16 @@ if (process.argv[1]?.replaceAll('\\', '/').endsWith('scripts/release-report/coll
   const local = argv.includes('--local')
   const job = option(argv, '--job')
   if (!local && job === undefined)
-    throw new Error('usage: collect.mjs --job <job> [--package <name>] [--variant <value>] [--image <image>], or --local --since <ISO instant>')
+    throw new Error(
+      'usage: collect.mjs --job <job> [--package <name>] [--variant <value>] [--shard <index>/<count>] [--image <image>], or --local --since <ISO instant>',
+    )
   const result = collect({
     job,
     pkg: option(argv, '--package'),
     variant: option(argv, '--variant'),
+    // The test job hands every leg its matrix's shard, empty where a package
+    // runs whole (0164).
+    shard: option(argv, '--shard') || undefined,
     image: option(argv, '--image'),
     local,
     since: option(argv, '--since'),

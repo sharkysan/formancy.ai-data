@@ -7,10 +7,14 @@
 // in: the `test` job's, on the default images, and one per image of the
 // matrix the `test-images` job ran it on (0067), so no test is counted
 // twice in a row and no two legs' wall times, which ran side by side, are
-// added. Two times are shown for a suite, each named for what it is: the
-// task's wall time from turbo's run summary, and vitest's span from the
-// first test's start to the last test's end, which leaves out container
-// starts, hooks and teardown.
+// added. A suite the `test` job runs in shards is one row of all of them
+// (0164): each file and test once, its times the longest shard's, since the
+// shards ran side by side too, and no coverage, since each shard's counts
+// only the lines its own files reached and totals do not add up to a union.
+// Two times are shown for a suite, each named for what it is: the task's
+// wall time from turbo's run summary, and vitest's span from the first
+// test's start to the last test's end, which leaves out container starts,
+// hooks and teardown.
 
 import { serversOf } from './versions.mjs'
 
@@ -18,6 +22,61 @@ const distinct = (values) => [...new Set(values)]
 
 /** A test's status, as the report counts it: anything but passed or failed is skipped, as vitest's pending and todo are. */
 const kind = (status) => (status === 'passed' || status === 'failed' ? status : status === 'todo' ? 'todo' : 'skipped')
+
+/** A suite's span, from its first file's start to its last file's end; null when no file says. */
+function spanOf(suite) {
+  const starts = suite.files.map((file) => file.startTime).filter(Number.isFinite)
+  const ends = suite.files.map((file) => file.endTime).filter(Number.isFinite)
+  return starts.length === 0 || ends.length === 0 ? null : Math.max(...ends) - Math.min(...starts)
+}
+
+/**
+ * A suite's shards as the report holds them (0164), or null for a suite no
+ * leg ran in shards: each leg as `<index>/<count>`, or `whole` for one that
+ * ran it all; whether those are anything but 1/N to N/N, each once; the
+ * shards of that count no leg left results of; and each file of the suite
+ * -- every one its legs listed as vitest resolves them -- that no shard
+ * ran, or that more than one did.
+ *
+ * The list is held too, since every file is held to it: a file a leg ran
+ * that no list names, which a list shorter than the run's would leave
+ * unheld; a list given that names no file while a leg ran some, which
+ * would hold nothing; and each file one shard's list names and another's
+ * does not, lists vitest may have divided two ways. A leg that wrote no
+ * list is in the run's `missing` already, which fails it, and its null is
+ * compared with nothing.
+ */
+function shardsOf(suites) {
+  if (suites.every((suite) => suite.shard == null)) return null
+  const legs = suites.map((suite) => (suite.shard == null ? 'whole' : `${String(suite.shard.index)}/${String(suite.shard.count)}`))
+  const counts = distinct(suites.filter((suite) => suite.shard != null).map((suite) => suite.shard.count))
+  const all = counts.length === 1 ? Array.from({ length: counts[0] }, (_, at) => `${String(at + 1)}/${String(counts[0])}`) : []
+  const ran = new Map()
+  suites.forEach((suite, at) => {
+    for (const file of suite.files) ran.set(file.file, [...(ran.get(file.file) ?? []), legs[at]])
+  })
+  const lists = suites.flatMap((suite, at) => (suite.shard?.suiteFiles == null ? [] : [{ leg: legs[at], files: distinct(suite.shard.suiteFiles).sort() }]))
+  const listed = distinct(lists.flatMap((entry) => entry.files)).sort()
+  const empty = lists.length > 0 && listed.length === 0 && ran.size > 0
+  return {
+    legs: [...legs].sort(),
+    mixed: legs.includes('whole') || counts.length !== 1 || distinct(legs).length !== legs.length,
+    absent: all.filter((leg) => !legs.includes(leg)),
+    unrun: listed.filter((file) => !ran.has(file)),
+    twice: [...ran].filter(([, by]) => by.length > 1).map(([file, by]) => ({ file, by: [...by].sort() })),
+    empty,
+    unlisted: empty ? [] : [...ran.keys()].filter((file) => !listed.includes(file)).sort(),
+    differing: listed
+      .filter((file) => lists.some((entry) => !entry.files.includes(file)))
+      .map((file) => ({
+        file,
+        by: lists
+          .filter((entry) => entry.files.includes(file))
+          .map((entry) => entry.leg)
+          .sort(),
+      })),
+  }
+}
 
 /**
  * One row per package with a `test:coverage` script and leg -- `image` null
@@ -30,9 +89,9 @@ function suiteRow(suites, servers, { name, path, published, image = null }) {
   const tests = files.flatMap((file) => file.tests.map((test) => ({ ...test, file: file.file })))
   const count = (wanted) => tests.filter((test) => kind(test.status) === wanted).length
   const tasks = suites.map((suite) => suite.task).filter((task) => task != null && task.endTime != null)
-  const starts = files.map((file) => file.startTime).filter(Number.isFinite)
-  const ends = files.map((file) => file.endTime).filter(Number.isFinite)
-  const coverage = suites.find((suite) => suite.coverage != null)?.coverage ?? null
+  const spans = suites.map(spanOf).filter((span) => span !== null)
+  const shards = shardsOf(suites)
+  const coverage = shards === null ? (suites.find((suite) => suite.coverage != null)?.coverage ?? null) : null
   const pct = (metric) => (coverage?.[metric]?.pct === undefined ? null : coverage[metric].pct)
   return {
     package: name,
@@ -53,8 +112,9 @@ function suiteRow(suites, servers, { name, path, published, image = null }) {
       .map((file) => ({ file: file.file, testsPassed: file.tests.every((test) => test.status === 'passed') })),
     success: suites.every((suite) => suite.success === true),
     numFailedTestSuites: suites.reduce((total, suite) => total + (suite.numFailedTestSuites ?? 0), 0),
-    wallMs: tasks.length === 0 ? null : tasks.reduce((total, task) => total + (task.endTime - task.startTime), 0),
-    spanMs: starts.length === 0 || ends.length === 0 ? null : Math.max(...ends) - Math.min(...starts),
+    wallMs: tasks.length === 0 ? null : Math.max(...tasks.map((task) => task.endTime - task.startTime)),
+    spanMs: spans.length === 0 ? null : Math.max(...spans),
+    shards,
     engines: distinct(
       servers.filter((server) => server.package === name && server.package !== null && jobs.includes(server.job)).map((server) => server.engine),
     ).sort(),
@@ -62,10 +122,15 @@ function suiteRow(suites, servers, { name, path, published, image = null }) {
   }
 }
 
-/** The suites of the run, each with the key of the results file it came in and, for an image leg, its image. */
+/** The suites of the run, each with the key of the results file it came in, for an image leg its image, and for a shard its shard. */
 const suitesOf = (results) =>
   results.flatMap((result) =>
-    (result.suites ?? []).map((suite) => ({ ...suite, job: result.key, image: result.job === 'test-images' ? (result.variant ?? null) : null })),
+    (result.suites ?? []).map((suite) => ({
+      ...suite,
+      job: result.key,
+      image: result.job === 'test-images' ? (result.variant ?? null) : null,
+      shard: result.shard ?? null,
+    })),
   )
 
 /** A package's rows: its default leg, present or not, then each image leg it ran in. */

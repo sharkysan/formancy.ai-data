@@ -26,7 +26,9 @@ import type { ViteUserConfig } from 'vitest/config'
 export const coverage: NonNullable<NonNullable<ViteUserConfig['test']>['coverage']> = {
   provider: 'v8',
   // `json-summary` writes coverage/coverage-summary.json, whose totals the
-  // release report shows per package -- reported there as here, never gated (0035).
+  // release report shows per package -- reported there as here, never gated
+  // (0035) -- but for a suite run in shards, whose shards each count only the
+  // lines their own files reached (0164).
   reporter: ['text', ['lcov', { projectRoot: '../..' }], 'json-summary'],
   include: ['src/**/*.ts'],
   exclude: ['src/**/*.test.ts', 'src/**/*.d.ts', 'src/index.ts', 'src/main.ts'],

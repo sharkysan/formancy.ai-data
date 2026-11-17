@@ -363,6 +363,29 @@ export function withImageLeg(inputs, { image = 'postgres:16-alpine', version = '
   return inputs
 }
 
+/**
+ * `inputs` (anything with the host's `results`, a copy of greenRun()'s) as a
+ * run in which the test job ran the host's suite in two shards (0164): its
+ * page test and one more file, one in each shard's results, each keyed by
+ * its shard, listing both files as the suite's, with the host's servers --
+ * each leg starts its own databases -- and a coverage of its own.
+ */
+export function withShards(inputs) {
+  const host = job(inputs, 'test-app-host')
+  const [suite] = host.suites
+  const files = [suite.files[0], { ...structuredClone(suite.files[0]), file: 'apps/host/src/stale.test.tsx' }]
+  inputs.results = inputs.results.filter((result) => result !== host)
+  for (const [at, own] of files.entries()) {
+    inputs.results.push({
+      ...structuredClone(host),
+      key: `test-app-host-${String(at + 1)}of2`,
+      shard: { index: at + 1, count: 2, suiteFiles: files.map((entry) => entry.file) },
+      suites: [{ ...structuredClone(suite), numTotalTests: own.tests.length, files: [structuredClone(own)] }],
+    })
+  }
+  return inputs
+}
+
 /** `inputs` as a run in which the gates run in Chromium and Firefox. */
 export const withFirefox = (inputs) =>
   withBrowser(inputs, {

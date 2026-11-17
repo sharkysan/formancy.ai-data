@@ -37,9 +37,13 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
    the `test` job's, on the default images, and each `test-images` leg's,
    on its image -- with files, tests, what did not pass, the task's wall
    time from turbo, vitest's span, the engines its run started, and
-   coverage, reported and never gated; then the repository's
-   guards, each browser gate in each browser, the install gate and the
-   container gate.
+   coverage, reported and never gated -- a suite the `test` job runs in
+   shards is one row of them, its times the longer shard's and no
+   coverage, since each shard's counts only the lines its own files
+   reached
+   ([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md));
+   then the repository's guards, each browser gate in each browser, the
+   install gate and the container gate.
 4. **Shared cases on both engines:** every case `sharedCases()` derives from
    data-fixtures' shared tables, `passed`, `failed` or `missing` on each
    image of each engine's matrix (`MATRIX_IMAGES`, 0067), from the tests
@@ -73,7 +77,13 @@ builds the report from all of them (`scripts/release-report/report.mjs`).
 A job of the gates that ended other than success; a job's results missing,
 twice, under another job's name, or from another commit or run; a package
 with no results, no tests, a test that did not pass -- skipped is not passed
--- a file that failed, or vitest calling the run unsuccessful; a browser gate
+-- a file that failed, or vitest calling the run unsuccessful; a suite in
+shards with a shard that left no results, legs other than 1/N to N/N each
+once, a file of the suite, as its legs listed it, that no shard ran or two
+did, a file a shard ran that no leg's list names, legs whose lists name no
+file, or a file one leg's list names and another's does not
+([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md));
+a browser gate
 missing in a browser the gates run in, in error, with a failed check, having
 made no check or no pass at a viewport width, or having made another list of
 passes, or in a pass another check by name, than the app's gate made in
@@ -154,6 +164,10 @@ A machine runs the default images unless `FORMANCY_IMAGES` names others, so
 the other images of the matrix answer nothing there: `test-images` allowed
 missing, a case missing on one of them is not a problem, and one that failed
 on an image that did run still is.
+
+A machine runs each suite whole, as one `turbo run test:coverage` does: the
+shards are the `test` job's, so a local report holds no shards to anything
+and shows every suite's coverage.
 
 `--since` has no default. A results file left by an earlier run, read as this
 one's, is the failure local mode has to rule out, and only the person running

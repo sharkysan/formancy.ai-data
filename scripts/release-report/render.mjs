@@ -61,7 +61,7 @@ const METHOD = [
   ],
   [
     'Results',
-    'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, turbo’s run summary (`--summarize`), each app’s `test-results/browser-<browser>.json` for each browser the gates run in, the install gate’s `test-results/install.json`, and `collect.mjs --job container`',
+    'each package’s `test-results/vitest.json` and `coverage/coverage-summary.json`, a shard’s `test-results/files.json` of every file its suite resolves (0164), turbo’s run summary (`--summarize`), each app’s `test-results/browser-<browser>.json` for each browser the gates run in, the install gate’s `test-results/install.json`, and `collect.mjs --job container`',
   ],
   [
     'Shared cases',
@@ -202,8 +202,11 @@ function factsSection() {
   ].join('\n')
 }
 
-/** A suite's row as the table names it: the package, and the image of an image leg (0067). */
-const leg = (row) => (row.image == null ? row.package : `${row.package} on ${row.image}`)
+/** A suite's row as the table names it: the package, the image of an image leg (0067), and the shards of a suite run in shards (0164). */
+const leg = (row) => {
+  const name = row.image == null ? row.package : `${row.package} on ${row.image}`
+  return row.shards == null ? name : `${name}, in shards ${row.shards.legs.join(', ')}`
+}
 
 const pct = (coverage) =>
   coverage === null
@@ -226,7 +229,9 @@ function resultsSection({ results }) {
           seconds(row.wallMs) || 'not measured',
           seconds(row.spanMs),
           row.engines.join(', '),
-          pct(row.coverage) || 'not measured',
+          // A shard's totals count only what its own files reached, and two
+          // totals do not add up to the lines either reached (0164).
+          pct(row.coverage) || (row.shards == null ? 'not measured' : 'not merged across its shards'),
         ]
       : [leg(row), row.published ? 'yes' : 'no', 'no results', '', '', '', '', '', '', '', '', ''],
   )

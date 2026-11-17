@@ -46,8 +46,10 @@ The gates are [`.github/workflows/gates.yml`](../../.github/workflows/gates.yml)
 which CI runs on every pull request and a release runs before it publishes:
 `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check`,
 `pnpm check:pkg`, `node scripts/verify-licenses.mjs` and `pnpm test:repo`
-in one job; each package's `test:coverage` in a job of its own, and
-data-fixtures' and each engine's adapter's again in the `test-images` job,
+in one job; each package's `test:coverage` in a job of its own, the host
+page's in two, each a shard of its files that vitest's `--shard` chooses
+([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md)),
+and data-fixtures' and each engine's adapter's again in the `test-images` job,
 once on every other image of the engine's matrix; in jobs of their own
 `pnpm test:e2e:install`, `pnpm test:browser` once per browser,
 `pnpm test:pictures`, the server image, and

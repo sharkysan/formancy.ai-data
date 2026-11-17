@@ -9,9 +9,11 @@
 // from the job's own collect step: `--job <id>`, and, for a job a matrix runs
 // more than once, `--package "$X"`, `--variant "$X"` or both, with X taken
 // from `${{ matrix.<name> }}` in the step's env -- both from an include-only
-// matrix, read as its pairs, as the `test-images` job's legs are (0067). A
-// matrix value added to the workflow is an artefact the report then expects,
-// without an edit here.
+// matrix, read as its pairs, as the `test-images` job's legs are (0067) --
+// or `--package` and `--shard`, from a list of packages run whole and an
+// `include` entry per shard of a suite run in shards, as the `test` job's
+// are (0164). A matrix value added to the workflow is an artefact the report
+// then expects, without an edit here.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -33,11 +35,18 @@ export function gateJobs(workflow) {
   return Object.keys(workflow?.jobs ?? {}).filter((id) => id !== 'report')
 }
 
-/** The packages the `test` job's matrix runs, by npm name. */
+/**
+ * The `test` job's legs, `{ package, shard }` each, by npm name: each package
+ * its matrix lists, whole (`shard` null), then each `include` entry, a shard
+ * of a suite the job runs in shards, `<index>/<count>` (0164).
+ */
 export function testMatrix(workflow) {
-  const values = workflow?.jobs?.test?.strategy?.matrix?.package
-  if (!Array.isArray(values)) throw new Error(`${GATES_WORKFLOW} has no test job whose matrix lists packages`)
-  return values.map(String)
+  const matrix = workflow?.jobs?.test?.strategy?.matrix
+  if (!Array.isArray(matrix?.package)) throw new Error(`${GATES_WORKFLOW} has no test job whose matrix lists packages`)
+  return [
+    ...matrix.package.map((name) => ({ package: String(name), shard: null })),
+    ...(matrix.include ?? []).map((entry) => ({ package: String(entry?.package), shard: entry?.shard === undefined ? null : String(entry.shard) })),
+  ]
 }
 
 /**
@@ -101,6 +110,34 @@ function matrixPairs(job, first, second, where) {
 }
 
 /**
+ * The legs of a job that collects with `--package` and `--shard`, as
+ * `[package, shard]`: each package its list gives, whole (shard undefined),
+ * then each `include` entry's package and shard (0164). An entry for a
+ * listed package is refused: GitHub adds an entry to the listed leg it
+ * matches rather than making one of its own, and a second entry's shard
+ * replaces the first's there, so one shard alone would run. A key beside
+ * the list would cross every package with its values, which no key names.
+ */
+function shardLegs(job, first, second, where) {
+  const [a, b] = [matrixField(first, where), matrixField(second, where)]
+  const matrix = job.strategy?.matrix ?? {}
+  const crossed = Object.keys(matrix).filter((key) => key !== 'include' && key !== a)
+  if (crossed.length > 0)
+    throw new Error(`${where} collects with --package and --shard, and its matrix lists ${crossed.join(', ')} beside ${a}, which no key can name`)
+  const listed = (Array.isArray(matrix[a]) ? matrix[a] : []).map(String)
+  const included = (matrix.include ?? []).map((entry, at) => {
+    const which = `${where}: the job's include entry ${String(at + 1)}`
+    if (entry?.[a] === undefined || entry?.[b] === undefined) throw new Error(`${which} gives no ${entry?.[a] === undefined ? a : b}`)
+    if (listed.includes(String(entry[a])))
+      throw new Error(
+        `${which} gives ${String(entry[a])} a ${b}, and its ${a} list names it too: GitHub adds the entry to that leg, where the next entry's ${b} replaces it`,
+      )
+    return [String(entry[a]), String(entry[b])]
+  })
+  return [...listed.map((name) => [name, undefined]), ...included]
+}
+
+/**
  * Every results key a run of `workflow` leaves, each with the job that
  * leaves it: `[{ key, job }]`. `named` is collect.mjs's namedPackages().
  * Throws, naming the job, when a job has no collect step or collects under
@@ -118,6 +155,13 @@ export function expectedKeys(workflow, named) {
     if (collects !== id) throw new Error(`${where} collects as --job ${String(collects)}, not as itself`)
     const pkg = argument(step, '--package')
     const variant = argument(step, '--variant')
+    const shard = argument(step, '--shard')
+    if (shard !== undefined) {
+      if (pkg === undefined || variant !== undefined)
+        throw new Error(`${where} collects with --shard, which divides one package's suite: it needs --package and no --variant`)
+      for (const [one, other] of shardLegs(job, pkg, shard, where)) keys.push({ key: keyFor({ job: id, pkg: one, shard: other }, named), job: id })
+      continue
+    }
     if (pkg === undefined && variant === undefined) {
       keys.push({ key: keyFor({ job: id }, named), job: id })
       continue

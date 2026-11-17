@@ -491,7 +491,8 @@ pull request and `release.yml` calls before it publishes, so a release passes
 exactly what CI does. It runs `pnpm build`, `pnpm typecheck`, `pnpm lint`,
 `pnpm format:check`, `pnpm check:pkg`, `node scripts/verify-licenses.mjs`
 and `pnpm test:repo` in one job; each package's `test:coverage` in a job of
-its own, on its own runner, because nine suites sharing one runner timed
+its own, the host's in two, each a shard of its files (0164), on its own
+runner, because nine suites sharing one runner timed
 out a test that takes two seconds alone
 (`scripts/ci-test-jobs.test.mjs` fails when that list and the workspace
 disagree); in jobs of their own `pnpm test:e2e:install`, `pnpm test:browser`

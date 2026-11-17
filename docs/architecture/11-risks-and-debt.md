@@ -962,9 +962,21 @@ changes). That is repository configuration, and no file here can assert it.
 **The host page's suite is the longest a pull request waits for.** Each of
 its page tests mounts both renderers against the real server on both
 engines, so the suite grows by minutes with a feature: 1292 s under
-coverage on 2026-10-28, its job 22 minutes. The job's limit was raised
-from 25 to 40 minutes (`.github/workflows/gates.yml`) rather than the suite
-split across runners, which is the next step when that is not enough. The
+coverage on 2026-10-28, its job 22 minutes, when the job's limit was raised
+from 25 to 40; 2331 s on 2026-11-17, its job 39 minutes, sixteen past the
+next longest; and past 40 the same day with the host page's actions,
+when #202 raised the limit to 60
+([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+It now runs in two shards, each a job on a runner of its own
+(`.github/workflows/gates.yml`;
+[0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md)),
+predicted near 21 and 18 minutes from the 2026-11-17 run's file times,
+before 0162 added its files, and not yet measured. Accepted with it: two runners pulling SQL Server's image and
+starting both databases where one did; a split vitest makes by a hash of
+each path, not by time, which puts both of that run's longest files in one
+shard and moves when a file is added; and no coverage figure for the
+suite in the release report, since each shard's counts only its own files'
+lines. A third shard is the next step when one nears the limit. The
 browser legs grow the same way, every journey walked in every window:
 WebKit's took up to 1553 s on main by 2026-11-12 and 1753 s with 0151's
 widths journey, past the thirty minutes the legs had, so their limit is
