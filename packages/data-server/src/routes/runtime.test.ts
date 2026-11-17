@@ -20,7 +20,7 @@ import type {
 } from '@formancy/data-core'
 import type { IdentityVerifier } from '@formancy/data-identity'
 import type { FastifyInstance } from 'fastify'
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { createDataServer } from '../app.js'
 import type { PublishedBundle } from '../bundle.js'
 import { recordReference } from '../audit.js'
@@ -850,9 +850,18 @@ describe('a write sent again (0031)', () => {
   test('a sending that arrives while the first is in flight waits for its answer', async () => {
     let release = (): void => {}
     insertGate = new Promise<void>((resolve) => (release = resolve))
+    // The first sending is in flight once the database holds it. A fixed 50 ms
+    // stood here, and a CI runner had not reached the insert by then (run
+    // 44154593962, 2026-11-17): waiting for the insert itself cannot be too
+    // short. The resend then takes the path the first took to the database,
+    // so it is given twice as long as the first needed to be waiting on its
+    // answer before that answer is released.
+    const sent = performance.now()
     const first = sending('/v1/forms/customer/records/create', { answers: NEW })
+    await vi.waitFor(() => expect(calls.inserts).toHaveLength(1), { timeout: 5_000 })
+    const reached = performance.now() - sent
     const again = sending('/v1/forms/customer/records/create', { answers: NEW })
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    await new Promise((resolve) => setTimeout(resolve, Math.max(50, 2 * reached)))
     expect(calls.inserts).toHaveLength(1)
     release()
     const answers = await Promise.all([first, again])
