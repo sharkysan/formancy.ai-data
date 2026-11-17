@@ -4460,7 +4460,7 @@
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
-      "reviewed": "sha256:2f768a5f3b1239c73dfa3019b8bea0015793d4cd2863fa5c48d476e6a45f815e",
+      "reviewed": "sha256:fbb37897d811afc32ce6883edb7c8472f170290241c9dc1ca042da945cda24fb",
       "limitations": [
         {
           "area": "writes",
