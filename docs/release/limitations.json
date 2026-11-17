@@ -4464,7 +4464,7 @@
       "limitations": [
         {
           "area": "writes",
-          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds; an administrator confirms together and a touch column in a generation request of their own, which the studio does not yet write.",
+          "says": "A record and its together children's rows are saved together through POST /v1/forms/:id/records/save, which the host page's record Save sends with the rows its tab holds; an administrator chooses together and a touch column on the studio's Choose step, which ticks and chooses neither.",
           "heldBy": "apps/host/src/together.test.tsx"
         },
         {
@@ -4589,6 +4589,16 @@
         {
           "area": "server",
           "says": "A save's answer is kept for a resend under the same byte cap as any write's, 32 MiB: measured once on the fixture's order, a save of 49 lines answered 7,508 bytes on PostgreSQL and 9,758 on SQL Server, about 148 and 193 a line, so the cap holds about 4,400 and 3,400 such saves, fewer with several together children or wider rows, and a resend whose answer was dropped first is applied again."
+        },
+        {
+          "area": "studio",
+          "says": "The studio offers a form's rows saved with their record under every lookup whose foreign key is NOT NULL onto another table, and says what the generator, the bundle check and publishing refuse of it before anything is sent: the generator run in the browser against the snapshot the Connect step discovered, and the policy check and SQL Server's batch against the policy as it stands, so a database changed since is said by Generate, and a policy changed later by the Policy and Publish steps.",
+          "heldBy": "apps/studio/src/together.test.ts"
+        },
+        {
+          "area": "studio",
+          "says": "A touch column is offered from the columns outside every key and foreign key, not generated, not pinned, that the connection may read and update; a column a check constraint names is offered too, since a check's expression is not parsed, and whether SQL Server evaluates the check again when the column is set to itself is not checked.",
+          "heldBy": "apps/studio/src/together.test.ts"
         }
       ]
     },

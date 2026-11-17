@@ -155,9 +155,10 @@ release; your application's own pages draw records their own way:
   [0031](./docs/decisions/0031-an-answer-lost-after-a-write-is-unknown.md)).
 - **A record saved with its rows**, an order with its lines, in one
   transaction on both engines and held to a bound an administrator
-  chooses: on the host page, the rows held in a tab beside the record,
-  each change said in words, until the record's own Save sends them with
-  it; through `@formancy/data-client`, one call of the runtime plane
+  chooses in the studio, which says before anything is sent what the
+  server would refuse of it: on the host page, the rows held in a tab
+  beside the record, each change said in words, until the record's own
+  Save sends them with it; through `@formancy/data-client`, one call of the runtime plane
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - **Actions an administrator names**: a routine your database already
   keeps, run over the open record in one transaction on both engines --
@@ -225,11 +226,9 @@ built from this repository and not published as a package:
 
 - No bulk delete and no undo; no file of a record with all its children,
   and no copy of a record with its children.
-- A record's rows saved with it are chosen in a generation request of an
-  administrator's own: the studio does not yet offer the choice; and two
-  people saving lines of one order at once makes the second stale, which
-  Keep my line changes and Save then store, line by line, refusing a line
-  both changed
+- Two people saving lines of one order at once makes the second stale,
+  which Keep my line changes and Save then store, line by line, refusing
+  a line both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 - An action is run through the runtime plane alone, over the open record
   and no selection of records: the host page offers no action's control,
@@ -298,8 +297,9 @@ administrator and kept by a person, a grid's filter typed as a line, a
 record's child forms in tabs, state moves, versions changed from a date,
 starting values, a select of the values a check lists, the server's
 stamps of who wrote a record and when, a record saved with its rows
-in one request of the runtime plane, from the host page's own Save, and an
-action an administrator names run over the open record -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
+in one request of the runtime plane, chosen in the studio and sent from
+the host page's own Save, and an action an administrator names run over
+the open record -- each a line of [`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased*, and the examples page and the live demo are deployed from
 `main`. [The status page](./docs/guide/status.md) says what 0.3.0 added
 over 0.2.0, and what is not yet measured or read by hand.

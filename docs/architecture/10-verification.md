@@ -494,6 +494,13 @@ have been saved, with the keyboard there, where it did not -- each as
 0058's table says of a lost POST on the connection it took
 (`apps/host/scripts/browser/together.mjs`,
 [0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
+The studio's fails when the Choose step is not measured clean at every
+width with a rowversion order's touch column chosen, an order's lines
+saved with it and a delivery's pin refused under the box; when a touch
+column is chosen before anybody chose one; when Space on the box does not
+tick it and keep the keyboard on it, or the next Tab does not reach At
+least; and when At most does not start at data-core's
+`TOGETHER_MAX_ROWS` (`apps/studio/scripts/browser/together.mjs`, 0155).
 `guardRequests` in the harness refuses and names every request to an origin
 the gate does not serve, and the pass that measures the fallback stack
 refuses every font file; on the examples page the demo's policy refuses

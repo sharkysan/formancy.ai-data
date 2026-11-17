@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { BuilderSession } from '@formancy/builder-core'
-import { defaultGroup, presentationOf, statesOf, unfilteredProblems, viewProblems } from '@formancy/data-core'
+import { defaultGroup, presentationOf, statesOf, togetherBatchProblem, unfilteredProblems, viewProblems } from '@formancy/data-core'
 import type { DriftChange, DriftReport, FormPolicy, ReassignedKey, StateLabel, StoredListView } from '@formancy/data-core'
 import type { AdminClient, Bundle, Failure, Proposal, Published } from './api.js'
 import { describeRef } from './choice.js'
@@ -202,6 +202,8 @@ export function PublishStep({
   const derived = useMemo(() => presentationOf(proposal.form, document, proposal.bindings), [proposal, document])
   // The Policy step's own check, so the two cannot disagree about whether the server will take the policy.
   const problems = policyCheck(policy, proposal.bindings, proposal.snapshot)
+  // The publish gate's prediction of one SQL Server batch (0155), over the policy as it is now; the Choose step said it against the policy as it was then.
+  const batch = togetherBatchProblem(proposal.snapshot, proposal.bindings, policy)
   const blockers = [
     problems.length === 0
       ? null
@@ -211,6 +213,7 @@ export function PublishStep({
     ...(derived.ok ? [] : derived.problems.map((problem) => `Not presentation, which the server refuses: ${problem}`)),
     ...viewProblems(views, proposal.bindings).map((problem) => `A list view the server refuses: ${problem}`),
     ...unfilteredProblems(unfiltered, proposal.bindings).map((problem) => `A field left out of the Filter panel the server refuses: ${problem}`),
+    batch === null ? null : `Rows saved with their record that publishing refuses: ${batch}. Lower At most on the Choose step and generate again.`,
   ].filter((blocker): blocker is string => blocker !== null)
   const expected = base.state === 'known' ? base.version : null
   const next = (expected ?? 0) + 1

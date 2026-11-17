@@ -938,7 +938,8 @@ and checked as a whole
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 `POST /v1/forms/:id/records/save` takes one through
 `@formancy/data-client`'s `save`, from the host page's own Save or a page
-an integrator writes; the studio does not yet offer the choice.
+an integrator writes, over a child an administrator chose on the
+studio's Choose step.
 
 0. The route (`packages/data-server/src/routes/runtime-save.ts`) checks,
    each answering alone: the body's shape, before the write id is read

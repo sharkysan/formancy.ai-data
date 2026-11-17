@@ -23,7 +23,7 @@ speaks only to the server's administrator plane and `/v1/whoami`
 <details>
 <summary>More: Choose</summary>
 
-<img src="../images/readme/studio-choose.webp" width="874" alt="The lookups group of the Choose step: two employee keys refused because sales.employee cannot be read by this connection, and the customer lookup ticked with name as the column to show and four columns this connection may not read.">
+<img src="../images/readme/studio-choose.webp" width="874" alt="The lookups group of the Choose step: two employee keys refused because sales.employee cannot be read by this connection, and the customer lookup ticked with name as the column to show, four columns this connection may not read, and the box to save orders with their customer, unticked.">
 
 **Step 2, Choose.** *As the order form's own account. A foreign key is offered as a lookup only where this account may read its target: `approved_by` and `created_by` point at `sales.employee`, whose rows “cannot be offered”, and the customer columns it may not read “cannot be shown” ([0027](../decisions/0027-a-snapshot-says-what-its-account-may-do.md)).*
 
@@ -130,6 +130,27 @@ and sorting keep them; a follow starts the other end unfiltered, and Back
 returns the page it left with its filter. A refusal is the step's alert,
 with what was typed kept
 ([0147](../decisions/0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md)).
+
+On the Choose step, under a lookup whose foreign key is NOT NULL and onto
+another table, "Rows of this form are saved with their order" makes the
+form's rows ones a host page holds under each order and stores with the
+order's own Save, in one transaction; ticked, "At least" and "At most" say
+how many each order holds, starting at none and at the most one save
+holds. Nothing ticks it for you. Where the generator would refuse it
+-- row security on the table, a section, a form over versions, another
+lookup already ticked -- the box is not offered and says why in the
+generator's words; ticked, what the generator, the bundle check and
+publishing refuse of it is listed under it in theirs, and changes as the
+bounds and the pins do -- "rowFilters: tenant_id is outside order's
+foreign key", or on SQL Server the most rows one batch holds. On a table that
+keeps a rowversion, "Rows saved with these records move the rowversion
+through" names the column a save of a record's rows alone sets to itself,
+from the columns the generator takes and none chosen; without one, rows
+are saved with such a record only as it is created. The step asks the
+generator in the browser, against the snapshot it discovered; the Policy
+step's check names a policy that narrows the rows by anything but their
+record, and the Publish step waits on a max past one batch
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
 Under each field's help text, the Presentation step says what a new record
 starts the field with, as the generator noted it -- "Generated: Starts with

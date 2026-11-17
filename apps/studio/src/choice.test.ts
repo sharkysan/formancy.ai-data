@@ -4,8 +4,8 @@
 import { describe, expect, test } from 'vitest'
 import { createSnapshot, findObject, generateForm } from '@formancy/data-core'
 import type { ForeignKeyMeta, MetadataSnapshot, ObjectMeta } from '@formancy/data-core'
-import { formIdFor, lookupBlocker, pinCandidates, throughBlocker, titleFor } from './choice.js'
-import { OWNER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
+import { choiceFor, choiceProblems, formIdFor, lookupBlocker, pinCandidates, proposalFor, throughBlocker, titleFor } from './choice.js'
+import { OWNER_SNAPSHOT, SQLSERVER_SNAPSHOT, WRITER_SNAPSHOT } from './test-server.js'
 
 /**
  * What the Choose step offers, decided from the snapshot. The captured
@@ -121,6 +121,61 @@ describe('which lookups a form can be reached through (0043)', () => {
     expect(throughBlocker(OWNER_SNAPSHOT, generated('order_line', 'fk_order_line_order', 'order_date'), 'order')).toBeNull()
     expect(throughBlocker(OWNER_SNAPSHOT, generated('customer', 'fk_customer_country', 'name'), 'country')).toBe(
       'it joins sales.customer.country_code and sales.country.iso_code, which a through cannot compare: only integer, decimal, uuid and date keys are compared without a collation, and the snapshot records none',
+    )
+  })
+})
+
+describe('rows saved with their record, and a touch column, as the request carries them (0155)', () => {
+  // What the Choose step chose is what the generator is asked for: a
+  // lookup's bounds on its choice and the touch column on the request, and
+  // neither where none is chosen -- the one spelling of none the server
+  // reads. Watched failing with each left out of proposalFor, one at a
+  // time: the request carried neither.
+  test('carries a lookup’s bounds and the touch column, and nothing where none is chosen', () => {
+    const order = choiceFor({ schema: 'sales', name: 'order' }, SQLSERVER_SNAPSHOT)
+    expect(proposalFor('fixture-sqlserver', order, [])).not.toHaveProperty('touchColumn')
+    expect(proposalFor('fixture-sqlserver', order, []).lookups.some((lookup) => 'together' in lookup)).toBe(false)
+    const together = {
+      ...order,
+      touchColumn: 'status',
+      lookups: order.lookups.map((lookup) => (lookup.foreignKey === 'fk_order_customer' ? { ...lookup, together: { min: 1, max: 20 } } : lookup)),
+    }
+    const asked = proposalFor('fixture-sqlserver', together, [])
+    expect(asked.touchColumn).toBe('status')
+    expect(asked.lookups.find((lookup) => lookup.foreignKey === 'fk_order_customer')?.together).toEqual({ min: 1, max: 20 })
+  })
+
+  // A box left empty is no number, and JSON has none to send: the step
+  // refuses it before anything is sent, in the server's words for a
+  // request's bounds. Watched failing with the bounds unasked: no problem
+  // listed, so Generate would have sent it.
+  test('refuses a bound that is no number, in the server’s words', () => {
+    const lines = choiceFor({ schema: 'sales', name: 'order_line' }, OWNER_SNAPSHOT)
+    const emptied = { ...lines, lookups: lines.lookups.map((lookup) => ({ ...lookup, together: { min: 0, max: Number.NaN } })) }
+    expect(choiceProblems(emptied, [])).toEqual(['fk_order_line_order is saved with its record, and its bounds are not whole numbers.'])
+  })
+
+  // An order saved with its customer is reached through no other lookup:
+  // the bundle check refuses a through by its creator, and the Policy step
+  // says so where it would offer the box, in that check's words; through
+  // the customer itself is offered. Watched failing with
+  // togetherPolicyProblems left out of throughBlocker: the creator's
+  // through had nothing against it, and its box would have been offered.
+  test('says why a through by another field than the together one is not offered', () => {
+    const bindings = generateForm(OWNER_SNAPSHOT, {
+      connection: 'fixture',
+      root: { schema: 'sales', name: 'order' },
+      formId: 'sales-order',
+      title: 'Order',
+      lookups: [
+        { foreignKey: 'fk_order_customer', display: ['name'], together: { min: 0, max: 5 } },
+        { foreignKey: 'fk_order_created_by', display: ['name'] },
+      ],
+      versionColumn: 'row_version',
+    }).bindings
+    expect(throughBlocker(OWNER_SNAPSHOT, bindings, 'customer')).toBeNull()
+    expect(throughBlocker(OWNER_SNAPSHOT, bindings, 'created_by')).toBe(
+      "it scopes the rows by another field than customer, which is saved with its record: a person could read some of a record's rows and not others",
     )
   })
 })

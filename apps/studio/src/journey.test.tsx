@@ -2,7 +2,20 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { cleanup, screen, waitFor, within } from '@testing-library/react'
-import { audit, discover, findStatus, focusedName, generateOrder, goTo, grantOrderDelete, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
+import {
+  audit,
+  discover,
+  findStatus,
+  focusedName,
+  generateOrder,
+  goTo,
+  grantOrderDelete,
+  offerOnly,
+  signIn,
+  step,
+  unnamed,
+  writeOrderPolicy,
+} from './test-studio.js'
 import type { User } from './test-studio.js'
 import { orderBundle, publishReviewed, PUBLISHER_REQUIRED, readOnly } from './test-review.js'
 import { OWNER_SNAPSHOT, startPlane, TOKENS, withoutColumn } from './test-server.js'
@@ -261,6 +274,100 @@ describe('the journey', () => {
     expect(step('Connect')).toBeTruthy()
     // The step's heading takes focus, so a keyboard starts where the step does.
     expect(document.activeElement?.textContent).toBe('Connect')
+  })
+})
+
+/** What the studio sent to publish `formId`, as the server received it: the request body's bundle. */
+function publishedBundle(plane: TestPlane, formId: string): Record<string, unknown> {
+  const sent = plane.requests.find((request) => request.method === 'POST' && request.path === `/v1/forms/${formId}/versions`)
+  const body = sent?.body as { bundle?: Record<string, unknown> } | undefined
+  if (body?.bundle === undefined) throw new Error(`nothing was published as ${formId}`)
+  return body.bundle
+}
+
+describe('the journey of a record and the rows saved with it (0155)', () => {
+  // A rowversion order with its touch column chosen, and its lines saved
+  // with it between 1 and 20, each published through the real server as
+  // chosen, axe and a name on every control at each new state; and the
+  // order regenerated from Drift keeps its touch column. Watched failing
+  // with `together` and then `touchColumn` left out of proposalFor (each
+  // bundle published without it), with At least's label pointing at
+  // another id (the state's audit named the box unlabelled), and with
+  // takeUp leaving the touch column out (the regenerated order's choice
+  // was None).
+  test('chooses the order’s touch column and its lines saved with it, names and audits each control, and publishes both as chosen', async () => {
+    const user = await signIn(plane)
+    // Each state audited where it stands, and failed there, by its name: the next step finds its controls by theirs.
+    const record = async (name: string) => {
+      expect({ [name]: [...(await audit()), ...unnamed()] }).toEqual({ [name]: [] })
+    }
+    await discover(user, 'fixture-sqlserver')
+    await user.click(screen.getByRole('button', { name: 'Choose a root' }))
+    const order = step('Choose')
+    await user.selectOptions(within(order).getByLabelText('Root table or view'), 'sales.order')
+    await offerOnly(user, order, ['fk_order_customer'])
+    await user.click(within(order).getByRole('checkbox', { name: 'Pin tenant_id' }))
+    const touch = 'Rows saved with these records move the rowversion through'
+    await user.selectOptions(within(order).getByRole('combobox', { name: touch }), 'status')
+    await record('Choose, the order’s touch column')
+    await user.click(within(order).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    await writeOrderPolicy(user)
+    const publishOrder = await goTo(user, 'Publish')
+    await user.click(await within(publishOrder).findByRole('button', { name: 'Publish version 1' }))
+    await within(publishOrder).findByText('Published version 1 of sales-order.')
+    const touched = publishedBundle(plane, 'sales-order') as { generation: { touchColumn?: string }; bindings: { concurrency: { touch?: string } } }
+    expect([touched.generation.touchColumn, touched.bindings.concurrency.touch]).toEqual(['status', 'status'])
+
+    const lines = await goTo(user, 'Choose')
+    await user.selectOptions(within(lines).getByLabelText('Root table or view'), 'sales.order_line')
+    await offerOnly(user, lines, ['fk_order_line_order'])
+    await user.click(within(lines).getByRole('checkbox', { name: 'Rows of this form are saved with their order' }))
+    await record('Choose, the lines saved with their order')
+    const least = within(lines).getByRole('spinbutton', { name: 'At least' })
+    const most = within(lines).getByRole('spinbutton', { name: 'At most' })
+    await user.clear(least)
+    await user.type(least, '1')
+    await user.clear(most)
+    await user.type(most, '20')
+    await user.click(within(lines).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    await record('Generate, the lines')
+    const policy = await goTo(user, 'Policy')
+    for (const operation of ['read', 'create', 'update']) await user.type(within(policy).getByLabelText(`Roles that may ${operation}`), 'clerk')
+    await user.click(within(policy).getByRole('button', { name: 'Fill every field from the operations' }))
+    await user.click(within(policy).getByRole('button', { name: 'Offer every row of sales.order' }))
+    await waitFor(() => expect(within(within(policy).getByRole('region', { name: 'Policy check' })).getByRole('status').textContent).toMatch(/fits this form/))
+    await record('Policy, the lines')
+    const publishLines = await goTo(user, 'Publish')
+    await user.click(await within(publishLines).findByRole('button', { name: 'Publish version 1' }))
+    await within(publishLines).findByText('Published version 1 of sales-order_line.')
+    await record('Publish, the lines')
+    const saved = publishedBundle(plane, 'sales-order_line') as {
+      generation: { lookups: Array<{ foreignKey: string; together?: unknown }> }
+      bindings: { fields: Array<{ field: string; together?: unknown; writes: { create: boolean; update: boolean } }> }
+    }
+    expect(saved.generation.lookups.map((lookup) => [lookup.foreignKey, lookup.together])).toEqual([['fk_order_line_order', { min: 1, max: 20 }]])
+    const field = saved.bindings.fields.find((binding) => binding.field === 'order')
+    expect([field?.together, field?.writes]).toEqual([
+      { min: 1, max: 20 },
+      { create: true, update: false },
+    ])
+    // The version the store wrote is the bundle sent, its request as the studio asked it.
+    const stored = JSON.parse(await readFile(join(plane.root, 'sales-order_line', '1.json'), 'utf8')) as { generation: unknown }
+    expect(stored.generation).toEqual(saved.generation)
+
+    // The order regenerated from Drift is the draft again, with its touch column chosen.
+    const drift = await goTo(user, 'Drift')
+    await user.clear(within(drift).getByLabelText('Form id'))
+    await user.type(within(drift).getByLabelText('Form id'), 'sales-order')
+    await user.click(within(drift).getByRole('button', { name: 'Check drift' }))
+    await user.click(await within(drift).findByRole('button', { name: 'Regenerate, keeping your presentation' }))
+    const regenerated = await within(drift).findByRole('region', { name: /^Regenerated from version 1$/ })
+    await user.click(within(regenerated).getByRole('button', { name: 'Continue to presentation' }))
+    await screen.findByRole('main', { name: 'Presentation' })
+    const again = await goTo(user, 'Choose')
+    expect(within(again).getByRole<HTMLSelectElement>('combobox', { name: touch }).value).toBe('status')
   })
 })
 

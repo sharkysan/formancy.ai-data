@@ -211,6 +211,8 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
     const { generation, snapshot, base, bindings, notes, form, version } = regeneration
     const { connection, root, formId, title, lookups } = generation
     const versionColumn = generation.versionColumn ?? null
+    // A rowversion's touch column (0155) is the request's: left out, the next version would save no record's rows over a saved record.
+    const touchColumn = generation.touchColumn ?? null
     // A chain of versions (0113) is the request's too: left out, the next version would be a form of records of their own.
     const validity = generation.validity ?? null
     // So are the stamps (0153): left out, the next version would let a person type who created a record.
@@ -223,11 +225,13 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
       lookups,
       pinned: generation.pinned ?? [],
       ...(versionColumn === null ? {} : { versionColumn }),
+      ...(touchColumn === null ? {} : { touchColumn }),
       ...(validity === null ? {} : { validity }),
       ...(stamps.length === 0 ? {} : { stamps }),
     }
     setDiscovered({ connection, snapshot })
-    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, validity, stamps } })
+    // A lookup's `together` rides on its choice, as its section does.
+    setChosen({ connection, choice: { root, formId, title, lookups, versionColumn, touchColumn, validity, stamps } })
     setPolicy(withRequiredLookupPins(regeneration.policy, bindings))
     setGenerated({
       request,
@@ -314,7 +318,7 @@ export function Workbench({ signedIn, onSignOut }: { signedIn: SignedIn; onSignO
             connection={discovered.connection}
             choice={chosen?.connection === discovered.connection ? chosen.choice : null}
             onChoice={(next) => chose(discovered.connection, next)}
-            rowFilters={policy.rowFilters}
+            policy={policy}
             onRowFilters={(rowFilters) => setPolicy((previous) => ({ ...previous, rowFilters }))}
             generated={generated?.request ?? null}
             onGenerate={generate}

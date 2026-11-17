@@ -1,9 +1,10 @@
-import { findObject, gapCovers, isDisplayType, rowFilterColumnProblem, throughProblems } from '@formancy/data-core'
+import { boundsProblem, findObject, gapCovers, isDisplayType, rowFilterColumnProblem, throughProblems, togetherPolicyProblems } from '@formancy/data-core'
 import type {
   ColumnMeta,
   CoverageGap,
   ForeignKeyMeta,
   FormBindings,
+  FormPolicy,
   LookupChoice,
   MetadataSnapshot,
   ObjectMeta,
@@ -26,6 +27,8 @@ export interface Choice {
   lookups: LookupChoice[]
   /** A version column the administrator confirms, or `null` for none. */
   versionColumn: string | null
+  /** A rowversion root's touch column the administrator confirms (0155), or `null` for none: never inferred, as a version column is not. */
+  touchColumn: string | null
   /** The columns a version starts and ends at, where the rows are versions of one thing (0113); `null` for records of their own. */
   validity: { from: string; to: string } | null
   /** The columns the server stamps (0153), each confirmed here; a column whose name suggests one is never stamped without it. */
@@ -87,7 +90,7 @@ export function choiceFor(ref: ObjectRef, snapshot: MetadataSnapshot): Choice {
     const display = target === undefined ? [] : suggestedDisplay(target, foreignKey.references.columns)
     return display.length === 0 ? [] : [{ foreignKey: foreignKey.name, display }]
   })
-  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, validity: null, stamps: [] }
+  return { root: { ...ref }, formId: formIdFor(ref), title: titleFor(ref), lookups, versionColumn: null, touchColumn: null, validity: null, stamps: [] }
 }
 
 /** The gaps about one object itself, which are what "cannot tell" is made of (0004). */
@@ -191,18 +194,14 @@ export function suggestedDisplay(target: ObjectMeta, keyColumns: readonly string
  * `null`. Asked of `throughProblems`, the function the server runs on
  * publish, so a lookup the policy step offers is one publishing accepts: a
  * key the snapshot says is text is refused there, and here it is said in
- * the same words, after "it". Whether the lookup's list is filtered is the
- * policy's question, and the step asks it.
+ * the same words, after "it"; so is a through by another field than the
+ * one a form's rows are saved with their record through, which the bundle
+ * check refuses in `togetherPolicyProblems` (0155). Whether the lookup's
+ * list is filtered is the policy's question, and the step asks it.
  */
 export function throughBlocker(snapshot: MetadataSnapshot, bindings: FormBindings, field: string): string | null {
-  const [problem] = throughProblems(snapshot, bindings, {
-    version: 1,
-    operations: { read: [], create: [], update: [] },
-    fields: {},
-    rowFilters: [],
-    lookups: {},
-    through: [field],
-  })
+  const policy: FormPolicy = { version: 1, operations: { read: [], create: [], update: [] }, fields: {}, rowFilters: [], lookups: {}, through: [field] }
+  const [problem] = [...throughProblems(snapshot, bindings, policy), ...togetherPolicyProblems(bindings, policy)]
   return problem === undefined ? null : `it ${problem.slice(`through: ${field} `.length)}`
 }
 
@@ -256,9 +255,11 @@ export function proposalFor(connection: string, choice: Choice, rowFilters: read
       foreignKey: lookup.foreignKey,
       display: [...lookup.display],
       ...(lookup.section === undefined ? {} : { section: { when: lookup.section.when === null ? null : { ...lookup.section.when } } }),
+      ...(lookup.together === undefined ? {} : { together: { ...lookup.together } }),
     })),
     pinned: rowFilters.map((rule) => rule.column),
     ...(choice.versionColumn === null ? {} : { versionColumn: choice.versionColumn }),
+    ...(choice.touchColumn === null ? {} : { touchColumn: choice.touchColumn }),
     ...(choice.validity === null ? {} : { validity: { ...choice.validity } }),
     ...(choice.stamps.length === 0 ? {} : { stamps: choice.stamps.map((stamp) => ({ ...stamp, value: { ...stamp.value } })) }),
   }
@@ -354,6 +355,9 @@ export function choiceProblems(choice: Choice, rowFilters: readonly RowFilterRul
   if (choice.title.trim() === '') problems.push('The form needs a title.')
   for (const lookup of choice.lookups) {
     if (lookup.display.length === 0) problems.push(`${lookup.foreignKey} needs at least one column to show.`)
+    // The server's reading of a request's bounds, in its words (0155): a box left empty is no number, and JSON has none to send.
+    const bounds = lookup.together === undefined ? null : boundsProblem(lookup.together)
+    if (bounds !== null) problems.push(`${lookup.foreignKey} is saved with its record, and ${bounds}.`)
   }
   for (const rule of rowFilters) {
     if (rule.attribute.trim() === '') problems.push(`Name the trusted attribute ${rule.column} is pinned to.`)

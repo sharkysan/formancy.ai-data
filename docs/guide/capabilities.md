@@ -197,6 +197,24 @@ get*](../../README.md#what-you-get) is the short version, and
   connection test and the studio's metadata pane say it before a form is
   generated
   ([0068](../decisions/0068-a-snapshot-records-the-server-it-was-read-from-and-nothing-refuses-a-server-discovery-can-read.md)).
+- **Chooses a form's rows saved with their record**, on `main` since
+  0.3.0: on the Choose step, under a lookup whose foreign key is NOT NULL
+  and onto another table, "Rows of this form are saved with their order",
+  never ticked for anybody, and its "At least" and "At most", starting at
+  none and at the most one save holds; and on a rowversion table, the
+  column a save of a record's rows alone sets to itself, chosen from the
+  generator's candidates alone, none chosen first. What the generator, the
+  bundle check and publishing would refuse of either is said before
+  anything is sent, in their words: a lookup the generator refuses -- row
+  security on the table, a section, a form over versions, another lookup
+  saved with its record -- is not offered, and under one ticked, bounds
+  out of order, a pin outside the record's key, and on SQL Server more
+  rows than one batch's parameters hold, with the most that fits. The
+  generator is asked in the browser against the snapshot the step
+  discovered, so a database changed since is said by Generate; a check
+  constraint's expression is not read, so a column a check names is
+  offered as a touch column
+  ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
 **For the person filling in the form, through any host:**
 
@@ -238,8 +256,8 @@ get*](../../README.md#what-you-get) is the short version, and
   ([0058](../decisions/0058-the-browser-gates-run-in-chromium-firefox-and-webkit-and-each-fact-the-browsers-disagree-on-is-named-and-held.md)).
 - **A record is saved with its rows in one request**, on `main` since
   0.3.0: an order with its lines, its child's lookup marked by an
-  administrator as saved with its record, between a fewest and a most
-  rows. `POST /v1/forms/:id/records/save`, which `@formancy/data-client`'s
+  administrator on the studio's Choose step as saved with its record,
+  between a fewest and a most rows. `POST /v1/forms/:id/records/save`, which `@formancy/data-client`'s
   `save` sends, takes the record -- a create, or an update that may change
   nothing -- and the child's creates, updates and deletes, and stores them
   all in one transaction or none, on both engines; a save past the bound,

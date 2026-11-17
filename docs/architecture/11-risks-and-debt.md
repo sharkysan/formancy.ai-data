@@ -610,6 +610,19 @@ a cell
 That the studio's line keeps the host's keys is held by its suite asserting
 the host's cases one for one; a key the host's line gains and the studio's
 lacks fails nothing, and review holds it.
+The Choose step offers a form's rows saved with their record under every
+lookup whose key is NOT NULL onto another table, an order's customer
+among them, and asks the generator what it refuses of them in the
+browser, against the snapshot the step discovered -- a database changed
+since is said by Generate, from the server's own discovery -- running it
+once more for each lookup that could be ticked on every change to the
+choice, unmeasured; the bundle check and SQL Server's batch are asked there
+against the policy as it stands, and again by the Policy and Publish
+steps. A touch column is offered from what the catalog says of keys alone:
+a column a check constraint names is offered, a check's expression being
+unread, and whether SQL Server evaluates the check again when the column
+is set to itself is not checked
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
 **The server.** Each request for the menu of forms reads and validates every
 published form, with nothing cached

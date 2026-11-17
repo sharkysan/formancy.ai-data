@@ -110,6 +110,12 @@
   margin-inline-start: 2rem;
 }
 
+/* Two numbers of a few digits each: as wide as a pin's attribute, not the fieldset (0155). */
+.bounds {
+  max-width: 20rem;
+  margin-inline-start: 2rem;
+}
+
 /* ----------------------------------------------------------- generate */
 
 .notes {

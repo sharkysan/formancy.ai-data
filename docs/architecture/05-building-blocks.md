@@ -461,9 +461,16 @@ and `src/policy-moves.tsx` writes a state field's moves, which
 ([0112](../decisions/0112-a-policy-holds-a-state-field-to-the-moves-it-lists.md));
 the Choose step's `src/choose-versions.tsx` names a chain of versions
 ([0114](../decisions/0114-the-studio-names-a-chain-of-versions-in-the-choose-step.md)),
-and `src/choice.ts`'s `choiceFor` starts it with every foreign key it can
+`src/choice.ts`'s `choiceFor` starts it with every foreign key it can
 offer ticked as a lookup
-([0138](../decisions/0138-the-studio-offers-every-lookup-it-can-by-default.md));
+([0138](../decisions/0138-the-studio-offers-every-lookup-it-can-by-default.md)),
+and `src/choose-together.tsx` offers a form's rows saved with their record
+under a lookup, and a rowversion's touch column, ticking and choosing
+neither, with `src/together.ts` asking the generator itself, in the
+browser, the bundle check's `togetherPolicyProblems` and the publish
+gate's `togetherBatchProblem` what each refuses of them, said in their
+words before anything is sent
+([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md));
 `src/versions.tsx` and `src/import.tsx` download and import a version's file
 (0062). Its tests run the real `createDataServer` behind a fake `fetch`
 (`src/test-server.ts`), and `src/journey.test.tsx` fails on any request

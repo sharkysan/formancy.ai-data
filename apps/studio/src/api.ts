@@ -75,6 +75,8 @@ export interface ProposalRequest {
   lookups: LookupChoice[]
   pinned: string[]
   versionColumn?: string
+  /** A rowversion root's touch column, as the administrator confirmed it (0155); a lookup's `together` rides on its choice. */
+  touchColumn?: string
   /** The root's rows are versions of one thing, each valid from `from` until `to` (0113). */
   validity?: { from: string; to: string }
   /** The columns the server stamps, as the administrator confirmed them (0153). */

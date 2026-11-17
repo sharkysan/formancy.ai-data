@@ -1,4 +1,4 @@
-import { deleteProblems, validatePolicy } from '@formancy/data-core'
+import { deleteProblems, togetherPolicyProblems, validatePolicy } from '@formancy/data-core'
 import type { CascadeRule, FieldBinding, FormBindings, FormPolicy, MetadataSnapshot, PolicyOperation, RowFilterRule, TransitionRule } from '@formancy/data-core'
 
 /**
@@ -151,17 +151,19 @@ export function withoutLookup(policy: FormPolicy, key: string): FormPolicy {
 
 /**
  * What the server refuses this policy for, in its words, of what it checks
- * at publish: what does not fit the bindings (`validatePolicy`), and what a
+ * at publish: what does not fit the bindings (`validatePolicy`), what a
  * delete it grants would also do to other tables, as the form's snapshot
- * shows them (`deleteProblems`, 0050, 0051). The Policy step lists them and
- * the Publish step waits on them, so the two cannot disagree (0052). Not
- * every refusal of the server's `policyProblems`: a row filter over a
- * column the snapshot says it cannot compare, and a through the snapshot
- * does not admit, are not among them.
+ * shows them (`deleteProblems`, 0050, 0051), and where the form's rows are
+ * saved with their record, a policy that narrows them by anything but that
+ * record, or one pinning the touch column (`togetherPolicyProblems`, 0155).
+ * The Policy step lists them and the Publish step waits on them, so the two
+ * cannot disagree (0052). Not every refusal of the server's
+ * `policyProblems`: a row filter over a column the snapshot says it cannot
+ * compare, and a through the snapshot does not admit, are not among them.
  */
 export function policyCheck(policy: FormPolicy, bindings: FormBindings, snapshot: MetadataSnapshot): string[] {
   const fitted = validatePolicy(policy, bindings)
-  return [...(fitted.ok ? [] : fitted.problems), ...deleteProblems(snapshot, bindings, policy)]
+  return [...(fitted.ok ? [] : fitted.problems), ...deleteProblems(snapshot, bindings, policy), ...togetherPolicyProblems(bindings, policy)]
 }
 
 /**

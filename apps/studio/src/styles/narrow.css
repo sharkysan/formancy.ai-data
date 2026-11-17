@@ -75,6 +75,7 @@
 
   fieldset.nested,
   .pin .field,
+  .bounds,
   .choice .hint,
   .choice .cannot-tell {
     margin-inline-start: 0;
