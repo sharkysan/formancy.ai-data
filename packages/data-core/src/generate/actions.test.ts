@@ -95,6 +95,25 @@ describe('an action the generator binds', () => {
     expect(generateForm(source, orderRequest(source, [])).bindings).toEqual(orderForm(source).bindings)
   })
 
+  // A selection is bound as a record action is, by the same rules, with
+  // its scope: the planner holds a run's records to it and the page offers
+  // it over a selection, so a scope lost here would run a selection over
+  // the open record alone or refuse every selection sent. Its note says
+  // what a selection costs: every record held to the last call, and one
+  // refusal undoing all. Watched failing on 2026-11-17 with the scope
+  // written `record` whatever the request said: "expected 'record' to be
+  // 'selection'".
+  test('binds a selection with its scope, and says what one costs', () => {
+    const source = routineSnapshot()
+    const generated = generateForm(source, orderRequest(source, [{ ...SHIP, name: 'ship-all', scope: 'selection' }]))
+    const [bound] = generated.bindings.actions ?? []
+    expect(bound?.scope).toBe('selection')
+    expect(bound?.parameters).toEqual(actionForm().bindings.actions?.[0]?.parameters)
+    expect(generated.notes.find((note) => note.subject === 'ship-all')?.message).toMatch(
+      /^Runs sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4\) once for each record of a selection of one page at most, after incrementing row_version on each, in one transaction that holds every record of it until the last call returns: one record refused/,
+    )
+  })
+
   // The administrator reads, before publication, what nothing here binds:
   // field grants, state moves and cascades, a routine writing other rows,
   // and a routine reaching past the account's grants. Watched failing with
@@ -449,7 +468,7 @@ describe('what the generator refuses, each with the rule', () => {
     const thrown = (actions: unknown[]) => () => generateForm(source, orderRequest(source, actions as ActionChoice[]))
     expect(thrown([{ ...SHIP, name: 'Ship it' }])).toThrow(/action name "Ship it" is not lower-case letters/)
     expect(thrown([SHIP, SHIP])).toThrow('two actions are named ship')
-    expect(thrown([{ ...SHIP, scope: 'selection' }])).toThrow(/scope "selection"; this release runs an action over the open record alone/)
+    expect(thrown([{ ...SHIP, scope: 'page' }])).toThrow(/scope "page"; an action runs over the open record or over a selection/)
     expect(thrown([{ ...SHIP, routine: { schema: 'sales', name: 'ship_order' } }])).toThrow(/names no routine as \{ schema, name, signature \}/)
     expect(thrown([{ ...SHIP, parameters: [{ parameter: 'order_id', from: { column: 'id' } }] }])).toThrow(/each parameter is \{ parameter, from/)
     expect(thrown([{ ...SHIP, parameters: [{ parameter: 'order_id', from: { input: 'in' } }] }])).toThrow(/input "in" is not a field key formancy accepts/)

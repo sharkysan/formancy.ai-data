@@ -15,6 +15,7 @@ import { filtersFor, throughFor } from '../records/scope.js'
 import { decodeRecordKey } from '../records/token.js'
 import type { DescribedTable, RecordConcurrency } from '../records/types.js'
 import { describeRoutine } from '../routines.js'
+import { LIST_PAGE_SIZE } from '../runtime.js'
 import type { ActionArgument, ActionBinding, ActionChoice, ActionRecord, ActionRequest, BoundSource, DescribedRoutine, ParameterSource } from './types.js'
 
 /*
@@ -29,9 +30,10 @@ import type { ActionArgument, ActionBinding, ActionChoice, ActionRecord, ActionR
  * field the action passes is refused with the policy -- and scopes it;
  * whether the database as the request described the root and the routine
  * still fits the action (0041); the record tokens, each once, and the
- * versions; then every answer through its parameter's codec, every error
- * collected; then what the context gives. A refusal at any step is the
- * answer. Pure: no I/O and no clock.
+ * versions, as many as the action's scope runs over -- one for the open
+ * record, up to a page for a selection (0165); then every answer through
+ * its parameter's codec, every error collected; then what the context
+ * gives. A refusal at any step is the answer. Pure: no I/O and no clock.
  */
 
 /** What a person is told when the database changed under an action: never which column or routine, which is the administrator's to read. */
@@ -42,13 +44,18 @@ export const ACTION_REFUSED =
  * A run that names one record twice (0159): two tokens of one key, which
  * would lock one row and call the routine on it twice. A refusal of the
  * action planner's own, beside the record planners' codes, since no other
- * request names more than one record.
+ * request names more than one record. `records` are the positions in the
+ * body of the two that name it (0165).
  */
 export interface DuplicateRecord {
   ok: false
   code: 'duplicate-record'
   message: string
+  records: number[]
 }
+
+/** What a person is told of a selection that names one record twice: by two tokens, or by two keys the database makes one row (0165). */
+export const DUPLICATE_RECORD = 'The selection names one record twice. Nothing was done.'
 
 export type PlannedAction = { ok: true; request: ActionRequest } | InvalidValues | PlanRefusal | DuplicateRecord
 
@@ -66,11 +73,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * A run's body by its shape alone, or `invalid-request`: the planner's own
  * reading, which the route asks first too (0161), so the two cannot read
  * one body two ways -- the route before it reads a write id or asks the
- * store, the planner again over what it plans.
+ * store, the planner again over what it plans. From one record to a page
+ * of them, `LIST_PAGE_SIZE`, whatever the action (0165): a selection is
+ * rows of the one page a list shows, never a number of its own, so a body
+ * past it is refused before the route sends any statement.
  */
 export function readRunBody(body: unknown): { ok: true; body: RunBody } | PlanRefusal {
   const shape = 'A run is { records: [{ record, version }], answers: { field: value } }.'
   if (!isRecord(body) || !Array.isArray(body['records']) || !isRecord(body['answers'])) return refuse('invalid-request', shape)
+  const count = (body['records'] as unknown[]).length
+  if (count < 1 || count > LIST_PAGE_SIZE)
+    return refuse('invalid-request', `A run names from 1 to ${String(LIST_PAGE_SIZE)} records: the open record, or a selection of the page a list shows.`)
   const records: RunBody['records'] = []
   for (const entry of body['records'] as unknown[]) {
     if (!isRecord(entry) || typeof entry['record'] !== 'string' || typeof entry['version'] !== 'string') return refuse('invalid-request', shape)
@@ -163,27 +176,39 @@ function driftRefusal(
   }
 }
 
-/** Each record the run addresses, by its token, once, at a version its concurrency could have returned. */
+/**
+ * Each record the run addresses, by its token, once, at a version its
+ * concurrency could have returned, in the order sent: exactly one for an
+ * action over the open record, and for a selection as many as
+ * `readRunBody` let through, one page at most (0165). Two tokens of one
+ * key are refused before anything is sent; two keys only the database's
+ * equality makes one -- `a` and `A` under a case-insensitive collation --
+ * are the adapter's to find (`ActionFailureCode`).
+ */
 function recordsOf(
   prepared: Prepared,
   concurrency: RecordConcurrency,
+  action: ActionBinding,
   records: RunBody['records'],
 ): { ok: true; records: ActionRecord[] } | PlanRefusal | DuplicateRecord {
   const decoded: ActionRecord[] = []
-  const seen = new Set<string>()
-  for (const { record, version } of records) {
+  const seen = new Map<string, number>()
+  for (const [index, { record, version }] of records.entries()) {
     const key = decodeRecordKey(prepared.target.identity, record)
     if (!key.ok) return refuse('invalid-record-token', key.message)
     // Two tokens of one key would lock one row and call the routine twice on it.
     const spelled = canonicalize(key.key.map((part) => part.value))
-    if (seen.has(spelled)) return { ok: false, code: 'duplicate-record', message: 'The request names one record twice. Nothing was done.' }
-    seen.add(spelled)
+    const earlier = seen.get(spelled)
+    if (earlier !== undefined) return { ok: false, code: 'duplicate-record', message: DUPLICATE_RECORD, records: [earlier, index] }
+    seen.set(spelled, index)
     if (!versionFits(prepared, concurrency.kind, concurrency.column, version))
       return refuse('invalid-version', `This is not a version a ${concurrency.kind} returns.`)
     decoded.push({ key: key.key, expectedVersion: version })
   }
-  // An action over the open record runs over exactly one.
-  if (decoded.length !== 1) return refuse('invalid-request', 'An action over the open record names exactly one record.')
+  // An action over the open record runs over exactly one; a selection over one page at most, which readRunBody held the body to.
+  if (action.scope === 'record' && decoded.length !== 1) return refuse('invalid-request', 'An action over the open record names exactly one record.')
+  if (decoded.length < 1 || decoded.length > LIST_PAGE_SIZE)
+    return refuse('invalid-request', `A selection names from 1 to ${String(LIST_PAGE_SIZE)} records: the page a list shows.`)
   return { ok: true, records: decoded }
 }
 
@@ -281,7 +306,7 @@ export function planAction(
   if (drifted !== undefined) return drifted
   // bindingProblem held the action to a confirmed token (`actionUnoffered`).
   const concurrency = prepared.target.concurrency as RecordConcurrency
-  const records = recordsOf(prepared, concurrency, read.body.records)
+  const records = recordsOf(prepared, concurrency, action, read.body.records)
   if (!records.ok) return records
   const argued = argumentsOf(action, read.body.answers, context)
   if (!argued.ok) return argued

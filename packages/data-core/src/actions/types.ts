@@ -7,10 +7,10 @@ import type { RoutineMeta, RoutineRef } from '../routines.js'
 
 /*
  * An action (0159): a routine the deployment keeps in its database, bound
- * by an administrator to a form and run over the open record. What the
- * request asks for, what the bindings keep, what the planner hands an
- * adapter, and the port both adapters run it through (0160). The route,
- * the client and the pages are later records'.
+ * by an administrator to a form and run over the open record, or over a
+ * selection of a page's records (0165). What the request asks for, what
+ * the bindings keep, what the planner hands an adapter, and the port both
+ * adapters run it through (0160).
  */
 
 /**
@@ -39,16 +39,27 @@ export interface ParameterChoice {
 }
 
 /**
+ * What an action runs over: `record`, the open record, exactly one; or
+ * `selection`, the records a person chose of the one page a list shows,
+ * from one to `LIST_PAGE_SIZE`, all in one transaction, each locked in key
+ * order and the routine called once for each, all or nothing (0165). A
+ * bundle from before 0165 binds `record` alone.
+ */
+export type ActionScope = 'record' | 'selection'
+
+/** Every scope, in the one order the generator reads them. */
+export const ACTION_SCOPES: readonly ActionScope[] = ['record', 'selection']
+
+/**
  * An action an administrator asks the generator to bind (0159): a name
- * unique in the form, the routine, and where each of its parameters comes
- * from. `scope` is `record`, the open record; a selection of records is a
- * later record's.
+ * unique in the form, the routine, what it runs over, and where each of
+ * its parameters comes from.
  */
 export interface ActionChoice {
   /** Lower-case letters, digits and hyphens, starting with a letter or a digit, at most 64. */
   name: string
   routine: RoutineRef
-  scope: 'record'
+  scope: ActionScope
   parameters: ParameterChoice[]
 }
 
@@ -98,7 +109,7 @@ export interface ActionBinding {
   routine: RoutineRef
   /** What the run calls: a PostgreSQL function, a SQL Server procedure. */
   kind: RoutineMeta['kind']
-  scope: 'record'
+  scope: ActionScope
   parameters: ActionParameter[]
   move: ActionMove
   dialog: FormSchema | null
@@ -141,6 +152,11 @@ export interface ActionArgument {
 export interface ActionRequest {
   action: string
   target: RecordTarget & { concurrency: RecordConcurrency }
+  /**
+   * In the order the person sent them, each key once: exactly one for an
+   * action over the open record, one to `LIST_PAGE_SIZE` for a selection
+   * (0165). An adapter locks them in key order, whatever this one is.
+   */
   records: ActionRecord[]
   filters: RowFilters
   through: Through[]
@@ -180,11 +196,20 @@ export interface ActionRequest {
  * - `unknown-outcome`: the answer was lost after the run was sent, a
  *   SQL Server run passed its deadline, or a procedure ended the
  *   transaction itself. It may have committed, and it is never sent again.
+ * - `duplicate-record`: two keys of a selection that the database's own
+ *   equality makes one row -- `a` and `A` under a case-insensitive key
+ *   collation on SQL Server -- found once both were locked, and rolled back
+ *   before any call (0165). Two tokens of one key are the planner's
+ *   refusal, before anything is sent.
+ *
+ * `not-found`, `stale`, `version-ended` and `duplicate-record` name the
+ * records they are about (`records`); every other code is about the run.
  */
 export type ActionFailureCode =
   | 'not-found'
   | 'stale'
   | 'version-ended'
+  | 'duplicate-record'
   | 'schema-changed'
   | 'permission-denied'
   | 'declined'
@@ -202,6 +227,12 @@ export interface ActionFailure {
   reason?: string
   /** `declined` only: the column `formancy: refused [column]: ` names, which may be no column of the form. */
   column?: string
+  /**
+   * `not-found`, `stale`, `version-ended` and `duplicate-record`: which
+   * records it is about, by their positions in `ActionRequest.records`, in
+   * that order (0165). The route names them by the tokens sent.
+   */
+  records?: number[]
 }
 
 /**
@@ -225,10 +256,14 @@ export type DescribedAction = { ok: true; table: DescribedTable; routine: Descri
  * which a run is decided over and guarded by.
  *
  * `run` is one transaction that locks each record under the person's
- * filters and throughs at the version they read, holds each through's
- * target for the run, moves the version (`ActionRequest.move`), then calls
- * the routine once per record moved, only while the root and the routine
- * still have the definitions it was decided over -- or nothing. It is sent
+ * filters and throughs at the version they read -- every record of a
+ * selection in key order, so two runs over overlapping selections wait
+ * for each other rather than deadlock on them (0165) -- holds each
+ * through's target for the run, moves the version
+ * (`ActionRequest.move`), then calls the routine once per record moved,
+ * only while the root and the routine still have the definitions it was
+ * decided over -- or nothing: any record's refusal, the routine's
+ * included, rolls back every record. It is sent
  * once and never again, and takes no signal: a run goes on after its
  * client leaves, as a write does (0031). `deadlineMs` is the server's, a
  * whole number of milliseconds from configuration. A database refusal is an
