@@ -37,8 +37,12 @@
   (watched failing with the absent-shard rule removed, and with the
   unrun-file rule removed); a file of the suite that no shard ran fails it;
   a file in two shards fails it (watched failing with that rule removed);
-  and shards of two counts, or a whole leg beside the shards, fail it
-  (watched failing with that rule removed).
+  shards of two counts, or a whole leg beside the shards, fail it (watched
+  failing with that rule removed); and the list itself is held: a
+  file a shard ran that no list names, every list empty while the shards
+  ran files, and a file one shard's list names and another's does not each
+  fail it (each watched failing with its rule removed, the empty list's
+  also with the flag that sets it forced false).
   `scripts/release-report/render.test.mjs` -- the row names its shards and
   says its coverage is not merged (watched failing with each removed).
   **Not yet shown by GitHub:** that the two `include` entries make two legs
@@ -95,18 +99,23 @@ list. The report reads a package's shards as one suite: each file and test
 once, its wall time and span the longest shard's, and no coverage. It fails
 the run on a shard that left no results, on legs other than 1/N to N/N each
 once, on a file of the list that no shard ran and on a file two shards ran,
-beside everything it fails a whole suite on. The matrix is the one place a
-package's shards are declared: `scripts/ci-test-jobs.test.mjs`, the report's
-expected artefacts and its checks all read it.
+beside everything it fails a whole suite on; and it holds the list those
+rules read, failing the run on a file a shard ran that the list leaves out,
+on a list that names no file while the shards ran some, and on shards whose
+lists differ. The matrix is the one place a package's shards are declared:
+`scripts/ci-test-jobs.test.mjs`, the report's expected artefacts and its
+checks all read it.
 
 ## Consequences
 
 **What it buys.** Predicted, not measured: shard 1/2's 46 files took 3626 s
 of run 44027383496's file time and 2/2's 45 took 3101 s; at that run's 2.92
-files at a time, their tasks come near 1241 s and 1062 s, about 21 and 18
-minutes, so the run's longest job would be WebKit's browser leg again. That
-run came before 0162 added its files, which the split places wherever their
-paths hash. The first run of the shards measures them.
+files at a time, their spans come near 1241 s and 1062 s, and their tasks,
+with the 28 s that run's task spent outside its span, near 1270 s and
+1090 s, about 21 and 18 minutes, so the run's longest job would be WebKit's
+browser leg again. That run came before 0162 added its files, which the
+split places wherever their paths hash. The first run of the shards
+measures them.
 
 **What it costs.** The host's suite takes two runners where it took one, and
 each installs, builds what the host depends on, pulls SQL Server's image of
@@ -129,9 +138,12 @@ row says "not merged across its shards". A sharded row's wall time is its
 longer shard's task, and vitest's span its longer shard's.
 
 Each shard's leg runs `vitest list` before its suite and fails if it fails.
-vitest refuses a shard count larger than the suite's files. The job keeps
-the 60-minute limit #202 gave the whole suite; the first run of the shards
-measures how much of it they take.
+vitest 5.0.3 refuses a shard count larger than the suite's files unless
+`passWithNoTests` is set (its `executeTests`), which the host's config
+does not set; with it, a surplus shard would run nothing and pass, and the
+report's list is what would hold the other shards to every file. The job
+keeps the 60-minute limit #202 gave the whole suite; the first run of the
+shards measures how much of it they take.
 
 turbo hands what follows its `--` to the task the command names and not to
 the builds `^build` runs first: watched on turbo 2.11.2 on 2026-11-17, where
@@ -139,7 +151,12 @@ the builds `^build` runs first: watched on turbo 2.11.2 on 2026-11-17, where
 `tsc --noEmit "--pretty"` and `tsdown` with no argument in data-core and
 data-identity. Its `--dry-run=json` names the arguments on every task all the
 same, which is not what it runs. A turbo release that handed them to the
-builds would fail the shards' builds, red, not silent.
+builds too would not show itself as a red build: tsdown 0.23.0's build
+command accepts options it does not know (`allowUnknownOptions` in its
+CLI), and nothing here has run one with `--shard`. vitest would still
+divide the suite. A turbo that stopped handing `--shard` to vitest would
+have each shard run every file, which the report fails as files run in two
+shards.
 
 The `test` job's check names become `test (@formancy/data-host, 1/2)` and
 `(…, 2/2)`, and the artefact `release-results-test-app-host` becomes one per
@@ -156,9 +173,10 @@ from `include` back to the list.
 - **Raising the limit**, as #202 did to 60. Every pull request still waits
   for the whole suite, which grows with each feature, and the limit chases
   it.
-- **Three shards.** Predicted the same way, 803 s, 843 s and 656 s, about 14
-  minutes each; but a third runner with its own image pull and databases,
-  when two already bring the host below the browser legs a run waits for.
+- **Three shards.** Predicted the same way, spans of 803 s, 843 s and
+  656 s, about 13, 14 and 11 minutes; but a third runner with its own image
+  pull and databases, when two already bring the host below the browser
+  legs a run waits for.
 - **Files divided by a list kept by hand.** A new file goes in no list until
   somebody notices, which is the failure the report now catches; vitest's
   hash divides them with no list to keep.
@@ -181,5 +199,15 @@ from `include` back to the list.
 
 0035 is extended: a package's suite may run in shards, each on a runner of
 its own, and its report reads them as one suite and fails on a shard
-missing, legs of another shape, or a file run in none or two; its Status
-line says so. 0003 is applied unchanged: each shard starts real databases.
+missing, legs of another shape, a file run in none or two, or a list of
+the suite's files that leaves one out, names none or differs between
+shards; its Status line says so. 0003 is applied unchanged: each shard
+starts real databases.
+
+0067 rejected `include:` entries on the `test` job because its legs were
+one per package, which its guard and the report's keys rested on. That no
+longer holds: the host's shards are such entries, and the guard and the
+keys tell a shard from a whole leg by its `shard` value. 0067's decision,
+a job of its own for the image legs, stands unchanged: image legs in the
+`test` job would still need a condition on its coverage upload, which
+shards, uploading as any leg does, do not.

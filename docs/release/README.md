@@ -79,8 +79,9 @@ twice, under another job's name, or from another commit or run; a package
 with no results, no tests, a test that did not pass -- skipped is not passed
 -- a file that failed, or vitest calling the run unsuccessful; a suite in
 shards with a shard that left no results, legs other than 1/N to N/N each
-once, or a file of the suite, as its legs listed it, that no shard ran or
-two did
+once, a file of the suite, as its legs listed it, that no shard ran or two
+did, a file a shard ran that no leg's list names, legs whose lists name no
+file, or a file one leg's list names and another's does not
 ([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md));
 a browser gate
 missing in a browser the gates run in, in error, with a failed check, having

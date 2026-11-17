@@ -37,6 +37,14 @@ function spanOf(suite) {
  * shards of that count no leg left results of; and each file of the suite
  * -- every one its legs listed as vitest resolves them -- that no shard
  * ran, or that more than one did.
+ *
+ * The list is held too, since every file is held to it: a file a leg ran
+ * that no list names, which a list shorter than the run's would leave
+ * unheld; a list given that names no file while a leg ran some, which
+ * would hold nothing; and each file one shard's list names and another's
+ * does not, lists vitest may have divided two ways. A leg that wrote no
+ * list is in the run's `missing` already, which fails it, and its null is
+ * compared with nothing.
  */
 function shardsOf(suites) {
   if (suites.every((suite) => suite.shard == null)) return null
@@ -47,13 +55,26 @@ function shardsOf(suites) {
   suites.forEach((suite, at) => {
     for (const file of suite.files) ran.set(file.file, [...(ran.get(file.file) ?? []), legs[at]])
   })
-  const listed = distinct(suites.flatMap((suite) => suite.shard?.suiteFiles ?? [])).sort()
+  const lists = suites.flatMap((suite, at) => (suite.shard?.suiteFiles == null ? [] : [{ leg: legs[at], files: distinct(suite.shard.suiteFiles).sort() }]))
+  const listed = distinct(lists.flatMap((entry) => entry.files)).sort()
+  const empty = lists.length > 0 && listed.length === 0 && ran.size > 0
   return {
     legs: [...legs].sort(),
     mixed: legs.includes('whole') || counts.length !== 1 || distinct(legs).length !== legs.length,
     absent: all.filter((leg) => !legs.includes(leg)),
     unrun: listed.filter((file) => !ran.has(file)),
     twice: [...ran].filter(([, by]) => by.length > 1).map(([file, by]) => ({ file, by: [...by].sort() })),
+    empty,
+    unlisted: empty ? [] : [...ran.keys()].filter((file) => !listed.includes(file)).sort(),
+    differing: listed
+      .filter((file) => lists.some((entry) => !entry.files.includes(file)))
+      .map((file) => ({
+        file,
+        by: lists
+          .filter((entry) => entry.files.includes(file))
+          .map((entry) => entry.leg)
+          .sort(),
+      })),
   }
 }
 

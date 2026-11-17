@@ -109,7 +109,7 @@ describe('a package’s suite in shards', () => {
       passed: 2,
       wallMs: 14_000,
       coverage: null,
-      shards: { legs: ['1/2', '2/2'], mixed: false, absent: [], unrun: [], twice: [] },
+      shards: { legs: ['1/2', '2/2'], mixed: false, absent: [], unrun: [], twice: [], empty: false, unlisted: [], differing: [] },
     })
   })
 
@@ -162,6 +162,53 @@ describe('a package’s suite in shards', () => {
         }),
       ),
     ).toEqual(['@formancy/data-host: 1 file(s) ran in more than one shard: apps/host/src/page.test.tsx in 1/2 and 2/2'])
+  })
+
+  // The rules above hold the shards to the list, and these hold the list,
+  // which would otherwise pass them for nothing.
+
+  // A list shorter than the run -- `vitest list` resolving fewer files than
+  // `vitest run` does, with a filter or a setting only one of them read --
+  // leaves the files it omits held by nothing: a shard lost with one of
+  // them in it would leave no file of the list unrun, and the run green.
+  test('with a file a shard ran that no list of the suite names fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          for (const result of inputs.results.filter((entry) => entry.shard !== undefined))
+            result.shard.suiteFiles = result.shard.suiteFiles.filter((file) => file !== 'apps/host/src/stale.test.tsx')
+        }),
+      ),
+    ).toEqual(['@formancy/data-host: 1 file(s) ran in a shard and are in no list of the suite: apps/host/src/stale.test.tsx'])
+  })
+
+  // A list written as `[]` -- a vitest whose `--filesOnly --json` writes
+  // something else, or a step that wrote the file before it globbed -- holds
+  // no shard to any file, so a lost shard's files would pass unnoticed.
+  test('with every list of the suite empty while its shards ran files fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          for (const result of inputs.results.filter((entry) => entry.shard !== undefined)) result.shard.suiteFiles = []
+        }),
+      ),
+    ).toEqual(['@formancy/data-host: its shards listed no file of the suite they ran, so nothing holds them to every file'])
+  })
+
+  // Two runners that resolved two lists -- another checkout, another tree --
+  // may each run their share of their own list, and the union of the lists
+  // hides a file one shard's division lost; the lists must be one list.
+  test('with shards whose lists of the suite differ fails the run', () => {
+    expect(
+      problemsOf(
+        sharded((inputs) => {
+          const { shard } = job(inputs, 'test-app-host-2of2')
+          shard.suiteFiles = shard.suiteFiles.filter((file) => file !== 'apps/host/src/stale.test.tsx')
+        }),
+      ),
+    ).toEqual([
+      "@formancy/data-host: 1 file(s) are in some of its shards' lists of the suite and not all, so vitest may have divided two lists: apps/host/src/stale.test.tsx listed by 1/2 only",
+    ])
   })
 
   // Shards of two counts divide the files two ways; a leg of the whole suite

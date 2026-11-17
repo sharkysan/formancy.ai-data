@@ -1253,6 +1253,24 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The host page's suite runs in two CI jobs, each a shard of its files
+  that vitest's `--shard` chooses** (0164). Why: it alone set every run's
+  wall time. On main's run 44027383496 (2026-11-17) its job took 39 of the
+  40 minutes it had, sixteen past the next longest job, and with the host
+  page's actions it passed 40 the same day, when its limit became 60. The
+  two shards are predicted from that run, before the actions' files, near
+  21 and 18 minutes, and not yet measured. Noticed by contributors: the
+  host's check is two, `test (@formancy/data-host, 1/2)` and `(…, 2/2)`,
+  each with an artefact of its own, `release-results-test-app-host-1of2`
+  and `-2of2`. Noticed by a reader of a release's report: the host's row
+  is one for both shards, named `@formancy/data-host, in shards 1/2, 2/2`,
+  with the longer shard's times and its coverage "not merged across its
+  shards", since each shard's figure counts only the lines its own files
+  reached; and the report fails a run in which a shard left no results,
+  the legs are other than 1/N to N/N each once, a file of the suite ran in
+  no shard or in two, or the shards' lists of the suite's files leave out
+  a file a shard ran, name none or differ. No upstream `@formancy/*`
+  version changes.
 - **The README speaks to somebody deciding whether to use the module, and
   its detail is in `docs/guide/`** (0154). Why: the README had become the
   whole reference, 1,675 lines on 2026-11-15, so a team lead or a product

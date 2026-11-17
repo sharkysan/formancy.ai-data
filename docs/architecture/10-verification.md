@@ -278,11 +278,13 @@ runner timed out a test that takes seconds alone.
 `scripts/ci-test-jobs.test.mjs` fails when the matrix and the workspace's
 packages with a suite disagree, so a new package cannot go untested in CI by
 being left off it, and when the `test-images` legs and `MATRIX_IMAGES`
-disagree. The host's suite, which alone ran sixteen minutes past every
-other job, runs in two shards, which vitest divides by a hash of each
-file's path: `scripts/ci-test-jobs.test.mjs` fails when a package's shards
-are other than 1/N to N/N, each once, and the report when a shard left no
-results, or a file of the suite ran in no shard or in two (0164).
+disagree. The host's suite, which on main's run 44027383496 (2026-11-17)
+ran sixteen minutes past every other job, runs in two shards, which vitest
+divides by a hash of each file's path: `scripts/ci-test-jobs.test.mjs`
+fails when a package's shards are other than 1/N to N/N, each once, and
+the report when a shard left no results, a file of the suite ran in no
+shard or in two, or the shards' lists of the suite's files leave out a file
+a shard ran, name none, or differ (0164).
 
 Outside the gates: `.github/workflows/cla.yml` fails a pull request naming
 any commit author with no signature in `.github/cla/signatories.json`;
@@ -676,11 +678,11 @@ release publishes; the release gates; and the known limitations
 It is a build output of the run, never a committed document, and it fails
 the run on anything in its problems: a job that ended other than success, a
 test skipped or failed -- skipped is not passed -- a shard of a suite that
-left no results, or a file of it that no shard ran or two did, a shared
-case on one
-engine only or missing on an image of the matrix, an image of the matrix
-that answered no test, a browser gate missing in a browser, two builds of
-one package that differ. `docs/release/README.md` lists every rule, and
+left no results, a file of it that no shard ran or two did, shards' lists
+of its files that leave out a file a shard ran, name none or differ, a
+shared case on one engine only or missing on an image of the matrix, an
+image of the matrix that answered no test, a browser gate missing in a
+browser, two builds of one package that differ. `docs/release/README.md` lists every rule, and
 how to build a report on one machine.
 
 Two registers live in `docs/release/` and are held by `pnpm test:repo`:
@@ -703,9 +705,11 @@ Two registers live in `docs/release/` and are held by `pnpm test:repo`:
 
 `vitest.coverage.ts` is one coverage policy for every package, with its
 exclusions argued: barrels, the composition root and declaration files. The
-report shows each package's totals; Codecov receives them when the
-repository has a token, and never during a release. There is no threshold,
-and none is wanted. The bar instead is that new behaviour arrives with a
+report shows each package's totals, but none for a suite run in shards,
+whose shards each count only the lines their own files reached
+([0164](../decisions/0164-a-suite-that-outgrows-every-other-job-runs-in-shards-and-the-report-holds-them-to-every-file-once.md));
+Codecov receives them when the repository has a token, and never during a
+release. There is no threshold, and none is wanted. The bar instead is that new behaviour arrives with a
 test that fails without it, and that each case says in a comment which
 failure it prevents -- both held by review, not by a tool.
 

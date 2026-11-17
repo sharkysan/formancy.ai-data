@@ -48,6 +48,12 @@ function suiteProblems(row) {
  * file its legs listed run in exactly one of them. A shard that left nothing
  * is files nobody ran, with every other leg green; a file in two shards is
  * a leg that ran more than its share, or a shard that never reached vitest.
+ *
+ * And the list those rules hold the files to, which would otherwise pass
+ * them for nothing: a file a shard ran that the list does not name is a
+ * list that resolved fewer files than the run, which can leave out the
+ * file a lost shard ran; a list that names none holds no shard to any; and
+ * shards that listed differently may have divided two lists.
  */
 function shardProblems(name, shards) {
   if (shards == null) return []
@@ -58,6 +64,13 @@ function shardProblems(name, shards) {
   if (shards.twice.length > 0)
     problems.push(
       `${name}: ${String(shards.twice.length)} file(s) ran in more than one shard: ${list(shards.twice.map((entry) => `${entry.file} in ${entry.by.join(' and ')}`))}`,
+    )
+  if (shards.empty) problems.push(`${name}: its shards listed no file of the suite they ran, so nothing holds them to every file`)
+  if (shards.unlisted.length > 0)
+    problems.push(`${name}: ${String(shards.unlisted.length)} file(s) ran in a shard and are in no list of the suite: ${list(shards.unlisted)}`)
+  if (shards.differing.length > 0)
+    problems.push(
+      `${name}: ${String(shards.differing.length)} file(s) are in some of its shards' lists of the suite and not all, so vitest may have divided two lists: ${list(shards.differing.map((entry) => `${entry.file} listed by ${entry.by.join(' and ')} only`))}`,
     )
   return problems
 }
