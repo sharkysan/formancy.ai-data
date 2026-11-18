@@ -1273,8 +1273,10 @@ the same day (formancy.ai 0232).
   wall time. On main's run 44027383496 (2026-11-17) its job took 39 of the
   40 minutes it had, sixteen past the next longest job, and with the host
   page's actions it passed 40 the same day, when its limit became 60. The
-  two shards are predicted from that run, before the actions' files, near
-  21 and 18 minutes, and not yet measured. Noticed by contributors: the
+  two shards were predicted from that run, before the actions' files, near
+  21 and 18 minutes, and measured the same day at 23½ and 13¼ minutes in
+  one run and 14 and 11 in the next, the same files on runners of
+  different speed. Noticed by contributors: the
   host's check is two, `test (@formancy/data-host, 1/2)` and `(…, 2/2)`,
   each with an artefact of its own, `release-results-test-app-host-1of2`
   and `-2of2`. Noticed by a reader of a release's report: the host's row
