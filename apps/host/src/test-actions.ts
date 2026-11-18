@@ -15,7 +15,7 @@ import type { Engine } from './test-plane.js'
  * and its presentation gives it a label alone, so the page says its own
  * confirmation and its own "Done."; and bound a third time as `close-all`,
  * over a selection (0165), with a label of its own, which the open
- * record's header never offers. The clerk reads the order, changes its
+ * record's header never offers and the bar above the grid does (0166). The clerk reads the order, changes its
  * note and amount, and may run all three, within their tenant through the
  * order's customer (0043). And how a suite writes and reads those orders
  * as the database's owner, beside the page, and loses a run's answer.
@@ -156,21 +156,27 @@ export interface ActionOrder {
 
 /** What a suite asks of the action orders as the owner. */
 export interface ActionDb {
-  /** An open order of tenant 1's in the actions schema, for a customer of its own, at version 1, as the owner inserts it: its token. */
-  insertActionOrder(connection: Engine['connection']): Promise<string>
+  /**
+   * An open order of tenant 1's in the actions schema, for a customer of its
+   * own, at version 1, as the owner inserts it: its token. `note`, its note,
+   * by which a search finds it among every order the suites inserted (0166).
+   */
+  insertActionOrder(connection: Engine['connection'], note?: string): Promise<string>
   actionOrder(connection: Engine['connection'], record: string): Promise<ActionOrder>
+  /** The order changed by somebody else, as the owner: its version moved, so a run from the version the page read is stale (0166). */
+  touchActionOrder(connection: Engine['connection'], record: string): Promise<void>
 }
 
 export function actionDb(pgAdmin: postgres.Sql, msAdmin: mssql.ConnectionPool): ActionDb {
   return {
-    insertActionOrder: async (connection) => {
+    insertActionOrder: async (connection, note) => {
       if (connection === 'pg') {
         const [customer] = await pgAdmin<
           Array<{ id: string }>
         >`insert into actions.customer (tenant_id, name) values (1, 'Host customer') returning id::text as id`
         const [row] = await pgAdmin<
           Array<{ id: string }>
-        >`insert into actions."order" (customer_id, amount) values (${customer?.id ?? ''}::bigint, 12.50) returning id::text as id`
+        >`insert into actions."order" (customer_id, amount, note) values (${customer?.id ?? ''}::bigint, 12.50, ${note ?? null}) returning id::text as id`
         return `k1:${String(row?.id)}`
       }
       const customer = await msAdmin
@@ -179,8 +185,16 @@ export function actionDb(pgAdmin: postgres.Sql, msAdmin: mssql.ConnectionPool): 
       const row = await msAdmin
         .request()
         .input('customer', mssql.BigInt, customer.recordset[0]?.id)
-        .query<{ id: string }>('insert into actions.[order] (customer_id, amount) output cast(inserted.id as nvarchar(20)) as id values (@customer, 12.50)')
+        .input('note', mssql.NVarChar(200), note ?? null)
+        .query<{ id: string }>(
+          'insert into actions.[order] (customer_id, amount, note) output cast(inserted.id as nvarchar(20)) as id values (@customer, 12.50, @note)',
+        )
       return `k1:${String(row.recordset[0]?.id)}`
+    },
+    touchActionOrder: async (connection, record) => {
+      const id = record.slice('k1:'.length)
+      if (connection === 'pg') await pgAdmin`update actions."order" set version = version + 1 where id = ${id}::bigint`
+      else await msAdmin.request().input('id', mssql.BigInt, id).query('update actions.[order] set version = version + 1 where id = @id')
     },
     actionOrder: async (connection, record) => {
       const id = record.slice('k1:'.length)

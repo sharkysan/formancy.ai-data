@@ -15,6 +15,8 @@ import type { OpenHow, RecordGridHandle, RowAt, RowDelete } from './record-grid.
 import type { GridSection } from './prefs.js'
 import { RecordTree } from './record-tree.js'
 import { Segmented } from './segmented.js'
+import { SelectionBar } from './selection-bar.js'
+import type { Selection } from './selection-bar.js'
 import { useGridState } from './use-grid-state.js'
 import { useOwnViews } from './use-own-views.js'
 import { ViewPicker } from './view-picker.js'
@@ -35,7 +37,9 @@ import { ViewPicker } from './view-picker.js'
  * time it is opened (use-grid-state.ts). A file is of what the grid lists:
  * the search submitted, never what the box holds, the filter applied, and
  * the sort, with every column whatever the grid hides. None of it is
- * written into the address, as no filter is (0104).
+ * written into the address, as no filter is (0104). Where the form serves
+ * this person an action over a selection, the grid has a column of boxes
+ * and the actions over the records chosen are a bar above its well (0166).
  */
 /** The Records panel's grid, kept apart from every child section's (0106). */
 const RECORDS: GridSection = { kind: 'records' }
@@ -59,6 +63,7 @@ export function Records({
   onOpen,
   remove,
   after,
+  selection,
   drilling,
   tree,
   onTreeOpen,
@@ -84,6 +89,8 @@ export function Records({
   remove: RowDelete | undefined
   /** A row's delete confirmation, in place under the grid. */
   after: ReactNode
+  /** The records grid's choice, and the actions over it (selection-bar.tsx, 0166): drawn where the form offers one. */
+  selection: Selection
   /** Shown in Drill down: the grid's rows say so (0090). */
   drilling: boolean
   /** The lookup field through which the form is its own child, which offers its records as a tree (0110); null for none. */
@@ -252,6 +259,7 @@ export function Records({
             bench="master-bench"
             {...(remove === undefined ? {} : { remove })}
             after={after}
+            {...(selection.offered ? { choose: selection.rows, aboveWell: <SelectionBar selection={selection} idBase="records-choice" /> } : {})}
             drilling={drilling}
             onOpen={onOpen}
             onSort={state.setSort}

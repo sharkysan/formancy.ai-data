@@ -26,6 +26,7 @@ import type {
 } from 'ag-grid-community'
 import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import type { ListSortTerm } from '@formancy/data-client'
+import { CHOOSE_COLUMN } from './choose-column.js'
 import type { ArrangedColumn } from './columns.js'
 import { cellText } from './grid-datasource.js'
 import type { GridRow } from './grid-datasource.js'
@@ -73,6 +74,11 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  *   keyboard when the cell does. It is out of the Tab order, so the grid
  *   stays one stop, and its Enter and Space are its own, never the row's.
  *   It asks the page, which confirms in place; no key deletes.
+ * - **A row's box is a real checkbox** (0166), in a first column where the
+ *   form offers this person an action over a selection, on Delete's
+ *   pattern (choose-column.tsx): its Space is its own, never the row's, so
+ *   it never opens the record or deselects the open row; its Enter opens
+ *   the record as any cell's does.
  */
 
 /**
@@ -281,6 +287,8 @@ export function columnDefsOf(
   boxed: ReadonlySet<string> = new Set(),
   widths: readonly ColumnWidth[] = [],
   floors: ReadonlyMap<string, number> = new Map(),
+  /** The column of the boxes a person chooses records with (choose-column.tsx, 0166): first, where the form offers this person an action over a selection. */
+  choose?: ColDef<GridRow>,
 ): ColDef<GridRow>[] {
   const first = columns.find((column) => column.shown)?.key
   const set = new Map(widths.map((each) => [each.field, each.width]))
@@ -316,10 +324,11 @@ export function columnDefsOf(
         : {}),
     }
   })
-  if (remove === undefined) return fields
+  const chosen = choose === undefined ? fields : [choose, ...fields]
+  if (remove === undefined) return chosen
   // Last, so Tab into the grid still lands on the open row's first column, and the bar stays first.
   return [
-    ...fields,
+    ...chosen,
     {
       colId: DELETE_COLUMN,
       headerName: remove.heading ?? 'Delete',
@@ -448,15 +457,15 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     onColumnResized: (event: ColumnResizedEvent<GridRow>) => {
       if (!event.finished) return
       const finished = (event.columns ?? [])
-        .filter((column) => column.getColId() !== DELETE_COLUMN)
+        .filter((column) => column.getColId() !== DELETE_COLUMN && column.getColId() !== CHOOSE_COLUMN)
         .map((column) => ({ field: column.getColId(), width: Math.round(column.getActualWidth()) }))
       const changes = event.source === 'uiColumnResized' ? changedWidths(finished, settled) : []
       for (const { field, width } of finished) settled.set(field, width)
       if (changes.length > 0) on.widthsSet(changes)
     },
     onRowClicked: (event: RowClickedEvent<GridRow>) => {
-      // A press of the row's Delete is the button's, never the row's: it does not open the record it asks about.
-      if (event.event?.target instanceof Element && event.event.target.closest('button') !== null) return
+      // A press of the row's Delete is the button's, and of its box the box's, never the row's: neither opens the record (0053, 0166).
+      if (event.event?.target instanceof Element && event.event.target.closest('button, input') !== null) return
       on.asked(event.data, 'click', event.rowIndex, firstColumn())
     },
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
@@ -469,8 +478,9 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
         on.example(event.data, event.column.getColId())
         return
       }
-      // Space and Enter on a row's Delete are its button's: the browser presses it.
-      if (!SPACE_OR_ENTER(key) || event.column.getColId() === DELETE_COLUMN) return
+      // Space and Enter on a row's Delete are its button's, and Space on its box the box's: the browser presses or ticks it (0166).
+      const own = event.column.getColId() === DELETE_COLUMN || (key === ' ' && event.column.getColId() === CHOOSE_COLUMN)
+      if (!SPACE_OR_ENTER(key) || own) return
       event.event?.preventDefault()
       on.asked(event.data, key === 'Enter' ? 'enter' : 'space', event.rowIndex, event.column.getColId())
     },

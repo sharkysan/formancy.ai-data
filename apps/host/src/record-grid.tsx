@@ -3,6 +3,8 @@ import type { ReactElement, ReactNode } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import type { GridApi } from 'ag-grid-community'
 import type { ListFilterTerm, ListSortTerm, PublishedForm, RecordListQuery } from '@formancy/data-client'
+import { chooseColumn } from './choose-column.js'
+import type { ChosenRows } from './chosen-rows.js'
 import { arrange } from './columns.js'
 import type { ColumnChoice } from './columns.js'
 import { answered, createDatasource } from './grid-datasource.js'
@@ -33,7 +35,12 @@ export { DELETE_COLUMN } from './grid-options.js'
  * grid-datasource.ts's, what the line says and where the pager is
  * use-grid-line.ts's, the sort on the headers use-grid-sort.ts's, the boxes
  * under them and `=` on a cell use-header-filters.ts's, and the columns'
- * widths and the well's height use-grid-sizing.ts's.
+ * widths and the well's height use-grid-sizing.ts's. Where the form offers
+ * this person an action over a selection, the boxes a person chooses the
+ * page's records with are a first column (choose-column.tsx), and each
+ * page drawn is told to the choice, which a page of another list or
+ * another page clears (chosen-rows.ts, 0166); what the panel draws above
+ * the well -- the actions over the records chosen -- is its own.
  *
  * What it holds itself: whether its page has answered and how many rows it
  * drew, and the open record's row selected in the grid after every page --
@@ -139,6 +146,10 @@ export interface RecordGridProps {
   remove?: RowDelete
   /** What the panel holds after the well: a row's delete confirmation, in place. */
   after?: ReactNode
+  /** The records a person chooses of the page for an action over them (0166): a column of boxes, and each page drawn told to it. */
+  choose?: ChosenRows
+  /** What the panel holds between the toolbar and the well: the actions over the records chosen, and a run's region (0166). */
+  aboveWell?: ReactNode
   /** Shown in Drill down, where every open goes down a level: what the grid says of a row follows (0090). */
   drilling?: boolean
   onOpen(token: string, how: OpenHow, at: RowAt): void
@@ -226,6 +237,8 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // says what the grid shows (P7, measured in delete-rows.test.tsx,
         // 0053).
         if (rows.length === 0 && start > 0) return
+        // The page drawn, which keeps the choice made on it, or clears one made on another (0166).
+        latest.current.choose?.page(from, start, rows)
         shown.current = { ...shown.current, rows: rows.length, loaded: true }
         api.current?.setGridAriaProperty('busy', null)
         const { noun, canCreate, columns: shownColumns } = latest.current
@@ -357,6 +370,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
   const removeNoun = props.remove?.noun
   const removeWorded = props.remove?.said !== undefined
   const removeHeading = props.remove?.heading
+  const { choose } = props
   // Each header's floor, measured again where the page's fonts loading changed one (0151).
   const floors = useHeaderFloors(columns)
   const columnDefs = useMemo(
@@ -368,8 +382,9 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
         // Read, not a dependency: a kept width is drawn when its column is made, and a width set since is the grid's already (0151).
         latest.current.widths,
         floors,
+        choose === undefined ? undefined : chooseColumn(choose),
       ),
-    [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors],
+    [arranged, removeNoun, removeWorded, removeHeading, boxedKeys, floors, choose],
   )
 
   const options = useMemo(
@@ -431,6 +446,7 @@ export const RecordGrid = forwardRef<RecordGridHandle, RecordGridProps>(function
           }}
         />
       </div>
+      {props.aboveWell}
       {/* Dimmed by the room's stylesheet while a page is asked for: the rows on screen stay (0146). */}
       <div className={`grid-bench ${bench}`} ref={well} data-waiting={status.kind === 'loading' ? '' : undefined} onPointerDown={() => held.press(true)}>
         <AgGridReact<GridRow> gridOptions={options} columnDefs={columnDefs} datasource={held.source} />

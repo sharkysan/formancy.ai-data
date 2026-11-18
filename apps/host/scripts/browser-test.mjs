@@ -117,6 +117,15 @@
 //     it from the keyboard, the keyboard then on what the server did and
 //     the order closed in the database; and "Not run" in the deployment's
 //     words, said as its own;
+//   - an action over the records chosen (0166): on the action order, the
+//     Records grid's column of boxes first and the bar above it, measured
+//     with a record chosen; a row's box reached by the arrow keys, a real
+//     checkbox named for its record, Space on it ticking it and opening
+//     nothing, Space on a field's cell still opening the record, and Tab
+//     from the box leaving the grid in one stop; and close-all run from the
+//     bar through its dialog and its confirmation, Keep it the next Tab and
+//     Enter on Run it from the keyboard, the keyboard then on what the
+//     server did, the order chosen closed in the database and the other not;
 //   - a grid's Columns (0106): Enter on Columns opens its panel and keeps
 //     the keyboard there, the next Tab on the first column's Show; Space on
 //     a Show hides its column and asks the server nothing, and a column
@@ -202,7 +211,8 @@
 // One module per reason to change, under scripts/browser/: the plane, the
 // server of the built page, the stylesheet's reads, the measurements, the
 // workspace's states, the record's journey, a delete's states, Download
-// CSV's, an order's lines saved with it, an action's, the filter's, the views', the rows
+// CSV's, an order's lines saved with it, an action's, an action over the
+// records chosen, the filter's, the views', the rows
 // kept while the next are asked for, the columns', Drill down's, a column's
 // width, a customer list that goes on, Stacked's line and the short window,
 // and the policy's allowance.
@@ -235,6 +245,7 @@ import {
 import { recordedPerBrowser } from '../../../scripts/release-report/gate-results.mjs'
 import { actionJourney } from './browser/acting.mjs'
 import { allowanceProblem } from './browser/allowance.mjs'
+import { choosingJourney } from './browser/choosing.mjs'
 import { columnsJourney } from './browser/columns.mjs'
 import { deleteJourney } from './browser/deleting.mjs'
 import { drillJourney } from './browser/drilling.mjs'
@@ -390,6 +401,8 @@ async function run(gate, browser) {
           ...togetherJourney(plane, hop, gate, run),
           // Back on the orders' Records at its end, which the filter's states begin from.
           ...actionJourney(plane, gate, run),
+          // On the action order's records, and back on the orders' Records at its end too.
+          ...choosingJourney(plane, gate, run),
           ...filterJourney(plane, gate),
           ...viewJourney(plane, gate),
           ...waitingJourney(plane, gate),
@@ -481,7 +494,7 @@ async function run(gate, browser) {
   // A failed check fails the run in recordedPerBrowser, which says so.
   if (gate.failures().length > 0) return
   console.log(
-    `browser checks passed: the host page's workspace, journey, deletes, downloads, an order's lines saved with it, an action, filter, views, columns, Drill down, widths and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
+    `browser checks passed: the host page's workspace, journey, deletes, downloads, an order's lines saved with it, an action, an action over the records chosen, filter, views, columns, Drill down, widths and a list that goes on at ${String(new Set(list.map(({ width }) => width)).size)} widths, one of them also with the web fonts refused, and Stacked in ${SHORT.label}, against the real server on PostgreSQL, in ${String(Math.round((Date.now() - started) / 1000))} s`,
   )
 }
 

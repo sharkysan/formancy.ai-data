@@ -189,6 +189,29 @@
   color: var(--muted);
 }
 
+/* The actions over the records chosen, above the well (0166): the actions,
+   how many are chosen, and the two that change the choice, in a row that
+   wraps; what to do first, while nothing is, on a line of its own. A panel
+   short of room shrinks the well, never this. */
+.choice-bar {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.choice-status {
+  flex: 1 1 10rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.choice-hint {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
 /* The grid's well. Only its size is the host's; inside is AG Grid's theme. */
 .grid-bench {
   flex: none;

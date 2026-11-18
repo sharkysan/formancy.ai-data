@@ -18,7 +18,8 @@
 // changes lines, and the order's own Save sends them. And over the actions
 // schema every fixture loads, an order with close_order bound as its
 // action `close`, worded by its presentation, as src/test-actions.ts
-// publishes it (0162): a clerk reads the order and runs close.
+// publishes it (0162), and again as `close-all`, over the records a person
+// chooses of the page (0166): a clerk reads the order and runs both.
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -36,6 +37,8 @@ export const SAVED_LINES = 'pg-saved-line'
 export const ACTION_ORDER = 'pg-action-order'
 /** What close's presentation says, as src/test-actions.ts's CLOSE_WORDS. */
 export const CLOSE_WORDS = { label: 'Close the order', confirm: 'It closes the order, and the database keeps the note with it.', done: 'The order is closed.' }
+/** What close-all's presentation says, as src/test-actions.ts's CLOSE_ALL_LABEL (0166). */
+export const CLOSE_ALL_LABEL = 'Close the chosen orders'
 export const TOKENS = { admin: 'browser-gate-administrator', clerk: 'browser-gate-clerk', thirdClerk: 'browser-gate-clerk-tenant-3' }
 
 /**
@@ -77,11 +80,31 @@ function clerkPolicy(bindings, extra = {}) {
   }
 }
 
+/** close_order over the open record, with a source for every parameter: the note asked in its dialog. */
+const CLOSE = {
+  name: 'close',
+  routine: {
+    schema: 'actions',
+    name: 'close_order',
+    signature: 'pg_catalog.int8, pg_catalog.text, pg_catalog.text, pg_catalog."numeric", pg_catalog.int4',
+  },
+  scope: 'record',
+  parameters: [
+    { parameter: 'p_order', from: { key: 'id' } },
+    { parameter: 'p_note', from: { input: 'note' } },
+    { parameter: 'p_actor', from: { actor: 'id' } },
+    { parameter: 'p_amount', from: { field: 'amount' } },
+    { parameter: 'p_tenant', from: { attribute: 'tenant' } },
+  ],
+}
+
 /**
  * The action order (0162): close_order bound as `close`, with a source for
  * every parameter -- the note asked in its dialog -- and worded by its
- * presentation, which the server checks as it checks the suites'; a clerk
- * of tenant 1 reads the order and runs close, through its customer (0043).
+ * presentation, which the server checks as it checks the suites'; and
+ * bound again as `close-all`, over the records a person chooses of the
+ * page (0166), so the grid has its boxes and the bar above it; a clerk of
+ * tenant 1 reads the order and runs both, through its customer (0043).
  */
 async function publishActionOrder(call) {
   const proposal = await call(TOKENS.admin, '/v1/form-proposals', {
@@ -91,26 +114,15 @@ async function publishActionOrder(call) {
     title: 'Order',
     lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
     versionColumn: 'version',
-    actions: [
-      {
-        name: 'close',
-        routine: {
-          schema: 'actions',
-          name: 'close_order',
-          signature: 'pg_catalog.int8, pg_catalog.text, pg_catalog.text, pg_catalog."numeric", pg_catalog.int4',
-        },
-        scope: 'record',
-        parameters: [
-          { parameter: 'p_order', from: { key: 'id' } },
-          { parameter: 'p_note', from: { input: 'note' } },
-          { parameter: 'p_actor', from: { actor: 'id' } },
-          { parameter: 'p_amount', from: { field: 'amount' } },
-          { parameter: 'p_tenant', from: { attribute: 'tenant' } },
-        ],
-      },
-    ],
+    actions: [CLOSE, { ...CLOSE, name: 'close-all', scope: 'selection' }],
   })
-  const presentation = { ...EMPTY_PRESENTATION, actions: [{ action: 'close', ...CLOSE_WORDS }] }
+  const presentation = {
+    ...EMPTY_PRESENTATION,
+    actions: [
+      { action: 'close', ...CLOSE_WORDS },
+      { action: 'close-all', label: CLOSE_ALL_LABEL },
+    ],
+  }
   const presented = applyPresentation(proposal.form, presentation, proposal.bindings)
   if (!presented.ok) throw new Error(`close's words do not apply: ${presented.problems.join('; ')}`)
   await call(TOKENS.admin, `/v1/forms/${ACTION_ORDER}/versions`, {
@@ -135,7 +147,7 @@ async function publishActionOrder(call) {
         rowFilters: [],
         lookups: { customer: [{ column: 'tenant_id', attribute: 'tenant' }] },
         through: ['customer'],
-        actions: { close: { roles: ['clerk'] } },
+        actions: { close: { roles: ['clerk'] }, 'close-all': { roles: ['clerk'] } },
       },
       snapshot: proposal.snapshot,
     },
@@ -334,10 +346,10 @@ export async function startPlane() {
       (
         await sql`select count(distinct o.id)::int as orders, count(l.id)::int as lines from parity.saved_order as o left join parity.saved_line as l on l.order_id = o.id where o.note = ${note}`
       )[0],
-    /** An open order of tenant 1's in the actions schema, for a customer of its own, as the owner inserts it: its token. */
-    actionOrder: async () => {
+    /** An open order of tenant 1's in the actions schema, for a customer of its own, as the owner inserts it, noted `note` where given: its token. */
+    actionOrder: async (note = null) => {
       const [{ id: customer }] = await sql`insert into actions.customer (tenant_id, name) values (1, 'Gate customer') returning id`
-      const [{ id }] = await sql`insert into actions."order" (customer_id, amount) values (${customer}, 12.50) returning id`
+      const [{ id }] = await sql`insert into actions."order" (customer_id, amount, note) values (${customer}, 12.50, ${note}) returning id`
       return `k1:${String(id)}`
     },
     /** An action order's status and note, as the owner reads them. */

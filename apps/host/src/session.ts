@@ -262,7 +262,7 @@ export function createSession({ client, formId, definition, renderer, namespace,
   let lost: { write: UnknownWrite; generation: number; held: boolean } | undefined
   const lostHere = () => (lost !== undefined && lost.generation === opened?.generation ? lost : undefined)
   /** What a press says while the record's deletion, or an action over it, is out (0053, 0162): by what holds it, set by `hold`, lifted by `release`. */
-  const holds = new Map<'delete' | 'action', string>()
+  const holds = new Map<'delete' | 'action' | 'selection', string>()
   /** A form opened, a save sent or a save answered: each is a change `subscribe`'s listeners hear. */
   const notify = (): void => {
     for (const listener of listeners) listener()
@@ -559,14 +559,15 @@ export function createSession({ client, formId, definition, renderer, namespace,
       return saving !== undefined && saving.generation === opened?.generation
     },
     /**
-     * While the record's deletion is out (0053), or an action over it (0162),
-     * a press sends nothing and says `message`; `release` lifts what `by`
-     * held, whatever it came to, and leaves the other's.
+     * While the record's deletion is out (0053), or an action over it (0162)
+     * or over a selection that holds it (0166), a press sends nothing and says
+     * `message`; `release` lifts what `by` held, whatever it came to, and
+     * leaves the others'.
      */
-    hold(message: string, by: 'delete' | 'action' = 'delete'): void {
+    hold(message: string, by: 'delete' | 'action' | 'selection' = 'delete'): void {
       holds.set(by, message)
     },
-    release(by: 'delete' | 'action' = 'delete'): void {
+    release(by: 'delete' | 'action' | 'selection' = 'delete'): void {
       holds.delete(by)
     },
     /** This form's last save whose outcome is unknown, if any. */
