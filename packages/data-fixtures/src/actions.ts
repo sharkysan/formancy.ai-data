@@ -14,8 +14,9 @@ import type {
 } from '@formancy/data-core'
 
 /*
- * A run of an action over the open record (0160), written once for both
- * adapters' `actions.integration.test.ts` and their
+ * A run of an action over the open record (0160), and over a selection
+ * (0165), written once for both adapters' `actions.integration.test.ts`,
+ * `actions-selection.integration.test.ts` and
  * `actions-lost-answer.integration.test.ts`.
  *
  * Each suite starts its own fixture, discovers the actions schema
@@ -82,6 +83,29 @@ export type ActionExpectation = ActionAnswer | Readonly<Record<DatabaseKind, Act
  *   which it may have committed (0031 P3).
  * - `lost-answer`: the connection cut once the call was sent: unknown,
  *   sent once.
+ *
+ * Over a selection (0165), `close-all`, close over the records chosen:
+ *
+ * - `selection-done`: three orders, sent out of key order, commit in one
+ *   run: each version moved by one, the routine called once for each, and
+ *   each answered by its key in the order sent.
+ * - `selection-crossed`: two runs over the same two orders, sent in
+ *   opposite orders while a third transaction holds the lower key's row:
+ *   both wait on it, and once it is let go one is done and the other
+ *   stale, never a deadlock -- each locks in key order whatever the order
+ *   sent. The answers sorted, `done, stale`.
+ * - `selection-stale`: one order of three changed since it was read: the
+ *   run is `stale`, naming that one, nothing called and nothing kept.
+ * - `selection-declined`: the routine refuses one order of three, its
+ *   amount 66.60: `declined` in its words, and nothing kept of any.
+ * - `selection-page`: a selection of exactly a page, `LIST_PAGE_SIZE`
+ *   orders, commits; one more is refused before any statement.
+ * - `selection-as-locked`: each call raises the amount of the selection's
+ *   other order, noted 'raise others': done, and each call was given the
+ *   amount its own order held once locked, never what the other call
+ *   wrote to it -- PostgreSQL reads every argument in one statement under
+ *   one snapshot, and SQL Server's batch reads every record's before its
+ *   first EXEC.
  */
 export const ACTION_PARITY = {
   done: 'done',
@@ -98,6 +122,12 @@ export const ACTION_PARITY = {
   'held-lock': { postgres: 'action-timeout', sqlserver: 'unavailable' },
   'slow-routine': { postgres: 'action-timeout', sqlserver: 'unknown-outcome' },
   'lost-answer': 'unknown-outcome',
+  'selection-done': 'done',
+  'selection-crossed': 'done, stale',
+  'selection-stale': 'stale',
+  'selection-declined': 'declined',
+  'selection-page': 'done',
+  'selection-as-locked': 'done',
 } as const satisfies Readonly<Record<string, ActionExpectation>>
 
 export type ActionCase = keyof typeof ACTION_PARITY
@@ -163,22 +193,23 @@ function routine(snapshot: MetadataSnapshot, name: string): ActionChoice['routin
   return { ...(found[0] as (typeof found)[number]).ref }
 }
 
-/** `close`: one value from each kind of source. `broken`: the key alone, to a routine whose body is broken. */
+/**
+ * `close`: one value from each kind of source. `close-all`: the same, over
+ * a selection (0165). `broken`: the key alone, to a routine whose body is
+ * broken.
+ */
 function orderActions(snapshot: MetadataSnapshot): ActionChoice[] {
   const kind = snapshot.kind
+  const close: ActionChoice['parameters'] = [
+    { parameter: named(kind, 'p_order'), from: { key: 'id' } },
+    { parameter: named(kind, 'p_note'), from: { input: 'note' } },
+    { parameter: named(kind, 'p_actor'), from: { actor: 'id' } },
+    { parameter: named(kind, 'p_amount'), from: { field: 'amount' } },
+    { parameter: named(kind, 'p_tenant'), from: { attribute: 'tenant' } },
+  ]
   return [
-    {
-      name: 'close',
-      routine: routine(snapshot, 'close_order'),
-      scope: 'record',
-      parameters: [
-        { parameter: named(kind, 'p_order'), from: { key: 'id' } },
-        { parameter: named(kind, 'p_note'), from: { input: 'note' } },
-        { parameter: named(kind, 'p_actor'), from: { actor: 'id' } },
-        { parameter: named(kind, 'p_amount'), from: { field: 'amount' } },
-        { parameter: named(kind, 'p_tenant'), from: { attribute: 'tenant' } },
-      ],
-    },
+    { name: 'close', routine: routine(snapshot, 'close_order'), scope: 'record', parameters: close },
+    { name: 'close-all', routine: routine(snapshot, 'close_order'), scope: 'selection', parameters: close },
     {
       name: 'broken',
       routine: routine(snapshot, 'broken_order'),
@@ -247,7 +278,7 @@ export function actionForms(snapshot: MetadataSnapshot): ActionForms {
         })
       : undefined
   return {
-    orders: bundle('action-order', orders, throughCustomer(['id', 'customer', 'note', 'amount', 'status'], ['close', 'broken'])),
+    orders: bundle('action-order', orders, throughCustomer(['id', 'customer', 'note', 'amount', 'status'], ['close', 'close-all', 'broken'])),
     prices: bundle('action-price', prices, throughCustomer(['id', 'customer', 'product_no', 'valid_from', 'valid_to', 'amount'], ['reprice'])),
     tickets:
       tickets === undefined
@@ -263,10 +294,49 @@ export function actionForms(snapshot: MetadataSnapshot): ActionForms {
   }
 }
 
+/**
+ * SQL Server's tag form (0165): a rowversion form keyed by text under a
+ * case-insensitive collation, `touch` over a selection of it. Apart from
+ * `actionForms`, which every action suite asks, so that only the suite it
+ * is for depends on it.
+ */
+export function actionTagForm(snapshot: MetadataSnapshot): ActionBundle {
+  if (snapshot.kind !== 'sqlserver') throw new Error('the actions schema has a tag table on SQL Server alone')
+  const tags = form(snapshot, {
+    root: { schema: 'actions', name: 'tag' },
+    formId: 'action-tag',
+    title: 'Tag',
+    lookups: [],
+    touchColumn: 'note',
+    actions: [{ name: 'touch', routine: routine(snapshot, 'touch_tag'), scope: 'selection', parameters: [{ parameter: '@p_code', from: { key: 'code' } }] }],
+  })
+  return {
+    id: 'action-tag',
+    connection: 'actions',
+    snapshot,
+    bindings: tags,
+    policy: {
+      version: 1,
+      operations: { read: CLERKS, create: [], update: [] },
+      fields: { code: READ, note: READ },
+      rowFilters: [],
+      lookups: {},
+      actions: { touch: { roles: CLERKS } },
+    },
+  }
+}
+
 /** The token of a row of the actions schema by its id, as the API carries it. */
 export function actionToken(id: number | string): string {
   const encoded = recordToken(['id'], { id: String(id) })
   if (!encoded.ok) throw new Error(`no token for ${String(id)}: ${encoded.message}`)
+  return encoded.token
+}
+
+/** The token of a tag, SQL Server's text key, as the API carries it: spelled as given, which the case-insensitive key collation may make another's. */
+export function tagToken(code: string): string {
+  const encoded = recordToken(['code'], { code })
+  if (!encoded.ok) throw new Error(`no token for ${code}: ${encoded.message}`)
   return encoded.token
 }
 
@@ -284,6 +354,21 @@ export async function plannedAction(
   body: { record: string; version: string; answers?: Record<string, unknown> },
   context: PolicyContext = ACTION_CLERK,
 ): Promise<ActionRequest> {
+  return plannedSelection(actions, bundle, name, { records: [{ record: body.record, version: body.version }], answers: body.answers ?? {} }, context)
+}
+
+/**
+ * A run over the records `body` names, planned as `plannedAction` plans
+ * one: for an action over a selection, every record chosen, in the order
+ * sent (0165).
+ */
+export async function plannedSelection(
+  actions: ActionAdapter,
+  bundle: ActionBundle,
+  name: string,
+  body: { records: Array<{ record: string; version: string }>; answers?: Record<string, unknown> },
+  context: PolicyContext = ACTION_CLERK,
+): Promise<ActionRequest> {
   const action = (bundle.bindings.actions ?? []).find((candidate) => candidate.name === name)
   if (action === undefined) throw new Error(`${bundle.id} binds no action ${name}`)
   const described = await actions.describe(bundle.bindings.root, action.routine)
@@ -294,7 +379,7 @@ export async function plannedAction(
     bundle.policy,
     context,
     name,
-    { records: [{ record: body.record, version: body.version }], answers: body.answers ?? {} },
+    { records: body.records, answers: body.answers ?? {} },
     { table: described.table, routine: described.routine },
   )
   if (!planned.ok) {

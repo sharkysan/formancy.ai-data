@@ -662,6 +662,8 @@ describe('a form published with actions', () => {
   // asked for no routine, so a real catalog's snapshot would record none
   // and the generator bind no action; and with a scope other than
   // `record` read as one: the generator's 422 in place of the reading's 400.
+  // Since 0165 `selection` is a scope too, and the scope of no shape is
+  // `page`.
   test('is proposed from a discovery that asks for the routines, and only then', async () => {
     const admin = await createDataServer({ verifyIdentity, admin: { registry: registry(), store, adminRoles: ['data-admin'], audit: { sink: () => {} } } })
     try {
@@ -674,7 +676,7 @@ describe('a form published with actions', () => {
       expect((await propose(plain)).statusCode).toBe(200)
       expect(scopes).toEqual([{ schemas: ['sales'], routines: true }, { schemas: ['sales'] }])
       for (const actions of [
-        [{ ...REQUEST.actions?.[1], scope: 'selection' }],
+        [{ ...REQUEST.actions?.[1], scope: 'page' }],
         [{ ...REQUEST.actions?.[1], parameters: [{ parameter: 'p_order', from: { column: 'id' } }] }],
         'close',
       ]) {

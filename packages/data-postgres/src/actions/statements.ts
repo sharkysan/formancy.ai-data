@@ -45,18 +45,29 @@ export function castOf(typeId: string): string {
   return `pg_catalog.${name}`
 }
 
+/** The column the lock returns last: the positions of the records a locked row answers to, as an array's text. */
+const POSITIONS = `"l".${quoteIdentifier('o')}`
+
 /**
- * Lock the record and move its version (0160), as one statement: the
- * record by its key, inside the person's filters and every through -- each
+ * Lock the records and move their versions (0160), as one statement: each
+ * record by its key -- one, or every record of a selection (0165) --
+ * inside the person's filters and every through -- each
  * through's parent locked FOR SHARE, so a move of the parent to another
  * tenant waits for the run, where FOR KEY SHARE would let an UPDATE that
  * leaves the parent's key alone through -- at the version its person read,
  * the open version alone on a form over versions (0113), and only while
  * the root has the definition the run was decided over (0041). The rows
  * are locked FOR NO KEY UPDATE in key order, PostgreSQL's locking after its
- * sort (measured, actions.integration.test.ts), and the version moved by
- * one in the same statement. Only each moved row's key, as canonical text,
- * and its version come back.
+ * sort (measured, actions.integration.test.ts), so two runs over
+ * overlapping selections take their common rows in one order whatever
+ * order each was sent in, and the version moved by one in the same
+ * statement. Only each moved row's key, as canonical text, its version,
+ * and the positions in the request of the records whose key it equals
+ * come back, in an order PostgreSQL does not promise: the positions
+ * compared by the key's own equality, as the lock found the row, so a row
+ * two keys of a selection name -- two spellings a nondeterministic
+ * collation makes one, or two numerics of one value -- carries both, and
+ * a record is never told from its row by how either is spelled (0165).
  */
 export function lockStatement(
   request: ActionRequest,
@@ -76,11 +87,18 @@ export function lockStatement(
   })
   const where = [`(${records.join(' or ')})`, ...(request.open === undefined ? [] : [`${column(request.open)} is null`])]
   where.push(...guard(statement, target.table, definition, path))
-  const joined = target.identity.map((entry) => `${column(entry.name)} ${op('=')} "l".${quoteIdentifier(entry.name)}`)
-  const returned = [...target.identity.map((entry) => canonicalText(entry.type, column(entry.name))), `${column(move.column)}::pg_catalog.text`]
+  const named = request.records.map((record, position) => `case when ${located(statement, record.key, [], []).join(' and ')} then ${String(position)} end`)
+  // Every column of "locked" named here, so no column of the table can take a name it uses.
+  const held = target.identity.map((entry, index) => `${column(entry.name)} as ${quoteIdentifier(`k${String(index)}`)}`)
+  const joined = target.identity.map((entry, index) => `${column(entry.name)} ${op('=')} "l".${quoteIdentifier(`k${String(index)}`)}`)
+  const returned = [
+    ...target.identity.map((entry) => canonicalText(entry.type, column(entry.name))),
+    `${column(move.column)}::pg_catalog.text`,
+    `${POSITIONS}::pg_catalog.text`,
+  ]
   const text = [
     `with "locked" as materialized (`,
-    `  select ${keys.join(', ')}`,
+    `  select ${held.join(', ')}, pg_catalog.array_remove(array[${named.join(', ')}], null) as ${quoteIdentifier('o')}`,
     `  from ${quoteTable(target.table)} as ${ROW}`,
     `  where ${where.join(' and ')}`,
     `  order by ${keys.join(', ')}`,

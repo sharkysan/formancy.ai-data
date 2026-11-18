@@ -39,9 +39,10 @@ export { ambiguousBeside, fitProblem, inputProblem, isParameterSource, routinePr
 export { fieldKeyFor } from './generate/names.js'
 export type { ActionGround } from './generate/actions.js'
 export { ACTION_REFRESH } from './actions/wire.js'
-export type { ActionDone, ActionRefresh, ActionRunBody, ActionUnknownOutcome, FormAction } from './actions/wire.js'
-export { ACTION_REFUSED, actionChoiceOf, planAction, readRunBody } from './actions/plan.js'
-export { runFailure } from './actions/failure.js'
+export type { ActionDone, ActionRecordsRefusal, ActionRefresh, ActionRunBody, ActionUnknownOutcome, FormAction } from './actions/wire.js'
+export { ACTION_REFUSED, actionChoiceOf, DUPLICATE_RECORD, planAction, readRunBody } from './actions/plan.js'
+export { runFailure, unmovedFailure } from './actions/failure.js'
+export { ACTION_SCOPES } from './actions/types.js'
 export type { DuplicateRecord, PlannedAction, RunBody } from './actions/plan.js'
 export type {
   ActionAdapter,
@@ -55,6 +56,7 @@ export type {
   ActionParameter,
   ActionRecord,
   ActionRequest,
+  ActionScope,
   ArgumentSource,
   BoundSource,
   DescribedAction,

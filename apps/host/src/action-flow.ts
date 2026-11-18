@@ -18,8 +18,10 @@ import type { HeldLevels } from './use-drill.js'
 /*
  * The open record's actions on the page (0162), run through running.ts's
  * states against the server, with the guard. The detail's header offers
- * each action the form serves this person (`PublishedForm.actions`, 0161);
- * the region under it asks, confirms and says what the server answered.
+ * each action over the open record the form serves this person
+ * (`PublishedForm.actions`, 0161) -- never one over a selection, whose
+ * place is above the grid (0165) -- and the region under it asks,
+ * confirms and says what the server answered.
  *
  * - **One question at a time.** Asking closes any other owner's
  *   confirmation -- a delete's -- and every request the person makes of
@@ -170,7 +172,8 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
 
   return {
     run,
-    actions: definition.actions,
+    // The open record's header offers the actions over it; one over a selection belongs above the grid, which offers none yet (0165).
+    actions: definition.actions.filter((action) => action.scope === 'record'),
     label,
     confirmation: (action) => words(definition.form, action.confirm),
     renderer,

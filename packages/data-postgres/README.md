@@ -889,6 +889,13 @@ The suites start `postgres:17-alpine`, or the image a file names for a fact of i
   answer the hop drops after the commit, counted at the wire; a deferred
   unique constraint refused after the row was sent, with and without the
   answer lost; and a statement timed out while it waits on a lock.
+- `actions-selection.integration.test.ts` — an action's run over a
+  selection (0165), each case `ACTION_PARITY`'s: three orders sent out of
+  key order committed, two overlapping selections sent in opposite orders
+  one done and one stale, one order changed and one the routine refuses
+  each rolling back every record, a page committed with one more refused
+  before any statement, and each call given the amount its order held
+  once locked, whatever the other call wrote to it.
 - `actions.integration.test.ts` — an action's run over the open record
   (0160), each case `ACTION_PARITY`'s, as the order form's own account:
   committed with the version moved and every source given, twice from one

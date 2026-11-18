@@ -84,7 +84,8 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * when it was refused before any statement. `save` (0155): how many row
    * changes the save carried -- creates, updates and deletes of its
    * children's rows, whatever became of them -- 0 for a body that is not
-   * one. `null` for every other operation. A number, never which records:
+   * one. `action` over a selection (0165): how many records it addressed.
+   * `null` for every other operation. A number, never which records:
    * an operator can see that somebody took ten thousand rows, or changed
    * twenty lines of an order, and the trail is still no copy of them. A
    * save's event names no child form, row, token or ref.
@@ -110,6 +111,16 @@ export interface RuntimeAuditEvent extends AuditEventBase {
    * code alone.
    */
   action?: string
+  /**
+   * `action` over a selection only (0165): every record it addressed, each
+   * by the keyed hash `record` would name it by, in the order sent -- at
+   * most a page of them -- or `null` without an audit key. Fifty updates
+   * leave fifty hashed records; one run over the same fifty answers "who
+   * closed invoice 7" as well. Its `record` is then `null`. Absent from
+   * every other event, and from a run whose form binds no action of its
+   * name.
+   */
+  records?: string[] | null
 }
 
 /**
@@ -184,6 +195,12 @@ export function auditedForm(id: unknown): string | null {
 export function recordReference(key: string | undefined, token: string | undefined): string | null {
   if (key === undefined || token === undefined || token === '') return null
   return createHmac('sha256', key).update(token, 'utf8').digest('hex').slice(0, 32)
+}
+
+/** A selection's records as the trail names them (0165): each by `recordReference`, or `null` for all without an audit key. */
+export function selectionReferences(key: string | undefined, tokens: readonly string[]): string[] | null {
+  if (key === undefined) return null
+  return tokens.map((token) => recordReference(key, token) ?? '')
 }
 
 /** What the shared hooks establish for every event, before a plane adds its own fields. */

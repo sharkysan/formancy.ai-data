@@ -1,3 +1,4 @@
+import { ACTION_SCOPES } from '../actions/types.js'
 import type { ActionBinding, ActionChoice, ActionMove, ActionParameter, BoundSource, ParameterSource } from '../actions/types.js'
 import type { DatabaseKind } from '../adapter.js'
 import type { MetadataSnapshot, NormalizedType, ObjectMeta } from '../metadata.js'
@@ -84,7 +85,8 @@ function assertChoices(choices: readonly ActionChoice[]): void {
     names.add(name)
     if (!isRecord(routine) || typeof routine['schema'] !== 'string' || typeof routine['name'] !== 'string' || typeof routine['signature'] !== 'string')
       throw new Error(`action ${name} names no routine as { schema, name, signature }`)
-    if (scope !== 'record') throw new Error(`action ${name} has scope ${JSON.stringify(scope)}; this release runs an action over the open record alone`)
+    if (!(ACTION_SCOPES as readonly unknown[]).includes(scope))
+      throw new Error(`action ${name} has scope ${JSON.stringify(scope)}; an action runs over the open record or over a selection (0165)`)
     if (!Array.isArray(parameters)) throw new Error(`action ${name}'s parameters are not a list`)
     for (const entry of parameters as unknown[]) {
       if (!isRecord(entry) || typeof entry['parameter'] !== 'string' || !isParameterSource(entry['from']))
@@ -305,7 +307,12 @@ function missing(snapshot: MetadataSnapshot, choice: ActionChoice): string | nul
   return `${named} is not in the snapshot`
 }
 
-/** What the generator says of an action it binds: what it runs, how the version moves, and what nothing here binds (0159). */
+/**
+ * What the generator says of an action it binds: what it runs, over what,
+ * how the version moves, and what nothing here binds (0159) -- for a
+ * selection, that every record of it is held until the last call returns,
+ * and one refusal undoes them all (0165).
+ */
 function boundNote(binding: BoundAction, routine: RoutineMeta): GenerationNote {
   const move = binding.move
   const moved = move.kind === 'increment' ? `incrementing ${move.column}` : `setting ${move.column} to itself, which moves the rowversion`
@@ -313,10 +320,14 @@ function boundNote(binding: BoundAction, routine: RoutineMeta): GenerationNote {
     routine.reach === 'owner'
       ? " It may act beyond this connection's account's own grants: SECURITY DEFINER, or on SQL Server every procedure, by ownership chaining."
       : ''
+  const over =
+    binding.scope === 'record'
+      ? `over the open record after ${moved}, in one transaction`
+      : `once for each record of a selection of one page at most, after ${moved} on each, in one transaction that holds every record of it until the last call returns: one record refused, by the routine or by a change since it was read, and nothing is kept of any`
   return {
     subject: binding.name,
     kind: 'inferred',
-    message: `Runs ${describeRoutine(routine.ref)} over the open record after ${moved}, in one transaction. What it does is the deployment's: field grants, state moves and the policy's cascades do not bind it, and a routine that writes other rows of this table must move their version itself.${reach}`,
+    message: `Runs ${describeRoutine(routine.ref)} ${over}. What it does is the deployment's: field grants, state moves and the policy's cascades do not bind it, and a routine that writes other rows of this table must move their version itself.${reach}`,
   }
 }
 
@@ -341,7 +352,7 @@ export function bindAction(snapshot: MetadataSnapshot, root: ObjectMeta, ground:
   if (typeof parameters === 'string') return parameters
   // actionUnoffered said a move exists, and asked actionMove for it.
   const move = actionMove(root, ground.identity ?? [], ground.concurrency as ConcurrencyBinding) as ActionMove
-  return { name: choice.name, routine: { ...routine.ref }, kind: routine.kind, scope: 'record', parameters, move }
+  return { name: choice.name, routine: { ...routine.ref }, kind: routine.kind, scope: choice.scope, parameters, move }
 }
 
 /**

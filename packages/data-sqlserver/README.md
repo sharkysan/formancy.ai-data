@@ -739,7 +739,14 @@ ERROR_PROCEDURE() inside a procedure and at an EXEC that does not
 resolve, a procedure out of an account's sight, SET LOCK_TIMEOUT after an
 attention, a large result set, and a pool's unreported bound; whether a
 procedure was called is counted by a sequence each draws from as it
-begins, which no rollback gives back). It
+begins, which no rollback gives back), and over a selection
+(`actions-selection.integration.test.ts`, 0165, each shared case
+`ACTION_PARITY`'s, and this engine's own: two keys a case-insensitive
+collation makes one row, `duplicate-record` before any call; a call that
+deletes a later record of its selection, that record still called once
+with its own key, since every record's arguments are read before the
+first EXEC; and a record a trigger of the lock removed, `refused`,
+nothing called). It
 needs Docker and, the first time, a
 pull of about a gigabyte and a half. `encryption.test.ts` needs none: the
 real mssql and tedious against data-fixtures' PRELOGIN stand-in, which

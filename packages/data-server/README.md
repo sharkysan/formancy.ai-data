@@ -249,7 +249,10 @@ existed would be documented and inert.
 
   `POST /v1/forms/:id/actions/:action/run` runs an action the form binds
   over the open record ([0161](../../docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md)): `{ records: [{ record, version }],
-  answers }`, exactly one record, and the dialog's answers by field key.
+  answers }`, exactly one record, and the dialog's answers by field key --
+  or, for an action over a selection, one to `LIST_PAGE_SIZE` records, all
+  or nothing ([0165](../../docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)); a body past a page is
+  400 before any statement.
   In this order, each answering alone: a body of another shape 400, before
   the write id is read; a write id that is not one 400; an action the form
   does not bind, and a person its policy does not let run it, 403 before
@@ -270,12 +273,15 @@ existed would be documented and inert.
   `permission-denied`, 422 `declined` in the deployment's words or
   `refused`, 503 `unavailable` or `action-timeout`, and 502
   `unknown-outcome` naming the action and each record with the version
-  sent where the answer was lost. It is sent once per write id, each action
+  sent where the answer was lost; a refusal about records -- 404, 409, 400
+  `duplicate-record` -- names them in `records` by the tokens sent. It is
+  sent once per write id, each action
   an operation of its own, and never again. `GET /v1/forms/:id` names in
   `actions` those this person may run that the table as described leaves
-  runnable, each with its words and its dialog. The audit is one `action`
-  event naming the action, once the form binds it, and the record's keyed
-  hash, and never an answer. `routes/runtime-actions.test.ts` holds what
+  runnable, each with its words, its scope and its dialog. The audit is
+  one `action` event naming the action, once the form binds it, and the
+  record's keyed hash -- over a selection every record's in `records`,
+  and their count in `rows` -- and never an answer. `routes/runtime-actions.test.ts` holds what
   reaches the port; `e2e-lost-answer.integration.test.ts` loses a run's
   answer on both engines and fails if it crosses to the database twice.
   A generation request's `actions` is read and held to the bindings by
@@ -588,8 +594,12 @@ existed would be documented and inert.
   sending's answer is audited as `repeated`, with the record that answer
   names, so a resend is not counted as a second write (0031). Every runtime
   event carries `rows`: for an `export`, how many records its file held,
-  or held when it was refused, 0 before any statement; `null` for every
-  other operation -- a number, never which records (0079). And `moved`: on
+  or held when it was refused, 0 before any statement; for a `save`, its
+  row changes (0155); for an `action` over a selection, how many records
+  it addressed (0165); `null` for every other operation -- a number,
+  never which records (0079). An `action` over a selection alone names
+  them too, in `records`: each record's keyed hash in the order sent,
+  `null` without an audit key, and its `record` is `null` (0165). And `moved`: on
   a create or an update of a form whose policy names a state field's moves,
   whether the write as planned moves it, `null` otherwise, and for a write
   refused before it was planned or answered again -- whether, never from

@@ -1,8 +1,9 @@
-import { authorizeAction, planAction, presentedActions, readRunBody, recordToken, runFailure, runnableActions } from '@formancy/data-core'
+import { authorizeAction, DUPLICATE_RECORD, planAction, presentedActions, readRunBody, recordToken, runFailure, runnableActions } from '@formancy/data-core'
 import type {
   ActionBinding,
   ActionDone,
   ActionFailure,
+  ActionRecordsRefusal,
   ActionUnknownOutcome,
   DriftVerdict,
   FormAction,
@@ -19,13 +20,14 @@ import type { WriteAnswer } from './write-once.js'
 
 /*
  * `POST /v1/forms/:id/actions/:action/run` (0161): an action a form binds
- * (0159), run over the open record by the adapter's one transaction
- * (0160), sent once per write id and never again.
+ * (0159), run over the open record, or over a selection of up to a page of
+ * records (0165), by the adapter's one transaction (0160), sent once per
+ * write id and never again.
  *
  * In this order, each step answering alone:
  *
  * 1. the body's shape (400), before the write id is read, the planner's own
- *    reading (`readRunBody`);
+ *    reading (`readRunBody`), which holds it to a page of records;
  * 2. the write id (400 for one that is not one);
  * 3. the published form, which validates (0019), and an action of that
  *    name it binds (403 `operation-unavailable`);
@@ -91,22 +93,41 @@ const MAY_HAVE_RUN =
   'The connection to the database failed after the action was sent. It may have run. Running it again from what you read is safe: if it ran, it is refused as changed since it was read.'
 
 /**
+ * The records an answer is about, by the tokens sent (0165): the positions
+ * an adapter or the planner named, each one the body addressed, in order.
+ */
+function named(positions: readonly number[] | undefined, sent: RunBody['records']): string[] {
+  return (positions ?? []).flatMap((position) => {
+    const record = sent[position]?.record
+    return record === undefined ? [] : [record]
+  })
+}
+
+/**
  * A run that did not commit as the person is told it (0160's codes, 0161):
  * in the server's words, never the database's, but for `declined`, whose
  * sentence is the deployment's own (0156), about the run as a whole -- an
  * action's person answers its dialog, not the form, so no field error is
  * placed. Every one says nothing was done; `unknown-outcome` is the route's
- * own, which names what was addressed.
+ * own, which names what was addressed. A refusal about some of the records
+ * -- gone, changed, ended, or two the database makes one row -- names them
+ * by the tokens `sent` (0165), so a page knows which to read again.
  */
-export function actionFailure(failure: ActionFailure): WriteAnswer {
+export function actionFailure(failure: ActionFailure, sent: RunBody['records']): WriteAnswer {
   const answer = (status: number, code: string, message: string): WriteAnswer => ({ status, body: { code, message } })
+  const about = (status: number, code: ActionRecordsRefusal['code'], message: string): WriteAnswer => ({
+    status,
+    body: { code, message, records: named(failure.records, sent) } satisfies ActionRecordsRefusal,
+  })
   switch (failure.code) {
     case 'not-found':
-      return answer(404, 'not-found', 'No such record. Nothing was done.')
+      return about(404, 'not-found', 'No such record. Nothing was done.')
     case 'stale':
-      return answer(409, 'stale', 'The record changed since it was read. Reload it and review the changes before running this again. Nothing was done.')
+      return about(409, 'stale', 'The record changed since it was read. Reload it and review the changes before running this again. Nothing was done.')
     case 'version-ended':
-      return answer(409, 'version-ended', 'This version has ended, and an action runs over the open version alone. Nothing was done.')
+      return about(409, 'version-ended', 'This version has ended, and an action runs over the open version alone. Nothing was done.')
+    case 'duplicate-record':
+      return about(400, 'duplicate-record', DUPLICATE_RECORD)
     case 'schema-changed':
       return answer(409, 'schema-changed', 'The database changed since this form was published. Nothing was done.')
     case 'permission-denied':
@@ -162,7 +183,7 @@ async function ran(
   if (!described.ok) {
     // A description reads; a lost answer to one changed nothing, and an adapter that said otherwise is wrong.
     if (described.code === 'unknown-outcome') throw new Error('a description is a read, which has no unknown outcome')
-    return actionFailure(runFailure(described))
+    return actionFailure(runFailure(described), body.records)
   }
   const plan = planAction(bundle.snapshot, bundle.bindings, bundle.policy, steps.context(request), action.name, bodyOf(body), {
     table: described.table,
@@ -170,7 +191,7 @@ async function ran(
   })
   if (!plan.ok) {
     if (plan.code === 'invalid-values') return { status: 422, body: { code: plan.code, message: plan.message, fieldErrors: plan.fieldErrors } }
-    if (plan.code === 'duplicate-record') return { status: 400, body: { code: plan.code, message: plan.message } }
+    if (plan.code === 'duplicate-record') return actionFailure({ ok: false, code: plan.code, message: plan.message, records: plan.records }, body.records)
     return steps.refusal(request, 'action', plan)
   }
   const outcome = await open.actions.run(plan.request, steps.actionDeadlineMs)
@@ -182,16 +203,21 @@ async function ran(
     )
     const records = body.records.map(({ record, version }) => ({ record, version }))
     const lost: ActionUnknownOutcome = { code: 'unknown-outcome', message: MAY_HAVE_RUN, operation: 'action', action: action.name, records }
-    return { status: 502, body: lost, record: records[0]?.record }
+    return { status: 502, body: lost, ...trailed(action, records[0]?.record) }
   }
-  if (!outcome.ok) return actionFailure(outcome)
+  if (!outcome.ok) return actionFailure(outcome, body.records)
   const identity = plan.request.target.identity.map((column) => column.name)
   // Each record as the statement that moved it read its key, so a token answered is the row's own (0028); the token sent where none can be made.
   const tokens = outcome.records.map((values, index) => {
     const token = recordToken(identity, values)
     return token.ok ? token.token : (body.records[index]?.record ?? '')
   })
-  return { status: 200, body: { records: tokens } satisfies ActionDone, record: tokens[0] }
+  return { status: 200, body: { records: tokens } satisfies ActionDone, ...trailed(action, tokens[0]) }
+}
+
+/** The record an answer names in the trail: the open record's, as its token stands; a selection's are named before it ran (`registerActionRoute`). */
+function trailed(action: ActionBinding, record: string | undefined): { record?: string } {
+  return action.scope === 'record' && record !== undefined ? { record } : {}
 }
 
 /**
@@ -218,6 +244,12 @@ export function registerActionRoute(app: FastifyInstance, steps: ActionRouteStep
     const action = (bundle.bindings.actions ?? []).find((candidate) => candidate.name === request.params.action)
     // Named once the form binds it: a name only the URL said is never written to the trail.
     if (trail !== undefined && action !== undefined) trail.action = action.name
+    // A selection is named in the trail by every record it addressed, and their count (0165).
+    if (trail !== undefined && action?.scope === 'selection') {
+      delete trail.record
+      trail.records = read.body.records.map(({ record }) => record)
+      trail.rows = read.body.records.length
+    }
     // Each action an operation of its own, by the URL's name: the bound one's wherever a run was sent.
     const operation = `action:${request.params.action}` as const
     // A sending acted on already is answered as it was, whatever the form published now binds or allows.

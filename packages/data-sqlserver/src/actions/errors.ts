@@ -5,6 +5,8 @@ import {
   ACTION_UNMOVED_MESSAGE,
   ARGUMENT_CHANGED,
   ARGUMENT_CHANGED_MESSAGE,
+  ARGUMENTS_UNREAD,
+  ARGUMENTS_UNREAD_MESSAGE,
   DEFINITION_MOVED,
   DEFINITION_MOVED_MESSAGE,
   ROUTINE_DENIED,
@@ -13,6 +15,8 @@ import {
   ROUTINE_MOVED_MESSAGE,
   ROUTINE_STATUS,
   ROUTINE_STATUS_MESSAGE,
+  SELECTION_DUPLICATE,
+  SELECTION_DUPLICATE_MESSAGE,
 } from '../records/batch-steps.js'
 import { passes, refusal } from '../records/errors.js'
 import { RUN_STEPS } from './statements.js'
@@ -22,8 +26,10 @@ import { RUN_STEPS } from './statements.js'
  * where they arose, which a single write's are not (records/errors.ts).
  *
  * - The run's own errors first, by number AND exact message, since a user
- *   error number is anybody's: no record moved, the routine's definition
- *   moved, an argument changed on its way, a status other than 0. Then the
+ *   error number is anybody's: a record not moved, two keys of a selection
+ *   the database makes one row (0165), a record locked and then not found
+ *   to read its arguments from (0165), the routine's definition moved, an
+ *   argument changed on its way, a status other than 0. Then the
  *   write batch's, which a run's lock step carries and records/errors.ts
  *   answers: a moved root, a transaction a trigger or a procedure ended.
  * - What the transaction did, wherever it arose: a deadlock, a lock wait
@@ -78,8 +84,9 @@ const ENDED_IN_MODULE = 3609
 
 /**
  * The answer to what the batch recorded in CATCH, `unmoved` where the lock
- * moved no record, which the caller explains by a read. Throws for the
- * batch's refusal of a second row: an identity that is not a key.
+ * moved fewer records than were sent, which the caller explains by a
+ * read. Throws for the batch's refusal of a second row: an identity that
+ * is not a key.
  */
 export function batchFailure(failed: readonly Failed[], request: ActionRequest): ActionFailure | 'unmoved' {
   const first = failed[0] as Failed
@@ -91,6 +98,21 @@ export function batchFailure(failed: readonly Failed[], request: ActionRequest):
       message: "The table's definition is not the one this run was decided over; nothing was called, and it was rolled back.",
     }
   if (own(ACTION_UNMOVED, ACTION_UNMOVED_MESSAGE)) return 'unmoved'
+  const twice = first.number === SELECTION_DUPLICATE ? SELECTION_DUPLICATE_MESSAGE.exec(first.message)?.[1] : undefined
+  if (twice !== undefined)
+    return {
+      ok: false,
+      code: 'duplicate-record',
+      message: 'Two keys of the selection name one row under the key’s collation; nothing was called, and the run was rolled back.',
+      records: twice.split(',').map(Number),
+    }
+  if (own(ARGUMENTS_UNREAD, ARGUMENTS_UNREAD_MESSAGE))
+    return {
+      ok: false,
+      code: 'refused',
+      message:
+        'A record the run locked was not found by its key to read its arguments from: a trigger of the lock removed it or moved its key. Nothing was called, and the run was rolled back.',
+    }
   if (own(ROUTINE_MOVED, ROUTINE_MOVED_MESSAGE))
     return {
       ok: false,

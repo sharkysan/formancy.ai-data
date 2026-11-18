@@ -18,6 +18,21 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **An action runs over a selection of up to a page of records, all or
+  nothing** (0165). Why: a routine is often meant for several records at
+  once, and a page looping one run per record could end half done. An
+  action's `scope` may be `selection`; its run takes one to
+  `LIST_PAGE_SIZE` records -- more is 400 before any statement -- locks
+  them in key order in one transaction on both engines, so overlapping
+  runs wait rather than deadlock, and calls the routine once per record,
+  each call given what its record held once locked -- never what an
+  earlier call of the run wrote to it, so both engines pass the same
+  values -- keeping nothing if any is refused. A refusal about records
+  names them in `records`, which data-client reads, and the trail names
+  each by its keyed hash. The open record's action sent one token twice
+  is told "The request names one record twice", as before. The studio
+  and the host page offer no selection yet
+  ([0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
 - **The studio binds a routine as an action over the open record, grants
   it, words it and reviews its drift** (0163). Why: the generator, the
   bundle, both adapters and the runtime plane held an action, and an

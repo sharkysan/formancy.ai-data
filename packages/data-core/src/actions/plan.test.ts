@@ -18,9 +18,11 @@ import {
   sales,
   TENANT_ONE,
 } from '../records/test-support.js'
+import { recordToken } from '../records/token.js'
 import type { RoutineMeta } from '../routines.js'
-import { ACTION_REFUSED, planAction } from './plan.js'
-import { ACTION_POLICY, actionForm, CLOSE_ORDER, pgParameter, pgRoutine, routineSnapshot, SHIP, SHIP_ORDER } from './test-actions.js'
+import { LIST_PAGE_SIZE } from '../runtime.js'
+import { ACTION_REFUSED, DUPLICATE_RECORD, planAction } from './plan.js'
+import { ACTION_POLICY, actionForm, CLOSE, CLOSE_ORDER, pgParameter, pgRoutine, routineSnapshot, SHIP, SHIP_ORDER } from './test-actions.js'
 import type { ActionChoice, DescribedRoutine } from './types.js'
 
 /*
@@ -207,6 +209,109 @@ describe('what a run refuses before anything is sent', () => {
   test('a row filter that pins the column a run moves', () => {
     const policy: FormPolicy = { ...ACTION_POLICY, rowFilters: [...ACTION_POLICY.rowFilters, { column: 'row_version', attribute: 'tenant' }] }
     expect(run('ship', { records: ONE, answers: {} }, { policy })).toMatchObject({ ok: false, code: 'invalid-policy' })
+  })
+})
+
+describe('a run over a selection', () => {
+  /** The order form with `ship-all`, ship over a selection of the page, which clerks may run. */
+  const SELECTION = actionForm(SOURCE, [SHIP, CLOSE, { ...SHIP, name: 'ship-all', scope: 'selection' }]).bindings
+  const POLICY: FormPolicy = { ...ACTION_POLICY, actions: { ...ACTION_POLICY.actions, 'ship-all': { roles: ['clerk'] } } }
+  /** `count` orders of the page, each by its own key at version 3. */
+  const page = (count: number) =>
+    Array.from({ length: count }, (_, index) => {
+      const token = recordToken(['id'], { id: String(index + 1) })
+      if (!token.ok) throw new Error(token.message)
+      return { record: token.token, version: '3' }
+    })
+  const ship = (records: unknown) =>
+    planAction(
+      SOURCE,
+      SELECTION,
+      POLICY,
+      CLERK,
+      'ship-all',
+      { records, answers: {} },
+      { table: described(SOURCE, SELECTION), routine: describedRoutine(SHIP_ORDER) },
+    )
+
+  // Every record the person chose reaches the adapter, each by its key and
+  // the version its person read, in the order sent -- the adapter locks
+  // them in key order, and the route names a refusal's records by their
+  // positions here. Watched failing on 2026-11-17 with a selection held to
+  // one record as the open record is: "expected { ok: false, …(2) } to
+  // match object { ok: true }".
+  test('is every record chosen, in the order sent, each at the version read', () => {
+    const records = [...page(3)].reverse()
+    const planned = ship(records)
+    expect(planned).toMatchObject({ ok: true })
+    expect(planned.ok && planned.request.records.map((record) => [record.key.map((part) => part.value), record.expectedVersion])).toEqual([
+      [['3'], '3'],
+      [['2'], '3'],
+      [['1'], '3'],
+    ])
+  })
+
+  // A selection is rows of the one page a list shows, never a number of
+  // its own: a page of records is planned, one more is refused before
+  // anything is described or sent, and so is none. readRunBody holds the
+  // bound alone: the planner reads no body it did not let through. Watched
+  // failing on 2026-11-17 with the bound taken out of readRunBody:
+  // "expected { ok: true, request: { …(8) } } to match object { ok: false,
+  // code: 'invalid-request' }".
+  test('is a page of records at most, and one at least', () => {
+    expect(ship(page(LIST_PAGE_SIZE))).toMatchObject({ ok: true })
+    expect(ship(page(LIST_PAGE_SIZE + 1))).toMatchObject({ ok: false, code: 'invalid-request' })
+    expect(ship([])).toMatchObject({ ok: false, code: 'invalid-request' })
+  })
+
+  // Two tokens of one key would lock one row and call the routine on it
+  // twice: refused before anything is sent, in the words a person reads,
+  // naming the two by their positions. Watched failing on 2026-11-17 with
+  // the duplicate check taken out: "expected { ok: true, request: { …(8) }
+  // } to deeply equal { ok: false, …(3) }".
+  test('names one record twice: refused, both named', () => {
+    const [first, second] = page(2) as [{ record: string; version: string }, { record: string; version: string }]
+    expect(ship([first, second, { ...first, version: '4' }])).toEqual({ ok: false, code: 'duplicate-record', message: DUPLICATE_RECORD, records: [0, 2] })
+  })
+
+  // The scope is the binding's, never the body's: an action over the open
+  // record sent two records is refused, as it was before selections, and a
+  // selection of one is a selection. Watched failing on 2026-11-17 with
+  // every action read as a selection: "expected { ok: true, request: {
+  // …(8) } } to match object { ok: false, …(2) }".
+  test('is the binding’s scope: the open record’s action takes one record', () => {
+    const two = page(2)
+    const once = (name: string) =>
+      planAction(
+        SOURCE,
+        SELECTION,
+        POLICY,
+        CLERK,
+        name,
+        { records: two, answers: {} },
+        { table: described(SOURCE, SELECTION), routine: describedRoutine(SHIP_ORDER) },
+      )
+    expect(once('ship')).toMatchObject({ ok: false, code: 'invalid-request', message: 'An action over the open record names exactly one record.' })
+    expect(ship(page(1))).toMatchObject({ ok: true })
+  })
+
+  // The open record's action sent one token twice is the duplicate it was
+  // before selections (0159), in words that fit it: it has no selection,
+  // so a person told "the selection names one record twice" would look
+  // for one that is not there. The words say the request, which a
+  // selection's duplicate has too.
+  test('of the open record, sent one token twice, is duplicate-record in words that name no selection', () => {
+    const [first] = page(1) as [{ record: string; version: string }]
+    const twice = planAction(
+      SOURCE,
+      SELECTION,
+      POLICY,
+      CLERK,
+      'ship',
+      { records: [first, first], answers: {} },
+      { table: described(SOURCE, SELECTION), routine: describedRoutine(SHIP_ORDER) },
+    )
+    expect(twice).toEqual({ ok: false, code: 'duplicate-record', message: 'The request names one record twice. Nothing was done.', records: [0, 1] })
   })
 })
 

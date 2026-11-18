@@ -82,7 +82,10 @@ browser.
   enforced or not — and `createSnapshot` refuses one stored before it did.
 - **Actions**: a routine of the form's own database bound as an action
   over the open record
-  ([0159](../../docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)).
+  ([0159](../../docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md)),
+  or over a selection of up to `LIST_PAGE_SIZE` records, `scope:
+  'selection'`, all or nothing
+  ([0165](../../docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
   `GenerationRequest.actions` names each, a routine and a source for every
   parameter; `generateForm` binds each into `FormBindings.actions`, with
   its dialog, or says in a `blocked` note which rule refused it, and
@@ -95,7 +98,9 @@ browser.
   `planAction` plans a run; `PresentationOverrides.actions` holds its
   words; drift review reads the routines a form's actions bind, and
   `DriftVerdict.actions` is those still runnable. Both adapters run one,
-  and data-server's runtime plane serves and runs it (0160, 0161).
+  and data-server's runtime plane serves and runs it (0160, 0161);
+  `unmovedFailure` is what both answer a selection that locked fewer
+  records than it addressed with (0165).
 
 ```ts
 import { generateForm } from '@formancy/data-core'

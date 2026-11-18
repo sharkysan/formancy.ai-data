@@ -8,8 +8,11 @@ export {
   actionAnswer,
   actionExpected,
   actionForms,
+  actionTagForm,
   actionToken,
   plannedAction,
+  plannedSelection,
+  tagToken,
 } from './actions.js'
 export type { ActionAnswer, ActionBundle, ActionCase, ActionExpectation, ActionForms } from './actions.js'
 export {
