@@ -674,16 +674,18 @@ describe('REFUSAL_PARITY: a refusal names the same code on both engines', () => 
 describe("a new record starts with its column's constant default (DEFAULT_PARITY, 0149)", () => {
   // Each default written as a person writes it in T-SQL, in a schema of
   // this suite's own, and discovered as the owner: what object_definition
-  // spells each as -- a number in two pairs of parentheses, text in one, N
-  // before the nvarchar's -- is what the generator reads, and the form
-  // starts every field at the answer PostgreSQL's suite starts it at. A
-  // bit's 1 and 0 are a flag's true and false. The varchar(3)'s 'toolong',
-  // which CREATE takes, is refused by its codec as too long; every insert
-  // here gives it NULL, so its own default is never applied. To be watched
-  // failing in CI with discovery spelling 'it''s' in a second pair of
-  // parentheses (it is then not read, and quoted starts empty) and with
-  // data-core reading a whole number without its sign (below then starts,
-  // and is stored, at 1).
+  // spells each as -- a number in two pairs of parentheses, one past int,
+  // which T-SQL types as numeric, with a point after its digits; text in
+  // one, N before the nvarchar's -- is what the generator reads, and the
+  // form starts every field at the answer PostgreSQL's suite starts it at.
+  // A bit's 1 and 0 are a flag's true and false. The varchar(3)'s
+  // 'toolong', which CREATE takes, is refused by its codec as too long;
+  // every insert here gives it NULL, so its own default is never applied.
+  // To be watched failing in CI with discovery spelling 'it''s' in a second
+  // pair of parentheses (it is then not read, and quoted starts empty),
+  // with data-core reading a whole number without its sign (below then
+  // starts, and is stored, at 1) and with it reading no point after one
+  // (huge then starts empty here and at its default on PostgreSQL).
   const { schema, name } = DEFAULT_TABLE
   const request: GenerationRequest = { connection: 'test', root: DEFAULT_TABLE, formId: 'defaulted', title: 'Defaulted', lookups: [], versionColumn: 'version' }
   const CLERK = { actor: { id: 'u-1', roles: ['clerk'] }, attributes: {} }
@@ -714,6 +716,7 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
       quantity int not null default 1,
       below int not null default -1,
       big bigint not null default 7,
+      huge bigint not null default 9007199254740993,
       price decimal(10,2) not null default 9.5,
       code varchar(3) null default 'toolong',
       made_at datetimeoffset not null default sysdatetimeoffset(),

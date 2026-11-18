@@ -678,7 +678,8 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
   // pg_get_expr spells each as is what the generator reads, and the form
   // starts every field at the answer SQL Server's suite starts it at. The
   // implicit cast to a bigint is not shown, so 7 is spelled bare; a
-  // negative integer is quoted and cast, so it reads back as itself. The
+  // negative integer is quoted and cast, so it reads back as itself, and
+  // so is one past int, which is a bigint constant already. The
   // varchar(3)'s 'toolong', which CREATE takes, is refused by its codec as
   // too long; every insert here gives it NULL, so its own default is never
   // applied. To be watched failing in CI with discovery spelling 'it''s'
@@ -715,6 +716,7 @@ describe("a new record starts with its column's constant default (DEFAULT_PARITY
       quantity int not null default 1,
       below int not null default -1,
       big bigint not null default 7,
+      huge bigint not null default 9007199254740993,
       price numeric(10,2) not null default 9.5,
       code varchar(3) null default 'toolong',
       made_at timestamptz not null default now(),

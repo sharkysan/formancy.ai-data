@@ -61,8 +61,18 @@ const POSTGRES_BARE = /^([0-9]+(?:\.[0-9]+)?)$/
 const POSTGRES_NUMBER = /^'(-?[0-9]+(?:\.[0-9]+)?)'::(?:integer|bigint|smallint|numeric)$/
 const POSTGRES_TEXT = /^'((?:[^']|'')*)'::(?:text|character varying|bpchar)$/
 
-/** SQL Server's spellings, as it writes a default's definition again from its parse: a number in two pairs of parentheses, text in one, N before a national literal. */
+/**
+ * SQL Server's spellings, as it writes a default's definition again from
+ * its parse: a number in two pairs of parentheses, its sign inside; text in
+ * one, N before a national literal. An integer past int, which T-SQL types
+ * as numeric, is written with a point and nothing after it --
+ * `((9007199254740993.))` -- and read as its digits alone; a point after a
+ * decimal's digits is no literal, and no constant. `check-lists.ts` reads
+ * the same literal inside a check, measured there, token by token where
+ * this reads a whole definition, so each keeps its own reading.
+ */
 const SQLSERVER_NUMBER = /^\(\((-?[0-9]+(?:\.[0-9]+)?)\)\)$/
+const SQLSERVER_WHOLE_NUMERIC = /^\(\((-?[0-9]+)\.\)\)$/
 const SQLSERVER_TEXT = /^\((N?)'((?:[^']|'')*)'\)$/
 
 function textConstant(quoted: string, national: boolean): Constant {
@@ -81,7 +91,7 @@ function readPostgres(expression: string): Constant | null {
 }
 
 function readSqlServer(expression: string): Constant | null {
-  const [, number] = SQLSERVER_NUMBER.exec(expression) ?? []
+  const [, number] = SQLSERVER_NUMBER.exec(expression) ?? SQLSERVER_WHOLE_NUMERIC.exec(expression) ?? []
   if (number !== undefined) return { kind: 'number', text: number }
   const [, prefix, quoted] = SQLSERVER_TEXT.exec(expression) ?? []
   return prefix === undefined || quoted === undefined ? null : textConstant(quoted, prefix === 'N')
