@@ -15,15 +15,24 @@ import { audit, focusedName, unnamed } from './test-accessible.js'
 
 /*
  * The column a person chooses a page's records with (0166), without a
- * server: AG Grid as the page configures it, the boxes' column first, and
- * three fake rows -- two records and a row whose key fits no token. What
- * a run over the records chosen sends, and what the page says of it, is
- * actions.test.tsx's against the real server, on both engines.
+ * server: AG Grid as the page configures it, the boxes' column first, a
+ * row's Delete last, and three fake rows -- two records and a row whose
+ * key fits no token. What a run over the records chosen sends, and what
+ * the page says of it, is actions.test.tsx's against the real server, on
+ * both engines.
  *
- * Found by role and accessible name. Two reads the accessibility tree
- * cannot answer, said where they are made: a box's `tabIndex`, which is
- * what keeps it out of the Tab order; and which row is the open one, its
- * `aria-selected`, which AG Grid writes on the row and no name says.
+ * Found by role and accessible name. The reads the accessibility tree
+ * cannot answer, said where they are made: a cell by the `col-id` AG Grid
+ * writes on it, and a row by its Id cell's text, since the tree names a
+ * cell by its value alone and a row by nothing (`rowOf`, `cellOf`, and
+ * the field the keyboard is on); the first header's text, which is the
+ * header's name with nothing AG Grid adds; a box's `tabIndex`, which is
+ * what keeps it out of the Tab order; which row is the open one, its
+ * `aria-selected`, which AG Grid writes on the row and no name says;
+ * whether the keyboard is inside a cell, by the cell around it, which no
+ * role of the focused element says; and what AG Grid's live region says
+ * of a row as the keyboard reaches one of its cells, read from the
+ * element AG Grid says it in (`rowSays`), which has no role or name.
  *
  * That Tab from a box leaves the grid in one stop is the browser gate's
  * (scripts/browser/choosing.mjs): AG Grid leaves the grid by moving the
@@ -48,8 +57,11 @@ const ROWS = [row('k1:1', 1, 'placed'), row('k1:2', 2, 'shipped'), row(null, 3, 
 /** Each row asked for, as the page would open it: the token, and how. */
 type Asked = Array<{ record: string | null; how: OpenHow; colId: string }>
 
-/** A grid of the three rows, its first record open, every row asked for kept in `asked`, the choice told of the page as record-grid.tsx tells it. */
-function Grid({ asked, choice }: { asked: Asked; choice: ChosenRows }): ReactElement {
+/** Each `=` the grid handed the page, by the column it was pressed on. */
+type Examples = string[]
+
+/** A grid of the three rows, its first record open, every row asked for kept in `asked` and every `=` in `examples`, the choice told of the page as record-grid.tsx tells it. */
+function Grid({ asked, examples, choice }: { asked: Asked; examples: Examples; choice: ChosenRows }): ReactElement {
   const [options] = useState(() =>
     gridOptionsFor({
       labelledBy: 'records',
@@ -65,7 +77,7 @@ function Grid({ asked, choice }: { asked: Asked; choice: ChosenRows }): ReactEle
         drilling: () => false,
         sorted: () => {},
         widthsSet: () => {},
-        example: () => {},
+        example: (_row, colId) => examples.push(colId),
       },
     }),
   )
@@ -75,7 +87,7 @@ function Grid({ asked, choice }: { asked: Asked; choice: ChosenRows }): ReactEle
       <div style={{ width: 800, height: 300 }}>
         <AgGridReact<GridRow>
           gridOptions={options}
-          columnDefs={columnDefsOf(COLUMNS, undefined, new Set(), [], new Map(), chooseColumn(choice))}
+          columnDefs={columnDefsOf(COLUMNS, { noun: 'Order', press: () => {} }, new Set(), [], new Map(), chooseColumn(choice))}
           datasource={{
             getRows: (params) => {
               choice.page(ROWS, 0, ROWS)
@@ -114,14 +126,18 @@ async function cellOf(id: string, colId: string): Promise<HTMLElement> {
     .find((cell) => cell.getAttribute('col-id') === colId) as HTMLElement
 }
 
-function mount(): { asked: Asked; choice: ChosenRows } {
+/** What AG Grid's live region last said of a row, without the mark it adds to a sentence said twice: a DOM read, said above. */
+const rowSays = (): string => (document.querySelector('.ag-aria-description-container')?.textContent ?? '').replaceAll('\u200b', '')
+
+function mount(): { asked: Asked; examples: Examples; choice: ChosenRows } {
   // What the page around a grid has, which axe asks of any document.
   document.title = 'Records'
   document.documentElement.lang = 'en'
   const asked: Asked = []
+  const examples: Examples = []
   const choice = createChosenRows('Order')
-  render(<Grid asked={asked} choice={choice} />)
-  return { asked, choice }
+  render(<Grid asked={asked} examples={examples} choice={choice} />)
+  return { asked, examples, choice }
 }
 
 describe('the boxes a person chooses records with', () => {
@@ -211,6 +227,58 @@ describe('the boxes a person chooses records with', () => {
     await user.tab()
     const at = document.activeElement
     expect(at?.closest('[role="gridcell"]') ?? null).toBeNull()
-    expect(at?.getAttribute('type')).not.toBe('checkbox')
+    expect(screen.getAllByRole('checkbox')).not.toContain(at)
+  })
+
+  // As the keyboard reaches a row's box, AG Grid's live region says what
+  // Space does there -- it ticks or unticks the box -- never that it opens
+  // the record, which it does on a field's cell; on the open row, that the
+  // record is open. On a row's Delete, whose Space and Enter press it, that
+  // they ask to delete it (watched failing with every cell said as a
+  // field's: "expected 'Space opens this record. Enter opens …' to be
+  // 'Space ticks or unticks this box. Ente…'").
+  test('are said as what Space does on them, as a field and Delete are', async () => {
+    mount()
+    const user = userEvent.setup()
+    ;(await cellOf('2', 'status')).focus()
+    await user.keyboard('{ArrowLeft}')
+    await waitFor(() => expect(rowSays()).toBe('Space opens this record. Enter opens it and moves to it.'))
+    await user.keyboard('{ArrowLeft}')
+    expect(focusedName()).toBe('Choose Order k1:2')
+    await waitFor(() => expect(rowSays()).toBe('Space ticks or unticks this box. Enter opens the record and moves to it.'))
+    await user.keyboard('{ArrowUp}')
+    expect(focusedName()).toBe('Choose Order k1:1')
+    await waitFor(() => expect(rowSays()).toBe('This record is open. Space ticks or unticks this box.'))
+    await user.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}')
+    expect(focusedName()).toBe('Delete Order k1:1')
+    await waitFor(() => expect(rowSays()).toBe('This record is open. Space or Enter asks to delete it.'))
+    await user.keyboard('{ArrowDown}')
+    expect(focusedName()).toBe('Delete Order k1:2')
+    await waitFor(() => expect(rowSays()).toBe('Space or Enter asks to delete this record.'))
+  })
+
+  // A row with no box -- its key fits no token -- leaves Space to the row,
+  // which the page answers by saying it cannot be opened, rather than a
+  // key that does nothing (watched failing with Space on the column taken
+  // as the box's on every row: "expected [] to deeply equal [ Array(1)
+  // ]"). And `=`, which keeps a field's value as its column's condition
+  // (0133), asks nothing on a box or a Delete, which hold none: the page
+  // would name the column by its id, "~choose" (watched failing with `=`
+  // handed on from every column: "expected [ 'status', '~choose',
+  // '~delete' ] to deeply equal [ 'status' ]").
+  test('leave Space to a row with no box, and `=` to the fields', async () => {
+    const { asked, examples } = mount()
+    const user = userEvent.setup()
+    ;(await cellOf('3', 'status')).focus()
+    await user.keyboard('{ArrowLeft}{ArrowLeft} ')
+    expect(asked).toEqual([{ record: null, how: 'space', colId: CHOOSE_COLUMN }])
+
+    ;(await cellOf('2', 'status')).focus()
+    await user.keyboard('={ArrowLeft}{ArrowLeft}')
+    expect(focusedName()).toBe('Choose Order k1:2')
+    await user.keyboard('={ArrowRight}{ArrowRight}{ArrowRight}')
+    expect(focusedName()).toBe('Delete Order k1:2')
+    await user.keyboard('=')
+    expect(examples).toEqual(['status'])
   })
 })

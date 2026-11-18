@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactElement, ReactNode, RefObject } from 'react'
 import type { DataClient, FormMenuEntry, PublishedForm } from '@formancy/data-client'
-import { useActionFlow } from './action-flow.js'
 import { useAfterRender } from './after-render.js'
 import type { ChildForm } from './children.js'
-import { crumbOf, recordName } from './crumbs.js'
-import type { Crumb } from './crumbs.js'
+import { recordName, trailOf } from './crumbs.js'
 import { DeleteRegion } from './delete-confirm.js'
 import { useDemo } from './demo-tools.js'
 import { useDeleteFlow } from './delete-flow.js'
@@ -25,7 +23,6 @@ import type { Layout, View } from './layout.js'
 import { levelOpens } from './lookup-opens.js'
 import { isOpen, nextLine, nextOf } from './next-version.js'
 import { useOpening } from './opening.js'
-import { useSelection } from './selection-bar.js'
 import { renderersOf } from './panes.js'
 import { axisOf } from './prefs.js'
 import type { Axis, RendererChoice, Shares } from './prefs.js'
@@ -34,6 +31,7 @@ import type { OpenHow, RecordGridHandle, RowAt } from './record-grid.js'
 import { Records } from './records.js'
 import { RecordTabs, useTabStart } from './record-tabs.js'
 import { focusChoice } from './segmented.js'
+import { useActions } from './selection-bar.js'
 import { createSession } from './session.js'
 import type { SaveResult, Session } from './session.js'
 import { laneStyle, Split, useLine } from './split.js'
@@ -45,21 +43,23 @@ import type { FormOf } from './use-drill.js'
 const DISCARDED: Said = ['Discarded the unsaved changes. ']
 
 /**
- * One open form (0047): its header -- the title and id, what this person may do, the
- * Layout group -- the unsaved notice when a request waits, and the lanes: the Records
- * panel, the line between it and the record in Side by side and in Stacked (0145), and
- * the detail with the record's forms and its child sections, in tabs beside it (0142).
+ * One open form (0047): its header -- the title and id, what this person
+ * may do, the Layout group -- the unsaved notice when a request waits, and
+ * the lanes: the Records panel, the line between it and the record in Side
+ * by side and in Stacked (0145), and the detail with the record's forms and
+ * its child sections, in tabs beside it (0142).
  *
- * Every lane stays mounted in every layout and view: a layout or view change alters
- * classes and `hidden`, nothing else, so it discards no draft and a grid keeps its page,
- * sort and search. Mounted again for another form. The record is the page's, in memory:
- * never in the address (layout.ts).
+ * Every lane stays mounted in every layout and view: a layout or view change
+ * alters classes and `hidden`, nothing else, so it discards no draft and a
+ * grid keeps its page, sort and search. Mounted again for another form.
  *
+ * The record is the page's, in memory: never in the address (layout.ts).
  * Where the server offers delete, the record's header and each row of the grid ask for
  * one, in place, under what asked (0053, delete-flow.ts); the header offers each action
  * over the open record the server serves too (0162, action-flow.ts), and the bar above
- * the grid each over the records chosen of its page (0166, selection-bar.tsx). Each
- * lookup of the record offers Open under its field, a Drill down level below it (0141).
+ * the grid each over the records chosen of its page (0166, selection-bar.tsx). Each lookup
+ * of the record offers Open under its field, which goes a Drill down level below it, from
+ * any layout (0141).
  */
 export function FormView({
   client,
@@ -204,10 +204,8 @@ export function FormView({
     childFormsOf,
     formOf,
   })
-  // The record's actions (0162): a run reads the record again into its panes, and its row and the sections it names; and those over a selection (0166).
-  const acting = { client, entry, definition, sessions, opening, renderer, grid, drill, onReread: storedIn, onLoad: load, onShow: reveal }
-  const running = useActionFlow(acting)
-  const selection = useSelection(acting)
+  // The record's actions (0162), and those over a selection (0166): a run reads the record again into its panes, and its row and the sections it names.
+  const actions = useActions({ client, entry, definition, sessions, opening, renderer, grid, drill, onReread: storedIn, onLoad: load, onShow: reveal })
   const drilling = layout === 'drill'
   const nameOf = (session: Session): string | null => recordName(definition.form.model.fields, session.saved().answers, null)
 
@@ -423,9 +421,11 @@ export function FormView({
   }
 
   /**
-   * The record has gone from the page: deleted, or not found and closed. Open, the detail is emptied; the grid asks for its
-   * page again and says so first; and the keyboard goes to the Records heading -- in Separate views the records view, without
-   * a step back to the record view. Quiet when the person moved on before the answer: the grid alone hears it.
+   * The record has gone from the page: deleted, or not found and closed.
+   * Open, the detail is emptied; the grid asks for its page again and says
+   * so first; and the keyboard goes to the Records heading -- in Separate
+   * views the records view, without a step back to the record view. Quiet
+   * when the person moved on before the answer: the grid alone hears it.
    */
   function recordGone(target: DeleteTarget, word: 'Deleted' | 'Closed', quiet: boolean): void {
     drill.levels.recordGone(formId, target.record)
@@ -445,8 +445,10 @@ export function FormView({
     after(() => recordsHeading.current?.focus())
   }
 
-  // Back or Forward between the two views of Separate views: the half the keyboard was in is hidden now, so it goes where the
-  // view's own buttons would send it -- without what those buttons also do, writing an entry, which would drop the one Forward goes to.
+  // Back or Forward between the two views of Separate views: the half the
+  // keyboard was in is hidden now, so it goes where the view's own buttons
+  // would send it -- without what those buttons also do, writing an entry,
+  // which would drop the one Forward goes to.
   useEffect(() => {
     // Drill down's levels from 2 down are the drill's own (use-drill.ts).
     if (historyView === 0 || (drilling && drill.shown >= 2)) return
@@ -461,11 +463,7 @@ export function FormView({
   const splitter = useLine(axisOf(layout), shares, lanes)
   const style = laneStyle(shares, splitter)
   /** Drill down's trail: the records, the record, and each level held down to the one shown. */
-  const crumbs: Crumb[] = [
-    { level: 0, said: ['Records'] },
-    ...(open === null ? [] : [crumbOf(1, title, open.kind === 'record' ? { token: open.token, name: masterName } : null)]),
-    ...drill.path.map((step) => crumbOf(step.level, step.form.menu.title, step.token === null ? null : { token: step.token, name: step.name })),
-  ].slice(0, drill.shown + 1)
+  const crumbs = trailOf(title, open === null ? null : open.kind === 'record' ? { token: open.token, name: masterName } : 'new', drill.path, drill.shown)
 
   return (
     <>
@@ -505,7 +503,7 @@ export function FormView({
               <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="records-delete" />
             ) : null
           }
-          selection={selection}
+          selection={actions.selection}
           drilling={drilling}
           tree={childForms.find((each) => each.child.form === formId)?.child.field ?? null}
           onTreeOpen={openFrom}
@@ -557,7 +555,7 @@ export function FormView({
               <DeleteRegion flow={removal} deleting={definition.deleting} level={4} idBase="detail-delete" />
             ) : null
           }
-          running={running}
+          running={actions.running}
           offer={offer}
           body={(panes, heading) => (
             <RecordTabs

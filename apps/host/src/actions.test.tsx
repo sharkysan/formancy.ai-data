@@ -5,11 +5,12 @@ import { LIST_PAGE_SIZE } from '@formancy/data-client'
 import { clearedText, NONE_CHOSEN } from './chosen-rows.js'
 import { WORK } from './leave.js'
 import { checkedText, DONE, NONE_CHANGED, READ_AGAIN, READING_AGAIN, RUNS_ON, RUNS_OVER_CHOSEN } from './running.js'
-import { CHOOSE_FIRST } from './selection-bar.js'
+import { CHOOSE_FIRST, NOTHING_TO_CLEAR } from './selection-bar.js'
 import { audit, focusedName, paragraphs, unnamed } from './test-accessible.js'
 import { askClose, closed, closeRegion, closing, dialogPaper, openActionOrder, region, runIt, runsSent } from './test-acting.js'
 import { actionForm, CLOSE_ALL_LABEL, CLOSE_WORDS, STAMP_LABEL } from './test-actions.js'
-import { askCloseAll, barSays, box, choiceBar, choiceSaid, choose, closeAllsSent, closingAll } from './test-choosing.js'
+import { askCloseAll, barSays, box, choiceBar, choiceSaid, choose, closeAllsSent, closingAll, continueCloseAll, openCloseAll } from './test-choosing.js'
+import { headers, listed, moveButton, openColumns } from './test-columns.js'
 import {
   answer,
   chooseForm,
@@ -47,7 +48,10 @@ import type { Plane } from './test-plane.js'
  * stored is asked of the database's owner.
  *
  * Found by role and accessible name. The reads the accessibility tree
- * cannot answer are the database's, and how many runs the wire carried.
+ * cannot answer are the database's, how many runs the wire carried, a
+ * row of the Records grid found from its box (`rowTexts`), a header's
+ * text, and the element the bar's line says each sentence in -- which no
+ * role names, and which is what makes a sentence said again heard again.
  */
 
 let plane: Plane
@@ -424,9 +428,10 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
   // confirmation that counts them: both are closed and the third is not,
   // each once; the region the keyboard lands on says how many it ran over;
   // the page is read again, its rows showing what the routine stored; and
-  // the choice is cleared. Every state passes axe and names every control
-  // (to be watched failing in CI with the records sent as the open record
-  // alone: one order closed, the other open).
+  // the choice is cleared. The boxes ticked, the dialog, the confirmation
+  // and done each pass axe and name every control (to be watched failing
+  // in CI with the records sent as the open record alone: one order
+  // closed, the other open).
   test.each(RENDERERS)('in %s, two orders chosen and closed together are both closed, and the page is read again', async (renderer) => {
     const note = stamp('chosen')
     const [first, second, third] = [
@@ -439,8 +444,11 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     await choose(user, [second, first])
     await barSays('2 chosen.')
     expect([...(await audit()), ...unnamed()]).toEqual([])
-    const confirming = await askCloseAll(user, 2, 'closed together', renderer)
+    const asking = await openCloseAll(user, 2, renderer)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
+    const confirming = await continueCloseAll(user, asking, 2, 'closed together', renderer)
     expect(computeAccessibleDescription(confirming)).toBe(RUNS_OVER_CHOSEN)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
     const from = plane.sent.length
     await user.click(within(confirming).getByRole('button', { name: 'Run it' }))
     const done = await waitFor(() => {
@@ -459,17 +467,18 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     expect(rowTexts(third)).toContain('open')
     await barSays(NONE_CHOSEN)
     expect([box(first).checked, box(second).checked]).toEqual([false, false])
-    expect(await audit()).toEqual([])
+    expect([...(await audit()), ...unnamed()]).toEqual([])
   })
 
   // One of two orders chosen changed by somebody else since the page read
   // it: the run is refused naming that order, by the words its row's Delete
   // names it with, says nothing was done to either -- all or nothing (0165)
   // -- and offers to read the page again, never to run it again anyway;
-  // neither order is closed. Read again, the choice is kept at the
-  // versions the page reads now, and run again it closes both (to be
-  // watched failing in CI with the refusal's records left unsaid: no "It
-  // is about Order …").
+  // neither order is closed. The region the keyboard lands on is described
+  // by all it says, so the records are said as it lands. Read again, the
+  // choice is kept at the versions the page reads now, and run again it
+  // closes both (to be watched failing in CI with the refusal's records
+  // left unsaid: no "It is about Order …").
   test('a choice with one order changed since it was read is refused naming it, nothing is closed, and the page read again runs', async () => {
     const note = stamp('stale')
     const kept = await plane.db.insertActionOrder(engine.connection, note)
@@ -484,6 +493,7 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     const [sentence, about, none] = paragraphs(refused)
     expect(sentence).toMatch(/^The record changed since it was read\./)
     expect([about, none]).toEqual([`It is about Order ${moved}.`, NONE_CHANGED])
+    expect(computeAccessibleDescription(refused)).toBe([sentence, about, none].join(' '))
     expect(within(refused).queryByRole('button', { name: /^Run it/ })).toBeNull()
     expect(within(refused).getByRole('button', { name: 'Close' })).toBeTruthy()
     expect(await audit()).toEqual([])
@@ -508,8 +518,12 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
   // did before 0166 -- while the action order's grid, whose close-all the
   // clerk may run, is headed by its boxes' column. Pressed with nothing
   // chosen, the action is no dead end: it sends nothing and says what to do
-  // first, which its button is described by (to be watched failing in CI
-  // with the column drawn on every form).
+  // first, which its button is described by, and pressed again says it
+  // again in a new element of the line, which is heard again where the
+  // same words set again would not be; Clear the choice says there is
+  // nothing to clear; and the bar with nothing chosen passes axe and names
+  // every control (to be watched failing in CI with the column drawn on
+  // every form).
   test('the boxes and the bar are drawn only on a form with an action over a selection, and an action with nothing chosen says what to do first', async () => {
     const user = mount(plane.fetch)
     await signIn(user, TOKENS.clerk)
@@ -517,28 +531,57 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     const records = within(gridSection('Records'))
     expect(records.queryAllByRole('checkbox', { name: /^Choose / })).toEqual([])
     expect(records.queryByRole('group', { name: 'Chosen records' })).toBeNull()
-    expect(records.getAllByRole('columnheader').map((header) => header.textContent?.trim())).not.toContain('Choose')
+    expect(headers('Records')).not.toContain('Choose')
 
     await chooseForm(user, actionForm(engine))
-    const headers = within(gridSection('Records'))
-      .getAllByRole('columnheader')
-      .map((header) => header.textContent?.trim())
-    expect(headers[0]).toBe('Choose')
+    expect(headers('Records')[0]).toBe('Choose')
     const action = within(choiceBar()).getByRole('button', { name: CLOSE_ALL_LABEL })
     expect(action.getAttribute('aria-disabled')).toBe('true')
     expect(computeAccessibleDescription(action)).toBe(CHOOSE_FIRST)
+    expect([...(await audit()), ...unnamed()]).toEqual([])
     const from = plane.sent.length
     await user.click(action)
     await barSays(`${NONE_CHOSEN} ${CHOOSE_FIRST}`)
+    const line = (): Element | null => within(choiceBar()).getByRole('status').firstElementChild
+    const first = line()
+    await user.click(action)
+    await waitFor(() => expect(line()).not.toBe(first))
+    expect(choiceSaid()).toBe(`${NONE_CHOSEN} ${CHOOSE_FIRST}`)
+    await user.click(within(choiceBar()).getByRole('button', { name: 'Clear the choice' }))
+    await barSays(`${NONE_CHOSEN} ${NOTHING_TO_CLEAR}`)
     expect(screen.queryByRole('region', { name: /^Close the chosen orders/ })).toBeNull()
     expect(closeAllsSent(plane, from)).toBe(0)
   })
 
+  // The boxes' column is the page's, not a field's: the Columns panel
+  // does not list it, so it cannot be hidden, and a field moved to the
+  // front of the panel's list is drawn after it, the boxes still first
+  // (to be watched failing in CI with the column listed as a field's).
+  test('the Columns panel neither lists nor moves the boxes’ column', async () => {
+    const user = mount(plane.fetch)
+    await signIn(user, TOKENS.clerk)
+    await chooseForm(user, actionForm(engine))
+    await openColumns(user, 'Records')
+    const labels = listed('Records').map((column) => column.label)
+    expect(labels).not.toContain('Choose')
+    const second = labels[1] as string
+    await user.click(moveButton('Records', second, 'up'))
+    await waitFor(() => expect(listed('Records')[0]?.label).toBe(second), ARRIVES)
+    const shown = listed('Records')
+      .filter((column) => column.shown)
+      .map((column) => column.label)
+    await waitFor(() => expect(headers('Records').slice(0, shown.length + 1)).toEqual(['Choose', ...shown]), ARRIVES)
+  })
+
   // A choice is of the page shown: Next rows clears it, and the bar says it
-  // did and why; back on the first page, nothing is chosen (to be watched
-  // failing in CI with a page told to the choice by where it starts
-  // alone, a choice kept from one page to the next of another list).
-  test('paging clears the choice and says so', async () => {
+  // did and why -- and the confirmation over it closes, nothing run, since
+  // Run it would close the first page's orders while the person looks at
+  // the second with nothing chosen; back on the first page, nothing is
+  // chosen (to be watched failing in CI with a page told to the choice by
+  // where it starts alone, a choice kept from one page to the next of
+  // another list; and with the question kept past its choice: the region
+  // still there).
+  test('paging clears the choice and says so, and closes a question over it', async () => {
     const note = stamp('paged')
     const orders: string[] = []
     for (let n = 0; n <= LIST_PAGE_SIZE; n += 1) orders.push(await plane.db.insertActionOrder(engine.connection, note))
@@ -552,12 +595,42 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     const firstPage = orders.filter((record) => within(gridSection('Records')).queryByRole('checkbox', { name: `Choose Order ${record}` }) !== null)
     await choose(user, firstPage.slice(0, 2))
     await barSays('2 chosen.')
+    const from = plane.sent.length
+    await askCloseAll(user, 2, 'never sent')
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Next rows' }))
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Rows ${String(LIST_PAGE_SIZE + 1)}–${String(LIST_PAGE_SIZE + 1)}.`), ARRIVES)
     await barSays(clearedText(2))
+    expect(screen.queryByRole('region', { name: /^Close the chosen orders/ })).toBeNull()
+    expect(closeAllsSent(plane, from)).toBe(0)
     await user.click(within(gridSection('Records')).getByRole('button', { name: 'Previous rows' }))
     await waitFor(() => expect(gridStatus('Records')?.textContent).toBe(`Rows 1–${String(LIST_PAGE_SIZE)}; more follow.`), ARRIVES)
     expect(firstPage.slice(0, 2).map((record) => box(record).checked)).toEqual([false, false])
+  })
+
+  // A question over the records chosen stands only while the choice holds
+  // them: a box unticked while the confirmation asks closes it, nothing
+  // run, as a box ticked while the dialog asks closes that -- Run it would
+  // have sent records the bar no longer says are chosen; asked again, the
+  // question counts the choice as it is (to be watched failing in CI with
+  // the question kept past its choice: "Close the chosen orders: 2
+  // records?" still there, 1 chosen).
+  test('a question over the records chosen closes when a box is ticked or unticked, nothing run', async () => {
+    const note = stamp('unticked')
+    const orders = [await plane.db.insertActionOrder(engine.connection, note), await plane.db.insertActionOrder(engine.connection, note)]
+    const [first, second] = orders as [string, string]
+    const user = await chosenPage(plane.fetch, engine, note, orders)
+    await choose(user, orders)
+    const from = plane.sent.length
+    await askCloseAll(user, 2, 'never sent')
+    await user.click(box(second))
+    await barSays('1 chosen.')
+    expect(screen.queryByRole('region', { name: /^Close the chosen orders/ })).toBeNull()
+    await openCloseAll(user, 1)
+    await user.click(box(second))
+    await barSays('2 chosen.')
+    expect(screen.queryByRole('region', { name: /^Close the chosen orders/ })).toBeNull()
+    expect(closeAllsSent(plane, from)).toBe(0)
+    for (const record of [first, second]) expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'open', closes: 0 })
   })
 
   // While a run over the records chosen is out, a second press sends

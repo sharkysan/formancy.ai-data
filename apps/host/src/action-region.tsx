@@ -33,7 +33,8 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   the record could not be read again, that, and the saved record.
  * - **Not run**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and the saved record offered after a
- *   stale run.
+ *   stale run -- the region the keyboard is taken to described by what it
+ *   says, so it is said as it lands, as done's is.
  * - **It may have run** (0031): the sentence, and a check that reads the
  *   record and says what the read showed in a status line already on the
  *   page; still at the version sent, Run it again; changed, the saved
@@ -218,21 +219,40 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
   }
   if (now.state === 'refused') {
     const many = isSelection(now.target)
+    const named = many && now.named.length > 0
+    // Every sentence it says, in order: the server's, the deployment's mark, the records named, and that none was changed.
+    const said = [
+      ['message', true],
+      ['declined', now.declined],
+      ['about', named],
+      ['none', many],
+    ] as const
+    const described = said.flatMap(([part, shown]) => (shown ? [`${idBase}-${part}`] : [])).join(' ')
     return (
-      <div {...region} className="notice" data-kind="refused">
+      <div {...region} className="notice" data-kind="refused" aria-describedby={described}>
         <RegionHeading level={4} id={headingId}>
           Not run
         </RegionHeading>
-        <p className="notice-text">{now.message}</p>
-        {now.declined ? <p className="notice-text">{DECLINED_BY}</p> : null}
-        {many && now.named.length > 0 ? (
-          <p className="notice-text">
+        <p id={`${idBase}-message`} className="notice-text">
+          {now.message}
+        </p>
+        {now.declined ? (
+          <p id={`${idBase}-declined`} className="notice-text">
+            {DECLINED_BY}
+          </p>
+        ) : null}
+        {named ? (
+          <p id={`${idBase}-about`} className="notice-text">
             <Words said={about(now.target, now.named)} />
           </p>
         ) : null}
-        {many ? <p className="notice-text">{NONE_CHANGED}</p> : null}
+        {many ? (
+          <p id={`${idBase}-none`} className="notice-text">
+            {NONE_CHANGED}
+          </p>
+        ) : null}
         <div className="notice-actions">
-          {now.stale || (many && now.named.length > 0) ? (
+          {now.stale || named ? (
             <button type="button" className="button" onClick={flow.load}>
               {loadLabel(now.target)}
             </button>

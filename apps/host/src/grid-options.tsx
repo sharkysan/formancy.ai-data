@@ -78,7 +78,14 @@ import type { ColumnWidth, WidthChange } from './widths.js'
  *   form offers this person an action over a selection, on Delete's
  *   pattern (choose-column.tsx): its Space is its own, never the row's, so
  *   it never opens the record or deselects the open row; its Enter opens
- *   the record as any cell's does.
+ *   the record as any cell's does. A row with no box -- no token, or none
+ *   at a version -- leaves Space to the row, which says why it cannot be
+ *   opened.
+ * - **What AG Grid's live region says of a row** as the keyboard reaches
+ *   one of its cells is what the keys do there: on a field's cell, what
+ *   Space and Enter open; on the box and on Delete, which take their own
+ *   keys, what those do. `=` keeps a field's value (0133); the box and
+ *   Delete hold none, so it asks nothing there.
  */
 
 /**
@@ -124,6 +131,34 @@ const DRILL_ROW_WORDS: Readonly<Record<string, string>> = {
   ariaRowDeselect: 'This record is open. Space or Enter moves to it.',
   ariaRowToggleSelection: 'Space or Enter opens this record.',
 }
+
+/** On a row's box (0166), whose Space ticks it and opens nothing; Enter opens the record as on any cell. */
+const CHOOSE_WORDS: Readonly<Record<string, string>> = {
+  ariaRowSelect: 'Space ticks or unticks this box. Enter opens the record and moves to it.',
+  ariaRowDeselect: 'This record is open. Space ticks or unticks this box.',
+}
+
+/** The same in Drill down, where Enter on the open record moves to it. */
+const DRILL_CHOOSE_WORDS: Readonly<Record<string, string>> = {
+  ariaRowSelect: 'Space ticks or unticks this box. Enter opens the record and moves to it.',
+  ariaRowDeselect: 'This record is open. Space ticks or unticks this box; Enter moves to it.',
+}
+
+/** On a row's Delete (0053), whose Space and Enter press it, in every layout: it asks, and confirms in place. */
+const DELETE_WORDS: Readonly<Record<string, string>> = {
+  ariaRowSelect: 'Space or Enter asks to delete this record.',
+  ariaRowDeselect: 'This record is open. Space or Enter asks to delete it.',
+}
+
+/** What AG Grid's live region says of a row with the keyboard on the column `colId`, in Drill down or not. */
+function rowWords(colId: string | undefined, drilling: boolean): Readonly<Record<string, string>> {
+  if (colId === CHOOSE_COLUMN) return drilling ? DRILL_CHOOSE_WORDS : CHOOSE_WORDS
+  if (colId === DELETE_COLUMN) return DELETE_WORDS
+  return drilling ? DRILL_ROW_WORDS : ROW_WORDS
+}
+
+/** A column of the page's own -- a row's box, or its Delete -- which takes its own keys and holds no field's value. */
+const ownColumn = (colId: string): boolean => colId === CHOOSE_COLUMN || colId === DELETE_COLUMN
 
 /** The value of a loading or failed row: nothing. AG Grid's skeleton says "Row data is loading" and "ERR". */
 function EmptyCell(): null {
@@ -426,9 +461,9 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     tabToNextCell: () => false,
     tabToNextHeader: () => false,
     // What AG Grid's live region says about a row is what the page does with
-    // it, in the layout shown now: the options are the grid's for its life,
-    // and a layout changes under it.
-    getLocaleText: ({ key, defaultValue }) => (on.drilling() ? DRILL_ROW_WORDS : ROW_WORDS)[key] ?? defaultValue,
+    // it, in the layout shown now and from the cell the keyboard is on: the
+    // options are the grid's for its life, and a layout changes under it.
+    getLocaleText: ({ key, defaultValue, api }) => rowWords(api.getFocusedCell()?.column.getColId(), on.drilling())[key] ?? defaultValue,
     focusGridInnerElement: (params) => {
       const token = on.openToken()
       const node = token === null ? undefined : params.api.getRowNode(token)
@@ -471,18 +506,20 @@ export function gridOptionsFor({ labelledBy, firstColumn, on }: { labelledBy: st
     onCellKeyDown: (event: CellKeyDownEvent<GridRow>) => {
       const keyboard = event.event as KeyboardEvent | null | undefined
       const key = keyboard?.key ?? ''
+      const colId = event.column.getColId()
       // `=` keeps the rows with the cell's value (0133) -- not with Ctrl or
       // Cmd, which zoom, nor a plain Alt; AltGr, which some layouts type `=`
-      // with, is Ctrl and Alt together.
+      // with, is Ctrl and Alt together. A box or a Delete holds no value.
       if (key === '=' && keyboard !== null && keyboard !== undefined && !keyboard.metaKey && keyboard.ctrlKey === keyboard.altKey) {
-        on.example(event.data, event.column.getColId())
+        if (!ownColumn(colId)) on.example(event.data, colId)
         return
       }
       // Space and Enter on a row's Delete are its button's, and Space on its box the box's: the browser presses or ticks it (0166).
-      const own = event.column.getColId() === DELETE_COLUMN || (key === ' ' && event.column.getColId() === CHOOSE_COLUMN)
+      const boxed = event.data?.record != null && event.data.version != null
+      const own = colId === DELETE_COLUMN || (key === ' ' && colId === CHOOSE_COLUMN && boxed)
       if (!SPACE_OR_ENTER(key) || own) return
       event.event?.preventDefault()
-      on.asked(event.data, key === 'Enter' ? 'enter' : 'space', event.rowIndex, event.column.getColId())
+      on.asked(event.data, key === 'Enter' ? 'enter' : 'space', event.rowIndex, colId)
     },
   }
 }

@@ -3,6 +3,7 @@ import type { GridRow } from './grid-datasource.js'
 import { listed } from './grid-datasource.js'
 import { counted } from './running.js'
 import type { RunRecord } from './running.js'
+import type { SessionState } from './session.js'
 
 /*
  * The records a person chose of the page a grid shows, for an action over
@@ -21,7 +22,10 @@ import type { RunRecord } from './running.js'
  * - **At the version read.** A chosen record is sent at the version the
  *   page read it at, or, where the detail heard a newer one since -- the
  *   person saved the open record -- at that one (`heard`): either is the
- *   latest this page knows, by when it arrived.
+ *   latest this page knows, by when it arrived. A form tells what it holds
+ *   each time a save is sent too, at the version it was opened at, which
+ *   is nothing new: only a version a form did not hold before is heard
+ *   (`hearForms`), as a delete hears one (delete-flow.ts's `useHeard`).
  * - **In the page's order**, whatever order the boxes were ticked in: the
  *   order a run sends, and a refusal names, the records in.
  */
@@ -34,6 +38,8 @@ export interface ChoiceNow {
   chosen: ReadonlySet<string>
   /** The status line's sentence: how many are chosen, or what cleared them. */
   said: string
+  /** How many times it was said: each saying a new one, so a sentence said again is heard again (selection-bar.tsx). */
+  count: number
 }
 
 /** The choice of one grid's page, which the column draws and an action over a selection runs over. */
@@ -75,12 +81,12 @@ export function createChosenRows(noun: string): ChosenRows {
   /** The page the choice is of, and its rows as drawn last, each version as last heard. */
   let shown: { list: ListIdentity; start: number; rows: Array<{ record: string; version: string }> } | null = null
   let chosen = new Set<string>()
-  let state: ChoiceNow = { chosen, said: NONE_CHOSEN }
+  let state: ChoiceNow = { chosen, said: NONE_CHOSEN, count: 0 }
   const name = (token: string): string => `${noun} ${token}`
 
   function set(next: Set<string>, said = chosenText(next.size)): void {
     chosen = next
-    state = { chosen, said }
+    state = { chosen, said, count: state.count + 1 }
     for (const listener of listeners) listener()
   }
 
@@ -125,6 +131,36 @@ export function createChosenRows(noun: string): ChosenRows {
     },
     records: () => (shown?.rows ?? []).filter((row) => chosen.has(row.record)).map(({ record, version }) => ({ record, version })),
     version: (token) => shown?.rows.find((row) => row.record === token)?.version ?? null,
+  }
+}
+
+/** What the choice hears of one of the record's forms: what it tells, and what it holds as it tells it (session.ts). */
+export interface HeardForm {
+  subscribe: (listener: () => void) => () => void
+  state: () => Pick<SessionState, 'record' | 'version'>
+}
+
+/**
+ * What the record's forms hear, the choice hears too (0166): a version of
+ * the open record one of them did not hold before -- a read, a save
+ * answered -- moves the version it is sent at where it is chosen. A form
+ * telling again what it holds, as it does when a save is sent, is not
+ * heard: it would put back a version older than one the page read since.
+ * The listeners' removal is returned.
+ */
+export function hearForms(chosen: Pick<ChosenRows, 'heard'>, sessions: readonly HeardForm[]): () => void {
+  const seen = new Map<object, string>()
+  const offs = sessions.map((session) =>
+    session.subscribe(() => {
+      const { record, version } = session.state()
+      const at = `${String(record)} ${String(version)}`
+      if (seen.get(session) === at) return
+      seen.set(session, at)
+      if (record !== undefined && version !== undefined) chosen.heard(record, version)
+    }),
+  )
+  return () => {
+    for (const off of offs) off()
   }
 }
 

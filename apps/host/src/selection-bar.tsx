@@ -18,12 +18,18 @@ import type { ChoiceNow, ChosenRows } from './chosen-rows.js'
  * it is `aria-disabled`, never `disabled`, which would drop the keyboard,
  * described by the sentence that says what to do first, which a press says
  * on the status line too -- as the pager and the Columns panel say what
- * cannot be done (0029, 0106). Drawn only on a form with such an action:
- * a form without one has no bar and no column, and no other grid changes.
+ * cannot be done (0029, 0106) -- and so is Clear the choice, which says
+ * there is nothing to clear. Each saying is a new element of the line, as
+ * the Columns panel's is, so a press that says what the last one said is
+ * heard again. Drawn only on a form with such an action: a form without
+ * one has no bar and no column, and no other grid changes.
  */
 
 /** What an action's button is described by, and what a press of it says, while nothing is chosen. */
 export const CHOOSE_FIRST = 'Choose records first, with the boxes in the grid’s Choose column, then run an action over them.'
+
+/** What a press of Clear the choice says while nothing is chosen. */
+export const NOTHING_TO_CLEAR = 'There is nothing to clear.'
 
 /** The records grid's choice and the flow of the actions over it, where the form offers this person one. */
 export interface Selection {
@@ -34,11 +40,17 @@ export interface Selection {
   now: ChoiceNow
 }
 
-/** The choice of the records grid's page, and a flow over it beside the open record's own (action-flow.ts). */
-export function useSelection(options: Omit<ActionFlowOptions, 'chosen'>): Selection {
+/**
+ * A form's actions: the open record's flow, which its header offers
+ * (0162), and the choice of the records grid's page with a flow over it
+ * beside that one, which the bar offers (0166) -- each run of either may
+ * be out at once (action-flow.ts).
+ */
+export function useActions(options: Omit<ActionFlowOptions, 'chosen'>): { running: ActionFlow; selection: Selection } {
+  const running = useActionFlow(options)
   const { rows, now } = useChosenRows(options.entry.title)
   const flow = useActionFlow({ ...options, chosen: rows })
-  return { offered: flow.actions.length > 0, flow, rows, now }
+  return { running, selection: { offered: flow.actions.length > 0, flow, rows, now } }
 }
 
 /** The bar above the records grid, and the region a run over the records chosen is drawn in. */
@@ -63,12 +75,17 @@ export function SelectionBar({ selection, idBase }: { selection: Selection; idBa
           </button>
         ))}
         <p role="status" id={`${idBase}-status`} className="choice-status">
-          {now.said}
+          <span key={now.count}>{now.said}</span>
         </p>
         <button type="button" className="button quiet" onClick={() => rows.all()}>
           Choose every record on this page
         </button>
-        <button type="button" className="button quiet" aria-disabled={none ? 'true' : undefined} onClick={() => (none ? undefined : rows.clear())}>
+        <button
+          type="button"
+          className="button quiet"
+          aria-disabled={none ? 'true' : undefined}
+          onClick={() => rows.clear(none ? `${NONE_CHOSEN} ${NOTHING_TO_CLEAR}` : undefined)}
+        >
           Clear the choice
         </button>
         {none ? (

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { clearedText, createChosenRows, NONE_CHOSEN } from './chosen-rows.js'
+import { clearedText, createChosenRows, hearForms, NONE_CHOSEN } from './chosen-rows.js'
 import type { GridRow } from './grid-datasource.js'
 
 /*
@@ -80,7 +80,61 @@ describe('the records chosen of a page', () => {
     expect([...choice.now().chosen]).toEqual(['k1:1', 'k1:2', 'k1:3'])
     expect(choice.now().said).toBe('3 chosen.')
     choice.clear()
-    expect(choice.now()).toEqual({ chosen: new Set(), said: NONE_CHOSEN })
+    expect(choice.now()).toMatchObject({ chosen: new Set(), said: NONE_CHOSEN })
     expect(choice.name('k1:1')).toBe('Order k1:1')
+  })
+
+  // Each saying is a new one, even of the same sentence: the bar draws
+  // each in an element of its own, so a second press of an action with
+  // nothing chosen is heard again (watched failing with the count kept
+  // between two sayings of one sentence: "expected 2 to be 3").
+  test('counts each saying, a sentence said again included', () => {
+    const choice = createChosenRows('Order')
+    choice.page(LIST, 0, PAGE)
+    choice.toggle(PAGE[0] as GridRow)
+    choice.clear('Nothing chosen. Choose first.')
+    const first = choice.now()
+    choice.clear('Nothing chosen. Choose first.')
+    expect(choice.now().said).toBe(first.said)
+    expect(choice.now().count).toBe(first.count + 1)
+  })
+
+  // A form tells what it holds when it opens a record, when a save is
+  // sent and when one is answered; the choice hears only a version a form
+  // did not hold before. A save sent from a form opened at version 1,
+  // after the page read the record at 2, would otherwise put 1 back, and
+  // a run over the choice would be refused as stale for a change the page
+  // had already read (watched failing with every telling heard: "expected
+  // '1' to be '2'").
+  test('hears a version a form did not hold before, never one it tells again', () => {
+    const choice = createChosenRows('Order')
+    const listeners = new Set<() => void>()
+    let held: { record: string | undefined; version: string | undefined } = { record: undefined, version: undefined }
+    const form = {
+      subscribe: (listener: () => void) => {
+        listeners.add(listener)
+        return () => {
+          listeners.delete(listener)
+        }
+      },
+      state: () => held,
+    }
+    const tell = (record: string, version: string): void => {
+      held = { record, version }
+      for (const listener of listeners) listener()
+    }
+    const off = hearForms(choice, [form])
+    choice.page(LIST, 0, PAGE)
+    choice.toggle(PAGE[0] as GridRow)
+    tell('k1:1', '1')
+    choice.page(LIST, 0, [row('k1:1', '2'), row('k1:2'), row('k1:3')])
+    expect(choice.version('k1:1')).toBe('2')
+    tell('k1:1', '1')
+    expect(choice.version('k1:1')).toBe('2')
+    tell('k1:1', '3')
+    expect(choice.records()).toEqual([{ record: 'k1:1', version: '3' }])
+    off()
+    tell('k1:1', '4')
+    expect(choice.version('k1:1')).toBe('3')
   })
 })

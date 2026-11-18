@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { createFormEngine } from '@formancy/core'
 import type { DataClient, FormAction, FormMenuEntry, PublishedForm } from '@formancy/data-client'
 import { useAfterRender } from './after-render.js'
+import { hearForms } from './chosen-rows.js'
 import type { ChosenRows } from './chosen-rows.js'
 import { useHeard, useSaving } from './delete-flow.js'
 import { formsAtRisk, useGuardContext, useRegistered } from './guard.js'
@@ -49,7 +50,12 @@ import type { HeldLevels } from './use-drill.js'
  * the records chosen of the page shown, each at the version the page read
  * it at or the detail heard since (chosen-rows.ts), and once it ran the
  * page read again and the choice cleared. Where the open record is one of
- * them, the run is over it too, and everything below holds of it.
+ * them, the run is over it too, and everything below holds of it. A
+ * question over a selection stands only while the choice holds what it
+ * was asked over: a box ticked or unticked, Clear the choice, or another
+ * page drawn -- which clears the choice, and the bar says so -- closes a
+ * dialog or a confirmation, nothing run, since Run it would send records
+ * the bar no longer says are chosen, or the person no longer sees.
  *
  * - **One question at a time.** Asking closes any other owner's
  *   confirmation -- a delete's -- and every request the person makes of
@@ -170,14 +176,34 @@ const overOpen = (flow: FlowState, target: RunTarget): string | null => {
  * The records a run is sent over, at their newest versions as Run it is
  * pressed: the open record's as the detail heard it last -- a save answered
  * while it asked moved it -- and a selection's as the page read each, or
- * the detail heard since (chosen-rows.ts).
+ * the detail heard since (chosen-rows.ts): the records chosen now, which
+ * `dropped` has found to be the ones it asked over.
  */
 function newest(flow: FlowState, target: RunTarget, heard: (record: string) => string | null): RunRecord[] {
   const { chosen } = flow.latest.current
-  return target.records.map(({ record, version }) => ({
-    record,
-    version: (chosen === undefined ? heard(record) : chosen.version(record)) ?? version,
-  }))
+  if (chosen !== undefined) return chosen.records()
+  return target.records.map(({ record, version }) => ({ record, version: heard(record) ?? version }))
+}
+
+/** The same records, by their tokens: a page drawn again in another order chooses the same ones, and a run sends them in the page's order. */
+const sameRecords = (left: readonly RunRecord[], right: readonly RunRecord[]): boolean =>
+  left.length === right.length && left.every((each) => right.some((other) => other.record === each.record))
+
+/**
+ * A question over a selection -- its dialog, or its confirmation -- whose
+ * records are no longer the ones chosen closed, nothing run, and the
+ * keyboard given back to the action where it was in the region; true when
+ * it was. A run out, or answered, is no question, and stays.
+ */
+function dropped(flow: FlowState): boolean {
+  const now = flow.current.current
+  const { chosen } = flow.latest.current
+  if (chosen === undefined || (now.state !== 'asking' && now.state !== 'confirming')) return false
+  if (sameRecords(chosen.records(), now.target.records)) return false
+  const held = flow.regionRef.current?.contains(document.activeElement) === true
+  flow.set(IDLE)
+  if (held) back(flow, now.target)
+  return true
 }
 
 /** The keyboard back on the action that asked. */
@@ -211,7 +237,9 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
   const savingNow = useSaving(options.sessions)
   const entry = useRunEntry(flow)
   const { definition, chosen } = options
-  useChosenHeard(chosen, options.sessions)
+  // What the record's forms hear, the choice hears too, and a question over it stands only while it holds what it asked over.
+  useEffect(() => (chosen === undefined ? undefined : hearForms(chosen, options.sessions)), [chosen, options.sessions])
+  useEffect(() => chosen?.subscribe(() => void dropped(flow)), [chosen, flow])
   useRunFocus(
     run,
     regionRef,
@@ -269,26 +297,6 @@ export function useActionFlow(options: ActionFlowOptions): ActionFlow {
     },
     ...regionAnswers(flow),
   }
-}
-
-/**
- * What the record's own forms hear, the choice hears too (0166): a save
- * answered, or a read, moves the version the open record is sent at where
- * it is one of the records chosen.
- */
-function useChosenHeard(chosen: ChosenRows | undefined, sessions: readonly Session[]): void {
-  useEffect(() => {
-    if (chosen === undefined) return
-    const offs = sessions.map((session) =>
-      session.subscribe(() => {
-        const { record, version } = session.state()
-        if (record !== undefined && version !== undefined) chosen.heard(record, version)
-      }),
-    )
-    return () => {
-      for (const off of offs) off()
-    }
-  }, [chosen, sessions])
 }
 
 /** The answers that end what the region shows, each only in the state it is drawn in: the keyboard back, or the record -- or the page -- read again. */
@@ -392,7 +400,8 @@ function useRunFocus(run: Run, regionRef: RefObject<HTMLDivElement | null>, show
 /** Run it: sent, unless a save of the open record it is over is out or a form the reread drops was typed into since it asked. */
 function confirmRun(flow: FlowState, atStake: (target: RunTarget) => PaneWork[], heard: (record: string) => string | null): void {
   const now = flow.current.current
-  if (now.state !== 'confirming') return
+  // A choice changed since it asked is not what it confirms: closed, nothing sent.
+  if (now.state !== 'confirming' || dropped(flow)) return
   // A save out moves the version the run would name: Run it waits for its answer, and says so.
   if (overOpen(flow, now.target) !== null && flow.latest.current.sessions.some((session) => session.isSaving())) return
   // Typed into since the question was asked: named before anything is sent.

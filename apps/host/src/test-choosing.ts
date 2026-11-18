@@ -39,19 +39,27 @@ export async function choose(user: User, records: readonly string[]): Promise<vo
 export const closingAll = (count: number, confirming = false): string =>
   `${CLOSE_ALL_LABEL}: ${String(count)} ${count === 1 ? 'record' : 'records'}${confirming ? '?' : ''}`
 
-/**
- * Close the chosen orders asked for from the bar: its dialog's note typed
- * in the paper `renderer` draws, and Continue -- the confirmation, once it
- * is there.
- */
-export async function askCloseAll(user: User, count: number, note: string, renderer: RendererName = 'React'): Promise<HTMLElement> {
+/** The dialog's paper in the region `asking`, as the renderer `renderer` draws it. */
+const paperIn = (asking: HTMLElement, renderer: RendererName): HTMLElement => within(asking).getByRole('form', { name: `${CLOSE_ALL_LABEL}, ${renderer}` })
+
+/** Close the chosen orders asked for from the bar: its region, once the paper `renderer` draws holds the dialog's note. */
+export async function openCloseAll(user: User, count: number, renderer: RendererName = 'React'): Promise<HTMLElement> {
   await user.click(within(choiceBar()).getByRole('button', { name: CLOSE_ALL_LABEL }))
   const asking = await screen.findByRole('region', { name: closingAll(count) }, ARRIVES)
-  const paper = (): HTMLElement => within(asking).getByRole('form', { name: `${CLOSE_ALL_LABEL}, ${renderer}` })
-  const field = await waitFor(() => within(paper()).getByRole('textbox', { name: /^Note\b/ }), ARRIVES)
-  await user.type(field, note)
-  await user.click(within(paper()).getByRole('button', { name: 'Continue' }))
+  await waitFor(() => within(paperIn(asking, renderer)).getByRole('textbox', { name: /^Note\b/ }), ARRIVES)
+  return asking
+}
+
+/** The dialog in `asking` answered: its note typed, and Continue -- the confirmation, once it is there. */
+export async function continueCloseAll(user: User, asking: HTMLElement, count: number, note: string, renderer: RendererName = 'React'): Promise<HTMLElement> {
+  await user.type(within(paperIn(asking, renderer)).getByRole('textbox', { name: /^Note\b/ }), note)
+  await user.click(within(paperIn(asking, renderer)).getByRole('button', { name: 'Continue' }))
   return screen.findByRole('region', { name: closingAll(count, true) }, ARRIVES)
+}
+
+/** Close the chosen orders asked for from the bar and its dialog answered: the confirmation, once it is there. */
+export async function askCloseAll(user: User, count: number, note: string, renderer: RendererName = 'React'): Promise<HTMLElement> {
+  return continueCloseAll(user, await openCloseAll(user, count, renderer), count, note, renderer)
 }
 
 /** How many runs of close-all the page sent, of the requests `plane` saw since `from`: what the wire carried, which no role names. */
