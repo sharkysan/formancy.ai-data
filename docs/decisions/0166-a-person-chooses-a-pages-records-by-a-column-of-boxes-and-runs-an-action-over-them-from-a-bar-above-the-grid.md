@@ -15,13 +15,18 @@
   the other choice a page's records a person chooses, a radio group with
   its legend in view that the arrow keys move in, described by the
   generator's note of the action as bound, which for a selection says
-  every record is held until the last call returns; the request carries
+  every record is held until the last call returns, and which sits in a
+  polite live region so a radio's change is heard; the request carries
   the scope, and the Generate step says the note (watched failing with
   the radios' change left unwritten: "expected [ true, false ] to deeply
-  equal [ false, true ]", and with the group described by nothing); the
-  Policy step's notice before the grant and the Presentation step's hint
-  say what a selection runs over, and the Choose step keeps the choice
-  (watched failing with each written for the open record alone).
+  equal [ false, true ]", with the group described by nothing, and with
+  the note in no live region); the Policy step's notice before the grant
+  and the Presentation step's hint say what a selection runs over, and
+  the Choose step keeps the choice (watched failing with each written
+  for the open record alone). `apps/studio/src/actions.test.ts` -- the
+  note that describes the group is the generator's of the action as
+  bound, never a field's whose key the action is named after (watched
+  failing with every note of that name taken).
   `apps/host/src/running.test.ts` -- a run over the records chosen is
   headed by how many it is over and done says how many it ran over
   (watched failing with the open record's heading for every run); a
@@ -34,8 +39,12 @@
   by where it starts alone); kept by its page drawn again, at the
   versions that read gave and the detail heard since, a record gone from
   it named, the records in the page's order (watched failing with the
-  versions kept from the first read); and only records a run could
-  address are chosen (watched failing with a row of no token chosen).
+  versions kept from the first read); only records a run could address
+  are chosen (watched failing with a row of no token chosen); each saying
+  counted, a sentence said again included (watched failing with the
+  count kept); and only a version a form did not hold before heard, so a
+  save sent never puts back a version older than the page's (watched
+  failing with every telling heard).
   `apps/host/src/choose-column.test.tsx`, run with a configuration of its
   own without the databases its package's suites start, which it does
   not use -- each box a real checkbox named for its record, first,
@@ -47,18 +56,31 @@
   Enter on the box opens it (watched failing with Space on the box given
   to the row); a click on the box opens nothing (watched failing with a
   click inside an input heard as the row's); Tab from the box leaves the
-  rows (watched failing with AG Grid's own Tab between cells).
+  rows (watched failing with AG Grid's own Tab between cells); AG Grid's
+  live region says on the box that Space ticks or unticks it, and on a
+  row's Delete that Space or Enter asks to delete it (watched failing
+  with every cell said as a field's); and a row with no box leaves Space
+  to the row, and `=` asks nothing of a box or a Delete (watched failing
+  with each rule taken out).
   First run in CI, never run: `apps/host/src/actions.test.tsx`, on both
   engines -- two orders of three chosen and closed together through the
   dialog in React and in Angular are both closed once, the third not, the
-  page read again and the choice cleared, every state passing axe; one
-  order changed since the page read it is refused naming it, nothing
-  closed, no run again offered, and the page read again runs; the boxes
-  and the bar only on a form with an action over a selection, an action
-  pressed with nothing chosen sending nothing and saying what to do
-  first; Next rows clearing the choice and saying so; a second press
-  while a run is out sending nothing; and the open record's header still
-  offering no action over a selection. `apps/host/scripts/browser-test.mjs`
+  page read again and the choice cleared, axe clean and every control
+  named with the boxes ticked, at the dialog, at the confirmation and
+  once done; one order changed since the page read it is refused naming
+  it, its region described by what it says, nothing closed, no run again
+  offered, and the page read again runs; the boxes and the bar only on a
+  form with an action over a selection, the Columns panel neither
+  listing nor moving the boxes' column, an action pressed with nothing
+  chosen sending nothing and saying what to do first, again in a new
+  element at a second press, Clear the choice saying there is nothing
+  to clear, and the bar with nothing chosen axe clean; Next rows clearing
+  the choice, saying so and closing the confirmation over it, nothing
+  run; a box ticked or unticked closing the dialog or the confirmation,
+  nothing run; a second press while a run is out sending nothing; and
+  the open record's header still offering no action over a selection.
+  The run out, a lost run and a check are held by `running.test.ts`
+  alone, without a page. `apps/host/scripts/browser-test.mjs`
   (`apps/host/scripts/browser/choosing.mjs`) in Chromium, Firefox and WebKit at
   every width -- the column and the bar measured with a record chosen,
   the box reached by the arrow keys, Space on it opening nothing, Tab
@@ -103,7 +125,14 @@ page at most (0165).
    opens the record as any cell's does. It is named for its record in the
    words its row's Delete names it with -- "Choose Order k1:7" -- 24
    pixels square, in the room's violet, by its own style attribute. A row
-   whose key fits no token, or that has no version, has none.
+   whose key fits no token, or that has no version, has none, and Space
+   on its cell is the row's, which says why it cannot be opened. AG
+   Grid's live region, which says what Space and Enter do as the
+   keyboard reaches a row's cell, says on the box that Space ticks or
+   unticks it, and on a row's Delete that Space or Enter asks to delete
+   it, never that either opens the record. `=`, which keeps a field's
+   value as its column's condition (0133), asks nothing on the box or on
+   Delete, which hold none.
 3. **Only on a form that offers this person an action over a
    selection** -- `PublishedForm.actions`, which the server fills with
    the actions this person may run -- and only on the Records grid: a
@@ -116,7 +145,10 @@ page at most (0165).
    the choice. An action pressed with nothing chosen sends nothing: it is
    `aria-disabled`, described by the sentence that says what to do first,
    which the press says on the status line, as the pager and the Columns
-   panel say what cannot be done.
+   panel say what cannot be done; Clear the choice with nothing chosen
+   says there is nothing to clear. Each saying is a new element of the
+   line, as the Columns panel's is, so a second press that says what the
+   first said is heard again.
 5. **A choice is of the page shown** (`apps/host/src/chosen-rows.ts`). A
    page of another list -- a search, a filter, a sort, a view -- or
    another page of this one, drawn in its place, clears it and says so: a
@@ -124,9 +156,18 @@ page at most (0165).
    send records the person no longer sees. The same page drawn again --
    after a save, a delete, Ask again -- keeps it, and a record no longer
    on it is no longer chosen, which is said. Another form unmounts it.
+   A question asked over a choice -- the dialog, the confirmation --
+   stands only while the choice holds the records it was asked over: a
+   box ticked or unticked, Clear the choice, or a page that clears or
+   narrows the choice closes it, nothing run, and the keyboard goes back
+   to the action where it was in the region. Run it sends the records
+   chosen as it is pressed, never a version kept from when it asked of a
+   record the page no longer shows.
 6. **The version sent** for each record is the one the page read it at,
    or the one the detail heard since -- a save of the open record, or a
-   read of it -- whichever arrived last: the latest this page knows. So a
+   read of it -- whichever arrived last: the latest this page knows. A
+   form tells what it holds when a save is sent too, at the version it
+   was opened at, which is nothing new and is not heard. So a
    person who saves the open record and then runs over a choice that
    holds it sends the version their save moved to, and Run it waits for
    a save of the open record out where it is chosen, as 0162's does.
@@ -143,8 +184,9 @@ page at most (0165).
    forms as 0162 reads it, and its forms are held while the run is out.
    A refusal naming records -- `stale`, `not-found` -- says the server's
    sentence, "It is about Order `k1:9`.", that nothing was done to any of
-   the chosen records, and offers Read the page again, which keeps the
-   choice at the versions read then. `unavailable` is Not run, as 0162
+   the chosen records -- the region the keyboard lands on described by
+   all of it, so it is said as it lands -- and offers Read the page
+   again, which keeps the choice at the versions read then. `unavailable` is Not run, as 0162
    says it for one record; a lost run is checked by a read of each
    record: every one at the version sent, Run it again with those
    versions; every one moved, it ran or each was changed; some of each,
@@ -180,6 +222,9 @@ they were.
 - **A choice is lost by paging**, and by a search, a filter, a sort or a
   view: said on the bar's line, and not kept anywhere, not even in the
   browser, so a reload loses it too.
+- **A question is lost with its choice.** A box ticked while the
+  confirmation asks closes it, and the dialog's answers with it: the
+  person asks again over the choice as it is now.
 - **One more column on those forms**, first, and a bar of the actions
   and two controls above the grid. The Columns panel neither hides nor
   moves it.
@@ -222,7 +267,7 @@ the same and says what it does.
 
 **The column on every form.** Lost: a box with no action to run over
 what it chooses is a control that does nothing, and every grid would
-change for every person (the design's decision 28).
+change for every person.
 
 ## Older records
 

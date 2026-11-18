@@ -20,13 +20,11 @@ the same day (formancy.ai 0232).
 
 - **A person chooses records on the host page and runs an action over
   them; the studio offers that scope** (0166). Why: 0165's selection was
-  reachable only by a client writing its own requests. The studio asks
-  what each action runs over; a form that offers one gets a first column
-  of real checkboxes on the Records grid -- the grid's selection stays the
-  open row -- and a bar above it. A choice is of the page shown, which
-  another page, a search, a filter, a sort or a view clears, saying so,
-  since a run is one page at most; a refusal names its records and offers
-  to read the page again, never to run past it.
+  reachable only by a client writing its own requests. A form that offers
+  one gets a first column of real checkboxes on the Records grid and a bar
+  above it; a choice is of the page shown, a question over it closes when
+  it changes, and a refusal names its records and offers to read the page
+  again.
 - **An action runs over a selection of up to a page of records, all or
   nothing** (0165). Why: a routine is often meant for several records at
   once, and a page looping one run per record could end half done. An

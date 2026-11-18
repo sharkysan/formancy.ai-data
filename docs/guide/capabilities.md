@@ -362,7 +362,8 @@ get*](../../README.md#what-you-get) is the short version, and
   with the actions, how many are chosen, Choose every record on this
   page and Clear the choice -- only on a form that offers its person
   such an action. A choice is of the page shown, which another page, a
-  search, a filter, a sort or a view clears, saying so; the run goes
+  search, a filter, a sort or a view clears, saying so, and a question
+  asked over it closes, nothing run, when it changes; the run goes
   through the open record's flow, its confirmation counting the records,
   done saying how many it ran over, and a refusal naming the records it
   is about and offering to read the page again

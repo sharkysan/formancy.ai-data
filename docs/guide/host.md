@@ -332,21 +332,28 @@ run it over -- "Choose Order `k1:7`", named as the row's Delete names its
 record -- and a bar above the grid holds a button for each such action,
 a line that says how many are chosen, Choose every record on this page
 and Clear the choice. The arrow keys reach a row's box as they reach any
-cell, Space ticks it and opens nothing, and Tab leaves the grid in one
-stop, as from any cell; Space on another cell still opens the record. A
-choice is of the page shown: another page, a search, a filter, a sort or
-a view clears it, and the bar's line says so; the same page read again,
-after a save, keeps it at the versions read then, and a save of the open
-record moves the version it is sent at. An action pressed with nothing
-chosen says what to do first and sends nothing. Pressed with records
+cell, and as they arrive the grid says that Space ticks or unticks it --
+on a row's Delete, that Space or Enter asks to delete it. Space ticks it
+and opens nothing, and Tab leaves the grid in one stop, as from any
+cell; Space on another cell still opens the record. A choice is of the
+page shown: another page, a search, a filter, a sort or a view clears
+it, and the bar's line says so; the same page read again, after a save,
+keeps it at the versions read then, and a save of the open record moves
+the version it is sent at. An action pressed with nothing chosen says
+what to do first and sends nothing, and Clear the choice that there is
+nothing to clear, each again at every press. Pressed with records
 chosen, it asks as the header's does, under the bar: its dialog, then a
-confirmation that counts the records and says that if one is refused,
-none of them is changed. Once it ran, "Done. It ran over 3 records.",
-the page read again and the choice cleared -- and the open record read
-again, where it was one of them. A refusal about some of the records
-names them, says nothing was done to any, and offers Read the page
-again, never a run again past it; a run whose answer was lost is checked
-by reading each record, and run again only where none moved
+confirmation that counts the records and, where the administrator wrote
+no sentence of their own, says that if one is refused, none of them is
+changed. Either stands only while the choice does: tick or untick a
+box, clear the choice or show another page, and it closes, nothing run.
+Once it ran, "Done. It ran over 3 records.", the page read again and
+the choice cleared -- and the open record read again, where it was one
+of them. A refusal about some of the records names them and says
+nothing was done to any, all of it said as the keyboard lands there,
+and offers Read the page again, never a run again past it; a run whose
+answer was lost is checked by reading each record, and run again only
+where none moved
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 
 New record, and a child's new row, start each field at its column's

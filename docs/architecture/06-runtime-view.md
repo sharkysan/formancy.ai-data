@@ -1228,12 +1228,17 @@ The steps are 6.15's, with these differences:
    each such action through a second `useActionFlow`, given the choice:
    step 6 of 6.15 over the records chosen, in the page's order -- the
    dialog, a confirmation counting them, one run, a second press sending
-   nothing -- and once done the page listed again and the choice cleared,
-   and the open record read again where it was chosen, its forms held
-   while the run was out. A refusal naming records names them and offers
-   to read the page again, never a run past it; a lost answer is one read
-   per record, run again only where none moved. The open record's header
-   still offers the actions over the open record alone.
+   nothing -- the dialog and the confirmation standing only while the
+   choice holds the records they asked over, closed with nothing run
+   when a box is ticked or unticked or another page clears it, and Run it
+   sending the records chosen at the versions the page knows then, never
+   a record the page no longer shows; once done the page listed again
+   and the choice cleared, and the open record read again where it was
+   chosen, its forms held while the run was out. A refusal naming records
+   names them and offers to read the page again, never a run past it; a
+   lost answer is one read per record, run again only where none moved.
+   The open record's header still offers the actions over the open
+   record alone.
 
 Held by the shared cases `selection-done`, `selection-crossed`,
 `selection-stale`, `selection-declined`, `selection-page` and

@@ -543,10 +543,11 @@ has a child section
 An action over a selection is offered over the Records grid's page
 alone: a choice is of the page shown, which another page, a search, a
 filter, a sort or a view clears, so more than a page is run a page at a
-time; the choice is kept nowhere but the page; the boxes are one more
-column, first, which the Columns panel neither hides nor moves; a lost
-run over them is one read per record to check; and none of it was run
-against a database or a browser before CI
+time; the choice is kept nowhere but the page; a question asked over
+it closes when it changes, its dialog's answers with it; the boxes are
+one more column, first, which the Columns panel neither hides nor
+moves; a lost run over them is one read per record to check; and none
+of it was run against a database or a browser before CI
 ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 A record's child forms are tabs beside it, so a child's rows are a press
 away from the record's form, and another record, a record its first save

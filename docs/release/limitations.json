@@ -5059,7 +5059,7 @@
       ]
     },
     "0166": {
-      "reviewed": "sha256:ec2c48b2579b123cfd8ac36e3923d7f65cef1c4ee41883b94d2b23da906ecd8e",
+      "reviewed": "sha256:a4521ceda264d4dd0d2af0eb038266065ee28083c9a05b8af9cd1430736f1f69",
       "limitations": [
         {
           "area": "host",
@@ -5072,8 +5072,22 @@
         },
         {
           "area": "host",
-          "says": "Where a form offers its person an action over a selection, the Records grid has one more column, of boxes, first, which the Columns panel neither hides nor moves; a child section and a Drill down level offer no choice.",
+          "says": "Where a form offers its person an action over a selection, the Records grid has one more column, of boxes, first.",
           "heldBy": "apps/host/src/choose-column.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "The Columns panel neither lists, hides nor moves the column of boxes a person chooses records with.",
+          "heldBy": "apps/host/src/actions.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A child section and a Drill down level offer no choice of records: an action over a selection runs from the Records grid alone."
+        },
+        {
+          "area": "host",
+          "says": "A question asked over a choice of records closes, nothing run, when the choice changes under it: a box ticked while the confirmation asks drops the dialog's answers, and the person asks again.",
+          "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
           "area": "host",
