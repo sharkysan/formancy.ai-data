@@ -1,11 +1,24 @@
 import { actionUnoffered, fieldKeyFor, generateForm, routineProblem, sourceProblem } from '@formancy/data-core'
-import type { ActionChoice, ActionGround, MetadataSnapshot, ObjectMeta, ParameterSource, RoutineMeta, RoutineParameter, RoutineRef } from '@formancy/data-core'
+import type {
+  ActionChoice,
+  ActionGround,
+  ActionScope,
+  MetadataSnapshot,
+  ObjectMeta,
+  ParameterSource,
+  RoutineMeta,
+  RoutineParameter,
+  RoutineRef,
+} from '@formancy/data-core'
 import type { ProposalRequest } from './api.js'
 
 /*
- * The routines of a connection offered as actions over the open record
- * (0159, 0163), as the Choose step offers them. Nothing is chosen for
- * anybody: no routine ticked, no parameter given a source. What the
+ * The routines of a connection offered as actions (0159, 0163), as the
+ * Choose step offers them: over the open record, or over the records a
+ * person chooses in the list (0165, 0166). Nothing is chosen for
+ * anybody: no routine ticked, no parameter given a source, and an action
+ * runs over the open record until the administrator says otherwise, as
+ * every bundle before 0165 binds it. What the
  * generator refuses -- of the form, of a routine, of a source, of the
  * action as mapped -- is asked of the functions it runs, in the browser,
  * on the request the step would send, and said in their words before
@@ -116,11 +129,13 @@ export interface ActionReasons {
   routines: ReadonlyMap<string, string>
   /** By action name: the generator's note refusing the action as it is mapped. */
   chosen: ReadonlyMap<string, string>
+  /** By action name: the generator's note of what the action does once bound -- what it runs over, and for a selection what that costs (0165). */
+  bound: ReadonlyMap<string, string>
   /** What the generator throws of the actions as a whole -- a name no URL carries, two of one name -- which the server refuses the request for. */
   thrown: string | null
 }
 
-const NOTHING: ActionReasons = { ground: null, unoffered: null, routines: new Map(), chosen: new Map(), thrown: null }
+const NOTHING: ActionReasons = { ground: null, unoffered: null, routines: new Map(), chosen: new Map(), bound: new Map(), thrown: null }
 
 /** The generator on `request`, as the server runs it on a proposal: the id and the title set to ones it accepts, since neither decides an action. */
 function generated(snapshot: MetadataSnapshot, request: ProposalRequest): ReturnType<typeof generateForm> | { refused: string } {
@@ -154,20 +169,36 @@ export function actionReasons(snapshot: MetadataSnapshot, root: ObjectMeta, requ
   const { identity, concurrency, fields } = base.bindings
   const ground: ActionGround = { identity, concurrency, fields }
   const chosen = new Map<string, string>()
+  const bound = new Map<string, string>()
   let thrown: string | null = null
   if (actions.length > 0) {
     const asked = generated(snapshot, request)
     if ('refused' in asked) thrown = asked.refused
     else
-      for (const note of asked.notes)
-        if (note.kind === 'blocked' && actions.some((action) => action.name === note.subject)) chosen.set(note.subject, note.message)
+      for (const note of asked.notes) {
+        if (!actions.some((action) => action.name === note.subject)) continue
+        if (note.kind === 'blocked') chosen.set(note.subject, note.message)
+        // The one note the generator writes of an action it binds, whose subject is the action alone: a dialog's are `name.input`.
+        else if (note.kind === 'inferred') bound.set(note.subject, note.message)
+      }
   }
-  return { ground, unoffered: actionUnoffered(snapshot.kind, root, identity, concurrency), routines, chosen, thrown }
+  return { ground, unoffered: actionUnoffered(snapshot.kind, root, identity, concurrency), routines, chosen, bound, thrown }
 }
 
 /** A choice of `routine` as an action, as it is first ticked: named, over the open record, and no parameter given anything. */
 export function startingAction(routine: RoutineMeta, taken: readonly string[]): ActionChoice {
   return { name: actionNameFor(routine, taken), routine: { ...routine.ref }, scope: 'record', parameters: [] }
+}
+
+/** What an action may run over, in the generator's order (`ACTION_SCOPES`), as the Choose step offers each: the open record, or a page's records a person chooses (0165, 0166). */
+export const SCOPES: ReadonlyArray<{ scope: ActionScope; label: string }> = [
+  { scope: 'record', label: 'The open record' },
+  { scope: 'selection', label: 'Records a person chooses in the list, up to a page' },
+]
+
+/** `action` over `scope`, its name and parameters as they were. */
+export function withScope(action: ActionChoice, scope: ActionScope): ActionChoice {
+  return { ...action, scope }
 }
 
 /** `action` with `parameter` given `from`, or given nothing for `undefined`, its parameters kept in the routine's order. */
