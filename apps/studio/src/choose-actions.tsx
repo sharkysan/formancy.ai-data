@@ -85,7 +85,9 @@ function ParameterSource({
  * generator binds the action, the generator's own note of what it does,
  * which for a selection says what holding every record until the last
  * call returns costs -- read with the group, so it is heard as the
- * keyboard enters it.
+ * keyboard enters it, and in a polite live region, so the note a radio's
+ * choice changes is heard as it is chosen: the arrow keys move inside the
+ * group, where only the radio is said again.
  */
 function ScopeChoice({
   id,
@@ -118,11 +120,13 @@ function ScopeChoice({
           <label htmlFor={`${id}-scope-${scope}`}>{label}</label>
         </div>
       ))}
-      {bound === null ? null : (
-        <p id={`${id}-scope-note`} className="hint">
-          {bound}
-        </p>
-      )}
+      <div aria-live="polite">
+        {bound === null ? null : (
+          <p id={`${id}-scope-note`} className="hint">
+            {bound}
+          </p>
+        )}
+      </div>
     </fieldset>
   )
 }

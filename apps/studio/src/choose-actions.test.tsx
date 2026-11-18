@@ -10,12 +10,19 @@ import { OWNER_ROUTINES, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
- * The Choose step's actions (0163): the routines a discovery that asked
- * for them read, each offered as an action over the open record, its
- * parameters given only the sources the generator binds, and every
- * refusal said in the generator's words before anything is sent --
- * against the real server behind a fake `fetch`, as every suite here
- * runs.
+ * The Choose step's actions (0163, 0166): the routines a discovery that
+ * asked for them read, each offered as an action over the open record or
+ * over the records a person chooses of a list's page, its parameters given
+ * only the sources the generator binds, and every refusal said in the
+ * generator's words before anything is sent -- against the real server
+ * behind a fake `fetch`, as every suite here runs.
+ *
+ * Found by role and accessible name, with two reads the accessibility
+ * tree cannot answer, said where they are made: that a group's name comes
+ * from a `legend` in view, by its tag -- the tree gives the group its name
+ * and not where the name is drawn; and that the generator's note of an
+ * action sits in a polite live region, by the `aria-live` of the element
+ * around it, which no role names.
  */
 let plane: TestPlane
 
@@ -320,13 +327,14 @@ describe('what an action runs over (0166)', () => {
   // 0165 binds it, and the other choice is a page's records a person
   // chooses: a radio group whose legend is in view, the arrow keys moving
   // between its two, and under it the generator's own note of the action
-  // as it binds it, read with the group, which for a selection says that
-  // every record is held until the last call returns. What is chosen is
-  // what is sent, and the Generate step says the generator's note too.
-  // Watched failing with the radios' change left unwritten: "expected [
-  // true, false ] to deeply equal [ false, true ]"; and with the group
-  // described by nothing: "expected '' to contain 'Runs
-  // sales.ship_order(pg_catalog.int8…'".
+  // as it binds it, read with the group and said as a radio's choice
+  // changes it, which for a selection says that every record is held until
+  // the last call returns. What is chosen is what is sent, and the
+  // Generate step says the generator's note too. Watched failing with the
+  // radios' change left unwritten: "expected [ true, false ] to deeply
+  // equal [ false, true ]"; with the group described by nothing: "expected
+  // '' to contain 'Runs sales.ship_order(pg_catalog.int8…'"; and with the
+  // note in no live region: "expected null not to be null".
   test('is the open record until a page’s chosen records are picked from the keyboard, and the generator says what that costs', async () => {
     const user = await signIn(plane)
     const here = await chooseShipping(user)
@@ -342,6 +350,9 @@ describe('what an action runs over (0166)', () => {
     expect(focusedName()).toBe(CHOSEN)
     await waitFor(() => expect(computeAccessibleDescription(group)).toContain('once for each record of a selection of one page at most'))
     expect(computeAccessibleDescription(group)).toContain('holds every record of it until the last call returns')
+    // Said as it is chosen: the arrow keys move inside the group, where only the radio is said again, never the group's description.
+    const note = within(group).getByText(/once for each record of a selection of one page at most/)
+    expect(note.closest('[aria-live="polite"]')).not.toBeNull()
     expect({ scope: [...(await audit()), ...unnamed()] }).toEqual({ scope: [] })
 
     await user.click(within(here).getByRole('button', { name: 'Generate the form' }))

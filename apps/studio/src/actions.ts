@@ -174,13 +174,16 @@ export function actionReasons(snapshot: MetadataSnapshot, root: ObjectMeta, requ
   if (actions.length > 0) {
     const asked = generated(snapshot, request)
     if ('refused' in asked) thrown = asked.refused
-    else
+    else {
+      // The actions the generator bound: a field's note may have an action's name for its subject -- a field key -- and is no note of an action.
+      const binds = new Set((asked.bindings.actions ?? []).map((action) => action.name))
       for (const note of asked.notes) {
         if (!actions.some((action) => action.name === note.subject)) continue
         if (note.kind === 'blocked') chosen.set(note.subject, note.message)
-        // The one note the generator writes of an action it binds, whose subject is the action alone: a dialog's are `name.input`.
-        else if (note.kind === 'inferred') bound.set(note.subject, note.message)
+        // The one note the generator writes of an action it binds, whose subject is the action alone, after every field's: a dialog's are `name.input`.
+        else if (note.kind === 'inferred' && binds.has(note.subject)) bound.set(note.subject, note.message)
       }
+    }
   }
   return { ground, unoffered: actionUnoffered(snapshot.kind, root, identity, concurrency), routines, chosen, bound, thrown }
 }
