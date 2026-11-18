@@ -1217,9 +1217,23 @@ The steps are 6.15's, with these differences:
    its version. The trail's `action` event names every record by its
    keyed hash in `records`, their count in `rows`, and no `record`.
 5. data-client's `runAction` sends every record and reads the records a
-   refusal names, each one it addressed. The host page offers a selection
-   nowhere yet: its open record's header offers the actions over the open
-   record alone (`apps/host/src/action-flow.ts`).
+   refusal names, each one it addressed.
+6. On the host page ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)), where the form serves its person an
+   action over a selection, the Records grid's first column holds a box
+   per record (`apps/host/src/choose-column.tsx`), and each page the grid
+   draws is told to the choice (`chosen-rows.ts`): a page of another list
+   or another page clears it, saying so on the bar's line, and the same
+   page drawn again keeps it at the versions that read gave, or the
+   detail heard since. The bar above the grid (`selection-bar.tsx`) offers
+   each such action through a second `useActionFlow`, given the choice:
+   step 6 of 6.15 over the records chosen, in the page's order -- the
+   dialog, a confirmation counting them, one run, a second press sending
+   nothing -- and once done the page listed again and the choice cleared,
+   and the open record read again where it was chosen, its forms held
+   while the run was out. A refusal naming records names them and offers
+   to read the page again, never a run past it; a lost answer is one read
+   per record, run again only where none moved. The open record's header
+   still offers the actions over the open record alone.
 
 Held by the shared cases `selection-done`, `selection-crossed`,
 `selection-stale`, `selection-declined`, `selection-page` and
@@ -1231,7 +1245,10 @@ later record and a record a trigger removed beside them; by
 by `packages/data-sqlserver/src/actions/statements.test.ts` for the order
 the batch locks in and its arguments read before the first call; by `packages/data-server/src/routes/runtime-actions-selection.test.ts`
 for the route and the trail; by `packages/data-client/src/transport.test.ts`;
-and by `apps/host/src/actions.test.tsx` for the header that offers none.
+and by `apps/host/src/actions.test.tsx` for the header that offers none
+and, on both engines, the choice and the run from the bar, with
+`running.test.ts`, `chosen-rows.test.ts` and `choose-column.test.tsx`
+beside it and the host's browser gate (`apps/host/scripts/browser/choosing.mjs`).
 The container suites were written without a database, and CI is their
 first run. What it costs: every record is held until the last call
 returns, the routine is called once per record and never for the set, a

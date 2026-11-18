@@ -354,9 +354,20 @@ get*](../../README.md#what-you-get) is the short version, and
   and the trail names every record by its keyed hash and their count.
   `@formancy/data-client`'s `runAction` sends it and reads the records a
   refusal names. Every record is held until the last call returns, and
-  the routine is never called once for the set. The studio binds the
-  open record's scope alone and the host page offers no selection yet
-  ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+  the routine is never called once for the set. The studio's Choose step
+  offers each action over the open record or over the records a person
+  chooses in the list, and the host page offers it on the Records grid:
+  a first column of boxes, each a real checkbox named for its record,
+  whose Space is its own and never the row's, and a bar above the grid
+  with the actions, how many are chosen, Choose every record on this
+  page and Clear the choice -- only on a form that offers its person
+  such an action. A choice is of the page shown, which another page, a
+  search, a filter, a sort or a view clears, saying so; the run goes
+  through the open record's flow, its confirmation counting the records,
+  done saying how many it ran over, and a refusal naming the records it
+  is about and offering to read the page again
+  ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md),
+  [0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 - **An instant or a time the person may read and did not change is never
   written back**
   ([0040](../decisions/0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md)).

@@ -270,6 +270,24 @@ order, its arguments read before the first call and its own numbers (`packages/d
 the client's reading (`packages/data-client/src/transport.test.ts`, run
 with a configuration of its own that starts no database).
 
+The studio's offer of the scope and the host page's choice of rows
+([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)) were
+written on 2026-11-18 without a database. What needs none ran and was
+watched failing with its rule taken out: the Choose step's radio group,
+the generator's note it is described by, the request's scope and what
+the Policy and Presentation steps say (`apps/studio/src/choose-actions.test.tsx`);
+a run's states over the records chosen (`apps/host/src/running.test.ts`);
+the choice of a page, cleared by another and kept by its own at the
+versions read (`chosen-rows.test.ts`); and the grid's boxes -- named,
+out of the Tab order, reached by the arrow keys, their Space and their
+click their own -- over fake rows without a server
+(`choose-column.test.tsx`, run with a configuration of its own that
+starts no database). The run against the real server on both engines --
+two orders closed together, one stale order refused by name, the column
+only where an action over a selection is offered, paging clearing the
+choice, a second press sending nothing (`actions.test.tsx`) -- and the
+browser gate's step (`apps/host/scripts/browser/choosing.mjs`) run first in CI.
+
 `sharedCases()` derives every case id, and a test declares the ones it
 asserts with `covers()`. The release report keeps a matrix of every case on
 each engine and fails a run in which one is missing or failed on either. What
@@ -471,12 +489,14 @@ the studio at every step of its journey against the real server
 ([0024](../decisions/0024-the-studio-speaks-only-the-admin-plane.md)), the
 host page at every state of a load, a save, a stale save, a lost answer, a
 refused selection, a delete and a download, and of an action its dialog,
-confirmation, done and declined run, though not its run out, a stale run
-or "It may have run", which the jsdom suites alone hold
+confirmation, done and declined run, and the records chosen with an
+action run over them from the bar above the grid, though not its run
+out, a stale run or "It may have run", which the jsdom suites alone hold
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md),
 [0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md),
 [0080](../decisions/0080-a-host-downloads-the-records-its-grid-lists-and-the-browser-saves-the-servers-file.md),
-[0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md))
+[0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
+[0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md))
 -- they check that nothing scrolls sideways down to 320 CSS pixels, WCAG's
 reflow width; that the first Tab lands on the skip link and the next in the
 content; axe's colour-contrast and target-size rules; and that no rule of

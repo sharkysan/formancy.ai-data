@@ -1,6 +1,6 @@
 # 0163 — The studio binds a routine as an action, offering each parameter only what the generator binds, and says what it does before it is granted
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0166](0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md): the Choose step offers each action over the open record or over the records a person chooses in the list, and the Policy and Presentation steps say which
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** the studio's side of an action over the open record --

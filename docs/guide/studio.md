@@ -157,7 +157,7 @@ record, and the Publish step waits on a max past one batch
 ([0155](../decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
 
 An action runs a function or procedure your database keeps over the open
-record. Tick Include routines on the Connect step before Discover, and
+record, or over the records a person chooses in the list. Tick Include routines on the Connect step before Discover, and
 the pane of what the connection can see lists its routines under its
 tables; without it no routine is read, and the Choose step offers no
 action and says so. There, an Actions group lists every routine, none
@@ -171,13 +171,19 @@ parameter a select starting at Nothing yet and offering only what the
 generator binds for its type: the record's key, a column of it, an answer
 in the action's dialog, a trusted attribute -- named, starting at
 `tenant` -- or the signed-in person's id. Until each has one, the
-generator's note under it says which is missing. An action chosen stays
+generator's note under it says which is missing. "What it runs over"
+starts at The open record; Records a person chooses in the list, up to a
+page, offers it over a page's records instead, all in one transaction
+that holds every one until the last call returns, which the generator's
+note under the choice says
+([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)). An action chosen stays
 listed, ticked, when its routine is no longer in the snapshot or the
 connection was discovered again without Include routines, since what you
 generate still names it: untick it there to leave it out. On the Policy step,
 "Roles that may run ship-order" is the grant, which needs read and not
 update, and above it a note says what the routine does that nothing here
-binds: it calls the routine after moving the record's version, field
+binds: it calls the routine after moving the record's version -- once
+for each record chosen, where it runs over them -- field
 grants, state moves and cascades do not bind it, a routine writing other
 rows over a version column must increment theirs, on SQL Server a RETURN
 status other than 0 refuses the run, and a routine reaching past this

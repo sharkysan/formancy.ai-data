@@ -1307,7 +1307,7 @@
       ]
     },
     "0047": {
-      "reviewed": "sha256:f8482e74b3d7c24d2579c2c4f1d6fa9942c4e11dcb7b83cf8ac9ac8fc8a8b8ed",
+      "reviewed": "sha256:0bd393b5229f6323d94bb6c21445497357f9cedee44673ecb1714447619b65fb",
       "limitations": [
         {
           "area": "host",
@@ -4913,11 +4913,11 @@
       ]
     },
     "0162": {
-      "reviewed": "sha256:d3d250cfbdec12256ad58ebec71ee8f13887196ac15efaa6f0b81861871bc142",
+      "reviewed": "sha256:adfda724451fcdb4bae0053fd6fba7682a49b72fbc525881c2ac8baa8a303ff9",
       "limitations": [
         {
           "area": "host",
-          "says": "The host page offers an action only in the open record's detail: a child row's detail, a Drill down level and a selection of rows offer none."
+          "says": "The host page offers an action over the open record only in its detail: a child row's detail and a Drill down level offer none."
         },
         {
           "area": "host",
@@ -4960,7 +4960,7 @@
       ]
     },
     "0163": {
-      "reviewed": "sha256:a4aa7eab5e965428edf9c7a0de99262ee58dbf506782382801b34661d170b803",
+      "reviewed": "sha256:69fab213d4267afa89ca9074d839191cc515775ec908ac1a6b53fc6da064dfa2",
       "limitations": [
         {
           "area": "studio",
@@ -4997,7 +4997,7 @@
       "none": "How CI runs the host page's suite, an app that is never published, in two jobs, and how the release report reads them: a contributor meets two check names where there was one and the runner time of a second set of databases. A release's report shows no coverage figure for that suite and says so in its row; nothing a user, integrator or operator installs or runs changes."
     },
     "0165": {
-      "reviewed": "sha256:acd7e9242fdd76d590a40ae9ead5838b97bcbd277aa20351903b9ee5233d488c",
+      "reviewed": "sha256:b15958a188194d2c6c7a4ee202c4c93aa570df249237b29bd69a800d48cbe691",
       "limitations": [
         {
           "area": "operations",
@@ -5053,17 +5053,41 @@
           "heldBy": "packages/data-server/src/routes/runtime-actions-selection.test.ts"
         },
         {
-          "area": "studio",
-          "says": "The studio binds an action over the open record alone, so only a client writing its own generation request publishes an action over a selection."
+          "area": "operations",
+          "says": "A server older than 0165 refuses every version whose generation request names an action over a selection, as it refuses every scope it does not run."
+        }
+      ]
+    },
+    "0166": {
+      "reviewed": "sha256:ec2c48b2579b123cfd8ac36e3923d7f65cef1c4ee41883b94d2b23da906ecd8e",
+      "limitations": [
+        {
+          "area": "host",
+          "says": "A choice of records on the host page is of the page shown: another page, a search, a filter, a sort or a view clears it, so a person runs an action over more than a page in runs of a page each, choosing again on each.",
+          "heldBy": "apps/host/src/chosen-rows.test.ts"
         },
         {
           "area": "host",
-          "says": "The host page offers an action over a selection nowhere: its open record's header offers the actions over the open record alone, and a selection is run through the runtime plane or @formancy/data-client.",
+          "says": "A choice of records is kept by the page alone, never in the browser or the address: a reload or another form drops it."
+        },
+        {
+          "area": "host",
+          "says": "Where a form offers its person an action over a selection, the Records grid has one more column, of boxes, first, which the Columns panel neither hides nor moves; a child section and a Drill down level offer no choice.",
+          "heldBy": "apps/host/src/choose-column.test.tsx"
+        },
+        {
+          "area": "host",
+          "says": "A run over the records chosen whose answer was lost is checked by one read per record, up to a page, and where some moved and some did not it is said as not run and never run again from there.",
+          "heldBy": "apps/host/src/running.test.ts"
+        },
+        {
+          "area": "host",
+          "says": "A refusal of a run over the records chosen names the records it is about and offers to read the page again, never to run it again anyway.",
           "heldBy": "apps/host/src/actions.test.tsx"
         },
         {
-          "area": "operations",
-          "says": "A server older than 0165 refuses every version whose generation request names an action over a selection, as it refuses every scope it does not run."
+          "area": "host",
+          "says": "A chosen record is sent at the version the page read it at or the detail heard since, whichever arrived last, so a page read after somebody else changed the open record runs over their version while its forms hold the older one, until the run reads it again."
         }
       ]
     }
