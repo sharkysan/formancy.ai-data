@@ -431,9 +431,12 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
   // the choice is cleared. The boxes ticked, the dialog, the confirmation
   // and done each pass axe and name every control (to be watched failing
   // in CI with the records sent as the open record alone: one order
-  // closed, the other open).
+  // closed, the other open). The note the run stores keeps the grid's
+  // search term, or the page read again under that search would no longer
+  // list the orders it closed (CI's first run: no box "Choose Order k1:16").
   test.each(RENDERERS)('in %s, two orders chosen and closed together are both closed, and the page is read again', async (renderer) => {
     const note = stamp('chosen')
+    const closedNote = `${note} closed together`
     const [first, second, third] = [
       await plane.db.insertActionOrder(engine.connection, note),
       await plane.db.insertActionOrder(engine.connection, note),
@@ -446,7 +449,7 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     expect([...(await audit()), ...unnamed()]).toEqual([])
     const asking = await openCloseAll(user, 2, renderer)
     expect([...(await audit()), ...unnamed()]).toEqual([])
-    const confirming = await continueCloseAll(user, asking, 2, 'closed together', renderer)
+    const confirming = await continueCloseAll(user, asking, 2, closedNote, renderer)
     expect(computeAccessibleDescription(confirming)).toBe(RUNS_OVER_CHOSEN)
     expect([...(await audit()), ...unnamed()]).toEqual([])
     const from = plane.sent.length
@@ -461,7 +464,7 @@ describe.each(ENGINES)('an action over the records chosen on $engine', (engine) 
     expect(closeAllsSent(plane, from)).toBe(1)
     expect(plane.sent.slice(from).some((request) => request.path.endsWith('/records/list'))).toBe(true)
     for (const record of [first, second])
-      expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'closed', note: 'closed together', version: 2, closes: 1 })
+      expect(await plane.db.actionOrder(engine.connection, record)).toMatchObject({ status: 'closed', note: closedNote, version: 2, closes: 1 })
     expect(await plane.db.actionOrder(engine.connection, third)).toMatchObject({ status: 'open', version: 1, closes: 0 })
     await waitFor(() => expect(rowTexts(first)).toContain('closed'), ARRIVES)
     expect(rowTexts(third)).toContain('open')
