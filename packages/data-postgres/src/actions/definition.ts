@@ -1,3 +1,4 @@
+import { nullInputProblem } from '@formancy/data-core'
 import type { DescribedRoutine, ObjectRef, RoutineRef, TextLengthUnit } from '@formancy/data-core'
 import { declaredOf, routineOf } from '../discovery/routines.js'
 import type { RoutineRow } from '../discovery/routines.js'
@@ -35,7 +36,10 @@ import type { RecordStatement } from '../records/sql.js'
  * A STRICT routine is described as `strict`, and no run calls it: given a
  * NULL argument PostgreSQL does not call it and answers NULL in its place,
  * so a run over a record whose field is NULL would move the version, commit
- * and answer done for a call that never happened.
+ * and answer done for a call that never happened. Decided by the
+ * generator's own rule (`nullInputProblem`, 0167) over the routine as
+ * `routineOf` reads it, so the generator, which refuses to bind one, and
+ * this description cannot read STRICT two ways.
  *
  * The facts are read from pg_proc as a query reads a table, under the
  * statement's snapshot; the call finds and runs the routine through the
@@ -172,7 +176,6 @@ export function describedRoutineFrom(ref: RoutineRef, read: RoutineRead, textUni
   const { facts, digest, spellings, current } = read
   if (facts === null || digest === null || spellings === null || current === null) return undefined
   const parsed = JSON.parse(facts) as Facts
-  if (parsed.strict) return 'strict'
   const spelled = JSON.parse(spellings) as { result: string; parameters: string[] }
   // Both are one statement's read of the same pg_proc row.
   if (spelled.parameters.length !== parsed.parameters.length) throw new Error("the routine's facts and their spellings disagree about its arguments")
@@ -186,12 +189,15 @@ export function describedRoutineFrom(ref: RoutineRef, read: RoutineRead, textUni
     result_type: parsed.result_type,
     result_spelling: spelled.result,
     security_definer: parsed.security_definer,
+    strict: parsed.strict,
     defaults: parsed.defaults,
   }
   const declared = parsed.parameters.map(([name, mode, typeOid], index) =>
     declaredOf({ name, mode, type_oid: typeOid, spelling: spelled.parameters[index] as string }, textUnit),
   )
-  return { ...routineOf(row, declared, textUnit), definition: `${digest}:${current}` }
+  const routine = routineOf(row, declared, textUnit)
+  if (nullInputProblem(routine) !== null) return 'strict'
+  return { ...routine, definition: `${digest}:${current}` }
 }
 
 /** What a run's call is guarded by: the digest of the routine's facts, and of its whole definition as the catalog cache holds it. */

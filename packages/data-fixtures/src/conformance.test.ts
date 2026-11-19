@@ -750,6 +750,7 @@ function perfectRoutines(kind: DatabaseKind, account: FixtureAccount): RoutineMe
         result: null,
         reach: facts.reach,
         executable: entry.executable[account],
+        onNull: entry.onNull,
       },
     ]
   })
@@ -843,6 +844,24 @@ describe('routineDisagreements', () => {
       'sales.ship_order(pg_catalog.int8, pg_catalog.int4) executable as the reader is true, expected false',
       'sales.ship_order(pg_catalog.int8, pg_catalog.int4) parameter order_id type min is "-2147483648", expected "-9223372036854775808" (database type fixture)',
       'sales.ship_order(pg_catalog.int8, pg_catalog.int4) parameter order_id type max is "2147483647", expected "9223372036854775807" (database type fixture)',
+    ])
+  })
+
+  // Whether the engine calls a routine given a NULL (0167) is a fact every
+  // discovery now reads, on both engines: a routine reported not called,
+  // and one that says nothing -- a discovery that never read it -- each
+  // differ from the model. Watched failing on 2026-11-19 with onNull
+  // uncompared: "expected [] to deeply equal [ …(2) ]".
+  test('notices whether the engine calls a routine given a NULL, and a routine that does not say', () => {
+    const differs = withRoutines('postgres', 'owner', (routines) => {
+      routineNamed(routines, 'ship_order').onNull = 'not-called'
+    })
+    const unread = withRoutines('sqlserver', 'owner', (routines) => {
+      delete routineNamed(routines, 'fn_customer_tenant').onNull
+    })
+    expect([...routineDisagreements(differs), ...routineDisagreements(unread)]).toEqual([
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) onNull is "not-called", expected "called"',
+      'sales.fn_customer_tenant() onNull is null, expected "called"',
     ])
   })
 

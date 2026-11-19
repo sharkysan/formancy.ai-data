@@ -397,6 +397,8 @@ function routineFacts(found: RoutineMeta, entry: ExpectedRoutine, facts: Expecte
   compare('reach', found.reach, facts.reach)
   compare('effects', found.effects, entry.effects)
   compare('returns', found.returns, entry.returns)
+  // Absent is a discovery that did not read it (0167): the model says, so absent is a disagreement.
+  compare('onNull', found.onNull ?? null, entry.onNull)
   compare(`executable as the ${account}`, found.executable, entry.executable[account])
   const names = found.parameters.map((parameter) => parameter.name)
   if (names.join('\u0000') !== facts.names.join('\u0000')) out.push(`${where} parameters are [${names.join(', ')}], expected [${facts.names.join(', ')}]`)

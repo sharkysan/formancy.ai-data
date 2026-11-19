@@ -16,8 +16,10 @@ import { discoverSqlServer } from './index.js'
  * Schema `probe` holds what the fixture does not: a routine of each shape no
  * action could bind, one the reader is granted and one the writer's role is
  * granted and the writer denied, a procedure and a function over a table
- * the reader may not read, and one marked as Microsoft's. Schema
- * `replicated` holds a replication-filter procedure beside a plain one.
+ * the reader may not read, one marked as Microsoft's, and a scalar
+ * function declared RETURNS NULL ON NULL INPUT beside one that is not
+ * (0167). Schema `replicated` holds a replication-filter procedure beside
+ * a plain one.
  * None touches `sales`, which stays exactly what the model describes.
  */
 let fixture: SqlServerFixture
@@ -73,6 +75,8 @@ beforeAll(async () => {
     `create procedure probe.typed @a probe.amount, @k probe.keys readonly, @b varbinary(16), @v varchar(20), @nv nvarchar(max), @x decimal(14, 2), @s sysname
       as set nocount on`,
     'create procedure probe.as_owner with execute as owner as set nocount on',
+    'create function probe.null_seven(@n int) returns int with returns null on null input as begin return 7 end',
+    'create function probe.called_seven(@n int) returns int as begin return 7 end',
     'create procedure probe.shipped as set nocount on',
     "exec sys.sp_MS_marksystemobject N'probe.shipped'",
     `create procedure probe.every_type @a uniqueidentifier, @b date, @c time(3), @d datetime2(7), @e datetimeoffset(7), @f tinyint, @g smallint,
@@ -397,5 +401,50 @@ describe('the type table (0158)', () => {
       ['239', 'text'],
     ])
     expect(every.parameters.every((parameter) => ROUTINE_TYPES.has(Number(parameter.typeId.split(':')[0])))).toBe(true)
+  })
+})
+
+describe('whether SQL Server calls a routine given a NULL (0167)', () => {
+  // A scalar function declared RETURNS NULL ON NULL INPUT is answered NULL
+  // given a NULL without running its body -- what PostgreSQL's STRICT is,
+  // and what a run would answer done for -- and is recorded not called,
+  // from sys.sql_modules' null_on_null_input; every other routine is
+  // called, a procedure whatever its module says, and none is left unread
+  // as the owner. The server's own answer to a NULL is asserted beside it,
+  // so the fact is held to what the engine does. First run in CI.
+  test('a function declared RETURNS NULL ON NULL INPUT is recorded as not called given a NULL, as the server answers one', async () => {
+    const snapshot = await discoverSqlServer(owner, { schemas: ['probe'], routines: true })
+    expect(['null_seven', 'called_seven', 'peek_value', 'rows_inline', 'rows_multi', 'granted'].map((name) => routine(snapshot, name).onNull)).toEqual([
+      'not-called',
+      'called',
+      'called',
+      'called',
+      'called',
+      'called',
+    ])
+    expect((snapshot.routines ?? []).filter((entry) => entry.onNull === undefined).map((entry) => describeRoutine(entry.ref))).toEqual([])
+    const answered = await owner
+      .request()
+      .query<{ skipped: number | null; called: number | null }>('select probe.null_seven(null) as skipped, probe.called_seven(null) as called')
+    expect(answered.recordset[0]).toEqual({ skipped: null, called: 7 })
+  })
+
+  // Microsoft's Metadata Visibility Configuration shows sys.sql_modules' row
+  // of a module to an account that holds any permission on it, as
+  // sys.objects shows the object, and keeps only its definition from one
+  // without VIEW DEFINITION: an account that may only EXECUTE the function
+  // reads whether it is called given a NULL. Read from the documentation,
+  // held here; were it not shown, the routine would record nothing, never a
+  // guess. First run in CI.
+  test('an account that may only EXECUTE a function reads whether it is called given a NULL', async () => {
+    const caller = await connectAs('routine_null_caller', ['grant execute on probe.null_seven to routine_null_caller'])
+    const snapshot = await discoverSqlServer(caller, { schemas: ['probe'], routines: true })
+    expect((snapshot.routines ?? []).map((entry) => [describeRoutine(entry.ref), entry.executable, entry.onNull])).toEqual([
+      ['probe.null_seven()', true, 'not-called'],
+    ])
+    const definition = await caller
+      .request()
+      .query<{ definition: string | null }>("select definition from sys.sql_modules where object_id = object_id(N'probe.null_seven')")
+    expect(definition.recordset).toEqual([{ definition: null }])
   })
 })

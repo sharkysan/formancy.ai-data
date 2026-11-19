@@ -79,13 +79,21 @@ const ROUTINE = `quotename(s.name) + N'.' + quotename(o.name)`
  * A char or varchar parameter takes the database's default collation, so
  * its code page -- what its length counts (0026) -- is the database's.
  *
+ * Whether SQL Server calls a function given a NULL argument is
+ * sys.sql_modules' `null_on_null_input` (0167), 1 for one declared RETURNS
+ * NULL ON NULL INPUT. The view shows a module's row to an account that
+ * holds a permission on it, as sys.objects shows the object, and keeps only
+ * its `definition` from one without VIEW DEFINITION (Microsoft's Metadata
+ * Visibility Configuration), so an account that may only EXECUTE reads it;
+ * NULL where no row is shown.
+ *
  * Of the routines `where` names, a condition on sys.objects `o` and
  * sys.schemas `s`: those in scope, for discovery, and the one routine a
  * run's description reads again (actions/definition.ts, 0160), so the two
  * cannot read one routine two ways.
  */
 export const ROUTINE_ROWS = (where: string): string => `
-  select r.object_id, r.schema_name, r.routine_name, r.type, r.access_object, r.can_execute,
+  select r.object_id, r.schema_name, r.routine_name, r.type, r.access_object, r.can_execute, r.null_on_null_input,
     p.parameter_id, p.name as parameter_name, p.user_type_id, p.max_length, p.precision, p.scale, p.is_output,
     t.name as type_name, schema_name(t.schema_id) as type_schema, t.is_user_defined, st.name as system_name,
     convert(int, collationproperty(convert(nvarchar(128), databasepropertyex(db_name(), 'Collation')), 'CodePage')) as code_page
@@ -94,7 +102,8 @@ export const ROUTINE_ROWS = (where: string): string => `
       case
         when o.type in ('P', 'FN') then has_perms_by_name(${ROUTINE}, N'OBJECT', N'EXECUTE')
         when o.type in ('IF', 'TF') then has_perms_by_name(${ROUTINE}, N'OBJECT', N'SELECT')
-      end as can_execute
+      end as can_execute,
+      (select m.null_on_null_input from sys.sql_modules m where m.object_id = o.object_id) as null_on_null_input
     from sys.objects o
     join sys.schemas s on s.schema_id = o.schema_id
     where o.type in ('P', 'FN', 'IF', 'TF', 'PC', 'FS', 'FT', 'RF') and o.is_ms_shipped = 0 and ${where}
@@ -116,6 +125,8 @@ export interface RoutineRow {
   access_object: string | null
   /** HAS_PERMS_BY_NAME's answer, for a routine this release reads; NULL for one it does not. */
   can_execute: number | null
+  /** sys.sql_modules' answer: whether it was declared RETURNS NULL ON NULL INPUT; NULL where the view shows no row (0167). */
+  null_on_null_input: boolean | null
 }
 
 /** One parameter of the routine, or its result, as the row carries it. */
@@ -204,6 +215,11 @@ export async function readRoutines(pool: ConnectionPool, schemas: readonly strin
  *   default is `null`, where PostgreSQL's pg_proc says.
  * - A procedure returns its RETURN status, the integer every procedure has,
  *   and no result: `void`. A scalar function's result is parameter 0.
+ * - A procedure is called whatever its arguments: CREATE PROCEDURE has no
+ *   RETURNS NULL ON NULL INPUT. A function declared with it is not called
+ *   given a NULL, as PostgreSQL's STRICT is not, and is recorded so (0167);
+ *   one whose module row the catalog does not show records nothing, never
+ *   a guess either way.
  * - A parameter's alias type the account holds nothing on is not in
  *   sys.types for it: recorded as unsupported, spelled as its base type, and
  *   said by a gap on the routine, as a column's is (columns.ts).
@@ -272,5 +288,12 @@ function toRoutine(row: RoutineRow, declared: readonly ParameterRow[], hidden: H
     result: returns === 'scalar' && result !== undefined ? typed(result, 'its result') : null,
     reach: 'owner',
     executable: row.can_execute === 1,
+    ...onNullOf(kind, row.null_on_null_input),
   }
+}
+
+/** Whether SQL Server calls the routine given a NULL (0167), as `RoutineMeta` holds it: absent where the module's row was not shown. */
+function onNullOf(kind: RoutineMeta['kind'], declared: boolean | null): Pick<RoutineMeta, 'onNull'> {
+  if (kind === 'procedure') return { onNull: 'called' }
+  return declared === null ? {} : { onNull: declared ? 'not-called' : 'called' }
 }

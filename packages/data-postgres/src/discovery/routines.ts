@@ -79,6 +79,8 @@ export interface RoutineRow {
   result_type: number
   result_spelling: string
   security_definer: boolean
+  /** `proisstrict`: PostgreSQL answers NULL for a call given a NULL argument, without running the body (0167). */
+  strict: boolean
   executable: boolean
   defaults: number
 }
@@ -138,6 +140,13 @@ function withDefaults(declared: readonly Declared[], defaults: number): RoutineP
  * the shorter signature ambiguous (42725): a fact a generator must refuse
  * by, and one SQL Server's catalog does not keep (its adapter says `null`).
  *
+ * Whether PostgreSQL calls a routine given a NULL argument is `proisstrict`
+ * (0167): STRICT, or RETURNS NULL ON NULL INPUT, and it answers NULL without
+ * running the body. A procedure cannot be declared either, so every one is
+ * called. pg_proc shows it to every role, so it is never unknown here; SQL
+ * Server's catalog shows a function's to an account that holds a
+ * permission on it, and never needs it for a procedure (its adapter says).
+ *
  * What a routine changes is what the engine enforces: a STABLE or IMMUTABLE
  * routine reads, and anything VOLATILE -- every procedure -- may write.
  * Whether a STABLE function that calls a VOLATILE one is stopped from
@@ -166,6 +175,7 @@ export async function readRoutines(sql: TransactionSql, schemas: readonly string
       p.prorettype as result_type,
       pg_catalog.format_type(p.prorettype, null) as result_spelling,
       p.prosecdef as security_definer,
+      p.proisstrict as strict,
       p.pronargdefaults::pg_catalog.int4 as defaults,
       pg_catalog.has_schema_privilege(n.oid, 'USAGE') and pg_catalog.has_function_privilege(p.oid, 'EXECUTE') as executable
     from pg_catalog.pg_proc p
@@ -221,5 +231,6 @@ export function routineOf(
     returns,
     result: returns === 'scalar' ? routineType(row.result_type, row.result_spelling, textUnit) : null,
     reach: row.security_definer ? 'owner' : 'account',
+    onNull: row.strict ? 'not-called' : 'called',
   }
 }

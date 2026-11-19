@@ -1,11 +1,15 @@
 import type { ActionAdapter, ActionOutcome, ActionRequest } from '@formancy/data-core'
+import { diffSnapshots, generateForm, nullInputProblem } from '@formancy/data-core'
 import {
   ACTION_DECLINED_REASON,
+  ACTION_ON_NULL,
+  ACTION_ON_NULL_CASE,
   ACTION_SCOPE,
   actionAnswer,
   actionCase,
   actionExpected,
   actionForms,
+  actionOnNull,
   actionToken,
   covers,
   plannedAction,
@@ -478,6 +482,80 @@ describe('a run whose routine changed after it was described', () => {
       expect(await calls(id)).toEqual(['close_order:overloaded:clara:12.50:1'])
     } finally {
       await owner`drop function actions.close_order(bigint, text, text, numeric, text)`
+    }
+  })
+})
+
+describe('a routine PostgreSQL does not call given a NULL, told before publication (0167)', () => {
+  // Discovery reads STRICT of every routine of the schema, the one
+  // expectation both engines are held to: weigh_order is STRICT, and every
+  // other routine is called given a NULL. First run in CI.
+  test('is recorded by discovery, and every other routine as called', covers('postgres', ACTION_ON_NULL_CASE), () => {
+    expect(actionOnNull(forms.orders.snapshot)).toEqual(ACTION_ON_NULL)
+  })
+
+  // The generator refuses to bind exactly what the run's description
+  // refuses to run, by one rule (`nullInputProblem`) over one reading of
+  // the routine (`routineOf`): for every routine of the schema the
+  // description answers STRICT's `refused` where the rule names one and
+  // describes it where it does not, and the generator refuses weigh_order
+  // in the rule's words. Were the two ever to read STRICT two ways, a form
+  // would be published whose every run is refused, or one refused whose
+  // runs would answer. First run in CI.
+  test('is refused by the generator exactly where the run’s description refuses it', async () => {
+    const snapshot = forms.orders.snapshot
+    const routines = (snapshot.routines ?? []).filter((routine) => routine.ref.schema === 'actions')
+    const answered: Array<[string, string, string]> = []
+    for (const routine of routines) {
+      const described = await actions.describe(forms.orders.bindings.root, routine.ref)
+      answered.push([
+        routine.ref.name,
+        described.ok ? 'described' : `${described.code}: ${described.message}`,
+        nullInputProblem(routine) === null ? 'bound' : 'refused',
+      ])
+    }
+    const strict = expect.stringMatching(/^refused: The routine is STRICT: PostgreSQL does not call it when an argument is NULL/)
+    expect(answered).toEqual([
+      ['broken_order', 'described', 'bound'],
+      ['close_order', 'described', 'bound'],
+      ['reprice', 'described', 'bound'],
+      ['weigh_order', strict, 'refused'],
+    ])
+    const weigh = routines.find((routine) => routine.ref.name === 'weigh_order')
+    if (weigh === undefined) throw new Error('the snapshot records no weigh_order')
+    const generated = generateForm(snapshot, {
+      connection: 'actions',
+      root: forms.orders.bindings.root,
+      formId: 'action-weigh',
+      title: 'Weigh',
+      lookups: [{ foreignKey: 'fk_order_customer', display: ['name'] }],
+      versionColumn: 'version',
+      actions: [{ name: 'weigh', routine: weigh.ref, scope: 'record', parameters: [{ parameter: 'p_order', from: { key: 'id' } }] }],
+    })
+    expect(generated.bindings.actions).toBeUndefined()
+    expect(generated.notes.filter((note) => note.subject === 'weigh').map((note) => [note.kind, note.message])).toEqual([
+      ['blocked', `Action weigh is not offered: ${String(nullInputProblem(weigh))}.`],
+    ])
+  })
+
+  // Made STRICT after publication, a bound routine stops the actions over
+  // it at review, discovering again, and in the runtime's verdict, as the
+  // run's description refuses it (0160); the action over another routine
+  // still runs. Made STRICT and back, so the cases after it run the
+  // routine as the fixture creates it. First run in CI.
+  test('made STRICT after publication, stops the actions over it at review', async () => {
+    await owner`alter function actions.close_order(bigint, text, text, numeric, int) strict`
+    try {
+      const current = await discoverPostgres(writer, ACTION_SCOPE)
+      const report = diffSnapshots(forms.orders.snapshot, current, forms.orders.bindings, forms.orders.policy)
+      const bound = JSON.stringify(forms.orders.bindings.actions?.find((action) => action.name === 'close')?.routine)
+      const closeOrder = report.changes.filter((change) => change.subject.kind === 'routine' && JSON.stringify(change.subject.routine) === bound)
+      expect(closeOrder.map((change) => [change.kind, change.severity, change.message])).toEqual([
+        ['routine-changed', 'blocking', expect.stringMatching(/^actions.close_order(.*) is STRICT: PostgreSQL does not call it when an argument is NULL/)],
+      ])
+      expect([report.actions, report.runtime.actions]).toEqual([['broken'], ['broken']])
+    } finally {
+      await owner`alter function actions.close_order(bigint, text, text, numeric, int) called on null input`
     }
   })
 })

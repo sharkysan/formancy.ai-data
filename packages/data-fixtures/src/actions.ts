@@ -11,6 +11,7 @@ import type {
   GenerationRequest,
   MetadataSnapshot,
   PolicyContext,
+  RoutineOnNull,
 } from '@formancy/data-core'
 
 /*
@@ -141,6 +142,31 @@ export function actionExpected(name: ActionCase, engine: DatabaseKind): ActionAn
 /** A run's answer as ACTION_PARITY writes it. */
 export function actionAnswer(outcome: ActionOutcome): ActionAnswer {
   return outcome.ok ? 'done' : outcome.code
+}
+
+/**
+ * Whether the engine calls each routine both editions of the actions schema
+ * create when an argument is NULL, as discovery records it (0167), one
+ * expectation for both engines: weigh_order is PostgreSQL's STRICT function
+ * and SQL Server's scalar function declared RETURNS NULL ON NULL INPUT,
+ * which each engine answers NULL for without running it; every other is
+ * called. `actionOnNull` reads a snapshot the same way.
+ */
+export const ACTION_ON_NULL = {
+  broken_order: 'called',
+  close_order: 'called',
+  reprice: 'called',
+  weigh_order: 'not-called',
+} as const satisfies Readonly<Record<string, RoutineOnNull>>
+
+/** What `snapshot` records of each routine ACTION_ON_NULL names, by name: `null` where it does not say, and `missing` where it records no routine of that name. */
+export function actionOnNull(snapshot: MetadataSnapshot): Record<string, RoutineOnNull | null | 'missing'> {
+  return Object.fromEntries(
+    Object.keys(ACTION_ON_NULL).map((name) => {
+      const found = (snapshot.routines ?? []).find((routine) => routine.ref.schema === 'actions' && routine.ref.name === name)
+      return [name, found === undefined ? 'missing' : (found.onNull ?? null)]
+    }),
+  )
 }
 
 /** What close_order says to the person of an order noted 'refuse', after the prefix both fixture files raise it with (0156). */
