@@ -4,9 +4,10 @@
 // Include routines, its ship_order offered on the order -- the box ticked
 // by keyboard, each parameter given a source, the tenant asked in its
 // dialog -- then granted after the notice of what it does that nothing
-// binds, and worded. Each state is measured on the way by the gate, the
-// notice's warm colour and the routine's long name at 320 pixels among
-// them.
+// binds, and worded; before it, the same routine made STRICT, refused
+// under its box in the generator's words (0167). Each state is measured
+// on the way by the gate, the notice's warm colour and the routine's long
+// name at 320 pixels among them.
 
 import { describeFocus } from './measure.mjs'
 import { chooseOrder, fillThePolicy, nav, step } from './journey.mjs'
@@ -23,6 +24,30 @@ async function focusedOn(page, target) {
 /** The states, in order, as `[name, act]`. */
 export function actions(plane, check) {
   return [
+    // A routine PostgreSQL does not call given a NULL is listed with its
+    // box disabled and the generator's refusal under it (0167), a note that
+    // quotes the routine's name and signature, one run with no space to
+    // break at: measured at 320 pixels as every state is, broken anywhere
+    // (steps.css) rather than cut off past the fieldset.
+    [
+      'Choose, a STRICT routine refused in the generator’s words',
+      async (page) => {
+        plane.databases.set(
+          'fixture',
+          withRoutines('postgres-owner.json', (routine) => (routine.ref.name === 'ship_order' ? { ...routine, onNull: 'not-called' } : routine)),
+        )
+        await nav(page, 'Connect').click()
+        await page.getByRole('checkbox', { name: 'Include routines', exact: true }).check()
+        await page.getByRole('button', { name: 'Discover fixture', exact: true }).click()
+        await page.getByRole('region', { name: 'What fixture can see', exact: true }).getByRole('list', { name: 'Routines', exact: true }).waitFor()
+        await chooseOrder(page)
+        const choose = step(page, 'Choose')
+        const box = choose.getByRole('checkbox', { name: `Offer ${SHIP_ORDER} as an action`, exact: true })
+        check('a STRICT routine’s box cannot be ticked', (await box.isDisabled()) ? null : 'it can be ticked')
+        const said = await choose.getByText(`The generator refuses it: ${SHIP_ORDER} is STRICT:`).count()
+        check('and the note under it says why, in the generator’s words', said === 1 ? null : `the refusal is said ${String(said)} times`)
+      },
+    ],
     // Space ticks the box and leaves the keyboard on it, the mapping drawn
     // after it, so the next Tab reaches the action's name: a box drawn
     // again as it was ticked would drop the keyboard, which only a browser
