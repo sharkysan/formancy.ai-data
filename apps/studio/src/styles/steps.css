@@ -100,9 +100,15 @@
   border-top: 1px solid var(--edge);
 }
 
+/* A note here quotes a routine by its name and signature, one run with no
+   space to break at -- "sales.ship_order(pg_catalog.int8," -- which at 320
+   pixels in a wide fallback font is wider than its fieldset: broken
+   anywhere, as `code` and a step's list items break it, or the run is cut
+   off and axe cannot decide its contrast (CI's first run of 0166). */
 .choice .hint,
 .choice .cannot-tell {
   margin-inline-start: 2rem;
+  overflow-wrap: anywhere;
 }
 
 .pin .field {
