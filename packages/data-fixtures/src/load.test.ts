@@ -1,8 +1,9 @@
+import { readdirSync } from 'node:fs'
 import { DATABASE_KINDS } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
 import { ACTION_ON_NULL } from './actions.js'
 import { READER, WRITER } from './containers.js'
-import { readFixture, splitBatches } from './load.js'
+import { type FixtureFile, readFixture, splitBatches } from './load.js'
 import { FIXTURE_ROUTINES } from './model.js'
 
 describe('splitBatches', () => {
@@ -44,6 +45,28 @@ describe('the fixture files', () => {
         contains ? opensWith : true,
         `a batch contains CREATE SCHEMA, VIEW, FUNCTION, PROCEDURE or TRIGGER after its first statement:\n${batch.slice(0, 120)}`,
       ).toBe(true)
+    }
+  })
+
+  // A PostgreSQL routine's body is a dollar-quoted string, `$$` or `$tag$`,
+  // closed by the same quote. One `$` lost in an edit leaves a dollar sign
+  // PostgreSQL's lexer reads as a stray character, and the file, sent as
+  // one simple query, is a syntax error before any of it runs: every start
+  // of the PostgreSQL fixture fails, every suite over it with it, and only
+  // where Docker runs. Comments stripped first, since a positional `$1` in
+  // one is prose; each quoted body taken out by its own tag; no dollar
+  // sign may be left. The files are listed from the directory, so one
+  // added is held too. Watched failing on 2026-11-19 with weigh_order's
+  // body quoted by a single `$`: "expected [ …(2) ] to deeply equal []",
+  // naming its opening and closing lines.
+  test('each PostgreSQL file closes every dollar quote it opens, and has no dollar sign outside one', () => {
+    const files = readdirSync(new URL('../fixtures/', import.meta.url)).filter((name) => /^postgres\b.*\.sql$/.test(name)) as FixtureFile[]
+    expect(files).toContain('postgres.actions.sql')
+    for (const file of files) {
+      const unquoted = readFixture(file)
+        .replaceAll(/--.*$/gm, '')
+        .replaceAll(/\$([A-Za-z_]\w*)?\$[\s\S]*?\$\1\$/g, '')
+      expect(unquoted.match(/^.*\$.*$/gm) ?? [], file).toEqual([])
     }
   })
 

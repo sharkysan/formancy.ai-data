@@ -107,12 +107,12 @@ begin
 end
 $$;
 
-create function actions.weigh_order(p_order bigint) returns void language plpgsql strict as $
+create function actions.weigh_order(p_order bigint) returns void language plpgsql strict as $$
 begin
   perform pg_catalog.nextval('actions.called');
   insert into actions.call (routine, record_id) values ('weigh_order', p_order);
 end
-$;
+$$;
 
 revoke execute on function actions.close_order(bigint, text, text, numeric, int), actions.broken_order(bigint), actions.reprice(bigint), actions.weigh_order(bigint) from public;
 grant usage on schema actions to formancy_writer;

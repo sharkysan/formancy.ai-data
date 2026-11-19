@@ -16,10 +16,11 @@ import { discoverPostgres } from './index.js'
  * Schema `probe` holds what the fixture does not: a routine of each shape
  * no action could bind, one PUBLIC may execute and one it may not, a
  * SECURITY DEFINER pair over a table the reader may not read, an
- * aggregate, and a STRICT pair beside one called given a NULL (0167). Schema `sealed` holds a function the reader is granted EXECUTE
- * on in a schema it has no USAGE on. Schema `ext` holds an extension's
- * functions beside one of its own. None touches `sales`, which stays
- * exactly what the model describes.
+ * aggregate, and a STRICT pair beside one called given a NULL (0167).
+ * Schema `sealed` holds a function the reader is granted EXECUTE on in a
+ * schema it has no USAGE on. Schema `ext` holds an extension's functions
+ * beside one of its own. None touches `sales`, which stays exactly what
+ * the model describes.
  */
 let fixture: PostgresFixture
 let owner: Sql
@@ -65,10 +66,10 @@ beforeAll(async () => {
     create function probe.defaulted(n integer, m integer default 0, out doubled integer) language sql as $$ select n * 2 $$;
     create aggregate probe.total(integer) (sfunc = int4pl, stype = integer);
     create function probe.every_type(a bool, b int8, c int2, d int4, e text, f float4, g float8, h varchar, i date, j time, k timestamp,
-      l timestamptz, m numeric, n uuid) returns void language sql as $ select $;
-    create function probe.strict_seven(n integer) returns integer language sql strict as $ select 7 $;
-    create function probe.null_on_null_seven(n integer) returns integer language sql returns null on null input as $ select 7 $;
-    create function probe.called_seven(n integer) returns integer language sql called on null input as $ select 7 $;
+      l timestamptz, m numeric, n uuid) returns void language sql as $$ select $$;
+    create function probe.strict_seven(n integer) returns integer language sql strict as $$ select 7 $$;
+    create function probe.null_on_null_seven(n integer) returns integer language sql returns null on null input as $$ select 7 $$;
+    create function probe.called_seven(n integer) returns integer language sql called on null input as $$ select 7 $$;
 
     create table probe.secret (v integer);
     insert into probe.secret values (42);
