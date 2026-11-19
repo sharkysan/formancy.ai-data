@@ -91,6 +91,39 @@ describe('a routine an action binds', () => {
     expect(report.runtime.actions).toEqual(['ship', 'close'])
   })
 
+  // Made STRICT since publication (0167): PostgreSQL no longer calls it
+  // given a NULL, and the run's description refuses it (0160). It stops
+  // its actions alone, at review and at the runtime, in the generator's
+  // words. Watched failing on 2026-11-19 with `madeStrict` answering null:
+  // a `routine-changed` for review, which stops nothing; and with it left
+  // out of `runtimeRoutineStops` alone: "expected [ 'ship', 'close' ] to
+  // deeply equal [ 'close' ]".
+  test('made STRICT blocks its actions, at review and at the runtime', () => {
+    const base = routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull: 'called' }, CLOSE_ORDER])
+    const report = review(routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull: 'not-called' }, CLOSE_ORDER]), base)
+    expect(rows(report)).toEqual([['routine-changed', 'blocking', 'ship_order']])
+    expect(report.changes[0]?.message).toBe(
+      'sales.ship_order(pg_catalog.int8, pg_catalog.int4) is STRICT: PostgreSQL does not call it when an argument is NULL, so a run would answer done for a call that never ran; it was not when the form was published. ship is blocked until the form is reviewed.',
+    )
+    expect(report.actions).toEqual(['close'])
+    expect(report.runtime.actions).toEqual(['close'])
+  })
+
+  // A snapshot taken before 0167 did not read whether PostgreSQL calls a
+  // routine given a NULL: read for the first time, the fact is no change of
+  // the routine, either way, and stops nothing -- the run's description
+  // still refuses a STRICT one (0160). Watched failing on 2026-11-19 with
+  // the routine compared whole: "called: expected [ [ 'routine-changed',
+  // …(2) ] ] to deeply equal []".
+  test('whether it is called given a NULL, read for the first time, is no change', () => {
+    for (const onNull of ['called', 'not-called'] as const) {
+      const report = review(routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull }, CLOSE_ORDER]))
+      expect(rows(report), onNull).toEqual([])
+      expect(report.actions, onNull).toEqual(['ship', 'close'])
+      expect(report.runtime.actions, onNull).toEqual(['ship', 'close'])
+    }
+  })
+
   // What a call does not rest on -- what it may change -- is said for
   // review and stops nothing. Watched failing with every change of a bound
   // routine read as a call's.
@@ -185,6 +218,19 @@ describe('a routine no action binds', () => {
       ['routine-added', 'info', 'reopen_order'],
     ])
     expect(rows(review(shipped(SHIP_ORDER, { ...other, executable: false }), base))).toEqual([['routine-changed', 'info', 'archive_order']])
+  })
+
+  // Read for the first time, whether the engine calls a routine given a
+  // NULL is no change of one nothing binds either; between two snapshots
+  // that both say, a change of it is a note like any other (0167). Watched
+  // failing on 2026-11-19 with routines compared whole: "expected [ [
+  // 'routine-changed', 'info', …(1) ] ] to deeply equal []".
+  test('whether it is called given a NULL is a note only where both snapshots say', () => {
+    const other = pgRoutine('archive_order', [pgParameter('order_id', 'int8')])
+    const unknown = routineSnapshot('postgres', [SHIP_ORDER, CLOSE_ORDER, other])
+    expect(rows(review(shipped(SHIP_ORDER, { ...other, onNull: 'not-called' }), unknown))).toEqual([])
+    const known = routineSnapshot('postgres', [SHIP_ORDER, CLOSE_ORDER, { ...other, onNull: 'called' }])
+    expect(rows(review(shipped(SHIP_ORDER, { ...other, onNull: 'not-called' }), known))).toEqual([['routine-changed', 'info', 'archive_order']])
   })
 })
 

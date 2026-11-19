@@ -1,6 +1,6 @@
 import { canonicalize } from '@formancy/spec'
 import type { ActionBinding } from '../actions/types.js'
-import { ambiguousBeside, fitProblem } from '../generate/actions.js'
+import { ambiguousBeside, fitProblem, nullInputProblem } from '../generate/actions.js'
 import { touchColumnProblem } from '../generate/together.js'
 import type { FormBindings } from '../generate/types.js'
 import type { CoverageGap, MetadataSnapshot, ObjectMeta } from '../metadata.js'
@@ -24,6 +24,14 @@ import type { DriftKind } from './types.js'
  * changes as their system does, and on SQL Server reading it needs VIEW
  * DEFINITION, which an account that may execute need not hold. A changed
  * body is not drift.
+ *
+ * Whether the engine calls a routine when an argument is NULL is compared
+ * only where both snapshots say (0167): one taken before 0167 did not read
+ * it, and a fact read for the first time is not a change of the routine.
+ * A bound routine PostgreSQL called given a NULL and now does not -- made
+ * STRICT -- stops the actions over it by the generator's own rule
+ * (`nullInputProblem`), at review and at the runtime, whose description of
+ * the routine refuses it (0160).
  */
 
 /** A routine's identity, as one string. */
@@ -33,6 +41,23 @@ function routineKey(ref: RoutineRef): string {
 
 function findRoutine(snapshot: MetadataSnapshot, ref: RoutineRef): RoutineMeta | undefined {
   return snapshot.routines?.find((routine) => routineKey(routine.ref) === routineKey(ref))
+}
+
+/** Whether two snapshots record a routine alike, `onNull` compared only where both record it (0167). */
+function recordedAlike(was: RoutineMeta, is: RoutineMeta): boolean {
+  if (was.onNull !== undefined && is.onNull !== undefined) return canonicalize(was) === canonicalize(is)
+  const { onNull: _was, ...before } = was
+  const { onNull: _is, ...after } = is
+  return canonicalize(before) === canonicalize(after)
+}
+
+/**
+ * Why a bound routine no longer runs since PostgreSQL stopped calling it
+ * given a NULL (0167) -- called in `was` and refused by the generator's own
+ * rule in `is` -- or `null`. Unknown in either is no change.
+ */
+function madeStrict(was: RoutineMeta, is: RoutineMeta): string | null {
+  return was.onNull === 'called' ? nullInputProblem(is) : null
 }
 
 /**
@@ -125,6 +150,8 @@ function boundChanges(comparison: Comparison, was: RoutineMeta, is: RoutineMeta,
       ),
     )
   }
+  const strict = madeStrict(was, is)
+  if (strict !== null) drafts.push(draft('routine-changed', is.ref, actions, `${strict}; it was not when the form was published. ${STOPPED(actions)}`))
   if (was.executable && !is.executable) {
     drafts.push(
       draft(
@@ -148,13 +175,13 @@ function boundChanges(comparison: Comparison, was: RoutineMeta, is: RoutineMeta,
       ),
     )
   }
-  if (drafts.length === 0 && canonicalize(was) !== canonicalize(is)) {
+  if (drafts.length === 0 && !recordedAlike(was, is)) {
     drafts.push(
       draft(
         'routine-changed',
         is.ref,
         [],
-        `${named} changed in what a call of it does not rest on: what it may change, or a parameter's default. Nothing is stopped.`,
+        `${named} changed in what a call of it does not rest on: what it may change, a parameter's default, or whether it is called given a NULL. Nothing is stopped.`,
         'review',
       ),
     )
@@ -172,7 +199,7 @@ function unboundChanges(comparison: Comparison, bound: ReadonlySet<string>, said
     if (bound.has(key) || said.has(key)) continue
     const before = was.get(key)
     if (before === undefined) drafts.push(draft('routine-added', routine.ref, [], `${describeRoutine(routine.ref)} is new. No action binds it.`))
-    else if (canonicalize(before) !== canonicalize(routine))
+    else if (!recordedAlike(before, routine))
       drafts.push(draft('routine-changed', routine.ref, [], `${describeRoutine(routine.ref)} changed. No action binds it.`))
   }
   for (const [key, routine] of was) {
@@ -221,9 +248,11 @@ export function routineChanges(comparison: Comparison): Draft[] {
 /**
  * The actions a request may still run against the routines as `current`
  * records them (0159): those whose routine is there with the call shape it
- * was bound with. What a request compares of a routine, beside the root;
- * where `current` does not record routines, each request describes its
- * routine itself, and nothing is taken away here.
+ * was bound with, and that PostgreSQL has not stopped calling given a NULL
+ * since (0167), which the run's description refuses. What a request
+ * compares of a routine, beside the root; where `current` does not record
+ * routines, each request describes its routine itself, and nothing is
+ * taken away here.
  */
 export function runtimeRoutineStops(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings): Set<string> {
   const stopped = new Set<string>()
@@ -231,7 +260,7 @@ export function runtimeRoutineStops(base: MetadataSnapshot, current: MetadataSna
   for (const action of bindings.actions ?? []) {
     const was = findRoutine(base, action.routine)
     const is = findRoutine(current, action.routine)
-    if (was === undefined || is === undefined || callShape(was) !== callShape(is)) stopped.add(action.name)
+    if (was === undefined || is === undefined || callShape(was) !== callShape(is) || madeStrict(was, is) !== null) stopped.add(action.name)
   }
   return stopped
 }

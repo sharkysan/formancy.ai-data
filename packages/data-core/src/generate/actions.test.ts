@@ -298,6 +298,62 @@ describe('what the generator refuses, each with the rule', () => {
     )
   })
 
+  // PostgreSQL does not call a STRICT function given a NULL argument, and a
+  // run over a record whose field is NULL would answer done for a call that
+  // never ran (0160): refused before publication, in that run's words
+  // (0167), however every other rule finds it. Watched failing on
+  // 2026-11-19 with `nullInputProblem` unasked in `routineProblem`: "a
+  // refused action was bound: expected true to be false".
+  test('a PostgreSQL routine the engine does not call given a NULL', () => {
+    const strict = { ...SHIP_ORDER, onNull: 'not-called' as const }
+    expect(refusal(routineSnapshot('postgres', [strict, CLOSE_ORDER]), [SHIP])).toBe(
+      'Action ship is not offered: sales.ship_order(pg_catalog.int8, pg_catalog.int4) is STRICT: PostgreSQL does not call it when an argument is NULL, so a run would answer done for a call that never ran.',
+    )
+    expect(routineProblem('postgres', [strict], { ...strict, onNull: 'called' })).toBeNull()
+  })
+
+  // A snapshot taken before 0167 does not say whether the engine calls a
+  // routine given a NULL, and a bundle published from one is checked at
+  // every write against what the generator binds from it (0030): unknown
+  // binds exactly what a routine known to be called binds, and what it
+  // bound before 0167, and the run's description still refuses a STRICT
+  // one at run time (0160). Watched failing on 2026-11-19 with an unknown
+  // routine read as one not called: "expected undefined to deeply equal
+  // [ { name: 'ship', …(6) }, …(1) ]".
+  test('a routine whose snapshot does not say binds as one the engine calls', () => {
+    const unknown = actionForm(routineSnapshot('postgres', [SHIP_ORDER, CLOSE_ORDER]))
+    const called = actionForm(
+      routineSnapshot('postgres', [
+        { ...SHIP_ORDER, onNull: 'called' },
+        { ...CLOSE_ORDER, onNull: 'called' },
+      ]),
+    )
+    expect(SHIP_ORDER).not.toHaveProperty('onNull')
+    expect(unknown.bindings.actions).toEqual(called.bindings.actions)
+    expect(unknown.bindings.actions?.map((action) => action.name)).toEqual(['ship', 'close'])
+    expect(unknown.notes).toEqual(called.notes)
+  })
+
+  // SQL Server binds a procedure, which it calls whatever its arguments; a
+  // function declared RETURNS NULL ON NULL INPUT is refused as the
+  // function it is, the rule a run on SQL Server rests on. Watched failing
+  // on 2026-11-19 with `nullInputProblem` asked before the engine's kind:
+  // "expected 'sales.weigh_order() is STRICT: Postgr…' to be
+  // 'sales.weigh_order() is a function, wh…'".
+  test('a SQL Server function the engine does not call given a NULL is refused as a function', () => {
+    const bigint = { kind: 'integer', min: '-9223372036854775808', max: '9223372036854775807' } as const
+    const skipped = msRoutine('weigh_order', [msParameter('@order_id', '127:8:19:0', bigint, 'bigint')], {
+      kind: 'function',
+      returns: 'scalar',
+      result: { databaseType: 'int', typeId: '56:4:10:0', type: INT32 },
+      effects: 'reads',
+      onNull: 'not-called',
+    })
+    expect(routineProblem('sqlserver', [skipped], skipped)).toBe(
+      'sales.weigh_order() is a function, which SQL Server forbids to write; a run calls a procedure',
+    )
+  })
+
   // A domain, an enum or a type outside the adapter's table is recorded
   // unsupported (0158): no cast could be spelled for it. A binary or a
   // rowversion, which no adapter's table holds, is refused as a routine

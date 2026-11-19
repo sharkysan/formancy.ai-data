@@ -148,6 +148,41 @@ describe('routines in a snapshot (0158)', () => {
     expect(snapshot([routine()], { gaps: [gap] }).fingerprint).not.toBe(before.fingerprint)
   })
 
+  // Whether the engine calls a routine given a NULL (0167) is recorded
+  // where discovery read it, and a snapshot that does not say -- every one
+  // taken before 0167, which every published bundle's is -- hashes to the
+  // fingerprint it was published with: the literal is what data-core at
+  // 7343512, the release before 0167, gave this snapshot. Read, the fact is
+  // in the fingerprint, so drift's fast path looks when it changes.
+  // Watched failing on 2026-11-19 with an absent fact recorded as
+  // `called`: the literal moved, and the routine carried a fact nobody
+  // read.
+  test('whether a routine is called given a NULL is recorded where read, and a snapshot that does not say hashes as before 0167', () => {
+    const before = snapshot([routine()])
+    expect(before.fingerprint).toBe('d5fc427702a3363c1e94eae696a1b3ac3d4b675801428c34852dd27058c859e0')
+    expect(before.routines?.[0]).not.toHaveProperty('onNull')
+    const called = snapshot([routine('ship_order', { onNull: 'called' })])
+    expect(called.routines?.[0]?.onNull).toBe('called')
+    expect(called.fingerprint).not.toBe(before.fingerprint)
+    expect(snapshot([routine('ship_order', { onNull: 'not-called' })]).fingerprint).not.toBe(called.fingerprint)
+  })
+
+  // Absent is "not read"; present, the fact is one of two. A null or a key
+  // set to undefined is a third spelling no adapter writes, and would hash
+  // otherwise than absence. Neither engine lets a procedure be declared
+  // anything but called. Watched failing on 2026-11-19 with the ON_NULL
+  // check taken out: each value was accepted; and with the procedure check
+  // taken out.
+  test('refuses whether a routine is called given a NULL as anything but the two, and a procedure not called', () => {
+    const refused = (extra: Record<string, unknown>) => () => snapshot([{ ...routine(), ...extra }])
+    expect(refused({ onNull: 'sometimes' })).toThrow(/sales\.ship_order\(.*\): onNull "sometimes" is not one the contract names/)
+    expect(refused({ onNull: null })).toThrow(/onNull null is not one the contract names/)
+    expect(refused({ onNull: undefined })).toThrow(/onNull undefined is not one the contract names/)
+    expect(refused({ onNull: true })).toThrow(/onNull true is not one the contract names/)
+    expect(refused({ kind: 'procedure', onNull: 'not-called' })).toThrow(/sales\.ship_order\(.*\): a procedure is called whatever its arguments/)
+    expect(snapshot([routine('ship_order', { kind: 'procedure', onNull: 'called' })]).routines?.[0]?.onNull).toBe('called')
+  })
+
   // What no catalog could have produced, refused naming the routine, as an
   // object's own shape is. A value outside a closed list, a scalar that
   // names no result or a void that names one, a parameter with no type

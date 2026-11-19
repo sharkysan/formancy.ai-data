@@ -1,0 +1,532 @@
+{
+  "format": 2,
+  "connection": "erp",
+  "generation": {
+    "connection": "erp",
+    "root": {
+      "schema": "sales",
+      "name": "order"
+    },
+    "formId": "order",
+    "title": "Order",
+    "lookups": [],
+    "pinned": [],
+    "versionColumn": "version",
+    "actions": [
+      {
+        "name": "note",
+        "routine": {
+          "schema": "sales",
+          "name": "note_order",
+          "signature": "pg_catalog.int8, pg_catalog.text"
+        },
+        "scope": "record",
+        "parameters": [
+          {
+            "parameter": "p_order",
+            "from": {
+              "key": "id"
+            }
+          },
+          {
+            "parameter": "p_note",
+            "from": {
+              "field": "note"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "base": {
+    "specVersion": "5",
+    "id": "order",
+    "title": "Order",
+    "model": {
+      "fields": [
+        {
+          "key": "id",
+          "label": "Id",
+          "type": "text",
+          "pattern": "^-?[0-9]{1,19}$"
+        },
+        {
+          "key": "tenant_id",
+          "label": "Tenant id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "note",
+          "label": "Note",
+          "type": "textarea"
+        }
+      ]
+    },
+    "logic": {
+      "rules": [
+        {
+          "target": "id",
+          "kind": "disabled",
+          "cel": "true"
+        }
+      ]
+    },
+    "layouts": [
+      {
+        "name": "default",
+        "nodes": [
+          {
+            "kind": "section",
+            "label": "Order",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "tenant_id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "note",
+                    "span": "all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "section",
+            "label": "Record",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "id"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "presentation": {
+    "version": 1,
+    "fields": [],
+    "sections": []
+  },
+  "form": {
+    "specVersion": "5",
+    "id": "order",
+    "title": "Order",
+    "model": {
+      "fields": [
+        {
+          "key": "id",
+          "label": "Id",
+          "type": "text",
+          "pattern": "^-?[0-9]{1,19}$"
+        },
+        {
+          "key": "tenant_id",
+          "label": "Tenant id",
+          "type": "number",
+          "min": -2147483648,
+          "max": 2147483647,
+          "step": 1,
+          "required": true
+        },
+        {
+          "key": "note",
+          "label": "Note",
+          "type": "textarea"
+        }
+      ]
+    },
+    "logic": {
+      "rules": [
+        {
+          "target": "id",
+          "kind": "disabled",
+          "cel": "true"
+        }
+      ]
+    },
+    "layouts": [
+      {
+        "name": "default",
+        "nodes": [
+          {
+            "kind": "section",
+            "label": "Order",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "tenant_id"
+                  },
+                  {
+                    "kind": "field",
+                    "path": "note",
+                    "span": "all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "section",
+            "label": "Record",
+            "children": [
+              {
+                "kind": "table",
+                "columns": 2,
+                "children": [
+                  {
+                    "kind": "field",
+                    "path": "id"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "bindings": {
+    "version": 2,
+    "root": {
+      "schema": "sales",
+      "name": "order"
+    },
+    "rootKind": "table",
+    "identity": [
+      "id"
+    ],
+    "concurrency": {
+      "kind": "version-column",
+      "column": "version",
+      "confirmed": true
+    },
+    "operations": {
+      "create": true,
+      "update": true,
+      "delete": true
+    },
+    "fields": [
+      {
+        "kind": "column",
+        "field": "id",
+        "column": "id",
+        "type": {
+          "kind": "integer",
+          "min": "-9223372036854775808",
+          "max": "9223372036854775807"
+        },
+        "nullable": false,
+        "writes": {
+          "create": false,
+          "update": false
+        }
+      },
+      {
+        "kind": "column",
+        "field": "tenant_id",
+        "column": "tenant_id",
+        "type": {
+          "kind": "integer",
+          "min": "-2147483648",
+          "max": "2147483647"
+        },
+        "nullable": false,
+        "writes": {
+          "create": true,
+          "update": true
+        }
+      },
+      {
+        "kind": "column",
+        "field": "note",
+        "column": "note",
+        "type": {
+          "kind": "text",
+          "maxLength": null,
+          "lengthUnit": "code-points",
+          "fixedLength": false
+        },
+        "nullable": true,
+        "writes": {
+          "create": true,
+          "update": true
+        }
+      }
+    ],
+    "snapshotFingerprint": "470a16632ca9ff382cf791beddfeb534412e5a138a89e8ca4e0c8dc4af77b493",
+    "actions": [
+      {
+        "name": "note",
+        "routine": {
+          "schema": "sales",
+          "name": "note_order",
+          "signature": "pg_catalog.int8, pg_catalog.text"
+        },
+        "kind": "function",
+        "scope": "record",
+        "parameters": [
+          {
+            "parameter": "p_order",
+            "typeId": "20",
+            "databaseType": "bigint",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "from": {
+              "kind": "key",
+              "column": "id"
+            }
+          },
+          {
+            "parameter": "p_note",
+            "typeId": "25",
+            "databaseType": "text",
+            "type": {
+              "kind": "text",
+              "maxLength": null,
+              "lengthUnit": "code-points",
+              "fixedLength": false
+            },
+            "from": {
+              "kind": "field",
+              "field": "note",
+              "column": "note"
+            }
+          }
+        ],
+        "move": {
+          "kind": "increment",
+          "column": "version"
+        },
+        "dialog": null
+      }
+    ]
+  },
+  "policy": {
+    "version": 1,
+    "operations": {
+      "read": [
+        "clerk"
+      ],
+      "create": [],
+      "update": []
+    },
+    "fields": {
+      "id": {
+        "read": [
+          "clerk"
+        ],
+        "write": []
+      },
+      "note": {
+        "read": [
+          "clerk"
+        ],
+        "write": []
+      }
+    },
+    "rowFilters": [
+      {
+        "column": "tenant_id",
+        "attribute": "tenant"
+      }
+    ],
+    "lookups": {},
+    "actions": {
+      "note": {
+        "roles": [
+          "clerk"
+        ]
+      }
+    }
+  },
+  "snapshot": {
+    "kind": "postgres",
+    "serverVersion": "17.6",
+    "account": {
+      "user": "writer",
+      "login": "writer"
+    },
+    "scope": {
+      "schemas": [
+        "sales"
+      ],
+      "routines": true
+    },
+    "objects": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "order"
+        },
+        "kind": "table",
+        "comment": null,
+        "columns": [
+          {
+            "name": "id",
+            "ordinal": 1,
+            "databaseType": "integer",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "identity-always",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "tenant_id",
+            "ordinal": 2,
+            "databaseType": "integer",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "nullable": false,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "note",
+            "ordinal": 3,
+            "databaseType": "text",
+            "type": {
+              "kind": "text",
+              "maxLength": null,
+              "lengthUnit": "code-points",
+              "fixedLength": false
+            },
+            "nullable": true,
+            "hasDefault": false,
+            "defaultExpression": null,
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          },
+          {
+            "name": "version",
+            "ordinal": 4,
+            "databaseType": "integer",
+            "type": {
+              "kind": "integer",
+              "min": "-2147483648",
+              "max": "2147483647"
+            },
+            "nullable": false,
+            "hasDefault": true,
+            "defaultExpression": "1",
+            "generated": "none",
+            "comment": null,
+            "access": {
+              "select": true,
+              "insert": true,
+              "update": true
+            }
+          }
+        ],
+        "primaryKey": {
+          "name": "pk_order",
+          "columns": [
+            "id"
+          ]
+        },
+        "uniqueKeys": [],
+        "foreignKeys": [],
+        "checks": [],
+        "rowSecurity": "none",
+        "access": {
+          "delete": true
+        },
+        "referencedBy": []
+      }
+    ],
+    "gaps": [],
+    "routines": [
+      {
+        "ref": {
+          "schema": "sales",
+          "name": "note_order",
+          "signature": "pg_catalog.int8, pg_catalog.text"
+        },
+        "kind": "function",
+        "parameters": [
+          {
+            "name": "p_order",
+            "mode": "in",
+            "typeId": "20",
+            "databaseType": "bigint",
+            "type": {
+              "kind": "integer",
+              "min": "-9223372036854775808",
+              "max": "9223372036854775807"
+            },
+            "hasDefault": false
+          },
+          {
+            "name": "p_note",
+            "mode": "in",
+            "typeId": "25",
+            "databaseType": "text",
+            "type": {
+              "kind": "text",
+              "maxLength": null,
+              "lengthUnit": "code-points",
+              "fixedLength": false
+            },
+            "hasDefault": false
+          }
+        ],
+        "effects": "writes",
+        "returns": "void",
+        "result": null,
+        "reach": "account",
+        "executable": true
+      }
+    ],
+    "fingerprint": "470a16632ca9ff382cf791beddfeb534412e5a138a89e8ca4e0c8dc4af77b493"
+  }
+}

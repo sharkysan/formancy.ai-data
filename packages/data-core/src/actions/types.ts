@@ -115,8 +115,13 @@ export interface ActionBinding {
   dialog: FormSchema | null
 }
 
-/** A routine as a request's description reads it, with the adapter's own token for the catalog facts it read (0041): what a run is decided over. */
-export type DescribedRoutine = Pick<RoutineMeta, 'ref' | 'kind' | 'parameters' | 'effects' | 'returns' | 'result' | 'reach'> & {
+/**
+ * A routine as a request's description reads it, with the adapter's own
+ * token for the catalog facts it read (0041): what a run is decided over.
+ * Whether the engine calls it given a NULL (0167) is read as discovery reads
+ * it; PostgreSQL's description refuses a routine it would not call (0160).
+ */
+export type DescribedRoutine = Pick<RoutineMeta, 'ref' | 'kind' | 'parameters' | 'effects' | 'returns' | 'result' | 'reach' | 'onNull'> & {
   definition: string
 }
 
