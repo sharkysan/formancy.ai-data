@@ -317,15 +317,16 @@ get*](../../README.md#what-you-get) is the short version, and
   same run sent again is refused as changed if it ran. What the routine
   does is the deployment's: field grants, state moves and the policy's
   cascades do not bind it. A STRICT PostgreSQL function, which PostgreSQL
-  does not call when an argument is NULL, is never bound: discovery reads
-  it, the generator refuses it before publication, and drift review stops
-  an action whose routine became STRICT since. A form published from a
-  snapshot taken before that keeps offering one, every run refused, until
-  it is generated again. The studio binds one: its routines discovered
-  with Include routines, each parameter offered only the sources the
-  generator binds for it, the grant made on the Policy step after a note
-  of what the routine does that nothing here binds, its words on the
-  Presentation step, and what drift leaves of it on the Drift step.
+  does not call when an argument is NULL, is not bound from a snapshot
+  that records it so: discovery reads it, the generator refuses it before
+  publication, and drift review stops an action whose routine became
+  STRICT since. A form published from a snapshot taken before that keeps
+  offering one, every run refused, until it is generated again. The
+  studio binds one: its routines discovered with Include routines, each
+  parameter offered only the sources the generator binds for it, the
+  grant made on the Policy step after a note of what the routine does
+  that nothing here binds, its words on the Presentation step, and what
+  drift leaves of it on the Drift step.
   The host page offers each action in the open record's header, asks its
   dialog and then a confirmation in place, waits for a save of the record
   out, reads the record again once it ran, and checks a run whose answer

@@ -1259,7 +1259,9 @@ the same day (formancy.ai 0232).
   refusal, and drift review stops an action whose routine became STRICT.
   A snapshot taken before says nothing and binds as it did, so a published
   form keeps its fingerprint and bindings, and one bound to a STRICT
-  routine keeps offering it, every run refused, until generated again.
+  routine keeps offering it, every run refused, until generated again;
+  every drift review of a form published before compares in full, since a
+  discovery that reads the fact hashes otherwise, and finds no change.
 - **The host page's suite runs in two CI jobs, each a shard of its files
   that vitest's `--shard` chooses** (0164). Why: it alone set every run's
   wall time. On main's run 44027383496 (2026-11-17) its job took 39 of the

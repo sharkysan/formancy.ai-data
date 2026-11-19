@@ -39,7 +39,18 @@
   [ 'close' ]"); the fact read for the first time is no change, bound or
   not, and a change between two snapshots that both say is a note
   (watched failing with routines compared whole: "called: expected [ [
-  'routine-changed', …(2) ] ] to deeply equal []").
+  'routine-changed', …(2) ] ] to deeply equal []"), and its fingerprint is
+  not the base's, so that review compares in full (watched failing with
+  the fact left out of the fingerprint); a SQL Server procedure become a
+  function declared RETURNS NULL ON NULL INPUT is one change of its call
+  shape (watched failing with STRICT's rule asked whatever the engine:
+  "expected [ [ 'routine-changed', …(2) ], …(1) ] to deeply equal [ [
+  'routine-changed', …(2) ] ]"). `packages/data-core/src/drift/fixture.ts`
+  holds every report the drift suites build, against a base none of whose
+  routines says, to the one against the same snapshot without the fact
+  (watched failing with routines compared whole: "whether a routine is
+  called given a NULL, read since 0167, changed a report against a base
+  that never read it").
   `packages/data-server/src/bundle.test.ts` --
   `fixtures/bundle-before-0167.json`, a bundle data-core and data-server
   at 7343512 published, its action bound over a routine whose snapshot
@@ -61,7 +72,11 @@
   each routine both actions editions create, and those it says are not
   called are the ones each file declares so (watched failing with
   weigh_order left out of it, and with STRICT taken out of the PostgreSQL
-  file). `cases.test.ts` -- `ACTION_ON_NULL` is a family of shared cases
+  file); and every PostgreSQL fixture file closes each dollar quote it
+  opens, since PostgreSQL parses a file sent as one query before it runs
+  any of it (watched failing with weigh_order's body quoted by a single
+  `$`: "expected [ …(2) ] to deeply equal []").
+  `cases.test.ts` -- `ACTION_ON_NULL` is a family of shared cases
   (watched failing without it: "expected [ 'ACTION_ON_NULL' ] to deeply
   equal []").
   `apps/studio/src/choose-actions.test.tsx`, against the real server
@@ -123,7 +138,7 @@ What the engines and their documentation say, 2026-11-19:
 |---|---|
 | R1, PostgreSQL | `pg_proc.proisstrict` is STRICT, which RETURNS NULL ON NULL INPUT spells too: the function is not called and its answer is NULL when an argument is NULL. CREATE PROCEDURE takes neither. pg_proc shows every role every routine (0158, R1). Held by the discovery suite beside the server's own answer, first run in CI. |
 | R2, SQL Server | CREATE FUNCTION's RETURNS NULL ON NULL INPUT "specifies the OnNULLCall attribute of a scalar function", CALLED ON NULL INPUT by default; CREATE PROCEDURE has no such option. `sys.sql_modules.null_on_null_input` is "declared to produce a NULL output on any NULL input"; OBJECTPROPERTY and OBJECTPROPERTYEX name no such property. Metadata Visibility Configuration: a catalog view shows a securable's row to a user who owns it or holds any permission on it, and of sys.sql_modules only `definition` is kept from one without VIEW DEFINITION -- so an account that may only EXECUTE a function reads its row. Read from Microsoft Learn; measured first in CI as such an account. |
-| R3 | data-core and data-server at 7343512 read a routine that carries the fact: `assertRoutine` checks only the fields it names, and the fingerprint hashes the routine as stored, so a snapshot taken after this record hashes to its own fingerprint there, and its generator ignores the fact. Read in the code, not run. |
+| R3 | data-core and data-server at 7343512 read a routine that carries the fact: `assertRoutine` checks only the fields it names, and the fingerprint hashes the routine as stored, so a snapshot taken after this record hashes to its own fingerprint there, and its generator ignores the fact. Its drift compares a routine whole (`canonicalize(was) !== canonicalize(is)`, `drift/routines.ts`), against a discovery that does not read the fact. Read in the code, not run. |
 
 ## Decision
 
@@ -165,13 +180,17 @@ What the engines and their documentation say, 2026-11-19:
    in the base and not called now is `routine-changed`, `blocking`, in the
    generator's words, for the actions over that routine alone, at review
    and in the runtime's verdict (`runtimeRoutineStops`), whose request's
-   description refuses it. Not in `callShape`, which a request compares
-   with a described routine: a base that does not say against a
-   description that does would make every request over a bundle published
-   before this record `drift`. The fact read for the first time, either
-   way, is no change of the routine, bound or not; between two snapshots
-   that both say, a change of an unbound routine is a note as any is. The
-   runtime's answer is 0160's, unmoved: the description refuses it.
+   description refuses it. Asked on PostgreSQL alone, as the generator
+   asks it: on SQL Server a bound routine is a procedure, and one dropped
+   and created again as a function declared RETURNS NULL ON NULL INPUT has
+   changed its call shape, which says so once. Not in `callShape`, which a
+   request compares with a described routine: a base that does not say
+   against a description that does would make every request over a bundle
+   published before this record `drift`. The fact read for the first
+   time, either way, is no change of the routine, bound or not; between
+   two snapshots that both say, a change of an unbound routine is a note
+   as any is. The runtime's answer is 0160's, unmoved: the description
+   refuses it.
 5. **One fixture routine written twice, one shared case.** The actions
    schema's `weigh_order`: a STRICT function returning void on PostgreSQL,
    bindable by every other rule, and on SQL Server a scalar function
@@ -202,11 +221,13 @@ published before keeps every binding, fingerprint and answer it had.
   Drift review of it against a new discovery stops nothing: nothing about
   the routine changed, and only the snapshot it was published from could
   not say.
-- **Every snapshot that records routines moves its fingerprint once.**
+- **Every snapshot that records routines moves its fingerprint.**
   Discovered since this record, it hashes otherwise than one of the same
-  catalog discovered before, so drift review of every form whose snapshot
-  records routines leaves its fingerprint shortcut once, and finds no
-  change.
+  catalog discovered before. Drift review compares a form's published
+  snapshot with a fresh discovery, so every review of a form published
+  from a snapshot taken before this record leaves the fingerprint
+  shortcut and compares in full, finding no change, until the form is
+  published again from a discovery since.
 - **A STRICT routine is refused whatever its arguments.** One whose every
   argument could never be NULL -- the key, a required answer, the actor's
   id -- is refused all the same: the generator does not reason about which
@@ -221,7 +242,12 @@ published before keeps every binding, fingerprint and answer it had.
 - **Rolling the server back** to one before this record loses the
   refusal: it reads a snapshot carrying the fact, hashes it to its own
   fingerprint, and binds a STRICT routine its run refuses (R3, read in the
-  code).
+  code). And its drift compares a routine whole while its discovery does
+  not read the fact, so every review of a form published since this
+  record reports each of its routines as changed -- a bound one
+  `routine-changed` for review, "changed in what a call of it does not
+  rest on", any other a note -- though nothing changed, until the form is
+  published again from a discovery of that server.
 - Every fixture container's actions schema holds one more routine,
   weigh_order, which no action binds.
 

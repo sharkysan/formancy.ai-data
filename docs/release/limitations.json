@@ -5106,7 +5106,7 @@
       ]
     },
     "0167": {
-      "reviewed": "sha256:0596372e6b9d68fd5523d97ce1008e756e7912cba517269a77a3d95857645c44",
+      "reviewed": "sha256:947df8f45b6c2cf4c8444d7a8746df8a0344d0cbecc48dab654712c636b70df6",
       "limitations": [
         {
           "area": "forms",
@@ -5120,8 +5120,8 @@
         },
         {
           "area": "operations",
-          "says": "Discovered again since 0167, a snapshot that records routines hashes otherwise than before, so drift review of each form whose snapshot records them compares it in full once, and finds no change.",
-          "heldBy": "packages/data-core/src/routines.test.ts"
+          "says": "Discovered since 0167, a snapshot that records routines hashes otherwise than one taken before, so every drift review of a form published from one taken before compares in full, and finds no change, until the form is published again from a discovery since 0167.",
+          "heldBy": "packages/data-core/src/drift/routines.test.ts"
         },
         {
           "area": "databases",
@@ -5130,7 +5130,7 @@
         },
         {
           "area": "operations",
-          "says": "A server older than 0167 reads a snapshot that records whether a routine is called given a NULL, and its generator binds a STRICT routine whose every run is refused."
+          "says": "A server older than 0167 reads a snapshot that records whether a routine is called given a NULL, and its generator binds a STRICT routine whose every run is refused; its drift review reports every routine of a form published since 0167 as changed, a bound one for review and any other as a note, though nothing changed, until the form is published again from a discovery of that server."
         }
       ]
     }

@@ -111,7 +111,9 @@ routine is refused by the run's description, and since
 publication too, by the same rule -- but a form published from a
 snapshot taken before 0167, which did not read STRICT, keeps offering an
 action over one, every run refused, until it is generated again, and
-review does not stop it, since the routine did not change. That an
+review does not stop it, since the routine did not change; and every
+drift review of a form published from such a snapshot compares in full,
+finding no change, until the form is published again. That an
 account that may only EXECUTE a SQL Server function reads whether it is
 called given a NULL is Microsoft's documentation, measured first in CI.
 And a routine with no

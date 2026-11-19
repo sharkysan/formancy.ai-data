@@ -113,7 +113,9 @@ server answered, which reports the difference and does not prevent it.
   `packages/data-fixtures/fixtures/sqlserver.sql`, with identically named
   constraints, beside a restricted reader and the order form's own account.
   `packages/data-fixtures/src/load.test.ts` holds the two files to the same
-  constraint names, and to the routines the model gives each engine.
+  constraint names, and to the routines the model gives each engine, and
+  every PostgreSQL file to closing each dollar quote it opens, since
+  PostgreSQL parses a file sent as one query before it runs any of it.
 - **The neutral truth and one comparator.** `FIXTURE_MODEL` says what
   discovery must report, per engine where the engines genuinely differ, and
   `packages/data-fixtures/src/conformance.ts` reports every disagreement as a
@@ -235,7 +237,10 @@ database by `packages/data-core/src/routines.test.ts` -- a snapshot that
 does not say hashes to the literal data-core at 7343512 gave it -- the
 generator's refusal of a STRICT routine, and an unknown one bound as
 before, by `generate/actions.test.ts`, drift by `drift/routines.test.ts`,
-and a bundle published before by `packages/data-server/src/bundle.test.ts`
+a SQL Server procedure become a function among it, every report the
+drift suites build against a base that never read the fact by
+`drift/fixture.ts`, held to the one without it, and a bundle published
+before by `packages/data-server/src/bundle.test.ts`
 against `fixtures/bundle-before-0167.json`, each watched failing; and on
 both engines, first in CI, by `ACTION_ON_NULL`, which each adapter's
 `actions.integration.test.ts` asserts through `covers()`, PostgreSQL's
