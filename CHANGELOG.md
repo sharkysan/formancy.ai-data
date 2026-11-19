@@ -18,6 +18,13 @@ the same day (formancy.ai 0232).
 
 ### Added
 
+- **A person chooses records on the host page and runs an action over
+  them; the studio offers that scope** (0166). Why: 0165's selection was
+  reachable only by a client writing its own requests. A form that offers
+  one gets a first column of real checkboxes on the Records grid and a bar
+  above it; a choice is of the page shown, a question over it closes when
+  it changes, and a refusal names its records and offers to read the page
+  again.
 - **An action runs over a selection of up to a page of records, all or
   nothing** (0165). Why: a routine is often meant for several records at
   once, and a page looping one run per record could end half done. An
@@ -147,55 +154,31 @@ the same day (formancy.ai 0232).
 
 - **The host page saves a record with its rows in the record's own Save**
   (0155). Why: the save route arrived with nothing on the page to call it,
-  so an order's lines were still listed and edited one at a time there,
-  and a line could be neither added nor removed, which the server refuses
-  alone. What a person notices: a child whose rows are saved with its
-  record is a tab whose rows are held on the page until the record's own
-  Save, which sends the record and every changed row together, stored all
-  or none. Each row's change is said in a column of its own -- New,
-  Changed, To be deleted, Changed by someone else -- and a line under the
-  heading says how many rows there are, the fewest and the most, why Add
-  or Remove is not there, and what is held, with Go to Save beside it,
-  which shows the record's tab and puts the keyboard on its Save and sends
-  nothing. Add, absent at the most rows, starts a row on a rail below with
-  the keyboard in its first field; a row opens there -- in Drill down too,
-  on the record's own level rather than a level below -- without the field
-  naming the record, which the save fills in, and Done closes it and sends
-  nothing. Remove, absent at the fewest rows, marks a row to be deleted
-  and becomes Undo remove, asking nothing, since nothing is deleted until
-  Save; Undo remove is absent at the most rows. A row whose form refuses
-  its answers is opened with its problems and nothing is sent; a refusal
-  about a row opens that row with the server's words, and one about the
-  count is said on the tab, the keyboard there. While the save is out
-  every row stays editable, the field being typed into keeping the
-  keyboard when the answer lands, but a row in that save has no Remove
-  until it is answered; and the other renderer's Save sends nothing
-  while it is out, nor after a lost save that created the record until it
-  is checked, since a second press would store the same rows under a
-  second record. Every save moves the record's version, so a save of
-  lines of an order someone else saved since is stale even where the two
-  changed different lines: where only lines changed, Keep my line changes
-  reads the order again and keeps each change at the version it was read
-  at, asking first where the order itself was typed into since, which it
-  drops -- and Save stores them, refusing at its line one the other
-  person changed too, until Load this line takes it as stored, or, deleted
-  since, off the page. A lost save is checked by the record, and Load the
-  saved record, there or after a stale save, asks first where the rows
-  hold changes and lists them again; leaving a record whose rows hold
-  changes asks first, naming them -- "Order k1:7 with 2 Order line rows
-  added and 1 to be deleted" -- and opening a record a save just created
-  asks nothing about its own rows. Such a child's own form says its rows
-  are added and removed with their record, and that a change made there is
-  saved by itself.
-  The tab lists the record's rows as the record opens, rather than the
-  first time it is shown, so the Save can show it: one list more for each
-  such record opened. What integrators notice: `GET /v1/forms/:id` now
-  serves a together child's `writable.create` -- what a row's create in a
-  save takes from this person -- where they may make that create, though
+  so an order's lines were still edited one at a time, and a line could
+  be neither added nor removed, which the server refuses alone. What a
+  person notices: a child whose rows are saved with its record is a tab
+  whose rows are held on the page until the record's Save, which sends
+  the record and every changed row together, stored all or none. Each
+  row's change is said in a column of its own -- New, Changed, To be
+  deleted, Changed by someone else -- and a line under the heading says
+  how many rows there are, the fewest and the most, and what is held,
+  with Go to Save beside it. Add starts a row on a rail below; Remove
+  marks one to be deleted and becomes Undo remove, asking nothing, since
+  nothing is deleted until Save. A refusal about a row opens that row
+  with the server's words. While the save is out the other renderer's
+  Save sends nothing, nor after a lost save that created the record
+  until it is checked. Every save moves the record's version, so lines of
+  an order someone else saved since are stale even where the two changed
+  different lines: Keep my line changes reads the order again and keeps
+  each change at the version it was read at. Leaving a record whose rows
+  hold changes asks first, naming them. The tab lists the record's rows
+  as the record opens: one list more for each such record opened. What
+  integrators notice: `GET /v1/forms/:id` now serves a together child's
+  `writable.create` where this person may make that create, though
   `operations` holds no create, which `@formancy/data-client`'s shape
   check accepts there and nowhere else; without it a page could not tell
-  what a new row's create takes, nor start one at its columns' defaults,
-  which the form is served with only where that create takes them (0149).
+  what a new row's create takes (0149). The guide's host page says the
+  rest.
 
 - **The runtime plane runs an action over the open record** (0161). Why:
   both adapters ran an action (0160) and nothing called them, nor could a

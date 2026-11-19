@@ -51,7 +51,7 @@ button:where(:not(.sheet *)):disabled {
   box-shadow: none;
 }
 
-input:not([type='checkbox']):where(:not(.sheet *)),
+input:not([type='checkbox'], [type='radio']):where(:not(.sheet *)),
 select:where(:not(.sheet *)),
 textarea:where(:not(.sheet *)) {
   width: 100%;
@@ -77,7 +77,7 @@ select:where(:not(.sheet *)) {
   contain: paint;
 }
 
-input:not([type='checkbox']):where(:not(.sheet *)):focus-visible,
+input:not([type='checkbox'], [type='radio']):where(:not(.sheet *)):focus-visible,
 select:where(:not(.sheet *)):focus-visible,
 textarea:where(:not(.sheet *)):focus-visible {
   outline: none;
@@ -90,7 +90,8 @@ textarea[aria-invalid='true']:where(:not(.sheet *)) {
   border-color: var(--invalid);
 }
 
-input[type='checkbox']:where(:not(.sheet *)) {
+/* A box and a radio alike: a target of 24 pixels, in the violet a person acts with. */
+input:is([type='checkbox'], [type='radio']):where(:not(.sheet *)) {
   flex: none;
   width: 1.5rem;
   height: 1.5rem;

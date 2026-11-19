@@ -171,14 +171,17 @@ release; your application's own pages draw records their own way:
   place, the record read again once it ran; and through
   `@formancy/data-client`, one call of the runtime plane. An action may
   also run over a selection of up to a page of records, all locked in key
-  order in one transaction and all kept or none, through the runtime
-  plane and `@formancy/data-client` alone so far
+  order in one transaction and all kept or none: offered so in the
+  studio, and on the host page over the records a person chooses by the
+  boxes of the Records grid, from a bar above it, told how many it ran
+  over or which records refused it
   ([0159](./docs/decisions/0159-a-form-binds-a-database-routine-as-an-action-over-the-open-record.md),
   [0160](./docs/decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
   [0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
   [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
   [0163](./docs/decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md),
-  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md),
+  [0166](./docs/decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 - **Deletes, copies and files**: a record deleted one at a time, reaching
   other tables only through the foreign keys its policy names; duplicated
   into a new one; and the records a list shows downloaded as one CSV file
@@ -239,14 +242,15 @@ built from this repository and not published as a package:
   which Keep my line changes and Save then store, line by line, refusing
   a line both changed
   ([0155](./docs/decisions/0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md)).
-- The host page runs an action over the open record alone, from its
-  detail and nowhere below it, and the studio binds that scope alone: an
-  action over a selection of records is published by a client writing
-  its own generation request and run through `@formancy/data-client`,
-  until the host page chooses the rows
-  ([0161](./docs/decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
-  [0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
-  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)).
+- The host page runs an action over the open record from its detail
+  and nowhere below it, and over the records chosen from the Records
+  grid alone: a choice is of the page shown, which another page, a
+  search, a filter, a sort or a view clears, so more than a page is run
+  a page at a time, and a child section or a Drill down level offers no
+  choice
+  ([0162](./docs/decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
+  [0165](./docs/decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md),
+  [0166](./docs/decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 - On a record just created, a field written on create only stays writable
   until the record is opened again, and the server refuses a changed one
   ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).
@@ -311,7 +315,8 @@ starting values, a select of the values a check lists, the server's
 stamps of who wrote a record and when, a record saved with its rows
 in one request of the runtime plane, chosen in the studio and sent from
 the host page's own Save, and an action an administrator binds in the
-studio, run over the open record from the host page's header -- each a
+studio, run over the open record from the host page's header or over
+the records a person chose of its grid's page -- each a
 line of [`CHANGELOG.md`](./CHANGELOG.md)'s
 *Unreleased*, and the examples page and the live demo are deployed from
 `main`. [The status page](./docs/guide/status.md) says what 0.3.0 added

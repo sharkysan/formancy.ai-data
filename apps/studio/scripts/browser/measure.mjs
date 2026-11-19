@@ -50,7 +50,12 @@ export async function audit(page, target) {
         axe: window.axe.version,
         violations: results.violations.map((rule) => `${rule.id} (${String(rule.nodes.length)}): ${rule.nodes[0]?.html.slice(0, 90) ?? ''}`),
         measured: ['color-contrast', 'target-size'].filter((id) => nodes(results.passes, id).length > 0),
-        undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({ html: node.html.slice(0, 60), target: node.target[0] })),
+        // Each with axe's own reason, as the host's gate says it, so a failure names why and not only what.
+        undecided: nodes(results.incomplete, 'color-contrast').map((node) => ({
+          html: node.html.slice(0, 60),
+          target: node.target[0],
+          reason: node.any.map((check) => check.message).join(' '),
+        })),
       }
     },
     [...ACCESSIBILITY_TAGS],
@@ -69,11 +74,11 @@ async function decideInRows(page, undecided) {
   return page.evaluate(async (nodes) => {
     const left = []
     const failing = []
-    for (const { html, target } of nodes) {
+    for (const { html, target, reason } of nodes) {
       const element = typeof target === 'string' ? document.querySelector(target) : null
       const region = element?.closest('.rows') ?? null
       if (element === null || region === null) {
-        left.push(html)
+        left.push(reason === '' ? html : `${html} (axe: ${reason})`)
         continue
       }
       const before = { region: region.scrollLeft, x: window.scrollX, y: window.scrollY }

@@ -1,6 +1,6 @@
 # 0162 — The host page runs an action from the open record's header, after its dialog and a confirmation in place, and reads the record again
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0166](0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md): an action over the records a person chose of the Records grid's page runs through the same flow, from a bar above the grid, its states over the records chosen
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** every jsdom case below was watched failing with its

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { FieldDef } from '@formancy/spec'
-import { crumbOf, recordName, shownCrumbs } from './crumbs.js'
+import { crumbOf, recordName, shownCrumbs, trailOf } from './crumbs.js'
 import type { Crumb } from './crumbs.js'
 
 /*
@@ -73,6 +73,32 @@ describe("a level's name", () => {
     expect(crumbOf(2, 'Customer', { token: 'k1:4711', name: 'Muster AG' })).toEqual({ level: 2, said: ['Customer Muster AG'] })
     expect(crumbOf(3, 'Order line', { token: 'k1:4711,2', name: null })).toEqual({ level: 3, said: ['Order line ', { code: 'k1:4711,2' }] })
     expect(crumbOf(3, 'Order line', null)).toEqual({ level: 3, said: ['New Order line'] })
+  })
+})
+
+describe('the trail', () => {
+  const path = [
+    { level: 2, form: { menu: { title: 'Order line' } }, token: 'k1:4711,2', name: null },
+    { level: 3, form: { menu: { title: 'Product' } }, token: null, name: null },
+  ]
+
+  // The records first, then the record open in the detail -- by its name,
+  // or as new for a new record or a next version -- then each level held
+  // below it, cut at the level shown: a trail past it would offer a crumb
+  // for a level the person went up from (watched failing with the cut
+  // left out: "expected [ …(4) ] to deeply equal [ …(2) ]").
+  test('goes from the records to the level shown', () => {
+    expect(trailOf('Order', { token: 'k1:4711', name: 'Muster AG' }, path, 3)).toEqual([
+      { level: 0, said: ['Records'] },
+      { level: 1, said: ['Order Muster AG'] },
+      { level: 2, said: ['Order line ', { code: 'k1:4711,2' }] },
+      { level: 3, said: ['New Product'] },
+    ])
+    expect(trailOf('Order', 'new', path, 1)).toEqual([
+      { level: 0, said: ['Records'] },
+      { level: 1, said: ['New Order'] },
+    ])
+    expect(trailOf('Order', null, [], 0)).toEqual([{ level: 0, said: ['Records'] }])
   })
 })
 

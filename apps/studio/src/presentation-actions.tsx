@@ -140,7 +140,11 @@ function ActionWords({
       />
       <fieldset className="nested">
         <legend>Read again after {name} runs</legend>
-        <p className="hint">The record it ran over is always read again: the run moved its version.</p>
+        <p className="hint">
+          {binding.scope === 'selection'
+            ? 'It runs over the records a person chooses in the list, up to a page, and the page’s rows are always read again, the choice cleared: the run moved every chosen record’s version.'
+            : 'The record it ran over is always read again: the run moved its version.'}
+        </p>
         {REFRESHED.map(({ view, label }) => (
           <div className="check" key={view}>
             <input

@@ -4,18 +4,25 @@ import { computeAccessibleDescription } from 'dom-accessibility-api'
 import { createSnapshot } from '@formancy/data-core'
 import type { RoutineMeta } from '@formancy/data-core'
 import { OFFER_SHIP_ORDER, SHIP_ORDER, SOURCE_OF, chooseShipping, discoverRoutines } from './test-actions.js'
-import { audit, discover, focusedName, goTo, offerOnly, signIn, step, unnamed } from './test-studio.js'
+import { audit, discover, focusedName, goTo, offerOnly, signIn, step, unnamed, writeOrderPolicy } from './test-studio.js'
 import type { User } from './test-studio.js'
 import { OWNER_ROUTINES, startPlane } from './test-server.js'
 import type { TestPlane } from './test-server.js'
 
 /**
- * The Choose step's actions (0163): the routines a discovery that asked
- * for them read, each offered as an action over the open record, its
- * parameters given only the sources the generator binds, and every
- * refusal said in the generator's words before anything is sent --
- * against the real server behind a fake `fetch`, as every suite here
- * runs.
+ * The Choose step's actions (0163, 0166): the routines a discovery that
+ * asked for them read, each offered as an action over the open record or
+ * over the records a person chooses of a list's page, its parameters given
+ * only the sources the generator binds, and every refusal said in the
+ * generator's words before anything is sent -- against the real server
+ * behind a fake `fetch`, as every suite here runs.
+ *
+ * Found by role and accessible name, with two reads the accessibility
+ * tree cannot answer, said where they are made: that a group's name comes
+ * from a `legend` in view, by its tag -- the tree gives the group its name
+ * and not where the name is drawn; and that the generator's note of an
+ * action sits in a polite live region, by the `aria-live` of the element
+ * around it, which no role names.
  */
 let plane: TestPlane
 
@@ -309,5 +316,79 @@ describe('an action chosen', () => {
     await user.click(within(again).getByRole('button', { name: 'Generate the form' }))
     await screen.findByRole('main', { name: 'Generate' })
     expect(proposed()).not.toHaveProperty('actions')
+  })
+})
+
+describe('what an action runs over (0166)', () => {
+  const OVER = `What it runs over for ${SHIP_ORDER}`
+  const CHOSEN = 'Records a person chooses in the list, up to a page'
+
+  // Ticked, an action runs over the open record, as every bundle before
+  // 0165 binds it, and the other choice is a page's records a person
+  // chooses: a radio group whose legend is in view, the arrow keys moving
+  // between its two, and under it the generator's own note of the action
+  // as it binds it, read with the group and said as a radio's choice
+  // changes it, which for a selection says that every record is held until
+  // the last call returns. What is chosen is what is sent, and the
+  // Generate step says the generator's note too. Watched failing with the
+  // radios' change left unwritten: "expected [ true, false ] to deeply
+  // equal [ false, true ]"; with the group described by nothing: "expected
+  // '' to contain 'Runs sales.ship_order(pg_catalog.int8…'"; and with the
+  // note in no live region: "expected null not to be null".
+  test('is the open record until a page’s chosen records are picked from the keyboard, and the generator says what that costs', async () => {
+    const user = await signIn(plane)
+    const here = await chooseShipping(user)
+    const group = within(here).getByRole('group', { name: OVER })
+    expect(within(group).getByText('What it runs over', { exact: false }).tagName).toBe('LEGEND')
+    const record = within(group).getByRole<HTMLInputElement>('radio', { name: 'The open record' })
+    const chosen = within(group).getByRole<HTMLInputElement>('radio', { name: CHOSEN })
+    expect([record.checked, chosen.checked]).toEqual([true, false])
+    expect(computeAccessibleDescription(group)).toContain(`Runs ${SHIP_ORDER} over the open record after incrementing row_version`)
+    record.focus()
+    await user.keyboard('{ArrowDown}')
+    expect([record.checked, chosen.checked]).toEqual([false, true])
+    expect(focusedName()).toBe(CHOSEN)
+    await waitFor(() => expect(computeAccessibleDescription(group)).toContain('once for each record of a selection of one page at most'))
+    expect(computeAccessibleDescription(group)).toContain('holds every record of it until the last call returns')
+    // Said as it is chosen: the arrow keys move inside the group, where only the radio is said again, never the group's description.
+    const note = within(group).getByText(/once for each record of a selection of one page at most/)
+    expect(note.closest('[aria-live="polite"]')).not.toBeNull()
+    expect({ scope: [...(await audit()), ...unnamed()] }).toEqual({ scope: [] })
+
+    await user.click(within(here).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const sent = plane.requests.findLast((request) => request.path === '/v1/form-proposals')?.body as { actions?: Array<{ scope: string }> }
+    expect(sent.actions?.[0]?.scope).toBe('selection')
+    expect(step('Generate').textContent).toContain(`Runs ${SHIP_ORDER} once for each record of a selection of one page at most`)
+  })
+
+  // The Policy step's notice before the grant and the Presentation step's
+  // say what a selection runs over, never "the open record" of an action
+  // that runs over the records a person chose; and back on the Choose
+  // step, the choice is kept as it was sent. Watched failing with the
+  // notice's first line written for the open record alone: "expected 'It
+  // calls sales.ship_order(pg_catalog.…' to match /^It calls
+  // sales\.ship_order\(pg_catal…/"; and with the Presentation step's hint
+  // written so too: "Unable to find an element with the text: /^It runs
+  // over the records a person chooses in the list, up to a page/".
+  test('is said by the Policy and Presentation steps, and kept on the Choose step', async () => {
+    const user = await signIn(plane)
+    const here = await chooseShipping(user)
+    await user.click(within(within(here).getByRole('group', { name: OVER })).getByRole('radio', { name: CHOSEN }))
+    await user.click(within(here).getByRole('button', { name: 'Generate the form' }))
+    await screen.findByRole('main', { name: 'Generate' })
+    const policy = await writeOrderPolicy(user)
+    const notice = within(policy).getByRole('note', { name: 'What ship-order does is the deployment’s' })
+    expect(within(notice).getAllByRole('listitem')[0]?.textContent).toMatch(
+      /^It calls sales\.ship_order\(pg_catalog\.int8, pg_catalog\.int4\) once for each record a person chooses in the list, up to a page, after incrementing row_version on each, in one transaction that holds every one of them until the last call returns/,
+    )
+    await user.type(within(policy).getByLabelText('Roles that may run ship-order'), 'clerk')
+    const presentation = await goTo(user, 'Presentation')
+    const words = within(presentation).getByRole('region', { name: 'Actions' })
+    expect(within(words).getByText(/^It runs over the records a person chooses in the list, up to a page/)).toBeTruthy()
+    expect(within(words).queryByText(/^The record it ran over is always read again/)).toBeNull()
+
+    const again = await goTo(user, 'Choose')
+    expect(within(within(again).getByRole('group', { name: OVER })).getByRole<HTMLInputElement>('radio', { name: CHOSEN }).checked).toBe(true)
   })
 })

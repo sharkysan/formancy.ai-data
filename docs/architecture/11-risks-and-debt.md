@@ -528,8 +528,8 @@ not ask before leaving unsaved work
 ([0047](../decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)).
 There is no bulk delete and no undo
 ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)).
-An action is offered in the open record's detail alone, never a child
-row's, a Drill down level's or a selection's; every run asks a
+An action over the open record is offered in its detail alone, never a
+child row's or a Drill down level's; every run asks a
 confirmation, after its dialog where it has one, even where its
 administrator wrote no sentence; under Both its dialog is React's; a
 dialog's answers are dropped without asking by any other request;
@@ -540,6 +540,15 @@ editing when it asks about a form typed into since saves stale; and
 after a run, is held by no test, since no form of the actions schema
 has a child section
 ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+An action over a selection is offered over the Records grid's page
+alone: a choice is of the page shown, which another page, a search, a
+filter, a sort or a view clears, so more than a page is run a page at a
+time; the choice is kept nowhere but the page; a question asked over
+it closes when it changes, its dialog's answers with it; the boxes are
+one more column, first, which the Columns panel neither hides nor
+moves; a lost run over them is one read per record to check; and none
+of it was run against a database or a browser before CI
+([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 A record's child forms are tabs beside it, so a child's rows are a press
 away from the record's form, and another record, a record its first save
 created included, opens on its own tab; a Drill down level's section

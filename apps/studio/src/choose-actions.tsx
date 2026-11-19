@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { describeRoutine } from '@formancy/data-core'
 import type { ActionChoice, ActionGround, MetadataSnapshot, ObjectMeta, RoutineMeta } from '@formancy/data-core'
 import type { ActionReasons } from './actions.js'
-import { routineFacts, routineKey, sameRoutine, sourceOptions, sourceValue, startingAction, withSource } from './actions.js'
+import { routineFacts, routineKey, sameRoutine, SCOPES, sourceOptions, sourceValue, startingAction, withScope, withSource } from './actions.js'
 import type { Choice } from './choice.js'
 import { useFocusAfterRender } from './focus.js'
 
@@ -77,13 +77,68 @@ function ParameterSource({
   )
 }
 
-/** A routine chosen as an action: its name, and where each of its parameters comes from. */
+/**
+ * What an action runs over (0165, 0166): the open record, as every action
+ * starts and every bundle before 0165 binds it, or the records a person
+ * chooses of the page a list shows. A radio group with its legend in
+ * view, the arrow keys moving between its two; under it, once the
+ * generator binds the action, the generator's own note of what it does,
+ * which for a selection says what holding every record until the last
+ * call returns costs -- read with the group, so it is heard as the
+ * keyboard enters it, and in a polite live region, so the note a radio's
+ * choice changes is heard as it is chosen: the arrow keys move inside the
+ * group, where only the radio is said again.
+ */
+function ScopeChoice({
+  id,
+  named,
+  action,
+  bound,
+  onAction,
+}: {
+  id: string
+  named: string
+  action: ActionChoice
+  bound: string | null
+  onAction: (next: ActionChoice) => void
+}): ReactElement {
+  return (
+    <fieldset aria-describedby={bound === null ? undefined : `${id}-scope-note`}>
+      <legend>
+        What it runs over <span className="visually-hidden">for {named}</span>
+      </legend>
+      {SCOPES.map(({ scope, label }) => (
+        <div className="check" key={scope}>
+          <input
+            type="radio"
+            id={`${id}-scope-${scope}`}
+            name={`${id}-scope`}
+            value={scope}
+            checked={action.scope === scope}
+            onChange={() => onAction(withScope(action, scope))}
+          />
+          <label htmlFor={`${id}-scope-${scope}`}>{label}</label>
+        </div>
+      ))}
+      <div aria-live="polite">
+        {bound === null ? null : (
+          <p id={`${id}-scope-note`} className="hint">
+            {bound}
+          </p>
+        )}
+      </div>
+    </fieldset>
+  )
+}
+
+/** A routine chosen as an action: its name, what it runs over, and where each of its parameters comes from. */
 function ActionMapping({
   id,
   root,
   ground,
   routine,
   action,
+  bound,
   onAction,
 }: {
   id: string
@@ -91,6 +146,8 @@ function ActionMapping({
   ground: ActionGround
   routine: RoutineMeta
   action: ActionChoice
+  /** The generator's note of the action as it binds it; null while it does not. */
+  bound: string | null
   onAction: (next: ActionChoice) => void
 }): ReactElement {
   const named = describeRoutine(routine.ref)
@@ -112,6 +169,7 @@ function ActionMapping({
           What a run&rsquo;s address carries, and the Policy and Presentation steps name it by: lower-case letters, digits and hyphens.
         </p>
       </div>
+      <ScopeChoice id={id} named={named} action={action} bound={bound} onAction={onAction} />
       {routine.parameters.length === 0 ? (
         <p className="hint">It takes no parameter.</p>
       ) : (
@@ -164,7 +222,15 @@ function RoutineRow({
         {routineFacts(routine)}.{refused === null ? null : ` The generator refuses it: ${refused}.`}
       </p>
       {chosen === undefined || reasons.ground === null ? null : (
-        <ActionMapping id={id} root={root} ground={reasons.ground} routine={routine} action={chosen} onAction={onAction} />
+        <ActionMapping
+          id={id}
+          root={root}
+          ground={reasons.ground}
+          routine={routine}
+          action={chosen}
+          bound={reasons.bound.get(chosen.name) ?? null}
+          onAction={onAction}
+        />
       )}
       <div aria-live="polite">{note === null ? null : <p className="cannot-tell">{note}</p>}</div>
     </div>
@@ -267,10 +333,11 @@ function focusAfterUntick(
 }
 
 /**
- * The routines of the approved schemas, each offered as an action over
- * the open record (0159, 0163): a box per routine, never ticked for
- * anybody, and once ticked its name and a select per parameter offering
- * only the sources the generator binds for it, none chosen. Every routine
+ * The routines of the approved schemas, each offered as an action (0159,
+ * 0163): a box per routine, never ticked for anybody, and once ticked its
+ * name, what it runs over -- the open record, or a page's records a
+ * person chooses (0166) -- and a select per parameter offering only the
+ * sources the generator binds for it, none chosen. Every routine
  * is listed, the ones the generator refuses too, disabled with its words;
  * the form's own refusal, where it offers none -- no confirmed version,
  * a view, a rowversion with no touch column -- is said above them, in the
@@ -320,9 +387,9 @@ export function ActionsChoice({
     <fieldset id={group} tabIndex={-1} aria-describedby={hint}>
       <legend>Actions</legend>
       <p id={hint} className="hint">
-        An action runs a function or procedure of this database over the open record, once its person has answered its dialog, in one transaction that locks the
-        record and moves its version. Each parameter is given its value by the form -- the record&rsquo;s key or a column of it, an answer in the dialog, a
-        trusted attribute or the person&rsquo;s id -- and none is given one for you.
+        An action runs a function or procedure of this database over the open record, or over the records a person chooses in the list, once its person has
+        answered its dialog, in one transaction that locks each record and moves its version. Each parameter is given its value by the form -- the
+        record&rsquo;s key or a column of it, an answer in the dialog, a trusted attribute or the person&rsquo;s id -- and none is given one for you.
       </p>
       {routines === undefined ? (
         <p className="none">

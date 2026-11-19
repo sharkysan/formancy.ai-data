@@ -4,7 +4,7 @@ import type { FormEngine } from '@formancy/core'
 import type { ActionOutcome, FormAction, UnknownAction } from '@formancy/data-client'
 import type { FormSchema } from '@formancy/spec'
 import type { PaneWork } from './leave.js'
-import { again, answer, answered, ask, checked, checkedText, close, IDLE, runWork, send, words } from './running.js'
+import { again, answer, answered, ask, checked, checkedText, close, doneText, heading, IDLE, runWork, send, words } from './running.js'
 import type { Run, RunTarget } from './running.js'
 
 /*
@@ -25,13 +25,13 @@ const DIALOG: FormSchema = {
 }
 
 const CLOSE: FormAction = { name: 'close', label: 'Close the order', scope: 'record', confirm: null, done: null, dialog: DIALOG, refresh: [] }
-const TARGET: RunTarget = { action: CLOSE, label: 'Close the order', noun: 'Order', record: 'k1:7', version: '3' }
+const TARGET: RunTarget = { action: CLOSE, label: 'Close the order', noun: 'Order', records: [{ record: 'k1:7', version: '3' }] }
 const engine = (): FormEngine => createFormEngine({ schema: DIALOG, formId: 'running-test' })
 
 /** The run out, from its dialog's answers, at `version`. */
 function sending(version = '3', dialog: FormEngine | null = engine()): Run {
   const asked = dialog === null ? ask(IDLE, TARGET, null, []) : answered(ask(IDLE, TARGET, dialog, []), { note: 'closed' }, [])
-  return send(asked, version)
+  return send(asked, [{ record: 'k1:7', version }])
 }
 
 const LOST: UnknownAction = {
@@ -55,7 +55,7 @@ describe('a run of an action over the open record', () => {
     expect(asking.state).toBe('asking')
     expect(ask(IDLE, TARGET, null, []).state).toBe('confirming')
     const out = sending('4')
-    expect(out).toMatchObject({ state: 'sending', target: { version: '4' }, answers: { note: 'closed' } })
+    expect(out).toMatchObject({ state: 'sending', target: { records: [{ record: 'k1:7', version: '4' }] }, answers: { note: 'closed' } })
     expect(runWork(out)).toBe('running')
     expect(close(out)).toBe(out)
   })
@@ -88,9 +88,9 @@ describe('a run of an action over the open record', () => {
   test('the run out carries what its confirmation listed, a run again none, and Run it again on a run out is nothing', () => {
     const listed: PaneWork[] = [{ owner: 'master', renderer: 'react', name: ['Order ', { code: 'k1:7' }], work: 'changed' }]
     const confirming = answered(ask(IDLE, TARGET, engine(), listed), { note: 'closed' }, listed)
-    expect(send(confirming, '3')).toMatchObject({ state: 'sending', discards: listed })
-    const unknown = answer(send(confirming, '3'), LOST, 'Done.').next
-    const unchanged = checked(unknown, { ok: true, value: { record: 'k1:7', version: '3', answers: {} } })
+    expect(send(confirming, [{ record: 'k1:7', version: '3' }])).toMatchObject({ state: 'sending', discards: listed })
+    const unknown = answer(send(confirming, [{ record: 'k1:7', version: '3' }]), LOST, 'Done.').next
+    const unchanged = checked(unknown, [{ ok: true, value: { record: 'k1:7', version: '3', answers: {} } }])
     const out = again(unchanged)
     expect(out).toMatchObject({ state: 'sending', discards: [] })
     expect(again(out)).toBe(out)
@@ -126,15 +126,15 @@ describe('a run of an action over the open record', () => {
   test('a lost run is checked by its record, and run again only from the version it sent', () => {
     const unknown = answer(sending('3'), LOST, 'Done.').next
     expect(runWork(unknown)).toBe('run-unknown')
-    const at = (version: string): Run => checked({ ...unknown, checking: true } as Run, { ok: true, value: { record: 'k1:7', version, answers: {} } })
+    const at = (version: string): Run => checked({ ...unknown, checking: true } as Run, [{ ok: true, value: { record: 'k1:7', version, answers: {} } }])
     expect(at('3')).toMatchObject({ state: 'checked', found: { kind: 'unchanged' } })
-    expect(again(at('3'))).toMatchObject({ state: 'sending', target: { version: '3' }, answers: { note: 'closed' } })
+    expect(again(at('3'))).toMatchObject({ state: 'sending', target: { records: [{ record: 'k1:7', version: '3' }] }, answers: { note: 'closed' } })
     const moved = at('4')
     expect(moved).toMatchObject({ found: { kind: 'changed' } })
     expect(again(moved)).toBe(moved)
-    const gone = checked(unknown, { ok: false, status: 404, code: 'not-found', message: 'No such record.' })
+    const gone = checked(unknown, [{ ok: false, status: 404, code: 'not-found', message: 'No such record.' }])
     expect(gone).toMatchObject({ found: { kind: 'absent' } })
-    const unread = checked(unknown, { ok: false, status: 503, code: 'unavailable', message: 'The database cannot be reached.' })
+    const unread = checked(unknown, [{ ok: false, status: 503, code: 'unavailable', message: 'The database cannot be reached.' }])
     expect(unread).toMatchObject({ found: { kind: 'unread' } })
     expect(runWork(unread)).toBe('run-unknown')
     expect(checkedText({ kind: 'unread', message: 'The database cannot be reached.' })).toBe('The database cannot be reached. Whether it ran is still unknown.')
@@ -147,5 +147,69 @@ describe('a run of an action over the open record', () => {
     expect(words(form, 'Close the order')).toBe('Close the order')
     expect(words(form, { $t: 'close.label' })).toBe('Bestellung schliessen')
     expect(words(form, null)).toBeNull()
+  })
+})
+
+describe('a run of an action over the records chosen (0166)', () => {
+  const CLOSE_ALL: FormAction = { ...CLOSE, name: 'close-all', label: 'Close the chosen orders', scope: 'selection' }
+  const CHOSEN: RunTarget = {
+    action: CLOSE_ALL,
+    label: 'Close the chosen orders',
+    noun: 'Order',
+    records: [
+      { record: 'k1:7', version: '3' },
+      { record: 'k1:9', version: '5' },
+    ],
+  }
+  const lost: UnknownAction = { ...LOST, action: 'close-all', records: [...CHOSEN.records] }
+  const read = (record: string, version: string) => ({ ok: true as const, value: { record, version, answers: {} } })
+  const out = (): Run => send(answered(ask(IDLE, CHOSEN, engine(), []), { note: 'closed' }, []), CHOSEN.records)
+
+  // Its region counts the records rather than naming one, and once it is
+  // done says how many it ran over after the administrator's sentence or
+  // the page's own (watched failing with the open record's heading for
+  // every run: "expected [ …(2) ] to deeply equal [ Array(1) ]").
+  test('is headed by how many records it is over, and done says how many it ran over', () => {
+    expect(heading(CHOSEN)).toEqual(['Close the chosen orders: 2 records'])
+    expect(heading({ ...CHOSEN, records: [{ record: 'k1:7', version: '3' }] })).toEqual(['Close the chosen orders: 1 record'])
+    expect(doneText(CHOSEN, 'Done.')).toBe('Done. It ran over 2 records.')
+    expect(doneText(TARGET, 'Done.')).toBe('Done.')
+  })
+
+  // A refusal about some of the records keeps the ones the server named,
+  // which the page names to the person and reads again; a refusal about
+  // none names none (watched failing with the refusal's records left
+  // unread: "expected { state: 'refused', …(6) } to match object { state:
+  // 'refused', stale: true, …(1) }").
+  test('refused, keeps the records the server named', () => {
+    const stale: ActionOutcome = { ok: false, status: 409, code: 'stale', message: 'The record changed since it was read.', records: ['k1:9'] }
+    expect(answer(out(), stale, 'Done.').next).toMatchObject({ state: 'refused', stale: true, named: ['k1:9'] })
+    const declined: ActionOutcome = { ok: false, status: 422, code: 'declined', message: 'This order cannot be closed now.' }
+    expect(answer(out(), declined, 'Done.').next).toMatchObject({ state: 'refused', named: [] })
+  })
+
+  // A lost run over the records chosen is checked by a read of each: every
+  // one at the version sent, it has not run, and Run it again sends every
+  // version sent; every one moved, it ran or each was changed; some of
+  // each, it did not run -- a run moves every record or none -- and it is
+  // never run again from there; every one gone, none is there; one read
+  // refused, it is still unknown (watched failing with the first record
+  // alone read: "expected { state: 'checked', …(5) } to match object {
+  // found: { kind: 'mixed' } }").
+  test('lost, is checked by a read of each record, and run again only when none moved', () => {
+    const unknown = answer(out(), lost, 'Done.').next
+    const unchanged = checked(unknown, [read('k1:7', '3'), read('k1:9', '5')])
+    expect(unchanged).toMatchObject({ found: { kind: 'unchanged' } })
+    expect(again(unchanged)).toMatchObject({ state: 'sending', target: { records: CHOSEN.records } })
+    expect(checked(unknown, [read('k1:7', '4'), read('k1:9', '6')])).toMatchObject({ found: { kind: 'changed' } })
+    const mixed = checked(unknown, [read('k1:7', '3'), read('k1:9', '6')])
+    expect(mixed).toMatchObject({ found: { kind: 'mixed' } })
+    expect(again(mixed)).toBe(mixed)
+    const absent = { ok: false as const, status: 404, code: 'not-found', message: 'No such record.' }
+    expect(checked(unknown, [absent, absent])).toMatchObject({ found: { kind: 'absent' } })
+    expect(checked(unknown, [read('k1:7', '3'), absent])).toMatchObject({ found: { kind: 'mixed' } })
+    const refused = { ok: false as const, status: 503, code: 'unavailable', message: 'The database cannot be reached.' }
+    expect(checked(unknown, [read('k1:7', '3'), refused])).toMatchObject({ found: { kind: 'unread' } })
+    expect(checkedText({ kind: 'unchanged' }, true)).toBe('The database shows it has not run: every record is still at the version you read.')
   })
 })

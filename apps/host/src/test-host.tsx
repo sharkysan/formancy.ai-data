@@ -327,10 +327,15 @@ export function dataCell(grid: HTMLElement, index = 0): HTMLElement {
   return cell
 }
 
-/** The first cell of every data row in the Records grid: a record's key, as the grid shows it. */
+/** The first field's cell of every data row in the Records grid: a record's key, as the grid shows it -- past a row's box, where the form offers an action over a selection (0166). */
 export function recordKeys(): string[] {
   const grid = within(gridSection('Records')).getByRole('grid', { name: 'Records' })
-  return dataRows(grid).map((row) => within(row).getAllByRole('gridcell')[0]?.textContent ?? '')
+  return dataRows(grid).map(
+    (row) =>
+      within(row)
+        .getAllByRole('gridcell')
+        .find((cell) => within(cell).queryByRole('checkbox') === null)?.textContent ?? '',
+  )
 }
 
 /**

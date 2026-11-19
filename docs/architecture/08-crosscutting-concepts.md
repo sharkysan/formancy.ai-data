@@ -665,6 +665,19 @@ user interface is the rule, and this is what each part of it rests on.
   ([0053](../decisions/0053-a-host-deletes-a-record-from-its-detail-or-its-row-after-a-confirmation-in-place.md)),
   and runs an action only after one too, Keep it the next Tab in both
   ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+  A choice of records is a column of real checkboxes, never the grid's
+  own selection, which stays the open row: each box in a cell the arrow
+  keys reach, out of the Tab order so the grid stays one stop, its Space
+  its own, 24 pixels square by its own style attribute in the room's
+  violet, since no rule of the host's reaches into a grid, and AG Grid's
+  live region says what Space does on it, as on a row's Delete what Space
+  and Enter do there, never that they open the record; an action pressed
+  with nothing chosen is `aria-disabled` and says what to do first, each
+  press in a new element of the bar's line so a sentence said again is
+  heard again, as the pager and the Columns panel say what cannot be
+  done; and a question asked over a choice closes, nothing run, when the
+  choice changes under it
+  ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 - **Accessible name only.** Tests find elements by role and accessible name
   ([formancy.ai 0034](https://github.com/sharkysan/formancy.ai/blob/main/docs/decisions/0034-accessible-name-only.md));
   where the tree cannot answer, a test reads the DOM and its header says

@@ -1,7 +1,7 @@
 // @vitest-environment node
 //
 // Node rather than jsdom: nothing here renders.
-import { createSnapshot, generateForm, sourceProblem } from '@formancy/data-core'
+import { createSnapshot, describeRoutine, generateForm, sourceProblem } from '@formancy/data-core'
 import type { ActionGround, ObjectMeta, RoutineMeta } from '@formancy/data-core'
 import { describe, expect, test } from 'vitest'
 import { actionNameFor, actionReasons, inputFor, routineFacts, routineKey, sourceOptions, startingAction, withSource } from './actions.js'
@@ -128,5 +128,30 @@ describe('what the step says of the actions', () => {
     const reasons = actionReasons(READER_ROUTINES, reader, { ...ORDER, connection: 'fixture-reader', versionColumn: 'nope' })
     expect(reasons.ground).toBeNull()
     expect(reasons.routines.get(routineKey(routine.ref))).toMatch(/may not execute/)
+  })
+
+  // A field's note has the field's key for its subject, which an action
+  // may be named too: refused, the action has no note of its own, and the
+  // field's would describe what the action runs over -- "What it runs
+  // over" read as a sentence about a column. Only an action the generator
+  // binds has its note, and that one is the generator's of the action
+  // (watched failing with every inferred note of the action's name taken:
+  // "expected 'A whole number held as text, because …' to be undefined").
+  test('take an action’s note only where the generator binds it, never a field’s of the same name', () => {
+    const plain = generateForm(OWNER_ROUTINES, ORDER)
+    const keys = new Set(plain.bindings.fields.map((binding) => binding.field))
+    const field = plain.notes.find((note) => note.kind === 'inferred' && keys.has(note.subject) && /^[a-z][a-z0-9-]*$/.test(note.subject))
+    if (field === undefined) throw new Error('no field of the order has a note an action could be named after')
+    const routine = shipping(OWNER_ROUTINES)
+    const tenant = routine.parameters[1] as RoutineMeta['parameters'][number]
+    const unmapped = { ...startingAction(routine, []), name: field.subject }
+    const refused = actionReasons(OWNER_ROUTINES, order, { ...ORDER, actions: [unmapped] })
+    expect(refused.chosen.get(field.subject)).toMatch(/is not offered/)
+    expect(refused.bound.get(field.subject)).toBeUndefined()
+
+    const mapped = withSource(withSource(unmapped, routine, 'order_id', { key: 'id' }), routine, tenant.name, { input: inputFor(tenant) })
+    const bound = actionReasons(OWNER_ROUTINES, order, { ...ORDER, actions: [mapped] })
+    expect(bound.chosen.get(field.subject)).toBeUndefined()
+    expect(bound.bound.get(field.subject)).toContain(`Runs ${describeRoutine(routine.ref)} over the open record`)
   })
 })

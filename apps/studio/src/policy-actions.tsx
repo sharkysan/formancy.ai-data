@@ -17,7 +17,9 @@ function moved(binding: ActionBinding): string {
 /**
  * What an action does that this module neither sees nor bounds, said
  * before it is granted and so before the form is published (0163), as
- * 0052 says what a delete also does: the routine is opaque; field grants,
+ * 0052 says what a delete also does: the routine is opaque, called over
+ * the open record or once for each record of a selection, which holds
+ * them all until the last call returns (0165, 0166); field grants,
  * state moves and the policy's cascades do not bind it (0159); on a form
  * whose version is a column, a routine writing other rows of the table
  * must move theirs; on SQL Server a RETURN status other than 0 refuses the
@@ -32,10 +34,18 @@ function Notice({ id, binding, snapshot, root }: { id: string; binding: ActionBi
         <strong>What {binding.name} does is the deployment&rsquo;s</strong>
       </p>
       <ul>
-        <li>
-          It calls <code>{describeRoutine(binding.routine)}</code> over the open record after {moved(binding)}, in one transaction. This module guards what it
-          hands the routine and the transaction around it, and cannot see what the routine does.
-        </li>
+        {binding.scope === 'selection' ? (
+          <li>
+            It calls <code>{describeRoutine(binding.routine)}</code> once for each record a person chooses in the list, up to a page, after {moved(binding)} on
+            each, in one transaction that holds every one of them until the last call returns: one refused, and nothing is kept of any. This module guards what
+            it hands the routine and the transaction around it, and cannot see what the routine does.
+          </li>
+        ) : (
+          <li>
+            It calls <code>{describeRoutine(binding.routine)}</code> over the open record after {moved(binding)}, in one transaction. This module guards what it
+            hands the routine and the transaction around it, and cannot see what the routine does.
+          </li>
+        )}
         <li>
           Field grants, state moves and the policy&rsquo;s cascades do not bind it: it may write fields no grant lets a person write, move a state outside the
           moves this policy lists, and delete through keys the policy does not accept.

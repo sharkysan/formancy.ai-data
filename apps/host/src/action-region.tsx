@@ -5,8 +5,10 @@ import type { ActionFlow } from './action-flow.js'
 import { AngularForm } from './angular-mount.js'
 import { SAVE_OUT } from './deletion.js'
 import { RENDERER_NAMES, WORK } from './leave.js'
+import type { Said } from './leave.js'
 import { ReactForm } from './react-form.js'
-import { checkedText, CONTINUE, heading, READ_AGAIN, RUNNING, RUNS_ON } from './running.js'
+import { checkedText, CONTINUE, heading, isSelection, NONE_CHANGED, READ_AGAIN, RUNNING, RUNS_ON, RUNS_OVER_CHOSEN } from './running.js'
+import type { RunTarget } from './running.js'
 import { ServerDid } from './server-did.js'
 import { DECLINED_BY, RegionHeading, Words } from './words.js'
 
@@ -31,13 +33,32 @@ import { DECLINED_BY, RegionHeading, Words } from './words.js'
  *   the record could not be read again, that, and the saved record.
  * - **Not run**: the server's sentence verbatim, a reason the deployment
  *   worded said as its own (0156), and the saved record offered after a
- *   stale run.
+ *   stale run -- the region the keyboard is taken to described by what it
+ *   says, so it is said as it lands, as done's is.
  * - **It may have run** (0031): the sentence, and a check that reads the
  *   record and says what the read showed in a status line already on the
  *   page; still at the version sent, Run it again; changed, the saved
  *   record; either, or not found, Close. No "Run it again anyway": a run
  *   can always be checked.
+ *
+ * Over the records chosen of a page (0166), the same region under the bar
+ * above the grid, in the words of a selection: the heading counts them,
+ * the confirmation says that one refused changes none, done says how many
+ * it ran over, and Not run names the records the server's refusal is
+ * about, by the words a row's Delete names its record with, that nothing
+ * was done to any, and offers to read the page again -- never to run it
+ * again anyway. A check reads every record, and where some moved and some
+ * did not, it did not run, and the page is read again.
  */
+
+/** "It is about Order `k1:7` and Order `k1:9`.": the records a refusal of a run over a selection names, as a row's Delete names each. */
+function about(target: RunTarget, named: readonly string[]): Said {
+  const each = named.flatMap((record, index): Said => [index === 0 ? '' : index === named.length - 1 ? ' and ' : ', ', `${target.noun} `, { code: record }])
+  return ['It is about ', ...each, '.']
+}
+
+/** What the page offers to read again: over a selection, its page; over the open record, the saved record. */
+const loadLabel = (target: RunTarget): string => (isSelection(target) ? 'Read the page again' : 'Load the saved record')
 
 /** A dialog asks for typed answers, never a lookup: its renderer is handed no option source. */
 const NO_SOURCES: OptionsSources = {}
@@ -130,7 +151,7 @@ function ActionConfirm({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
         <Words said={[...heading(now.target), '?']} />
       </RegionHeading>
       <div id={`${idBase}-lead`}>
-        <p className="notice-text">{flow.confirmation(now.target.action) ?? RUNS_ON}</p>
+        <p className="notice-text">{flow.confirmation(now.target.action) ?? (isSelection(now.target) ? RUNS_OVER_CHOSEN : RUNS_ON)}</p>
         {discards.length === 0 ? null : <p className="notice-text">{READ_AGAIN}</p>}
       </div>
       {discards.length === 0 ? null : (
@@ -197,17 +218,43 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
     )
   }
   if (now.state === 'refused') {
+    const many = isSelection(now.target)
+    const named = many && now.named.length > 0
+    // Every sentence it says, in order: the server's, the deployment's mark, the records named, and that none was changed.
+    const said = [
+      ['message', true],
+      ['declined', now.declined],
+      ['about', named],
+      ['none', many],
+    ] as const
+    const described = said.flatMap(([part, shown]) => (shown ? [`${idBase}-${part}`] : [])).join(' ')
     return (
-      <div {...region} className="notice" data-kind="refused">
+      <div {...region} className="notice" data-kind="refused" aria-describedby={described}>
         <RegionHeading level={4} id={headingId}>
           Not run
         </RegionHeading>
-        <p className="notice-text">{now.message}</p>
-        {now.declined ? <p className="notice-text">{DECLINED_BY}</p> : null}
+        <p id={`${idBase}-message`} className="notice-text">
+          {now.message}
+        </p>
+        {now.declined ? (
+          <p id={`${idBase}-declined`} className="notice-text">
+            {DECLINED_BY}
+          </p>
+        ) : null}
+        {named ? (
+          <p id={`${idBase}-about`} className="notice-text">
+            <Words said={about(now.target, now.named)} />
+          </p>
+        ) : null}
+        {many ? (
+          <p id={`${idBase}-none`} className="notice-text">
+            {NONE_CHANGED}
+          </p>
+        ) : null}
         <div className="notice-actions">
-          {now.stale ? (
+          {now.stale || named ? (
             <button type="button" className="button" onClick={flow.load}>
-              Load the saved record
+              {loadLabel(now.target)}
             </button>
           ) : null}
           {closes}
@@ -218,6 +265,7 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
   if (now.state !== 'unknown' && now.state !== 'checked') return null
   const found = now.state === 'checked' ? now.found : null
   const unread = found === null || found.kind === 'unread'
+  const many = isSelection(now.target)
   return (
     <div {...region} className="notice" data-kind="unknown">
       <RegionHeading level={4} id={headingId}>
@@ -225,7 +273,7 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
       </RegionHeading>
       <p className="notice-text">{now.unknown.message}</p>
       <p role="status" className="notice-text">
-        {found === null ? '' : checkedText(found)}
+        {found === null ? '' : checkedText(found, many)}
       </p>
       <div className="notice-actions">
         {unread ? (
@@ -238,9 +286,9 @@ function ActionOutcome({ flow, idBase }: { flow: ActionFlow; idBase: string }): 
             Run it again
           </button>
         ) : null}
-        {found?.kind === 'changed' ? (
+        {found?.kind === 'changed' || found?.kind === 'mixed' ? (
           <button type="button" className="button" onClick={flow.load}>
-            Load the saved record
+            {loadLabel(now.target)}
           </button>
         ) : null}
         {unread ? null : closes}

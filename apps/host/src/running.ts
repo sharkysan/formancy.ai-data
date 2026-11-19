@@ -7,9 +7,11 @@ import { NOT_FOUND } from './deletion.js'
 import type { PaneWork, Said, Work } from './leave.js'
 
 /*
- * One run of an action over the open record on the host page (0162),
- * decided here and only shown by the page: the dialog the action asks,
- * a confirmation in place, then what the server answered.
+ * One run of an action on the host page, decided here and only shown by
+ * the page: over the open record, from its header (0162), or over the
+ * records a person chose of the page a grid shows, from above it (0166).
+ * The dialog the action asks, a confirmation in place, then what the
+ * server answered.
  *
  *   idle → asking (its dialog) → confirming → sending → done | refused | unknown
  *   sending → asking again, when the server refused an answer by its field
@@ -23,15 +25,19 @@ import type { PaneWork, Said, Work } from './leave.js'
  *   administrator wrote or the page's own, and lists the forms of the
  *   record that hold work, which reading it again after the run drops.
  *   Asked again while a run is out or unknown, it is that one asked again.
- * - **Done** is a token for the record, and nothing else; the page reads
- *   the record again, since the run moved its version.
+ * - **Done** is a token for each record, and nothing else; the page reads
+ *   the records again, since the run moved their versions.
  * - **Refused** is any other answer of the server's, in its words; stale
  *   offers the saved record, and a reason the deployment worded is said as
- *   its own (0156).
- * - **Unknown** is a run whose answer was lost (0031). A check reads the
- *   record: still at the version sent, it has not run, and Run it again
- *   sends that version again, never the one read since -- if the first
- *   committed after all, the second is stale.
+ *   its own (0156). A selection's refusal keeps the records the server
+ *   named (0165), which the page names to the person: nothing was done to
+ *   any of them, all or nothing.
+ * - **Unknown** is a run whose answer was lost (0031). A check reads each
+ *   record: every one still at the version sent, it has not run, and Run
+ *   it again sends those versions again, never ones read since -- if the
+ *   first committed after all, the second is stale. Some moved and some
+ *   not, it did not run -- a run moves every record or none -- and some
+ *   were changed since: the page is read again, never run again.
  *
  * `n` counts the states that take the keyboard: each is a new region to
  * focus, even when it looks like the last one.
@@ -40,17 +46,31 @@ import type { PaneWork, Said, Work } from './leave.js'
 /** A dialog's answers, by field key, as the renderer submitted them. */
 export type Answers = Record<string, unknown>
 
-/** The run a person asked for: the action as the form offers it, its label in words, the form's title, and the record with the version the page read it at. */
-export interface RunTarget {
-  action: FormAction
-  label: string
-  noun: string
+/** A record a run is over, by its token, at the version the page read it. */
+export interface RunRecord {
   record: string
   version: string
 }
 
-/** What a check of an unknown run found: only what one read of the record showed. */
-export type RunChecked = { kind: 'unchanged' } | { kind: 'changed' } | { kind: 'absent' } | { kind: 'unread'; message: string }
+/**
+ * The run a person asked for: the action as the form offers it, its label
+ * in words, the form's title, and the records it is over -- the open
+ * record alone (0162), or the records chosen of the page shown, in its
+ * order (0166) -- each with the version the page read it at.
+ */
+export interface RunTarget {
+  action: FormAction
+  label: string
+  noun: string
+  records: readonly RunRecord[]
+}
+
+/**
+ * What a check of an unknown run found: only what one read of each record
+ * showed -- every one at the version sent, every one moved, none there,
+ * the reads refused, or, of a selection, some moved and some not.
+ */
+export type RunChecked = { kind: 'unchanged' } | { kind: 'changed' } | { kind: 'mixed' } | { kind: 'absent' } | { kind: 'unread'; message: string }
 
 export type Run =
   | { state: 'idle' }
@@ -62,7 +82,8 @@ export type Run =
   | { state: 'sending'; target: RunTarget; dialog: FormEngine | null; answers: Answers; discards: readonly PaneWork[]; n: number }
   /** `reread`: the server's sentence where the record could not be read again after the run. */
   | { state: 'done'; target: RunTarget; said: string; reread: string | null; n: number }
-  | { state: 'refused'; target: RunTarget; message: string; stale: boolean; declined: boolean; n: number }
+  /** `named`: the records the server said its refusal is about (0165), each a token the run addressed. */
+  | { state: 'refused'; target: RunTarget; message: string; stale: boolean; declined: boolean; named: readonly string[]; n: number }
   | { state: 'unknown'; target: RunTarget; answers: Answers; unknown: UnknownAction; checking: boolean; n: number }
   | { state: 'checked'; target: RunTarget; answers: Answers; unknown: UnknownAction; found: RunChecked; n: number }
 
@@ -72,6 +93,11 @@ export const IDLE: Run = { state: 'idle' }
 export const CONTINUE = 'Continue'
 /** The confirmation's lead where the administrator wrote no sentence of their own. */
 export const RUNS_ON = 'It runs in the database, over this record. This page cannot take it back.'
+/** The same, over the records chosen: one transaction, all or nothing (0165). */
+export const RUNS_OVER_CHOSEN =
+  'It runs in the database, over each of these records, in one transaction: if one is refused, none of them is changed. This page cannot take it back.'
+/** After the server's sentence, where it refused a run over the records chosen: what all or nothing means for them (0165). */
+export const NONE_CHANGED = 'Nothing was done to any of the chosen records: a run over them changes every one or none.'
 /** Before the forms of the record that hold work, which the record read again after the run replaces. */
 export const READ_AGAIN = 'The record is read again once it has run, which discards the unsaved changes in these forms:'
 /** In the region while the run is out. */
@@ -93,26 +119,46 @@ export function words(form: Pick<FormSchema, 'i18n'>, text: Text | null): string
   return typeof text === 'string' ? text : (resolveText(form, text, form.i18n?.defaultLocale ?? '') ?? null)
 }
 
-/** The region's question and title: "Close the order: Order `k1:7`". */
+/** Whether a run is over the records chosen of a page (0166), rather than the open record. */
+export const isSelection = (target: RunTarget): boolean => target.action.scope === 'selection'
+
+/** "1 record", "3 records". */
+export const counted = (n: number): string => `${String(n)} ${n === 1 ? 'record' : 'records'}`
+
+/** The region's question and title: "Close the order: Order `k1:7`", or over the records chosen, "Close the chosen orders: 3 records". */
 export function heading(target: RunTarget): Said {
-  return [`${target.label}: ${target.noun} `, { code: target.record }]
+  if (isSelection(target)) return [`${target.label}: ${counted(target.records.length)}`]
+  return [`${target.label}: ${target.noun} `, { code: target.records[0]?.record ?? '' }]
 }
 
-/** What a check found, in words: only what the read showed. */
-export function checkedText(found: RunChecked): string {
+/** What a run says once it is done: the administrator's sentence, or "Done.", and over the records chosen, how many it ran over. */
+export function doneText(target: RunTarget, said: string): string {
+  return isSelection(target) ? `${said} It ran over ${counted(target.records.length)}.` : said
+}
+
+/** What a check found, in words: only what the reads showed -- of the one record, or of every record chosen. */
+export function checkedText(found: RunChecked, many = false): string {
   switch (found.kind) {
     case 'unchanged':
-      return 'The database shows it has not run: the record is still at the version you read.'
+      return many
+        ? 'The database shows it has not run: every record is still at the version you read.'
+        : 'The database shows it has not run: the record is still at the version you read.'
     case 'changed':
-      return 'It ran, or the record was changed since you read it.'
+      return many ? 'It ran, or every record was changed since you read it.' : 'It ran, or the record was changed since you read it.'
+    case 'mixed':
+      return 'It did not run, since a run changes every record or none; some of these records were changed or deleted since you read them.'
     case 'absent':
-      return NOT_FOUND
+      return many ? 'None of these records is there any more.' : NOT_FOUND
     case 'unread':
       return `${found.message} Whether it ran is still unknown.`
   }
 }
 
 const numbered = (now: Run): number => (now.state === 'idle' ? 0 : now.n) + 1
+
+/** Whether two runs are over the same records, in the same order. */
+const sameRecords = (a: RunTarget, b: RunTarget): boolean =>
+  a.records.length === b.records.length && a.records.every((each, index) => each.record === b.records[index]?.record)
 
 /**
  * Ask to run `target`'s action: its dialog first where it has one, its
@@ -123,7 +169,7 @@ const numbered = (now: Run): number => (now.state === 'idle' ? 0 : now.n) + 1
  */
 export function ask(now: Run, target: RunTarget, dialog: FormEngine | null, discards: readonly PaneWork[]): Run {
   if (runWork(now) !== null) return { ...now, n: numbered(now) } as Run
-  if (now.state === 'asking' && now.target.action.name === target.action.name && now.target.record === target.record) return { ...now, n: numbered(now) }
+  if (now.state === 'asking' && now.target.action.name === target.action.name && sameRecords(now.target, target)) return { ...now, n: numbered(now) }
   if (dialog !== null) return { state: 'asking', target, dialog, n: numbered(now) }
   return { state: 'confirming', target, dialog: null, answers: {}, discards, n: numbered(now) }
 }
@@ -134,10 +180,10 @@ export function answered(now: Run, answers: Answers, discards: readonly PaneWork
   return { state: 'confirming', target: now.target, dialog: now.dialog, answers, discards, n: numbered(now) }
 }
 
-/** Run it: the confirmation becomes the run out, in the same region, at the version given. */
-export function send(now: Run, version: string): Run {
+/** Run it: the confirmation becomes the run out, in the same region, over the records at the versions given. */
+export function send(now: Run, records: readonly RunRecord[]): Run {
   if (now.state !== 'confirming') return now
-  return { state: 'sending', target: { ...now.target, version }, dialog: now.dialog, answers: now.answers, discards: now.discards, n: now.n }
+  return { state: 'sending', target: { ...now.target, records }, dialog: now.dialog, answers: now.answers, discards: now.discards, n: now.n }
 }
 
 /**
@@ -154,7 +200,8 @@ export function answer(now: Run, outcome: ActionOutcome, said: string): { next: 
   const problems = fieldProblems(outcome)
   if (now.dialog !== null && Object.keys(problems).length > 0) return { next: { state: 'asking', target, dialog: now.dialog, n }, done: false, problems }
   const stale = outcome.status === 409 && outcome.code === 'stale'
-  return { next: { state: 'refused', target, message: outcome.message, stale, declined: outcome.code === 'declined', n }, done: false }
+  const named = outcome.records ?? []
+  return { next: { state: 'refused', target, message: outcome.message, stale, declined: outcome.code === 'declined', named, n }, done: false }
 }
 
 /** The record could not be read again after the run: said in the region, which keeps the keyboard. */
@@ -170,29 +217,47 @@ export function checking(now: Run): Run {
   return now
 }
 
-/** What the check's read of the record showed, against the version the run sent: its own state, which takes the keyboard. */
-export function checked(now: Run, found: Outcome<FormRecord>): Run {
+/**
+ * What the check's reads of the records showed, each against the version
+ * the run sent it at -- `found` in the order the run named them: its own
+ * state, which takes the keyboard. A read refused leaves it unknown; every
+ * record at the version sent, it has not run; every one gone, not found;
+ * every one moved or gone, it ran, or each was changed since; some at the
+ * version sent and some not, it did not run, since a run moves every
+ * record or none (0165), and some were changed since.
+ */
+export function checked(now: Run, found: readonly Outcome<FormRecord>[]): Run {
   if (now.state !== 'unknown') return now
-  const sent = now.unknown.records[0]?.version
-  const result: RunChecked = found.ok
-    ? { kind: found.value.version === sent ? 'unchanged' : 'changed' }
-    : found.status === 404 && found.code === 'not-found'
-      ? { kind: 'absent' }
-      : { kind: 'unread', message: found.message }
+  const each = now.unknown.records.map((sent, index): RunChecked => {
+    const read = found[index]
+    if (read === undefined) return { kind: 'unread', message: 'The record was not read.' }
+    if (read.ok) return { kind: read.value.version === sent.version ? 'unchanged' : 'changed' }
+    return read.status === 404 && read.code === 'not-found' ? { kind: 'absent' } : { kind: 'unread', message: read.message }
+  })
+  const all = (kind: RunChecked['kind']): boolean => each.every((one) => one.kind === kind)
+  const result: RunChecked =
+    each.find((one) => one.kind === 'unread') ??
+    (all('unchanged')
+      ? { kind: 'unchanged' }
+      : all('absent')
+        ? { kind: 'absent' }
+        : each.some((one) => one.kind === 'unchanged')
+          ? { kind: 'mixed' }
+          : { kind: 'changed' })
   return { state: 'checked', target: now.target, answers: now.answers, unknown: now.unknown, found: result, n: numbered(now) }
 }
 
 /**
- * Run it again, after a check found the record still at the version sent:
- * the run out once more with that version and the same answers -- never a
- * version read since, which would run it a second time over a first that
- * committed after the check. No second confirmation: the version is the
- * guard.
+ * Run it again, after a check found every record still at the version
+ * sent: the run out once more with those versions and the same answers --
+ * never a version read since, which would run it a second time over a
+ * first that committed after the check. No second confirmation: the
+ * versions are the guard.
  */
 export function again(now: Run): Run {
   if (now.state !== 'checked' || now.found.kind !== 'unchanged') return now
-  const version = now.unknown.records[0]?.version ?? now.target.version
-  return { state: 'sending', target: { ...now.target, version }, dialog: null, answers: now.answers, discards: [], n: numbered(now) }
+  const records = now.unknown.records.map(({ record, version }) => ({ record, version }))
+  return { state: 'sending', target: { ...now.target, records }, dialog: null, answers: now.answers, discards: [], n: numbered(now) }
 }
 
 /** Closed by another request, Keep it, or Close: only what holds no work closes. */

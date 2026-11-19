@@ -40,6 +40,25 @@ export function crumbOf(level: number, title: string, open: { token: string; nam
   return { level, said: open.name === null ? [`${title} `, { code: open.token }] : [`${title} ${open.name}`] }
 }
 
+/**
+ * Drill down's trail, down to the level `shown`: the records; the record
+ * open in the detail, by `open` -- its token and name -- or as new, for a
+ * new record or the next version of one; and each level held below it, by
+ * its form's title.
+ */
+export function trailOf(
+  title: string,
+  open: { token: string; name: string | null } | 'new' | null,
+  path: ReadonlyArray<{ level: number; form: { menu: { title: string } }; token: string | null; name: string | null }>,
+  shown: number,
+): Crumb[] {
+  return [
+    { level: 0, said: ['Records'] },
+    ...(open === null ? [] : [crumbOf(1, title, open === 'new' ? null : open)]),
+    ...path.map((step) => crumbOf(step.level, step.form.menu.title, step.token === null ? null : { token: step.token, name: step.name })),
+  ].slice(0, shown + 1)
+}
+
 /** What the trail draws: every crumb, or on a phone past three the first, how many there are, and the last two. */
 export function shownCrumbs(crumbs: readonly Crumb[], compact: boolean, expanded: boolean): Array<Crumb | { more: number }> {
   if (!compact || expanded || crumbs.length <= 3) return [...crumbs]

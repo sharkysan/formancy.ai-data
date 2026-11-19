@@ -1,6 +1,6 @@
 # 0165 — An action runs over a selection of up to a page of records in one transaction, locked in key order, all or nothing
 
-- **Status:** accepted
+- **Status:** accepted; extended by [0166](0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md): the studio binds an action over a selection and the host page offers it, from a bar above the Records grid, so its Decision 9 holds of the open record's header alone
 - **Date:** 2026-11-17
 - **Deciders:** Daniel Bacher
 - **Verified by:** the server's half of a selection -- data-core, both

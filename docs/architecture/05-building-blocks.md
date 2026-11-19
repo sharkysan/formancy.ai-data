@@ -604,6 +604,11 @@ record -- its dialog, a confirmation in place, the run, the record read
 again, and a lost answer checked by a read -- and `src/action-region.tsx`
 its buttons in the detail's header and its region under it
 ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md));
+the same flow over the records a person chose of the Records grid's page:
+`src/chosen-rows.ts` the choice, of the page shown and at the versions
+read, `src/choose-column.tsx` the grid's first column of boxes, and
+`src/selection-bar.tsx` the bar above the grid with its actions and the
+region under it ([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md));
 `src/unknown-notice.tsx` an unknown write (0031). The address names the
 form, layout and view, never the record (`src/layout.ts`), and an arrival
 whose address names no layout opens in the one the person chose last,

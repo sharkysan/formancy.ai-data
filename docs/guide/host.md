@@ -294,8 +294,8 @@ again
 Each action the server offers you on the form over the open record -- a
 routine the database keeps, which an administrator bound to it -- is a
 button in the open record's header, named by its label, and only there:
-a child row and a Drill down level offer none, and an action over a
-selection of records is offered nowhere on this page yet
+a child row and a Drill down level offer none, and an action over the
+records you choose is above the grid, below
 ([0165](../decisions/0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md)). Pressed, it asks in place under the header,
 with no overlay: first its dialog, where it has one, drawn by the
 renderer you chose -- React where both are shown -- on its own paper,
@@ -325,6 +325,36 @@ ran reads the record, and only where it is still at the version the run
 sent does it offer Run it again, which sends that version -- so if the
 first ran after all, the second is refused as changed
 ([0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md)).
+
+Where the form offers you an action over the records you choose, the
+Records grid's first column, Choose, holds a box on each row you could
+run it over -- "Choose Order `k1:7`", named as the row's Delete names its
+record -- and a bar above the grid holds a button for each such action,
+a line that says how many are chosen, Choose every record on this page
+and Clear the choice. The arrow keys reach a row's box as they reach any
+cell, and as they arrive the grid says that Space ticks or unticks it --
+on a row's Delete, that Space or Enter asks to delete it. Space ticks it
+and opens nothing, and Tab leaves the grid in one stop, as from any
+cell; Space on another cell still opens the record. A choice is of the
+page shown: another page, a search, a filter, a sort or a view clears
+it, and the bar's line says so; the same page read again, after a save,
+keeps it at the versions read then, and a save of the open record moves
+the version it is sent at. An action pressed with nothing chosen says
+what to do first and sends nothing, and Clear the choice that there is
+nothing to clear, each again at every press. Pressed with records
+chosen, it asks as the header's does, under the bar: its dialog, then a
+confirmation that counts the records and, where the administrator wrote
+no sentence of their own, says that if one is refused, none of them is
+changed. Either stands only while the choice does: tick or untick a
+box, clear the choice or show another page, and it closes, nothing run.
+Once it ran, "Done. It ran over 3 records.", the page read again and
+the choice cleared -- and the open record read again, where it was one
+of them. A refusal about some of the records names them and says
+nothing was done to any, all of it said as the keyboard lands there,
+and offers Read the page again, never a run again past it; a run whose
+answer was lost is checked by reading each record, and run again only
+where none moved
+([0166](../decisions/0166-a-person-chooses-a-pages-records-by-a-column-of-boxes-and-runs-an-action-over-them-from-a-bar-above-the-grid.md)).
 
 New record, and a child's new row, start each field at its column's
 constant default where the form has one -- an order at `draft` -- and a
@@ -462,7 +492,8 @@ the real server on PostgreSQL, which needs Docker: the workspace in every
 layout down to 320 pixels, Stacked's line moved by its keys and a pointer,
 the grids' keyboard and colours, the record's
 journey, a delete's confirmations and answers, an action's dialog,
-confirmation and answers, and a file downloaded, its bytes the server's.
+confirmation and answers, the records chosen and an action over them,
+and a file downloaded, its bytes the server's.
 
 The page has a second build, for the [live demo](live-demo.md):
 `pnpm --filter @formancy/data-host build:demo` writes it to
