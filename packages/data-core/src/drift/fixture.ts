@@ -328,6 +328,17 @@ function withoutRoutines(snapshot: MetadataSnapshot): MetadataSnapshot {
   return createSnapshot({ ...rest, scope: { schemas: scope.schemas }, gaps: rest.gaps.filter((gap) => gap.aspect !== 'routines') })
 }
 
+/** Whether any routine of `snapshot` says whether the engine calls it given a NULL, which discovery reads since 0167. */
+function readsOnNull(snapshot: MetadataSnapshot): boolean {
+  return (snapshot.routines ?? []).some((routine) => routine.onNull !== undefined)
+}
+
+/** `snapshot` as discovery before 0167 would have taken it: no routine saying whether the engine calls it given a NULL. */
+function withoutOnNull(snapshot: MetadataSnapshot): MetadataSnapshot {
+  const { fingerprint: _fingerprint, routines, ...rest } = JSON.parse(JSON.stringify(snapshot)) as MetadataSnapshot
+  return createSnapshot({ ...rest, ...(routines === undefined ? {} : { routines: routines.map(({ onNull: _onNull, ...routine }) => routine) }) })
+}
+
 /**
  * `diffSnapshots`, held on every call the drift suites make to what the
  * runtime rests on (0041), so every report any of them builds is a case of
@@ -348,6 +359,12 @@ function withoutRoutines(snapshot: MetadataSnapshot): MetadataSnapshot {
  *   current snapshot records change nothing (0158), for the same reason:
  *   every form published before then would review routines nobody looked
  *   for as new.
+ * - Against a base none of whose routines says whether the engine calls it
+ *   given a NULL, a current snapshot that says changes nothing (0167):
+ *   the report is the one review gives against the same snapshot without
+ *   it. Otherwise every routine of every form published before 0167 would
+ *   be reviewed as changed on every review until the form is published
+ *   again.
  */
 export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot, bindings: FormBindings, policy: DriftPolicy): DriftReport {
   const report = review(base, current, bindings, policy)
@@ -377,6 +394,12 @@ export function diffSnapshots(base: MetadataSnapshot, current: MetadataSnapshot,
   }
   if (!recordsRoutines(base) && recordsRoutines(current)) {
     expect(review(base, withoutRoutines(current), bindings, policy), 'routines changed a report against a base that never asked for them').toEqual(report)
+  }
+  if (!readsOnNull(base) && readsOnNull(current)) {
+    expect(
+      review(base, withoutOnNull(current), bindings, policy),
+      'whether a routine is called given a NULL, read since 0167, changed a report against a base that never read it',
+    ).toEqual(report)
   }
   return report
 }

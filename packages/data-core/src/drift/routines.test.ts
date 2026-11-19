@@ -147,12 +147,23 @@ describe('a routine an action binds', () => {
   // A snapshot taken before 0167 did not read whether PostgreSQL calls a
   // routine given a NULL: read for the first time, the fact is no change of
   // the routine, either way, and stops nothing -- the run's description
-  // still refuses a STRICT one (0160). Watched failing on 2026-11-19 with
-  // the routine compared whole: "called: expected [ [ 'routine-changed',
-  // …(2) ] ] to deeply equal []".
+  // still refuses a STRICT one (0160). The fact is in the fingerprint, so
+  // such a review never takes the fast path: every review of a form
+  // published before 0167 compares in full, until the form is published
+  // again from a discovery since, and finds no change -- the report the
+  // fast path gives, which `fixture.ts` holds on every call. Watched
+  // failing on 2026-11-19 with the routine compared whole: "called:
+  // expected [ [ 'routine-changed', …(2) ] ] to deeply equal []"; and,
+  // with `fixture.ts`'s check of 0167 beside it, that check first:
+  // "whether a routine is called given a NULL, read since 0167, changed a
+  // report against a base that never read it"; and with the fact left out
+  // of the fingerprint: "called: expected '9f09d16e…' not to be
+  // '9f09d16e…'".
   test('whether it is called given a NULL, read for the first time, is no change', () => {
     for (const onNull of ['called', 'not-called'] as const) {
-      const report = review(routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull }, CLOSE_ORDER]))
+      const current = routineSnapshot('postgres', [{ ...SHIP_ORDER, onNull }, CLOSE_ORDER])
+      expect(current.fingerprint, onNull).not.toBe(BASE.fingerprint)
+      const report = review(current)
       expect(rows(report), onNull).toEqual([])
       expect(report.actions, onNull).toEqual(['ship', 'close'])
       expect(report.runtime.actions, onNull).toEqual(['ship', 'close'])
