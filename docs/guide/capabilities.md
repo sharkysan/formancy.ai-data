@@ -316,7 +316,12 @@ get*](../../README.md#what-you-get) is the short version, and
   or a lost answer that names the action and the version sent, so the
   same run sent again is refused as changed if it ran. What the routine
   does is the deployment's: field grants, state moves and the policy's
-  cascades do not bind it. The studio binds one: its routines discovered
+  cascades do not bind it. A STRICT PostgreSQL function, which PostgreSQL
+  does not call when an argument is NULL, is never bound: discovery reads
+  it, the generator refuses it before publication, and drift review stops
+  an action whose routine became STRICT since. A form published from a
+  snapshot taken before that keeps offering one, every run refused, until
+  it is generated again. The studio binds one: its routines discovered
   with Include routines, each parameter offered only the sources the
   generator binds for it, the grant made on the Policy step after a note
   of what the routine does that nothing here binds, its words on the
@@ -330,7 +335,8 @@ get*](../../README.md#what-you-get) is the short version, and
   [0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md),
   [0161](../decisions/0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md),
   [0162](../decisions/0162-the-host-page-runs-an-action-from-the-open-records-header-after-its-dialog-and-a-confirmation-in-place-and-reads-the-record-again.md),
-  [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md)).
+  [0163](../decisions/0163-the-studio-binds-a-routine-as-an-action-offering-each-parameter-only-what-the-generator-binds-and-says-what-it-does-before-it-is-granted.md),
+  [0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)).
 - **An action runs over a selection of up to a page of records**, on
   `main` since 0.3.0: an action whose `scope` is `selection` in the
   generation request, bound by the generator's rules for the open

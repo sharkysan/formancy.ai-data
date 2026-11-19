@@ -470,7 +470,10 @@ assert through `covers()` on both engines.
 **What it costs.** What 0160 records: a run holds its record and the
 parent for up to its deadline, fires the root's UPDATE triggers, needs
 UPDATE on a through's parent on PostgreSQL, refuses a STRICT routine
-there, answers EXECUTE revoked as the procedure gone on SQL Server where
+there -- which the generator refuses to bind wherever the snapshot says
+so, and review stops where a bound one became so, while a form
+published from a snapshot that did not say keeps offering it
+([0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)) -- answers EXECUTE revoked as the procedure gone on SQL Server where
 the account held no other permission on it, and over-reports a lost
 answer on PostgreSQL and any run past its deadline on SQL Server as "it
 may have run".

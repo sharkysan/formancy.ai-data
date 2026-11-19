@@ -1251,6 +1251,15 @@ the same day (formancy.ai 0232).
 
 ### Changed
 
+- **The generator refuses a STRICT PostgreSQL routine before
+  publication** (0167). Why: no run calls one (0160), so a form bound to
+  one was published and its every run refused. Discovery records whether
+  the engine calls each routine given a NULL, `onNull` -- `proisstrict`,
+  SQL Server's `null_on_null_input` -- the studio's Choose step says the
+  refusal, and drift review stops an action whose routine became STRICT.
+  A snapshot taken before says nothing and binds as it did, so a published
+  form keeps its fingerprint and bindings, and one bound to a STRICT
+  routine keeps offering it, every run refused, until generated again.
 - **The host page's suite runs in two CI jobs, each a shard of its files
   that vitest's `--shard` chooses** (0164). Why: it alone set every run's
   wall time. On main's run 44027383496 (2026-11-17) its job took 39 of the

@@ -106,8 +106,15 @@ its deadline, or whose procedure ended the transaction, is
 `unknown-outcome` even where it rolled back, and on PostgreSQL so is a run
 whose answer was lost before its COMMIT was sent. Half the deadline for
 SQL Server's lock wait is chosen, not measured. On PostgreSQL a STRICT
-routine is refused by the run's description, and neither discovery nor
-the generator says so before publication; and a routine with no
+routine is refused by the run's description, and since
+[0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md) by the generator before
+publication too, by the same rule -- but a form published from a
+snapshot taken before 0167, which did not read STRICT, keeps offering an
+action over one, every run refused, until it is generated again, and
+review does not stop it, since the routine did not change. That an
+account that may only EXECUTE a SQL Server function reads whether it is
+called given a NULL is Microsoft's documentation, measured first in CI.
+And a routine with no
 parameter, replaced by an IMMUTABLE one between the description and the
 call, is evaluated while the call is planned, before its guard refuses
 it. On SQL Server, EXECUTE revoked from an account that held no other

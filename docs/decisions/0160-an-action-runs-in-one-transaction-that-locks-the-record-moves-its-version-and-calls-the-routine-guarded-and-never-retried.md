@@ -1,6 +1,6 @@
 # 0160 — An action runs in one transaction that locks the record, moves its version and calls the routine, guarded and never retried
 
-- **Status:** accepted; extended by [0161](0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md): the runtime plane runs it, under `FORMANCY_DATA_ACTION_DEADLINE_MS`, never queued on the actions' pool; extended by [0165](0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md): both adapters run a selection of up to a page of records in one transaction, each locked in key order, all or nothing
+- **Status:** accepted; extended by [0161](0161-the-runtime-plane-runs-an-action-once-per-write-id-under-a-deadline-and-never-queues-it.md): the runtime plane runs it, under `FORMANCY_DATA_ACTION_DEADLINE_MS`, never queued on the actions' pool; extended by [0165](0165-an-action-runs-over-a-selection-of-up-to-a-page-of-records-in-one-transaction-locked-in-key-order-all-or-nothing.md): both adapters run a selection of up to a page of records in one transaction, each locked in key order, all or nothing; extended by [0167](0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md): the description refuses a STRICT routine by the generator's own rule, and discovery and the generator say so before publication
 - **Date:** 2026-11-16
 - **Deciders:** Daniel Bacher
 - **Verified by:** the adapters' run, the part of this decision built so

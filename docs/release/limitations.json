@@ -4668,7 +4668,7 @@
       ]
     },
     "0158": {
-      "reviewed": "sha256:ef482bca7d7453c9c7906306b6434fb67273d4e87a5d933d8d141df27d7ccf85",
+      "reviewed": "sha256:4974b297a7f0481f253a9ef9ab2afbaa757788c4c24bd0a0401dac824a287e93",
       "limitations": [
         {
           "area": "databases",
@@ -4728,7 +4728,7 @@
       ]
     },
     "0159": {
-      "reviewed": "sha256:63d9b0c3d88af569976abc220eaa55c1b044841d54bb2ad51d7bf6747c41f412",
+      "reviewed": "sha256:528841418c238a6a972c89665035d236c20dcb85708da0dc133c0ac699cf9866",
       "limitations": [
         {
           "area": "databases",
@@ -4785,7 +4785,7 @@
       ]
     },
     "0160": {
-      "reviewed": "sha256:66046da519842150ab7d1f90739ef8264d5842eaad033fcb1f066e4334f2f81f",
+      "reviewed": "sha256:d7cf5d1815b0e06ac90d8460a569694082c2d99d98f37c4e380951fdb6e2b321",
       "limitations": [
         {
           "area": "writes",
@@ -4837,7 +4837,7 @@
         },
         {
           "area": "databases",
-          "says": "On PostgreSQL a STRICT routine is never run, since PostgreSQL would not call it for a NULL argument: a run’s description refuses it, and neither discovery nor the generator says so before publication.",
+          "says": "On PostgreSQL a STRICT routine is never run, since PostgreSQL would not call it for a NULL argument: a run’s description refuses it, and so does the generator before publication wherever the snapshot says so (0167).",
           "heldBy": "packages/data-postgres/src/actions.integration.test.ts"
         },
         {
@@ -5102,6 +5102,35 @@
         {
           "area": "host",
           "says": "A chosen record is sent at the version the page read it at or the detail heard since, whichever arrived last, so a page read after somebody else changed the open record runs over their version while its forms hold the older one, until the run reads it again."
+        }
+      ]
+    },
+    "0167": {
+      "reviewed": "sha256:0596372e6b9d68fd5523d97ce1008e756e7912cba517269a77a3d95857645c44",
+      "limitations": [
+        {
+          "area": "forms",
+          "says": "A form published before 0167 that binds a STRICT PostgreSQL routine keeps offering its action, every run of it refused, until it is generated again from a discovery since, which drops the action; drift review does not stop it, since the routine did not change.",
+          "heldBy": "packages/data-core/src/drift/routines.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "A STRICT PostgreSQL routine is refused as an action whatever its arguments, one whose every argument can never be NULL included, until it is declared CALLED ON NULL INPUT.",
+          "heldBy": "packages/data-core/src/generate/actions.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "Discovered again since 0167, a snapshot that records routines hashes otherwise than before, so drift review of each form whose snapshot records them compares it in full once, and finds no change.",
+          "heldBy": "packages/data-core/src/routines.test.ts"
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server whether a function is called given a NULL is read from sys.sql_modules, which Microsoft documents as shown to an account holding any permission on the function; where it is not shown, nothing is recorded.",
+          "heldBy": "packages/data-sqlserver/src/discovery-routines.integration.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0167 reads a snapshot that records whether a routine is called given a NULL, and its generator binds a STRICT routine whose every run is refused."
         }
       ]
     }

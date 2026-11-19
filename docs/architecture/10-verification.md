@@ -230,6 +230,19 @@ a pool's reported size, a run's round trips on both of PostgreSQL's paths
 on 2026-11-16, and `packages/data-server/src/drivers.integration.test.ts`
 holds the actions' own client on each engine
 ([0160](../decisions/0160-an-action-runs-in-one-transaction-that-locks-the-record-moves-its-version-and-calls-the-routine-guarded-and-never-retried.md)).
+Whether the engine calls a routine given a NULL is held without a
+database by `packages/data-core/src/routines.test.ts` -- a snapshot that
+does not say hashes to the literal data-core at 7343512 gave it -- the
+generator's refusal of a STRICT routine, and an unknown one bound as
+before, by `generate/actions.test.ts`, drift by `drift/routines.test.ts`,
+and a bundle published before by `packages/data-server/src/bundle.test.ts`
+against `fixtures/bundle-before-0167.json`, each watched failing; and on
+both engines, first in CI, by `ACTION_ON_NULL`, which each adapter's
+`actions.integration.test.ts` asserts through `covers()`, PostgreSQL's
+beside a case that holds the run's description and the generator to one
+answer for every routine of the actions schema, and by each discovery
+suite beside the server's own answer to a NULL
+([0167](../decisions/0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md)).
 The route that runs one is held over fake ports by
 `packages/data-server/src/routes/runtime-actions.test.ts` -- 403 before
 the connection is opened and before any statement, an action drift
