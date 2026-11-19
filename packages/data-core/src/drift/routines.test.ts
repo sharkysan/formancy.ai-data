@@ -47,6 +47,21 @@ function shipped(routine: RoutineMeta | null, ...more: RoutineMeta[]): MetadataS
 const rows = (report: DriftReport) =>
   report.changes.map((change) => [change.kind, change.severity, change.subject.kind === 'routine' ? change.subject.routine.name : ''])
 
+/**
+ * The order on SQL Server with `ship` bound over `ship`, a procedure by
+ * the order's id, on its rowversion with `notes` confirmed as the touch
+ * column a run sets (0155).
+ */
+function sqlServerShip(ship: RoutineMeta): { base: MetadataSnapshot; bindings: FormBindings } {
+  const base = withRoutines(snapshot('sqlserver'), [ship])
+  const generated = orderForm(base).bindings
+  const concurrency: ConcurrencyBinding = { ...(generated.concurrency as ConcurrencyBinding), touch: 'notes' }
+  const root = base.objects.find((object) => object.ref.name === 'order') as ObjectMeta
+  const choice: ActionChoice = { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] }
+  const bound = bindAction(base, root, { identity: generated.identity, concurrency, fields: generated.fields }, choice) as BoundAction
+  return { base, bindings: { ...generated, concurrency, actions: [{ ...bound, dialog: null }] } }
+}
+
 describe('a routine an action binds', () => {
   // Gone, with no gap to say the account lost sight of it: `ship` cannot
   // run, and only `ship`; every write the form offers is untouched.
@@ -107,6 +122,26 @@ describe('a routine an action binds', () => {
     )
     expect(report.actions).toEqual(['close'])
     expect(report.runtime.actions).toEqual(['close'])
+  })
+
+  // STRICT's rule is PostgreSQL's alone (0167): a run on SQL Server calls
+  // a procedure, which the engine always calls. A bound procedure dropped
+  // and created again as a scalar function declared RETURNS NULL ON NULL
+  // INPUT changed what a call of it rests on, and that one change says so,
+  // without a second in PostgreSQL's words beside it. Watched failing on
+  // 2026-11-19 with `madeStrict` asked whatever the engine: "expected [ [
+  // 'routine-changed', …(2) ], …(1) ] to deeply equal [ [
+  // 'routine-changed', …(2) ] ]".
+  test('on SQL Server, a procedure become a function not called given a NULL is one change of what a call rests on', () => {
+    const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', INT64, 'bigint')], { onNull: 'called' })
+    const { base, bindings } = sqlServerShip(ship)
+    const result = { typeId: '127:8:19:0', databaseType: 'bigint', type: INT64 }
+    const current = withRoutines(snapshot('sqlserver'), [{ ...ship, kind: 'function', effects: 'reads', returns: 'scalar', result, onNull: 'not-called' }])
+    const report = diffSnapshots(base, current, bindings, ACTION_POLICY)
+    expect(rows(report)).toEqual([['routine-changed', 'blocking', 'ship_order']])
+    expect(report.changes[0]?.message).toMatch(/changed what a call of it rests on/)
+    expect(report.actions).toEqual([])
+    expect(report.runtime.actions).toEqual([])
   })
 
   // A snapshot taken before 0167 did not read whether PostgreSQL calls a
@@ -352,13 +387,7 @@ describe('a change of the root', () => {
   // `stillServes`: `ship` still ran.
   test('stops the actions whose touch column a run can no longer set', () => {
     const ship = msRoutine('ship_order', [msParameter('@order_id', '127:8:19:0', INT64, 'bigint')])
-    const base = withRoutines(snapshot('sqlserver'), [ship])
-    const generated = orderForm(base).bindings
-    const concurrency: ConcurrencyBinding = { ...(generated.concurrency as ConcurrencyBinding), touch: 'notes' }
-    const root = base.objects.find((object) => object.ref.name === 'order') as ObjectMeta
-    const choice: ActionChoice = { ...SHIP, routine: ship.ref, parameters: [{ parameter: '@order_id', from: { key: 'id' } }] }
-    const bound = bindAction(base, root, { identity: generated.identity, concurrency, fields: generated.fields }, choice) as BoundAction
-    const bindings: FormBindings = { ...generated, concurrency, actions: [{ ...bound, dialog: null }] }
+    const { base, bindings } = sqlServerShip(ship)
     expect(diffSnapshots(base, base, bindings, ACTION_POLICY).actions).toEqual(['ship'])
     const current = withRoutines(
       snapshot('sqlserver', (objects) => restrict(objects, 'order', 'notes', { update: false })),

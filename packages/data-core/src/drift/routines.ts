@@ -1,5 +1,6 @@
 import { canonicalize } from '@formancy/spec'
 import type { ActionBinding } from '../actions/types.js'
+import type { DatabaseKind } from '../adapter.js'
 import { ambiguousBeside, fitProblem, nullInputProblem } from '../generate/actions.js'
 import { touchColumnProblem } from '../generate/together.js'
 import type { FormBindings } from '../generate/types.js'
@@ -54,10 +55,13 @@ function recordedAlike(was: RoutineMeta, is: RoutineMeta): boolean {
 /**
  * Why a bound routine no longer runs since PostgreSQL stopped calling it
  * given a NULL (0167) -- called in `was` and refused by the generator's own
- * rule in `is` -- or `null`. Unknown in either is no change.
+ * rule in `is` -- or `null`. Unknown in either is no change. Asked on
+ * PostgreSQL alone, as the generator asks it (`routineProblem`): on SQL
+ * Server a bound routine is a procedure, which the engine always calls,
+ * and one become a function has changed its call shape, said once.
  */
-function madeStrict(was: RoutineMeta, is: RoutineMeta): string | null {
-  return was.onNull === 'called' ? nullInputProblem(is) : null
+function madeStrict(kind: DatabaseKind, was: RoutineMeta, is: RoutineMeta): string | null {
+  return kind === 'postgres' && was.onNull === 'called' ? nullInputProblem(is) : null
 }
 
 /**
@@ -150,7 +154,7 @@ function boundChanges(comparison: Comparison, was: RoutineMeta, is: RoutineMeta,
       ),
     )
   }
-  const strict = madeStrict(was, is)
+  const strict = madeStrict(comparison.base.kind, was, is)
   if (strict !== null) drafts.push(draft('routine-changed', is.ref, actions, `${strict}; it was not when the form was published. ${STOPPED(actions)}`))
   if (was.executable && !is.executable) {
     drafts.push(
@@ -260,7 +264,7 @@ export function runtimeRoutineStops(base: MetadataSnapshot, current: MetadataSna
   for (const action of bindings.actions ?? []) {
     const was = findRoutine(base, action.routine)
     const is = findRoutine(current, action.routine)
-    if (was === undefined || is === undefined || callShape(was) !== callShape(is) || madeStrict(was, is) !== null) stopped.add(action.name)
+    if (was === undefined || is === undefined || callShape(was) !== callShape(is) || madeStrict(base.kind, was, is) !== null) stopped.add(action.name)
   }
   return stopped
 }

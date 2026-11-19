@@ -144,12 +144,13 @@ export function ambiguousBeside(routines: readonly RoutineMeta[], routine: Routi
  * engine always calls, and a SQL Server function declared RETURNS NULL ON
  * NULL INPUT is refused first, as a function (`routineProblem`).
  *
- * The one rule, asked by the generator of a snapshot's routine and by
- * PostgreSQL's run description of the routine it reads again
+ * The one rule, asked by the generator of a snapshot's routine, by drift
+ * of a bound PostgreSQL routine since publication (`drift/routines.ts`),
+ * and by PostgreSQL's run description of the routine it reads again
  * (`describedRoutineFrom`, which answers `refused`, 0160), each over a
  * routine discovery's own `routineOf` normalised; that adapter's actions
- * suite holds the two to one answer for every routine of the fixture's
- * actions schema. A routine whose snapshot does not say -- one taken
+ * suite holds the generator and the description to one answer for every
+ * routine of the fixture's actions schema. A routine whose snapshot does not say -- one taken
  * before 0167 -- is no problem here: it binds as it did, and the
  * description still refuses it at run time.
  */
