@@ -100,16 +100,30 @@ export function togetherJourney(plane, hop, { check, measure, asked }, run) {
         await chooseSavedOrders(page)
         const search = records(page).getByRole('textbox', { name: 'Search' })
         await search.fill(at.note)
+        // The search's own list, answered, and the grid no longer busy with
+        // it. At the first width this order is the only one saved, so the
+        // list before the search already says "Rows 1–1.", and its rows are
+        // held on screen while the search's are asked for (0146): Enter on a
+        // held row, pressed before the search's list replaced it, opened
+        // nothing (CI, 2026-11-19: no heading "Order k1:1" in 20 s).
+        const searched = page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname.endsWith(`/v1/forms/${SAVED_ORDER}/records/list`) &&
+            JSON.parse(response.request().postData() ?? '{}').search === at.note,
+          WITHIN,
+        )
         await records(page).getByRole('button', { name: 'Search', exact: true }).click()
-        // The one order its note finds, once the search has answered: an earlier pass's order may show its number in another column.
+        await searched
+        const grid = records(page).getByRole('grid', { name: 'Records', exact: true })
+        // The one order its note finds: an earlier pass's order may show its number in another column.
         await until(
-          async () => ((await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? '') === 'Rows 1–1.',
+          async () =>
+            (await grid.getAttribute('aria-busy')) === null &&
+            ((await records(page).getByRole('status', { name: /^$/ }).first().textContent()) ?? '') === 'Rows 1–1.',
           'the search never listed the order alone',
         )
-        const cell = records(page)
-          .getByRole('grid', { name: 'Records', exact: true })
-          .getByRole('gridcell', { name: at.record.slice(3), exact: true })
-          .first()
+        const cell = grid.getByRole('gridcell', { name: at.record.slice(3), exact: true }).first()
         await cell.focus()
         await page.keyboard.press('Enter')
         await page.getByRole('heading', { level: 3, name: `Order ${at.record}`, exact: true }).waitFor(WITHIN)
