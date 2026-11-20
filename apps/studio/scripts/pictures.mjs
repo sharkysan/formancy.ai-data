@@ -40,8 +40,8 @@
 // studio-starting-value, which the guide shows after the Presentation
 // step's own picture and which runs after the preview, where the label of
 // status is Status again; Publish's act takes its starting value back by
-// Undo first, so version 1 and every picture after it are what they were
-// (0169). Elements are found by role and accessible name.
+// Undo first, and asks the server that version 1 gives status none of its
+// own, so version 1 and every picture after it are what they were (0169). Elements are found by role and accessible name.
 // One exception: the host token is a password field, which has no role, so
 // it is found by its label.
 //
@@ -302,9 +302,11 @@ function actsOver(plane, scenes) {
 
     // Status given another starting value than its column's default, draft:
     // after the preview, so its label is Status again, and taken back by
-    // studio-publish's Undo, so version 1 is what it was.
-    'studio-starting-value': async (page, scene) => {
-      const here = await at(page, scene.step)
+    // studio-publish's Undo, so version 1 is what it was. The Presentation
+    // step's, named by studio-presentation alone, so the guide leads one
+    // caption with the step.
+    'studio-starting-value': async (page) => {
+      const here = await at(page, stepOf('studio-presentation'))
       const named = { name: `Starting value of ${STARTING.field}`, exact: true }
       await here.getByRole('textbox', named).fill(STARTING.value)
       await here
@@ -343,6 +345,10 @@ function actsOver(plane, scenes) {
         throw new Error(
           `the latest version of ${FORM.formId} answered ${String(latest.statusCode)} with version ${String(latest.json()?.version)}, not version 1`,
         )
+      // And what Undo left, asked of the server too: version 1 gives status no starting value of its own, so it starts at its column's.
+      const given = latest.json().bundle.presentation.fields.find((field) => field.field === STARTING.field)?.default
+      if (given !== undefined)
+        throw new Error(`version 1 of ${FORM.formId} gives ${STARTING.field} the starting value ${JSON.stringify(given)}, not its column's ${STARTING.column}`)
       return { parts: { Publish: here } }
     },
 

@@ -198,7 +198,9 @@ the parcel's paper names its delivery (watched failing with Freight) and
 that the trail names every level (watched failing with the second parcel
 last); and that the starting value's note says the column's default and
 offers it back, and that Undo gives Status that default again before the
-publish (each watched failing with another value expected). They run at
+publish (each watched failing with another value expected), and that
+version 1, as the server answers it, gives Status no starting value of
+its own (watched failing with the Undo taken out). They run at
 every capture and every `--check`.
 
 ## Commands
@@ -280,7 +282,6 @@ Filed, not hidden, because a picture is the product as it is:
   theme draws the `*` from; the field still says "required" after Validate.
   That is `@formancy/react`'s fallback, at 0.3.0 to 0.13.0 alike,
   and the themes, upstream.
-
 - **A starting value's note and its button spell the column's apostrophe
   two ways.** Under a starting value the generator's note says "the
   column's default", straight, and the button beside it "Use the column’s
@@ -292,6 +293,14 @@ Filed, not hidden, because a picture is the product as it is:
   ([0117](../decisions/0117-a-form-names-what-each-write-accepts-and-a-host-page-sends-nothing-none-accepts.md)),
   and the paper still has its Save under them, which the Drill down
   picture shows. Filed.
+- **A disabled field with a limit still counts the characters left.**
+  Under the parcel's Label, disabled because the parcels' form grants no
+  write, the paper says "You have 27 characters remaining.", an invitation
+  to type that nobody can act on; the Drill down picture shows it. The
+  sentence is `@formancy/core`'s `countSentence`, which asks only whether
+  the field's type is counted and has a `maxLength`, never whether it is
+  disabled, and `@formancy/react`'s `CharacterCount` draws it under the
+  field, both at 0.13.0: upstream's.
 
 ## What nothing checks
 
