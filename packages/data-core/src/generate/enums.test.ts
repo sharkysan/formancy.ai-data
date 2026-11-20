@@ -204,6 +204,12 @@ describe('an enum column is a select of its labels', () => {
     expect(codec.parse('Placed')).toMatchObject({ ok: false, code: 'not-a-label' })
     expect(codec.parse(' placed')).toMatchObject({ ok: false, code: 'not-a-label' })
     expect(codec.parse(1)).toMatchObject({ ok: false, code: 'not-a-label' })
+    // The refusal reaches the person filling the form in as the field's
+    // error (`records/answers.ts`), where no other codec names a type:
+    // the type's name is the generator's note's, which the administrator
+    // reads. Watched failing with "Expected one of the labels of
+    // states.order_state."
+    expect(codec.parse('lost')).toEqual({ ok: false, code: 'not-a-label', message: 'Expected one of the options this field offers.' })
   })
 
   // Generation is deterministic (0009): two runs over the same snapshot are the same bytes.
@@ -264,7 +270,7 @@ describe("an enum's default and starting value", () => {
     const { form, bindings } = generated([column('state', 2, 'states.order_state', ORDER_STATE)])
     const state = binding(bindings.fields, 'state')
     expect(givenStart(state, field(form, 'state') as FieldDef, 'shipped')).toEqual({ ok: true, answer: 'shipped' })
-    expect(givenStart(state, field(form, 'state') as FieldDef, 'lost')).toEqual({ ok: false, reason: 'expected one of the labels of states.order_state' })
+    expect(givenStart(state, field(form, 'state') as FieldDef, 'lost')).toEqual({ ok: false, reason: 'expected one of the options this field offers' })
   })
 })
 

@@ -54,16 +54,15 @@ function parseFloat32(value: number): CodecOutcome {
  * other text with 22P02 (0170). Its field is a select of them, which an
  * empty label cannot be one of -- a select cannot tell it from no answer
  * -- and an enum of no labels holds nothing a field could write; either is
- * shown, never written.
+ * shown, never written. The refusal is the person's field error, so it
+ * names no type, as no other codec's does; the generator's note names it.
  */
 function enumParser(type: Extract<NormalizedType, { kind: 'enum' }>): ((value: unknown) => CodecOutcome) | string {
   if (type.labels.length === 0) return `${type.name.schema}.${type.name.name} has no labels, so nothing but NULL can be written`
   if (type.labels.includes('')) return `${type.name.schema}.${type.name.name} has an empty label, which a select cannot tell from no answer`
   const labels = new Set(type.labels)
   return (value) =>
-    typeof value === 'string' && labels.has(value)
-      ? { ok: true, value }
-      : refuse('not-a-label', `Expected one of the labels of ${type.name.schema}.${type.name.name}.`)
+    typeof value === 'string' && labels.has(value) ? { ok: true, value } : refuse('not-a-label', 'Expected one of the options this field offers.')
 }
 
 /**
