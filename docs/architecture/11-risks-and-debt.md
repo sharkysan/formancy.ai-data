@@ -827,14 +827,24 @@ is: fields read-only on update are drawn editable on a loaded record on the
 host page, which the server refuses on save and which the runtime plane
 gives the page no way to know; a restore's help line already names the
 version after the one it made; a moved key's two column names are told
-apart by a space set in proportional type; and the studio's preview loses a
+apart by a space set in proportional type; the studio's preview loses a
 field's required marker where the renderer cannot fill its options, which
-is upstream's renderer and themes. Accepted for the README's *How it
+is upstream's renderer and themes; a starting value's note and its button
+spell the column's apostrophe two ways, straight and curly; a form that
+grants no write still draws Save under its disabled fields; and a disabled
+field with a limit still counts the characters left, which is upstream's
+`countSentence` and `CharacterCount`. Accepted for the README's *How it
 works*: its pictures are drawn at 0.7 of the size they were taken at,
 which was read at that scale but not at GitHub's width, which nothing
 measures; a reader opens one whole. Its Publish step pictures a
 publish, not 0065's review, which the studio's pictures plane does not run
 ([0168](../decisions/0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md)).
+Accepted for the guide's pages: three features they describe are said in
+words and not pictured -- a form shown as a tree, which would need a grant
+the pictures' account lacks; a state's moves, a select's options, which a
+picture draws closed; and the studio's Browse, which would need a
+database, a browse role and Docker in the studio's walk
+([0169](../decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
 Accepted for the README's sketch of the architecture: it is drawn by hand,
 so its arrows and layout are true only while review keeps them so -- its
 guard holds the names it writes, its colours and its alt, not where an

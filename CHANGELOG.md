@@ -14,6 +14,12 @@ which are kept unchanged under a heading of their own below it (0171).
 
 ### Added
 
+- The guide's pages picture Drill down, a person's own view, Columns and a
+  starting value, so a reader sees each where its prose describes it; a
+  tree, a state's moves and the studio's Browse stay unpictured, for the
+  reasons the record gives
+  ([0169](docs/decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
+
 ### Changed
 
 - **The README is a short page for somebody deciding, and *How it works*

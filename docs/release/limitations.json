@@ -945,7 +945,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:c72fa7c1553d13fdbd54f720b1955d373062dea3da6926d672965f55f456e3bc",
+      "reviewed": "sha256:2605dfe2fe08693618d04b4db124e11d658adb7f70e057b81bd6a779aa4636fd",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -5135,8 +5135,12 @@
       ]
     },
     "0168": {
-      "reviewed": "sha256:34fb7fdb245d3beea8d79d2f424da6ac884934066617bb9bf0e9f3c0562dcd89",
+      "reviewed": "sha256:b25cee3a7e8f8c9d8f5d6ec97dd93cf301056ffae45f95e19305e2fef02e71d5",
       "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and step pictures drawn at 0.7 of their size that a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
+    },
+    "0169": {
+      "reviewed": "sha256:3d55cd640565c0961ed4fc1bb860248f0fabab2036b8ba67a71bec822156a396",
+      "none": "Its costs are the repository's and CI's: four more pictures to retake when a pictured sentence or the look changes, three of them needing Docker, their bytes, a longer host walk in the pictures job, and two frames more between the camera's shots. Nobody who installs, integrates or operates the module meets them."
     },
     "0171": {
       "reviewed": "sha256:703e34ee44f928cf8a8a665b68f48c126a77ab4baa43e4b2624a7af7659a3c05",
