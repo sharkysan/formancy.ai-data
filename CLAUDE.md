@@ -348,8 +348,9 @@ the same promises:
   `room.css` before its own stylesheet, and no stylesheet here declares one
   of its variables again
   ([0096](docs/decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)).
-- **The README's pictures**, the hero's in `README.md` and each app's on
-  its page of the guide, `scripts/pictures/readme.test.mjs` in
+- **The README's pictures**, the hero's and one under each step of *How
+  it works* in `README.md`, and each app's on its page of the guide,
+  `scripts/pictures/readme.test.mjs` in
   `pnpm test:repo` and each app's `pictures.mjs --check` in
   `pnpm test:pictures`, in Chromium, in a CI job of its own: every picture is whole elements of a state the page
   reaches, and a caption quotes only text those elements hold
