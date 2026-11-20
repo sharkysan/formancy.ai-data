@@ -181,7 +181,7 @@ only enforcement is "we remember" says so plainly.
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted; amended by 0128 |
-| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129, 0152; extended by 0149 |
+| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129, 0152; extended by 0149, 0170 |
 | [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md) | The grids of an open form share a person's own views | accepted |
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
@@ -203,10 +203,10 @@ only enforcement is "we remember" says so plainly.
 | [0146](0146-the-page-says-what-the-server-did.md) | The page says what the server did, and keeps the demo's controls out of the way | accepted |
 | [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |
 | [0148](0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md) | The workspace's Node is one every package it installs accepts, and so is the server image's | accepted |
-| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150; extended by 0152 |
+| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150; extended by 0152, 0170 |
 | [0150](0150-an-administrator-gives-a-field-another-starting-value.md) | An administrator gives a field another starting value | accepted |
 | [0151](0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md) | A person sets a grid column's width, and the browser keeps it | accepted |
-| [0152](0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md) | A column whose values a check lists is a select of them | accepted |
+| [0152](0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md) | A column whose values a check lists is a select of them | accepted; extended by 0170 |
 | [0153](0153-the-server-stamps-who-wrote-a-record-and-when.md) | The server stamps who wrote a record, and when | accepted |
 | [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted; extended by 0168 |
 | [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole | accepted; extended by 0159 |
@@ -223,4 +223,5 @@ only enforcement is "we remember" says so plainly.
 | [0167](0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md) | A snapshot says whether the engine calls a routine given a NULL, and the generator refuses a STRICT one before publication | accepted |
 | [0168](0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md) | The README pictures the workspace a buyer meets, and each step of How it works; the exact digits move to the host page's guide | accepted; extended by 0169 |
 | [0169](0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md) | The guide's pages picture Drill down, a person's own view, Columns and a starting value, and the camera waits two frames between shots | accepted |
+| [0170](0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md) | An enum is a select of its labels, and a domain whose check lists its values a select of them | accepted |
 | [0171](0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md) | Every release's notes are a summary, and an Unreleased entry is a sentence or two | accepted |

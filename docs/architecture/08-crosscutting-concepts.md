@@ -89,6 +89,12 @@ take is no list, so the column keeps its box. The database still decides:
 the server does not check an answer against the list, and a value the
 check no longer names is refused by it with a check violation
 ([0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
+A PostgreSQL domain's check is such a list, read with `VALUE` where the
+column stands; an enum has no check, and its labels are its type in the
+snapshot, in the engine's own order, which a select offers, a value is
+held to before it is bound, and PostgreSQL is told a value of by a cast
+to the type's own quoted name, since text has none to an enum
+([0170](../decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
 
 **Held by** `packages/data-core/src/codecs/codec.test.ts` -- the fixture's
 largest `numeric(18,4)` and an integer past 2^53 survive as strings, and a

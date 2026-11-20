@@ -349,6 +349,17 @@ refuses an offered value. The server does not check an answer against
 the list, the database does; a state field's moves are not held to it;
 and a form published before keeps its box until it is generated again
 ([0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
+A PostgreSQL enum is a select of its labels and a domain over a list one
+of its values, but a domain over any type besides text and a whole number
+is still unsupported; a domain's NOT NULL is read as the column's though
+PostgreSQL lets such a column hold a NULL it never coerced; an enum's
+filter offers equality alone; a label added under a published form is
+refused by it until it is generated again, and one renamed stops its
+writes; a value is cast to the enum by name, so an account without USAGE
+on the type's schema is refused at runtime, which discovery does not see;
+and on SQL Server a bound rule is not read. The PostgreSQL suites that
+prove the operations were written without a server and run first in CI
+([0170](../decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
 A client sends exact decimals as strings, and a value comes back
 canonicalised to its column's scale
 ([0008](../decisions/0008-exact-values-travel-as-strings.md)). An instant

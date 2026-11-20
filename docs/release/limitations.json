@@ -3630,7 +3630,7 @@
       ]
     },
     "0127": {
-      "reviewed": "sha256:fbb9b08ea6131a34226c5cf22e8a73bb28c6df9e603d244791104754182efaf2",
+      "reviewed": "sha256:df74e4ec44b507338058227c2bea81cdacf2aa372f4f9b180c5239cfaf8520a0",
       "limitations": [
         {
           "area": "host",
@@ -4204,7 +4204,7 @@
       ]
     },
     "0149": {
-      "reviewed": "sha256:8a9a351adaed086898c6b08b080246a6b450f25783241de59a84296cd2c6ce14",
+      "reviewed": "sha256:eb6e21f44480a75c1232b03853527e0b033e6c84789b90cd7aefbd41f70cf3b8",
       "limitations": [
         {
           "area": "forms",
@@ -4352,7 +4352,7 @@
       ]
     },
     "0152": {
-      "reviewed": "sha256:33e43be7b520b073d779ca42edaa1e5a77cafe16e9eb4b6d94273b35486b3e1b",
+      "reviewed": "sha256:2c7c8db8e51437b8fc2677e851549715e9ca3c1623003a2810da3fbc1374e555",
       "limitations": [
         {
           "area": "forms",
@@ -5141,6 +5141,74 @@
     "0169": {
       "reviewed": "sha256:3d55cd640565c0961ed4fc1bb860248f0fabab2036b8ba67a71bec822156a396",
       "none": "Its costs are the repository's and CI's: four more pictures to retake when a pictured sentence or the look changes, three of them needing Docker, their bytes, a longer host walk in the pictures job, and two frames more between the camera's shots. Nobody who installs, integrates or operates the module meets them."
+    },
+    "0170": {
+      "reviewed": "sha256:1ff3ece1e0216dc6dc1147544b90eb82dedbd320657b8175ce2437f9fa5a1a7a",
+      "limitations": [
+        {
+          "area": "databases",
+          "says": "A PostgreSQL domain over any type but text and a whole number -- numeric, a date, a uuid, a boolean, a timestamp -- is still unsupported and left out of a form, and a routine parameter of an enum or a domain is unsupported as before.",
+          "heldBy": "packages/data-postgres/src/discovery/types.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A domain's NOT NULL is read as the column's, though PostgreSQL lets such a column hold a NULL it never coerced, so a record holding one is refused on Save until a value is chosen."
+        },
+        {
+          "area": "forms",
+          "says": "An enum with an empty label, or with no label at all, is shown and never written, and an enum's labels are offered as the type holds them, relabelled only on a state field.",
+          "heldBy": "packages/data-core/src/generate/enums.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A list's filter offers an enum equality with one of its labels and nothing else: no range in the type's order, and no contains.",
+          "heldBy": "packages/data-core/src/generate/enums.test.ts"
+        },
+        {
+          "area": "forms",
+          "says": "A label added under a published form is refused by it until the form is generated again, so a record holding one is refused on Save until an offered label is chosen, a record whose key holds one cannot be opened by its token, and a lookup that reads the enum is blocked.",
+          "heldBy": "packages/data-core/src/drift/enums.test.ts"
+        },
+        {
+          "area": "writes",
+          "says": "A label renamed under a published form stops the writes of its field in review and at runtime until the form is generated again.",
+          "heldBy": "packages/data-core/src/drift/enums.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A form published before 0170 over a table with a column of a domain NOT NULL with no default stops offering create, which the database already refused, until it is generated again with that column; every other form published before keeps what it offered, and its review notes each enum and domain column once.",
+          "heldBy": "packages/data-core/src/drift/enums.test.ts"
+        },
+        {
+          "area": "operations",
+          "says": "A database with an enum or a domain column fingerprints otherwise at its first discovery since 0170, so every drift review of a form published before compares in full until the form is published again."
+        },
+        {
+          "area": "operations",
+          "says": "A server older than 0170 handed a snapshot taken since cannot generate a form over a table with an enum column, so a downgrade needs a discovery by the older server."
+        },
+        {
+          "area": "access",
+          "says": "A value is cast to the enum by its name, so an account without USAGE on the type's schema is refused every write and comparison of it at runtime, which discovery does not see."
+        },
+        {
+          "area": "forms",
+          "says": "A change to a domain's checks that is no list a published select rests on is not reported by drift review, where a table's check is noted."
+        },
+        {
+          "area": "databases",
+          "says": "On SQL Server a rule bound to an alias type or a column is not read: a value it refuses is refused on Save, and a rule that lists values is no select."
+        },
+        {
+          "area": "studio",
+          "says": "The studio's starting value of an enum's field is typed, not chosen, and refused unless it is one of its labels."
+        },
+        {
+          "area": "testing",
+          "says": "The PostgreSQL suites over enums and domains were written without a server, and the spellings they hold for a domain's check and an enum's default are first held against a real one in CI.",
+          "heldBy": "packages/data-postgres/src/states.integration.test.ts"
+        }
+      ]
     },
     "0171": {
       "reviewed": "sha256:703e34ee44f928cf8a8a665b68f48c126a77ab4baa43e4b2624a7af7659a3c05",
