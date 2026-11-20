@@ -36,7 +36,12 @@
 // and studio-policy, and Publish, version 1 published alone, before
 // studio-publish-conflict's conflict. This plane has no publisher roles,
 // so Publish is a publish, not a draft approved by a second administrator,
-// which a server started under review would take (0065). Elements are found by role and accessible name.
+// which a server started under review would take (0065). And but for
+// studio-starting-value, which the guide shows after the Presentation
+// step's own picture and which runs after the preview, where the label of
+// status is Status again; Publish's act takes its starting value back by
+// Undo first, so version 1 and every picture after it are what they were
+// (0169). Elements are found by role and accessible name.
 // One exception: the host token is a password field, which has no role, so
 // it is found by its label.
 //
@@ -145,6 +150,9 @@ async function at(page, step, { go = true } = {}) {
   await main.waitFor()
   return main
 }
+
+/** studio-starting-value's field, the starting value it is given, and its column's own default, which the generator starts it with. */
+const STARTING = { field: 'status', value: 'placed', column: 'draft' }
 
 /** The order's lines, the root of studio-through's form. */
 const LINES = 'sales.order_line'
@@ -292,10 +300,40 @@ function actsOver(plane, scenes) {
       return { parts: { Preview: here } }
     },
 
+    // Status given another starting value than its column's default, draft:
+    // after the preview, so its label is Status again, and taken back by
+    // studio-publish's Undo, so version 1 is what it was.
+    'studio-starting-value': async (page, scene) => {
+      const here = await at(page, scene.step)
+      const named = { name: `Starting value of ${STARTING.field}`, exact: true }
+      await here.getByRole('textbox', named).fill(STARTING.value)
+      await here
+        .getByRole('status')
+        .filter({ hasText: `Gave ${STARTING.field} the starting value “${STARTING.value}”.` })
+        .waitFor()
+      // The caption's premise: the generator's note says the column's own default, which the button gives back.
+      const row = here.getByRole('listitem').filter({ has: page.getByRole('textbox', named) })
+      await row.getByText(`Generated: Starts with the column's default, “${STARTING.column}”.`, { exact: true }).waitFor()
+      await row.getByRole('button', { name: `Use the column’s default for ${STARTING.field}`, exact: true }).waitFor()
+      return { parts: { Status: row } }
+    },
+
     // How it works' Publish: version 1, published alone. This plane has no
     // publisher roles, so its studio has no Review step: a draft approved by
     // a second administrator needs a server started under review (0065).
     'studio-publish': async (page) => {
+      // studio-starting-value's starting value taken back, as Undo takes the last edit back.
+      const presentation = await at(page, stepOf('studio-presentation'))
+      await presentation.getByRole('button', { name: 'Undo', exact: true }).click()
+      // The box follows the document a render later, so it is waited for.
+      await untilSnapshot(
+        presentation.getByRole('textbox', { name: `Starting value of ${STARTING.field}`, exact: true }),
+        new RegExp(`: ${STARTING.column}$`),
+        {
+          within: WITHIN,
+          what: `the column's ${STARTING.column} as the starting value of ${STARTING.field} after Undo`,
+        },
+      )
       const here = await at(page, stepOf('studio-publish-conflict'))
       await here.getByRole('button', { name: 'Publish version 1', exact: true }).click()
       await here.getByText(`Published version 1 of ${FORM.formId}.`, { exact: true }).waitFor()

@@ -13,7 +13,10 @@
 //   with ONLINE, a list view an administrator named, in its presentation
 //   (0105), and `pg-delivery`, an order's deliveries: the one child table
 //   the order form's own account may read, where it may not read
-//   sales.order_line (0142).
+//   sales.order_line (0142);
+// - when host-drill-down's scene starts, `pg-parcel`, a delivery's parcels,
+//   which that account may read too, kept to their delivery's tenant
+//   (0043, 0169).
 //
 // Every bundle's form is its base: a presentation of views alone leaves the
 // form as the generator made it (0030, 0105), which the server checks.
@@ -68,6 +71,32 @@ export const DELIVERY = {
 /** The deliveries' policy: the guide's operations and row filter, and the order list filtered to the person's tenant. */
 export const deliveryPolicy = (bindings) => {
   const policy = { ...journey.policy, lookups: { order: [{ column: 'tenant_id', attribute: 'tenant' }] } }
+  return { version: 1, ...policy, fields: fieldsFromOperations(policy, bindings) }
+}
+
+/**
+ * The parcels' form: a delivery's child, with no tenant of its own and no
+ * version column, so read alone. A parcel is kept to the tenant of its
+ * delivery through its lookup (`through`, 0043), whose list is filtered to
+ * the person's tenant.
+ */
+export const PARCEL = {
+  connection: FORM.connection,
+  root: { schema: 'sales', name: 'parcel' },
+  formId: 'pg-parcel',
+  title: 'Parcel',
+  lookups: [{ foreignKey: 'fk_parcel_delivery', display: ['carrier'] }],
+  pinned: [],
+}
+
+/** The parcels' policy: read by whoever reads orders, no row filter of their own, and scoped through their delivery. */
+export const parcelPolicy = (bindings) => {
+  const policy = {
+    operations: { read: [...journey.policy.operations.read], create: [], update: [] },
+    rowFilters: [],
+    lookups: { delivery: [{ column: 'tenant_id', attribute: 'tenant' }] },
+    through: ['delivery'],
+  }
   return { version: 1, ...policy, fields: fieldsFromOperations(policy, bindings) }
 }
 

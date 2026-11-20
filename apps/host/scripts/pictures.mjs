@@ -53,10 +53,15 @@
 // form beside the order's, the one child table this account may read; its
 // header says why they come before host-delete, which takes the orders out.
 //
+// The guide's pictures of Columns, a person's own view and Drill down are
+// pictures-guide.mjs's acts, over the workspace's orders, before
+// host-delete's.
+//
 // Walk order: typeahead, the exact values, stale, refused, unknown, the
-// unsaved notice, another tenant, the record's tabs, the workspace, a
-// delete's confirmation, drift -- last, because it changes the table; the
-// README and the guide show them in scenes.json's order.
+// unsaved notice, another tenant, the record's tabs, the workspace,
+// Columns, a person's own view, Drill down, a delete's confirmation, drift
+// -- last, because it changes the table; the README and the guide show
+// them in scenes.json's order.
 // Elements are found by role and accessible name, with one exception, said
 // where it is: the host token is a password field, which has no role, so it
 // is found by its label.
@@ -76,6 +81,7 @@ import journey from '../../../scripts/getting-started/journey.json' with { type:
 import { HOST } from '../../../scripts/getting-started/walk.mjs'
 import { field, fillField, pictures, said, untilSnapshot } from '../../../scripts/pictures/session.mjs'
 import { deletingPolicy, FORM, guidePolicy, orderRequest, publish } from './pictures-forms.mjs'
+import { guideScenes } from './pictures-guide.mjs'
 import { workspaceScenes } from './pictures-workspace.mjs'
 
 const app = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -396,6 +402,7 @@ function actsOver(plane) {
     },
 
     ...workspace.acts,
+    ...guideScenes(plane, { records, detail, carryOn, signIn, untilSnapshot, tokens: TOKENS, HOST, within: WITHIN }),
 
     'host-delete': async (page) => {
       // The workspace's orders taken out again: its grid holds the fixture's order alone.
