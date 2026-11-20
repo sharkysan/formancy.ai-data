@@ -33,7 +33,11 @@
     default, and that Use the column's default is offered -- each with
     another state or field named, a 30 s timeout; and that Undo gives
     status the column's default back before version 1 is published --
-    with placed waited for, a 30 s timeout.
+    with placed waited for, a 30 s timeout -- and that version 1, as the
+    server answers it, gives status no starting value of its own -- with
+    the Undo and its wait taken out, "studio-publish: version 1 of
+    pg-order gives status the starting value "placed", not its column's
+    draft".
 
   `scripts/pictures/readme.test.mjs`, in `pnpm test:repo`, holds the new
   scenes as it holds every other: each region is the render, each quote is
@@ -158,17 +162,33 @@ window's width while it is shot, as the host page does in Drill down.
   arrangements in the browser, and leave the page in Drill down; host-delete
   undoes the rows and the layout, and a change to what one act leaves is
   met in the next one's check. `pnpm pictures --check --app host` took
-  28.9 s for 14 scenes, PostgreSQL's start included, and `--app studio`
-  11.9 s for 18, once each in that container.
+  32.7 s for 14 scenes, PostgreSQL's start included, and `--app studio`
+  19.5 s for 18: each the wall clock of one run of that command under
+  bash's `time`, in that container, on this record's final code, on
+  2026-11-20.
 - **Two shots are two frames further apart**, at every capture of every
   scene; a picture that settles in two shots waits four frames more.
 - **The width Columns says is a number of the look.** “Customer is 237
   pixels wide.” is quoted, and the width a step reaches depends on the
   face the header is measured in, so a font release that moves it turns
   host-columns' check red, as it would change the picture.
-- **What a select offers is not pictured.** View's list and a state's
-  moves are in the record's text and not in the picture, so a caption says
-  what View names, never what it lists.
+- **What a select offers is not pictured, and a person's own views are
+  not even recorded.** A picture draws a select closed, so a state's moves
+  and the views View offers are in none. The options right under a select
+  are in the record's text; those under an `optgroup` are not, because the
+  accessibility snapshot leaves them out. So host-views' recorded View
+  lists All records and Online orders and not Placed orders, clara's own
+  under Your views, which the picture shows chosen. That View names it is
+  held by the act's own check, the option chosen, and not by the
+  caption's quote: “Placed orders” is matched in the record by the status
+  line beside View, Saved your view “Placed orders”., another element. A
+  caption says what View names, never what it lists.
+- **Three things the pictures show are filed, not fixed**, in
+  [`docs/images/README.md`](../images/README.md): a starting value's note
+  and its button spell the column's apostrophe two ways; a form that
+  grants no write still draws Save under its disabled fields; and a
+  disabled field with a limit still counts the characters left, which is
+  upstream's.
 
 **What it forecloses.** Nothing published: the pictures and their scripts
 are never in a package.
