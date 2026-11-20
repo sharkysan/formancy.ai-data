@@ -15,6 +15,8 @@ import { createPostgresRecords, discoverPostgres } from './index.js'
  * runtime over the root's description (0041), and refused or taken by the
  * database itself.
  *
+ * - Discovered under a search_path that makes the types visible: their
+ *   columns respelled by their bare names, and no drift.
  * - ALTER TYPE … ADD VALUE: a label a row may hold that the select does
  *   not offer. For review; nothing stops, and the published codec refuses
  *   the new label until the form is generated again.
@@ -79,6 +81,35 @@ async function runtimeCreate() {
   if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
   return { described: now.described, refusal: driftRefusal(base, bindings, policy, now.described, 'create') }
 }
+
+describe('a published form over an enum and a domain, under another search_path', () => {
+  // format_type leaves a type's schema out exactly when the session's
+  // search_path makes it visible: discovered with states on the path, an
+  // enum's and a domain's column is spelled by its bare name, and
+  // described by a session without it, qualified. Nothing changed, and
+  // review and the runtime both say so; a respelling read as a type
+  // changed refused every read of the form. Before any change below.
+  test('is not drift: discovered with the schema on the path, reviewed and described without it', async () => {
+    const pathed = postgres(fixture.admin, { onnotice: () => {}, connection: { search_path: 'states, public' } })
+    try {
+      const visible = await discoverPostgres(pathed, STATES_SCOPE)
+      const spelled = (snapshot: MetadataSnapshot, name: string) =>
+        snapshot.objects.find((object) => object.ref.name === 'ticket')?.columns.find((column) => column.name === name)?.databaseType
+      // The case is the one it means: the path respelled both.
+      expect([spelled(visible, 'state'), spelled(visible, 'colour')]).toEqual(['order_state', 'colour'])
+      expect([spelled(base, 'state'), spelled(base, 'colour')]).toEqual(['states.order_state', 'states.colour'])
+      const published = generateForm(visible, REQUEST).bindings
+      expect(diffSnapshots(visible, base, published, policy).changes).toEqual([])
+      const now = await createPostgresRecords(owner).describe(TICKET)
+      if (!now.ok) throw new Error(`expected a description, got ${now.code}`)
+      for (const operation of ['read', 'create', 'update'] as const) {
+        expect(driftRefusal(visible, published, policy, now.described, operation), operation).toBeUndefined()
+      }
+    } finally {
+      await pathed.end()
+    }
+  })
+})
 
 describe('a published form over an enum and a domain, after the database changed', () => {
   test('a label added is for review, stops nothing, and is offered once the form is generated again', async () => {

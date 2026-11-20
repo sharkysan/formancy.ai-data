@@ -3,7 +3,7 @@ import { generateForm } from '../generate/generate.js'
 import type { GenerationRequest } from '../generate/types.js'
 import type { CheckMeta, ColumnMeta, DomainMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import type { DriftReport } from './types.js'
-import { addColumn, col, column, diffSnapshots, NO_FILTERS, ORDER, snapshot } from './fixture.js'
+import { addColumn, col, column, diffSnapshots, NO_FILTERS, object, ORDER, snapshot, table } from './fixture.js'
 
 /*
  * An enum and a domain's list against a published form (0170), as drift
@@ -60,6 +60,33 @@ function review(before: ColumnMeta[], after: ColumnMeta[]): DriftReport {
 }
 
 const shape = (report: DriftReport) => report.changes.map((change) => [change.kind, change.severity, 'name' in change.subject ? change.subject.name : ''])
+
+const TEXT: NormalizedType = { kind: 'text', maxLength: null, lengthUnit: 'code-points', fixedLength: false }
+/** The order form with a lookup onto the stage its state refers to. */
+const LOOKUP: GenerationRequest = { ...REQUEST, lookups: [{ foreignKey: 'fk_order_stage', display: ['title'] }] }
+
+/** The order's state referring to a stage keyed by the same enum, as `states.ticket` refers to `states.stage`. */
+const staged =
+  (type: NormalizedType = ORDER_STATE, databaseType = 'sales.order_state') =>
+  (objects: ObjectMeta[]): void => {
+    objects.push(table('stage', [col('state', databaseType, type), col('title', 'text', TEXT)], { primaryKey: { name: 'stage_pkey', columns: ['state'] } }))
+    addColumn(objects, 'order', col('state', databaseType, type, { nullable: true }))
+    object(objects, 'order').foreignKeys.push({
+      name: 'fk_order_stage',
+      columns: ['state'],
+      references: { table: { schema: 'sales', name: 'stage' }, columns: ['state'] },
+      onUpdate: 'no-action',
+      onDelete: 'no-action',
+      enforced: true,
+      validated: true,
+    })
+  }
+
+/** The order form with its stage lookup published over `staged()`, reviewed against `after`. */
+function reviewLookup(after: (objects: ObjectMeta[]) => void): DriftReport {
+  const base = snapshot(staged(), { kind: 'postgres' })
+  return diffSnapshots(base, snapshot(after, { kind: 'postgres' }), generateForm(base, LOOKUP).bindings, NO_FILTERS)
+}
 
 describe('a snapshot taken before 0170 against one that reads its enums and domains', () => {
   // Every enum and every domain was unsupported before 0170, and no form
@@ -129,6 +156,22 @@ describe('a published select of an enum against its labels', () => {
     expect(report.runtime).toMatchObject({ readable: true, writable: { create: false, update: false } })
   })
 
+  // A select the form only shows -- the account may neither insert nor
+  // update the column -- writes nothing, so a rename stops nothing; but
+  // every row that held placed now holds ordered, which the select does
+  // not offer, as a label added is (above). Watched failing with the
+  // tightened column read as a narrower one alone: "every value it shows
+  // still fits", a note, while an added label was for review.
+  test('a label renamed under a select the form only shows is a field the column outgrew, for review', () => {
+    const shown = { access: { select: true, insert: false, update: false } }
+    const report = review([enumState(ORDER_STATE, shown)], [enumState({ ...ORDER_STATE, labels: ['draft', 'ordered', 'shipped'] }, shown)])
+    expect(shape(report)).toEqual([['column-outgrew-field', 'review', 'state']])
+    expect(report.changes[0]?.message).toBe(
+      'state: its type, sales.order_state, no longer has “placed” and now has “ordered”. state does not offer “ordered”, which a row may now hold: the select refuses to save a record holding one until an offered label is chosen; generate the form again to offer what the column now holds.',
+    )
+    expect(report).toMatchObject({ blocking: false, writable: { create: true, update: true } })
+  })
+
   // Another type is cast to another name: the published binding would cast
   // a value to one that is gone (42704). Read with the codec it was
   // published with, the form is blocked until it is reviewed.
@@ -137,6 +180,69 @@ describe('a published select of an enum against its labels', () => {
     const report = review([enumState()], [enumState(moved, { databaseType: 'sales.order_status' })])
     expect(shape(report)).toEqual([['column-type-changed', 'blocking', 'state']])
     expect(report.readable).toBe(false)
+  })
+
+  // USAGE on the type's schema revoked: PostgreSQL discovery reads the enum
+  // as unsupported for an account that cannot name it, since no value can
+  // be cast to it. A type changed, said as such, not "from
+  // sales.order_state to sales.order_state". Watched failing with the
+  // spelling alone.
+  test('an enum the account may no longer name is unsupported, and the form is blocked', () => {
+    const report = review([enumState()], [enumState({ kind: 'unsupported' })])
+    expect(shape(report)).toEqual([['column-type-changed', 'blocking', 'state']])
+    expect(report.changes[0]?.message).toMatch(/^state: its type, sales\.order_state, was read as enum and is now unsupported\. /)
+    expect(report.readable).toBe(false)
+  })
+})
+
+describe('a lookup keyed by an enum', () => {
+  const lookupChanges = (report: DriftReport) => report.changes.filter((change) => change.kind === 'lookup-changed').map((change) => change.message)
+
+  // The lookup encodes and checks a token by the key's published type, so
+  // a label added or renamed blocks it (0028) -- said by the labels, since
+  // an enum's spelling is its name and stays. Watched failing with the
+  // spelling alone: "its type changed from sales.order_state to
+  // sales.order_state".
+  test.each([
+    ['added', ['draft', 'placed', 'shipped', 'cancelled'], 'now has “cancelled” too'],
+    ['renamed', ['draft', 'ordered', 'shipped'], 'no longer has “placed” and now has “ordered”'],
+  ])('a label %s says which, and blocks the lookup', (_case, labels, which) => {
+    const report = reviewLookup(staged({ ...ORDER_STATE, labels }))
+    expect(lookupChanges(report)).toEqual([
+      `state of sales.stage: its type, sales.order_state, ${which}. The stage lookup reads it as its key by the type it was published with, so it is blocked until the form is reviewed.`,
+    ])
+    expect(report.blocking).toBe(true)
+  })
+})
+
+describe('an enum and a domain spelled by another search_path', () => {
+  // format_type leaves a type's schema out exactly when the session's
+  // search_path makes it visible, so a discovery under another path
+  // respells an enum's and a domain's column while the type is the one
+  // it was: an enum's name is in its type, and a domain's in its chain.
+  // A respelling read as a type changed blocked every read of the form, in
+  // review and at runtime. Watched failing with the spelling compared
+  // alone: state and colour were column-type-changed, blocking.
+  test('is the same type, in review and at runtime', () => {
+    const report = review([enumState(), colour()], [enumState(ORDER_STATE, { databaseType: 'order_state' }), colour(undefined, { databaseType: 'colour' })])
+    expect(report.changes).toEqual([])
+    expect(report).toMatchObject({ blocking: false, readable: true, writable: { create: true, update: true } })
+    expect(report.runtime).toMatchObject({ readable: true, writable: { create: true, update: true } })
+  })
+
+  // A lookup reads its target's key by its published type, compared by
+  // the same rule.
+  test('is no change to a lookup keyed by the enum', () => {
+    expect(reviewLookup(staged(ORDER_STATE, 'order_state')).changes).toEqual([])
+  })
+
+  // A domain's column retyped to another domain, or to its base type, is
+  // still a type the spelling alone tells apart.
+  test('is told from another domain, or none', () => {
+    const other = colour([{ ref: { schema: 'sales', name: 'shade' }, checks: [colourCheck()] }], { databaseType: 'sales.shade' })
+    expect(shape(review([colour()], [other]))).toContainEqual(['column-type-changed', 'blocking', 'colour'])
+    const none = col('colour', 'character varying(10)', VARCHAR10, { nullable: true })
+    expect(shape(review([colour()], [none]))).toContainEqual(['column-type-changed', 'blocking', 'colour'])
   })
 })
 
