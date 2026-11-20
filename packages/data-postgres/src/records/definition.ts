@@ -1,6 +1,7 @@
 import { inSnapshotOrder } from '@formancy/data-core'
 import type { DescribedTable, ForeignKeyMeta, ObjectRef } from '@formancy/data-core'
-import { columnOf, DECLARED_COLUMN, DEFAULT_EXPRESSION, NOT_NULL, textUnitOf } from '../discovery/columns.js'
+import { columnOf, DECLARED_COLUMN, HELD_DEFAULT, HOLDS_NO_NULL, textUnitOf } from '../discovery/columns.js'
+import { DOMAIN_CHAIN, domainsOf, HELD_MODIFIER, LABELS } from '../discovery/domains.js'
 import { action, DECLARED_FOREIGN_KEY, TRIGGERS_ENABLED } from '../discovery/foreign-keys.js'
 import { addKeyColumn, INDEX_KEY_COLUMN, KEY_CONSTRAINT, UNIQUE_INDEX_KEY } from '../discovery/keys.js'
 import type { ObjectKeys } from '../discovery/keys.js'
@@ -17,7 +18,16 @@ import type { Statement } from '../sql/statement.js'
  * flags -- whether a column holds no NULL is discovery's `NOT_NULL`, so a
  * NOT NULL added NOT VALID reads as discovery reads it and the digest moves
  * when it is validated (0077) -- and a default's stored node tree (`adbin`),
- * which carries oids and raw constants, never a spelling. The relation's own
+ * which carries oids and raw constants, never a spelling. A column of a
+ * domain or an enum (0170) is read through discovery's `DOMAIN_CHAIN`: the
+ * type its chain ends in, the innermost domain's modifier, its domains'
+ * NOT NULL and the nearest one's default as its node tree, and an enum's
+ * labels in their order, which are names -- so a label added or renamed,
+ * a domain made NOT NULL or given a default, moves the digest, and the
+ * description reads the column as discovery does. A domain's checks are
+ * spelled by `pg_get_expr`, which the search_path respells, so they travel
+ * with the spellings, for the description alone, and no write is guarded by
+ * them, as none is by a table's checks. The relation's own
  * oid is one of them: no ALTER changes it, a rewrite included, and a table
  * dropped and created again under the same definition has another, as SQL
  * Server's object_id does --
@@ -51,13 +61,13 @@ const FACTS = `pg_catalog.jsonb_build_object(
   'relation', c.oid,
   'columns', coalesce((
     select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(
-      a.attnum, a.attname, a.atttypid, a.atttypmod, t.typname, tn.nspname, ${NOT_NULL}, a.attidentity, a.attgenerated,
-      case when a.attgenerated ${op('=')} '' then d.adbin::pg_catalog.text end
+      a.attnum, a.attname, a.atttypid, ${HELD_MODIFIER}, bt.typname, bn.nspname, ${HOLDS_NO_NULL}, a.attidentity, a.attgenerated,
+      case when a.attgenerated ${op('=')} '' then d.adbin::pg_catalog.text end,
+      ${LABELS}, dom.is_domain, dom.default_bin::pg_catalog.text
     ) order by a.attnum)
     from pg_catalog.pg_attribute a
-    join pg_catalog.pg_type t on t.oid ${op('=')} a.atttypid
-    join pg_catalog.pg_namespace tn on tn.oid ${op('=')} t.typnamespace
     left join pg_catalog.pg_attrdef d on d.adrelid ${op('=')} a.attrelid and d.adnum ${op('=')} a.attnum
+    ${DOMAIN_CHAIN}
     where a.attrelid ${op('=')} c.oid and ${DECLARED_COLUMN}
   ), '[]'::pg_catalog.jsonb),
   'keys', coalesce((
@@ -95,11 +105,16 @@ const FACTS = `pg_catalog.jsonb_build_object(
   ), '[]'::pg_catalog.jsonb)
 )`
 
-/** What the facts are spelled as for this session, never digested: each column's type and default as discovery spells them. */
+/**
+ * What the facts are spelled as for this session, never digested: each
+ * column's type and default as discovery spells them, a domain's default
+ * among them, and its domains with their checks (0170).
+ */
 const SPELLINGS = `coalesce((
-  select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(a.attnum, pg_catalog.format_type(a.atttypid, a.atttypmod), ${DEFAULT_EXPRESSION}) order by a.attnum)
+  select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_array(a.attnum, pg_catalog.format_type(a.atttypid, a.atttypmod), ${HELD_DEFAULT}, dom.domains) order by a.attnum)
   from pg_catalog.pg_attribute a
   left join pg_catalog.pg_attrdef d on d.adrelid ${op('=')} a.attrelid and d.adnum ${op('=')} a.attnum
+  ${DOMAIN_CHAIN}
   where a.attrelid ${op('=')} c.oid and ${DECLARED_COLUMN}
 ), '[]'::pg_catalog.jsonb)`
 
@@ -160,7 +175,7 @@ export function parseDefinition(token: string): Definition {
   return { digest: found[1] as string, isolation: found[2] as string }
 }
 
-type ColumnFact = [number, string, unknown, number, string, string, boolean, string, string, string | null]
+type ColumnFact = [number, string, unknown, number, string, string, boolean, string, string, string | null, string | null, boolean, string | null]
 type KeyFact = [string, boolean, string[]]
 type ForeignKeyFact = [string, string, string, boolean, boolean, string, string, Array<[string, string]>]
 
@@ -182,10 +197,13 @@ export function describedFrom(facts: string | null, spellings: string | null, en
   if (facts === null) return undefined
   const parsed = JSON.parse(facts) as Facts
   const spelled = new Map(
-    (JSON.parse(spellings ?? '[]') as Array<[number, string, string | null]>).map(([attnum, type, expression]) => [attnum, { type, expression }]),
+    (JSON.parse(spellings ?? '[]') as Array<[number, string, string | null, string | null]>).map(([attnum, type, expression, domains]) => [
+      attnum,
+      { type, expression, domains },
+    ]),
   )
   const textUnit = textUnitOf(encoding)
-  const columns = parsed.columns.map(([attnum, name, _typeOid, modifier, typeName, typeSchema, notNull, identity, generated]) => {
+  const columns = parsed.columns.map(([attnum, name, _typeOid, modifier, typeName, typeSchema, notNull, identity, generated, _default, labels, isDomain]) => {
     const spelling = spelled.get(attnum)
     // Both lists are one statement's read of the same pg_attribute rows.
     if (spelling === undefined) throw new Error(`the facts and their spellings disagree about column ${String(attnum)}`)
@@ -197,12 +215,15 @@ export function describedFrom(facts: string | null, spellings: string | null, en
         type_name: typeName,
         type_schema: typeSchema,
         type_modifier: modifier,
+        labels,
+        is_domain: isDomain,
         not_null: notNull,
         identity,
         generated,
         default_expression: spelling.expression,
       },
       textUnit,
+      domainsOf(spelling.domains),
     )
   })
   const keys: ObjectKeys = { primaryKey: null, uniqueKeys: [] }

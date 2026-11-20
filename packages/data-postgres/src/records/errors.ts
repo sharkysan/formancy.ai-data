@@ -35,6 +35,10 @@ const BY_STATE: ReadonlyMap<string, RecordFailureCode> = new Map([
   ['428C9', 'schema-changed'],
   ['42883', 'schema-changed'],
   ['42804', 'schema-changed'],
+  // A type a statement casts to by name that is gone: an enum the bindings
+  // name (0170), renamed, moved or dropped since the description, which
+  // the server cannot parse a statement casting to.
+  ['42704', 'schema-changed'],
   // "statement completion unknown": the server's own unknown-outcome.
   ['40003', 'unknown-outcome'],
 ])

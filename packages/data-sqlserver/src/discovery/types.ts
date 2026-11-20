@@ -161,6 +161,15 @@ function spell(facts: TypeFacts, systemName: string | null): string {
  * its own, and an account may read a table without any permission on the type
  * of one of its columns. Normalising from the declared type would lose that
  * column's meaning; joining to it would lose the column.
+ *
+ * Where the engines differ (0170): SQL Server has no enum, and an alias type
+ * -- `create type sales.status from varchar(20)` -- is its system type, read
+ * so since before PostgreSQL's domains were, and spelled by its own name. It
+ * carries no check to read a list from: a column's checks are the table's,
+ * read as 0152 reads them. A rule bound to an alias type or a column
+ * (`sp_bindrule`, deprecated) is not read, so a value it refuses is refused
+ * by the server on save, as a check out of sight is, and a rule that lists
+ * values is no select.
  */
 export function normalizeType(facts: TypeFacts): ColumnType {
   const systemName = facts.systemName ?? facts.typeName
