@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 888" width="600" height="888" role="img" aria-labelledby="title desc">
+  <title id="title">How Formancy Data fits together</title>
+  <desc id="desc">Your application's pages draw published forms with @formancy/react or @formancy/angular, and ask the data server's runtime plane through @formancy/data-client, with the token the application already holds; the host page, apps/host, is this repository's example of one. The studio, apps/studio, is for administrators, built from this repository, and asks only the administrator plane. The data server, @formancy/data-server, is one image holding the runtime plane, for records, lookups, saves and actions; the administrator plane, to discover, generate, publish and review drift; @formancy/data-core, which decides policy, generation, plans and drift; @formancy/data-identity, which verifies your application's token offline; and the configuration store, the published forms kept as files. Below it the adapters, @formancy/data-postgres and @formancy/data-sqlserver, read and write PostgreSQL and SQL Server as the account each connection names. Violet is what a person acts on, teal what the server does. Built on the Apache-2.0 formancy engine; this module is source-available.</desc>
+  <!--
+    Drawn by hand (0172). The colours are @formancy/themes' room.css, written
+    as it writes them; the faces are the reader's own, since GitHub draws an
+    SVG in an img with no web font, no script and nothing fetched.
+    scripts/architecture-sketch.test.mjs holds the names, the colours and
+    that nothing is loaded; that the arrows and the layout are true is
+    review's.
+  -->
+  <style>
+    .ground { fill: #080a12; stroke: rgb(255 255 255 / 15%); }
+    .panel { fill: #0f1422; stroke-width: 1.5; }
+    .surface { fill: #151b2b; stroke: rgb(255 255 255 / 12%); }
+    .person { stroke: #8b7bff; }
+    .server { stroke: #3fe0d5; }
+    .database { fill: #151b2b; stroke: rgb(255 255 255 / 15%); stroke-width: 1.5; }
+    .flow { fill: none; stroke-width: 2; }
+    .head-person { fill: #8b7bff; }
+    .head-server { fill: #3fe0d5; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; fill: #eef1f8; text-anchor: middle; }
+    .code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+    .title { font-size: 18px; font-weight: 600; }
+    .name { font-size: 15px; font-weight: 600; }
+    .sub { font-size: 14px; fill: #95a0b4; }
+    .note { font-size: 13px; fill: #95a0b4; }
+    .left { text-anchor: start; }
+    .violet { fill: #8b7bff; }
+    .teal { fill: #3fe0d5; }
+  </style>
+  <defs>
+    <marker id="to-person" viewBox="0 0 10 10" refX="10" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path class="head-person" d="M0 0 10 5 0 10z"/>
+    </marker>
+    <marker id="to-server" viewBox="0 0 10 10" refX="10" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path class="head-server" d="M0 0 10 5 0 10z"/>
+    </marker>
+  </defs>
+
+  <rect class="ground" x="0.5" y="0.5" width="599" height="887" rx="20"/>
+
+  <!-- What a person acts on: your application and the studio. -->
+  <rect class="panel person" x="24" y="20" width="268" height="198" rx="12"/>
+  <text class="title" x="158" y="50">Your application</text>
+  <text class="sub" x="158" y="72">its pages draw published forms</text>
+  <text class="sub" x="158" y="94">with <tspan class="code violet">@formancy/react</tspan></text>
+  <text class="sub" x="158" y="114">or <tspan class="code violet">@formancy/angular</tspan></text>
+  <rect class="surface person" x="46" y="126" width="224" height="32" rx="8"/>
+  <text class="name code violet" x="158" y="147">@formancy/data-client</text>
+  <text class="sub" x="158" y="182">with the token it already holds</text>
+  <text class="sub" x="158" y="202">the host page, <tspan class="code">apps/host</tspan>, is one</text>
+
+  <rect class="panel person" x="308" y="20" width="268" height="198" rx="12"/>
+  <text class="title" x="442" y="50">The studio</text>
+  <text class="sub" x="442" y="72">for administrators,</text>
+  <text class="sub" x="442" y="94">built from this repository</text>
+  <rect class="surface person" x="330" y="126" width="224" height="32" rx="8"/>
+  <text class="name code violet" x="442" y="147">apps/studio</text>
+  <text class="sub" x="442" y="182">it speaks only the</text>
+  <text class="sub" x="442" y="202">administrator plane</text>
+
+  <!-- What the server does: one image, two planes over data-core. -->
+  <rect class="panel server" x="12" y="258" width="576" height="316" rx="16"/>
+  <text class="name code teal" x="300" y="284">@formancy/data-server</text>
+  <text class="note" x="300" y="304">one image</text>
+
+  <rect class="surface" x="24" y="318" width="268" height="80" rx="10"/>
+  <text class="name" x="158" y="346">runtime plane</text>
+  <text class="sub" x="158" y="368">records and lookups,</text>
+  <text class="sub" x="158" y="388">saves and actions</text>
+
+  <rect class="surface" x="308" y="318" width="268" height="80" rx="10"/>
+  <text class="name" x="442" y="346">administrator plane</text>
+  <text class="sub" x="442" y="368">discover and generate,</text>
+  <text class="sub" x="442" y="388">publish and drift</text>
+
+  <rect class="surface" x="24" y="412" width="552" height="58" rx="10"/>
+  <text class="name code teal" x="300" y="436">@formancy/data-core</text>
+  <text class="sub" x="300" y="458">decides: policy, generator, plans and drift</text>
+
+  <rect class="surface" x="24" y="484" width="268" height="76" rx="10"/>
+  <text class="name code teal" x="158" y="508">@formancy/data-identity</text>
+  <text class="sub" x="158" y="530">verifies your application's</text>
+  <text class="sub" x="158" y="550">token, offline</text>
+
+  <rect class="surface" x="308" y="484" width="268" height="76" rx="10"/>
+  <text class="name" x="442" y="508">configuration store</text>
+  <text class="sub" x="442" y="530">published forms,</text>
+  <text class="sub" x="442" y="550">kept as files</text>
+
+  <!-- Drawn after the server's box, so that it does not cover them. -->
+  <path class="flow person" d="M158 218V317" marker-end="url(#to-person)"/>
+  <path class="flow person" d="M442 218V317" marker-end="url(#to-person)"/>
+
+  <path class="flow server" d="M158 574V613" marker-end="url(#to-server)"/>
+  <path class="flow server" d="M442 574V613" marker-end="url(#to-server)"/>
+
+  <!-- The adapters, each translating for its engine. -->
+  <rect class="panel server" x="24" y="614" width="268" height="58" rx="12"/>
+  <text class="name code teal" x="158" y="638">@formancy/data-postgres</text>
+  <text class="sub" x="158" y="658">on the postgres driver</text>
+
+  <rect class="panel server" x="308" y="614" width="268" height="58" rx="12"/>
+  <text class="name code teal" x="442" y="638">@formancy/data-sqlserver</text>
+  <text class="sub" x="442" y="658">on mssql over tedious</text>
+
+  <path class="flow server" d="M158 672V711" marker-end="url(#to-server)"/>
+  <path class="flow server" d="M442 672V711" marker-end="url(#to-server)"/>
+
+  <!-- Your databases. -->
+  <path class="database" d="M58 722V778A100 10 0 0 0 258 778V722"/>
+  <ellipse class="database" cx="158" cy="722" rx="100" ry="10"/>
+  <text class="title" x="158" y="758">PostgreSQL</text>
+
+  <path class="database" d="M342 722V778A100 10 0 0 0 542 778V722"/>
+  <ellipse class="database" cx="442" cy="722" rx="100" ry="10"/>
+  <text class="title" x="442" y="758">SQL Server</text>
+
+  <text class="sub" x="300" y="814">your databases, read and written as the account each connection names</text>
+
+  <!-- What the colours say, and on what terms. -->
+  <path class="flow person" d="M118 836H142" marker-end="url(#to-person)"/>
+  <text class="note left" x="150" y="841">what a person acts on</text>
+  <path class="flow server" d="M316 836H340" marker-end="url(#to-server)"/>
+  <text class="note left" x="348" y="841">what the server does</text>
+  <text class="note" x="300" y="868">Built on the Apache-2.0 formancy engine; this module is source-available.</text>
+</svg>

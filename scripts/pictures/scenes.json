@@ -4,7 +4,7 @@
     "app": "host",
     "placement": "hero",
     "title": "The workspace",
-    "caption": "The host page, an example of your application's own page, as clara, a clerk of tenant 1, sees it: the forms she may read; the orders of `sales.order` a page at a time in an AG Grid Community grid, opened on “Online orders”, a list view an administrator named; and the open order's deliveries in a tab beside it, a form of their own over `sales.delivery`, with their own id and the tenant hidden in its Columns. Every row is what the server answered her through `@formancy/data-client`, under the form's policy ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md), [0105](./docs/decisions/0105-a-forms-list-offers-views-its-administrator-named.md), [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)). The order's own tab draws its form, as Run in [How it works](#how-it-works) shows. The orders, the deliveries and three of the customers are invented, and the capture script inserts them through the database's owner; Muster AG is the test fixture's.",
+    "caption": "The host page, an example of your application's own page, as clara, a clerk of tenant 1, sees it: the orders on “Online orders”, a list view an administrator named, and the open order's deliveries in a tab beside it, each row what the server answered her under the form's policy ([0047](./docs/decisions/0047-a-hosts-workspace-lists-opens-and-edits-records-in-linked-grids.md)). The orders, the deliveries and three of the customers are invented, inserted by the capture script; Muster AG is the test fixture's.",
     "alt": "The host page's workspace: Forms listing Delivery and Order under Sales, and Delivery linked to Order; the Records grid of Order on the view “Online orders”, filtered by group Online, saying “Rows 1–6.” and listing orders 10418 to 10423 for “Café Entwurf GmbH”, “Beispiel Logistik KG”, “Muster AG” and “Vorlage & Partner GmbH”, draft, placed and shipped, with amounts from “157.3500” to “12800.0000”; below it order k1:10422 open on its Delivery tab, saying “Delivery rows 1–2.”: “Express”, shipped on 18 November, and “Freight”, not yet shipped.",
     "quotes": {
       "Online orders": ["Workspace"],
@@ -26,10 +26,9 @@
     "placement": "step",
     "title": "Connect",
     "step": "1. Connect",
-    "caption": "`pg`, discovered in the studio as the order form's own account, inside the schemas its connection approves: “No gap was reported: everything in the approved schemas was visible to this connection.” What an account cannot see is said as a gap, never taken as absent ([0004](./docs/decisions/0004-a-snapshot-says-what-it-could-not-see.md), [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
+    "caption": "`pg`, discovered as the order form's own account. What an account cannot see is said as a gap, never taken as absent, and here there was none ([0004](./docs/decisions/0004-a-snapshot-says-what-it-could-not-see.md)).",
     "alt": "The studio's Connect step for pg: “PostgreSQL 17.11, schemas sales: 8 tables and 1 view.”, discovered as formancy_writer; a panel saying that no gap was reported; and the tables and views it found.",
     "quotes": {
-      "No gap was reported: everything in the approved schemas was visible to this connection.": ["Seen"],
       "PostgreSQL 17.11, schemas sales: 8 tables and 1 view.": ["Seen"]
     }
   },
@@ -39,11 +38,9 @@
     "placement": "step",
     "title": "Generate",
     "step": "2. Generate",
-    "caption": "`sales.order` as the root, and its customer key as a lookup. The generator says what it made of them from what this account may do: a column it may not update is “Read-only on update”, and the lookup is “drawn as a typeahead searching name” ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md), [0027](./docs/decisions/0027-a-snapshot-says-what-its-account-may-do.md)).",
+    "caption": "`sales.order` as the root and its customer key as a lookup. The generator says what it made of each from what this account may do ([0009](./docs/decisions/0009-generation-is-deterministic-and-says-what-it-chose.md)).",
     "alt": "The studio's Generate step: pg-order generated from sales.order, “9 fields.”, and what the generator chose: create, update and delete offered, “Blocked 0”, “Read-only 5”, “Excluded 0”, “Inferred 11”, among them the customer lookup drawn as a typeahead, and “Access 1”, row-level security on sales.customer.",
     "quotes": {
-      "Read-only on update": ["Generate"],
-      "drawn as a typeahead searching name": ["Generate"],
       "9 fields.": ["Generate"],
       "Blocked 0": ["Generate"],
       "Read-only 5": ["Generate"],
@@ -58,7 +55,7 @@
     "placement": "step",
     "title": "Govern and arrange",
     "step": "3. Govern and arrange",
-    "caption": "By the roles your application's tokens already carry: here `clerk` reads, creates and updates, and nobody deletes. “A role granted an operation the form does not offer is refused.” Its row filters are taken from the signed-in person's trusted attributes, never from the form ([0011](./docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md)).",
+    "caption": "By the roles your application's tokens already carry: `clerk` reads, creates and updates, and nobody deletes ([0011](./docs/decisions/0011-every-operation-carries-a-trusted-policy-context.md)): “A role granted an operation the form does not offer is refused.”",
     "alt": "The Policy step's group Who may do what: clerk may read, create and update, nobody may delete, and a note that the form offers create, update and delete, and that a role granted an operation the form does not offer is refused.",
     "quotes": {
       "A role granted an operation the form does not offer is refused.": ["Roles"]
@@ -70,7 +67,7 @@
     "placement": "step",
     "title": "Publish",
     "step": "4. Publish",
-    "caption": "One bundle -- the form, its bindings, the policy and the snapshot -- which the server checks again before it writes anything: “Published version 1 of pg-order.” This server was started without publisher roles, so its studio publishes alone; with them, a draft is published only when a publisher who did not submit it approves it ([0013](./docs/decisions/0013-published-configuration-is-files-with-link-based-swap.md), [0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).",
+    "caption": "One bundle, which the server checks again before it writes: “Published version 1 of pg-order.” This server has no publisher roles; with them, a second person approves each draft ([0065](./docs/decisions/0065-with-publisher-roles-set-a-draft-is-published-only-when-a-publisher-who-did-not-submit-it-approves-it.md)).",
     "alt": "The studio's Publish step: one bundle of form, bindings, policy and snapshot, version 1 of pg-order published, a button Publish version 2, and the status “Published version 1 of pg-order.” with Check its drift.",
     "quotes": {
       "Published version 1 of pg-order.": ["Publish"]
@@ -82,7 +79,7 @@
     "placement": "step",
     "title": "Run",
     "step": "5. Run",
-    "caption": "The order open in the workspace at the top of this page, on its own tab, drawn by React for its update: the fields written on create only are disabled, and its deliveries are the tab beside it, “Delivery” ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md), [0142](./docs/decisions/0142-a-records-child-forms-are-tabs-beside-it.md)).",
+    "caption": "The order from the top of this page, drawn by React for its update: the fields written on create only are disabled, and its deliveries are the tab beside it ([0122](./docs/decisions/0122-a-host-page-draws-a-saved-record-for-the-update-and-a-new-one-for-the-create.md)).",
     "alt": "The open order k1:10422, on its own tab before a tab “Delivery”: the React form on white paper with Customer Muster AG, Order date, Amount 1240.5000 and Created by disabled, Status placed, Notes Goods entrance, Group Online, an empty Approved by, Id 10422, and Save.",
     "quotes": {
       "Delivery": ["Record"]

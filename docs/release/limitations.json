@@ -945,7 +945,7 @@
       ]
     },
     "0038": {
-      "reviewed": "sha256:54849b14b5ad53a1056a9657b3b79718c8cc8fd3465fb4652bfb6392d389f48b",
+      "reviewed": "sha256:2605dfe2fe08693618d04b4db124e11d658adb7f70e057b81bd6a779aa4636fd",
       "none": "Its costs are the repository's and CI's: the pictures' bytes, retaking them when a pictured sentence changes, and the pictures job's time. Nobody who installs, integrates or operates the module meets them."
     },
     "0039": {
@@ -4456,7 +4456,7 @@
       ]
     },
     "0154": {
-      "reviewed": "sha256:58b76a63d96b7c5474fe9099d9ff134562278d5130f0533cd886d5edb8f3ef7f",
+      "reviewed": "sha256:6ad092402779978a1a2dde059ffccacc2fc9ce27199f12f845a4bb6702bc1f0b",
       "none": "Its costs -- two places to keep in step, a README that shows less at once, and a link from outside to a README anchor that moved, which now opens the README at its top -- fall on the documentation's readers and its maintainer; nothing a user, integrator or operator of the module installs, runs or configures changed."
     },
     "0155": {
@@ -5135,7 +5135,7 @@
       ]
     },
     "0168": {
-      "reviewed": "sha256:1fcb6a8516dc11e7fa809c82b7100280b3ec43eed46684195cc9ae8640c44718",
+      "reviewed": "sha256:b25cee3a7e8f8c9d8f5d6ec97dd93cf301056ffae45f95e19305e2fef02e71d5",
       "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and step pictures drawn at 0.7 of their size that a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
     },
     "0169": {
@@ -5232,6 +5232,10 @@
           "says": "A release's notes are a summary written by hand: why each change since the release before was made is in CHANGELOG.md, under that release's development heading, and in its decision record, not on the release page, and nothing checks that the summary says what those entries say."
         }
       ]
+    },
+    "0172": {
+      "reviewed": "sha256:00f102b47f404731574ccdddb30426a0bbc80513aff6ed9c037411367d001912",
+      "none": "Its costs fall on the documentation's readers and its maintainer: a reader of the README follows a link for a condition or a number it no longer states, and the README's sketch of the architecture is redrawn by hand when a block changes, its arrows held by review alone. Nothing a user, integrator or operator of the module installs, runs or configures changed."
     }
   }
 }

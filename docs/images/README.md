@@ -1,6 +1,6 @@
 # How the README's pictures are taken
 
-Every picture in the [README](../../README.md) and on the guide's pages --
+Every screenshot in the [README](../../README.md) and on the guide's pages --
 [Studio](../guide/studio.md), [Host example](../guide/host.md) and
 [Examples](../guide/examples.md) -- is taken by `pnpm pictures`, in
 Chromium, from a state the product reaches: the built page against the real
@@ -8,7 +8,10 @@ data server, never a mock-up, and never retouched. The pictures job then walks
 the same states, in Chromium, and fails when a picture's elements no longer
 say what they said when it was taken
 ([0038](../decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
-This page says how, and what that does not hold.
+This page says how, and what that does not hold. The README's one
+drawing, the sketch of the architecture that opens its *How it works*, is
+no screenshot: [*The sketch*](#the-sketch) says how it is drawn and what
+holds it.
 
 Sizes, bytes, capture dates and the look each picture was taken on are in
 [`readme/captured.json`](readme/captured.json), which the capture writes; this
@@ -260,6 +263,35 @@ added. A picture wider than the column is scaled down by GitHub; how
 far, and whether the hero's rows stay legible at that scale, is for the
 first review on github.com to say, with the window width and the date.
 
+## The sketch
+
+[`architecture.svg`](architecture.svg) is drawn by hand, as SVG text in an
+editor, not taken: your application and the studio, each over its plane of
+the data server; the server's one image holding both planes, data-core,
+data-identity and the configuration store; and the two adapters and their
+databases below it. It is drawn for the README's column, on its own dark
+ground with rounded corners so that it reads on GitHub's light and dark
+pages alike, in `@formancy/themes`' room.css colours written as room.css
+writes them -- violet for what a person acts on, teal for what the server
+does -- and a system font stack, because a browser draws an SVG in an
+`<img>` without fetching a font or running a script. Its `<title>` and
+`<desc>`, and the README's alt, say what it draws
+([0172](../decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
+
+`scripts/architecture-sketch.test.mjs`, in `pnpm test:repo`, fails when it
+names a package or an app the workspace does not have, when a published
+package is drawn by no box, when its `<desc>` or the README's alt leaves
+out a name a box draws, when it would load anything, and when it draws
+with a colour room.css does not declare.
+
+To change it: edit the file, then draw it in Chromium by an `<img>` 600
+CSS px wide in a column 880 px wide, and again in a column 400 px wide at
+a device pixel ratio of 2, as a phone draws it, on a light and a dark
+ground, and read both whole: no text past its box or over an arrow, no
+arrow through a label. It was read so on 2026-11-20, on Windows 11 in
+Playwright 1.63.0's Chromium with Segoe UI and Consolas; the wider faces
+macOS and Linux give the same stack were not seen.
+
 ## What the pictures show that is wrong
 
 Filed, not hidden, because a picture is the product as it is:
@@ -304,6 +336,10 @@ Filed, not hidden, because a picture is the product as it is:
 
 ## What nothing checks
 
+- **The sketch's arrows and layout.** That each arrow goes where the code
+  calls, that a box says what its package does, and that it reads at
+  GitHub's width or a phone's, are review's alone; the guard holds its
+  names, colours, alt and that it loads nothing.
 - **What a picture looks like.** A change to a stylesheet or a theme alone, a
   font package that moved, or a Chromium rendering change leaves the text the same;
   `--check` prints a notice when the app's stylesheet changed, and fails on

@@ -350,17 +350,24 @@ the same promises:
   `room.css` before its own stylesheet, and no stylesheet here declares one
   of its variables again
   ([0096](docs/decisions/0096-the-apps-wear-formancys-room-css-rather-than-a-copy-of-admin-css.md)).
-- **The README's pictures**, the hero's and one under each step of *How
+- **The README's screenshots**, the hero's and one under each step of *How
   it works* in `README.md`, and each app's on its page of the guide,
   `scripts/pictures/readme.test.mjs` in
   `pnpm test:repo` and each app's `pictures.mjs --check` in
-  `pnpm test:pictures`, in Chromium, in a CI job of its own: every picture is whole elements of a state the page
+  `pnpm test:pictures`, in Chromium, in a CI job of its own: every screenshot is whole elements of a state the page
   reaches, and a caption quotes only text those elements hold
   ([0038](docs/decisions/0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md)).
+- **The README's sketch of the architecture**, `docs/images/architecture.svg`,
+  drawn by hand, and `scripts/architecture-sketch.test.mjs` in
+  `pnpm test:repo`: every package or app it names is the workspace's, every
+  published package is drawn, its `<desc>` and the README's alt name what it
+  draws, it loads nothing, and its colours are `room.css`'s
+  ([0172](docs/decisions/0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md)).
 
 What nothing holds yet, said: that the examples' `app.css` never reaches
-into a preview's paper is held by review; what a README picture looks like, which
-review alone holds; and the one-shell bullet has nothing to hold until the
+into a preview's paper is held by review; what a README screenshot looks
+like, and whether the sketch's arrows say what the code does, which review
+alone holds; and the one-shell bullet has nothing to hold until the
 `formancy.ai/data` page exists.
 
 ## Branch names

@@ -307,7 +307,7 @@ describe('each check, on a small repository', () => {
       ].join('\n'),
     )
     expect(render(list, record).hero).toMatch(
-      /^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nEvery picture in this README is taken by `pnpm pictures`/,
+      /^<img src="\.\/docs\/images\/readme\/host-loaded\.webp"[\s\S]*\n\nThe screenshots in this README are taken by `pnpm pictures`/,
     )
   })
 
