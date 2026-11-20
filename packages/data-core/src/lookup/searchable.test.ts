@@ -29,6 +29,8 @@ const DECIDED: Decided = {
   timestamp: { type: { kind: 'timestamp', withTimeZone: true, precision: 6 }, searchable: false },
   // Upper case on SQL Server, lower case on PostgreSQL.
   uuid: { type: { kind: 'uuid' }, searchable: false },
+  // PostgreSQL's alone, with no LIKE of its own: matched as its label's text, which is what a label shows (0170).
+  enum: { type: { kind: 'enum', name: { schema: 'sales', name: 'order_state' }, labels: ['draft', 'placed', 'shipped'] }, searchable: true },
   binary: { type: { kind: 'binary', maxLength: null, fixedLength: false }, searchable: false },
   rowversion: { type: { kind: 'rowversion' }, searchable: false },
   unsupported: { type: { kind: 'unsupported' }, searchable: false },
@@ -43,8 +45,8 @@ describe('searchableDisplay', () => {
   // list of one page though the server would search it. The set and the
   // function each answer for every kind, so a function that read the set
   // wrongly fails here as surely as a set that holds the wrong kinds.
-  test('searches text and whole numbers, and no other kind', () => {
-    expect(kinds.filter((kind) => SEARCHABLE_KINDS.has(kind))).toEqual(['text', 'integer'])
+  test('searches text, whole numbers and enums, and no other kind', () => {
+    expect(kinds.filter((kind) => SEARCHABLE_KINDS.has(kind))).toEqual(['text', 'integer', 'enum'])
     for (const kind of kinds) {
       const { type, searchable } = DECIDED[kind]
       expect(SEARCHABLE_KINDS.has(kind), kind).toBe(searchable)

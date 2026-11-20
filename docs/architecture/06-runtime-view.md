@@ -275,7 +275,12 @@ line (0059).
 1. Opening a form, `GET /v1/forms/:id` (`routes/runtime.ts`), starts from
    what the policy grants (0045), describes the root in one statement, and
    offers only what the database allows now
-   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)):
+   ([0041](../decisions/0041-the-runtime-refuses-what-drift-blocks.md)) --
+   an enum's labels among the facts it reads, so a label renamed since
+   publication stops the writes of its field here too, while an enum or a
+   domain the session's search_path alone spells otherwise than
+   discovery did is the same type
+   ([0170](../decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)):
    `operations`, the readable fields, `list` -- what a page may be sorted,
    searched and filtered by, and the published views this person could
    have built from those (`listColumns`, 0105), those for one of their

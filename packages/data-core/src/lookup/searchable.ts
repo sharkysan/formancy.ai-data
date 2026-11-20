@@ -11,8 +11,12 @@ import type { LookupSearchColumn, LookupSearchType } from './types.js'
  * `generate/version.ts`, so the generator never imports `config.ts`.
  */
 
-/** Kinds both engines spell alike as text, so a search over them matches what the label shows. */
-export const SEARCHABLE_KINDS: ReadonlySet<NormalizedTypeKind> = new Set<LookupSearchType['kind']>(['text', 'integer'])
+/**
+ * Kinds both engines spell alike as text, so a search over them matches
+ * what the label shows; and PostgreSQL's enum, which has no LIKE of its
+ * own and is matched as its label's text (0170).
+ */
+export const SEARCHABLE_KINDS: ReadonlySet<NormalizedTypeKind> = new Set<LookupSearchType['kind']>(['text', 'integer', 'enum'])
 
 function isSearchType(type: NormalizedType): type is LookupSearchType {
   return SEARCHABLE_KINDS.has(type.kind)

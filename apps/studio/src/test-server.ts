@@ -25,6 +25,7 @@ import writer from './fixtures/postgres-writer.json'
 import sqlserver from './fixtures/sqlserver-owner.json'
 import sqlserverReader from './fixtures/sqlserver-reader.json'
 import sqlserverWriter from './fixtures/sqlserver-writer.json'
+import { withEnumStatus } from './test-enums.js'
 import { withoutRoutines, withRoutines } from './test-routines.js'
 
 /**
@@ -310,11 +311,13 @@ function holds(values: Record<string, ApiValue>, condition: RecordFilter): boole
  * publishes directly, an administrator submits a draft, and a publisher
  * who did not submit it approves it. `browse: true` starts it as
  * `FORMANCY_DATA_BROWSE_ROLES=data-browser` would (0099). `sections: true`
- * adds `fixture-sections`, over `SECTIONS_SNAPSHOT` (0109), and
- * `versions: true` adds `fixture-versions`, over `VERSIONS_SNAPSHOT` (0113).
+ * adds `fixture-sections`, over `SECTIONS_SNAPSHOT` (0109),
+ * `versions: true` adds `fixture-versions`, over `VERSIONS_SNAPSHOT` (0113),
+ * and `enums: true` adds `fixture-enums`, the owner's with the order's
+ * status an enum (`withEnumStatus`, 0170).
  */
 export async function startPlane(
-  options: { administrator?: boolean; review?: boolean; browse?: boolean; sections?: boolean; versions?: boolean } = {},
+  options: { administrator?: boolean; review?: boolean; browse?: boolean; sections?: boolean; versions?: boolean; enums?: boolean } = {},
 ): Promise<TestPlane> {
   const root = await mkdtemp(join(tmpdir(), 'formancy-data-studio-'))
   const store = createFileConfigurationStore(root)
@@ -327,6 +330,7 @@ export async function startPlane(
     ['fixture-sqlserver-writer', SQLSERVER_WRITER_ROUTINES],
     ...(options.sections === true ? [['fixture-sections', SECTIONS_SNAPSHOT] as const] : []),
     ...(options.versions === true ? [['fixture-versions', VERSIONS_SNAPSHOT] as const] : []),
+    ...(options.enums === true ? [['fixture-enums', withEnumStatus(OWNER_ROUTINES)] as const] : []),
   ])
   const unreachable = new Set<string>()
   const rows = new Map<string, Array<Record<string, ApiValue>>>()

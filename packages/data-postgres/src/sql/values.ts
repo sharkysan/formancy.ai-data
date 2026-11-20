@@ -84,8 +84,9 @@ function timeText(column: string): string {
 /**
  * The SQL that reads one column as its canonical text.
  *
- * - text, integers, decimals, uuids: their own output, which no setting
- *   changes. A decimal keeps its scale (`12.50`); a uuid is lower case.
+ * - text, integers, decimals, uuids, enums: their own output, which no
+ *   setting changes. A decimal keeps its scale (`12.50`); a uuid is lower
+ *   case; an enum is its label, as the type holds it (0170).
  *   char(n) is read as text, which drops the padding, as PostgreSQL's own
  *   char-to-text cast does: trailing blanks are not significant in char(n).
  * - boolean: `true` or `false`.
@@ -101,6 +102,7 @@ export function canonicalText(type: NormalizedType, column: string): string {
     case 'decimal':
     case 'uuid':
     case 'boolean':
+    case 'enum':
       return `${column}::pg_catalog.text`
     case 'float':
       return `pg_catalog.encode(pg_catalog.${type.bits === 32 ? 'float4send' : 'float8send'}(${column}), 'hex')`

@@ -6,6 +6,7 @@ export type FixtureFile =
   | 'postgres.restricted.sql'
   | 'postgres.parity.sql'
   | 'postgres.actions.sql'
+  | 'postgres.states.sql'
   | 'sqlserver.sql'
   | 'sqlserver.restricted.sql'
   | 'sqlserver.parity.sql'

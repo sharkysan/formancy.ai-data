@@ -1,9 +1,10 @@
 import { controlFor } from '../generate/controls.js'
 import { numbersKey, versionProvesRecord } from '../generate/offers.js'
+import { quotedValues } from '../generate/quoted.js'
 import type { FormBindings } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
 import { cite, hiding, unseen } from './access.js'
-import { type ColumnChangeKind, classify, compareTypes, sameDefinition } from './compare.js'
+import { type ColumnChangeKind, classify, compareTypes, labelChanges, sameDefinition } from './compare.js'
 import { allFields, type Comparison, describe, type Draft, fieldsOver, list, type Operation, stampedWrites, stampsOn, writesOn, writtenOn } from './context.js'
 import type { DriftKind } from './types.js'
 
@@ -48,6 +49,34 @@ function outgrownControl(bindings: FormBindings, after: ColumnMeta): string | nu
     !(STRINGS.has(published.field.type) && STRINGS.has(now.field.type))
     ? published.field.type
     : null
+}
+
+/**
+ * The labels a column's enum now has that its published select does not
+ * offer (0170): a value a row may now hold, which the select cannot show.
+ * Empty where the field is not a select of an enum's labels -- a lookup, a
+ * text box, a field published before the column was read as one.
+ */
+function labelsOutgrown(bindings: FormBindings, after: ColumnMeta): string[] {
+  const binding = bindings.fields.find((candidate) => candidate.kind === 'column' && candidate.column === after.name)
+  if (binding?.kind !== 'column' || binding.type.kind !== 'enum' || after.type.kind !== 'enum') return []
+  return labelChanges(binding.type, after.type).added
+}
+
+/**
+ * A select of an enum's labels a row may now hold a label of that it does
+ * not offer (0170). A select refuses an answer it does not offer, rather
+ * than writing another back (formancy.ai 0076), so it stops nothing, as a
+ * value a check now lists does not (0152): for review.
+ */
+function outgrewLabels(fields: readonly string[], labels: readonly string[]): Effect {
+  return {
+    kind: 'column-outgrew-field',
+    stops: [],
+    breaksReads: false,
+    otherwise: 'review',
+    consequence: `${list(fields)} does not offer ${quotedValues(labels)}, which a row may now hold: the select refuses to save a record holding one until an offered label is chosen; generate the form again to offer what the column now holds.`,
+  }
 }
 
 /**
@@ -244,7 +273,7 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
         }
       }
       return { ...note(unbound), otherwise: fields.length > 0 ? 'review' : 'info' }
-    case 'column-tightened':
+    case 'column-tightened': {
       if (writable) {
         return {
           kind,
@@ -254,8 +283,15 @@ function effectOf(bindings: FormBindings, kind: ColumnChangeKind, is: ColumnMeta
           consequence: `The form would accept values the database now refuses, so writes of ${list(fields)} are blocked until its validation is reviewed.`,
         }
       }
+      // A label renamed under a select the form only shows stops nothing it
+      // writes, and is a value every row that held the old one now holds (0170).
+      const renamed = labelsOutgrown(bindings, is)
+      if (renamed.length > 0) return outgrewLabels(fields, renamed)
       return note(fields.length > 0 ? 'The form only shows it, and every value it shows still fits.' : unbound)
+    }
     case 'column-loosened': {
+      const labels = labelsOutgrown(bindings, is)
+      if (labels.length > 0) return outgrewLabels(fields, labels)
       const control = outgrownControl(bindings, is)
       if (control === null) return note('Every value the form accepts is still accepted.')
       if (writable) {

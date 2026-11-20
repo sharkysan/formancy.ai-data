@@ -1,13 +1,16 @@
 import { schemaHash } from '@formancy/spec'
 import type {
+  CheckMeta,
   ColumnAccess,
   ColumnMeta,
   CoverageAspect,
   CoverageGap,
   CoverageSubject,
+  DomainMeta,
   Generation,
   InboundKey,
   MetadataSnapshot,
+  NormalizedType,
   ObjectAccess,
   ObjectMeta,
   ObjectRef,
@@ -97,6 +100,8 @@ function assertContractColumn(where: string, column: ColumnMeta): void {
   if (type.kind === 'binary' && typeof (type.fixedLength as unknown) !== 'boolean') {
     throw new Error(`${where}: column ${column.name} is binary with no fixedLength flag`)
   }
+  if (type.kind === 'enum') assertEnum(`${where}: column ${column.name}`, type)
+  if (column.domains !== undefined) assertDomains(`${where}: column ${column.name}`, column.domains)
   // 0027: a column without access is an adapter that forgot privileges, or a
   // snapshot stored before they were read. Either way nobody knows what the
   // account may do with it, and neither "nothing" nor "everything" is safe.
@@ -104,6 +109,44 @@ function assertContractColumn(where: string, column: ColumnMeta): void {
   if (typeof access !== 'object' || access === null) throw new Error(`${where}: column ${column.name} has no access; it was taken before 0027`)
   for (const capability of CAPABILITIES) {
     if (typeof access[capability] !== 'boolean') throw new Error(`${where}: column ${column.name} has an access ${capability} that is not a boolean`)
+  }
+}
+
+/** Whether a value read back from JSON is an object's two names, neither empty. */
+function isRef(value: unknown): value is ObjectRef {
+  const ref = value as Partial<Record<keyof ObjectRef, unknown>> | null
+  return typeof ref === 'object' && ref !== null && typeof ref.schema === 'string' && ref.schema !== '' && typeof ref.name === 'string' && ref.name !== ''
+}
+
+/**
+ * An enum as no catalog could have produced it (0170): a type with no name,
+ * labels that are not text, or a label twice -- `pg_enum` holds each once
+ * per type, and a select offering one twice could not say which was
+ * chosen. An enum of no labels, and an empty label, are ones PostgreSQL
+ * holds, and the generator's to decline.
+ */
+function assertEnum(at: string, type: Extract<NormalizedType, { kind: 'enum' }>): void {
+  if (!isRef(type.name)) throw new Error(`${at} is an enum that names no type`)
+  const labels = type.labels as unknown
+  if (!Array.isArray(labels) || !labels.every((label) => typeof label === 'string')) throw new Error(`${at} is an enum whose labels are not a list of text`)
+  if (new Set(labels).size !== labels.length) throw new Error(`${at} is an enum that holds a label twice`)
+}
+
+/** A column's domains (0170): a list, each a named domain with its checks, every one with its flags, and no domain twice in one chain. */
+function assertDomains(at: string, domains: readonly DomainMeta[]): void {
+  if (!Array.isArray(domains) || domains.length === 0) throw new Error(`${at} has domains that are not a list of at least one`)
+  const seen = new Set<string>()
+  for (const domain of domains as unknown[]) {
+    const { ref, checks } = (typeof domain === 'object' && domain !== null ? domain : {}) as Partial<DomainMeta>
+    if (!isRef(ref)) throw new Error(`${at} has a domain that names no type`)
+    if (seen.has(refKey(ref))) throw new Error(`${at} names domain ${describe(ref)} twice`)
+    seen.add(refKey(ref))
+    if (!Array.isArray(checks)) throw new Error(`${at}: domain ${describe(ref)} has no list of checks`)
+    for (const check of checks as unknown[]) {
+      const { name, expression, enforced, validated } = (typeof check === 'object' && check !== null ? check : {}) as Partial<Record<keyof CheckMeta, unknown>>
+      if (typeof name !== 'string' || name === '' || typeof expression !== 'string' || typeof enforced !== 'boolean' || typeof validated !== 'boolean')
+        throw new Error(`${at}: domain ${describe(ref)} has a check that is not one the contract names`)
+    }
   }
 }
 
@@ -378,9 +421,17 @@ function byReferrer(a: InboundKey, b: InboundKey): number {
   return byCodepoint(a.table.schema, b.table.schema) || byCodepoint(a.table.name, b.table.name) || byCodepoint(a.name, b.name)
 }
 
+/** A column with its domains' checks by name, as an object's are; only where it has domains, which a column taken before 0170 never has. */
+function withDomainsSorted(column: ColumnMeta): ColumnMeta {
+  if (column.domains === undefined) return column
+  return { ...column, domains: column.domains.map((domain) => ({ ref: domain.ref, checks: [...domain.checks].sort((a, b) => byCodepoint(a.name, b.name)) })) }
+}
+
 function sortObject(object: ObjectMeta): ObjectMeta {
+  const ordered = inSnapshotOrder(object)
   const sorted: ObjectMeta = {
-    ...inSnapshotOrder(object),
+    ...ordered,
+    columns: ordered.columns.map(withDomainsSorted),
     checks: [...object.checks].sort((a, b) => byCodepoint(a.name, b.name)),
   }
   // Only when present: a snapshot taken before 0049 has no such property,

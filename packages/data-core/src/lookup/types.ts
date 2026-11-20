@@ -5,8 +5,9 @@ import type { NormalizedType, ObjectRef } from '../metadata.js'
  * which `lookupKeys` can check before anything is bound. A boolean, a time or
  * a timestamp has no settled one, and a float is not equal to its own
  * decimal spelling, so `buildLookupConfig` refuses a key of any other kind.
+ * An enum's value is one of its labels, exactly (0170).
  */
-export type LookupKeyType = Extract<NormalizedType, { kind: 'text' | 'integer' | 'decimal' | 'uuid' | 'date' }>
+export type LookupKeyType = Extract<NormalizedType, { kind: 'text' | 'integer' | 'decimal' | 'uuid' | 'date' | 'enum' }>
 
 /** The kinds a row filter compares: those with one settled spelling (0012). A boolean, float, time or timestamp filter is refused (0028). */
 export type RowFilterType = LookupKeyType
@@ -20,8 +21,8 @@ export interface LookupDisplayColumn {
   readonly type: LookupDisplayType
 }
 
-/** What a typed search may match: the kinds both engines spell alike as text. */
-export type LookupSearchType = Extract<NormalizedType, { kind: 'text' | 'integer' }>
+/** What a typed search may match: the kinds both engines spell alike as text, and PostgreSQL's enum, matched as its label (0170). */
+export type LookupSearchType = Extract<NormalizedType, { kind: 'text' | 'integer' | 'enum' }>
 
 /** One column a search matches, with its type: text as itself, an integer as its canonical text (0028). */
 export interface LookupSearchColumn {

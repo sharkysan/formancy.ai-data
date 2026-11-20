@@ -1,4 +1,5 @@
-import type { ColumnMeta, NormalizedType } from '../metadata.js'
+import { quotedValues } from '../generate/quoted.js'
+import type { ColumnMeta, DomainMeta, NormalizedType } from '../metadata.js'
 
 /**
  * How one column type relates to another, by the values it accepts.
@@ -43,6 +44,28 @@ function verdict(directions: readonly Direction[]): TypeVerdict {
   return directions.includes(1) ? 'loosened' : 'same'
 }
 
+type EnumType = Extract<NormalizedType, { kind: 'enum' }>
+
+/** The labels one enum has and the other does not: `gone`, those `before` had, and `added`, those `after` has (0170). */
+export function labelChanges(before: EnumType, after: EnumType): { gone: string[]; added: string[] } {
+  return { gone: before.labels.filter((label) => !after.labels.includes(label)), added: after.labels.filter((label) => !before.labels.includes(label)) }
+}
+
+/**
+ * An enum against an enum (0170): another type is another type, cast to
+ * another name; of the same type, a label gone -- RENAME VALUE takes the
+ * old one away -- is one the database now refuses, and a label added is one
+ * more value. Moved both ways, it is tightened, as a type is. The labels'
+ * order is not a value accepted or refused, so labels moved about alone
+ * are the same type: PostgreSQL moves none of a type's labels, and ADD
+ * VALUE … BEFORE adds one.
+ */
+function enumVerdict(before: EnumType, after: EnumType): TypeVerdict {
+  if (before.name.schema !== after.name.schema || before.name.name !== after.name.name) return 'changed'
+  const { gone, added } = labelChanges(before, after)
+  return verdict([gone.length > 0 ? -1 : 0, added.length > 0 ? 1 : 0])
+}
+
 export function compareTypes(before: NormalizedType, after: NormalizedType): TypeVerdict {
   if (before.kind === 'text' && after.kind === 'text') {
     // char pads with spaces and varchar does not: not a wider or narrower text.
@@ -62,6 +85,7 @@ export function compareTypes(before: NormalizedType, after: NormalizedType): Typ
     // An instant and a wall clock are different values, not more or less precise ones.
     return before.withTimeZone === after.withTimeZone ? verdict([limit(before.precision, after.precision)]) : 'changed'
   }
+  if (before.kind === 'enum' && after.kind === 'enum') return enumVerdict(before, after)
   if (before.kind === 'binary' && after.kind === 'binary') {
     // binary(n) pads with zero bytes and varbinary(n) does not: what is read back differs.
     return before.fixedLength === after.fixedLength ? verdict([limit(before.maxLength, after.maxLength)]) : 'changed'
@@ -80,8 +104,22 @@ const SERIOUSNESS: readonly ColumnChangeKind[] = [
   'column-default-changed',
 ]
 
-/** Why a type is a different one. A text whose unit moved under one spelling — a collation change — says so, rather than "from varchar(20) to varchar(20)". */
+/**
+ * Why a type is a different one. A text whose unit moved under one spelling
+ * — a collation change — says so, rather than "from varchar(20) to
+ * varchar(20)"; so does a type this release reads where the snapshot
+ * before called it unsupported under the same spelling, as one taken
+ * before 0170 calls every enum and every domain, and one read before and
+ * unsupported now, as an enum is for an account that may no longer name it.
+ */
 function typeChange(before: ColumnMeta, after: ColumnMeta): string {
+  if (before.type.kind === 'unsupported' && after.type.kind !== 'unsupported' && before.databaseType === after.databaseType) {
+    return `its type, ${after.databaseType}, was unsupported and is now read as ${after.type.kind}`
+  }
+  // An enum whose schema the account may no longer use is unsupported for it (0170).
+  if (before.type.kind !== 'unsupported' && after.type.kind === 'unsupported' && before.databaseType === after.databaseType) {
+    return `its type, ${after.databaseType}, was read as ${before.type.kind} and is now unsupported`
+  }
   if (
     before.type.kind === 'text' &&
     after.type.kind === 'text' &&
@@ -94,15 +132,54 @@ function typeChange(before: ColumnMeta, after: ColumnMeta): string {
 }
 
 /**
+ * Whether the database spells two columns' types as one, or differently by
+ * nothing the type is (0170). PostgreSQL's `format_type` leaves a type's
+ * schema out exactly when the session's search_path makes it visible, so a
+ * discovery under another path respells an enum's or a domain's column
+ * while it is the type it was: an enum's name is in its normalised type,
+ * which `compareTypes` compares, and a domain's names are its chain,
+ * outermost first. A column whose chain is another -- a domain retyped to
+ * another domain, or to none -- is told apart by its spelling, as before.
+ */
+function spelledAlike(before: ColumnMeta, after: ColumnMeta): boolean {
+  if (before.databaseType === after.databaseType) return true
+  const was = before.domains ?? []
+  const is = after.domains ?? []
+  if (was.length > 0 || is.length > 0) {
+    const same = (domain: DomainMeta, index: number) => is[index]?.ref.schema === domain.ref.schema && is[index]?.ref.name === domain.ref.name
+    return was.length === is.length && was.every(same)
+  }
+  return before.type.kind === 'enum' && after.type.kind === 'enum'
+}
+
+/**
  * Why a column's type is not the one it was, in any direction, or `null` when
  * the normalised type and the database's spelling of it are both unchanged.
  * For a column read by its published type, where wider is as different as
- * narrower.
+ * narrower; an enum's, whose spelling is its name, said by its labels.
  */
 export function typeDifference(before: ColumnMeta, after: ColumnMeta): string | null {
   const verdict = compareTypes(before.type, after.type)
-  if (verdict === 'same' && before.databaseType === after.databaseType) return null
-  return verdict === 'changed' ? typeChange(before, after) : `its type changed from ${before.databaseType} to ${after.databaseType}`
+  if (verdict === 'same' && spelledAlike(before, after)) return null
+  if (verdict === 'changed') return typeChange(before, after)
+  if (verdict !== 'same' && before.type.kind === 'enum' && after.type.kind === 'enum') return narrowing(before, after)
+  return `its type changed from ${before.databaseType} to ${after.databaseType}`
+}
+
+/**
+ * How a type of the same kind moved: from one spelling to another, or, for
+ * an enum, whose spelling stays its name, by the labels it lost and gained
+ * (0170).
+ */
+function narrowing(before: ColumnMeta, after: ColumnMeta): string {
+  if (before.type.kind === 'enum' && after.type.kind === 'enum') {
+    const { gone, added } = labelChanges(before.type, after.type)
+    const lost = gone.length === 0 ? [] : [`no longer has ${quotedValues(gone)}`]
+    const gained = added.length === 0 ? [] : [`now has ${quotedValues(added)}${gone.length === 0 ? ' too' : ''}`]
+    return `its type, ${after.databaseType}, ${[...lost, ...gained].join(' and ')}`
+  }
+  const moved = compareTypes(before.type, after.type) === 'tightened' ? 'narrowed' : 'widened'
+  return `it ${moved} from ${before.databaseType} to ${after.databaseType}`
 }
 
 /** Why the way the database generates a column is different, named both ways. */
@@ -122,9 +199,9 @@ export function classify(before: ColumnMeta, after: ColumnMeta): { kind: ColumnC
 
   const type = compareTypes(before.type, after.type)
   if (type === 'changed') found.push({ kind: 'column-type-changed', reason: typeChange(before, after) })
-  if (type === 'tightened') found.push({ kind: 'column-tightened', reason: `it narrowed from ${before.databaseType} to ${after.databaseType}` })
-  if (type === 'loosened') found.push({ kind: 'column-loosened', reason: `it widened from ${before.databaseType} to ${after.databaseType}` })
-  if (type === 'same' && before.databaseType !== after.databaseType) {
+  if (type === 'tightened') found.push({ kind: 'column-tightened', reason: narrowing(before, after) })
+  if (type === 'loosened') found.push({ kind: 'column-loosened', reason: narrowing(before, after) })
+  if (type === 'same' && !spelledAlike(before, after)) {
     // nvarchar to varchar: every normalised property kept, every character outside the code page lost.
     found.push({
       kind: 'column-type-changed',

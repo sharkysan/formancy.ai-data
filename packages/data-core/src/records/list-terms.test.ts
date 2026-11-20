@@ -104,6 +104,28 @@ describe('listTerms', () => {
     expect(listTerms(altered({ search: null })).search).toBeNull()
   })
 
+  // The planner searches an enum as its label's text (0170), and so does
+  // PostgreSQL's adapter; refused here, every search of a form with a
+  // readable enum field, and every browse of a table with one, failed on
+  // PostgreSQL before a statement was built. Its type is rebuilt fresh, as
+  // a row filter's is: one whose name or labels were edited by hand is not
+  // the type the planner decided. Watched failing with text and integer
+  // alone accepted.
+  test('reads a search over an enum column, its type rebuilt, and refuses one whose type is no enum', () => {
+    const PRIORITY = { kind: 'enum', name: { schema: 'sales', name: 'priority' }, labels: ['low', 'high', 'urgent'] } as const
+    const search = { text: 'urg', columns: [{ name: 'priority', type: { ...PRIORITY, extra: true } }] }
+    expect(listTerms(altered({ search })).search).toEqual({ text: 'urg', columns: [{ name: 'priority', type: PRIORITY }] })
+    for (const type of [
+      { ...PRIORITY, name: { schema: '', name: 'priority' } },
+      { ...PRIORITY, name: 'sales.priority' },
+      { ...PRIORITY, labels: ['low', 'low'] },
+      { ...PRIORITY, labels: [1] },
+      { kind: 'enum', name: PRIORITY.name },
+    ]) {
+      expect(() => listTerms(altered({ search: { text: 'urg', columns: [{ name: 'priority', type }] } })), JSON.stringify(type)).toThrow(/A list request/)
+    }
+  })
+
   // A parent's values are bound as their columns' types; one not spelled as
   // its column holds it would be converted by one engine and refused by the
   // other.

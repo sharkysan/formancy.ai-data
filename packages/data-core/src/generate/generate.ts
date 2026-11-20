@@ -17,7 +17,7 @@ import {
 import { actionsFor } from './actions.js'
 import { controlFor } from './controls.js'
 import { startWithDefaults } from './defaults.js'
-import { listedControl, listedFor } from './listed.js'
+import { listedBinding, listedControl, listedFor, listedName } from './listed.js'
 import { helpTextFor, tooLongNote } from './help.js'
 import type { HelpText } from './help.js'
 import { createKeyAllocator, fieldKeyFor, labelFor, labelOfLookup, sourceNameFor } from './names.js'
@@ -365,7 +365,8 @@ function planColumn(
   })
   if (help.kind === 'too-long') notes.push({ subject: key, kind: 'inferred', message: tooLongNote(help.length) })
   if (control.caveat !== undefined) notes.push({ subject: key, kind: 'inferred', message: control.caveat })
-  if (listed.kind === 'refused') notes.push({ subject: key, kind: 'inferred', message: `Not a select of the values ${listed.check} lists: ${listed.reason}.` })
+  if (listed.kind === 'refused')
+    notes.push({ subject: key, kind: 'inferred', message: `Not a select of the values ${listedName(listed)} lists: ${listed.reason}.` })
   if (column.generated !== 'none') notes.push({ subject: key, kind: 'read-only', message: generatedNote(column.generated) })
   if (filled) notes.push({ subject: key, kind: 'read-only', message: FILLED_KEY })
   if (control.readOnly !== undefined) notes.push({ subject: key, kind: 'read-only', message: `Shown, never written: ${control.readOnly}.` })
@@ -390,7 +391,7 @@ function planColumn(
       type: column.type,
       nullable: column.nullable,
       writes,
-      ...(listed.kind === 'select' ? { listed: { check: listed.check, values: [...listed.values] } } : {}),
+      ...(listed.kind === 'select' ? { listed: listedBinding(listed) } : {}),
     },
     system: generated || filled || stamp !== undefined,
     multiline: control.field.type === 'textarea',

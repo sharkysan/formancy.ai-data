@@ -137,6 +137,8 @@ export async function startPostgresFixture(image: string = selectedImage('postgr
     await sql.unsafe(readFixture('postgres.parity.sql'))
     // The actions schema (0160), outside every other scope, after the principals it grants to.
     await sql.unsafe(readFixture('postgres.actions.sql'))
+    // The states schema (0170), PostgreSQL's alone and outside every other scope.
+    await sql.unsafe(readFixture('postgres.states.sql'))
   } finally {
     await sql.end()
   }

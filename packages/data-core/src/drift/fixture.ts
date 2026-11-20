@@ -306,9 +306,15 @@ function onlyTheRootDefinition(base: MetadataSnapshot, current: MetadataSnapshot
   if (was.comment !== is.comment || was.rowSecurity !== is.rowSecurity || JSON.stringify(was.checks) !== JSON.stringify(is.checks)) return false
   // Whether the account may delete, and what refers to the root, are review's alone (0050).
   if (JSON.stringify([was.access, was.referencedBy]) !== JSON.stringify([is.access, is.referencedBy])) return false
+  // A column's domains hold its checks (0170), which no request describes, as a table's are not.
   return was.columns.every((column) => {
     const now = is.columns.find((candidate) => candidate.name === column.name)
-    return now === undefined || (now.comment === column.comment && JSON.stringify(now.access) === JSON.stringify(column.access))
+    return (
+      now === undefined ||
+      (now.comment === column.comment &&
+        JSON.stringify(now.access) === JSON.stringify(column.access) &&
+        JSON.stringify(now.domains) === JSON.stringify(column.domains))
+    )
   })
 }
 

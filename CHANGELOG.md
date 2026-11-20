@@ -19,6 +19,12 @@ which are kept unchanged under a heading of their own below it (0171).
   tree, a state's moves and the studio's Browse stay unpictured, for the
   reasons the record gives
   ([0169](docs/decisions/0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md)).
+- **A PostgreSQL enum is a select of its labels in its type's order, and a
+  domain whose check lists its values a select of them**
+  ([0170](docs/decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)):
+  an enum is how PostgreSQL says a column's states, and every form left
+  such a column out as unsupported. A label renamed under a published form
+  stops its writes, and one added is for review.
 
 ### Changed
 

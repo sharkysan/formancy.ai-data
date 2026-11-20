@@ -14,6 +14,7 @@ export type {
   CoverageSubject,
   DiscoveryAccount,
   DiscoveryScope,
+  DomainMeta,
   ForeignKeyMeta,
   ForeignKeyTarget,
   Generation,
@@ -30,10 +31,10 @@ export type {
   TextLengthUnit,
 } from './metadata.js'
 export { generateForm } from './generate/generate.js'
-export { readCheckList } from './generate/check-lists.js'
+export { readCheckList, readDomainList } from './generate/check-lists.js'
 export type { CheckList, ListedLiteral } from './generate/check-lists.js'
-export { listedFor } from './generate/listed.js'
-export type { Listed } from './generate/listed.js'
+export { listedFor, listedName } from './generate/listed.js'
+export type { Listed, ListSource } from './generate/listed.js'
 export { actionMove, actionUnoffered, deleteUnoffered, offeredFor, offers, versionProvesRecord } from './generate/offers.js'
 export { ambiguousBeside, fitProblem, inputProblem, isParameterSource, nullInputProblem, routineProblem, sourceProblem } from './generate/actions.js'
 export { fieldKeyFor } from './generate/names.js'

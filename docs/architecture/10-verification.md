@@ -127,7 +127,16 @@ server answered, which reports the difference and does not prevent it.
   ([0158](../decisions/0158-a-snapshot-records-the-routines-in-scope-when-asked-and-only-then.md)).
   Each adapter's discovery suites assert the lists are empty;
   `packages/data-fixtures/src/conformance.test.ts` holds the comparators
-  themselves.
+  themselves. PostgreSQL's alone, `STATES_MODEL` says what discovery of
+  the `states` schema of enums and domains must report, which
+  `packages/data-postgres/src/states.integration.test.ts` holds through
+  the same comparator and `packages/data-fixtures/src/states.test.ts` holds
+  the comparator to -- an enum's labels in order, a column's domains and
+  what data-core reads of their checks, and none on a column of none
+  ([0170](../decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)). No SQL Server suite runs it, and it is no shared case:
+  SQL Server has no enum. Its operations, against a real server, are
+  `states-records.integration.test.ts` and `states-drift.integration.test.ts`
+  beside it, written without one and run first in CI.
 - **One expectation per shared case**: filters, labels and refusals in
   `packages/data-fixtures/src/parity.ts`
   ([0028](../decisions/0028-filters-labels-and-refusals-mean-the-same-on-both-engines.md)),

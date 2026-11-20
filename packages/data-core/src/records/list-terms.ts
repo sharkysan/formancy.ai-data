@@ -1,6 +1,6 @@
 import { rowFilterTerms, rowFilterType } from '../lookup/filters.js'
 import { checkPage, checkSearch } from '../lookup/search.js'
-import type { LookupSearchColumn, RowFilterTerm } from '../lookup/types.js'
+import type { LookupSearchColumn, LookupSearchType, RowFilterTerm } from '../lookup/types.js'
 import { isKeyValue, isLookupKeyType } from '../lookup/values.js'
 import type { NormalizedType } from '../metadata.js'
 import { LIST_PAGE_SIZE } from '../runtime.js'
@@ -178,18 +178,32 @@ function relatedOf(given: unknown): RelatedTerms[] {
   })
 }
 
-/** The search: null, or text a person may search for, trimmed and not empty, over at least one text or integer column. */
+/**
+ * A search column's type: text or an integer, which both engines spell
+ * alike, or an enum, matched as its label's text (0170) and rebuilt fresh
+ * as a row filter's is -- its name and its labels, each once -- so a type
+ * edited by hand is not read as the one the planner decided.
+ */
+function searchType(type: unknown): LookupSearchType | undefined {
+  if (!isRecord(type)) return undefined
+  if (type['kind'] === 'text' || type['kind'] === 'integer') return type as LookupSearchType
+  if (type['kind'] !== 'enum') return undefined
+  const fresh = rowFilterType(type)
+  return fresh?.kind === 'enum' ? fresh : undefined
+}
+
+/** The search: null, or text a person may search for, trimmed and not empty, over at least one column of a kind `searchType` reads. */
 function searchOf(given: unknown): ListTerms['search'] {
   if (given === null) return null
   if (!isRecord(given) || !Array.isArray(given['columns']) || given['columns'].length === 0) throw refuse('searches null, or text over at least one column')
   const text = checkSearch(given['text'])
   if (!text.ok || text.search === '' || text.search !== given['text']) throw refuse('searches text a person may search for, trimmed and not empty')
   const columns = (given['columns'] as unknown[]).map((entry): LookupSearchColumn => {
-    const type = isRecord(entry) ? entry['type'] : undefined
-    if (!isRecord(entry) || !isName(entry['name']) || !isRecord(type) || (type['kind'] !== 'text' && type['kind'] !== 'integer')) {
-      throw refuse('searches only text and integer columns, which both engines spell alike')
+    const type = isRecord(entry) ? searchType(entry['type']) : undefined
+    if (!isRecord(entry) || !isName(entry['name']) || type === undefined) {
+      throw refuse('searches only text, integer and enum columns, each of a type the planner writes')
     }
-    return { name: entry['name'], type: type as LookupSearchColumn['type'] }
+    return { name: entry['name'], type }
   })
   return { text: text.search, columns }
 }

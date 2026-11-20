@@ -15,7 +15,7 @@ import type { LookupKeyType } from './types.js'
  * whole query where one token is the problem.
  */
 
-const KEY_KINDS: ReadonlySet<NormalizedType['kind']> = new Set<LookupKeyType['kind']>(['text', 'integer', 'decimal', 'uuid', 'date'])
+const KEY_KINDS: ReadonlySet<NormalizedType['kind']> = new Set<LookupKeyType['kind']>(['text', 'integer', 'decimal', 'uuid', 'date', 'enum'])
 
 /** Whether a column of this type can be a lookup's key. */
 export function isLookupKeyType(type: NormalizedType): type is LookupKeyType {
@@ -96,5 +96,9 @@ export function isKeyValue(type: LookupKeyType, value: string): boolean {
       return UUID.test(value)
     case 'date':
       return isDate(value)
+    case 'enum':
+      // One of its labels, exactly: any other text is refused by the engine
+      // with 22P02, which would fail the whole statement over one value (0170).
+      return type.labels.includes(value)
   }
 }

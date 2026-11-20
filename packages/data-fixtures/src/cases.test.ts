@@ -173,6 +173,9 @@ const NOT_CASES: Readonly<Record<string, string>> = {
   ACTION_CLERK: 'the person who runs in the actions suites (0160)',
   ACTION_DECLINED_REASON: "what close_order says to the person of an order noted 'refuse'; what a run answers then is ACTION_PARITY's",
   PAGED_ORDERS: "the page of orders and one more the paged suites insert (0085); what the order line's select says over them is lookup-more.test.tsx's",
+  STATES: 'what the PostgreSQL suites over the states schema expect (0170): SQL Server has no enum, so none is a shared case',
+  STATES_MODEL: 'what discovery of the states schema must report (0170), held by the shared comparator on PostgreSQL alone, which has an enum',
+  STATES_SCOPE: 'a discovery scope',
 }
 
 /** What a call made while a file is collected gave: its options, or the sentence it threw. */

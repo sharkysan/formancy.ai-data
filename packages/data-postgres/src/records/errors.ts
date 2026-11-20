@@ -84,6 +84,19 @@ const PASSING_STATES: ReadonlySet<string> = new Set(['55P03', '55006', '25006', 
  */
 const PROGRAMMING_ERROR_CLASS = '42'
 
+/**
+ * undefined_object, 42704, is two facts the SQLSTATE alone cannot tell
+ * apart. Met by a statement, as an ERROR, it is a type the statement casts
+ * to by name that is gone -- an enum the bindings name (0170), renamed,
+ * moved or dropped since the description -- and the schema changed. Sent as
+ * a connection starts, as FATAL, it is a setting the server does not know
+ * -- transaction_timeout to a PostgreSQL before 17 -- the deployment's or
+ * this adapter's at fault, and thrown as the rest of class 42 is. Told apart
+ * by the severity the server gave it (the ErrorResponse's V field, never
+ * localised), never by its message.
+ */
+const UNDEFINED_OBJECT = '42704'
+
 /** RAISE EXCEPTION's SQLSTATE, the one whose message a deployment words for the person (0156). */
 const RAISED = 'P0001'
 
@@ -111,6 +124,13 @@ interface ServerError extends Error {
   column_name?: unknown
   /** The error's context, PostgreSQL's W field: filled under a function's error context, absent for an error in the statement sent. postgres.js names it `where`. */
   where?: unknown
+  /** The severity the server gave it, PostgreSQL's V field (ERROR, FATAL, PANIC), never localised. postgres.js names it `severity`. */
+  severity?: unknown
+}
+
+/** Whether the server sent `error` as a statement's 42704: a type the statement names is gone (`UNDEFINED_OBJECT`). */
+function typeGone(error: ServerError): boolean {
+  return error.code === UNDEFINED_OBJECT && error.severity === 'ERROR'
 }
 
 /**
@@ -224,6 +244,9 @@ function raised(error: ServerError, phase: Phase): RecordFailure | undefined {
  * value ("Key (id)=(42) already exists").
  */
 function serverFailure(error: ServerError, phase: Phase): RecordFailure {
+  if (typeGone(error)) {
+    return { ok: false, code: 'schema-changed', message: `PostgreSQL refused the statement with SQLSTATE ${error.code}: a type it names is gone.` }
+  }
   if (error.code.slice(0, 2) === PROGRAMMING_ERROR_CLASS && !BY_STATE.has(error.code)) {
     if (!insideFunction(error)) throw error
     return {

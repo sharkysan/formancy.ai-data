@@ -58,13 +58,13 @@ only enforcement is "we remember" says so plainly.
 | [0001](0001-a-paid-module-in-its-own-repository.md) | A paid module lives in its own repository, under its own licence | accepted; extended by 0048 |
 | [0002](0002-depend-on-upstream-never-copy-it.md) | Depend on released upstream packages at exact versions; never copy them | accepted; spec 4 window closed, 0042; extended by 0055; narrowed by 0116 |
 | [0003](0003-real-databases-in-every-test-run.md) | Database behaviour is proved against real servers, on both engines, in every run | accepted; narrowed by 0067, 0074; extended by 0073 |
-| [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049, 0158 |
-| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056, 0152, 0158 |
-| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077, 0158 |
+| [0004](0004-a-snapshot-says-what-it-could-not-see.md) | A metadata snapshot says what it could not see, and is made in one place | accepted; narrowed by 0027; extended by 0049, 0158, 0170 |
+| [0005](0005-one-fixture-written-twice.md) | One business model, written twice, and one comparator both adapters answer to | accepted; extended by 0026, 0027, 0034, 0043, 0049, 0056, 0152, 0158, 0170 |
+| [0006](0006-postgres-discovery-reads-pg-catalog.md) | PostgreSQL discovery reads pg_catalog, and says what the account may not use | accepted; narrowed by 0027; extended by 0049, 0057, 0067, 0077, 0158, 0170 |
 | [0007](0007-sqlserver-discovery-and-what-it-hides.md) | SQL Server discovery reads the catalog views, and names each thing they hide | accepted; narrowed by 0026, 0027, 0067; extended by 0049, 0068, 0158 |
 | [0008](0008-exact-values-travel-as-strings.md) | Exact values travel as strings, are canonical, and are never rounded | accepted; narrowed by 0026, 0028; extended by 0079 |
 | [0009](0009-generation-is-deterministic-and-says-what-it-chose.md) | A form is generated deterministically, and says what it chose and what it refused | accepted; narrowed by 0026, 0027, 0042, 0056; extended by 0066, 0109, 0137, 0152, 0155, 0159 |
-| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050, 0158; extended by 0030, 0051, 0068, 0111, 0152, 0159 |
+| [0010](0010-drift-is-classified-against-the-bindings.md) | Drift is classified against the bindings | accepted; narrowed by 0026, 0027, 0028, 0041, 0049, 0050, 0158; extended by 0030, 0051, 0068, 0111, 0152, 0159, 0170 |
 | [0011](0011-every-operation-carries-a-trusted-policy-context.md) | Every operation carries a trusted policy context | accepted; extended by 0043, 0050, 0112, 0159 |
 | [0012](0012-a-lookup-token-is-a-reference-not-a-permission.md) | A lookup token is a reference, not a permission | accepted; narrowed by 0028, 0056; extended by 0044, 0061, 0085 |
 | [0013](0013-published-configuration-is-files-with-link-based-swap.md) | Published configuration is files, and compare-and-swap is a hard link | accepted; extended by 0030, 0065, 0126; narrowed by 0062 |
@@ -95,7 +95,7 @@ only enforcement is "we remember" says so plainly.
 | [0038](0038-readme-pictures-are-taken-by-a-script-and-held-to-the-text-they-show.md) | README pictures are taken by a script from states the product reaches, and held to the text they show | accepted; extended by 0058, 0072, 0168, 0169; narrowed by 0062, 0172 |
 | [0039](0039-a-publish-says-what-happens-to-the-grants-of-reassigned-keys.md) | The server refuses a publish whose keys now name other columns, unless it says what happens to their grants | accepted; extended by 0043, 0062, 0065 |
 | [0040](0040-instants-and-times-are-read-to-the-shape-and-an-unedited-one-is-never-written.md) | Instants and times are read to formancy's shape on both engines, and an unedited one is never written back | accepted; narrowed by 0041; extended by 0041, 0079 |
-| [0041](0041-the-runtime-refuses-what-drift-blocks.md) | The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it | accepted; extended by 0044, 0050, 0051, 0155, 0159, 0160, 0161 |
+| [0041](0041-the-runtime-refuses-what-drift-blocks.md) | The runtime refuses what drift blocks in the form's own table, decided over a description read in each request, and every write holds the table to it | accepted; extended by 0044, 0050, 0051, 0155, 0159, 0160, 0161, 0170 |
 | [0042](0042-generated-forms-stay-on-spec-3-after-spec-4-is-released.md) | Generated forms stay on spec 3 after spec 4 is released | superseded by 0118 |
 | [0043](0043-a-child-forms-rows-are-reached-only-through-a-parent-its-policy-admits.md) | A child form's rows are reached only through a parent its policy admits | accepted; extended by 0044, 0050, 0079, 0155, 0160 |
 | [0044](0044-a-forms-records-are-listed-a-page-at-a-time-under-its-read-policy.md) | A form's records are listed a page at a time under its read policy, searched and paged as a lookup is | accepted; narrowed by 0056; extended by 0079, 0099, 0104; narrowed by 0108; extended by 0110, 0136 |
@@ -181,7 +181,7 @@ only enforcement is "we remember" says so plainly.
 | [0124](0124-a-list-view-may-be-offered-to-some-roles-and-open-their-grids.md) | A list view may be offered to some roles, and open their grids | accepted; amended by 0125 |
 | [0125](0125-a-list-view-may-count-days-from-today-and-compare-with-the-signed-in-persons-attribute.md) | A list view may count days from today and compare with the signed-in person's attribute | accepted |
 | [0126](0126-a-person-keeps-their-own-list-views-on-the-server-for-themselves-alone.md) | A person keeps their own list views, on the server, for themselves alone | accepted; amended by 0128 |
-| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129, 0152; extended by 0149 |
+| [0127](0127-a-host-page-draws-a-state-field-as-the-moves-its-person-may-make.md) | A host page draws a state field as the moves its person may make | accepted; amended by 0129, 0152; extended by 0149, 0170 |
 | [0128](0128-the-grids-of-an-open-form-share-a-persons-own-views.md) | The grids of an open form share a person's own views | accepted |
 | [0129](0129-an-administrator-labels-a-state-fields-states.md) | An administrator labels a state field's states | accepted |
 | [0130](0130-a-filters-range-may-leave-out-either-bounds-own-value.md) | A filter's range may leave out either bound's own value | accepted |
@@ -203,10 +203,10 @@ only enforcement is "we remember" says so plainly.
 | [0146](0146-the-page-says-what-the-server-did.md) | The page says what the server did, and keeps the demo's controls out of the way | accepted |
 | [0147](0147-the-studio-browses-with-the-filter-line-its-chips-and-a-box-under-each-header.md) | The studio browses with the filter line, its chips and a box under each header | accepted |
 | [0148](0148-the-workspaces-node-is-one-every-package-it-installs-accepts-and-so-is-the-server-images.md) | The workspace's Node is one every package it installs accepts, and so is the server image's | accepted |
-| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150; extended by 0152 |
+| [0149](0149-a-new-record-starts-with-its-columns-constant-default.md) | A new record starts with its column's constant default | accepted; amended by 0150; extended by 0152, 0170 |
 | [0150](0150-an-administrator-gives-a-field-another-starting-value.md) | An administrator gives a field another starting value | accepted |
 | [0151](0151-a-person-sets-a-grid-columns-width-and-the-browser-keeps-it.md) | A person sets a grid column's width, and the browser keeps it | accepted |
-| [0152](0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md) | A column whose values a check lists is a select of them | accepted |
+| [0152](0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md) | A column whose values a check lists is a select of them | accepted; extended by 0170 |
 | [0153](0153-the-server-stamps-who-wrote-a-record-and-when.md) | The server stamps who wrote a record, and when | accepted |
 | [0154](0154-the-readme-speaks-to-a-buyer-first-and-the-detail-lives-in-the-guide.md) | The README speaks to a buyer first, and the detail lives in the guide | accepted; extended by 0168, 0172 |
 | [0155](0155-a-records-rows-may-be-saved-with-it-in-one-transaction-guarded-by-its-version-and-checked-as-a-whole.md) | A record's rows may be saved with it, in one transaction guarded by its version and checked as a whole | accepted; extended by 0159 |
@@ -223,5 +223,6 @@ only enforcement is "we remember" says so plainly.
 | [0167](0167-a-snapshot-says-whether-the-engine-calls-a-routine-given-a-null-and-the-generator-refuses-a-strict-one-before-publication.md) | A snapshot says whether the engine calls a routine given a NULL, and the generator refuses a STRICT one before publication | accepted |
 | [0168](0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md) | The README pictures the workspace a buyer meets, and each step of How it works; the exact digits move to the host page's guide | accepted; extended by 0169, 0172 |
 | [0169](0169-the-guides-pages-picture-drill-down-a-persons-own-view-columns-and-a-starting-value-and-the-camera-waits-two-frames-between-shots.md) | The guide's pages picture Drill down, a person's own view, Columns and a starting value, and the camera waits two frames between shots | accepted |
+| [0170](0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md) | An enum is a select of its labels, and a domain whose check lists its values a select of them | accepted |
 | [0171](0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md) | Every release's notes are a summary, and an Unreleased entry is a sentence or two | accepted |
 | [0172](0172-the-readme-is-a-short-pitch-page-and-how-it-works-opens-with-a-sketch-drawn-by-hand.md) | The README is a short pitch page, and How it works opens with a sketch of the architecture drawn by hand | accepted |

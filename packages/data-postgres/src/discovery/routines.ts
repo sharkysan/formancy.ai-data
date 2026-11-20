@@ -49,7 +49,7 @@ function routineType(oid: number, spelling: string, textUnit: TextLengthUnit): R
   return {
     databaseType: spelling,
     typeId: String(oid),
-    type: name === undefined ? UNSUPPORTED : normalizeType({ name, schema: 'pg_catalog', modifier: -1 }, textUnit),
+    type: name === undefined ? UNSUPPORTED : normalizeType({ name, schema: 'pg_catalog', modifier: -1, labels: null, domain: false }, textUnit),
   }
 }
 

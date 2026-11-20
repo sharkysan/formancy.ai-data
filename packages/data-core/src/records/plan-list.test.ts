@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { generateForm } from '../generate/generate.js'
-import type { ColumnMeta, ObjectMeta } from '../metadata.js'
+import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import type { FormPolicy } from '../policy/types.js'
 import { unscopedLookups } from '../policy/through.js'
 import { validatePolicy } from '../policy/validate.js'
 import type { RecordListQuery } from '../runtime.js'
 import { CURSOR_GONE, cursorRefusal, listable, listColumns, planList, recordPage } from './list.js'
+import { listTerms } from './list-terms.js'
 import { planRead } from './plan.js'
 import type { DescribedTable } from './types.js'
 import {
@@ -273,9 +274,10 @@ describe('planList', () => {
 
   // What a list may be sorted and searched by is one function's answer, the
   // one `GET /v1/forms/:id` sends: readable column fields; sortable when the
-  // kind has canonical text, searchable when it is text or integer. A lookup
-  // field holds a token, not the label a person reads, so it is neither;
-  // it is filtered by the record it refers to (the test below, 0135).
+  // kind has canonical text, searchable when it is text or integer, or an
+  // enum (the case below, 0170). A lookup field holds a token, not the
+  // label a person reads, so it is neither; it is filtered by the record
+  // it refers to (the test below, 0135).
   test('sorts and searches only by readable column fields, and searches only text and integers', () => {
     const clerk = planList(PG, PG_ORDER, ORDER_POLICY, CLERK, query({ search: 'Muster' }))
     expect(clerk).toMatchObject({
@@ -329,6 +331,26 @@ describe('planList', () => {
         ],
       },
     })
+  })
+
+  // An enum is searched as its label's text (0170): planned among the
+  // searched columns with its type, and read by `listTerms`, which every
+  // adapter's list reads its request through before a statement is built.
+  // Watched failing with `listTerms` refusing every kind but text and
+  // integer: the planner said yes and PostgreSQL's list threw.
+  test('searches an enum field as its label, in a request the adapters read', () => {
+    const STAGE: NormalizedType = { kind: 'enum', name: { schema: 'sales', name: 'stage' }, labels: ['draft', 'placed', 'shipped'] }
+    const source = snapshot('postgres', (objects) => {
+      const order = objects.find((object) => object.ref.name === 'order') as ObjectMeta
+      order.columns.push(col('stage', 13, STAGE, { nullable: true, databaseType: 'sales.stage' }))
+    })
+    const bindings = orderForm(source).bindings
+    const policy: FormPolicy = { ...ORDER_POLICY, fields: { ...ORDER_POLICY.fields, stage: CLERK_RW } }
+    expect(validatePolicy(policy, bindings)).toEqual({ ok: true })
+    const plan = planList(source, bindings, policy, CLERK, query({ search: 'plac' }))
+    if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+    expect(plan.request.search?.columns).toContainEqual({ name: 'stage', type: STAGE })
+    expect(listTerms(plan.request).search).toEqual(plan.request.search)
   })
 
   // A column with no canonical text has no order both engines agree on. The

@@ -96,6 +96,8 @@ const SHOWN: Shown = {
   time: { type: { kind: 'time', precision: 0 }, value: '10:34' },
   timestamp: { type: { kind: 'timestamp', withTimeZone: true, precision: 6 }, value: '2026-10-08T08:34:56Z' },
   uuid: { type: { kind: 'uuid' }, value: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
+  // A label, as the type holds it (0170).
+  enum: { type: { kind: 'enum', name: { schema: 'sales', name: 'order_state' }, labels: ['draft', 'placed', 'shipped'] }, value: 'placed' },
   // No canonical text: bytes, a counter the database writes, a type with no codec.
   binary: { type: { kind: 'binary', maxLength: null, fixedLength: false }, value: undefined },
   rowversion: { type: { kind: 'rowversion' }, value: undefined },

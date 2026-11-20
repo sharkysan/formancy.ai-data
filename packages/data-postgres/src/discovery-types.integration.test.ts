@@ -91,9 +91,11 @@ const CASES: TypeCase[] = [
   { column: 'cash', declared: 'money', type: UNSUPPORTED },
   // An array of text is not text.
   { column: 'tags', declared: 'text[]', type: UNSUPPORTED },
-  { column: 'mood', declared: 'types_probe.mood', type: UNSUPPORTED },
-  // A domain carries its own checks. Reported as its base type, a form would
-  // accept the negative price the domain refuses.
+  // An enum is its labels, in the order the type gives them (0170).
+  { column: 'mood', declared: 'types_probe.mood', type: { kind: 'enum', name: { schema: 'types_probe', name: 'mood' }, labels: ['calm', 'cross'] } },
+  // A domain over numeric: a domain is read as its base type over text and
+  // the whole numbers alone, the kinds every operation over one is proved
+  // on (0170); over any other base it stays unsupported.
   { column: 'price', declared: 'types_probe.price', type: UNSUPPORTED },
   // A type that is merely NAMED int4, outside pg_catalog, is not PostgreSQL's
   // int4. Matching on the name alone would call this composite an integer.

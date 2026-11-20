@@ -31,7 +31,7 @@ export function rowFilterColumnProblem(object: ObjectMeta, column: string): stri
   if (found === undefined) return `${object.ref.name} has no column ${column}`
   if (!found.access.select) return `${column} is a column this connection's account may not read`
   if (!isLookupKeyType(found.type)) {
-    return `${column} is ${found.databaseType}, which a row filter cannot compare: only text, integer, decimal, uuid and date columns have one spelling on both engines`
+    return `${column} is ${found.databaseType}, which a row filter cannot compare: only text, integer, decimal, uuid and date columns have one spelling on both engines, and an enum one on PostgreSQL`
   }
   return null
 }
@@ -76,7 +76,7 @@ export function scopeRowFilters(object: ObjectMeta, filter: RowFilter, where: st
 const NOTHING_SAID =
   "Row filters are { kind: 'unrestricted' }, or { kind: 'restricted' } with at least one equality; anything else would read as every row, so it is refused."
 const UNTYPED =
-  "A row filter term carries its column's type, as the snapshot describes it: text, integer, decimal, uuid or date. Any other kind, or a type no snapshot holds, is refused."
+  "A row filter term carries its column's type, as the snapshot describes it: text, integer, decimal, uuid, date or a PostgreSQL enum. Any other kind, or a type no snapshot holds, is refused."
 
 const LENGTH_UNITS: ReadonlySet<unknown> = new Set<TextLengthUnit>(['code-points', 'utf16-code-units', 'utf8-bytes', 'code-page-bytes'])
 /** As a snapshot spells an integer's bounds: no sign but a minus, no leading zero. */
@@ -111,9 +111,25 @@ export function rowFilterType(type: unknown): RowFilterType | undefined {
     case 'uuid':
     case 'date':
       return { kind: type.kind }
+    case 'enum':
+      return enumFilterType(type)
     default:
       return undefined
   }
+}
+
+/**
+ * An enum's type, rebuilt (0170): the schema and name it is cast to, each
+ * a name, and its labels, each text and each once -- what `isKeyValue`
+ * holds a value to, so a term whose labels were edited by hand is refused
+ * rather than read with another type's.
+ */
+function enumFilterType(type: Record<string, unknown>): RowFilterType | undefined {
+  const { name, labels } = type
+  if (!isRecord(name) || typeof name['schema'] !== 'string' || name['schema'] === '' || typeof name['name'] !== 'string' || name['name'] === '')
+    return undefined
+  if (!Array.isArray(labels) || !labels.every((label): label is string => typeof label === 'string') || new Set(labels).size !== labels.length) return undefined
+  return { kind: 'enum', name: { schema: name['schema'], name: name['name'] }, labels: [...labels] }
 }
 
 /** Whether a record has exactly these keys, so a contradictory policy is not half-read. */

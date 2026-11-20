@@ -66,6 +66,15 @@ function noValue(type: NormalizedType): Error {
 }
 
 /**
+ * SQL Server has no enum (0170): its alias types are their system type, as
+ * discovery reads them, and carry no labels. One here was not discovered on
+ * this engine, and is a programming error.
+ */
+function noEnum(): Error {
+  return new Error('SQL Server has no enum, and discovery on it never reports one: this type was not read on this engine.')
+}
+
+/**
  * SQL that reads `expression` as the text of its canonical API value.
  *
  * - text: itself, as nvarchar(max), so a `varchar` is decoded by the server's
@@ -119,6 +128,8 @@ export function canonicalText(type: NormalizedType, expression: string): string 
       return type.withTimeZone ? `convert(nchar(19), switchoffset(${expression}, '+00:00'), 126) + N'Z'` : zonelessText(expression)
     case 'uuid':
       return `lower(convert(nchar(36), ${expression}))`
+    case 'enum':
+      throw noEnum()
     case 'binary':
     case 'rowversion':
     case 'unsupported':
@@ -247,6 +258,8 @@ export function bindValue(parameters: Parameters, type: NormalizedType, value: A
     case 'uuid':
       requireType(given === null || given === 'string', type)
       return fromText(type, asText(parameters, value))
+    case 'enum':
+      throw noEnum()
     case 'binary':
     case 'rowversion':
     case 'unsupported':

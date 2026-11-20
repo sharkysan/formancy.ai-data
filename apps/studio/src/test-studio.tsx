@@ -88,12 +88,12 @@ export async function offerOnly(user: User, choose: HTMLElement, foreignKeys: re
 }
 
 /**
- * The order form the journey builds, from the Connect step: the fixture
- * discovered, the customer lookup, the tenant pinned, and the version column
- * confirmed, so create and update are both offered.
+ * The order form the journey builds, from the Connect step: the fixture --
+ * or `connection` -- discovered, the customer lookup, the tenant pinned,
+ * and the version column confirmed, so create and update are both offered.
  */
-export async function chooseOrder(user: User): Promise<HTMLElement> {
-  await discover(user)
+export async function chooseOrder(user: User, connection = 'fixture'): Promise<HTMLElement> {
+  await discover(user, connection)
   await user.click(screen.getByRole('button', { name: 'Choose a root' }))
   const choose = step('Choose')
   await user.selectOptions(within(choose).getByLabelText('Root table or view'), 'sales.order')
@@ -104,8 +104,8 @@ export async function chooseOrder(user: User): Promise<HTMLElement> {
 }
 
 /** Choose the order and generate it, landing on the Generate step. */
-export async function generateOrder(user: User): Promise<HTMLElement> {
-  const choose = await chooseOrder(user)
+export async function generateOrder(user: User, connection = 'fixture'): Promise<HTMLElement> {
+  const choose = await chooseOrder(user, connection)
   await user.click(within(choose).getByRole('button', { name: 'Generate the form' }))
   return screen.findByRole('main', { name: 'Generate' })
 }

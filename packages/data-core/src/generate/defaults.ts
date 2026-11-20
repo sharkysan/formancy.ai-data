@@ -4,6 +4,7 @@ import type { Codec } from '../codecs/codec.js'
 import { codecFor, codecForType } from '../codecs/codec.js'
 import type { ColumnMeta, NormalizedType, ObjectMeta } from '../metadata.js'
 import { formValue, storedValue } from '../records/answers.js'
+import { listedName } from './list-source.js'
 import type { FieldBinding, GenerationNote } from './types.js'
 
 /*
@@ -27,8 +28,17 @@ import type { FieldBinding, GenerationNote } from './types.js'
  * out, as before.
  */
 
-/** A constant as a column's default spells it: text, a number's decimal digits, or a truth value. `national` is T-SQL's N prefix. */
-export type Constant = { kind: 'text'; text: string; national: boolean } | { kind: 'number'; text: string } | { kind: 'boolean'; value: boolean }
+/**
+ * A constant as a column's default spells it: text, a number's decimal
+ * digits, a truth value, or -- PostgreSQL's alone -- text cast to a type
+ * of a schema's, `type` as the cast names it, its schema `null` where the
+ * deparser left it out (0170). `national` is T-SQL's N prefix.
+ */
+export type Constant =
+  | { kind: 'text'; text: string; national: boolean }
+  | { kind: 'number'; text: string }
+  | { kind: 'boolean'; value: boolean }
+  | { kind: 'label'; text: string; type: { schema: string | null; name: string } }
 
 /**
  * Whether `text` holds a C0 control or DEL that `field`'s box draws otherwise
@@ -62,6 +72,22 @@ const POSTGRES_NUMBER = /^'(-?[0-9]+(?:\.[0-9]+)?)'::(?:integer|bigint|smallint|
 const POSTGRES_TEXT = /^'((?:[^']|'')*)'::(?:text|character varying|bpchar)$/
 
 /**
+ * An enum's label, as `get_const_expr` deparses a default of an enum
+ * column (0170): quoted, its quotes doubled, and cast to the type as
+ * `format_type` names it -- `'placed'::sales.order_state`, the schema left
+ * out where the session's search_path finds the type by its bare name, and
+ * each name in double quotes, its own doubled, where it needs them
+ * (`quote_identifier`): `'placed'::"Sales"."Order State"`.
+ */
+const PG_NAME = '"(?:[^"]|"")+"|[a-z_][a-z0-9_$]*'
+const POSTGRES_LABEL = new RegExp(`^'((?:[^']|'')*)'::(${PG_NAME})(?:\\.(${PG_NAME}))?$`)
+
+/** A name as `quote_identifier` wrote it, read back: its quotes taken off and the doubled ones undoubled. */
+function unquoted(name: string): string {
+  return name.startsWith('"') ? name.slice(1, -1).replaceAll('""', '"') : name
+}
+
+/**
  * SQL Server's spellings, as it writes a default's definition again from
  * its parse: a number in two pairs of parentheses, its sign inside; text in
  * one, N before a national literal. An integer past int, which T-SQL types
@@ -88,6 +114,25 @@ function readPostgres(expression: string): Constant | null {
   // without it, and the snapshot does not say which the server spelled by.
   if (quoted === undefined || quoted.includes('\\')) return null
   return textConstant(quoted, false)
+}
+
+/**
+ * An enum column's default as its label (0170), read only for such a
+ * column: any other's cast to a type of its own -- a date's, a uuid's --
+ * is no constant, as it was before, so no other field's start or note
+ * moves. A backslash is left unread, as in text.
+ */
+function readLabel(expression: string): Constant | null {
+  const [, label, first, second] = POSTGRES_LABEL.exec(expression) ?? []
+  if (label === undefined || first === undefined || label.includes('\\')) return null
+  const type = second === undefined ? { schema: null, name: unquoted(first) } : { schema: unquoted(first), name: unquoted(second) }
+  return { kind: 'label', text: label.replaceAll("''", "'"), type }
+}
+
+/** The constant `column`'s default is: an enum's label, read as its own (0170), or what `readConstant` reads; `null` for none. */
+function constantOf(kind: DatabaseKind, column: ColumnMeta): Constant | null {
+  if (column.defaultExpression === null) return null
+  return kind === 'postgres' && column.type.kind === 'enum' ? readLabel(column.defaultExpression) : readConstant(kind, column.defaultExpression)
 }
 
 function readSqlServer(expression: string): Constant | null {
@@ -145,6 +190,19 @@ const READERS: ReadonlyMap<Kind, Reader> = new Map<Kind, Reader>([
   ],
   ['integer', (_kind, constant) => (constant.kind === 'number' ? withoutLeadingZeros(constant.text) : undefined)],
   ['decimal', (_kind, constant) => (constant.kind === 'number' ? constant.text : undefined)],
+  // An enum's label, cast to the enum itself: by its name, and by its
+  // schema where the cast says one. A default is of its column's type, and
+  // no cast joins two enums, so a bare name is the column's own type (0170).
+  [
+    'enum',
+    (_kind, constant, type) =>
+      constant.kind === 'label' &&
+      type.kind === 'enum' &&
+      constant.type.name === type.name.name &&
+      (constant.type.schema === null || constant.type.schema === type.name.schema)
+        ? constant.text
+        : undefined,
+  ],
 ])
 
 /** Whether a field of a column of `kind` starts at a value: one its column's constant is read for (0149), and so one a starting value is offered for (0150). */
@@ -193,7 +251,7 @@ function clause(sentence: string): string {
  * empty default, so a document carrying one is never published.
  */
 export function startingAnswer(kind: DatabaseKind, column: ColumnMeta, binding: ColumnBinding, field: FieldDef): Starting {
-  const constant = column.defaultExpression === null ? null : readConstant(kind, column.defaultExpression)
+  const constant = constantOf(kind, column)
   const stored = constant === null ? undefined : asStored(kind, constant, column)
   if (constant === null || stored === undefined) return NONE
   const taken = answerTaken(codecFor(column), binding, field, stored)
@@ -231,7 +289,7 @@ function answerTaken(codec: Codec, binding: ColumnBinding, field: FieldDef, stor
   }
   // A select of the values a check lists (0152) starts at one of them or at none: the engine refuses to open a form whose default no option offers.
   if (binding.listed !== undefined && !binding.listed.values.includes(String(answer))) {
-    return { kind: 'refused', reason: `it is not one of the values ${binding.listed.check} lists` }
+    return { kind: 'refused', reason: `it is not one of the values ${listedName(binding.listed)} lists` }
   }
   return { kind: 'answer', answer }
 }

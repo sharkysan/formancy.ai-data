@@ -1,8 +1,16 @@
-import type { ColumnMeta, Generation, TextLengthUnit } from '@formancy/data-core'
+import type { ColumnMeta, DomainMeta, Generation, TextLengthUnit } from '@formancy/data-core'
 import type { TransactionSql } from 'postgres'
 import { op } from '../sql/catalog.js'
+import { DOMAIN_CHAIN, domainsOf, HELD_MODIFIER, labelsOf, LABELS } from './domains.js'
 import { normalizeType } from './types.js'
 
+/**
+ * One column as the catalog states it. For a column of a domain (0170) the
+ * type is the one its chain ends in, with the innermost domain's modifier,
+ * `not_null` and `default_expression` what the column holds with its
+ * domains' (`domains.ts`), and `is_domain` says so; `labels` is an enum's,
+ * as jsonb text, NULL for a type that is no enum.
+ */
 export interface ColumnRow {
   oid: number
   name: string
@@ -11,10 +19,17 @@ export interface ColumnRow {
   type_name: string
   type_schema: string
   type_modifier: number
+  labels: string | null
+  is_domain: boolean
   not_null: boolean
   identity: string
   generated: string
   default_expression: string | null
+}
+
+/** A column's row with its domains, as jsonb text, NULL for a type that is no domain: what discovery reads beside the facts (0170). */
+interface DiscoveredRow extends ColumnRow {
+  domains: string | null
 }
 
 /** A column before its comment and its access are attached; each is its own concern. */
@@ -72,26 +87,46 @@ export const NOT_NULL = `(a.attnotnull and not exists (
   select from pg_catalog.pg_constraint nn
   where nn.conrelid ${op('=')} a.attrelid and nn.contype ${op('=')} 'n' and not nn.convalidated and nn.conkey[1] ${op('=')} a.attnum))`
 
+/**
+ * Whether column `a` holds no NULL with its domains (0170): its own NOT
+ * NULL (`NOT_NULL`), or one of a domain of its type's chain, which refuses
+ * NULL however the column is declared -- an INSERT that leaves it out
+ * included. Of `DOMAIN_CHAIN`'s `dom`. Shared with the root's definition.
+ */
+export const HOLDS_NO_NULL = `(${NOT_NULL} or dom.not_null)`
+
+/**
+ * Column `a`'s default with its domains (0170), spelled for this session:
+ * its own (`DEFAULT_EXPRESSION`), or its type's where it has none -- the
+ * domain it is declared with, never one that domain is declared over -- what
+ * an INSERT that leaves it out stores. Never a generated column's
+ * or an identity's, which no default fills. Of `DOMAIN_CHAIN`'s `dom`.
+ * Shared with the root's description.
+ */
+export const HELD_DEFAULT = `coalesce(${DEFAULT_EXPRESSION}, case when a.attgenerated ${op('=')} '' and a.attidentity ${op('=')} '' then pg_catalog.pg_get_expr(dom.default_bin, 0) end)`
+
 export async function readColumns(sql: TransactionSql, schemas: readonly string[], textUnit: TextLengthUnit): Promise<Map<number, UncommentedColumn[]>> {
-  const rows = await sql<ColumnRow[]>`
+  const rows = await sql<DiscoveredRow[]>`
     select
       a.attrelid as oid,
       a.attname as name,
       a.attnum as ordinal,
       pg_catalog.format_type(a.atttypid, a.atttypmod) as database_type,
-      t.typname as type_name,
-      tn.nspname as type_schema,
-      a.atttypmod as type_modifier,
-      ${sql.unsafe(NOT_NULL)} as not_null,
+      bt.typname as type_name,
+      bn.nspname as type_schema,
+      ${sql.unsafe(HELD_MODIFIER)} as type_modifier,
+      ${sql.unsafe(LABELS)} as labels,
+      dom.is_domain,
+      dom.domains,
+      ${sql.unsafe(HOLDS_NO_NULL)} as not_null,
       a.attidentity as identity,
       a.attgenerated as generated,
-      ${sql.unsafe(DEFAULT_EXPRESSION)} as default_expression
+      ${sql.unsafe(HELD_DEFAULT)} as default_expression
     from pg_catalog.pg_attribute a
     join pg_catalog.pg_class c on c.oid = a.attrelid
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    join pg_catalog.pg_type t on t.oid = a.atttypid
-    join pg_catalog.pg_namespace tn on tn.oid = t.typnamespace
     left join pg_catalog.pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+    ${sql.unsafe(DOMAIN_CHAIN)}
     where n.nspname = any(${schemas})
       and ${sql.unsafe(DECLARED_COLUMN)}
     order by a.attrelid, a.attnum`
@@ -99,23 +134,31 @@ export async function readColumns(sql: TransactionSql, schemas: readonly string[
   const byObject = new Map<number, UncommentedColumn[]>()
   for (const row of rows) {
     const columns = byObject.get(row.oid) ?? []
-    columns.push(columnOf(row, textUnit))
+    columns.push(columnOf(row, textUnit, domainsOf(row.domains)))
     byObject.set(row.oid, columns)
   }
   return byObject
 }
 
-/** One column from its catalog row: what discovery reports, and what the root's description reports of it (0041). */
-export function columnOf(row: Omit<ColumnRow, 'oid'>, textUnit: TextLengthUnit): UncommentedColumn {
+/**
+ * One column from its catalog row: what discovery reports, and what the
+ * root's description reports of it (0041). `domains` are discovery's
+ * alone, as a table's checks are: the description reads no check, and a
+ * column of no domain has none, not an empty list, so a snapshot of a
+ * catalog with no domain is the one it was before 0170.
+ */
+export function columnOf(row: Omit<ColumnRow, 'oid'>, textUnit: TextLengthUnit, domains?: DomainMeta[]): UncommentedColumn {
+  const type = { name: row.type_name, schema: row.type_schema, modifier: row.type_modifier, labels: labelsOf(row.labels), domain: row.is_domain }
   return {
     name: row.name,
     ordinal: row.ordinal,
     databaseType: row.database_type,
-    type: normalizeType({ name: row.type_name, schema: row.type_schema, modifier: row.type_modifier }, textUnit),
+    type: normalizeType(type, textUnit),
     nullable: !row.not_null,
     hasDefault: row.default_expression !== null,
     defaultExpression: row.default_expression,
     generated: generation(row),
+    ...(domains === undefined ? {} : { domains }),
   }
 }
 

@@ -1,4 +1,5 @@
 import type { NormalizedType } from '@formancy/data-core'
+import { quoteTable } from './identifiers.js'
 
 /** PostgreSQL's integer types, by the range discovery reports for them (`discovery/types.ts`). */
 const INTEGERS = new Map<string, string>([
@@ -18,6 +19,20 @@ const INTEGERS = new Map<string, string>([
  * with no conversion from canonical text — binary, a rowversion, anything
  * unsupported — or an integer range no PostgreSQL type has is a programming
  * error: discovery on this engine never reports one.
+ *
+ * An enum is the one type named from the snapshot rather than here (0170):
+ * its schema and name, approved metadata, each quoted. Text has no cast to
+ * an enum but through its input function, so a parameter must be cast to
+ * the type itself -- left as text, an insert is refused with 42804 ("column
+ * is of type … but expression is of type text") and a comparison with
+ * 42883 -- and compared in it, an enum compares by its labels' order, as
+ * it sorts, where its text would compare by the alphabet. A domain over
+ * text or a whole number is cast to its base type, which the database
+ * takes into the domain and holds to its checks; a domain over an enum is
+ * cast to the enum. A qualified type name resolves only in a schema the
+ * role may use (42501 otherwise), so discovery reads an enum in a schema
+ * the account may not use as unsupported, and no value of it is bound
+ * (`discovery/domains.ts`'s `LABELS`).
  */
 export function sqlTypeOf(type: NormalizedType): string {
   switch (type.kind) {
@@ -43,6 +58,8 @@ export function sqlTypeOf(type: NormalizedType): string {
       return type.withTimeZone ? 'pg_catalog.timestamptz' : 'pg_catalog.timestamp'
     case 'uuid':
       return 'pg_catalog.uuid'
+    case 'enum':
+      return quoteTable(type.name)
     case 'binary':
     case 'rowversion':
     case 'unsupported':

@@ -51,7 +51,7 @@ describe('a policy’s moves', () => {
       'transitions: customer is not a column field of this form',
     ])
     expect(refused({ field: 'paid', moves: [{ from: null, to: 'true', roles: ['clerk'] }] })).toEqual([
-      'transitions: paid is boolean; a state field is text or a whole number',
+      'transitions: paid is boolean; a state field is text, a whole number or an enum',
     ])
     expect(refused({ field: 'status', moves: [{ from: 'placed', to: 'x'.repeat(21), roles: ['clerk'] }] })).toEqual([
       'transitions.moves[0].to is not spelled as status holds its values',

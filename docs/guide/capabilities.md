@@ -89,6 +89,15 @@ get*](../../README.md#what-you-get) is the short version, and
   stays a box, and drift review blocks the field's writes when an
   enforced list it reads leaves out a value it offers
   ([0152](../decisions/0152-a-column-whose-values-a-check-lists-is-a-select-of-them.md)).
+  On PostgreSQL an enum column is a select of its labels in the order its
+  type gives them, its default starting the field, a state field over one
+  keeps its moves, and a list sorts, pages, searches and filters it as the
+  type does; a domain whose check lists its values is a select of them,
+  and a domain over text or a whole number is read as that type. Drift
+  review blocks the field's writes when a label is renamed under it, and
+  asks for review when one is added; a domain over any other type stays
+  unsupported, and SQL Server has no enum
+  ([0170](../decisions/0170-an-enum-is-a-select-of-its-labels-and-a-domain-whose-check-lists-its-values-a-select-of-them.md)).
   Who created or last changed a record, and when, can be the server's to
   write: a column the Choose step's stamps tick -- suggested by an audit
   name, never stamped without the tick -- is filled on create, on update or
