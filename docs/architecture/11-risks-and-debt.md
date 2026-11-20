@@ -1058,6 +1058,11 @@ another file, are still the branch's to carry across by hand
 before it was made is in `CHANGELOG.md`, and nothing checks that the summary
 says what those entries say
 ([0064](../decisions/0064-the-first-releases-notes-summarise-the-development-before-it.md)).
+So are 0.4.0's and every release's after it, the entries since the release
+before kept under a heading of their own below each summary; and an entry
+under Unreleased is held to 500 characters, not to two sentences, so a long
+sentence passes and the detail is the record's to keep
+([0171](../decisions/0171-every-releases-notes-are-a-summary-and-an-unreleased-entry-is-a-sentence-or-two.md)).
 
 ## 11.7 Work in progress, not on main
 

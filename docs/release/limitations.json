@@ -1996,7 +1996,7 @@
       ]
     },
     "0064": {
-      "reviewed": "sha256:79f3e9ef75ae138b60c09328fc8fc62ff9ffec41943c8ec2a4de821bc44cffa8",
+      "reviewed": "sha256:4a48eec39f6d955f9b6c5bf35b85616a219d390d7981b7b98f6a7ebcf71c95a2",
       "limitations": [
         {
           "area": "operations",
@@ -5137,6 +5137,15 @@
     "0168": {
       "reviewed": "sha256:7f92093fedb2908e9c1452c3ba2f09548db74f809c8ef0f19d6b7d0c5ebde1da",
       "none": "Its costs are the repository's and CI's: six more pictures to retake when a pictured sentence or the look changes, two of them needing Docker, their bytes, a longer host walk in the pictures job, and step pictures drawn at 0.7 of their size that a reader may have to open to read. Nobody who installs, integrates or operates the module meets them."
+    },
+    "0171": {
+      "reviewed": "sha256:703e34ee44f928cf8a8a665b68f48c126a77ab4baa43e4b2624a7af7659a3c05",
+      "limitations": [
+        {
+          "area": "operations",
+          "says": "A release's notes are a summary written by hand: why each change since the release before was made is in CHANGELOG.md, under that release's development heading, and in its decision record, not on the release page, and nothing checks that the summary says what those entries say."
+        }
+      ]
     }
   }
 }

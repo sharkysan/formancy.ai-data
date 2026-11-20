@@ -6,7 +6,9 @@ depends on are a separate line, and a change to one is called out explicitly.
 
 Loosely [Keep a Changelog](https://keepachangelog.com), with reasons attached —
 a line that says only *what* changed is rarely the line you need six months
-later.
+later. An entry is a sentence or two with its decision record, where the
+detail is; a release's section summarises the entries written before it,
+which are kept unchanged under a heading of their own below it (0171).
 
 ## Unreleased
 
