@@ -153,7 +153,7 @@ function equalTerms(
  * (`not-sortable`); every equal term a shown column of a key kind, once,
  * with a value it can hold (`not-comparable`); every filter condition one
  * a shown column offers, with values it can hold (`not-filterable`, 0104);
- * a search has a text or integer column to match (`not-searchable`). The order is the requested terms, then the key's
+ * a search has a text, integer or enum column to match (`not-searchable`, 0170). The order is the requested terms, then the key's
  * columns -- or, without a key it may read, every shown column -- each
  * ascending, NULLs last where the snapshot says a column holds them.
  */
