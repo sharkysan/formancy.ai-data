@@ -67,6 +67,15 @@ export type NormalizedType =
   | { kind: 'binary'; maxLength: number | null; fixedLength: boolean }
   /** SQL Server's `rowversion`: an opaque, database-generated concurrency token, never a clock. */
   | { kind: 'rowversion' }
+  /**
+   * A PostgreSQL enum (0170): `name` is the type, which a value is cast to,
+   * and `labels` are its values in the engine's own order,
+   * `pg_enum.enumsortorder` -- the order it sorts and compares them in, not
+   * the alphabet's. A domain over an enum is the enum. SQL Server has no
+   * enum, and never reports one. Absent from every snapshot taken before
+   * 0170, where such a column is `unsupported`.
+   */
+  | { kind: 'enum'; name: ObjectRef; labels: string[] }
   | { kind: 'unsupported' }
 
 export type NormalizedTypeKind = NormalizedType['kind']
@@ -170,6 +179,28 @@ export interface ColumnMeta {
    * Both are consulted; neither implies the other.
    */
   access: ColumnAccess
+  /**
+   * The PostgreSQL domains the column's type is (0170), outermost first:
+   * the one the column is declared with, then each it is declared over,
+   * down to the type `type` normalises -- each with its checks, which is
+   * where a domain's list of values is read. Its NOT NULL is already in
+   * `nullable`, and its default, where the column has none, in `hasDefault`
+   * and `defaultExpression`. Absent from a column of any other type, from
+   * every SQL Server column, and from every column of a snapshot taken
+   * before 0170, whose fingerprint it therefore leaves as it was.
+   */
+  domains?: DomainMeta[]
+}
+
+/**
+ * One PostgreSQL domain of a column's type (0170). Its checks are spelled
+ * as `pg_get_expr` deparses a domain's constraint, the value written
+ * `VALUE`; a domain's own constraints are always readable, so none is
+ * `null` here.
+ */
+export interface DomainMeta {
+  ref: ObjectRef
+  checks: CheckMeta[]
 }
 
 /** A primary or unique key. Column order is the key's order, which matters for a composite one. */

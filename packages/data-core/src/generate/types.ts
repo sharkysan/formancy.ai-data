@@ -147,10 +147,14 @@ export interface FieldWrites {
  * each as a record holding it reads back -- a whole number's canonical
  * digits as text -- in the order the field offers them. What drift review
  * compares the check with, and what tells the answer's shape: a select's
- * answer is the value itself, never a number or a yes or no.
+ * answer is the value itself, never a number or a yes or no. `domain` is
+ * the PostgreSQL domain whose check it is, where it is a domain's (0170):
+ * absent on a list of the table's own, and on every binding written before
+ * 0170, which reads as it always did.
  */
 export interface ListedBinding {
   check: string
+  domain?: ObjectRef
   values: string[]
 }
 

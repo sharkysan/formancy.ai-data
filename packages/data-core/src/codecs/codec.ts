@@ -50,6 +50,23 @@ function parseFloat32(value: number): CodecOutcome {
 }
 
 /**
+ * An enum's value is one of its labels, exactly: the engine refuses any
+ * other text with 22P02 (0170). Its field is a select of them, which an
+ * empty label cannot be one of -- a select cannot tell it from no answer
+ * -- and an enum of no labels holds nothing a field could write; either is
+ * shown, never written.
+ */
+function enumParser(type: Extract<NormalizedType, { kind: 'enum' }>): ((value: unknown) => CodecOutcome) | string {
+  if (type.labels.length === 0) return `${type.name.schema}.${type.name.name} has no labels, so nothing but NULL can be written`
+  if (type.labels.includes('')) return `${type.name.schema}.${type.name.name} has an empty label, which a select cannot tell from no answer`
+  const labels = new Set(type.labels)
+  return (value) =>
+    typeof value === 'string' && labels.has(value)
+      ? { ok: true, value }
+      : refuse('not-a-label', `Expected one of the labels of ${type.name.schema}.${type.name.name}.`)
+}
+
+/**
  * The check for one value of this column's type, with null already handled.
  *
  * Text is counted in the column's own `lengthUnit` (0026, `parseText`): the
@@ -100,6 +117,9 @@ function valueParser(type: NormalizedType): ((value: unknown) => CodecOutcome) |
 
     case 'rowversion':
       return 'a rowversion is a concurrency token the database writes'
+
+    case 'enum':
+      return enumParser(type)
 
     case 'binary':
     case 'unsupported':

@@ -1,5 +1,7 @@
 import type { FieldDef } from '@formancy/spec'
+import { codecForType } from '../codecs/codec.js'
 import type { NormalizedType, TextLengthUnit } from '../metadata.js'
+import { quotedValues } from './quoted.js'
 
 /**
  * The part of a field that follows from the column's type: which control, and
@@ -58,6 +60,25 @@ function lengthCaveat(n: number, unit: TextLengthUnit): string {
 function isSafe(bound: string): boolean {
   const value = Number(bound)
   return Number.isSafeInteger(value) && String(value) === bound
+}
+
+/**
+ * An enum is a select of exactly its labels, in the order the type gives
+ * them (0170): `pg_enum.enumsortorder`, which is also the order the engine
+ * sorts and compares them in, and the same on every discovery of the type,
+ * so not the stated order 0152 gives a check's list, which SQL Server
+ * writes back to front. Each label is its own option's text, as the column
+ * holds it. A nullable column's select is not required, and its empty
+ * choice is NULL (0095). An empty label, or no label at all, has no select
+ * that can write it, and is shown, never written (the codec's reason).
+ */
+function enumControl(type: Extract<NormalizedType, { kind: 'enum' }>): ControlPlan {
+  const reason = codecForType(type, true).reason
+  if (reason !== null) return { field: { type: 'text' }, describe: 'text', readOnly: reason }
+  return {
+    field: { type: 'select', options: type.labels.map((label) => ({ value: label, label })) },
+    describe: `a select of the labels of its type, ${quotedValues(type.labels)}, in the order the type gives them,`,
+  }
 }
 
 export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan {
@@ -144,6 +165,9 @@ export function controlFor(type: NormalizedType, nullable: boolean): ControlPlan
 
     case 'rowversion':
       return { exclude: 'a rowversion is a concurrency token, never a field' }
+
+    case 'enum':
+      return enumControl(type)
 
     case 'unsupported':
       return { exclude: 'no tested codec exists for this type' }

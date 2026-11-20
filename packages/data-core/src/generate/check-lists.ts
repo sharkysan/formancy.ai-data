@@ -116,18 +116,32 @@ const PG_TEXT_CASTS = ['text', 'character varying', 'bpchar'] as const
 const PG_NUMBER_CASTS = ['integer', 'bigint', 'smallint'] as const
 const PG_NAME = /[a-z_][a-z0-9_]*/
 
+/** What a comparison compares: a table's column by its name, or a domain's value (0170). */
+type Subject = (text: string, at: number) => Step<string>
+
 function pgIdentifier(text: string, at: number): Step<string> {
   return text[at] === '"' ? delimited(text, at, '"', '"') : match(text, at, PG_NAME)
 }
 
-/** A column as a comparison names it: bare, or relabelled as text. */
-function pgColumn(text: string, at: number): Step<string> {
-  const relabelled = text[at] === '(' ? pgIdentifier(text, at + 1) : null
+/**
+ * A domain's value, as `pg_get_expr` deparses one in a domain's constraint
+ * (ruleutils.c, `CoerceToDomainValue`): `VALUE`, in capitals and never
+ * quoted, which a column cannot be spelled as -- a column named so is
+ * written `"VALUE"`. Read as the empty name, which no column has.
+ */
+function pgValue(text: string, at: number): Step<string> {
+  const end = token(text, at, 'VALUE')
+  return end === null ? null : { at: end, value: '' }
+}
+
+/** A column or a domain's value as a comparison names it: bare, or relabelled as text. */
+function pgColumn(text: string, at: number, subject: Subject): Step<string> {
+  const relabelled = text[at] === '(' ? subject(text, at + 1) : null
   if (relabelled !== null) {
     const after = token(text, relabelled.at, ')::text')
     return after === null ? null : { at: after, value: relabelled.value }
   }
-  return pgIdentifier(text, at)
+  return subject(text, at)
 }
 
 /** An integer as `get_const_expr` writes one: bare while positive, `'-1'::integer` otherwise. */
@@ -179,8 +193,8 @@ function pgArray(text: string, at: number): Step<ListedLiteral[]> {
 }
 
 /** `(column = literal)` or `(column = ANY (array))`. */
-function pgComparison(text: string, at: number): Step<CheckList> {
-  const column = text[at] === '(' ? pgColumn(text, at + 1) : null
+function pgComparison(text: string, at: number, subject: Subject): Step<CheckList> {
+  const column = text[at] === '(' ? pgColumn(text, at + 1, subject) : null
   const equals = column === null ? null : token(text, column.at, ' = ')
   if (column === null || equals === null) return null
   const any = token(text, equals, 'ANY (')
@@ -195,14 +209,14 @@ function pgComparison(text: string, at: number): Step<CheckList> {
 }
 
 /** A comparison, or two or more terms joined by OR in one pair of parentheses. */
-function pgTerm(text: string, at: number): Step<CheckList> {
-  const comparison = pgComparison(text, at)
+function pgTerm(text: string, at: number, subject: Subject): Step<CheckList> {
+  const comparison = pgComparison(text, at, subject)
   if (comparison !== null) return comparison
   if (text[at] !== '(') return null
   const terms: CheckList[] = []
   let next = at + 1
   for (;;) {
-    const term = pgTerm(text, next)
+    const term = pgTerm(text, next, subject)
     if (term === null) return null
     terms.push(term.value)
     const or = token(text, term.at, ' OR ')
@@ -282,6 +296,21 @@ function msGroup(text: string, at: number): Step<CheckList> {
  * `listed.ts`'s.
  */
 export function readCheckList(kind: DatabaseKind, expression: string): CheckList | null {
-  const read = kind === 'postgres' ? pgTerm(expression, 0) : msGroup(expression, 0)
+  const read = kind === 'postgres' ? pgTerm(expression, 0, pgIdentifier) : msGroup(expression, 0)
   return read !== null && read.at === expression.length ? read.value : null
+}
+
+/**
+ * The literals a PostgreSQL domain's check compares its value with, as
+ * `pg_get_expr` deparses the constraint (0170): a table check's spelling
+ * with `VALUE` where the column stands --
+ * `((VALUE)::text = ANY ((ARRAY['a'::character varying, …])::text[]))` over
+ * varchar, `(VALUE = ANY (ARRAY['a'::text, …]))` over text, `(VALUE = ANY
+ * (ARRAY[1, 2]))` over an integer -- and nothing else; `null` where it is
+ * anything else, a column's name included. SQL Server has no domain: an
+ * alias type carries no check, and a rule bound to one is not read.
+ */
+export function readDomainList(expression: string): ListedLiteral[] | null {
+  const read = pgTerm(expression, 0, pgValue)
+  return read !== null && read.at === expression.length ? read.value.literals : null
 }

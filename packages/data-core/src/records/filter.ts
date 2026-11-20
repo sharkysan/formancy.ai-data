@@ -26,10 +26,14 @@ import type { EqualsFilterType, RangeFilterType, RecordFilter } from './types.js
  * time is read cut to the minute, and binary, a rowversion or an
  * unsupported column has no text to compare. A timestamp offers no
  * equality, since a page shows it cut to the second (0040) and a person
- * would type what the page shows: its range is whole days.
+ * would type what the page shows: its range is whole days. An enum offers
+ * equality with one of its labels, typed as text, and nothing else (0170):
+ * the engine compares its labels in the type's own order, which a range
+ * typed as text would not say, and has no LIKE for `contains`.
  */
 const OWN: Partial<Record<NormalizedTypeKind, Omit<FilterOffer, 'days'>>> = {
   text: { operators: ['equals', 'contains'], input: 'text' },
+  enum: { operators: ['equals'], input: 'text' },
   integer: { operators: ['equals', 'range'], input: 'integer' },
   decimal: { operators: ['equals', 'range'], input: 'decimal' },
   date: { operators: ['equals', 'range'], input: 'date' },
@@ -115,7 +119,8 @@ function decimalText(given: string, scale: number | null): string | null {
  * else is trimmed first, a uuid lowercased, and a number spelled without a
  * plus or a leading zero, so a person need not type the canonical form.
  * What is left must be a value the column can hold (`isKeyValue`): a
- * number outside its range or precision is refused, never clamped.
+ * number outside its range or precision is refused, never clamped. An
+ * enum's value is one of its labels exactly, untrimmed, as text is (0170).
  */
 function valueOf(type: EqualsFilterType | Exclude<RangeFilterType, { kind: 'timestamp' }>, given: string): string | null {
   const trimmed = given.trim()
@@ -123,6 +128,7 @@ function valueOf(type: EqualsFilterType | Exclude<RangeFilterType, { kind: 'time
     case 'boolean':
       return trimmed === 'true' || trimmed === 'false' ? trimmed : null
     case 'text':
+    case 'enum':
       return isKeyValue(type, given) ? given : null
     case 'integer': {
       const value = integerText(trimmed)

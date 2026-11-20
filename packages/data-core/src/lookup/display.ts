@@ -62,8 +62,8 @@ function toTheSecond(shape: RegExp, value: string, zone: string): string {
 /**
  * The text a label shows for one display value, or null for SQL NULL.
  *
- * - text, integer, decimal, uuid, date: the canonical string unchanged
- *   (`12.50`, a lower-case uuid).
+ * - text, integer, decimal, uuid, date, an enum: the canonical string
+ *   unchanged (`12.50`, a lower-case uuid, a label as the type holds it).
  * - boolean: `true` or `false`.
  * - a double: `String(n)`; a real: `String(canonicalFloat32(n))`, which is
  *   idempotent whichever layer already applied it. NaN and the infinities,
@@ -81,6 +81,7 @@ export function displayText(type: LookupDisplayType, value: ApiValue): string | 
     case 'decimal':
     case 'uuid':
     case 'date':
+    case 'enum':
       return text(type, value)
     case 'boolean':
       if (typeof value !== 'boolean') throw wrongType(type, value)

@@ -143,6 +143,7 @@ const TYPE_KINDS: Readonly<Record<NormalizedTypeKind, true>> = {
   uuid: true,
   binary: true,
   rowversion: true,
+  enum: true,
   unsupported: true,
 }
 const TEXT_UNITS: Readonly<Record<TextLengthUnit, true>> = { 'code-points': true, 'utf16-code-units': true, 'utf8-bytes': true, 'code-page-bytes': true }
@@ -167,6 +168,8 @@ function assertType(at: string, value: unknown): void {
   const type = value['type']
   if (!isRecord(type) || !isListed(TYPE_KINDS, type['kind'])) throw new Error(`${at} has a type that is not one the contract names`)
   if (type['kind'] === 'text' && !isListed(TEXT_UNITS, type['lengthUnit'])) throw new Error(`${at} is text with no length unit`)
+  // A routine's types are read by oid among PostgreSQL's own (0158): an enum's never is, so one here was written by hand (0170).
+  if (type['kind'] === 'enum') throw new Error(`${at} is an enum, and a routine's type is read among the engine's own types only`)
 }
 
 /** What no catalog could have produced of one routine, refused naming it. */

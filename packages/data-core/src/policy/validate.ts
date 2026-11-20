@@ -157,9 +157,10 @@ function actionFitProblems(policy: ParsedPolicy, bindings: FormBindings): string
 
 /**
  * A state field's moves (0112) must be about this form: a column field of
- * text or a whole number, whose states have one spelling each, every state
- * spelled as its column holds it -- one spelled otherwise names no value a
- * record can hold -- and every role of a move one that may make it: write
+ * text, a whole number or a PostgreSQL enum (0170), whose states have one
+ * spelling each, every state spelled as its column holds it -- an enum's
+ * one of its labels; one spelled otherwise names no value a record can
+ * hold -- and every role of a move one that may make it: write
  * the field, read it, as the move is checked against the record as read,
  * and the operation, `create` for a move from nothing, `update` otherwise.
  * A role a move names that could make no change of the field anyway is a
@@ -171,7 +172,8 @@ function transitionFitProblems(policy: ParsedPolicy, byField: ReadonlyMap<string
   const binding = byField.get(rule.field)
   if (binding === undefined || binding.kind !== 'column') return [`transitions: ${rule.field} is not a column field of this form`]
   const { type } = binding
-  if (type.kind !== 'text' && type.kind !== 'integer') return [`transitions: ${rule.field} is ${type.kind}; a state field is text or a whole number`]
+  if (type.kind !== 'text' && type.kind !== 'integer' && type.kind !== 'enum')
+    return [`transitions: ${rule.field} is ${type.kind}; a state field is text, a whole number or an enum`]
   const grant = policy.fields.get(rule.field)
   const problems: string[] = []
   for (const [index, move] of rule.moves.entries()) {

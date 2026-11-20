@@ -1,6 +1,6 @@
 import type { FieldBinding, ListedBinding } from '../generate/types.js'
 import type { ColumnMeta } from '../metadata.js'
-import { enforcedLists, listedFor, quotedValues } from '../generate/listed.js'
+import { enforcedLists, listedFor, listedName, quotedValues, sameSource } from '../generate/listed.js'
 import type { EnforcedList } from '../generate/listed.js'
 import { type Comparison, type Draft, writtenOn } from './context.js'
 
@@ -29,6 +29,11 @@ import { type Comparison, type Draft, writtenOn } from './context.js'
  * A check this connection can no longer read is the gap's to report, as
  * every check's is: a list in sight that refuses an offered value still
  * stops writes, and nothing is concluded about what a row may hold.
+ *
+ * A list of a PostgreSQL domain of the column's type (0170) is weighed as
+ * one of the table's, wherever in the domain chain it is: a select drawn
+ * from it, against the domains the column's type is now; and a domain's
+ * list beside the table's is one more list either way.
  */
 
 type Listed = Extract<FieldBinding, { kind: 'column' }> & { listed: ListedBinding }
@@ -52,10 +57,19 @@ function heldTo(lists: ReadonlyArray<{ values: readonly string[] }>): string[] |
 }
 
 /** The published values the database now refuses on a write, and the lists that refuse them; a list whose values are not read refuses nothing known. */
-function refused(was: ListedBinding, lists: readonly EnforcedList[]): { values: string[]; by: string[] } {
-  const read = lists.flatMap((list) => (list.values === null ? [] : [{ check: list.check, values: list.values }]))
+function refused(was: ListedBinding, lists: readonly EnforcedList[]): { values: string[]; by: EnforcedList[] } {
+  const read = lists.filter((list): list is EnforcedList & { values: string[] } => list.values !== null)
   const by = read.filter((list) => was.values.some((value) => !list.values.includes(value)))
-  return { values: was.values.filter((value) => by.some((list) => !list.values.includes(value))), by: by.map((list) => list.check) }
+  return { values: was.values.filter((value) => by.some((list) => !list.values.includes(value))), by }
+}
+
+/** Whether the check a select was drawn from is still where it was: of the table, or of a domain the column's type still is (0170). */
+function stillThere(was: ListedBinding, column: ColumnMeta, comparison: Comparison): boolean {
+  if (was.domain === undefined) return comparison.after.checks.some((check) => check.name === was.check)
+  const { schema, name } = was.domain
+  return (column.domains ?? []).some(
+    (domain) => domain.ref.schema === schema && domain.ref.name === name && domain.checks.some((check) => check.name === was.check),
+  )
 }
 
 /** What a field over a listed column is weighed with: the column as it is now, and every enforced list of it. */
@@ -72,8 +86,13 @@ function tightened({ binding, column, lists }: Weighed, comparison: Comparison):
   if (gone.values.length === 0) return null
   const on = writtenOn(comparison.bindings, column.name)
   const [only] = gone.by
+  const by = gone.by.map(listedName)
   const says =
-    gone.by.length > 1 ? `${named(gone.by)} between them do not list` : only === was.check ? `${was.check} no longer lists` : `${only ?? ''} does not list`
+    gone.by.length > 1
+      ? `${named(by)} between them do not list`
+      : only !== undefined && sameSource(only, was)
+        ? `${listedName(was)} no longer lists`
+        : `${by.join('')} does not list`
   return {
     kind: 'column-tightened',
     subject: { kind: 'column', object: comparison.after.ref, name: column.name },
@@ -92,19 +111,20 @@ function tightened({ binding, column, lists }: Weighed, comparison: Comparison):
 function outgrownBecause({ binding, column, lists }: Weighed, comparison: Comparison): string | null {
   const { after, current } = comparison
   const was = binding.listed
-  const holding = lists.flatMap((list) => (list.validated && list.values !== null ? [{ check: list.check, values: list.values }] : []))
+  const holding = lists.filter((list): list is EnforcedList & { values: string[] } => list.validated && list.values !== null)
   const held = heldTo(holding)
   if (held !== null) {
     const added = held.filter((value) => !was.values.includes(value))
     if (added.length === 0) return null
-    const holders = holding.map((list) => list.check)
+    const holders = holding.map(listedName)
     return `${named(holders)} now ${holders.length > 1 ? 'list' : 'lists'} ${quotedValues(added)} too, and ${binding.field} does not offer ${pronoun(added)}.`
   }
   const now = listedFor(current.kind, after, column)
+  const published = listedName(was)
   if (now.kind === 'refused')
-    return `${binding.field} offers the values ${was.check} listed, and ${now.check} no longer holds ${column.name} to a list: ${now.reason}.`
-  if (!after.checks.some((check) => check.name === was.check)) return `${was.check}, whose values ${binding.field} offers, is gone from ${column.name}.`
-  return `${was.check}, whose values ${binding.field} offers, is no longer a list this release reads, so whether it still takes every value ${binding.field} offers is not known; the database refuses one it does not, with a check violation.`
+    return `${binding.field} offers the values ${published} listed, and ${listedName(now)} no longer holds ${column.name} to a list: ${now.reason}.`
+  if (!stillThere(was, column, comparison)) return `${published}, whose values ${binding.field} offers, is gone from ${column.name}.`
+  return `${published}, whose values ${binding.field} offers, is no longer a list this release reads, so whether it still takes every value ${binding.field} offers is not known; the database refuses one it does not, with a check violation.`
 }
 
 /** Every change to the lists a select of the form rests on, two per field at most: what it offers that is now refused, and what a row may hold that it does not offer. */
