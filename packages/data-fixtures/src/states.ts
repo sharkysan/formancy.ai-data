@@ -115,6 +115,12 @@ export const STATES_MODEL: readonly ExpectedObject[] = [
  *   given; `updated`, an update's.
  * - `exported`: the file's records for id, state, priority and title, a
  *   label as its cell and NULL as an empty one.
+ * - `domains`: the same over a domain over varchar and one over an
+ *   integer, each whose check lists its values, and one over text whose
+ *   check is no list -- colour, size and code --, each operation its base
+ *   type's: the titles by each, NULLs last both ways; what a filter equal
+ *   to one value narrows a list to; and the file's records for id, the
+ *   three and title.
  */
 export const STATES = {
   form: {
@@ -137,4 +143,17 @@ export const STATES = {
   stored: { state: 'shipped', priority: 'urgent', colour: 'green', size: '3', code: 'Z', tone: 'blue', stated: 'draft', title: 'stored' },
   updated: { priority: 'low', colour: 'red', stated: 'shipped' },
   exported: ['1,shipped,low,first', '2,draft,urgent,second', '3,placed,high,third', '4,draft,,fourth'],
+  domains: {
+    sorted: {
+      colour: { asc: ['second', 'third', 'first', 'fourth'], desc: ['first', 'third', 'second', 'fourth'] },
+      size: { asc: ['first', 'third', 'second', 'fourth'], desc: ['second', 'third', 'first', 'fourth'] },
+      code: { asc: ['first', 'second', 'third', 'fourth'], desc: ['third', 'second', 'first', 'fourth'] },
+    },
+    filter: [
+      { field: 'colour', value: 'blue', titles: ['second'] },
+      { field: 'size', value: '1', titles: ['first'] },
+      { field: 'code', value: 'C', titles: ['third'] },
+    ],
+    exported: ['1,red,1,A,first', '2,blue,3,B,second', '3,green,2,C,third', '4,,,,fourth'],
+  },
 } as const

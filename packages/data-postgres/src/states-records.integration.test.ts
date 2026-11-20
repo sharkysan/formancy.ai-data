@@ -5,6 +5,7 @@ import {
   exportHeader,
   exportRecord,
   generateForm,
+  offers,
   planCreate,
   planList,
   planRead,
@@ -65,10 +66,19 @@ const EVERY_ROW: RowFilters = { kind: 'unrestricted' }
 const NEVER = new AbortController().signal
 const EVERY: RecordListQuery = { search: '', sort: [], parent: null, filter: [], after: null, limit: 50 }
 
-/** Every field read by the clerk, and written where the form writes it. */
+/**
+ * Every field read by the clerk, and written where the form writes it. An
+ * operation is granted only where the form offers it: the stage table has
+ * no version, so its form offers no update, and a policy granting one is
+ * refused as invalid before any statement is sent (0027).
+ */
 const policyOf = (bindings: FormBindings, extra: Partial<FormPolicy> = {}): FormPolicy => ({
   version: 1,
-  operations: { read: ['clerk'], create: ['clerk'], update: ['clerk'] },
+  operations: {
+    read: ['clerk'],
+    create: offers(bindings, 'create') ? ['clerk'] : [],
+    update: offers(bindings, 'update') ? ['clerk'] : [],
+  },
   fields: Object.fromEntries(
     bindings.fields.map((binding) => [binding.field, { read: ['clerk'], write: binding.writes.create || binding.writes.update ? ['clerk'] : [] }]),
   ),
@@ -212,16 +222,7 @@ describe('a page of tickets', () => {
   test('pages after a row by an enum, one row at a time, as the one page of every row', async () => {
     for (const direction of ['asc', 'desc'] as const) {
       const sort = [{ field: 'priority', direction }]
-      const whole = titles(await listed({ sort }))
-      const walked: string[] = []
-      let after: string | null = null
-      for (let page = 0; page < 20; page += 1) {
-        const next: RecordList = await listed({ sort, after, limit: 1 })
-        walked.push(...titles(next))
-        if (next.next === null) break
-        after = next.next
-      }
-      expect(walked, direction).toEqual(whole)
+      expect(await walked(sort), direction).toEqual(titles(await listed({ sort })))
     }
   })
 
@@ -238,23 +239,71 @@ describe('a page of tickets', () => {
 
   // A label is its cell, as the type holds it; NULL an empty one.
   test("an export writes each label as the row's cell", async () => {
-    const readable = ['id', 'state', 'priority', 'title']
-    const policy = policyOf(tickets.bindings, {
-      fields: Object.fromEntries(readable.map((field) => [field, { read: ['clerk'], write: [] }])),
-      operations: { read: ['clerk'], create: [], update: [] },
-    })
-    const plan = planList(states, tickets.bindings, policy, CLERK, EVERY)
-    if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
-    const outcome = await records.list(plan.request)
-    if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}`)
-    const page = recordPage(tickets.bindings, plan, outcome.rows)
-    const columns = exportColumns(tickets.form, tickets.bindings, plan.fields)
-    const lines = [exportHeader(columns), ...page.rows.map((row) => exportRecord(columns, row, new Map()))].map((line) => (line.ok ? line.text : line.message))
-    const fixtureRows = lines
-      .slice(1)
-      .map((line) => line.replace(/\r\n$/, ''))
-      .filter((line) => STATES.rows.some((title) => line.endsWith(`,${title}`)))
-    expect(fixtureRows).toEqual(STATES.exported)
+    expect(await exported(['id', 'state', 'priority', 'title'])).toEqual(STATES.exported)
+  })
+})
+
+/** The fixture's rows of the file an export of `readable` writes, each record without its line end. */
+async function exported(readable: readonly string[]): Promise<string[]> {
+  const policy = policyOf(tickets.bindings, {
+    fields: Object.fromEntries(readable.map((field) => [field, { read: ['clerk'], write: [] }])),
+    operations: { read: ['clerk'], create: [], update: [] },
+  })
+  const plan = planList(states, tickets.bindings, policy, CLERK, EVERY)
+  if (!plan.ok) throw new Error(`expected a list, got ${plan.code}: ${plan.message}`)
+  const outcome = await records.list(plan.request)
+  if (!outcome.ok) throw new Error(`expected a page, got ${outcome.code}`)
+  const page = recordPage(tickets.bindings, plan, outcome.rows)
+  const columns = exportColumns(tickets.form, tickets.bindings, plan.fields)
+  const lines = [exportHeader(columns), ...page.rows.map((row) => exportRecord(columns, row, new Map()))].map((line) => (line.ok ? line.text : line.message))
+  return lines
+    .slice(1)
+    .map((line) => line.replace(/\r\n$/, ''))
+    .filter((line) => STATES.rows.some((title) => line.endsWith(`,${title}`)))
+}
+
+/** Every row of a list in `sort`, walked one page of one row at a time from the start. */
+async function walked(sort: RecordListQuery['sort']): Promise<string[]> {
+  const rows: string[] = []
+  let after: string | null = null
+  for (let page = 0; page < 20; page += 1) {
+    const next: RecordList = await listed({ sort, after, limit: 1 })
+    rows.push(...titles(next))
+    if (next.next === null) break
+    after = next.next
+  }
+  return rows
+}
+
+describe('a page of tickets by a column of a domain', () => {
+  // A domain over varchar and one over an integer, each listed, and one
+  // over text that is not: each sorted as its base type is, NULLs last
+  // both ways. To be watched failing in CI with an order the engine could
+  // not resolve over the domain.
+  test.each(Object.entries(STATES.domains.sorted))('sorts by %s as its base type', async (field, sorted) => {
+    expect(titles(await listed({ sort: [{ field, direction: 'asc' }] }))).toEqual(sorted.asc)
+    expect(titles(await listed({ sort: [{ field, direction: 'desc' }] }))).toEqual(sorted.desc)
+  })
+
+  // A page continues after a row compared column against column in the
+  // base type's operator, spelled with its schema (0108): walked one row at
+  // a time, the pages are the one page of every row.
+  test.each(Object.keys(STATES.domains.sorted))('pages after a row by %s, one row at a time, as the one page of every row', async (field) => {
+    for (const direction of ['asc', 'desc'] as const) {
+      const sort = [{ field, direction }]
+      expect(await walked(sort), direction).toEqual(titles(await listed({ sort })))
+    }
+  })
+
+  // Equality with a value bound as the base type, which the engine
+  // compares with the domain's.
+  test.each(STATES.domains.filter)('a filter narrows $field to one value', async ({ field, value, titles: expected }) => {
+    expect(titles(await listed({ filter: [{ field, op: 'equals', value }] }))).toEqual(expected)
+  })
+
+  // A domain's value is its cell, as its base type spells it.
+  test("an export writes each domain's value as the row's cell", async () => {
+    expect(await exported(['id', 'colour', 'size', 'code', 'title'])).toEqual(STATES.domains.exported)
   })
 })
 
