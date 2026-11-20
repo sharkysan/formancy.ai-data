@@ -1,6 +1,10 @@
 # 0154 — The README speaks to a buyer first, and the detail lives in the guide
 
-- **Status:** accepted
+- **Status:** accepted; extended by
+  [0168](0168-the-readme-pictures-the-workspace-a-buyer-meets-and-each-step-of-how-it-works.md):
+  README.md holds a second pictures region, a small picture for each step
+  of *How it works*, and its hero is the host page's workspace, the exact
+  digits an inline picture of the host page's guide
 - **Date:** 2026-11-15
 - **Deciders:** Daniel Bacher
 - **Verified by:** what held the README's sections holds them where they
